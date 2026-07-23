@@ -108,6 +108,8 @@ Define the v0.1 artifact, claim, evidence, and result contracts
 
 ### Body
 
+[Tracking decision: GitHub #1](https://github.com/morluto/jacobian/issues/1)
+
 #### Current limitation
 
 Jacobian does not yet have language-neutral contracts for mathematical objects
@@ -154,6 +156,8 @@ Implement domain-separated artifact identity and local content-addressed storage
 
 ### Body
 
+[Tracking decision: GitHub #1](https://github.com/morluto/jacobian/issues/1)
+
 #### Current limitation
 
 Jacobian cannot persist or deduplicate mathematical objects, and hashing payload
@@ -199,6 +203,8 @@ a digest-keyed filesystem and metadata in SQLite using WAL mode.
 Define immutable plugin manifests and optional capability discovery
 
 ### Body
+
+[Tracking decision: GitHub #1](https://github.com/morluto/jacobian/issues/1)
 
 #### Current limitation
 
@@ -254,6 +260,8 @@ Add an operator-managed checker registry and revocation model
 
 ### Body
 
+[Tracking decision: GitHub #1](https://github.com/morluto/jacobian/issues/1)
+
 #### Current limitation
 
 There is no trusted mapping from witness or certificate formats to authorized
@@ -293,6 +301,8 @@ Registration and revocation are operator actions outside problem plugins.
 Implement generic witness and certificate verification dispatch
 
 ### Body
+
+[Tracking decision: GitHub #1](https://github.com/morluto/jacobian/issues/1)
 
 #### Current limitation
 
