@@ -26,6 +26,13 @@ provisional later-release specifications, but no implementation. The first
 decision should fix the trust boundary and scope before implementation issues
 create accidental commitments.
 
+Relevant documents:
+
+- [v0.1 specification](https://github.com/morluto/jacobian/blob/main/docs/specifications/v0.1.md)
+- [tool surface](https://github.com/morluto/jacobian/blob/main/docs/tools.md)
+- [threat model](https://github.com/morluto/jacobian/blob/main/docs/threat-model.md)
+- [v0.1 conformance specification](https://github.com/morluto/jacobian/blob/main/docs/conformance-v0.1.md)
+
 The proposed v0.1 core exposes:
 
 ```text
