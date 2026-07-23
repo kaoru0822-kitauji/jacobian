@@ -5,12 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  release:
-    types: [published]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'release' }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -87,8 +85,8 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
-    needs: [lint, test, duplicate-code, build]
+    if: needs.release-please.outputs.release_created == 'true'
+    needs: [release-please, build]
     environment: pypi
     permissions:
       id-token: write
@@ -104,8 +102,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     needs: [lint, test, duplicate-code, build]
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           release-type: python
           package-name: jacobian-research-kernel
