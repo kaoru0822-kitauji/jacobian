@@ -83,7 +83,10 @@ def _digest_from_uri(uri: str) -> str:
     if not uri.startswith(prefix):
         raise ArtifactNotFoundError(f"invalid artifact URI: {uri!r}")
     value = uri.removeprefix(prefix)
-    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+    if len(value) != 64 or any(
+        char not in "0123456789abcdef"  # pragma: allowlist secret
+        for char in value
+    ):
         raise ArtifactNotFoundError(f"invalid artifact URI: {uri!r}")
     return "sha256:" + value
 
@@ -203,7 +206,8 @@ class ArtifactStore:
     def _blob_path(self, digest: str) -> Path:
         hex_digest = digest.removeprefix("sha256:")
         if len(hex_digest) != 64 or any(
-            char not in "0123456789abcdef" for char in hex_digest
+            char not in "0123456789abcdef"  # pragma: allowlist secret
+            for char in hex_digest
         ):
             raise ArtifactIntegrityError(f"invalid blob digest: {digest!r}")
         return self.blob_root / hex_digest[:2] / hex_digest[2:]

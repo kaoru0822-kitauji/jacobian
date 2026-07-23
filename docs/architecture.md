@@ -51,7 +51,7 @@ that schema validation can establish it automatically.
 - Representation transformers
 - SAT, SMT, LP, MIP, and polyhedral solvers
 - Language-model output
-- Model-uploaded code introduced in later releases
+- Model-uploaded code introduced in later milestones
 
 A solver or evaluator can produce evidence. It cannot promote its own evidence
 to `VERIFIED`.
@@ -89,10 +89,34 @@ version. A run record does not change the identity of the mathematical object.
 v0.2 persists verification records and adds durable mutable experiment
 snapshots plus immutable scope, archive-page, and archive-manifest artifacts.
 
-### Knowledge record
+### Curated research record
 
-A curated record promoted from experiments after deduplication and review.
-Raw runs never become trusted knowledge merely because they were stored.
+A provider-curated reference to an experiment or external source, introduced
+by the optional M5 research-corpus integration. Raw runs never become trusted
+knowledge merely because they were stored, indexed, retrieved, or reviewed.
+The source artifact and verification records remain immutable.
+
+## Optional research-corpus integration
+
+Jacobian's experiment ledger is part of the toolbench: it preserves the local
+lineage and evidence needed to resume and replay work. Corpus-scale indexing,
+ranking, and cross-project retrieval are separate, optional capabilities:
+
+```text
+agent
+  │ MCP tools
+  ▼
+Jacobian search, conjecture, and verification tools
+  │                         ▲
+  │ versioned episodes      │ trust-labeled retrieval
+  ▼                         │
+optional research-corpus provider
+```
+
+The provider may suggest records, motifs, or hypotheses. It is outside the
+verification trust boundary and cannot mutate artifacts, register checkers, or
+promote evidence. Conjecture workflows remain available when no provider is
+configured.
 
 ## Common result model
 

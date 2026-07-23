@@ -572,9 +572,9 @@ This scenario checks candidate enumeration, operation-table canonical bytes,
 law evaluation, counterassignments, and honest distinction between labeled
 tables and isomorphism classes.
 
-## v0.3 search scenarios
+## M3 search scenarios
 
-v0.3 composes earlier exact scenarios rather than inventing new truth
+M3 composes earlier exact scenarios rather than inventing new truth
 semantics:
 
 | ID | Workflow | Exact promotion gate |
@@ -587,15 +587,11 @@ semantics:
 
 Search score, novelty, or model confidence never replaces the promotion gate.
 
-## v0.4 and v0.5 research scenarios
+## M4 conjecture-workflow scenarios
 
-Later scenarios focus on learning from experiments:
+M4 scenarios exercise agent-facing conjecture tools without requiring a
+shared corpus:
 
-- cluster omitted-path failures separately from malformed-path failures;
-- cluster magma countermodels by the smallest violating assignment;
-- retrieve a verified witness without upgrading neighboring unverified
-  experiments;
-- enforce a publication-date cutoff during historical retrieval;
 - mutate a true bounded theorem by dropping one necessary hypothesis, then
   generate and verify a counterexample;
 - repair the bounded statement “\(n\)-queens has a solution for every
@@ -607,6 +603,18 @@ Symbolic hypothesis deletion is particularly valuable: recent formal
 counterexample work generates false statements by removing necessary
 hypotheses from verified theorems, then asks for formal counterexamples. Jacobian
 can use the same idea on small pure-data domains before Lean integration.
+
+## M5 research-corpus scenarios
+
+M5 adds optional corpus-assisted workflows:
+
+- cluster omitted-path failures separately from malformed-path failures;
+- cluster magma countermodels by the smallest violating assignment;
+- retrieve a verified witness without upgrading neighboring unverified
+  experiments;
+- enforce a publication-date cutoff during historical retrieval;
+- run an M4 repair task with the provider unavailable and report global
+  novelty as unknown rather than failing or inventing a result.
 
 ## Held-out variants
 

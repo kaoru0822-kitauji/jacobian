@@ -225,9 +225,9 @@ polytope proposal costs. Experiment snapshot and archive benchmarks will be
 added when the local worker no longer launches one evaluator process per
 candidate.
 
-## Later-release benchmark groups
+## Planned-milestone benchmark groups
 
-### v0.3 — Scalable search
+### M3 — Scalable search
 
 Measure:
 
@@ -243,7 +243,19 @@ Measure:
 Establish a correct sequential reference run before interpreting parallel
 speedups.
 
-### v0.4 — Research memory
+### M4 — Conjecture workflows
+
+Measure:
+
+- falsification throughput for generated hypotheses;
+- duplicate and near-duplicate filtering cost within supplied records;
+- parameter-region proposal and certificate replay cost;
+- verified yield per compute budget.
+
+No count of generated conjectures is meaningful without falsification and
+trust labels. Corpus-wide novelty is not an M4 performance claim.
+
+### M5 — Research corpus integration
 
 Measure:
 
@@ -251,21 +263,11 @@ Measure:
 - exact filter, structural, formula, and text retrieval latency;
 - index refresh and retention-policy cost;
 - deduplication and curated-promotion overhead;
-- held-out retrieval quality, not just query speed.
+- held-out improvement to search or repair, not just query speed;
+- provider-unavailable fallback overhead.
 
-Quality metrics must be computed separately by trust label and temporal cutoff.
-
-### v0.5 — Conjecture development
-
-Measure:
-
-- falsification throughput for generated hypotheses;
-- duplicate and near-duplicate filtering cost;
-- parameter-region proposal and certificate replay cost;
-- verified yield per compute budget.
-
-No count of generated conjectures is meaningful without novelty, falsification,
-and trust labels.
+Quality metrics must be computed separately by trust label, provider corpus,
+and temporal cutoff.
 
 ### v1.0 — Reproducibility
 

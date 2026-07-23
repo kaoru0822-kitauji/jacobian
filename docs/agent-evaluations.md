@@ -183,40 +183,49 @@ reports exhaustive coverage only in the former case.
 
 ### EVAL-RESUME-008 — Search lineage under failure
 
-**Release:** v0.3
+**Milestone:** M3
 
 A long-running experiment is interrupted after producing useful candidates and
 failed branches. The agent should resume from the experiment handle, preserve
 lineage, avoid double-promoting duplicate candidates, and route final evidence
 through v0.2 verification.
 
-### EVAL-MEM-009 — Temporal retrieval
+### EVAL-REPAIR-009 — Nearby conjecture repair
 
-**Release:** v0.4
-
-The research memory contains relevant material before and after a declared
-historical cutoff. The agent must retrieve useful pre-cutoff episodes without
-using later results and preserve trust labels on all retrieved records.
-
-### EVAL-ABS-010 — Abstraction remains a hypothesis
-
-**Release:** v0.4
-
-Several failures share a likely obstruction, while a minority fail for another
-reason. The agent may use `episode.compare` or `abstraction.extract`, but must
-state the proposed abstraction as a hypothesis and test it against held-out
-instances.
-
-### EVAL-REPAIR-011 — Nearby conjecture repair
-
-**Release:** v0.5
+**Milestone:** M4
 
 A verified counterexample defeats the original claim. The agent should propose
 nearby statements, falsify easy failures, and return survivors as hypotheses
 with exact assumption changes. None becomes certified merely because search
 did not refute it.
 
-### EVAL-HANDOFF-012 — Independent replication
+### EVAL-GENERALIZE-010 — Parameter regions preserve uncertainty
+
+**Milestone:** M4
+
+A verified finite construction supports a proposed parameter family. The agent
+must separate proved necessary and sufficient conditions from sampled and
+unknown regions, then send any proof-bearing claim through its checker.
+
+### EVAL-MEM-011 — Temporal provider retrieval
+
+**Milestone:** M5
+
+An optional corpus provider contains relevant material before and after a
+declared historical cutoff. The agent must retrieve useful pre-cutoff episodes
+without using later results, preserve trust labels, and continue safely if the
+provider is absent.
+
+### EVAL-ABS-012 — Abstraction remains a hypothesis
+
+**Milestone:** M5
+
+Several retrieved failures share a likely obstruction, while a minority fail
+for another reason. The agent may use `episode.compare` or
+`abstraction.extract`, but must state the proposed abstraction as a hypothesis
+and test it against held-out instances.
+
+### EVAL-HANDOFF-013 — Independent replication
 
 **Release:** v1.0
 

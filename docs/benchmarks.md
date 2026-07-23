@@ -69,9 +69,9 @@ because it combines semantic closure, adversarial routing, rational arithmetic,
 polyhedral separation, and shrinking. It is not the definition of v0.2 and does
 not block the first verification kernel.
 
-After v0.4, add historical conjecture episodes with temporal knowledge cutoffs.
-The system must not retrieve information published after a benchmark's cutoff
-date.
+After M5, add historical conjecture episodes with temporal knowledge cutoffs.
+The optional corpus provider must not retrieve information published after a
+benchmark's cutoff date.
 
 Public known answers are suitable for conformance and regression. Held-out
 model evaluation uses generated structural variants with separate hidden
