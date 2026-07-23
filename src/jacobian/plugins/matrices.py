@@ -1,6 +1,6 @@
 """Search-side integer-matrix reference plugin.
 
-Implements the v0.1 matrix reference scenarios:
+Implements the v0.2 matrix reference scenarios:
 - MAT-KERNEL-001: the 2x2 matrix [[2,4],[1,2]] is singular.
 - MAT-MAXDET3-001: maximize |det A| over 3x3 matrices with entries in {-1,1}.
 
@@ -60,6 +60,97 @@ def _to_int_matrix(entries: Any) -> list[list[int]]:
 
 def _canonical_rational(frac: Fraction) -> dict[str, str]:
     return {"num": str(frac.numerator), "den": str(frac.denominator)}
+
+
+def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Page through a finite rectangular integer-matrix scope."""
+
+    bounds = request.get("bounds")
+    cursor = request.get("cursor")
+    page_size = request.get("page_size")
+    if not isinstance(bounds, dict):
+        raise ValueError("bounds must be an object")
+    errors = _validate_scope(bounds)
+    if errors:
+        raise ValueError("; ".join(errors))
+    if not isinstance(page_size, int) or isinstance(page_size, bool) or page_size < 1:
+        raise ValueError("page_size must be a positive integer")
+    offset = 0
+    if cursor is not None:
+        if (
+            not isinstance(cursor, dict)
+            or set(cursor) != {"offset"}
+            or not isinstance(cursor["offset"], int)
+            or isinstance(cursor["offset"], bool)
+            or cursor["offset"] < 0
+        ):
+            raise ValueError("cursor must contain a nonnegative integer offset")
+        offset = cursor["offset"]
+
+    rows = cast(int, bounds["rows"])
+    cols = cast(int, bounds["cols"])
+    values = [_to_int(value) for value in cast(list[Any], bounds["entries"])]
+    total = len(values) ** (rows * cols)
+    stop = min(offset + page_size, total)
+    candidates: list[dict[str, Any]] = []
+    for flat_index in range(offset, stop):
+        index = flat_index
+        flat: list[str] = []
+        for _ in range(rows * cols):
+            flat.append(str(values[index % len(values)]))
+            index //= len(values)
+        entries = [flat[row * cols : (row + 1) * cols] for row in range(rows)]
+        candidates.append({"rows": rows, "cols": cols, "entries": entries})
+
+    complete = stop >= total
+    return {
+        "response_version": "1",
+        "candidates": candidates,
+        "next_cursor": None if complete else {"offset": stop},
+        "complete": complete,
+        "scope": {
+            "rows": rows,
+            "cols": cols,
+            "entries": [str(value) for value in values],
+            "labeled": True,
+            "candidate_count": total,
+        },
+    }
+
+
+def transform_row_major_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Propose a row-major representation of one integer matrix."""
+
+    source = request.get("source")
+    if not isinstance(source, dict):
+        raise ValueError("source must be an object")
+    errors = validate_candidate(source)
+    if errors:
+        raise ValueError("; ".join(errors))
+    rows = cast(int, source["rows"])
+    cols = cast(int, source["cols"])
+    values = [
+        str(_to_int(value))
+        for row in cast(list[list[Any]], source["entries"])
+        for value in row
+    ]
+    return {
+        "response_version": "1",
+        "transform_format": "matrix.row_major",
+        "format_version": "1",
+        "relation": "EQUIVALENT",
+        "target_payload": {
+            "rows": rows,
+            "cols": cols,
+            "values": values,
+        },
+        "obligation": {
+            "kind": "row_major_bijection",
+            "source_entry_count": rows * cols,
+            "target_value_count": len(values),
+        },
+        "detail": "flattened entries in row-major order",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -699,7 +790,7 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
                             }
                         )
 
-    # maximize_absolute_determinant has no candidate reductions in v0.1.
+    # maximize_absolute_determinant has no candidate reductions in v0.2.
 
     proposed.sort(
         key=lambda r: (r["objectives"]["elements"], r["objectives"]["max_abs_entry"])

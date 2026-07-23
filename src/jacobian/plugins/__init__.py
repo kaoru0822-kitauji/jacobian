@@ -1,1 +1,1 @@
-"""Search-side reference plugins for Jacobian v0.1."""
+"""Search-side reference plugins for Jacobian v0.2."""

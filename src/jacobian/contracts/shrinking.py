@@ -82,7 +82,7 @@ class ShrinkResult(ContractModel):
     def v01_reports_only_implemented_minimality_levels(self) -> Self:
         if self.minimality not in {Minimality.NONE, Minimality.LOCAL}:
             raise ValueError(
-                "v0.1 only supports NONE and LOCAL minimality; stronger claims "
+                "v0.2 only supports NONE and LOCAL minimality; stronger claims "
                 "require independently checked neighborhood or global evidence"
             )
         return self

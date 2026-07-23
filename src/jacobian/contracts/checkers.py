@@ -23,6 +23,7 @@ class EvidenceKind(StrEnum):
     WITNESS = "WITNESS"
     CERTIFICATE = "CERTIFICATE"
     PRESERVATION = "PRESERVATION"
+    TRANSFORMATION = "TRANSFORMATION"
 
 
 class CheckerRegistration(ContractModel):
@@ -37,6 +38,8 @@ class CheckerRegistration(ContractModel):
     claim_schema_uris: tuple[ArtifactUri, ...] = ()
     semantics_uris: tuple[ArtifactUri, ...] = ()
     candidate_schema_uris: tuple[ArtifactUri, ...] = ()
+    target_schema_uris: tuple[ArtifactUri, ...] = ()
+    target_semantics_uris: tuple[ArtifactUri, ...] = ()
     authorized: bool = True
 
 

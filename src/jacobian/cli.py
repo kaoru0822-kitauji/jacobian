@@ -1,4 +1,4 @@
-"""Typer command-line adapter for the v0.1 kernel."""
+"""Typer command-line adapter for the v0.2 kernel."""
 
 from __future__ import annotations
 
@@ -9,6 +9,9 @@ from typing import Annotated, Any
 import typer
 
 from jacobian.canonical import loads_strict_json
+from jacobian.contracts.discovery import EnumerationBudget, SearchEnumerateRequest
+from jacobian.contracts.evaluation import EvaluationProfile
+from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.kernel import JacobianKernel
 from jacobian.references import reference_catalog
 
@@ -55,7 +58,13 @@ def initialize(context: typer.Context) -> None:
     """Initialize storage and print installed reference identifiers."""
 
     state = _state(context)
-    _emit(reference_catalog(state.kernel.references))
+    _emit(
+        reference_catalog(
+            state.kernel.references,
+            polytope=state.kernel.polytope,
+            polytope_checkers=state.kernel.polytope_checkers,
+        )
+    )
 
 
 @app.command("artifact-put")
@@ -184,6 +193,139 @@ def shrink_run(
     _emit(result.model_dump(mode="json"))
 
 
+@app.command("structure-canonicalize")
+def structure_canonicalize(
+    context: typer.Context,
+    structure_uri: str,
+    plugin_id: str,
+    wall_seconds: int = 30,
+) -> None:
+    result = _state(context).kernel.structures.canonicalize(
+        structure_uri=structure_uri,
+        plugin_id=plugin_id,
+        wall_seconds=wall_seconds,
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("search-enumerate")
+def search_enumerate(
+    context: typer.Context,
+    claim_uri: str,
+    plugin_id: str,
+    bounds_file: Path,
+    quotient_by_isomorphism: bool = False,
+    profile: str = "EXACT_CANDIDATE",
+    seed: int = 0,
+    candidates_max: int = 100_000,
+    wall_seconds: int = 300,
+    page_size: int = 128,
+) -> None:
+    experiments = _state(context).kernel.experiments
+    handle = experiments.start_enumeration(
+        SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds=_read_json_object(bounds_file),
+            quotient_by_isomorphism=quotient_by_isomorphism,
+            profile=EvaluationProfile(profile),
+            seed=seed,
+            budget=EnumerationBudget(
+                candidates_max=candidates_max,
+                wall_seconds=wall_seconds,
+                page_size=page_size,
+            ),
+        )
+    )
+    result = experiments.wait(
+        handle.experiment_uri,
+        timeout_seconds=wall_seconds + 5,
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("experiment-inspect")
+def experiment_inspect(
+    context: typer.Context,
+    experiment_uri: str,
+) -> None:
+    result = _state(context).kernel.experiments.inspect(experiment_uri)
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("experiment-wait")
+def experiment_wait(
+    context: typer.Context,
+    experiment_uri: str,
+    timeout_seconds: float = 30,
+) -> None:
+    result = _state(context).kernel.experiments.wait(
+        experiment_uri,
+        timeout_seconds=timeout_seconds,
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("experiment-cancel")
+def experiment_cancel(
+    context: typer.Context,
+    experiment_uri: str,
+) -> None:
+    result = _state(context).kernel.experiments.cancel(experiment_uri)
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("transform-apply")
+def transform_apply(
+    context: typer.Context,
+    source_uri: str,
+    plugin_id: str,
+    target_schema_uri: str,
+    target_semantics_uri: str,
+    requested_relation: str,
+    wall_seconds: int = 30,
+) -> None:
+    result = _state(context).kernel.transformations.apply(
+        source_uri=source_uri,
+        plugin_id=plugin_id,
+        target_schema_uri=target_schema_uri,
+        target_semantics_uri=target_semantics_uri,
+        requested_relation=requested_relation,
+        wall_seconds=wall_seconds,
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("transform-verify")
+def transform_verify(
+    context: typer.Context,
+    transformation_uri: str,
+) -> None:
+    result = _state(context).kernel.verification.verify_transformation(
+        transformation_uri=transformation_uri
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("polytope-separate")
+def polytope_separate(
+    context: typer.Context,
+    point_uri: str,
+    generator_set_uri: str,
+    projection: Annotated[list[int] | None, typer.Option("--projection")] = None,
+    wall_seconds: int = 30,
+) -> None:
+    result = _state(context).kernel.polytope.separate(
+        PolytopeSeparateRequest(
+            point_uri=point_uri,
+            generator_set_uri=generator_set_uri,
+            projection=tuple(projection) if projection is not None else None,
+            wall_seconds=wall_seconds,
+        )
+    )
+    _emit(result.model_dump(mode="json"))
+
+
 def _state(context: typer.Context) -> CliState:
     state = context.obj
     if not isinstance(state, CliState):
@@ -193,6 +335,13 @@ def _state(context: typer.Context) -> CliState:
 
 def _read_json(path: Path) -> Any:
     return loads_strict_json(path.read_bytes())
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    value = _read_json(path)
+    if not isinstance(value, dict):
+        raise typer.BadParameter("JSON input must be an object")
+    return value
 
 
 def _emit(payload: Any) -> None:

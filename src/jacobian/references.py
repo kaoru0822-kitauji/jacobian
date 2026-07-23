@@ -1,4 +1,4 @@
-"""Operator bootstrap for the two v0.1 reference domains."""
+"""Operator bootstrap for the two v0.2 reference domains."""
 
 from __future__ import annotations
 
@@ -31,6 +31,15 @@ class ReferenceInstallation:
     witness_checker_ids: dict[str, str]
     certificate_checker_ids: dict[str, str]
     preservation_checker_ids: dict[str, str]
+    transformation_checker_ids: dict[str, str]
+    representation_schema_uris: dict[str, str]
+    representation_semantics_uris: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class PolytopeCheckerInstallation:
+    witness_checker_id: str
+    certificate_checker_id: str
 
 
 class ReferenceInstaller:
@@ -41,12 +50,15 @@ class ReferenceInstaller:
         artifacts: ArtifactService,
         plugins: PluginRegistry,
         checkers: CheckerRegistry,
+        *,
+        transformation_claim_schema_uri: str,
     ) -> None:
         self.store = store
         self.schemas = schemas
         self.artifacts = artifacts
         self.plugins = plugins
         self.checkers = checkers
+        self.transformation_claim_schema_uri = transformation_claim_schema_uri
         self.manifest_schema_uri = schemas.register(
             name="jacobian.plugin-manifest",
             version="1",
@@ -73,6 +85,38 @@ class ReferenceInstaller:
         graph = self.install_graph_paths()
         matrix = self.install_matrices()
         return {graph.name: graph, matrix.name: matrix}
+
+    def install_polytope_checkers(
+        self,
+        *,
+        claim_schema_uri: str,
+        semantics_uri: str,
+        point_schema_uri: str,
+    ) -> PolytopeCheckerInstallation:
+        """Authorize the separately implemented finite-polytope replay code."""
+
+        witness_checker_id = self._authorize_checker(
+            name="finite-polytope convex-combination checker",
+            entrypoint=("jacobian_checkers.polytope:check_convex_combination"),
+            evidence_kind="WITNESS",
+            format_id="polytope.convex_combination",
+            claim_schema=claim_schema_uri,
+            semantics=semantics_uri,
+            candidate_schema=point_schema_uri,
+        )
+        certificate_checker_id = self._authorize_checker(
+            name="finite-polytope linear-separator checker",
+            entrypoint="jacobian_checkers.polytope:check_linear_separator",
+            evidence_kind="CERTIFICATE",
+            format_id="polytope.linear_separator",
+            claim_schema=claim_schema_uri,
+            semantics=semantics_uri,
+            candidate_schema=point_schema_uri,
+        )
+        return PolytopeCheckerInstallation(
+            witness_checker_id=witness_checker_id,
+            certificate_checker_id=certificate_checker_id,
+        )
 
     def install_graph_paths(self) -> ReferenceInstallation:
         domain = "jacobian.graph-paths"
@@ -126,6 +170,12 @@ class ReferenceInstaller:
                 ),
                 "Reducer": ("jacobian.plugins.graph_paths:reductions_capability"),
                 "SemanticEnumerator": ("jacobian.plugins.graph_paths:materialize"),
+                "Canonicalizer": (
+                    "jacobian.plugins.graph_paths:canonicalize_capability"
+                ),
+                "CandidateEnumerator": (
+                    "jacobian.plugins.graph_paths:enumerate_candidates_capability"
+                ),
             }
         )
         plugin_id = self._install_manifest(
@@ -199,6 +249,9 @@ class ReferenceInstaller:
             witness_checker_ids=witness_checkers,
             certificate_checker_ids=certificate_checkers,
             preservation_checker_ids=preservation_checkers,
+            transformation_checker_ids={},
+            representation_schema_uris={},
+            representation_semantics_uris={},
         )
 
     def install_matrices(self) -> ReferenceInstallation:
@@ -239,12 +292,53 @@ class ReferenceInstaller:
             version="1",
             schema=_matrix_candidate_schema(),
         )
+        row_major_semantics = self.store.register_descriptor(
+            kind="semantics",
+            name=f"{domain}.row-major",
+            version="1",
+            definition={
+                "description": (
+                    "row-major exact integer encoding of a rectangular matrix"
+                )
+            },
+        )
+        row_major_schema = self.schemas.register(
+            name=f"{domain}.row-major",
+            version="1",
+            schema={
+                "type": "object",
+                "properties": {
+                    "rows": {"type": "integer", "minimum": 1},
+                    "cols": {"type": "integer", "minimum": 1},
+                    "values": {
+                        "type": "array",
+                        "items": {
+                            "oneOf": [
+                                {"type": "integer"},
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?(?:0|[1-9][0-9]*)$",
+                                },
+                            ]
+                        },
+                    },
+                },
+                "required": ["rows", "cols", "values"],
+                "additionalProperties": False,
+            },
+        )
         capabilities = self._capabilities(
             {
                 "Evaluator": ("jacobian.plugins.matrices:evaluate_capability"),
                 "WitnessOracle": ("jacobian.plugins.matrices:find_witness_capability"),
                 "Reducer": "jacobian.plugins.matrices:reductions_capability",
                 "SemanticEnumerator": ("jacobian.plugins.matrices:materialize"),
+                "CandidateEnumerator": (
+                    "jacobian.plugins.matrices:enumerate_candidates_capability"
+                ),
+                "Transformer": (
+                    "jacobian.plugins.matrices:transform_row_major_capability"
+                ),
             }
         )
         plugin_id = self._install_manifest(
@@ -296,6 +390,21 @@ class ReferenceInstaller:
                 candidate_schema=candidate_schema,
             )
         }
+        transformation_checkers = {
+            "matrix.row_major": self._authorize_checker(
+                name="matrix row-major transformation checker",
+                entrypoint=(
+                    "jacobian_checkers.matrices:check_row_major_transformation"
+                ),
+                evidence_kind="TRANSFORMATION",
+                format_id="matrix.row_major",
+                claim_schema=self.transformation_claim_schema_uri,
+                semantics=semantics,
+                candidate_schema=candidate_schema,
+                target_schema=row_major_schema,
+                target_semantics=row_major_semantics,
+            )
+        }
         return ReferenceInstallation(
             name="matrices",
             plugin_id=plugin_id,
@@ -307,6 +416,9 @@ class ReferenceInstaller:
             witness_checker_ids=witness_checkers,
             certificate_checker_ids=certificate_checkers,
             preservation_checker_ids=preservation_checkers,
+            transformation_checker_ids=transformation_checkers,
+            representation_schema_uris={"row_major": row_major_schema},
+            representation_semantics_uris={"row_major": row_major_semantics},
         )
 
     def _capabilities(
@@ -361,6 +473,8 @@ class ReferenceInstaller:
         claim_schema: str,
         semantics: str,
         candidate_schema: str,
+        target_schema: str | None = None,
+        target_semantics: str | None = None,
     ) -> str:
         registration = self.checkers.authorize(
             name=name,
@@ -371,17 +485,24 @@ class ReferenceInstaller:
             claim_schema_uris=(claim_schema,),
             semantics_uris=(semantics,),
             candidate_schema_uris=(candidate_schema,),
-            reason="bundled v0.1 reference checker",
+            target_schema_uris=((target_schema,) if target_schema is not None else ()),
+            target_semantics_uris=(
+                (target_semantics,) if target_semantics is not None else ()
+            ),
+            reason="bundled reference checker",
         )
         return registration.checker_id
 
 
 def reference_catalog(
     references: dict[str, ReferenceInstallation],
+    *,
+    polytope: Any | None = None,
+    polytope_checkers: PolytopeCheckerInstallation | None = None,
 ) -> dict[str, Any]:
     """Return stable operator-facing identifiers for installed references."""
 
-    return {
+    catalog: dict[str, Any] = {
         name: {
             "plugin_id": reference.plugin_id,
             "semantics_uri": reference.semantics_uri,
@@ -392,9 +513,30 @@ def reference_catalog(
             "witness_checker_ids": reference.witness_checker_ids,
             "certificate_checker_ids": reference.certificate_checker_ids,
             "preservation_checker_ids": reference.preservation_checker_ids,
+            "transformation_checker_ids": reference.transformation_checker_ids,
+            "representation_schema_uris": reference.representation_schema_uris,
+            "representation_semantics_uris": (reference.representation_semantics_uris),
         }
         for name, reference in sorted(references.items())
     }
+    if polytope is not None:
+        catalog["finite_polytopes"] = {
+            "semantics_uri": polytope.semantics_uri,
+            "claim_schema_uri": polytope.claim_schema_uri,
+            "point_schema_uri": polytope.point_schema_uri,
+            "generator_set_schema_uri": polytope.generator_set_schema_uri,
+            "witness_checker_id": (
+                polytope_checkers.witness_checker_id
+                if polytope_checkers is not None
+                else None
+            ),
+            "certificate_checker_id": (
+                polytope_checkers.certificate_checker_id
+                if polytope_checkers is not None
+                else None
+            ),
+        }
+    return catalog
 
 
 def _claim_schema(

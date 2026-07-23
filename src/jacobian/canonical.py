@@ -84,9 +84,7 @@ def _normalize_rational(
     numerator = value["num"]
     denominator = value["den"]
     if not isinstance(numerator, str) or not isinstance(denominator, str):
-        raise CanonicalizationError(
-            "rational numerator and denominator must be strings"
-        )
+        return None
     if not _INTEGER.fullmatch(numerator) or not _INTEGER.fullmatch(denominator):
         raise CanonicalizationError(
             "rational components must be canonical decimal integers"

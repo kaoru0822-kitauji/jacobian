@@ -1,4 +1,4 @@
-"""Application composition root for the v0.1 research kernel."""
+"""Application composition root for the v0.2 research kernel."""
 
 from __future__ import annotations
 
@@ -7,9 +7,12 @@ from pathlib import Path
 from jacobian.artifacts import ArtifactService
 from jacobian.claims import ClaimValidationService
 from jacobian.evaluation import EvaluationService
+from jacobian.experiments import ExperimentService
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
+from jacobian.polytope import PolytopeService
 from jacobian.references import (
+    PolytopeCheckerInstallation,
     ReferenceInstallation,
     ReferenceInstaller,
 )
@@ -17,12 +20,14 @@ from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.shrinking import ShrinkService
 from jacobian.store import ArtifactStore
+from jacobian.structures import StructureService
+from jacobian.transformations import TransformationService
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
 
 
 class JacobianKernel:
-    """Local sequential v0.1 services over one content-addressed store."""
+    """Local v0.2 services over one content-addressed store."""
 
     def __init__(
         self,
@@ -41,12 +46,34 @@ class JacobianKernel:
             self.plugins,
         )
         self.plugin_executor = PluginExecutor()
+        self.structures = StructureService(
+            self.store,
+            self.schemas,
+            self.plugins,
+            self.plugin_executor,
+        )
+        self.transformations = TransformationService(
+            self.store,
+            self.schemas,
+            self.plugins,
+            self.plugin_executor,
+        )
+        self.polytope = PolytopeService(self.store, self.schemas)
         self.evaluation = EvaluationService(
             self.store,
             self.schemas,
             self.plugins,
             self.claims,
             self.plugin_executor,
+        )
+        self.experiments = ExperimentService(
+            self.store,
+            self.schemas,
+            self.plugins,
+            self.claims,
+            self.plugin_executor,
+            self.evaluation,
+            self.structures,
         )
         self.verification = VerificationService(
             self.store,
@@ -74,7 +101,14 @@ class JacobianKernel:
             self.artifacts,
             self.plugins,
             self.checkers,
+            transformation_claim_schema_uri=(self.transformations.claim_schema_uri),
         )
         self.references: dict[str, ReferenceInstallation] = {}
+        self.polytope_checkers: PolytopeCheckerInstallation | None = None
         if install_references:
             self.references = self.reference_installer.install_all()
+            self.polytope_checkers = self.reference_installer.install_polytope_checkers(
+                claim_schema_uri=self.polytope.claim_schema_uri,
+                semantics_uri=self.polytope.semantics_uri,
+                point_schema_uri=self.polytope.point_schema_uri,
+            )

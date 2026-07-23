@@ -17,12 +17,27 @@ from pydantic import BaseModel, ConfigDict, Field
 from jacobian import __version__
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.claims import ClaimValidationResult
-from jacobian.contracts.evaluation import EvaluationBatchResult
+from jacobian.contracts.discovery import (
+    EnumerationBudget,
+    ExperimentCancelResult,
+    ExperimentHandle,
+    SearchEnumerateRequest,
+    StructureCanonicalizationResult,
+)
+from jacobian.contracts.evaluation import (
+    EvaluationBatchResult,
+    EvaluationProfile,
+)
+from jacobian.contracts.polytope import (
+    PolytopeSeparateRequest,
+    PolytopeSeparateResult,
+)
 from jacobian.contracts.results import (
     ResultEnvelope,
     validate_result_envelope,
 )
 from jacobian.contracts.shrinking import ShrinkResult
+from jacobian.contracts.transformations import TransformationApplyResult
 from jacobian.contracts.witness_search import WitnessFindResult
 
 if TYPE_CHECKING:
@@ -46,6 +61,16 @@ class WitnessBudget(AdapterModel):
 
 class ShrinkBudget(AdapterModel):
     evaluations: int = Field(default=10_000, ge=1, le=10_000_000)
+
+
+class EnumerationBudgetInput(AdapterModel):
+    candidates_max: int = Field(default=100_000, ge=1, le=10_000_000)
+    wall_seconds: int = Field(default=300, ge=1, le=86_400)
+    page_size: int = Field(default=128, ge=1, le=4096)
+
+
+class OperationBudget(AdapterModel):
+    wall_seconds: int = Field(default=30, ge=1, le=86_400)
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,7 +117,7 @@ def create_server(
         name="jacobian",
         title="Jacobian Research Kernel",
         description=("Verifier-centric tools for bounded executable mathematics"),
-        version="0.1.0a0",
+        version=__version__,
         lifespan=lifespan,
     )
 
@@ -165,7 +190,7 @@ def create_server(
             claim_uri=claim_uri,
             candidate_uris=tuple(candidate_uris),
             plugin_id=plugin_id,
-            profile=profile,
+            profile=EvaluationProfile(profile),
             seed=seed,
             wall_seconds=active_budget.wall_seconds,
         )
@@ -276,6 +301,165 @@ def create_server(
         )
         return validate_result_envelope(result)
 
+    @server.tool(
+        name="structure.canonicalize",
+        description=(
+            "Compute an untrusted domain canonical form and symmetry metadata "
+            "for search deduplication."
+        ),
+        structured_output=True,
+    )
+    async def structure_canonicalize(
+        structure_uri: str,
+        plugin_id: str,
+        budget: OperationBudget | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> StructureCanonicalizationResult:
+        kernel = _kernel(ctx)
+        active_budget = budget or OperationBudget()
+        result = await asyncio.to_thread(
+            kernel.structures.canonicalize,
+            structure_uri=structure_uri,
+            plugin_id=plugin_id,
+            wall_seconds=active_budget.wall_seconds,
+        )
+        return StructureCanonicalizationResult.model_validate(
+            result.model_dump(mode="json")
+        )
+
+    @server.tool(
+        name="search.enumerate",
+        description=(
+            "Launch a persistent bounded candidate-enumeration experiment and "
+            "return a handle immediately. Search results remain unverified."
+        ),
+        structured_output=True,
+    )
+    async def search_enumerate(
+        claim_uri: str,
+        plugin_id: str,
+        bounds: dict[str, Any],
+        quotient_by_isomorphism: bool = False,
+        profile: str = "EXACT_CANDIDATE",
+        seed: int = 0,
+        budget: EnumerationBudgetInput | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> ExperimentHandle:
+        kernel = _kernel(ctx)
+        active_budget = budget or EnumerationBudgetInput()
+        request = SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds=bounds,
+            quotient_by_isomorphism=quotient_by_isomorphism,
+            profile=EvaluationProfile(profile),
+            seed=seed,
+            budget=EnumerationBudget(
+                candidates_max=active_budget.candidates_max,
+                wall_seconds=active_budget.wall_seconds,
+                page_size=active_budget.page_size,
+            ),
+        )
+        return await asyncio.to_thread(
+            kernel.experiments.start_enumeration,
+            request,
+        )
+
+    @server.tool(
+        name="experiment.cancel",
+        description=(
+            "Request cooperative cancellation of a persistent experiment; "
+            "already committed artifacts remain immutable."
+        ),
+        structured_output=True,
+    )
+    async def experiment_cancel(
+        experiment_uri: str,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> ExperimentCancelResult:
+        kernel = _kernel(ctx)
+        return await asyncio.to_thread(
+            kernel.experiments.cancel,
+            experiment_uri,
+        )
+
+    @server.tool(
+        name="transform.apply",
+        description=(
+            "Run an untrusted representation transformer and emit an explicit "
+            "relation and proof obligation."
+        ),
+        structured_output=True,
+    )
+    async def transform_apply(
+        source_uri: str,
+        plugin_id: str,
+        target_schema_uri: str,
+        target_semantics_uri: str,
+        requested_relation: str,
+        budget: OperationBudget | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> TransformationApplyResult:
+        kernel = _kernel(ctx)
+        active_budget = budget or OperationBudget()
+        result = await asyncio.to_thread(
+            kernel.transformations.apply,
+            source_uri=source_uri,
+            plugin_id=plugin_id,
+            target_schema_uri=target_schema_uri,
+            target_semantics_uri=target_semantics_uri,
+            requested_relation=requested_relation,
+            wall_seconds=active_budget.wall_seconds,
+        )
+        return TransformationApplyResult.model_validate(result.model_dump(mode="json"))
+
+    @server.tool(
+        name="transform.verify",
+        description=(
+            "Replay a representation relation with the uniquely compatible "
+            "operator-authorized independent checker."
+        ),
+        structured_output=True,
+    )
+    async def transform_verify(
+        transformation_uri: str,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> ResultEnvelope:
+        kernel = _kernel(ctx)
+        result = await asyncio.to_thread(
+            kernel.verification.verify_transformation,
+            transformation_uri=transformation_uri,
+        )
+        return validate_result_envelope(result)
+
+    @server.tool(
+        name="polytope.separate",
+        description=(
+            "Generate exact finite convex-hull membership evidence or a "
+            "strict rational separator. Evidence remains unverified until replay."
+        ),
+        structured_output=True,
+    )
+    async def polytope_separate(
+        point_uri: str,
+        generator_set_uri: str,
+        projection: list[int] | None = None,
+        budget: OperationBudget | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> PolytopeSeparateResult:
+        kernel = _kernel(ctx)
+        active_budget = budget or OperationBudget()
+        result = await asyncio.to_thread(
+            kernel.polytope.separate,
+            PolytopeSeparateRequest(
+                point_uri=point_uri,
+                generator_set_uri=generator_set_uri,
+                projection=(tuple(projection) if projection is not None else None),
+                wall_seconds=active_budget.wall_seconds,
+            ),
+        )
+        return PolytopeSeparateResult.model_validate(result.model_dump(mode="json"))
+
     @server.resource(
         "artifact://sha256/{digest}",
         name="artifact",
@@ -307,7 +491,119 @@ def create_server(
     )
     async def reference_catalog_resource() -> str:
         return json.dumps(
-            reference_catalog(kernel.references),
+            reference_catalog(
+                kernel.references,
+                polytope=kernel.polytope,
+                polytope_checkers=kernel.polytope_checkers,
+            ),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}",
+        name="experiment",
+        description="Read the latest durable experiment snapshot.",
+        mime_type="application/json",
+    )
+    async def experiment_resource(experiment_id: str) -> str:
+        snapshot = await asyncio.to_thread(
+            kernel.experiments.inspect,
+            f"experiment://{experiment_id}",
+        )
+        return json.dumps(
+            snapshot.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}/accounting",
+        name="experiment-accounting",
+        description="Read durable enumeration accounting and assurance labels.",
+        mime_type="application/json",
+    )
+    async def experiment_accounting_resource(experiment_id: str) -> str:
+        snapshot = await asyncio.to_thread(
+            kernel.experiments.inspect,
+            f"experiment://{experiment_id}",
+        )
+        return json.dumps(
+            {
+                "experiment_uri": snapshot.experiment_uri,
+                "state": snapshot.state.value,
+                "stop_reason": (
+                    snapshot.stop_reason.value
+                    if snapshot.stop_reason is not None
+                    else None
+                ),
+                "coverage": snapshot.coverage.value,
+                "verification": snapshot.verification.value,
+                "accounting": snapshot.accounting.model_dump(mode="json"),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}/scope",
+        name="experiment-scope",
+        description="Read the current enumeration scope artifact, when available.",
+        mime_type="application/json",
+    )
+    async def experiment_scope_resource(experiment_id: str) -> str:
+        snapshot = await asyncio.to_thread(
+            kernel.experiments.inspect,
+            f"experiment://{experiment_id}",
+        )
+        if snapshot.scope_uri is None:
+            return json.dumps(
+                {
+                    "experiment_uri": snapshot.experiment_uri,
+                    "scope_uri": None,
+                },
+                sort_keys=True,
+            )
+        scope = await asyncio.to_thread(kernel.store.get, snapshot.scope_uri)
+        return json.dumps(
+            {
+                "experiment_uri": snapshot.experiment_uri,
+                "scope_uri": scope.artifact_uri,
+                "manifest": scope.manifest.model_dump(mode="json"),
+                "payload": scope.payload,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}/archive",
+        name="experiment-archive",
+        description="Read the immutable archive manifest and page handles.",
+        mime_type="application/json",
+    )
+    async def experiment_archive_resource(experiment_id: str) -> str:
+        snapshot = await asyncio.to_thread(
+            kernel.experiments.inspect,
+            f"experiment://{experiment_id}",
+        )
+        if snapshot.archive_uri is None:
+            return json.dumps(
+                {
+                    "experiment_uri": snapshot.experiment_uri,
+                    "archive_uri": None,
+                    "page_uris": list(snapshot.archive_page_uris),
+                },
+                sort_keys=True,
+            )
+        archive = await asyncio.to_thread(kernel.store.get, snapshot.archive_uri)
+        return json.dumps(
+            {
+                "experiment_uri": snapshot.experiment_uri,
+                "archive_uri": archive.artifact_uri,
+                "manifest": archive.manifest.model_dump(mode="json"),
+                "payload": archive.payload,
+            },
             ensure_ascii=False,
             sort_keys=True,
         )

@@ -124,6 +124,8 @@ class CheckerRegistry:
         claim_schema_uris: tuple[str, ...],
         semantics_uris: tuple[str, ...],
         candidate_schema_uris: tuple[str, ...],
+        target_schema_uris: tuple[str, ...] = (),
+        target_semantics_uris: tuple[str, ...] = (),
         reason: str = "operator authorization",
     ) -> CheckerRegistration:
         """Authorize one measured checker for explicit evidence compatibility."""
@@ -140,6 +142,8 @@ class CheckerRegistry:
             "claim_schema_uris": sorted(claim_schema_uris),
             "semantics_uris": sorted(semantics_uris),
             "candidate_schema_uris": sorted(candidate_schema_uris),
+            "target_schema_uris": sorted(target_schema_uris),
+            "target_semantics_uris": sorted(target_semantics_uris),
         }
         identifier = hashlib.sha256(
             b"jacobian.checker.v1\x00" + canonicalize_json(identity_payload)
@@ -155,6 +159,8 @@ class CheckerRegistry:
             claim_schema_uris=tuple(sorted(claim_schema_uris)),
             semantics_uris=tuple(sorted(semantics_uris)),
             candidate_schema_uris=tuple(sorted(candidate_schema_uris)),
+            target_schema_uris=tuple(sorted(target_schema_uris)),
+            target_semantics_uris=tuple(sorted(target_semantics_uris)),
             authorized=True,
         )
         encoded = canonicalize_json(registration.model_dump(mode="json"))
@@ -238,6 +244,8 @@ class CheckerRegistry:
         claim_schema_uri: str,
         semantics_uri: str,
         candidate_schema_uri: str,
+        target_schema_uri: str | None = None,
+        target_semantics_uri: str | None = None,
     ) -> CheckerRegistration:
         """Require an active checker matching every declared evidence binding."""
 
@@ -264,6 +272,25 @@ class CheckerRegistry:
                 raise CheckerCompatibilityError(
                     f"checker does not support the requested {label}"
                 )
+        target_compatibility = (
+            (
+                registration.target_schema_uris,
+                target_schema_uri,
+                "target schema",
+            ),
+            (
+                registration.target_semantics_uris,
+                target_semantics_uri,
+                "target semantics",
+            ),
+        )
+        for target_supported, target_actual, target_label in target_compatibility:
+            if target_supported and (
+                target_actual is None or target_actual not in target_supported
+            ):
+                raise CheckerCompatibilityError(
+                    f"checker does not support the requested {target_label}"
+                )
         return registration
 
     def select_compatible(
@@ -275,6 +302,8 @@ class CheckerRegistry:
         claim_schema_uri: str,
         semantics_uri: str,
         candidate_schema_uri: str,
+        target_schema_uri: str | None = None,
+        target_semantics_uri: str | None = None,
     ) -> CheckerRegistration:
         """Select the unique active checker compatible with an evidence format."""
 
@@ -294,6 +323,8 @@ class CheckerRegistry:
                         claim_schema_uri=claim_schema_uri,
                         semantics_uri=semantics_uri,
                         candidate_schema_uri=candidate_schema_uri,
+                        target_schema_uri=target_schema_uri,
+                        target_semantics_uri=target_semantics_uri,
                     )
                 )
             except CheckerCompatibilityError:
