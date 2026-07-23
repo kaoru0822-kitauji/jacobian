@@ -68,7 +68,7 @@ An immutable object encoded using a versioned schema and canonicalizer.
 object_digest = SHA256(
     object_format_version
     || schema_uri
-    || semantics_digest
+    || semantics_uri
     || canonicalizer_digest
     || canonical_bytes
 )
@@ -86,6 +86,8 @@ schema, parent artifacts, and a short summary.
 
 Execution metadata such as runtime, seed, environment, limits, logs, and tool
 version. A run record does not change the identity of the mathematical object.
+v0.1 persists verification records; generic experiment-run persistence begins
+with the bounded-discovery job model in v0.2.
 
 ### Knowledge record
 
@@ -162,6 +164,12 @@ verification:
 
 Only authorized verification tools may return `verification = VERIFIED`.
 `TIMEOUT` and `ERROR` are execution states, not mathematical conclusions.
+A verified result is not limited to rational exhaustive enumeration:
+kernel-checked symbolic proofs, exact algebraic certificates, and
+outward-rounded interval certificates are valid assurance mechanisms when an
+authorized checker replays them. Such proof certificates may use
+`coverage = NOT_APPLICABLE`; direct finite enumeration must instead report
+`EXHAUSTIVE`.
 
 ## Plugin capabilities
 

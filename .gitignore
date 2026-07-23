@@ -1,2 +1,17 @@
 # Local design source material
 deep_review.md
+
+# Python development artifacts
+.coverage
+coverage.json
+.hypothesis/
+.jacobian/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.py[cod]
+build/
+dist/
+htmlcov/

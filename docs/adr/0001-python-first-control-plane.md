@@ -75,9 +75,10 @@ Python kernel
 | Blob storage | Atomic digest-keyed filesystem |
 | Search-side graph handling | NetworkX |
 | CLI | Typer |
-| Tests | pytest and Hypothesis |
-| MCP | Official Python MCP SDK |
-| Local parallelism | Spawned processes through `concurrent.futures` |
+| Tests | pytest, Hypothesis, and `jsonschema` |
+| Performance benchmarks | pyperf |
+| MCP | Official Python MCP SDK `2.0.0b2` |
+| Local execution | Sequential orchestration with bounded child processes |
 
 Pydantic validates data but does not define canonical cross-language bytes.
 Jacobian therefore owns a versioned canonical artifact encoding and forbids
@@ -86,15 +87,15 @@ JSON floating-point values in exact mathematical objects.
 An independent graph-domain checker should use a small standard-library graph
 traversal instead of importing its search plugin's NetworkX routines.
 
-At the time of this decision, the production MCP dependency should remain on
-the v1 line:
+At the user's explicit request, v0.1 pins the current v2 beta exactly:
 
 ```toml
-mcp = ">=1.27,<2"
+mcp = "==2.0.0b2"
 ```
 
-The MCP package is isolated under `adapters/mcp` so a later SDK migration does
-not affect mathematical schemas or verification code.
+The exact prerelease pin prevents an unreviewed beta upgrade. The MCP package
+is isolated under `adapters/mcp` so SDK migration does not affect mathematical
+schemas or verification code.
 
 ## Planned optional backends
 
@@ -115,8 +116,12 @@ not affect mathematical schemas or verification code.
 - SCIP/PySCIPOpt for MIP and branch-cut-price
 - Graphillion or other BDD/ZDD systems for symbolic graph families
 - Lean 4 and mathlib for formal checking
-- OCI plus gVisor, and later microVMs if needed, for model-uploaded code
 - PostgreSQL and S3-compatible storage if distributed execution justifies them
+
+Jacobian does not plan to provide a security sandbox. Plugins and checkers are
+operator-installed local code. A remote or multi-tenant deployment that accepts
+untrusted executable uploads would need its own isolation layer outside the
+research kernel.
 
 Optional backends are installed in dependency groups. They do not become
 dependencies of the trusted checker API merely because a search plugin uses

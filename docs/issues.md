@@ -1,7 +1,8 @@
 # Proposed implementation issues
 
-These are local, copy-ready drafts. They should be reviewed against the v0.1
-specification before being posted to GitHub.
+This file preserves the original issue briefs and later local backlog. Issues
+0–5 have been posted; their “current limitation” sections describe the state
+at filing time, not the present implementation.
 
 The issues build the generic kernel first and use two reference plugins only as
 conformance tests. Domain-specific types do not enter the public core API.
@@ -19,6 +20,23 @@ conformance tests. Domain-specific types do not enter the public core API.
 
 Issues 6–10 remain local drafts until their dependencies are concrete.
 
+## Testing work
+
+Tests are acceptance evidence for each implementation issue, not a final
+hardening phase. The [testing strategy](testing-strategy.md) defines work
+packages T0–T6 for the shared harness, trust-boundary conformance, cross-domain
+fixtures, performance baselines, and model evaluations.
+
+Do not open one broad “add tests” issue. Instead:
+
+- include the relevant contract, property, integration, and adversarial tests
+  in each feature issue;
+- open the T0 harness work when implementation scaffolding begins;
+- open cross-cutting conformance work after the schema, store, and checker
+  boundaries exist;
+- open performance and model-evaluation issues only after their correctness
+  targets are stable.
+
 ## Issue 0
 
 ### Title
@@ -34,10 +52,10 @@ implementation contract?
 
 #### Context
 
-The repository currently has an architecture, tool-surface, roadmap, and
-provisional later-release specifications, but no implementation. The first
-decision should fix the trust boundary and scope before implementation issues
-create accidental commitments.
+At filing time the repository had an architecture, tool surface, roadmap, and
+provisional later-release specifications but no implementation. The decision
+fixed the trust boundary and scope before implementation issues created
+accidental commitments.
 
 Relevant documents:
 
@@ -75,7 +93,7 @@ Accept the v0.1 specification with these constraints:
 
 #### Alternatives
 
-1. Build directly around the first graph/routing benchmark. This would produce
+1. Build directly around the first graph/path benchmark. This would produce
    a faster vertical slice but risks freezing domain assumptions into the API.
 2. Design a universal mathematical intermediate representation first. This
    broadens the upfront scope without evidence that the abstraction will be
@@ -109,8 +127,8 @@ Accept the v0.1 specification with these constraints:
 1–5 ──► 6. evaluation and witness-search orchestration
 1–6 ──► 7. checker-preserving shrinking
 1–7 ──► 8. CLI and MCP adapter
-1–8 ──► 9. graph/routing reference plugin
-1–9 ──► 10. non-routing plugin and adversarial release gate
+1–8 ──► 9. directed-graph/path reference plugin
+1–9 ──► 10. non-graph plugin and adversarial release gate
 ```
 
 ## Issue 1
@@ -497,7 +515,7 @@ structured content and URIs.
 
 ### Title
 
-Validate semantic closure and hidden witnesses with a graph-routing plugin
+Validate semantic closure and hidden witnesses with a graph-path plugin
 
 ### Body
 
@@ -508,13 +526,13 @@ semantic family differs from a designer's intended objects.
 
 #### Desired outcome
 
-Implement the graph/routing reference plugin described in
+Implement the directed-graph/path reference plugin described in
 `docs/benchmarks.md`, including:
 
-- pure-data graph, flow, path, and routing schemas;
+- pure-data graph and path schemas;
 - an evaluator and witness oracle;
 - explicit bounded semantic-family materialization;
-- structured hidden-path and routing witnesses;
+- structured hidden-path witnesses;
 - independent witness and finite-enumeration checkers;
 - domain-specific reducers.
 
@@ -524,7 +542,7 @@ Implement the graph/routing reference plugin described in
 - Enumeration limits cannot report exhaustive coverage.
 - Returned witnesses replay through the independent checker.
 - The plugin uses only generic artifact, result, and capability contracts.
-- No routing-specific type is added to the kernel package.
+- No graph-specific type is added to the kernel package.
 
 #### Non-goals
 
@@ -547,9 +565,9 @@ and happy-path replay does not demonstrate fail-closed behavior.
 
 #### Desired outcome
 
-Implement a bounded matrix or other non-routing reference plugin and a
+Implement a bounded matrix or other non-graph reference plugin and a
 cross-domain conformance suite. The second plugin must use different candidate,
-witness, and reduction shapes from the graph/routing plugin.
+witness, and reduction shapes from the graph/path plugin.
 
 The adversarial suite covers:
 

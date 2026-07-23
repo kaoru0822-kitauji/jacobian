@@ -1,0 +1,746 @@
+# Mathematical scenario catalog
+
+- Status: Draft
+- Purpose: Exact public fixtures, reference-plugin workloads, and held-out
+  model evaluations
+
+## Decision
+
+Jacobian should be tested first on small mathematical obligations, not on a
+leaderboard of famous conjectures.
+
+A whole conjecture entangles statement formalization, representation choice,
+search, verification, and explanation. When it fails, we learn very little
+about which capability is missing. A component scenario isolates one operation:
+
+```text
+validate a quantified claim
+find and replay one counter-witness
+close a finite semantic family
+check an exhaustive certificate
+shrink while preserving a predicate
+verify a representation relation
+enumerate a declared finite scope
+separate a rational point from a convex hull
+```
+
+The initial corpus therefore has four layers:
+
+1. **Public exact micro-scenarios.** Tiny, hand-auditable fixtures used in
+   contract and conformance tests. Their answers are intentionally public.
+2. **Reference-plugin workflows.** Several micro-scenarios combined through
+   one domain plugin and replayed in a clean process.
+3. **Held-out structural variants.** Generated or manually transformed cases
+   with hidden oracles, used for model-in-the-loop evaluation.
+4. **Imported and historical corpora.** Pinned external statements or
+   evaluator programs used for later compatibility, formal-proof, and
+   rediscovery experiments.
+
+Passing layer 1 is necessary but says nothing about model creativity. Passing
+layer 3 says something about tool-assisted behavior but cannot replace layer 1
+checker conformance.
+
+## Scenario record
+
+Every scenario receives an immutable manifest containing:
+
+```text
+scenario ID and version
+release and capability under test
+public claim and starting artifacts
+declared finite scope
+expected operational state
+expected mathematical conclusion
+required assurance mechanism
+accepted witnesses or certificate class
+hidden or public oracle digest
+adversarial mutations
+scale parameters
+source and derivation
+license and redistribution status
+knowledge cutoff and contamination class
+checker and environment requirements
+```
+
+Public fixtures may store the complete oracle beside the input. Held-out
+fixtures store only an oracle digest and evaluator-visible metadata in the
+candidate workspace.
+
+An imported dataset row is never its own oracle. A `proved`, `valid`, or
+`answer` field is provenance to investigate; Jacobian must replay the relevant
+checker under a pinned environment.
+
+## v0.1 public exact scenarios
+
+These scenarios are deliberately small enough to verify with standard-library
+Python and exact integers or rationals.
+
+### QNT-CYCLE-001 — One finite quantifier alternation
+
+**Claim**
+
+Let \(U = \mathbb Z/3\mathbb Z\). Verify
+
+\[
+\forall x \in U\;\exists y \in U:\quad y \equiv x+1 \pmod 3.
+\]
+
+**Public oracle**
+
+```text
+x = 0 -> y = 1
+x = 1 -> y = 2
+x = 2 -> y = 0
+```
+
+**Capabilities**
+
+- `claim.validate` checks finite domains, bound variables, quantifier order,
+  and the modular-arithmetic semantics reference.
+- `evaluate.batch` may score a proposed witness table.
+- `certificate.verify` replays the complete three-row table.
+
+**Adversarial variants**
+
+- leave `y` unbound;
+- refer to modulus zero;
+- omit the row for `x = 2` while claiming exhaustive coverage;
+- bind a valid table to modulus 4.
+
+This is a schema and quantifier scenario, not a test of whether a model can
+recall a theorem.
+
+### INT-FACTOR-001 — Direct counter-witness versus finite nonexistence
+
+**Claim**
+
+For a bounded positive integer candidate \(n\), determine whether \(n\) is
+prime.
+
+**Instances**
+
+- \(n=91\): false, with direct witness \(91=7\cdot13\).
+- \(n=97\): true in the declared divisor domain, with a complete table showing
+  that no \(d\in\{2,\ldots,96\}\) divides 97.
+
+**Capabilities**
+
+- `witness.find` returns a factor for 91.
+- `witness.verify` checks bounds, nontriviality, and exact multiplication.
+- `certificate.verify` checks the complete finite divisor table for 97.
+
+**Adversarial variants**
+
+- factors 1 and 91;
+- a factor of a different candidate;
+- a table stopping at 9 but lacking a checked square-root argument;
+- a timeout relabeled as “prime.”
+
+The search side may use trial division only through \(\lfloor\sqrt n\rfloor\).
+The first independent checker should deliberately use the simpler full bounded
+domain.
+
+### BOOL-MP-001 — Counterassignment and exhaustive truth table
+
+**Claims**
+
+1. \((p \land (p\rightarrow q))\rightarrow q\) is a tautology.
+2. \(p\lor q\) is a tautology.
+
+**Public oracle**
+
+- The first claim has four satisfying truth-table rows.
+- The second is false under \(p=\mathrm{false},q=\mathrm{false}\).
+
+**Capabilities**
+
+- `witness.find` returns a counterassignment for the false claim.
+- `witness.verify` directly evaluates the formula under that assignment.
+- `certificate.verify` checks all four rows for the true claim.
+
+**Adversarial variants**
+
+- omit one truth-table row;
+- change variable ordering without changing the encoding digest;
+- provide an assignment with an unknown variable;
+- copy the tautology certificate to another formula.
+
+### BOOL-MUS-001 — Checked shrinking of an unsatisfiable core
+
+**Candidate**
+
+\[
+(x)\land(\neg x)\land(y\lor z).
+\]
+
+**Public oracle**
+
+The candidate is unsatisfiable. Under clause deletion, the one-step-minimal
+core is:
+
+\[
+(x)\land(\neg x).
+\]
+
+Removing either remaining clause makes the formula satisfiable.
+
+**Capabilities**
+
+- `evaluate.batch` reports an unverified unsatisfiable result or objective.
+- `shrink.run` proposes clause deletions.
+- the preservation checker rejects any step that makes the formula satisfiable;
+- `certificate.verify` replays a complete table or a later registered SAT proof
+  format.
+
+**Adversarial variants**
+
+- a reducer claims minimality without checking both final deletions;
+- variable renaming is treated as clause deletion;
+- a cached UNSAT result survives a changed clause set.
+
+### PATH-CLOSURE-001 — Intended paths are not the path language
+
+**Structure**
+
+Vertices:
+
+```text
+s, a, b, x, t1, t2
+```
+
+Arcs:
+
+```text
+s -> a
+a -> x
+s -> b
+b -> x
+x -> t1
+x -> t2
+```
+
+The designer lists only:
+
+```text
+s -> a -> x -> t1
+s -> b -> x -> t2
+```
+
+**Public oracle**
+
+The actual graph induces four simple source-terminal paths, including:
+
+```text
+s -> a -> x -> t2
+s -> b -> x -> t1
+```
+
+**Capabilities**
+
+- the graph plugin's `family.materialize` capability enumerates the complete
+  bounded path family;
+- `witness.find` returns one omitted path;
+- `witness.verify` checks every arc and the source/terminal role;
+- `shrink.run` may minimize the responsible subgraph.
+
+**Adversarial variants**
+
+- one terminal is renamed without updating distinguished roles;
+- an intended-path list is mislabeled exhaustive;
+- duplicate arcs or a path with a missing arc;
+- a depth or path-count limit is reached but coverage remains exhaustive.
+
+This tiny synthetic graph replaces a full routing conjecture as the first
+semantic-closure fixture.
+
+### GRAPH-BIP-001 — Shrink a structural counterexample
+
+**Candidate**
+
+A triangle together with three isolated vertices.
+
+**Claim**
+
+The graph is bipartite.
+
+**Public oracle**
+
+The triangle is an odd-cycle witness. Deleting the three isolated vertices
+preserves non-bipartiteness; deleting any triangle edge does not.
+
+**Capabilities**
+
+- `witness.find` returns an odd cycle;
+- `witness.verify` checks adjacency, closure, odd length, and distinct interior
+  vertices;
+- `shrink.run` reduces the candidate to the triangle and reports a verified
+  local reduction. A one-step-minimality claim needs separate checked
+  neighborhood-completeness evidence.
+
+**Adversarial variants**
+
+- an even cycle;
+- a repeated interior vertex;
+- an edge from another graph;
+- a “smaller” graph that lost the odd cycle.
+
+### MAT-KERNEL-001 — Exact linear-algebra witness
+
+**Candidate**
+
+\[
+A=\begin{pmatrix}2&4\\1&2\end{pmatrix}.
+\]
+
+**Claim**
+
+\(A\) is nonsingular over the rationals.
+
+**Public oracle**
+
+\[
+v=\begin{pmatrix}2\\-1\end{pmatrix}\neq0,\qquad Av=0.
+\]
+
+**Capabilities**
+
+- `witness.find` proposes a kernel vector;
+- `witness.verify` checks dimensions, nonzeroness, and exact multiplication;
+- a separate determinant evaluator may report \(\det A=0\), but it cannot
+  certify its own result.
+
+**Adversarial variants**
+
+- the zero vector;
+- a vector of the wrong dimension;
+- a valid vector rebound to a nearby matrix;
+- floating residuals treated as exact zero.
+
+### MAT-MAXDET3-001 — Tiny solved optimization question
+
+**Question**
+
+Among all \(3\times3\) matrices with entries in \(\{-1,1\}\), maximize
+\(|\det A|\).
+
+**Public oracle**
+
+The exact optimum is 4. One maximizer is:
+
+\[
+\begin{pmatrix}
+-1&-1&-1\\
+-1&-1&1\\
+-1&1&-1
+\end{pmatrix}.
+\]
+
+There are \(2^9=512\) labeled candidates. A complete labeled enumeration finds
+192 maximizers.
+
+**Capabilities**
+
+- `evaluate.batch` computes exact determinant objectives;
+- a candidate matrix is a lower-bound witness;
+- `certificate.verify` checks all 512 determinant rows for the upper bound;
+- `shrink.run` may simplify a certificate but must not alter its scope.
+
+**Adversarial variants**
+
+- enumerate only normalized first-row matrices while claiming labeled scope;
+- omit determinant signs but claim the signed optimum;
+- substitute a \(3\times2\) matrix;
+- use floating determinant rounding.
+
+This is the initial non-graph reference-plugin optimization workload.
+
+### MAGMA-IMPL-001 — A finite countermodel to a false implication
+
+**Claim**
+
+Every commutative magma is associative.
+
+**Countermodel**
+
+On \(\{0,1\}\), use the operation table:
+
+| \(\diamond\) | 0 | 1 |
+| --- | ---: | ---: |
+| 0 | 1 | 0 |
+| 1 | 0 | 0 |
+
+The table is commutative. Associativity fails for \((0,0,1)\):
+
+```text
+(0 ◇ 0) ◇ 1 = 0
+0 ◇ (0 ◇ 1) = 1
+```
+
+**Capabilities**
+
+- the candidate is a finite operation table;
+- the witness contains a model and a violating variable assignment;
+- `witness.verify` checks closure, every commutativity row, and the displayed
+  associativity failure;
+- a complete certificate may enumerate all eight triples.
+
+**Adversarial variants**
+
+- an out-of-domain table entry;
+- a table that violates the hypothesis as well as the conclusion;
+- an assignment from another table;
+- an evaluator checks only the displayed commutative pairs.
+
+This scenario is inspired by the finite-countermodel workflow of the
+[Equational Theories project](https://github.com/teorth/equational_theories),
+but the two-element table and checker are independently generated for Jacobian.
+
+## v0.1 reference-plugin decision
+
+Use three levels of implementation:
+
+1. A tiny finite-logic fixture adapter exercises schemas and checker dispatch
+   early.
+2. The directed-graph/path plugin is the first semantic-closure reference.
+3. The integer-matrix plugin is the structurally different release reference.
+
+The finite-magma scenario is the preferred third domain when the capability API
+is stable. It has a different candidate representation, a model-plus-assignment
+witness, and a natural route to later theorem-prover integration.
+
+The full routing counterexample episode is no longer a v0.1 blocker. It becomes
+a later end-to-end regression workload after the tiny path-language fixture has
+proved the semantic-closure boundary.
+
+## v0.2 discovery and transformation scenarios
+
+### XFORM-AMO-001 — Equivalence versus relaxation
+
+**Source predicate**
+
+At most one of \(a,b,c\) is true.
+
+**Correct CNF**
+
+\[
+(\neg a\lor\neg b)\land
+(\neg a\lor\neg c)\land
+(\neg b\lor\neg c).
+\]
+
+**Public oracle**
+
+The full encoding is equivalent over all eight assignments. If
+\((\neg a\lor\neg c)\) is omitted, the result is only a relaxation:
+
+```text
+a = true
+b = false
+c = true
+```
+
+satisfies the incomplete CNF but violates the source predicate.
+
+**Capabilities**
+
+- `transform.apply` emits the encoding and variable map;
+- `transform.verify` checks the declared relation by complete enumeration;
+- a direct assignment refutes an incorrect equivalence claim;
+- `shrink.run` minimizes the omitted-clause explanation.
+
+### POLY-SEP-001 — Exact membership and separation
+
+**Generator set**
+
+\[
+S=\{000,100,010,001\}.
+\]
+
+**Points**
+
+- \((1/4,1/4,1/4)\) lies in \(\operatorname{conv}(S)\).
+- \((1/2,1/2,1/2)\) lies outside it.
+
+**Public oracle**
+
+The second point violates:
+
+\[
+z_1+z_2+z_3\le1
+\]
+
+by exactly \(1/2\). The first has convex weights
+\((1/4,1/4,1/4,1/4)\).
+
+**Capabilities**
+
+- exact convex-hull membership;
+- exact separator construction and replay;
+- sparse primitive-normal normalization;
+- distinction between a membership witness and a separation certificate.
+
+An additional variant compares the integral hull with the pairwise relaxation
+\(z_i+z_j\le1\), which admits \((1/2,1/2,1/2)\).
+
+### ENUM-NQUEENS-001 — Parameterized finite enumeration
+
+**Question**
+
+Count labeled \(n\)-queens placements for \(1\le n\le5\).
+
+**Public oracle**
+
+```text
+n:      1  2  3  4   5
+count:  1  0  0  2  10
+```
+
+The two \(n=4\) row vectors by column are:
+
+```text
+(1, 3, 0, 2)
+(2, 0, 3, 1)
+```
+
+**Capabilities**
+
+- `search.enumerate` declares the full row-vector scope;
+- a solution is a direct witness;
+- zero counts require a complete certificate;
+- later symmetry reduction must distinguish labeled solutions from orbits.
+
+The formulation follows
+[CSPLib problem 054](https://www.csplib.org/Problems/prob054/). Jacobian
+recomputes its small oracle independently and does not vendor CSPLib files
+until their redistribution terms are explicitly resolved.
+
+### ENUM-RAMSEY-001 — Alternating quantifiers at a larger finite scale
+
+**Questions**
+
+- Exhibit a red/blue edge coloring of \(K_5\) with no monochromatic triangle.
+- Verify that every red/blue edge coloring of \(K_6\) has a monochromatic
+  triangle.
+
+**Public oracle**
+
+- A 5-cycle in red with its complement in blue is a \(K_5\) witness.
+- The \(K_6\) exhaustive scope contains \(2^{15}=32768\) colorings and none
+  avoids a monochromatic triangle.
+
+**Capabilities**
+
+- direct model witness for the existential side;
+- complete enumeration for the universal side;
+- symmetry-aware enumeration may optimize search but must bind its orbit
+  certificate.
+
+This is public conformance, not a hidden test of whether a model remembers
+\(R(3,3)=6\).
+
+### ENUM-CAPSET-001 — Small construction and optimum
+
+**Question**
+
+Find the largest subset of \(\mathbb F_3^2\) containing no three distinct
+points whose sum is zero.
+
+**Public oracle**
+
+The optimum is 4. One maximizer is:
+
+```text
+(1,1), (1,2), (2,1), (2,2)
+```
+
+The complete subset scope has \(2^9=512\) candidates.
+
+**Capabilities**
+
+- finite-set candidate validation;
+- forbidden-triple witnesses;
+- exhaustive upper-bound certificate;
+- construction search and later program-search scaling.
+
+### ENUM-MAGMA-001 — Complete finite model space
+
+There are \(2^{2^2}=16\) binary operation tables on a labeled two-element
+carrier. Enumerate them and classify each under selected equational laws such
+as commutativity and associativity.
+
+This scenario checks candidate enumeration, operation-table canonical bytes,
+law evaluation, counterassignments, and honest distinction between labeled
+tables and isomorphism classes.
+
+## v0.3 search scenarios
+
+v0.3 composes earlier exact scenarios rather than inventing new truth
+semantics:
+
+| ID | Workflow | Exact promotion gate |
+| --- | --- | --- |
+| `CEGIS-AMO-001` | Start from an incomplete at-most-one encoding; add a clause for each defeating assignment | `transform.verify` proves equivalence over all eight assignments |
+| `EVOLVE-DET3-001` | Mutate \(\{-1,1\}\) matrices to maximize absolute determinant | Candidate determinant replay plus the existing 512-row optimum certificate |
+| `TREE-NQUEENS-001` | Explore partial queen placements with backtracking, best-first, or tree search | Direct solution checker or complete bounded search certificate |
+| `PROGRAM-CAPSET-001` | Search for a constructor producing cap sets over small finite fields | Every materialized set receives forbidden-triple replay |
+| `RESUME-SEARCH-001` | Interrupt and resume any of the above after a fixed number of evaluations | Identical lineage and promoted verified artifacts after clean replay |
+
+Search score, novelty, or model confidence never replaces the promotion gate.
+
+## v0.4 and v0.5 research scenarios
+
+Later scenarios focus on learning from experiments:
+
+- cluster omitted-path failures separately from malformed-path failures;
+- cluster magma countermodels by the smallest violating assignment;
+- retrieve a verified witness without upgrading neighboring unverified
+  experiments;
+- enforce a publication-date cutoff during historical retrieval;
+- mutate a true bounded theorem by dropping one necessary hypothesis, then
+  generate and verify a counterexample;
+- repair the bounded statement “\(n\)-queens has a solution for every
+  \(1\le n\le8\)” to the exact surviving parameter set;
+- infer candidate determinant or cap-set patterns from small values while
+  keeping the extrapolation explicitly hypothetical.
+
+Symbolic hypothesis deletion is particularly valuable: recent formal
+counterexample work generates false statements by removing necessary
+hypotheses from verified theorems, then asks for formal counterexamples. Jacobian
+can use the same idea on small pure-data domains before Lean integration.
+
+## Held-out variants
+
+Public exact fixtures are unsuitable for measuring model reasoning because the
+answers are visible. Each public template therefore has a private generator:
+
+- relabel carrier elements, vertices, variables, rows, and columns;
+- add irrelevant structure that a shrinker must remove;
+- move the decisive omitted clause, path, or certificate row;
+- change constants while preserving the same quantifier skeleton;
+- generate both true and false neighboring instances;
+- insert one tempting witness that is valid for a nearby artifact;
+- vary whether the search completes, times out, or reaches a declared bound.
+
+The generator seed is recorded for reproducibility but hidden during a run. The
+oracle is generated by a separate exhaustive implementation, frozen, and then
+removed from the candidate workspace.
+
+Do not rely on random generation alone. Every family contains hand-designed
+boundary cases, and every generated instance is checked for:
+
+- a unique intended discriminator or documented alternate routes;
+- nontriviality under the baseline condition;
+- absence of answer leakage in names and metadata;
+- bounded oracle runtime;
+- replayability under the declared checker.
+
+## External source decisions
+
+### Use now as design references or import seeds
+
+| Source | Useful artifacts | Decision |
+| --- | --- | --- |
+| [TPTP/TSTP](https://tptp.org/TPTP/) | Stable problem identifiers, explicit statuses, parameterized problem generators, standard solution records | Adopt its status/reproducibility discipline; import only pinned small cases later |
+| [CSPLib](https://github.com/csplib/csplib) | Structured finite constraint specifications, models, and known small result tables | Use formulations as inspiration; independently derive oracles; do not copy files until licensing is clear |
+| [Equational Theories](https://github.com/teorth/equational_theories) | Equation lists, finite magma tables, implication/countermodel workflows, Lean-verified outcomes | Strong v0.2 finite-algebra source; pin an Apache-2.0 release and replay models |
+| [AlphaEvolve problem repository](https://github.com/google-deepmind/alphaevolve_repository_of_problems) | Prompts, verification code, initial programs, and evolved programs in notebooks | Later program-search regression corpus; answers are public, so not held out |
+| [SMT-LIB](https://smt-lib.org/) | Standard theory semantics, input/output formats, and solver benchmark instances | Later typed-backend compatibility and parser corpus, not public `solver.solve` semantics |
+
+### Use later for formal integration, not v0.1 oracles
+
+| Source | Reason |
+| --- | --- |
+| [miniF2F](https://github.com/openai/miniF2F) | Useful multilingual formal statements, but the repository is archived and public solutions make it a contaminated hidden benchmark |
+| [PutnamBench](https://github.com/trishullab/PutnamBench) | Broad formal mathematics and multilingual coverage, but it is intentionally treated as an evaluation set and asks users not to publish proofs |
+| [Formal Conjectures](https://github.com/google-deepmind/formal-conjectures) | Excellent claim-ingestion and provenance corpus; open statements lack ground-truth proofs and the maintainers explicitly warn about misformalization |
+
+### Hugging Face datasets
+
+The Dataset Viewer investigation on 2026-07-23 produced these decisions:
+
+| Dataset | Useful fields or metadata found | Decision |
+| --- | --- | --- |
+| [`Tonic/MiniF2F`](https://huggingface.co/datasets/Tonic/MiniF2F) | 488 rows; names, declared split, informal statement, formal statement, goal, header; MIT-tagged snapshot | Good parser and later Lean compatibility corpus; never a hidden reasoning oracle |
+| [`internlm/Lean-Workbook`](https://huggingface.co/datasets/internlm/Lean-Workbook) | 25,214 Viewer rows; NL statement, answer, formal statement, tactic, proof states; Apache-2.0 | Useful proof-state and ingestion stress corpus; pin and replay against its declared Lean environment |
+| [`formalanon/semantic-lean-errors`](https://huggingface.co/datasets/formalanon/semantic-lean-errors) | 92 expert-annotated NL/formalization mismatch cases; 24 labeled primary specification errors | Excellent design source for `claim.validate` and transformation traps, but no license was declared; write independent analogues unless permission is obtained |
+| [`AgenticCommons/formal-math-autoformalization`](https://huggingface.co/datasets/AgenticCommons/formal-math-autoformalization) | The dataset card declares NL/Lean/proof pairs with per-row provenance, toolchain, mathlib revision, axioms, and a CC0 license | Promising later statement/proof import source; the Dataset Viewer returned server errors during this review, so those fields still require row-level confirmation from a pinned commit |
+| [`charliemeyer2000/ai4math-lean`](https://huggingface.co/datasets/charliemeyer2000/ai4math-lean) | Aggregates millions of rows with source, proof, toolchain, and structured verification labels; Apache-2.0 | Useful v1 compatibility corpus; too large and answer-rich for initial or hidden fixtures |
+| [`AllenGrahamHart/formal-conjectures-gold`](https://huggingface.co/datasets/AllenGrahamHart/formal-conjectures-gold) | Pinned source/mathlib/toolchain fields, per-row licensing and redistribution status, bundled-oracle metadata | Use its manifest design as precedent; do not expose bundled gold solutions to evaluated agents |
+
+The observations above were made at these Hub revisions:
+
+```text
+Tonic/MiniF2F@3a5dceb842b916345a4d7bb7dc4c4c1dbd4b98aa
+internlm/Lean-Workbook@2e066e310b2c6d2c27616927ae131f82901c8f1c
+formalanon/semantic-lean-errors@16a65901fc7c79ad0f93fc94187c0fcb13ea5cd2
+AgenticCommons/formal-math-autoformalization@6ad33573f0f333b42afb51882d4384c939b0c0b3
+charliemeyer2000/ai4math-lean@6735c2403f2c57bcd5e9b7aab572872d8265d7d9
+AllenGrahamHart/formal-conjectures-gold@aa2ea46926454b2e8ab23103dbccebc5f2f9fc81
+```
+
+Every imported Hugging Face fixture records:
+
+```text
+dataset ID
+Hub commit SHA
+config and split
+stable row ID and row index
+source dataset and original identifier
+license and redistribution status
+Lean/mathlib versions when applicable
+retrieved row digest
+local transformed-artifact digest
+```
+
+Use Dataset Viewer pagination and filters to select small rows instead of
+downloading an entire corpus. If a viewer is unavailable, record that fact and
+use a pinned raw file or parquet shard only after its license and digest are
+known.
+
+## Suggested repository layout
+
+Do not freeze this layout until the v0.1 schemas exist, but keep public inputs
+and hidden oracles separate:
+
+```text
+scenarios/
+    manifests/
+        QNT-CYCLE-001.yaml
+        INT-FACTOR-001.yaml
+        ...
+    public/
+        QNT-CYCLE-001/
+        ...
+    generators/
+        path_closure.py
+        matrix_kernel.py
+        ...
+    imported/
+        sources.lock
+
+oracle/
+    public/
+        ...
+    private/
+        ...
+```
+
+The private oracle directory must not be packaged into candidate workspaces,
+MCP resources, public container layers, or agent trace exports.
+
+## Implementation order
+
+1. Implement `BOOL-MP-001` as the smallest full witness/certificate vertical
+   slice.
+2. Add `INT-FACTOR-001` to prove the result model is not Boolean-formula
+   specific.
+3. Implement `MAT-KERNEL-001` as the first exact nontrivial mathematical
+   witness.
+4. Implement `PATH-CLOSURE-001` to attack semantic incompleteness.
+5. Add `BOOL-MUS-001` for checker-preserving shrinking.
+6. Add `MAT-MAXDET3-001` for an exact finite optimization certificate.
+7. Add `MAGMA-IMPL-001` to test finite countermodels.
+8. Only then add v0.2 enumeration, transformation, and polyhedral scenarios.
+
+This sequence produces useful, correct mathematical operations before any
+large search engine or famous-conjecture benchmark is required.

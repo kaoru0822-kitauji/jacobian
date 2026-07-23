@@ -5,8 +5,9 @@
 This document defines the v0.1 threats to mathematical integrity, artifact
 integrity, and service availability.
 
-v0.1 accepts pure data only. Arbitrary model-uploaded executable code is out of
-scope until the sandboxed execution work planned for v0.3.
+v0.1 accepts pure data plus operator-installed local plugins and checkers.
+Jacobian does not provide a security sandbox. Code installed by the operator is
+assumed safe to execute on that machine.
 
 ## Protected properties
 
@@ -26,9 +27,10 @@ produce timeout or error, never a false mathematical conclusion.
 
 ## Adversaries and failure sources
 
-### Untrusted problem plugin
+### Mathematically untrusted problem plugin
 
-A plugin may:
+v0.1 plugins are operator-installed and trusted not to attack the host. They
+are not trusted to establish mathematical truth. A plugin may:
 
 - omit legal semantic objects;
 - misreport arithmetic or coverage;
@@ -42,6 +44,9 @@ Controls:
 - plugin output remains unverified;
 - checker authorization is outside plugin manifests;
 - evidence binds claim, semantics, candidate, and scope;
+- plugin workers have bounded process/output lifetime for operational
+  containment, but run locally with the operator's environment and are not a
+  security sandbox;
 - reference plugins are tested against adversarial fixtures.
 
 ### Malformed or ambiguous artifact
@@ -130,6 +135,8 @@ v0.1 assumes:
 - correct operation of the host filesystem and SQLite within their documented
   guarantees;
 - an operator controls checker authorization;
+- an operator installs only plugin and checker code considered safe to execute
+  on the host;
 - the Python runtime and checker dependencies are part of the checker trusted
   computing base;
 - formal claims and semantics have been reviewed to the degree recorded in

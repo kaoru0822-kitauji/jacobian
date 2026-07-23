@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jacobian-research-kernel"
+version = "0.1.0a0"
+description = "A verifier-centric research kernel for bounded, executable mathematics"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Jacobian contributors" }]
+dependencies = [
+    "jsonschema>=4.23,<5",
+    "mcp==2.0.0b2",
+    "mcp-types==2.0.0b2",
+    "networkx>=3.4,<4",
+    "pydantic>=2.12,<3",
+    "rfc8785==0.1.4",
+    "typer>=0.20,<1",
+]
+
+[project.scripts]
+jacobian = "jacobian.cli:app"
+jacobian-mcp = "jacobian.adapters.mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.130,<7",
+    "mypy>=1.15,<2",
+    "pyperf>=2.9,<3",
+    "pytest>=8.3,<10",
+    "pytest-cov>=6,<8",
+    "ruff>=0.11,<1",
+    "types-jsonschema>=4.23,<5",
+    "types-networkx>=3.4,<4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jacobian", "src/jacobian_checkers"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "contract: public wire and Python contract tests",
+    "property: property-based invariant tests",
+    "stateful: persistent lifecycle state-machine tests",
+    "integration: real filesystem, SQLite, or process-boundary tests",
+    "end_to_end: complete user-visible research-kernel workflows",
+    "subprocess: clean-process replay tests",
+    "conformance: normative v0.1 conformance cases",
+    "differential: independent implementation comparisons",
+    "external_backend: tests requiring an optional external engine",
+    "slow: tests excluded from the fastest development loop",
+    "benchmark: performance measurements",
+    "agent_eval: model-in-the-loop evaluations",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "A",
+    "B",
+    "C4",
+    "E",
+    "F",
+    "I",
+    "N",
+    "PIE",
+    "PTH",
+    "RUF",
+    "SIM",
+    "UP",
+]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["jacobian", "jacobian_checkers"]
+
+[tool.coverage.run]
+branch = true
+source = ["jacobian", "jacobian_checkers"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

@@ -19,7 +19,8 @@ shrunk, and independently verified without trusting its search implementation.
 
 - Versioned claim, candidate, witness, certificate, and result schemas
 - Canonical artifact encoding and domain-separated hashing
-- Digest-keyed local artifact store and SQLite run metadata
+- Digest-keyed local artifact store and SQLite registry metadata
+- Immutable verification-record artifacts
 - Operator-managed checker registry
 - Seven generic MCP tools
 - A generic plugin capability API
@@ -30,7 +31,9 @@ shrunk, and independently verified without trusting its search implementation.
 ### Exit gate
 
 Both reference plugins replay exact certificates, return independently verified
-failure witnesses, and reject deliberately corrupted evidence.
+failure witnesses, and reject deliberately corrupted evidence. Every normative
+v0.1 conformance test passes in a clean installed environment, with no
+unresolved trust-critical failure or accepted flake.
 
 ## v0.2 — Bounded discovery
 
@@ -57,7 +60,8 @@ candidate classes and verifying representation changes.
 
 A bounded search produces a candidate archive with auditable scope, and at
 least one representation transformation and exact separator are independently
-verified.
+verified. Enumeration-limit, transformation-direction, and canonicalization
+attacks pass their release test suites.
 
 ## v0.3 — Scalable search
 
@@ -87,6 +91,8 @@ lineage, failure evidence, and exact-verification boundaries.
 
 Long-running experiments survive interruption and resumption, retain complete
 lineage, and route promoted candidates through the v0.1 verification boundary.
+Sequential reference results are preserved under multi-process execution,
+worker failure, cancellation, and resume.
 
 ## v0.4 — Research memory
 
@@ -113,7 +119,8 @@ confusing retrieval or clustering with proof.
 ### Exit gate
 
 Retrieval improves a held-out search benchmark while never upgrading unverified
-records into certified conclusions.
+records into certified conclusions. The improvement holds under trust-label and
+temporal-cutoff tests rather than only in an unrestricted retrieval corpus.
 
 ## v0.5 — Conjecture development
 
@@ -137,7 +144,9 @@ parameter families, and new research questions.
 ### Exit gate
 
 Every generated or repaired claim is explicitly labeled as a hypothesis and can
-re-enter the ordinary validation, search, and verification pipeline.
+re-enter the ordinary validation, search, and verification pipeline. Held-out
+evaluations confirm that failure to falsify a generated statement is never
+reported as verification.
 
 ## v1.0 — Stable research platform
 
@@ -165,7 +174,8 @@ and collaborative mathematical work.
 
 An independent installation can replay published result bundles from hashes and
 obtain the same verified conclusion without importing the originating search
-engine.
+engine. Released wire formats, trust-root changes, and historical records pass
+their compatibility and migration suites.
 
 ## Cross-cutting constraints
 
@@ -180,3 +190,9 @@ All releases preserve these invariants:
   evidence.
 - Future backends may extend assurance mechanisms without changing the meaning
   of older verified records.
+
+The cross-release evidence plan is defined in:
+
+- [Testing strategy](testing-strategy.md)
+- [Performance benchmarks](performance-benchmarks.md)
+- [Agent evaluations](agent-evaluations.md)

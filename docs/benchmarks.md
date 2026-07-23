@@ -2,36 +2,51 @@
 
 Benchmarks validate the generic kernel; they do not define its public API.
 
-## Why more than one benchmark is required
+This document defines pass/fail mathematical workloads. Operational speed and
+resource measurements are specified in
+[Performance benchmarks](performance-benchmarks.md), and model behavior is
+evaluated separately in [Agent evaluations](agent-evaluations.md).
+
+The exact component fixtures and their public oracles are specified in the
+[Mathematical scenario catalog](math-scenarios.md).
+
+## Benchmark hierarchy
+
+Jacobian distinguishes:
+
+1. contract and adversarial conformance cases;
+2. small public mathematical scenarios;
+3. reference-plugin workflows;
+4. held-out structural variants for models;
+5. historical end-to-end research episodes.
+
+A famous conjecture is not a substitute for the first three layers. It is too
+difficult to diagnose and too easy to contaminate through public solutions.
+
+## Why more than one reference plugin is required
 
 A single domain can accidentally bake its own assumptions into apparently
 generic interfaces. Jacobian therefore does not stabilize the v0.1 capability
 interfaces until at least two structurally different plugins use them.
 
-## Benchmark A: bounded routing counterexample
+## Reference A: finite directed graphs and path languages
 
-The Dinitz–Garg–Goemans episode is a strong adversarial benchmark because it
-requires:
+The first plugin uses tiny directed graphs to test:
 
-- pure-data graph and rational-flow candidates;
 - complete semantic closure rather than intended path lists;
-- structured hidden-path and routing witnesses;
-- exact capacity and cost replay;
+- structured path and odd-cycle witnesses;
+- graph candidate validation;
 - candidate and witness shrinking;
 - finite enumeration certificates.
 
-The benchmark should include both false restricted-path candidates and the
-small verified counterexample. It tests whether omitted legal objects can cause
-a false discovery.
+`PATH-CLOSURE-001` and `GRAPH-BIP-001` are the initial public cases. Their
+checker implementation does not import the search plugin's graph routines.
 
-The DGG schemas, paths, and checker implementation live in a domain plugin and
-benchmark package. They are not part of the generic kernel specification.
+## Reference B: bounded integer matrices
 
-## Benchmark B: bounded binary-matrix problem
-
-The second plugin should use matrix candidates and a different witness shape,
-for example a bounded discrepancy, determinant, or forbidden-submatrix
-property.
+The second plugin uses integer-matrix candidates, kernel-vector witnesses, and
+finite determinant certificates. `MAT-KERNEL-001` and `MAT-MAXDET3-001` are the
+initial public cases.
 
 It should test that the kernel does not assume:
 
@@ -41,11 +56,23 @@ It should test that the kernel does not assume:
 - every search uses mutation;
 - witnesses have the same representation as candidates.
 
-The exact benchmark statement should be selected before implementation based on
-the availability of a small independent checker and useful failure witnesses.
+## Third-domain candidate: finite magmas
 
-## Historical benchmarks after v0.4
+`MAGMA-IMPL-001` adds finite operation tables, equational-law evaluation, and a
+model-plus-assignment witness. It is the preferred third plugin after the v0.1
+capability surface is stable.
 
-Later evaluation should add historical conjecture episodes with temporal
-knowledge cutoffs. The system must not retrieve information published after the
-benchmark's cutoff date.
+## Historical end-to-end episodes
+
+The Dinitz–Garg–Goemans routing episode remains a valuable later regression
+because it combines semantic closure, adversarial routing, rational arithmetic,
+polyhedral separation, and shrinking. It is not the definition of v0.1 and does
+not block the first verification kernel.
+
+After v0.4, add historical conjecture episodes with temporal knowledge cutoffs.
+The system must not retrieve information published after a benchmark's cutoff
+date.
+
+Public known answers are suitable for conformance and regression. Held-out
+model evaluation uses generated structural variants with separate hidden
+oracles.
