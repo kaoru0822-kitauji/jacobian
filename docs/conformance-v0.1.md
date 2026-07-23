@@ -9,6 +9,10 @@ reference plugins.
 Passing a happy-path benchmark is insufficient. Every integrity attack below
 must fail closed.
 
+The suite is one part of the broader [testing strategy](testing-strategy.md).
+Conformance is a correctness gate and is never replaced by code coverage,
+performance results, or successful model-in-the-loop evaluations.
+
 ## Artifact identity
 
 | ID | Test | Required result |
@@ -69,19 +73,24 @@ must fail closed.
 | --- | --- | --- |
 | SHR-001 | Reducer proposes a smaller preserving target | Accepted after checker replay |
 | SHR-002 | Reducer breaks the predicate | Rejected |
-| SHR-003 | Budget ends before one-step minimality | Honest minimality class |
+| SHR-003 | Budget ends before checked neighborhood exhaustion | Honest minimality class |
 | SHR-004 | Tool claims global minimality without certificate | Protocol violation |
 | SHR-005 | Final target lacks a fresh verification record | Output remains unverified |
 
-## Cache and replay
+## Record and replay
 
 | ID | Test | Required result |
 | --- | --- | --- |
-| RPL-001 | Change evaluator digest | Evaluation cache miss |
-| RPL-002 | Change checker digest | Verification cache miss |
-| RPL-003 | Change scope or limits | Coverage-sensitive cache miss |
-| RPL-004 | Replay a completed bundle in a clean process | Same verified conclusion |
-| RPL-005 | Replay with a missing dependency artifact | Explicit resolution failure |
+| RPL-001 | Inspect a verification record | Exact checker and environment digests are present |
+| RPL-002 | Change authorized checker bytes before replay | New verification is denied |
+| RPL-003 | Replay a completed bundle in a clean process | Same verified conclusion |
+| RPL-004 | Replay with a missing dependency artifact | Explicit resolution failure |
+| RPL-005 | Revoke a checker while verification is in flight | No record commits after revocation completes |
+| RPL-006 | Present schema-invalid data under an authorized schema URI | Verification is rejected before checker dispatch |
+
+Generic evaluation caching is deferred beyond v0.1. When introduced, changing
+an evaluator, checker, scope, limit, or semantics-relevant environment field
+must produce a cache miss.
 
 ## Cross-domain gate
 

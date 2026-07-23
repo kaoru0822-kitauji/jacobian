@@ -97,18 +97,18 @@ Read-only discovery and large-object access use MCP resources:
 
 ```text
 artifact://sha256/<digest>
-schema://sha256/<digest>
-plugin://sha256/<digest>
-checker://sha256/<digest>
-experiment://<opaque-id>
+reference://catalog
 ```
 
-Consequently, v0.1 does not need `artifact.get`, `schema.get`, `plugin.list`, or
-`checker.list` tools. Clients read those resources and use MCP's ordinary tool
-discovery for installed public operations.
+Schemas, semantics, plugin manifests, witnesses, certificates, and verification
+records are all ordinary artifacts and use the artifact resource template.
+`reference://catalog` exposes the identifiers installed by the bundled
+reference fixtures. Checker administration remains outside the model-facing
+MCP surface.
 
-Experiment status is also a resource. State-changing lifecycle actions such as
-`experiment.cancel`, `experiment.pause`, and `experiment.resume` remain tools.
+Later releases add experiment resources. State-changing lifecycle actions such
+as `experiment.cancel`, `experiment.pause`, and `experiment.resume` remain
+tools.
 
 ## Operator actions, not model tools
 

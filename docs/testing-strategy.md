@@ -1,0 +1,661 @@
+# Testing strategy
+
+## Purpose
+
+Jacobian is a fail-closed verification system. Its tests must establish more
+than ordinary application correctness: they must demonstrate that malformed
+inputs, incomplete computations, stale caches, and substituted evidence cannot
+be promoted into verified mathematical conclusions.
+
+This document defines the test architecture for v0.1 and the gates that later
+releases inherit. It complements the normative
+[v0.1 conformance specification](conformance-v0.1.md). The conformance
+specification states what an implementation must do; this document states how
+we build and maintain evidence that it does so.
+
+Two principles govern the suite:
+
+1. Tests exercise public behavior and stable artifacts, not private helper
+   names or copied implementation branches.
+2. Correctness gates and performance measurements remain separate. A fast
+   checker that accepts invalid evidence is simply a broken checker.
+
+`EXACT_RATIONAL + EXHAUSTIVE` is one strong evidence profile, but it does not
+automatically create a verified result. A direct exact witness need not be
+exhaustive, and a checked SAT proof or proof-assistant term may certify a claim
+through another assurance route. In every case, only an operator-authorized
+checker may originate `verification = VERIFIED`.
+
+The current local validation commands are:
+
+```sh
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv build
+```
+
+## Criticality classes
+
+Every module and change is assigned the highest applicable criticality class.
+The class determines the minimum test and review evidence.
+
+### C0 — Trust-critical
+
+C0 code can cause false evidence to become verified, bind evidence to the wrong
+mathematical object, or corrupt the identity of an object. It includes:
+
+- canonical encoding and mathematical object digests;
+- exact integer and rational parsing and normalization;
+- common result-state invariants;
+- artifact atomicity and digest verification;
+- checker authorization, compatibility, and revocation;
+- witness and certificate binding and replay;
+- verification cache keys;
+- the dependency boundary between search and checkers.
+
+C0 changes require:
+
+- an attack or invariant test written before the implementation change;
+- public-interface behavior tests;
+- property or state-machine tests where the input space is combinatorial;
+- the relevant adversarial conformance tests;
+- an independent exact-diff review;
+- rerunning every affected C0 suite against the final tree.
+
+No C0 test may be marked flaky, retried until green, or converted to an expected
+failure to unblock a release. An intermittent C0 failure is a product defect.
+
+### C1 — Correctness-critical
+
+C1 code can misreport experimental scope, lose evidence, or make a generic tool
+behave incorrectly without directly authorizing a verified conclusion. It
+includes:
+
+- plugin manifests and capability dispatch;
+- evaluation and witness-search orchestration;
+- shrinking;
+- budgets, cancellation, and partial batch handling;
+- CLI and MCP equivalence;
+- reference plugins and their search-side implementations.
+
+C1 changes require behavior tests, boundary-focused integration tests, and
+property tests where useful. A change that affects a C0 dependency is reviewed
+and tested as C0.
+
+### C2 — Supporting
+
+C2 code includes human-facing formatting, documentation rendering, development
+utilities, and reports that cannot alter stored identities or verification
+outcomes. It receives ordinary unit or snapshot coverage where that protects a
+public behavior. Exact private formatting is not tested unless it is a promised
+wire format.
+
+## Critical-area risk register
+
+| Area | Catastrophic failure | Minimum release evidence |
+| --- | --- | --- |
+| Result semantics | Timeout, error, or incomplete search becomes a mathematical conclusion | Generated state matrix, malformed-wire tests, conformance IDs `RES-*` |
+| Artifact identity | Distinct semantics collide or metadata changes mathematical identity | Canonicalization properties, domain-separation tests, independent fixture digests |
+| Evidence binding | A valid witness or certificate is reused for the wrong target | Field-by-field substitution matrix, clean-process replay, `WIT-*` and `CRT-*` |
+| Checker authority | A plugin or caller selects code that certifies itself | Registry state machine, administrative-boundary tests, executable-digest checks |
+| Checker independence | Finder and checker share the same semantic omission | Dependency tests, deliberately separate implementation, differential fixtures |
+| Storage and cache | Partial/corrupt data or stale results are accepted | Real-filesystem crash tests, digest-on-read, cache-key mutation matrix |
+| Semantic completeness | Intended or sampled objects are reported as the full domain | Adversarial hidden-object fixtures, scope certificates, honest coverage fields |
+| Resource limits | Exhaustion changes truth or leaves a half-committed result | Fault injection, bounded parser/store tests, mixed-batch timeout/cancellation tests |
+| Shrinking | A smaller but invalid artifact replaces the verified target | Per-step checker replay, cycle/budget state machine, minimality-label attacks |
+| Representation changes | A relaxation or restriction is treated as equivalence | v0.2 direction tests, proof-obligation replay, proposer/checker separation |
+| Research memory | Retrieved hypotheses silently gain verified status | v0.4 trust-label, retention, and temporal-cutoff tests |
+
+The first seven rows are the highest-risk v0.1 areas. They should be reviewed
+before optimizing throughput or expanding the public tool surface.
+
+## Test layers
+
+The suite uses several complementary layers. Their names describe different
+kinds of evidence; they are not a ladder in which a higher layer makes the
+lower ones unnecessary.
+
+### Contract tests
+
+Contract tests exercise versioned schemas and public Python, CLI, resource, and
+MCP interfaces. They cover accepted inputs, rejected inputs, round trips,
+result envelopes, compatibility behavior, and generated JSON Schema.
+
+### Property tests
+
+Property tests use generated data to explore invariants that example tests
+cannot cover adequately. Hypothesis is the initial Python implementation.
+Important targets include:
+
+- canonical rational normalization;
+- canonical encode/decode round trips;
+- equivalent input encodings producing one mathematical identity;
+- semantics-relevant changes producing different identities;
+- evidence mutation invalidating a binding or changing replay;
+- reducer acceptance preserving the checked predicate;
+- state transitions never creating verification authority.
+
+Generated examples should be represented by domain strategies and public
+constructors. Tests must not reproduce the production algorithm and compare it
+to itself.
+
+### State-machine tests
+
+Hypothesis rule-based state machines model persistent or lifecycle behavior:
+
+- put, read, deduplicate, corrupt, and reopen an artifact store;
+- authorize, use, revoke, and audit a checker;
+- begin, time out, cancel, complete, and replay a run;
+- propose, accept, reject, and terminate shrink steps;
+- populate, miss, invalidate, and reuse caches.
+
+Invariants are checked after every transition, not only at the end of a
+generated sequence.
+
+### Integration tests
+
+Integration tests use real temporary filesystems, real SQLite databases, and
+real process boundaries. We do not mock our own store, registry, or checker
+dispatcher. A fake is appropriate only at an actual external boundary and must
+record calls rather than predict internal implementation details.
+
+### Clean-process replay tests
+
+A completed result bundle is replayed in a fresh process with an empty
+in-memory cache. These tests catch hidden global state, unrecorded dependencies,
+ambient paths, and accidental imports from the search package.
+
+### Differential tests
+
+Trust-critical mathematical operations should have a genuinely independent
+comparison where practical:
+
+- a simple, deliberately separate witness replay implementation;
+- an external canonicalizer or solver checked against a small exhaustive
+  implementation;
+- two serialization/parser implementations for fixed certificate formats;
+- a proof-assistant kernel for later high-assurance formats.
+
+Sharing a stable wire schema is acceptable. Importing the evaluator, witness
+oracle, search canonicalizer, or solver adapter into its checker is not.
+Different languages can help defense in depth, but language diversity alone is
+not independence.
+
+### Adversarial and fault-injection tests
+
+These tests deliberately attack the trust boundary:
+
+- malformed and ambiguous serialized values;
+- wrong-claim, wrong-candidate, wrong-semantics, and wrong-scope evidence;
+- corrupted blobs and interrupted commits;
+- evaluator lies about arithmetic or coverage;
+- solver timeout presented as infeasibility;
+- plugin attempts to authorize its own checker;
+- cache entries copied across evaluator, checker, scope, or semantics versions;
+- output, nesting, dependency, and storage limit exhaustion.
+
+The required result is fail-closed behavior with a precise operational status,
+not a generic exception and not a mathematical conclusion.
+
+### Performance benchmarks
+
+Performance runs measure throughput, latency, memory, and storage amplification
+on already-correct behavior. Their design is specified in
+[Performance benchmarks](performance-benchmarks.md).
+
+### Model-in-the-loop evaluations
+
+Model evaluations ask whether access to Jacobian improves a model's ability to
+notice semantic gaps, use witnesses, preserve uncertainty, and hand off
+replayable evidence. Their design is specified in
+[Agent evaluations](agent-evaluations.md).
+
+## Component test matrix
+
+### Schemas and common results
+
+Required examples and properties:
+
+- accept every valid enum combination used by the public contract;
+- reject noncanonical rationals, zero denominators, JSON floats in exact
+  objects, duplicate keys, excessive nesting, and oversized integers;
+- normalize signs, common factors, and zero exactly once;
+- round-trip every versioned schema through canonical bytes;
+- preserve unknown data only where the compatibility policy explicitly permits
+  it;
+- reject `TIMEOUT`, `CANCELLED`, or `ERROR` records that claim a verified
+  mathematical conclusion;
+- reject `input.status = REJECTED` records that carry a verified conclusion;
+- reject `verification = VERIFIED` without an authorized checker identity and
+  supported assurance method;
+- demonstrate that an exact direct witness can be verified with
+  `coverage = NOT_APPLICABLE`;
+- demonstrate that exhaustive floating-point evaluation remains unverified.
+
+The state cross-product should be generated from the schema rules rather than
+maintained as a few hand-picked examples.
+
+### Artifact identity and storage
+
+Required examples, properties, and state sequences:
+
+- equal canonical mathematical objects have the same object digest;
+- different schema, semantics, canonicalizer, or object-format versions change
+  identity even when payload bytes are equal;
+- manifests and run metadata can change without changing mathematical object
+  identity;
+- repeated and concurrent puts are idempotent;
+- staging files never become addressable artifacts before commit;
+- simulated process failure before and after rename leaves either the old
+  complete state or the new complete state;
+- digest verification catches modified and truncated blobs;
+- SQLite rollback, reopen, and WAL recovery preserve manifest/blob agreement;
+- unresolved, cyclic, too-deep, and too-wide dependency graphs fail within
+  configured bounds;
+- resource URIs cannot escape the store through path traversal, symlinks, or
+  crafted digests;
+- quotas reject new data without damaging existing artifacts;
+- garbage collection preserves every configured root and reachable object;
+- a cache cannot return a result after any semantics-relevant key component
+  changes.
+
+The state-machine oracle models the logical set of committed objects. It does
+not duplicate the store's file layout.
+
+### Plugin manifests and capability dispatch
+
+Required tests:
+
+- plugins may implement only the capabilities they need;
+- missing or incompatible capabilities fail before execution;
+- capability resolution is deterministic and version-aware;
+- manifests bind their semantics and implementation digests;
+- a changed implementation cannot retain the old manifest identity;
+- domain-specific graph, matrix, solver, or proof types never enter the core
+  manifest;
+- a manifest cannot authorize, replace, or revoke a checker;
+- two structurally different plugins use the same generic dispatch path.
+
+### Checker registry
+
+Required examples and state sequences:
+
+- only the operator administration surface can authorize a checker;
+- authorization binds executable digest, supported schemas, semantics,
+  evidence formats, and version ranges;
+- callers cannot override checker selection through certificate input;
+- duplicate identifiers with different executable digests are rejected;
+- incompatible checkers are rejected before evidence replay;
+- revocation blocks new verification records while preserving the historical
+  identity and policy state of old records;
+- checker replacement creates a new identity and invalidates verification
+  cache hits;
+- authorization and revocation are auditable and transactionally durable;
+- time-of-check/time-of-use substitution of a checker executable is detected.
+
+### Witness verification
+
+Required tests:
+
+- a valid witness is checked for domain membership and logical effect;
+- an otherwise valid witness bound to another claim, semantics, candidate, or
+  role is rejected;
+- deletion, insertion, permutation, and value mutation of witness components
+  either changes the checked meaning or causes rejection;
+- malformed or over-limit witnesses fail before mathematical replay;
+- a witness remains independently verifiable when the oracle is unavailable;
+- a witness found after an oracle timeout is judged only by replay, never by
+  the oracle's status;
+- checker code cannot import evaluator, oracle, mutator, or search-solver
+  packages;
+- the two reference plugins use different witness shapes and replay logic.
+
+### Certificate verification
+
+Required tests:
+
+- certificate format and version select an operator-authorized checker;
+- certificate payloads self-describe their format and bind claim, semantics,
+  candidate when applicable, encoding when applicable, and payload;
+- substitution of any bound digest fails before replay;
+- direct finite witness and complete finite enumeration formats have
+  independent clean-process replay tests;
+- malformed, truncated, unsupported, over-limit, and revoked-checker
+  certificates remain unverified;
+- a solver's `optimal`, `unsat`, or `complete` label is not accepted in place
+  of a supported checked certificate;
+- verification records are immutable and identify the exact checker digest;
+- repeated verification may use a cache only when all bindings and policy
+  inputs match;
+- parser and replay failures return an operational error or rejected evidence,
+  never a mathematical falsehood.
+
+Later certificate formats add format-specific mutation, differential, and
+known-answer suites before authorization is possible.
+
+### Evaluation and witness search
+
+Required tests:
+
+- a batch may contain accepted, rejected, completed, timed-out, and errored
+  candidates without one result contaminating another;
+- returned results preserve input ordering or carry stable candidate identity;
+- actual arithmetic, coverage, scope, limits, evaluator digest, seed, and
+  environment are recorded;
+- reaching any search or enumeration limit prevents exhaustive coverage;
+- heuristic, sampled, restricted, and exact evaluation remain unverified;
+- proposed evidence is stored by URI rather than embedded without bounds;
+- a timeout, cancellation, crash, or partial backend response never becomes
+  `FALSE`, `INFEASIBLE`, `NONE_CERTIFIED`, or `VERIFIED`;
+- `NONE_CERTIFIED` is returned only with a successful verification record bound
+  to the exact search question;
+- changing evaluator, scope, limits, seed when semantically relevant, or
+  environment invalidates the corresponding cache entry;
+- evaluator and oracle bugs cannot write to the checker registry.
+
+### Shrinking
+
+Required examples and state sequences:
+
+- every accepted reduction strictly improves at least one declared objective
+  without worsening a higher-priority objective under the selected ordering;
+- every accepted reduction receives a fresh preservation-checker replay;
+- a reduction that breaks the predicate is rejected without changing the
+  current target;
+- a malformed or nonterminating reducer is bounded;
+- repeated candidates and cycles do not cause nontermination;
+- budget exhaustion reports the strongest minimality actually established;
+- v0.1 rejects `ONE_STEP`, `BOUNDED_GLOBAL`, and `PROVED_GLOBAL`; later
+  releases cannot emit them without the corresponding checked completeness
+  evidence;
+- the final output, accepted-step trace, rejected proposals, objectives, and
+  checker identities can be replayed;
+- candidate and witness targets use typed reducers and cannot be confused;
+- certificate simplification remains a later, separate workflow.
+
+### CLI and MCP adapter
+
+The CLI and MCP layer must be thin enough to test by equivalence:
+
+- the Python API, CLI, and MCP call return the same semantic result envelope
+  for the same artifact inputs;
+- tool input and output schemas match the checked-in contract;
+- malformed requests fail before kernel invocation;
+- large artifacts and traces are returned as resource URIs;
+- response-size limits are enforced;
+- cancellation and progress never mutate mathematical conclusions;
+- stdio startup and one request work in a clean installed environment;
+- adapter packages contain no domain mathematics or verification policy.
+
+### Reference plugins
+
+The public mathematical inputs and expected oracles are selected in the
+[Mathematical scenario catalog](math-scenarios.md).
+
+The finite directed-graph/path reference plugin must contain:
+
+- a candidate whose intended family omits a legal induced object;
+- an oracle that returns the unexpected path;
+- a separately implemented checker that accepts the witness;
+- an exact, verified structural counterexample and finite certificate;
+- deliberately corrupted variants for every binding dimension.
+
+The second reference plugin must use a non-graph candidate, a different witness
+shape, and different optional capabilities. Its exact statement is frozen
+before implementation so it cannot be chosen merely because the current core
+already happens to pass it.
+
+## Test organization
+
+An initial layout may use:
+
+```text
+tests/
+    contract/
+    property/
+    stateful/
+    integration/
+    subprocess/
+    conformance/
+    differential/
+    fixtures/
+```
+
+Package-local tests are appropriate for focused behavior. Cross-package trust
+tests live in the top-level groups above. Suggested pytest markers are:
+
+```text
+contract
+property
+stateful
+integration
+subprocess
+conformance
+differential
+external_backend
+slow
+benchmark
+agent_eval
+```
+
+Markers are selection tools, not excuses for leaving required tests out of
+release validation.
+
+Use real clocks only when time itself is under test. Otherwise inject a clock,
+random source, executor, or backend at a public seam. Use temporary real SQLite
+databases and filesystems rather than mocks of persistence behavior.
+
+## Test tooling
+
+The initial test stack remains deliberately small:
+
+| Need | Initial tool | Use |
+| --- | --- | --- |
+| Test runner and fixtures | pytest | Public behavior, integration, subprocess, and conformance suites |
+| Generative and stateful testing | Hypothesis | Canonicalization, parser, persistence, lifecycle, and reduction invariants |
+| Language-neutral schema validation | `jsonschema` | Check generated wire contracts independently of Pydantic parsing |
+| Coverage diagnostics | coverage.py through pytest-cov | Find unexercised code; never substitute percentage for behavior coverage |
+| Performance measurement | pyperf | Calibrated Python benchmarks with metadata and raw JSON |
+| Static checks | Ruff plus a strict Python type checker selected during scaffolding | Catch ordinary defects before runtime suites |
+
+The checked-in JSON Schemas should be exercised both through Pydantic and a
+standards-oriented JSON Schema validator. A Pydantic model successfully reading
+its own generated schema is not independent contract evidence.
+
+Use the standard library's `tempfile`, `subprocess`, and process primitives for
+artifact and replay tests. Do not use an in-memory filesystem or `pyfakefs` to
+claim evidence about atomic rename, SQLite WAL recovery, symlink handling, or
+durability. Those behaviors require a real filesystem.
+
+Do not add `pytest-xdist` until sequential behavior is stable. Parallelizing a
+test suite too early can obscure shared-state bugs; concurrency is introduced
+through explicit state-machine and integration scenarios first. Similarly,
+select a mutation-testing tool only after the C0 suite is stable enough that
+surviving mutants are actionable rather than noise.
+
+## Test work packages
+
+Testing belongs to each implementation issue rather than to one cleanup issue
+at the end. Cross-cutting harness work can be tracked separately in these
+packages:
+
+### T0 — Test foundation
+
+- configure pytest markers and bounded Hypothesis profiles;
+- add canonical fixture/artifact builders through public constructors;
+- add real temporary store and clean-process helpers;
+- add checked-in schema validation through `jsonschema`;
+- make random seeds and failure artifacts visible in CI output.
+
+### T1 — Result and artifact invariants
+
+- implement generated result-state cross-product tests;
+- implement rational and canonical-encoding properties;
+- implement artifact-store state machines and crash points;
+- cover cache-key domain separation.
+
+This work ships with the schema and artifact issues, not after them.
+
+### T2 — Trust-boundary conformance
+
+- make the conformance IDs executable and traceable to tests;
+- implement checker-registry state machines;
+- implement evidence-substitution mutation matrices;
+- enforce package/import and clean-process boundaries;
+- add direct-witness and finite-enumeration known-answer fixtures.
+
+### T3 — Orchestration and shrinking
+
+- add mixed-batch and resource-failure scenarios;
+- add oracle outcome and `NONE_CERTIFIED` protocol tests;
+- add reduction state machines, cycle detection, and minimality-label tests;
+- compare Python API, CLI, and MCP results.
+
+### T4 — Cross-domain release fixtures
+
+- freeze the two reference problem statements and hidden expected facts;
+- implement independent search and checker paths;
+- add adversarial variants and replayable bundles;
+- demonstrate that neither plugin changes core schemas.
+
+### T5 — Performance baseline
+
+- freeze the benchmark corpus;
+- add pyperf commands and raw-result artifact collection;
+- establish same-host variance before proposing regression gates;
+- profile only after correctness and baseline results exist.
+
+### T6 — Model-evaluation harness
+
+- isolate public fixtures from hidden oracles;
+- implement baseline and kernel conditions;
+- record every run, seed, model/tool version, and hard failure;
+- pilot semantic-closure, timeout, binding, shrinking, and cross-domain cases.
+
+T0 should begin with implementation scaffolding. T1–T4 follow the dependency
+order of the existing foundational issues. T5 and T6 can be specified early,
+but they should not compete with the v0.1 trust boundary for implementation
+time.
+
+## TDD implementation sequence
+
+The test plan is an inventory, not an instruction to write thousands of tests
+before implementation. Each issue proceeds in thin vertical slices:
+
+1. Add one failing public behavior or attack test.
+2. Confirm it fails for the intended reason.
+3. Implement the smallest contract-preserving behavior.
+4. Run the focused suite.
+5. Refactor only while the behavior remains green.
+6. Add the next boundary case.
+
+The first slices should be:
+
+1. Reject an operational timeout carrying a false verified conclusion.
+2. Canonicalize equivalent rationals and reject ambiguous exact values.
+3. Give equal objects equal digests and domain-separated objects different
+   digests.
+4. Recover atomically from an interrupted artifact put.
+5. Reject a plugin attempt to register a checker.
+6. Reject a valid certificate rebound to another candidate.
+7. Accept and replay one direct witness in a clean process.
+8. Reject a shrink step that is smaller but does not preserve the predicate.
+
+This sequence crosses the result, storage, registry, verification, and
+orchestration boundaries early enough to expose a flawed architecture before
+large modules accumulate.
+
+## CI and release gates
+
+### Local and change-focused
+
+During implementation, run the smallest affected contract, property, or
+integration subset. Static formatting, lint, and type checks run with it once
+their configuration exists.
+
+### Pull request
+
+Every pull request runs:
+
+- deterministic contract tests;
+- bounded property and state-machine profiles;
+- real SQLite/filesystem integration tests;
+- applicable subprocess, conformance, and dependency-boundary tests;
+- both reference-plugin tests once they exist.
+
+C0 changes additionally require an independent exact-diff review. After any
+resulting edit, only invalidated focused evidence is rerun, followed by one full
+required validation pass against the final tree.
+
+### Nightly
+
+Nightly validation runs:
+
+- higher Hypothesis example counts and longer state-machine sequences;
+- fault-injection and crash-recovery matrices;
+- differential implementations and optional external backends;
+- clean-install and clean-process replay;
+- performance measurements on a controlled runner;
+- mutation testing pilots for selected C0 modules.
+
+Nightly failures are triaged as defects. Retrying is useful for diagnosis, not
+for declaring the original result green.
+
+### Release
+
+A v0.1 release requires:
+
+- every normative conformance test;
+- both structurally different reference plugins;
+- package installation and replay in a clean environment;
+- no unresolved C0 failure or accepted flake;
+- a replayable artifact bundle for each reference result;
+- recorded checker identities and dependency versions;
+- an independent review of final C0 diffs since the preceding release.
+
+Code coverage is diagnostic, not a release proxy. Completion of the behavior
+and attack matrix is the primary measure. Mutation testing can strengthen C0
+confidence after the suite is stable, but a mutation score is not itself a
+mathematical assurance level.
+
+## Later-release test additions
+
+### v0.2
+
+- enumeration scope and completeness certificates;
+- isomorphism/canonicalization differential tests;
+- transformation direction and proof-obligation tests;
+- exact projection and separator replay;
+- persistent experiment lifecycle and cancellation.
+
+### v0.3
+
+- deterministic single-worker lineage before concurrency;
+- resumability, idempotency, queue, and worker-crash state machines;
+- local worker timeout, output-limit, and dependency-pinning tests;
+- distributed duplicate-work and stale-lease tests;
+- search never bypasses promotion through v0.1 verification.
+
+### v0.4
+
+- trust-label preservation through indexing and retrieval;
+- retention, quota, deduplication, and promotion state machines;
+- temporal cutoff and data-leakage tests;
+- retrieval-quality evaluations on held-out episodes.
+
+### v0.5
+
+- generated and repaired conjectures always remain hypotheses;
+- falsification pipelines cannot self-promote claims;
+- parameter-region certificates bind the original claim and encoding;
+- novelty checks respect temporal and provenance constraints.
+
+### v1.0
+
+- wire-format and artifact compatibility across released versions;
+- signed bundle and trust-root rotation tests;
+- independent installation and offline replay;
+- verified encoding-bridge and Lean kernel integration suites;
+- migration rollback and historical-record preservation.

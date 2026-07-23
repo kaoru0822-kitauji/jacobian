@@ -42,6 +42,10 @@ provisional and may change in response to evidence from earlier releases.
 - [Tool surface](docs/tools.md)
 - [Roadmap and release gates](docs/roadmap.md)
 - [Reference benchmarks](docs/benchmarks.md)
+- [Mathematical scenario catalog](docs/math-scenarios.md)
+- [Testing strategy and critical areas](docs/testing-strategy.md)
+- [Performance benchmarks](docs/performance-benchmarks.md)
+- [Model-in-the-loop evaluations](docs/agent-evaluations.md)
 - [Threat model](docs/threat-model.md)
 - [v0.1 conformance specification](docs/conformance-v0.1.md)
 - [v0.1 specification](docs/specifications/v0.1.md)
@@ -55,8 +59,21 @@ provisional and may change in response to evidence from earlier releases.
 
 ## Current status
 
-The repository is in the specification phase. No public API or artifact format
-is stable yet.
+v0.1 alpha is implemented as a local Python package, CLI, and MCP adapter. Its
+seven-tool verification surface and artifact format remain pre-stable while
+the conformance suite and reference domains mature.
+
+```sh
+uv sync --dev
+uv run pytest
+uv run ruff check .
+uv run mypy
+uv run jacobian --help
+uv run jacobian-mcp
+```
+
+The MCP adapter is pinned to the official Python SDK `2.0.0b2`. It remains
+isolated from the mathematical kernel because that SDK release is a beta.
 
 ## Initial non-goals
 
