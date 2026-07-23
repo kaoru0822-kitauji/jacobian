@@ -78,11 +78,20 @@ multi-process leases and resumable ownership belong to M3.
 ```sh
 uv sync --dev
 uv run pytest
+uv run pytest -n 0 -m "not integration and not end_to_end"
 uv run ruff check .
+uv run ruff format --check .
 uv run mypy
+uv run deptry .
+uv run pre-commit install
 uv run jacobian --help
 uv run jacobian-mcp
 ```
+
+The full suite uses up to four `pytest-xdist` workers with work stealing. Use
+the marker-filtered command for the fast development loop, or add `-n 0` when
+debugging one test in a single process. Pre-commit keeps commit-time checks
+fast; the full type, dependency, test, and build gates remain explicit.
 
 The MCP adapter is pinned to the official Python SDK `2.0.0b2`. It remains
 isolated from the mathematical kernel because that SDK release is a beta.

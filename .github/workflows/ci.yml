@@ -5,20 +5,29 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  release:
+    types: [published]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
 
 jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8
         with:
           python-version: "3.12"
-      - run: uv sync --dev
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --frozen --dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
+      - run: uv run deptry .
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
@@ -27,59 +36,40 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --dev
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --frozen --dev
       - run: uv run pytest --cov --cov-report=xml --cov-report=term --durations=10
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-${{ matrix.python-version }}
-          path: .coverage
-
-  unused-deps:
-    name: Unused Dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-      - run: uv sync --dev
-      - run: uv run deptry .
-
-  tech-debt:
-    name: Tech Debt Tracking
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-      - run: uv sync --dev
-      - run: uv run ruff check . --select TD --output-format=full
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
 
   duplicate-code:
     name: Duplicate Code Detection
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npx jscpd --config .jscpd.json .
+      - run: npx --yes jscpd@5.0.12 --config .jscpd.json .
 
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8
         with:
           python-version: "3.12"
           enable-cache: true
+          cache-dependency-glob: uv.lock
       - run: |
           echo "::group::Build timing"
           /usr/bin/time -v uv build 2>&1 | tee build-timing.log
@@ -98,23 +88,22 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
+    needs: [lint, test, duplicate-code, build]
     environment: pypi
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/download-artifact@v5
         with:
-          python-version: "3.12"
-          enable-cache: true
-      - run: uv build
+          name: dist
+          path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    needs: [lint, test, unused-deps, tech-debt, duplicate-code, build]
+    needs: [lint, test, duplicate-code, build]
     steps:
       - uses: googleapis/release-please-action@v4
         with:

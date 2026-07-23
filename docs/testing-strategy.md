@@ -30,11 +30,20 @@ The current local validation commands are:
 
 ```sh
 uv run pytest
+uv run pytest -n 0 -m "not integration and not end_to_end"
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
+uv run deptry .
 uv build
 ```
+
+The first command is the full suite. It uses `pytest-xdist` work stealing and
+at most four workers because test durations vary substantially and many tests
+wait on isolated subprocesses. The second command is the fast local loop. Use
+`-n 0` for debugger-friendly, single-process execution and `--durations=25`
+when investigating regressions. Parallel workers retain separate `tmp_path`
+roots; tests that add shared external state must coordinate it explicitly.
 
 ## Criticality classes
 

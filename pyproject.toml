@@ -30,6 +30,7 @@ dev = [
     "deptry>=0.21,<1",
     "hypothesis>=6.130,<7",
     "mypy>=1.15,<3",
+    "pre-commit>=4.4,<5",
     "pyperf>=2.9,<3",
     "pytest>=8.3,<10",
     "pytest-cov>=6,<8",
@@ -44,7 +45,7 @@ dev = [
 packages = ["src/jacobian", "src/jacobian_checkers"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers"
+addopts = "-ra --strict-config --strict-markers -n auto --maxprocesses=4 --dist=worksteal"
 testpaths = ["tests"]
 markers = [
     "contract: public wire and Python contract tests",
