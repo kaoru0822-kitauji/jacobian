@@ -6,6 +6,19 @@ specification before being posted to GitHub.
 The issues build the generic kernel first and use two reference plugins only as
 conformance tests. Domain-specific types do not enter the public core API.
 
+## Posted issues
+
+| Draft | GitHub |
+| --- | --- |
+| Issue 0 | [#1](https://github.com/morluto/jacobian/issues/1) |
+| Issue 1 | [#2](https://github.com/morluto/jacobian/issues/2) |
+| Issue 2 | [#3](https://github.com/morluto/jacobian/issues/3) |
+| Issue 3 | [#4](https://github.com/morluto/jacobian/issues/4) |
+| Issue 4 | [#5](https://github.com/morluto/jacobian/issues/5) |
+| Issue 5 | [#6](https://github.com/morluto/jacobian/issues/6) |
+
+Issues 6–10 remain local drafts until their dependencies are concrete.
+
 ## Issue 0
 
 ### Title
