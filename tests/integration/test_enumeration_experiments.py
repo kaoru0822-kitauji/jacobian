@@ -175,13 +175,32 @@ def test_experiment_metadata_uses_registered_schema_validation(
         parameters={},
     )
     validated_schema_uris: list[str] = []
+    validated_semantics_uris: list[str] = []
     original_validate = kernel.schemas.validate
+    original_get_descriptor = kernel.store.get_descriptor
 
     def record_validation(schema_uri: str, payload: object) -> object:
         validated_schema_uris.append(schema_uri)
         return original_validate(schema_uri, payload)
 
+    def record_descriptor_validation(
+        artifact_uri: str,
+        *,
+        expected_kind: str | None = None,
+    ) -> dict[str, object]:
+        if expected_kind == "semantics":
+            validated_semantics_uris.append(artifact_uri)
+        return original_get_descriptor(
+            artifact_uri,
+            expected_kind=expected_kind,
+        )
+
     monkeypatch.setattr(kernel.schemas, "validate", record_validation)
+    monkeypatch.setattr(
+        kernel.store,
+        "get_descriptor",
+        record_descriptor_validation,
+    )
     handle = kernel.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
@@ -201,6 +220,7 @@ def test_experiment_metadata_uses_registered_schema_validation(
     assert kernel.experiments.evaluation_schema_uri in validated_schema_uris
     assert kernel.experiments.archive_page_schema_uri in validated_schema_uris
     assert kernel.experiments.archive_manifest_schema_uri in validated_schema_uris
+    assert kernel.references["matrices"].semantics_uri in validated_semantics_uris
 
 
 @pytest.mark.integration

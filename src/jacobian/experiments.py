@@ -523,8 +523,12 @@ class ExperimentService:
 
                 selected_uris: list[str] = []
                 selected_keys: list[str] = []
+                manifest = self.plugins.get(request.plugin_id)
+                self.store.get_descriptor(
+                    manifest.semantics_uri,
+                    expected_kind="semantics",
+                )
                 for payload in page.candidates:
-                    manifest = self.plugins.get(request.plugin_id)
                     normalized_payload = self.schemas.validate(
                         manifest.candidate_schema_uri,
                         payload,
