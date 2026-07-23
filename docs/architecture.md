@@ -86,8 +86,8 @@ schema, parent artifacts, and a short summary.
 
 Execution metadata such as runtime, seed, environment, limits, logs, and tool
 version. A run record does not change the identity of the mathematical object.
-v0.1 persists verification records; generic experiment-run persistence begins
-with the bounded-discovery job model in v0.2.
+v0.2 persists verification records and adds durable mutable experiment
+snapshots plus immutable scope, archive-page, and archive-manifest artifacts.
 
 ### Knowledge record
 
@@ -231,6 +231,39 @@ a proof-assistant kernel. Different programming languages are useful for
 defense in depth, but language diversity alone does not establish mathematical
 independence.
 
+## Bounded discovery
+
+`search.enumerate` validates a claim and the plugin's optional enumerator,
+evaluator, and canonicalizer capabilities before creating a durable experiment
+handle. The local worker pages through a declared scope, commits candidate and
+evaluation artifacts, and maintains exact accounting:
+
+```text
+enumerator page
+    → schema validation
+    → optional implementation-bound canonical key
+    → duplicate rejection
+    → batch evaluation
+    → immutable archive page
+    → durable snapshot
+```
+
+The snapshot distinguishes complete enumerator reports, candidate limits,
+wall-time limits, cancellation, and errors. Even a complete report remains
+unverified. Canonical mathematical objects retain ordinary artifact identity;
+the search key separately hashes the canonical object digest together with the
+canonicalizer implementation digest.
+
+Representation changes follow a proposer/checker split. A transformer stores
+the target, relation label, implementation digest, and proof obligation.
+`transform.verify` rebinds both source and target schemas, semantics, and
+digests before dispatching to an operator-authorized checker.
+
+The initial `polytope.separate` backend covers finite rational V-represented
+polytopes. Z3 proposes exact convex weights or an exact separator. Independent
+checkers replay those objects using `Fraction` arithmetic and do not import
+Z3.
+
 ## MCP boundary
 
 The engine is a normal Python library and CLI. MCP is a thin adapter:
@@ -239,7 +272,8 @@ The engine is a normal Python library and CLI. MCP is a thin adapter:
 - Resources expose large artifacts, traces, and experiment state.
 - Tool responses contain only compact structured summaries and resource URIs.
 - Long-running searches return an experiment handle.
-- Immutable experiment snapshots are content-addressed artifacts.
+- Scope and archive artifacts are immutable; the experiment snapshot is a
+  durable lifecycle record.
 
 The engine does not expose a generic public `solver.solve`. Solver families have
 different inputs, guarantees, and certificates, and remain typed internal

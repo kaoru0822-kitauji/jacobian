@@ -7,9 +7,9 @@ than ordinary application correctness: they must demonstrate that malformed
 inputs, incomplete computations, stale caches, and substituted evidence cannot
 be promoted into verified mathematical conclusions.
 
-This document defines the test architecture for v0.1 and the gates that later
+This document defines the test architecture for v0.2 and the gates that later
 releases inherit. It complements the normative
-[v0.1 conformance specification](conformance-v0.1.md). The conformance
+[v0.2 conformance specification](conformance-v0.2.md). The conformance
 specification states what an implementation must do; this document states how
 we build and maintain evidence that it does so.
 
@@ -108,7 +108,7 @@ wire format.
 | Representation changes | A relaxation or restriction is treated as equivalence | v0.2 direction tests, proof-obligation replay, proposer/checker separation |
 | Research memory | Retrieved hypotheses silently gain verified status | v0.4 trust-label, retention, and temporal-cutoff tests |
 
-The first seven rows are the highest-risk v0.1 areas. They should be reviewed
+The first seven rows are the highest-risk v0.2 areas. They should be reviewed
 before optimizing throughput or expanding the public tool surface.
 
 ## Test layers
@@ -367,7 +367,7 @@ Required examples and state sequences:
 - a malformed or nonterminating reducer is bounded;
 - repeated candidates and cycles do not cause nontermination;
 - budget exhaustion reports the strongest minimality actually established;
-- v0.1 rejects `ONE_STEP`, `BOUNDED_GLOBAL`, and `PROVED_GLOBAL`; later
+- v0.2 rejects `ONE_STEP`, `BOUNDED_GLOBAL`, and `PROVED_GLOBAL`; later
   releases cannot emit them without the corresponding checked completeness
   evidence;
 - the final output, accepted-step trace, rejected proposals, objectives, and
@@ -536,7 +536,7 @@ This work ships with the schema and artifact issues, not after them.
 
 T0 should begin with implementation scaffolding. T1–T4 follow the dependency
 order of the existing foundational issues. T5 and T6 can be specified early,
-but they should not compete with the v0.1 trust boundary for implementation
+but they should not compete with the v0.2 trust boundary for implementation
 time.
 
 ## TDD implementation sequence
@@ -603,9 +603,9 @@ Nightly validation runs:
 Nightly failures are triaged as defects. Retrying is useful for diagnosis, not
 for declaring the original result green.
 
-### Release
+### v0.2 release
 
-A v0.1 release requires:
+A v0.2 release requires:
 
 - every normative conformance test;
 - both structurally different reference plugins;
@@ -620,15 +620,21 @@ and attack matrix is the primary measure. Mutation testing can strengthen C0
 confidence after the suite is stable, but a mutation score is not itself a
 mathematical assurance level.
 
-## Later-release test additions
+## Bounded-discovery coverage
 
-### v0.2
-
-- enumeration scope and completeness certificates;
+- enumeration scope, page-progress, limit, and cancellation behavior;
 - isomorphism/canonicalization differential tests;
+- canonical keys bound to canonicalizer implementation identity;
 - transformation direction and proof-obligation tests;
 - exact projection and separator replay;
 - persistent experiment lifecycle and cancellation.
+
+The normative attack matrix is
+[v0.2 conformance](conformance-v0.2.md). Complete search snapshots remain
+unverified; a theorem inferred from the absence of a candidate needs a
+domain-specific completeness certificate and checker.
+
+## Later-release test additions
 
 ### v0.3
 
@@ -636,7 +642,7 @@ mathematical assurance level.
 - resumability, idempotency, queue, and worker-crash state machines;
 - local worker timeout, output-limit, and dependency-pinning tests;
 - distributed duplicate-work and stale-lease tests;
-- search never bypasses promotion through v0.1 verification.
+- search never bypasses promotion through v0.2 verification.
 
 ### v0.4
 

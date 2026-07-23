@@ -7,7 +7,7 @@ and provenance. Mathematical meaning is supplied by versioned domain plugins.
 The public tool surface is layered so a heuristic operation cannot masquerade
 as a verifier.
 
-## v0.1 core tools
+## Core v0.2 tools
 
 | Tool | Capability |
 | --- | --- |
@@ -33,6 +33,7 @@ result or `UNKNOWN`.
 | --- | --- |
 | `transform.apply` | Propose or compute a new representation, such as graph to path family, routing to polytope, recurrence to program, or formula to SAT/PB encoding. |
 | `transform.verify` | Verify whether the transformation is an equivalence, over-approximation, under-approximation, or heuristic transformation, and check its proof obligation. |
+| `polytope.separate` | For finite rational generator sets, perform exact coordinate projection and return either convex-combination weights or a strict separator. |
 
 The component proposing a representation change cannot certify its own
 relationship.
@@ -51,6 +52,10 @@ Search strategies have separate typed operations:
 These tools start experiment jobs and return experiment resource handles. They
 do not produce verified conclusions by themselves.
 
+The resident MCP server returns the `search.enumerate` handle immediately. The
+local CLI waits for the bounded experiment and prints its terminal snapshot,
+because a daemon worker cannot outlive a short-lived CLI process.
+
 ## Optional domain tools
 
 Domains expose only the operations they support:
@@ -60,7 +65,6 @@ Domains expose only the operations they support:
 | `family.materialize` | Explicitly enumerate a complete bounded semantic family, such as all paths, legal deviations, generated words, or reachable states. |
 | `family.compile` | Compile a large family into a BDD, ZDD, automaton, dynamic program, or oracle. |
 | `structure.canonicalize` | Produce a canonical representation, automorphisms, and orbits for a supported finite structure. |
-| `polytope.separate` | Perform typed exact projection, convex-hull membership, separation, and facet computation. |
 
 These are plugin capabilities, not mandatory universal tools. A numerical
 analysis plugin need not implement graph canonicalization; a Lean proof plugin
@@ -98,6 +102,10 @@ Read-only discovery and large-object access use MCP resources:
 ```text
 artifact://sha256/<digest>
 reference://catalog
+experiment://<id>
+experiment://<id>/accounting
+experiment://<id>/scope
+experiment://<id>/archive
 ```
 
 Schemas, semantics, plugin manifests, witnesses, certificates, and verification
@@ -106,9 +114,9 @@ records are all ordinary artifacts and use the artifact resource template.
 reference fixtures. Checker administration remains outside the model-facing
 MCP surface.
 
-Later releases add experiment resources. State-changing lifecycle actions such
-as `experiment.cancel`, `experiment.pause`, and `experiment.resume` remain
-tools.
+v0.2 experiment resources expose durable snapshots and compact artifact
+handles. `experiment.cancel` is a tool because it changes state. Pause and
+resume remain later work.
 
 ## Operator actions, not model tools
 

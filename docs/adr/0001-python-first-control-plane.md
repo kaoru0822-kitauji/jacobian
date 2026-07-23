@@ -1,6 +1,6 @@
 # ADR 0001: Use a Python-first control plane
 
-- Status: Accepted for v0.1
+- Status: Accepted for v0.2
 - Date: 2026-07-23
 
 ## Decision
@@ -61,7 +61,7 @@ Python kernel
     └── Lean 4
 ```
 
-## v0.1 libraries
+## v0.2 libraries
 
 | Capability | Choice |
 | --- | --- |
@@ -87,7 +87,7 @@ JSON floating-point values in exact mathematical objects.
 An independent graph-domain checker should use a small standard-library graph
 traversal instead of importing its search plugin's NetworkX routines.
 
-At the user's explicit request, v0.1 pins the current v2 beta exactly:
+At the user's explicit request, v0.2 pins the current v2 beta exactly:
 
 ```toml
 mcp = "==2.0.0b2"
