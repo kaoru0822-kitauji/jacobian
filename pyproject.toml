@@ -26,11 +26,14 @@ jacobian-mcp = "jacobian.adapters.mcp.server:main"
 
 [dependency-groups]
 dev = [
+    "deptry>=0.21,<1",
     "hypothesis>=6.130,<7",
     "mypy>=1.15,<2",
     "pyperf>=2.9,<3",
     "pytest>=8.3,<10",
     "pytest-cov>=6,<8",
+    "pytest-rerunfailures>=14,<16",
+    "pytest-xdist>=3.6,<4",
     "ruff>=0.11,<1",
     "types-jsonschema>=4.23,<5",
     "types-networkx>=3.4,<4",
@@ -67,6 +70,7 @@ select = [
     "A",
     "B",
     "C4",
+    "C90",
     "E",
     "F",
     "I",
@@ -79,15 +83,24 @@ select = [
 ]
 ignore = ["E501"]
 
+[tool.ruff.lint.mccabe]
+max-complexity = 28
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
 packages = ["jacobian", "jacobian_checkers"]
+
+[tool.deptry]
+extend_exclude = ["benchmarks"]
+known_first_party = ["jacobian", "jacobian_checkers"]
+per_rule_ignores = { "DEP002" = ["mcp-types"] }
 
 [tool.coverage.run]
 branch = true
 source = ["jacobian", "jacobian_checkers"]
 
 [tool.coverage.report]
+fail_under = 50
 show_missing = true
 skip_covered = true

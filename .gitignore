@@ -1,6 +1,22 @@
 # Local design source material
 deep_review.md
 
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE configs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
 # Python development artifacts
 .coverage
 coverage.json

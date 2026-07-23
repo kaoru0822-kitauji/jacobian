@@ -1,0 +1,26 @@
+{
+    "name": "Jacobian Development",
+    "image": "mcr.microsoft.com/devcontainers/python:3.12",
+    "features": {
+        "ghcr.io/astral-sh/setup-uv:1": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "ms-python.mypy-type-checker",
+                "ms-python.python"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": ".venv/bin/python",
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.ruff": "explicit",
+                    "source.organizeImports.ruff": "explicit"
+                }
+            }
+        }
+    },
+    "postCreateCommand": "uv sync --dev",
+    "remoteUser": "vscode"
+}
