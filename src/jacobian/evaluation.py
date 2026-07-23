@@ -66,6 +66,8 @@ class EvaluationService:
         seed: int,
         wall_seconds: int,
     ) -> EvaluationBatchResult:
+        """Evaluate candidates without promoting any plugin result to verified."""
+
         selected_profile = EvaluationProfile(profile)
         candidates = tuple(candidate_uris)
         if not candidates:

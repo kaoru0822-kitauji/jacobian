@@ -47,7 +47,7 @@ def compute_entrypoint_digest(entrypoint: str) -> str:
 
 
 class CheckerRegistry:
-    """Persistent checker policy, reachable only from operator administration."""
+    """Persist operator authorization, compatibility, audit, and revocation."""
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
@@ -126,6 +126,8 @@ class CheckerRegistry:
         candidate_schema_uris: tuple[str, ...],
         reason: str = "operator authorization",
     ) -> CheckerRegistration:
+        """Authorize one measured checker for explicit evidence compatibility."""
+
         executable_digest = compute_entrypoint_digest(entrypoint)
         identity_payload = {
             "checker_schema_version": "1",
@@ -196,6 +198,8 @@ class CheckerRegistry:
         return registration
 
     def get(self, checker_id: str) -> CheckerRegistration:
+        """Return a checker registration, including its revocation state."""
+
         with self._connect() as connection:
             row = connection.execute(
                 """
@@ -212,6 +216,8 @@ class CheckerRegistry:
         return CheckerRegistration.model_validate(data)
 
     def require_active(self, checker_id: str) -> CheckerRegistration:
+        """Return a checker only while it may create new verified records."""
+
         registration = self.get(checker_id)
         if not registration.authorized:
             raise CheckerRevokedError(f"checker is revoked: {checker_id}")
@@ -233,6 +239,8 @@ class CheckerRegistry:
         semantics_uri: str,
         candidate_schema_uri: str,
     ) -> CheckerRegistration:
+        """Require an active checker matching every declared evidence binding."""
+
         registration = self.require_active(checker_id)
         expected_kind = EvidenceKind(evidence_kind)
         if registration.evidence_kind is not expected_kind:
@@ -268,6 +276,8 @@ class CheckerRegistry:
         semantics_uri: str,
         candidate_schema_uri: str,
     ) -> CheckerRegistration:
+        """Select the unique active checker compatible with an evidence format."""
+
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT checker_id FROM checkers WHERE authorized = 1"
@@ -299,6 +309,8 @@ class CheckerRegistry:
         return compatible[0]
 
     def revoke(self, checker_id: str, *, reason: str) -> None:
+        """Block new verification while preserving historical records."""
+
         with self._exclusive_policy_lock(), self._connect() as connection:
             row = connection.execute(
                 "SELECT authorized FROM checkers WHERE checker_id = ?",
@@ -321,6 +333,8 @@ class CheckerRegistry:
             )
 
     def audit_log(self, checker_id: str) -> tuple[CheckerAuditEvent, ...]:
+        """Return ordered authorization and revocation events."""
+
         with self._connect() as connection:
             rows = connection.execute(
                 """

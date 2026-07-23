@@ -19,6 +19,8 @@ from jacobian.store import ArtifactStore, StoreError
 
 
 class ClaimValidationService:
+    """Validate a claim's structure and capabilities without proving it."""
+
     def __init__(
         self,
         store: ArtifactStore,
@@ -35,6 +37,8 @@ class ClaimValidationService:
         claim_uri: str,
         plugin_id: str,
     ) -> ClaimValidationResult:
+        """Check a stored claim against the selected installed plugin."""
+
         errors: list[str] = []
         warnings: list[str] = []
         claim_digest: str | None = None

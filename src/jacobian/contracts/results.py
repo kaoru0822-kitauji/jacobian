@@ -17,6 +17,8 @@ class ContractModel(BaseModel):
 
 
 class ExecutionStatus(StrEnum):
+    """Operational completion state, independent of mathematical truth."""
+
     COMPLETED = "COMPLETED"
     TIMEOUT = "TIMEOUT"
     CANCELLED = "CANCELLED"
@@ -29,6 +31,8 @@ class InputStatus(StrEnum):
 
 
 class Conclusion(StrEnum):
+    """Mathematical conclusion; UNKNOWN is never interpreted as false."""
+
     TRUE = "TRUE"
     FALSE = "FALSE"
     UNKNOWN = "UNKNOWN"
@@ -87,6 +91,8 @@ class InputValidation(ContractModel):
 
 
 class Assurance(ContractModel):
+    """Arithmetic, method, coverage, and checker identity for a conclusion."""
+
     arithmetic: Arithmetic
     method: Method
     coverage: Coverage
@@ -136,6 +142,8 @@ class Assurance(ContractModel):
 
 
 class ResultEnvelope(ContractModel):
+    """Separate execution, input, conclusion, assurance, and evidence."""
+
     schema_version: Literal["1"] = "1"
     execution: Execution
     input: InputValidation

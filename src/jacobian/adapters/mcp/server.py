@@ -58,6 +58,8 @@ def create_server(
     *,
     install_references: bool = True,
 ) -> MCPServer[AppState]:
+    """Create the thin MCP adapter over one local Jacobian kernel."""
+
     # Keep ``--help`` and ``--version`` independent of the MCP runtime's
     # heavier imports and shutdown hooks.
     from mcp.server import MCPServer

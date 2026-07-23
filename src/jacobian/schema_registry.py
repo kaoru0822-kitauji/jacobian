@@ -35,10 +35,14 @@ def _reject_external_references(value: Any) -> None:
 
 
 class SchemaRegistry:
+    """Store and apply closed local JSON Schemas used by artifact contracts."""
+
     def __init__(self, store: ArtifactStore) -> None:
         self.store = store
 
     def register(self, *, name: str, version: str, schema: dict[str, Any]) -> str:
+        """Register a schema after rejecting unsupported external references."""
+
         normalized = loads_strict_json(canonicalize_json(schema))
         _reject_external_references(normalized)
         try:
@@ -53,6 +57,8 @@ class SchemaRegistry:
         )
 
     def resolve(self, schema_uri: str) -> dict[str, Any]:
+        """Load a previously registered schema definition."""
+
         try:
             descriptor = self.store.get_descriptor(
                 schema_uri,
@@ -67,6 +73,8 @@ class SchemaRegistry:
         return definition
 
     def validate(self, schema_uri: str, payload: Any) -> Any:
+        """Validate and canonically normalize a payload."""
+
         normalized = loads_strict_json(canonicalize_json(payload))
         schema = self.resolve(schema_uri)
         validator = Draft202012Validator(schema, format_checker=FormatChecker())

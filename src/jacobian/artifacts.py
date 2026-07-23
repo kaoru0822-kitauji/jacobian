@@ -14,6 +14,8 @@ class ArtifactValidationError(ValueError):
 
 
 class ArtifactService:
+    """Validate domain payloads before committing immutable artifacts."""
+
     def __init__(self, store: ArtifactStore, schemas: SchemaRegistry) -> None:
         self.store = store
         self.schemas = schemas
@@ -27,6 +29,8 @@ class ArtifactService:
         parents: tuple[str, ...] | list[str] = (),
         summary: str = "",
     ) -> ArtifactPutResult:
+        """Validate and store one artifact under its schema and semantics."""
+
         try:
             normalized = self.schemas.validate(schema_uri, payload)
             self.store.get_descriptor(

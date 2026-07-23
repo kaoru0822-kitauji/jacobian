@@ -16,6 +16,8 @@ from jacobian.implementation import package_source_digest
 
 @dataclass(frozen=True, slots=True)
 class PluginExecutionResult:
+    """Operational result from one local plugin worker invocation."""
+
     status: ExecutionStatus
     output: dict[str, Any] | None
     diagnostics: str
@@ -24,7 +26,12 @@ class PluginExecutionResult:
 
 
 class PluginExecutor:
-    """Run an installed capability out of process with fail-closed outcomes."""
+    """Run operator-installed local code with bounded, fail-closed outcomes.
+
+    The child-process boundary limits elapsed time, output, and descendant
+    lifetime. It is not a security sandbox and does not make plugin results
+    mathematically trusted.
+    """
 
     def __init__(
         self,
@@ -43,6 +50,8 @@ class PluginExecutor:
         request: dict[str, Any],
         timeout_seconds: float,
     ) -> PluginExecutionResult:
+        """Execute a capability only if the worker measures the expected source."""
+
         started = time.monotonic()
         expected_digest = implementation_digest or package_source_digest(entrypoint)
         environment = dict(os.environ)
