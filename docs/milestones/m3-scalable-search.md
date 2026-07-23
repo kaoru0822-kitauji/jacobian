@@ -1,4 +1,4 @@
-# v0.3 specification: scalable search
+# Milestone 3 specification: scalable search
 
 - Status: Provisional
 - Theme: Place large search loops inside the engine
@@ -103,7 +103,7 @@ they consider safe to run locally.
 
 ## 5. Exit gate
 
-v0.3 is complete when:
+Milestone 3 is complete when:
 
 - a long search can pause, resume, and reproduce its archive lineage;
 - counter-witnesses influence subsequent proposals;

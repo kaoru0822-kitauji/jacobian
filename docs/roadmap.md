@@ -1,14 +1,14 @@
 # Roadmap
 
-## Release policy
+## Release and milestone policy
 
-Each release is gated by evidence, not by a calendar date. A later release does
-not begin until the preceding release's trust and compatibility gates pass.
+Each milestone is gated by evidence, not by a calendar date. Later milestone
+work does not begin until the preceding trust and compatibility gates pass.
 
-v0.2 is the current and only supported pre-stable alpha contract. Earlier
-development milestones are ordinary regression coverage rather than separate
-compatibility releases. v0.3 through v1.0 remain provisional plans whose APIs
-may change.
+v0.2 is the current and only supported pre-stable alpha contract. M3 through
+M5 are capability milestones, not promised package versions or compatibility
+releases. Their scope and APIs may change. v1.0 remains a stability target
+rather than the next scheduled release.
 
 ## v0.2 — Bounded discovery
 
@@ -52,7 +52,7 @@ The alpha exact-polytope scope is finite V-representation membership,
 coordinate projection, and strict separation. Broader H/V conversion and
 facet tooling remain optional backend work rather than release-gate claims.
 
-## v0.3 — Scalable search
+## M3 — Scalable search
 
 ### Entry gate
 
@@ -84,61 +84,69 @@ lineage, and route promoted candidates through the verification boundary.
 Sequential reference results are preserved under multi-process execution,
 worker failure, cancellation, and resume.
 
-## v0.4 — Research memory
+## M4 — Conjecture workflows
 
 ### Entry gate
 
-The system has accumulated enough verified and failed experiments for retrieval
-quality to be measurable.
+Scalable search reliably records verified counterexamples, constructions, and
+their exact transformation lineage.
 
 ### Objective
 
-Turn experiment history into useful, trust-labeled research memory without
-confusing retrieval or clustering with proof.
-
-### Deliverables
-
-- Structural and textual experiment retrieval
-- Trust and review labels
-- Failure clustering and episode comparison
-- Suggested abstraction and motif extraction
-- Certificate simplification
-- Retention quotas, deduplication, and curated promotion
-- Temporal availability metadata
-
-### Exit gate
-
-Retrieval improves a held-out search benchmark while never upgrading unverified
-records into certified conclusions. The improvement holds under trust-label and
-temporal-cutoff tests rather than only in an unrestricted retrieval corpus.
-
-## v0.5 — Conjecture development
-
-### Entry gate
-
-Memory and transformation records are reliable enough to guide new experiments.
-
-### Objective
-
-Turn verified counterexamples and constructions into nearby statements,
-parameter families, and new research questions.
+Give agents tools to turn verified counterexamples and constructions into
+nearby statements, parameter families, and new experiments.
 
 ### Deliverables
 
 - Conjecture repair across assumptions, constants, domains, and conclusions
-- Candidate conjecture generation and deduplication
+- Candidate conjecture generation under typed grammars
+- Deduplication within the active experiment or supplied reference set
 - Exact or certified parameter-region extraction
-- Novelty checks against the temporal knowledge base
 - Falsification pipelines for generated statements
+- Explicit source and transformation records for every proposal
+- Honest `UNKNOWN` novelty when no research-corpus provider is configured
 
 ### Exit gate
 
-Every generated or repaired claim is explicitly labeled as a hypothesis and can
-re-enter the ordinary validation, search, and verification pipeline. Held-out
-evaluations confirm that failure to falsify a generated statement is never
-reported as verification.
+Every generated or repaired claim is explicitly labeled as a hypothesis and
+can re-enter the ordinary validation, search, and verification pipeline.
+Held-out evaluations confirm that failure to falsify a generated statement is
+never reported as verification. Parameter claims distinguish proved, sampled,
+and unknown regions.
 
-## v1.0 — Stable research platform
+## M5 — Research corpus integration
+
+### Entry gate
+
+The search and conjecture tools have produced enough diverse verified and
+failed experiments for retrieval quality and useful query patterns to be
+measurable.
+
+### Objective
+
+Let agents retrieve prior mathematical work without turning Jacobian into a
+monolithic knowledge platform or confusing retrieval with proof.
+
+### Deliverables
+
+- A versioned research-episode export and provider interface
+- An optional reference provider rather than a required kernel dependency
+- Structural, textual, metadata, ancestry, and temporal retrieval
+- Trust, review, source, retraction, and availability labels
+- Retention quotas, canonical deduplication, and curated promotion
+- Provider-backed novelty checks with explicit corpus and cutoff scope
+- Episode comparison and abstraction suggestions as optional hypothesis tools
+- Certificate simplification as an independent checker-replay workflow
+
+### Exit gate
+
+The conjecture tools operate correctly with no provider configured. When a
+provider is present, retrieval improves a held-out search or repair benchmark
+while preserving trust labels and temporal cutoffs. Retrieved records and
+suggested abstractions never gain verified status through ranking, clustering,
+or ingestion.
+
+## Stability target — v1.0 research platform
 
 ### Entry gate
 

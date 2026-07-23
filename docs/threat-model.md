@@ -190,6 +190,15 @@ The implemented releases assume:
 The system does not assume that an evaluator, solver, model, plugin, retrieved
 research record, or search policy is correct.
 
+An optional research-corpus provider is treated as an untrusted accelerator.
+It may omit relevant work, return poisoned or retracted records, violate an
+expected ranking policy, or attempt to relabel evidence. Provider responses
+therefore carry source, corpus, temporal-cutoff, review, retraction, and
+verification metadata; Jacobian independently resolves local artifacts and
+verification records. The provider cannot authorize checkers or write verified
+results, and its absence must not disable the core search, conjecture, or
+verification tools.
+
 ## Out of scope for v0.2
 
 - Hostile executable plugin code

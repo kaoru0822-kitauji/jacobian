@@ -106,7 +106,7 @@ wire format.
 | Resource limits | Exhaustion changes truth or leaves a half-committed result | Fault injection, bounded parser/store tests, mixed-batch timeout/cancellation tests |
 | Shrinking | A smaller but invalid artifact replaces the verified target | Per-step checker replay, cycle/budget state machine, minimality-label attacks |
 | Representation changes | A relaxation or restriction is treated as equivalence | v0.2 direction tests, proof-obligation replay, proposer/checker separation |
-| Research memory | Retrieved hypotheses silently gain verified status | v0.4 trust-label, retention, and temporal-cutoff tests |
+| Research corpus integration | Retrieved hypotheses silently gain verified status | M5 trust-label, provider-isolation, retention, and temporal-cutoff tests |
 
 The first seven rows are the highest-risk v0.2 areas. They should be reviewed
 before optimizing throughput or expanding the public tool surface.
@@ -634,9 +634,9 @@ The normative attack matrix is
 unverified; a theorem inferred from the absence of a candidate needs a
 domain-specific completeness certificate and checker.
 
-## Later-release test additions
+## Planned-milestone test additions
 
-### v0.3
+### M3
 
 - deterministic single-worker lineage before concurrency;
 - resumability, idempotency, queue, and worker-crash state machines;
@@ -644,19 +644,21 @@ domain-specific completeness certificate and checker.
 - distributed duplicate-work and stale-lease tests;
 - search never bypasses promotion through v0.2 verification.
 
-### v0.4
-
-- trust-label preservation through indexing and retrieval;
-- retention, quota, deduplication, and promotion state machines;
-- temporal cutoff and data-leakage tests;
-- retrieval-quality evaluations on held-out episodes.
-
-### v0.5
+### M4
 
 - generated and repaired conjectures always remain hypotheses;
 - falsification pipelines cannot self-promote claims;
 - parameter-region certificates bind the original claim and encoding;
-- novelty checks respect temporal and provenance constraints.
+- corpus-free workflows report global novelty as unknown.
+
+### M5
+
+- M4 tools behave identically at the verification boundary with no provider;
+- trust-label preservation through indexing and retrieval;
+- provider compromise cannot mutate artifacts or checker authority;
+- retention, quota, deduplication, and promotion state machines;
+- temporal cutoff, provenance, and data-leakage tests;
+- retrieval-quality evaluations on held-out episodes.
 
 ### v1.0
 

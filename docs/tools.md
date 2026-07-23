@@ -42,12 +42,12 @@ relationship.
 
 Search strategies have separate typed operations:
 
-| Release | Tool | Capability |
+| Availability | Tool | Capability |
 | --- | --- | --- |
 | v0.2 | `search.enumerate` | Exhaustively enumerate a bounded candidate class using a domain-provided enumerator and auditable scope. |
-| v0.3 | `search.evolve` | Run evolutionary or program search with Pareto archives, novelty, lineage, and periodic verification. |
-| v0.3 | `search.cegis` | Alternate candidate synthesis, verified counter-witnesses, and refinement constraints. |
-| v0.3 | `search.tree` | Run beam, best-first, Monte Carlo tree, or related state-space search. |
+| M3 | `search.evolve` | Run evolutionary or program search with Pareto archives, novelty, lineage, and periodic verification. |
+| M3 | `search.cegis` | Alternate candidate synthesis, verified counter-witnesses, and refinement constraints. |
+| M3 | `search.tree` | Run beam, best-first, Monte Carlo tree, or related state-space search. |
 
 These tools start experiment jobs and return experiment resource handles. They
 do not produce verified conclusions by themselves.
@@ -70,20 +70,25 @@ These are plugin capabilities, not mandatory universal tools. A numerical
 analysis plugin need not implement graph canonicalization; a Lean proof plugin
 need not implement mutation.
 
-## Research tools
+## Conjecture and corpus tools
 
 These tools produce hypotheses or research records unless their outputs are
 separately verified:
 
-| Release | Tool | Capability |
+| Milestone | Tool | Capability |
 | --- | --- | --- |
-| v0.4 | `memory.search` | Retrieve prior experiments, failures, witnesses, certificates, and research episodes with trust labels. |
-| v0.4 | `abstraction.extract` | Suggest an abstract mathematical explanation for concrete artifacts. |
-| v0.4 | `episode.compare` | Compare failures and propose recurring obstructions or no-go lemmas. |
-| v0.4 | `certificate.simplify` | Minimize a certificate while replaying its authorized checker. |
-| v0.5 | `conjecture.repair` | Propose nearby claims after a counterexample by changing assumptions, constants, domains, or conclusions. |
-| v0.5 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
-| v0.5 | `parameter.generalize` | Propose and certify parameter regions around a verified construction. |
+| M4 | `conjecture.repair` | Propose nearby claims after a counterexample by changing assumptions, constants, domains, or conclusions. |
+| M4 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
+| M4 | `parameter.generalize` | Propose and certify parameter regions around a verified construction. |
+| M5 | `memory.search` | Ask an optional corpus provider for prior experiments, failures, witnesses, certificates, and research episodes with trust labels. |
+| M5 | `abstraction.extract` | Suggest an abstract mathematical explanation for supplied or retrieved artifacts. |
+| M5 | `episode.compare` | Compare failures and propose recurring obstructions or no-go lemmas. |
+| M5 | `certificate.simplify` | Minimize a certificate while replaying its authorized checker locally. |
+
+The M4 tools operate without a shared corpus. When no M5 provider is
+configured, they deduplicate against supplied or local experiment records and
+report corpus-wide novelty as unknown. Corpus retrieval can suggest inputs to
+any tool but cannot authorize checkers or promote verification status.
 
 ## Internal backends
 

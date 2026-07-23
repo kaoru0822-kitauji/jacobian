@@ -1,12 +1,12 @@
-# v0.5 specification: conjecture development
+# Milestone 4 specification: conjecture workflows
 
 - Status: Provisional
-- Theme: Turn discoveries into new mathematical questions
+- Theme: Give agents tools for developing conjectures
 
 ## 1. Entry gate
 
-Verified transformations, failures, and temporal memory must be reliable enough
-to ground statement-level experimentation.
+Scalable search must reliably preserve verified counterexamples,
+constructions, and transformation lineage.
 
 ## 2. New tools
 
@@ -26,10 +26,13 @@ Each proposal records its edit relative to the source claim and begins with
 
 ### `conjecture.generate`
 
-Generate candidate formal statements under a typed grammar, deduplicate them,
-search for immediate counter-witnesses, and rank surviving hypotheses.
+Generate candidate formal statements under a typed grammar, deduplicate them
+within the active experiment or supplied reference set, search for immediate
+counter-witnesses, and rank surviving hypotheses.
 
-Interestingness and novelty scores are research heuristics, not assurance.
+Interestingness, apparent novelty, and failure to find a counterexample are
+research heuristics, not assurance. Without an M5 corpus provider, global
+novelty is reported as `UNKNOWN`.
 
 ### `parameter.generalize`
 
@@ -52,15 +55,19 @@ verified result
     → claim.validate
     → falsification and bounded search
     → witness or certificate verification
-    → curated research episode
+    → experiment record
 ```
+
+The workflow may consult an M5 corpus provider when one is configured, but its
+correctness and verification boundary do not depend on one.
 
 ## 4. Exit gate
 
-v0.5 is complete when:
+Milestone 4 is complete when:
 
 - every generated statement has a precise source and transformation record;
-- novelty checks respect temporal cutoffs;
+- generated and repaired statements remain hypotheses;
 - immediate counterexamples are stored with verified witnesses;
 - parameter claims distinguish proved and sampled regions;
-- no generation or ranking score is displayed as proof.
+- generation, ranking, and non-falsification are never displayed as proof;
+- every workflow remains usable without a research-corpus provider.

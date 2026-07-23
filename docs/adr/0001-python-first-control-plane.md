@@ -108,7 +108,7 @@ schemas or verification code.
 - SoPlex for exact rational LP
 - `gmpy2.mpq` if `Fraction` becomes a measured bottleneck
 
-### v0.3 and later
+### M3 and later
 
 - PySAT for SAT, MaxSAT, and MUS/MCS workflows
 - cvc5 for SMT and SyGuS

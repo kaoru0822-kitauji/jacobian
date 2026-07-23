@@ -1,11 +1,11 @@
 # Jacobian
 
-Jacobian is a verifier-centric research kernel for bounded, executable
-mathematics.
+Jacobian is a verifier-centric MCP toolbench for agents working on bounded,
+executable mathematics.
 
-It gives models and researchers a common environment in which they can propose
-candidates, search large spaces, receive structured counter-witnesses, minimize
-discoveries, and replay exact certificates. The kernel is not a
+It gives agents and researchers executable tools with which to propose
+candidates, search large spaces, receive structured counter-witnesses, repair
+claims, and replay exact certificates. The kernel is not a
 `solve_conjecture` endpoint and does not treat model output or solver status as
 mathematical truth.
 
@@ -24,25 +24,30 @@ The central invariant is:
 
 ## Roadmap
 
-| Release | Theme | Primary outcome |
+| Milestone | Theme | Primary outcome |
 | --- | --- | --- |
-| v0.2 | Verification and bounded discovery | Store, evaluate, attack, shrink, independently verify, enumerate structures, verify representation changes, and compute exact separators |
-| v0.3 | Scalable search | Run evolutionary, CEGIS, and tree search as resumable experiments |
-| v0.4 | Research memory | Retrieve failures and certificates and suggest recurring abstractions |
-| v0.5 | Conjecture development | Repair, generate, and parametrically generalize conjectures |
-| v1.0 | Stable research platform | Publish a stable API with formal-checking and collaboration support |
+| Current release | Verification and bounded discovery | v0.2 alpha stores, evaluates, attacks, shrinks, independently verifies, enumerates structures, verifies representation changes, and computes exact separators |
+| M3 | Scalable search | Run evolutionary, CEGIS, and tree search as resumable experiments |
+| M4 | Conjecture workflows | Repair, generate, falsify, and parametrically generalize conjectures |
+| M5 | Research corpus integration | Retrieve prior solutions, failures, witnesses, and certificates through an optional provider |
+| Stability target | Stable research platform | Publish a v1.0 API with formal-checking and collaboration support |
+
+The roadmap is tool-first: search and conjecture workflows remain useful
+without a shared corpus service. Jacobian records its own experiments for
+replay and lineage; corpus-scale retrieval is an optional integration that
+cannot promote evidence or authorize checkers.
 
 The only current implementation and public release contract is v0.2 alpha
 (`0.2.0a0`). It includes both the verification kernel and bounded discovery.
 Earlier development milestones are covered by the current regression suite,
-not presented as separately supported releases. Later specifications remain
-provisional.
+not presented as separately supported releases. Future milestone plans remain
+provisional and do not determine package version numbers.
 
 ## Documents
 
 - [Architecture](docs/architecture.md)
 - [Tool surface](docs/tools.md)
-- [Roadmap and release gates](docs/roadmap.md)
+- [Roadmap and milestone gates](docs/roadmap.md)
 - [Reference benchmarks](docs/benchmarks.md)
 - [Mathematical scenario catalog](docs/math-scenarios.md)
 - [Testing strategy and critical areas](docs/testing-strategy.md)
@@ -51,9 +56,9 @@ provisional.
 - [Threat model](docs/threat-model.md)
 - [v0.2 conformance specification](docs/conformance-v0.2.md)
 - [v0.2 specification](docs/specifications/v0.2.md)
-- [v0.3 specification](docs/specifications/v0.3.md)
-- [v0.4 specification](docs/specifications/v0.4.md)
-- [v0.5 specification](docs/specifications/v0.5.md)
+- [M3 scalable-search milestone](docs/milestones/m3-scalable-search.md)
+- [M4 conjecture-workflows milestone](docs/milestones/m4-conjecture-workflows.md)
+- [M5 research-corpus milestone](docs/milestones/m5-research-corpus.md)
 - [v1.0 specification](docs/specifications/v1.0.md)
 - [Why the control plane is Python-first](docs/adr/0001-python-first-control-plane.md)
 - [Proposed implementation issues](docs/issues.md)
@@ -68,7 +73,7 @@ All public contracts and artifact formats remain pre-stable.
 
 The alpha experiment runner is local and single-process. A state directory
 must not be opened by another Jacobian process while an experiment is running;
-multi-process leases and resumable ownership belong to v0.3.
+multi-process leases and resumable ownership belong to M3.
 
 ```sh
 uv sync --dev
