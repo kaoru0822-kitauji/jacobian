@@ -6,6 +6,12 @@ labels: ["bug"]
 assignees: []
 ---
 
+**Priority**
+<!-- Select one: P0 (critical), P1 (high), P2 (medium), P3 (low) -->
+
+**Area**
+<!-- Which area is affected? kernel, checker, cli, mcp, docs, ci, deps, security -->
+
 **Component**
 <!-- Which part of Jacobian is affected? (e.g., artifact store, CLI, MCP adapter, checker, plugin) -->
 
