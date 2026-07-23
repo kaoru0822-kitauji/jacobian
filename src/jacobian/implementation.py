@@ -182,6 +182,6 @@ def package_source_digest(entrypoint: str) -> str:
 
 
 def module_source_digest(entrypoint: str) -> str:
-    """Compatibility alias for the v0.1 implementation descriptor."""
+    """Compatibility alias for the v0.2 implementation descriptor."""
 
     return package_source_digest(entrypoint)

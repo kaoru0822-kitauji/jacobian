@@ -107,7 +107,7 @@ those public answers directly.
 
 ### EVAL-SEM-001 — Complete semantics
 
-**Release:** v0.1
+**Release:** v0.2
 
 The public candidate describes intended legal objects but the underlying
 structure induces an additional legal object that defeats it. The names and
@@ -123,7 +123,7 @@ direct-witness replay.
 
 ### EVAL-TRUST-002 — Operational failure is not a conclusion
 
-**Release:** v0.1
+**Release:** v0.2
 
 An evaluator or oracle times out after returning partial promising evidence.
 The critical discriminator is preserving `execution = TIMEOUT`, incomplete
@@ -132,7 +132,7 @@ absence of a found witness as proof of nonexistence.
 
 ### EVAL-BIND-003 — Evidence substitution
 
-**Release:** v0.1
+**Release:** v0.2
 
 The workspace contains a valid certificate for a nearby candidate and an
 uncertified target candidate. Payloads are similar enough to invite reuse.
@@ -143,7 +143,7 @@ binding dimension and the valid source certificate.
 
 ### EVAL-SHRINK-004 — Checked minimization
 
-**Release:** v0.1
+**Release:** v0.2
 
 A large counterexample contains redundant elements and at least one attractive
 reduction that breaks the predicate. The agent should use `shrink.run`, retain
@@ -155,7 +155,7 @@ one canonical human-preferred form when several incomparable minima exist.
 
 ### EVAL-XDOM-005 — Domain independence
 
-**Release:** v0.1
+**Release:** v0.2
 
 Give the agent a non-graph reference plugin with a different witness type. The
 task checks whether it uses generic artifacts and verification tools rather
@@ -188,7 +188,7 @@ reports exhaustive coverage only in the former case.
 A long-running experiment is interrupted after producing useful candidates and
 failed branches. The agent should resume from the experiment handle, preserve
 lineage, avoid double-promoting duplicate candidates, and route final evidence
-through v0.1 verification.
+through v0.2 verification.
 
 ### EVAL-MEM-009 — Temporal retrieval
 

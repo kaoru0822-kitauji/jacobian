@@ -1,6 +1,6 @@
 """Search-side directed graph/path reference plugin.
 
-Implements the v0.1 graph-path reference scenarios:
+Implements the v0.2 graph-path reference scenarios:
 - PATH-CLOSURE-001: intended source-terminal path family is incomplete.
 - GRAPH-BIP-001: a triangle plus isolated vertices is not bipartite.
 
@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import time
 from copy import deepcopy
-from itertools import pairwise
+from itertools import pairwise, permutations
 from typing import Any, cast
 
 import networkx as nx
+
+from jacobian.canonical import canonicalize_json
 
 # ---------------------------------------------------------------------------
 # Validation helpers
@@ -771,4 +773,157 @@ def reductions_capability(request: dict[str, Any]) -> dict[str, Any]:
         },
         "reductions": proposals,
         "detail": response["detail"],
+    }
+
+
+def canonicalize_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Return the exact lexicographic form of a small labeled graph.
+
+    This bundled reference implementation deliberately favors transparency
+    over scale. Production graph plugins can bind nauty/Traces while retaining
+    the same capability contract.
+    """
+
+    structure = request.get("structure")
+    if not isinstance(structure, dict):
+        raise ValueError("structure must be an object")
+    errors = validate_candidate(structure)
+    if errors:
+        raise ValueError("; ".join(errors))
+    vertices = structure["vertices"]
+    if len(vertices) > 9:
+        raise ValueError("reference canonicalizer is limited to nine vertices")
+
+    best_bytes: bytes | None = None
+    best_payload: dict[str, Any] | None = None
+    best_mappings: list[dict[str, str]] = []
+    canonical_names = tuple(f"v{index}" for index in range(len(vertices)))
+    for ordering in permutations(vertices):
+        mapping = dict(zip(ordering, canonical_names, strict=True))
+        payload = _relabel_graph_payload(structure, mapping)
+        encoded = canonicalize_json(payload)
+        if best_bytes is None or encoded < best_bytes:
+            best_bytes = encoded
+            best_payload = payload
+            best_mappings = [mapping]
+        elif encoded == best_bytes:
+            best_mappings.append(mapping)
+
+    assert best_payload is not None
+    chosen_mapping = best_mappings[0]
+    orbit_sets: list[set[str]] = [{vertex} for vertex in vertices]
+    for canonical_name in canonical_names:
+        members = {
+            vertex
+            for mapping in best_mappings
+            for vertex, mapped in mapping.items()
+            if mapped == canonical_name
+        }
+        if not members:
+            continue
+        merged = set().union(
+            *(orbit for orbit in orbit_sets if orbit.intersection(members))
+        )
+        orbit_sets = [orbit for orbit in orbit_sets if not orbit.intersection(merged)]
+        orbit_sets.append(merged)
+
+    return {
+        "response_version": "1",
+        "canonical_payload": best_payload,
+        "mapping": chosen_mapping,
+        "automorphism_group_order": str(len(best_mappings)),
+        "orbits": [
+            sorted(orbit)
+            for orbit in sorted(orbit_sets, key=lambda value: sorted(value))
+        ],
+    }
+
+
+def _relabel_graph_payload(
+    structure: dict[str, Any],
+    mapping: dict[str, str],
+) -> dict[str, Any]:
+    payload = deepcopy(structure)
+    payload["vertices"] = sorted(mapping.values())
+    payload["arcs"] = sorted(
+        [[mapping[left], mapping[right]] for left, right in structure.get("arcs", [])]
+    )
+    if isinstance(structure.get("source"), str):
+        payload["source"] = mapping[structure["source"]]
+    if isinstance(structure.get("terminals"), list):
+        payload["terminals"] = sorted(
+            mapping[terminal] for terminal in structure["terminals"]
+        )
+    if isinstance(structure.get("intended_paths"), list):
+        payload["intended_paths"] = sorted(
+            [
+                [mapping[vertex] for vertex in path]
+                for path in structure["intended_paths"]
+            ]
+        )
+    return payload
+
+
+def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Page through labeled DAGs whose arcs respect the vertex index order."""
+
+    bounds = request.get("bounds")
+    cursor = request.get("cursor")
+    page_size = request.get("page_size")
+    if not isinstance(bounds, dict):
+        raise ValueError("bounds must be an object")
+    if set(bounds) != {"vertices"}:
+        raise ValueError("graph bounds require exactly vertices")
+    vertex_count = bounds["vertices"]
+    if (
+        not isinstance(vertex_count, int)
+        or isinstance(vertex_count, bool)
+        or vertex_count < 1
+        or vertex_count > 8
+    ):
+        raise ValueError("vertices must be an integer from one through eight")
+    if not isinstance(page_size, int) or isinstance(page_size, bool) or page_size < 1:
+        raise ValueError("page_size must be a positive integer")
+    offset = 0
+    if cursor is not None:
+        if (
+            not isinstance(cursor, dict)
+            or set(cursor) != {"offset"}
+            or not isinstance(cursor["offset"], int)
+            or isinstance(cursor["offset"], bool)
+            or cursor["offset"] < 0
+        ):
+            raise ValueError("cursor must contain a nonnegative integer offset")
+        offset = cursor["offset"]
+
+    vertices = [f"v{index}" for index in range(vertex_count)]
+    possible_arcs = [
+        [vertices[left], vertices[right]]
+        for left in range(vertex_count)
+        for right in range(left + 1, vertex_count)
+    ]
+    total = 1 << len(possible_arcs)
+    stop = min(offset + page_size, total)
+    candidates = [
+        {
+            "vertices": vertices,
+            "arcs": [arc for bit, arc in enumerate(possible_arcs) if mask & (1 << bit)],
+        }
+        for mask in range(offset, stop)
+    ]
+    complete = stop >= total
+    return {
+        "response_version": "1",
+        "candidates": candidates,
+        "next_cursor": None if complete else {"offset": stop},
+        "complete": complete,
+        "scope": {
+            "vertices": vertex_count,
+            "simple": True,
+            "directed": True,
+            "acyclic": True,
+            "labeled": True,
+            "arc_rule": "v_i_to_v_j_only_when_i_less_than_j",
+            "candidate_count": total,
+        },
     }

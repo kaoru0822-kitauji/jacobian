@@ -1,8 +1,8 @@
-"""Reproducible local performance baselines for v0.1.
+"""Reproducible local performance baselines for Jacobian's core tools.
 
 Run with:
 
-    uv run python benchmarks/benchmark_v01.py
+    uv run python benchmarks/benchmark_core.py
 
 The benchmark records timing only. Contract and conformance tests remain the
 correctness gate.
@@ -33,7 +33,7 @@ def _canonicalize_rational() -> None:
 
 def main() -> None:
     runner = pyperf.Runner()
-    runner.metadata["suite"] = "jacobian-v0.1"
+    runner.metadata["suite"] = "jacobian-v0.2-core"
     runner.bench_func("canonicalize-64-rationals", _canonicalize_rational)
 
     with tempfile.TemporaryDirectory(prefix="jacobian-benchmark-") as directory:

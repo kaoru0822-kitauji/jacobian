@@ -70,7 +70,7 @@ An imported dataset row is never its own oracle. A `proved`, `valid`, or
 `answer` field is provenance to investigate; Jacobian must replay the relevant
 checker under a pinned environment.
 
-## v0.1 public exact scenarios
+## v0.2 public exact scenarios
 
 These scenarios are deliberately small enough to verify with standard-library
 Python and exact integers or rationals.
@@ -395,7 +395,7 @@ This scenario is inspired by the finite-countermodel workflow of the
 [Equational Theories project](https://github.com/teorth/equational_theories),
 but the two-element table and checker are independently generated for Jacobian.
 
-## v0.1 reference-plugin decision
+## Reference-plugin decision
 
 Use three levels of implementation:
 
@@ -408,11 +408,11 @@ The finite-magma scenario is the preferred third domain when the capability API
 is stable. It has a different candidate representation, a model-plus-assignment
 witness, and a natural route to later theorem-prover integration.
 
-The full routing counterexample episode is no longer a v0.1 blocker. It becomes
+The full routing counterexample episode is not a v0.2 release blocker. It becomes
 a later end-to-end regression workload after the tiny path-language fixture has
 proved the semantic-closure boundary.
 
-## v0.2 discovery and transformation scenarios
+## Discovery and transformation scenarios
 
 ### XFORM-AMO-001 — Equivalence versus relaxation
 
@@ -646,7 +646,7 @@ boundary cases, and every generated instance is checked for:
 | [AlphaEvolve problem repository](https://github.com/google-deepmind/alphaevolve_repository_of_problems) | Prompts, verification code, initial programs, and evolved programs in notebooks | Later program-search regression corpus; answers are public, so not held out |
 | [SMT-LIB](https://smt-lib.org/) | Standard theory semantics, input/output formats, and solver benchmark instances | Later typed-backend compatibility and parser corpus, not public `solver.solve` semantics |
 
-### Use later for formal integration, not v0.1 oracles
+### Use later for formal integration, not v0.2 oracles
 
 | Source | Reason |
 | --- | --- |
@@ -699,7 +699,7 @@ known.
 
 ## Suggested repository layout
 
-Do not freeze this layout until the v0.1 schemas exist, but keep public inputs
+Do not freeze this layout until the v0.2 schemas exist, but keep public inputs
 and hidden oracles separate:
 
 ```text

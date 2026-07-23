@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+import hashlib
+import math
+from pathlib import Path
+
+import pytest
+
+from jacobian.canonical import canonicalize_json
+from jacobian.contracts.polytope import PolytopeSeparateRequest
+from jacobian.kernel import JacobianKernel
+
+
+def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
+    divisor = math.gcd(numerator, denominator)
+    numerator //= divisor
+    denominator //= divisor
+    if denominator < 0:
+        numerator = -numerator
+        denominator = -denominator
+    return {"num": str(numerator), "den": str(denominator)}
+
+
+def _simplex(
+    kernel: JacobianKernel,
+    point: tuple[tuple[int, int], ...],
+) -> tuple[str, str]:
+    point_artifact = kernel.artifacts.put(
+        schema_uri=kernel.polytope.point_schema_uri,
+        semantics_uri=kernel.polytope.semantics_uri,
+        payload={
+            "point_schema_version": "1",
+            "coordinates": [_q(*value) for value in point],
+        },
+    )
+    generators = kernel.artifacts.put(
+        schema_uri=kernel.polytope.generator_set_schema_uri,
+        semantics_uri=kernel.polytope.semantics_uri,
+        payload={
+            "generator_set_schema_version": "1",
+            "dimension": 3,
+            "generators": [
+                {"values": [_q(0), _q(0), _q(0)]},
+                {"values": [_q(1), _q(0), _q(0)]},
+                {"values": [_q(0), _q(1), _q(0)]},
+                {"values": [_q(0), _q(0), _q(1)]},
+            ],
+        },
+    )
+    return point_artifact.artifact_uri, generators.artifact_uri
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_exact_membership_witness_is_independently_replayed(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    assert kernel.polytope_checkers is not None
+    point_uri, generators_uri = _simplex(
+        kernel,
+        ((1, 4), (1, 4), (1, 4)),
+    )
+
+    proposed = kernel.polytope.separate(
+        PolytopeSeparateRequest(
+            point_uri=point_uri,
+            generator_set_uri=generators_uri,
+        )
+    )
+
+    assert proposed.status.value == "MEMBER"
+    assert proposed.witness_uri is not None
+    assert proposed.certificate_uri is None
+    assert proposed.result.assurance.verification.value == "UNVERIFIED"
+    verified = kernel.verification.verify_witness(
+        claim_uri=proposed.claim_uri or "",
+        candidate_uri=proposed.effective_point_uri or "",
+        witness_uri=proposed.witness_uri,
+        checker_id=kernel.polytope_checkers.witness_checker_id,
+    )
+    assert verified.conclusion.value == "TRUE"
+    assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
+    assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_exact_separator_is_generated_then_independently_checked(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    point_uri, generators_uri = _simplex(
+        kernel,
+        ((1, 2), (1, 2), (1, 2)),
+    )
+
+    proposed = kernel.polytope.separate(
+        PolytopeSeparateRequest(
+            point_uri=point_uri,
+            generator_set_uri=generators_uri,
+        )
+    )
+
+    assert proposed.status.value == "SEPARATED"
+    assert proposed.certificate_uri is not None
+    assert proposed.witness_uri is None
+    assert proposed.result.assurance.verification.value == "UNVERIFIED"
+    certificate = kernel.store.get(proposed.certificate_uri).payload
+    payload = certificate["payload"]
+    coefficients = [
+        int(value["num"]) // int(value["den"]) for value in payload["coefficients"]
+    ]
+    rhs = int(payload["rhs"]["num"]) // int(payload["rhs"]["den"])
+    assert math.gcd(*[abs(value) for value in (*coefficients, rhs)]) == 1
+    assert payload["margin"] == _q(1, 2)
+
+    verified = kernel.verification.verify_certificate(
+        certificate_uri=proposed.certificate_uri,
+    )
+    assert verified.conclusion.value == "TRUE"
+    assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
+    assert verified.assurance.coverage.value == "EXHAUSTIVE"
+    assert verified.assurance.verification.value == "VERIFIED"
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_separator_payload_tampering_fails_closed(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    point_uri, generators_uri = _simplex(
+        kernel,
+        ((1, 2), (1, 2), (1, 2)),
+    )
+    proposed = kernel.polytope.separate(
+        PolytopeSeparateRequest(
+            point_uri=point_uri,
+            generator_set_uri=generators_uri,
+        )
+    )
+    assert proposed.certificate_uri is not None
+    original = kernel.store.get(proposed.certificate_uri)
+    tampered = dict(original.payload)
+    tampered_payload = dict(tampered["payload"])
+    tampered_payload["coefficients"] = [_q(0), _q(0), _q(1)]
+    tampered["payload"] = tampered_payload
+    tampered["payload_digest"] = (
+        "sha256:" + hashlib.sha256(canonicalize_json(tampered_payload)).hexdigest()
+    )
+    stored = kernel.store.put(
+        schema_uri=original.manifest.schema_uri,
+        semantics_uri=original.manifest.semantics_uri,
+        payload=tampered,
+        parents=original.manifest.parents,
+        summary="adversarial separator tampering",
+    )
+
+    result = kernel.verification.verify_certificate(certificate_uri=stored.artifact_uri)
+
+    assert result.input.status.value == "REJECTED"
+    assert result.conclusion.value == "UNKNOWN"
+    assert result.assurance.verification.value == "UNVERIFIED"
+    assert result.verification_record_uri is None
+
+
+@pytest.mark.integration
+def test_projection_is_explicit_and_bound_to_derived_artifacts(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    point = kernel.artifacts.put(
+        schema_uri=kernel.polytope.point_schema_uri,
+        semantics_uri=kernel.polytope.semantics_uri,
+        payload={
+            "point_schema_version": "1",
+            "coordinates": [_q(99), _q(1, 2), _q(1, 2), _q(1, 2)],
+        },
+    )
+    generators = kernel.artifacts.put(
+        schema_uri=kernel.polytope.generator_set_schema_uri,
+        semantics_uri=kernel.polytope.semantics_uri,
+        payload={
+            "generator_set_schema_version": "1",
+            "dimension": 4,
+            "generators": [
+                {"values": [_q(0), _q(0), _q(0), _q(0)]},
+                {"values": [_q(7), _q(1), _q(0), _q(0)]},
+                {"values": [_q(8), _q(0), _q(1), _q(0)]},
+                {"values": [_q(9), _q(0), _q(0), _q(1)]},
+            ],
+        },
+    )
+
+    proposed = kernel.polytope.separate(
+        PolytopeSeparateRequest(
+            point_uri=point.artifact_uri,
+            generator_set_uri=generators.artifact_uri,
+            projection=(1, 2, 3),
+        )
+    )
+
+    assert proposed.status.value == "SEPARATED"
+    assert proposed.effective_point_uri != point.artifact_uri
+    assert proposed.effective_generator_set_uri != generators.artifact_uri
+    projected_point = kernel.store.get(proposed.effective_point_uri or "")
+    projected_generators = kernel.store.get(proposed.effective_generator_set_uri or "")
+    assert projected_point.manifest.parents == (point.artifact_uri,)
+    assert projected_generators.manifest.parents == (generators.artifact_uri,)

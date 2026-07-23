@@ -230,6 +230,12 @@ class ArtifactStore:
                 _unlock_file(lock_file)
 
     def _write_blob(self, data: bytes) -> str:
+        try:
+            return self._write_blob_unchecked(data)
+        except OSError as exc:
+            raise StoreError(f"filesystem error while writing blob: {exc}") from exc
+
+    def _write_blob_unchecked(self, data: bytes) -> str:
         digest = _sha256(data)
         target = self._blob_path(digest)
         target.parent.mkdir(parents=True, exist_ok=True)

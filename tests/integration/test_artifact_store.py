@@ -11,6 +11,7 @@ from jacobian.canonical import CanonicalizationError
 from jacobian.store import (
     ArtifactIntegrityError,
     ArtifactStore,
+    StoreError,
     StoreLimitError,
     StoreLimits,
 )
@@ -216,3 +217,49 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     assert not second.is_alive()
     assert sum(isinstance(outcome, str) for outcome in outcomes) == 1
     assert sum(isinstance(outcome, StoreLimitError) for outcome in outcomes) == 1
+
+
+@pytest.mark.integration
+@pytest.mark.conformance
+def test_store_wraps_filesystem_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    schema = store.register_descriptor(
+        kind="schema",
+        name="example.candidate",
+        version="1",
+        definition={"type": "object"},
+    )
+    semantics = store.register_descriptor(
+        kind="semantics",
+        name="example.meaning",
+        version="1",
+        definition={"description": "meaning"},
+    )
+    original_mkdir = Path.mkdir
+
+    def fail_blob_directory(
+        path: Path,
+        mode: int = 0o777,
+        parents: bool = False,
+        exist_ok: bool = False,
+    ) -> None:
+        if store.blob_root in path.parents:
+            raise OSError("simulated filesystem failure")
+        original_mkdir(
+            path,
+            mode=mode,
+            parents=parents,
+            exist_ok=exist_ok,
+        )
+
+    monkeypatch.setattr(Path, "mkdir", fail_blob_directory)
+
+    with pytest.raises(StoreError, match="writing blob"):
+        store.put(
+            schema_uri=schema,
+            semantics_uri=semantics,
+            payload={"unique": "filesystem-error"},
+        )

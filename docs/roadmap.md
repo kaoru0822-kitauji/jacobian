@@ -5,15 +5,19 @@
 Each release is gated by evidence, not by a calendar date. A later release does
 not begin until the preceding release's trust and compatibility gates pass.
 
-v0.1 is normative. v0.2 through v1.0 are provisional plans whose APIs may
-change.
+v0.2 is the current and only supported pre-stable alpha contract. Earlier
+development milestones are ordinary regression coverage rather than separate
+compatibility releases. v0.3 through v1.0 remain provisional plans whose APIs
+may change.
 
-## v0.1 — Verification kernel
+## v0.2 — Bounded discovery
+
+Status: implemented in `0.2.0a0`.
 
 ### Objective
 
-Demonstrate that a bounded mathematical candidate can be stored, attacked,
-shrunk, and independently verified without trusting its search implementation.
+Provide one fail-closed kernel that can verify supplied candidates, search
+bounded candidate classes, and independently verify representation changes.
 
 ### Deliverables
 
@@ -22,46 +26,31 @@ shrunk, and independently verified without trusting its search implementation.
 - Digest-keyed local artifact store and SQLite registry metadata
 - Immutable verification-record artifacts
 - Operator-managed checker registry
-- Seven generic MCP tools
+- Seven generic verification tools
 - A generic plugin capability API
 - At least two structurally different reference plugins and replay checkers
 - CLI and thin MCP adapter
-- Adversarial fail-closed test suite
-
-### Exit gate
-
-Both reference plugins replay exact certificates, return independently verified
-failure witnesses, and reject deliberately corrupted evidence. Every normative
-v0.1 conformance test passes in a clean installed environment, with no
-unresolved trust-critical failure or accepted flake.
-
-## v0.2 — Bounded discovery
-
-### Entry gate
-
-- v0.1 artifact and result schemas have survived both reference-plugin
-  adversarial suites.
-
-### Objective
-
-Move from verifying supplied candidates to exhaustively searching bounded
-candidate classes and verifying representation changes.
-
-### Deliverables
-
+- Adversarial fail-closed verification suite
 - Bounded enumeration experiments
 - Search-safe canonicalization and symmetry rejection
 - Transformation proposal and independent transformation verification
 - Exact polyhedral projection and separation
 - Persistent experiment handles and cancellation
-- Bounded-discovery workflows exercised in both v0.1 reference plugins
+- Verification and bounded-discovery workflows exercised in both reference
+  plugins
 
 ### Exit gate
 
-A bounded search produces a candidate archive with auditable scope, and at
-least one representation transformation and exact separator are independently
-verified. Enumeration-limit, transformation-direction, and canonicalization
-attacks pass their release test suites.
+Both reference plugins replay exact evidence, reject deliberately corrupted
+evidence, and complete bounded searches with auditable scope. At least one
+representation transformation and exact separator are independently verified.
+Every normative v0.2 conformance case passes in a clean installed environment,
+including enumeration-limit, transformation-direction, and canonicalization
+attacks.
+
+The alpha exact-polytope scope is finite V-representation membership,
+coordinate projection, and strict separation. Broader H/V conversion and
+facet tooling remain optional backend work rather than release-gate claims.
 
 ## v0.3 — Scalable search
 
@@ -85,12 +74,13 @@ lineage, failure evidence, and exact-verification boundaries.
   oracles
 - Resumable and cancellable experiments
 - Local multi-process execution followed by distributed workers when justified
-- Sandboxed model-generated candidate code
+- Resource-bounded local execution for operator-approved generated candidate
+  code, without claiming a security sandbox
 
 ### Exit gate
 
 Long-running experiments survive interruption and resumption, retain complete
-lineage, and route promoted candidates through the v0.1 verification boundary.
+lineage, and route promoted candidates through the verification boundary.
 Sequential reference results are preserved under multi-process execution,
 worker failure, cancellation, and resume.
 

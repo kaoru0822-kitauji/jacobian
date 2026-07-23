@@ -78,6 +78,87 @@ def check_kernel_vector(request: dict[str, Any]) -> dict[str, Any]:
         return _reject("malformed checker request")
 
 
+def check_row_major_transformation(
+    request: dict[str, Any],
+) -> dict[str, Any]:
+    """Independently replay the matrix-to-row-major representation."""
+
+    try:
+        if request.get("request_version") != "1":
+            return _reject(
+                "unsupported request version",
+                method="CHECKED_CERTIFICATE",
+            )
+        transformation = request["transformation"]["payload"]
+        if transformation.get("transform_format") != "matrix.row_major":
+            return _reject(
+                "unexpected transformation format",
+                method="CHECKED_CERTIFICATE",
+            )
+        if transformation.get("format_version") != "1":
+            return _reject(
+                "unsupported transformation version",
+                method="CHECKED_CERTIFICATE",
+            )
+        if transformation.get("relation") != "EQUIVALENT":
+            return _reject(
+                "row-major checker only certifies equivalence",
+                method="CHECKED_CERTIFICATE",
+            )
+        if transformation.get("bindings") != request["expected_bindings"]:
+            return _reject(
+                "transformation bindings do not match the request",
+                method="CHECKED_CERTIFICATE",
+            )
+
+        matrix = _parse_matrix(request["source"]["payload"])
+        target = request["target"]["payload"]
+        if not isinstance(target, dict):
+            raise ValueError("target must be an object")
+        rows = target.get("rows")
+        cols = target.get("cols")
+        values = target.get("values")
+        if (
+            rows != len(matrix)
+            or cols != len(matrix[0])
+            or not isinstance(values, list)
+        ):
+            return _reject(
+                "target dimensions do not match the source",
+                method="CHECKED_CERTIFICATE",
+            )
+        expected = [value for row in matrix for value in row]
+        actual = [_parse_integer(value) for value in values]
+        if actual != expected:
+            return _reject(
+                "target values are not the source row-major entries",
+                method="CHECKED_CERTIFICATE",
+            )
+        obligation = transformation.get("obligation")
+        if obligation != {
+            "kind": "row_major_bijection",
+            "source_entry_count": len(expected),
+            "target_value_count": len(actual),
+        }:
+            return _reject(
+                "row-major obligation payload is invalid",
+                method="CHECKED_CERTIFICATE",
+            )
+        return {
+            "accepted": True,
+            "conclusion": "TRUE",
+            "arithmetic": "EXACT_INTEGER",
+            "method": "CHECKED_CERTIFICATE",
+            "coverage": "NOT_APPLICABLE",
+            "detail": "row-major representation replayed entry by entry",
+        }
+    except (KeyError, TypeError, ValueError):
+        return _reject(
+            "malformed transformation request",
+            method="CHECKED_CERTIFICATE",
+        )
+
+
 def check_maximizer_witness(request: dict[str, Any]) -> dict[str, Any]:
     """Exhaustively verify that a proposed matrix maximizes the scoped objective."""
 

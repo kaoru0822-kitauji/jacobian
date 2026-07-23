@@ -49,6 +49,18 @@ def test_num_den_is_a_reserved_exact_rational_shape() -> None:
 
 
 @pytest.mark.contract
+def test_num_den_schema_property_map_is_regular_json() -> None:
+    encoded = canonicalize_json(
+        {
+            "num": {"type": "string"},
+            "den": {"type": "string"},
+        }
+    )
+
+    assert encoded == b'{"den":{"type":"string"},"num":{"type":"string"}}'
+
+
+@pytest.mark.contract
 def test_unicode_bom_and_non_json_tuples_are_rejected() -> None:
     with pytest.raises(CanonicalizationError):
         canonicalize_json(b'\xef\xbb\xbf{"value":1}')

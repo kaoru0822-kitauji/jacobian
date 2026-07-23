@@ -2,10 +2,11 @@
 
 ## Scope
 
-This document defines the v0.1 threats to mathematical integrity, artifact
-integrity, and service availability.
+This document defines the v0.2 threats to mathematical integrity,
+artifact integrity, and service availability.
 
-v0.1 accepts pure data plus operator-installed local plugins and checkers.
+The implemented releases accept pure data plus operator-installed local
+plugins and checkers.
 Jacobian does not provide a security sandbox. Code installed by the operator is
 assumed safe to execute on that machine.
 
@@ -29,7 +30,7 @@ produce timeout or error, never a false mathematical conclusion.
 
 ### Mathematically untrusted problem plugin
 
-v0.1 plugins are operator-installed and trusted not to attack the host. They
+v0.2 plugins are operator-installed and trusted not to attack the host. They
 are not trusted to establish mathematical truth. A plugin may:
 
 - omit legal semantic objects;
@@ -127,9 +128,53 @@ Controls:
 - reached limits downgrade coverage;
 - tool errors cannot be translated into false, infeasible, or exhaustive.
 
+### Faulty enumeration or canonicalization
+
+A domain enumerator may omit candidates, change scope between pages, repeat a
+cursor, exceed the requested page, or falsely claim completion. A
+canonicalizer may collide non-isomorphic structures or change across runs.
+
+Controls:
+
+- page progress, page size, cursor advancement, and scope stability are
+  validated;
+- candidate, wall-time, cancellation, and operational limits preserve bounded
+  coverage;
+- search snapshots never self-certify;
+- canonical keys bind the canonical mathematical object to the exact
+  canonicalizer implementation digest;
+- any negative theorem based on enumeration requires a separate authorized
+  completeness checker.
+
+### Representation substitution
+
+A proposed transformation may bind the wrong source or target, strengthen a
+relaxation into equivalence, or change its proof obligation after generation.
+
+Controls:
+
+- transformation evidence binds both schemas, both semantics digests, both
+  object digests, relation, obligation digest, and transformer digest;
+- transformer output remains unverified;
+- an independently authorized checker selects on format plus source and target
+  compatibility and creates a separate immutable verification record.
+
+### Solver-generated false evidence
+
+The exact-rational solver backend may be buggy, time out, or return a model
+that does not satisfy the intended mathematics.
+
+Controls:
+
+- solver status never directly becomes verified;
+- membership weights and separators are self-describing artifacts;
+- a checker that does not import Z3 or the generator replays every rational
+  equality and inequality;
+- changed coefficients, margins, bindings, or scopes are rejected.
+
 ## Trust assumptions
 
-v0.1 assumes:
+The implemented releases assume:
 
 - SHA-256 collision resistance;
 - correct operation of the host filesystem and SQLite within their documented
@@ -145,7 +190,7 @@ v0.1 assumes:
 The system does not assume that an evaluator, solver, model, plugin, retrieved
 research record, or search policy is correct.
 
-## Out of scope for v0.1
+## Out of scope for v0.2
 
 - Hostile executable plugin code
 - Kernel or hypervisor compromise

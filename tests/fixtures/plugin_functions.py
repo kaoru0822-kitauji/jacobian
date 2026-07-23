@@ -63,6 +63,18 @@ def evaluate_candidate(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def enumerate_invalid_candidate(_request: dict[str, Any]) -> dict[str, Any]:
+    """Return a complete page whose candidate violates the installed schema."""
+
+    return {
+        "response_version": "1",
+        "candidates": [{"not": "a matrix"}],
+        "next_cursor": None,
+        "complete": True,
+        "scope": {"fixture": "invalid candidate"},
+    }
+
+
 def find_fixture_witness(request: dict[str, Any]) -> dict[str, Any]:
     value = request["candidate"]["value"]
     return {

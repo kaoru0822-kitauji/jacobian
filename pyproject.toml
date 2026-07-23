@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jacobian-research-kernel"
-version = "0.1.0a0"
+version = "0.2.0a0"
 description = "A verifier-centric research kernel for bounded, executable mathematics"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -18,6 +18,7 @@ dependencies = [
     "pydantic>=2.12,<3",
     "rfc8785==0.1.4",
     "typer>=0.20,<1",
+    "z3-solver>=4.15.4,<5",
 ]
 
 [project.scripts]
@@ -52,7 +53,7 @@ markers = [
     "integration: real filesystem, SQLite, or process-boundary tests",
     "end_to_end: complete user-visible research-kernel workflows",
     "subprocess: clean-process replay tests",
-    "conformance: normative v0.1 conformance cases",
+    "conformance: normative release conformance cases",
     "differential: independent implementation comparisons",
     "external_backend: tests requiring an optional external engine",
     "slow: tests excluded from the fastest development loop",

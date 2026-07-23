@@ -51,7 +51,7 @@ The initial corpus contains:
 - artifact blobs near 1 KiB, 100 KiB, and 10 MiB;
 - manifest graphs with zero, tens, and thousands of parent references within
   allowed limits;
-- batches of 1, 32, and the v0.1 maximum of 256 candidates;
+- batches of 1, 32, and the v0.2 maximum of 256 candidates;
 - direct witnesses and finite-enumeration certificates of several sizes;
 - cold-store, deduplication-hit, and verified-cache-hit cases.
 
@@ -75,7 +75,7 @@ witness representation, and cost profile.
 The exact public workloads are defined in the
 [Mathematical scenario catalog](math-scenarios.md).
 
-## v0.1 benchmark groups
+## v0.2 benchmark groups
 
 ### Canonical encoding and hashing
 
@@ -193,27 +193,39 @@ The initial executable harness covers canonical rational encoding,
 deduplicated artifact insertion, and verified artifact reads:
 
 ```sh
-uv run python benchmarks/benchmark_v01.py
+uv run python benchmarks/benchmark_core.py
+```
+
+The v0.2 harness adds bounded graph canonicalization and finite rational
+membership/separation:
+
+```sh
+uv run python benchmarks/benchmark_v02.py
 ```
 
 Use pyperf's ordinary CLI flags to select a faster development run or write raw
-JSON. These measurements are baselines only; no timing threshold is a v0.1
+JSON. These measurements are baselines only; no timing threshold is a v0.2
 release gate.
 
-## Later-release benchmark groups
-
-### v0.2 — Bounded discovery
+## Bounded-discovery benchmarks
 
 Measure:
 
 - raw and isomorphism-reduced candidates per second;
 - canonicalization cache hit rate and cost;
-- enumeration checkpoint and resume overhead;
+- durable progress-snapshot and cancellation overhead;
 - exact separator and projection cost by dimension and generator count;
 - transformation proposal and verification cost separately.
 
 Enumeration benchmarks always report the exact declared scope and number of
 unique canonical objects. Throughput without scope correctness is meaningless.
+
+The executable alpha harness measures canonicalization and exact finite
+polytope proposal costs. Experiment snapshot and archive benchmarks will be
+added when the local worker no longer launches one evaluator process per
+candidate.
+
+## Later-release benchmark groups
 
 ### v0.3 — Scalable search
 

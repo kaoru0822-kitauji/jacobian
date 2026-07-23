@@ -35,6 +35,11 @@ from jacobian.contracts.results import (
     ResultEnvelope,
     Verification,
 )
+from jacobian.contracts.transformations import (
+    TransformationClaim,
+    TransformationEnvelope,
+    TransformationVerificationRecord,
+)
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.registry import (
     CheckerExecutableChangedError,
@@ -104,6 +109,12 @@ class VerificationService:
             name="jacobian.preservation-envelope",
             version="1",
             definition=PreservationEnvelope.model_json_schema(),
+        )
+        self.transformation_record_schema_uri = store.register_descriptor(
+            kind="schema",
+            name="jacobian.transformation-verification-record",
+            version="1",
+            definition=TransformationVerificationRecord.model_json_schema(),
         )
 
     def _semantics_digest(self, artifact: StoredArtifact) -> str:
@@ -187,12 +198,26 @@ class VerificationService:
             for artifact in (claim, candidate, witness_artifact):
                 self._validate_artifact(artifact)
             witness = WitnessEnvelope.model_validate(witness_artifact.payload)
+            if witness.bindings.encoding_digest is not None:
+                raise ValueError(
+                    "direct witnesses do not support external encoding bindings"
+                )
+            scope = None
+            if witness.bindings.scope_digest is not None:
+                scope = self._resolve_bound_parent(
+                    witness_artifact,
+                    witness.bindings.scope_digest,
+                    label="scope",
+                )
+                self._validate_artifact(scope)
             semantics_digest = self._semantics_digest(candidate)
             expected_bindings = {
                 "claim_digest": claim.manifest.object_digest,
                 "semantics_digest": semantics_digest,
                 "candidate_digest": candidate.manifest.object_digest,
-                "scope_digest": None,
+                "scope_digest": (
+                    scope.manifest.object_digest if scope is not None else None
+                ),
                 "encoding_digest": None,
             }
             if witness.bindings.model_dump(mode="json") != expected_bindings:
@@ -200,16 +225,24 @@ class VerificationService:
                     "witness bindings do not match the verification target"
                 )
             required_parents = {claim_uri, candidate_uri}
+            if scope is not None:
+                required_parents.add(scope.artifact_uri)
             if not required_parents.issubset(witness_artifact.manifest.parents):
                 raise ValueError(
-                    "witness artifact parents do not bind the claim and candidate"
+                    "witness artifact parents do not bind its verification target"
                 )
             if (
                 claim.manifest.semantics_uri != candidate.manifest.semantics_uri
                 or witness_artifact.manifest.semantics_uri
                 != candidate.manifest.semantics_uri
+                or (
+                    scope is not None
+                    and scope.manifest.semantics_uri != candidate.manifest.semantics_uri
+                )
             ):
-                raise ValueError("claim, candidate, and witness semantics differ")
+                raise ValueError(
+                    "claim, candidate, witness, and scope semantics differ"
+                )
 
             checker = self.checker_registry.require_compatible(
                 checker_id,
@@ -236,6 +269,7 @@ class VerificationService:
                     "semantics_uri": candidate.manifest.semantics_uri,
                     "payload": candidate.payload,
                 },
+                "scope": (self._checker_artifact(scope) if scope is not None else None),
                 "witness": {
                     "artifact_uri": witness_uri,
                     "object_digest": witness_artifact.manifest.object_digest,
@@ -281,6 +315,7 @@ class VerificationService:
                 verification=Verification.VERIFIED,
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
+                scope_uri=scope.artifact_uri if scope is not None else None,
             )
             record = VerificationRecord(
                 checker_id=checker.checker_id,
@@ -295,13 +330,16 @@ class VerificationService:
                 request_digest=request_digest,
                 environment_digest=_environment_digest(checker.executable_digest),
             )
+            parent_uris = [claim_uri, candidate_uri, witness_uri]
+            if scope is not None:
+                parent_uris.append(scope.artifact_uri)
             record_artifact = self._commit_verification_record(
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
                 schema_uri=self.record_schema_uri,
                 semantics_uri=self.record_semantics_uri,
                 payload=record.model_dump(mode="json"),
-                parents=(claim_uri, candidate_uri, witness_uri),
+                parents=tuple(parent_uris),
                 summary="authorized witness verification",
             )
             return ResultEnvelope(
@@ -362,7 +400,7 @@ class VerificationService:
             )
             if certificate.bindings.encoding_digest is not None:
                 raise ValueError(
-                    "v0.1 certificates do not support external encoding bindings"
+                    "v0.2 certificates do not support external encoding bindings"
                 )
             claim = self._resolve_bound_parent(
                 certificate_artifact,
@@ -371,7 +409,7 @@ class VerificationService:
             )
             if certificate.bindings.candidate_digest is None:
                 raise ValueError(
-                    "v0.1 reference certificates require a candidate binding"
+                    "v0.2 reference certificates require a candidate binding"
                 )
             candidate = self._resolve_bound_parent(
                 certificate_artifact,
@@ -506,6 +544,190 @@ class VerificationService:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
                 detail="checker timed out",
+                started=started,
+            )
+        except CheckerExecutableChangedError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.ERROR,
+                detail=str(exc),
+                started=started,
+            )
+        except (
+            CheckerRegistryError,
+            SchemaRegistryError,
+            ValueError,
+            ValidationError,
+        ) as exc:
+            return self._rejected_input(str(exc), started=started)
+        except StoreError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.ERROR,
+                detail=str(exc),
+                started=started,
+            )
+        except CheckerExecutionError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.ERROR,
+                detail=str(exc),
+                started=started,
+            )
+
+    def verify_transformation(
+        self,
+        *,
+        transformation_uri: str,
+    ) -> ResultEnvelope:
+        """Replay a representation relation with an authorized checker."""
+
+        started = time.monotonic()
+        try:
+            transformation_artifact = self.store.get(transformation_uri)
+            self._validate_artifact(transformation_artifact)
+            transformation = TransformationEnvelope.model_validate(
+                transformation_artifact.payload
+            )
+            claim = self.store.get(transformation.claim_uri)
+            source = self.store.get(transformation.source_uri)
+            target = self.store.get(transformation.target_uri)
+            for artifact in (claim, source, target):
+                self._validate_artifact(artifact)
+            parsed_claim = TransformationClaim.model_validate(claim.payload)
+            if (
+                parsed_claim.transform_format != transformation.transform_format
+                or parsed_claim.format_version != transformation.format_version
+                or parsed_claim.relation != transformation.relation
+                or parsed_claim.bindings != transformation.bindings
+            ):
+                raise ValueError(
+                    "transformation claim does not match its evidence envelope"
+                )
+            source_semantics_digest = self._semantics_digest(source)
+            target_semantics_digest = self._semantics_digest(target)
+            expected_bindings = {
+                "source_digest": source.manifest.object_digest,
+                "source_schema_uri": source.manifest.schema_uri,
+                "source_semantics_digest": source_semantics_digest,
+                "target_digest": target.manifest.object_digest,
+                "target_schema_uri": target.manifest.schema_uri,
+                "target_semantics_digest": target_semantics_digest,
+            }
+            if transformation.bindings.model_dump(mode="json") != expected_bindings:
+                raise ValueError(
+                    "transformation bindings do not match source and target"
+                )
+            required_parents = {
+                claim.artifact_uri,
+                source.artifact_uri,
+                target.artifact_uri,
+            }
+            if not required_parents.issubset(transformation_artifact.manifest.parents):
+                raise ValueError(
+                    "transformation artifact parents do not bind its objects"
+                )
+            checker = self.checker_registry.select_compatible(
+                evidence_kind=EvidenceKind.TRANSFORMATION,
+                format_id=transformation.transform_format,
+                format_version=transformation.format_version,
+                claim_schema_uri=claim.manifest.schema_uri,
+                semantics_uri=source.manifest.semantics_uri,
+                candidate_schema_uri=source.manifest.schema_uri,
+                target_schema_uri=target.manifest.schema_uri,
+                target_semantics_uri=target.manifest.semantics_uri,
+            )
+            request = {
+                "request_version": "1",
+                "claim": self._checker_artifact(claim),
+                "source": self._checker_artifact(source),
+                "target": self._checker_artifact(target),
+                "transformation": {
+                    **self._checker_artifact(transformation_artifact),
+                    "payload": transformation.model_dump(mode="json"),
+                },
+                "expected_bindings": expected_bindings,
+            }
+            request_digest = _digest_bytes(canonicalize_json(request))
+            decision = self._run_checker(
+                entrypoint=checker.entrypoint,
+                expected_digest=checker.executable_digest,
+                request=request,
+            )
+            runtime_ms = int((time.monotonic() - started) * 1000)
+            if not decision.accepted:
+                return ResultEnvelope(
+                    execution=Execution(
+                        status=ExecutionStatus.COMPLETED,
+                        runtime_ms=runtime_ms,
+                    ),
+                    input=InputValidation(
+                        status=InputStatus.REJECTED,
+                        errors=(decision.detail,),
+                    ),
+                    conclusion=Conclusion.UNKNOWN,
+                    assurance=Assurance(
+                        arithmetic=decision.arithmetic,
+                        method=decision.method,
+                        coverage=decision.coverage,
+                        verification=Verification.UNVERIFIED,
+                    ),
+                    claim_digest=claim.manifest.object_digest,
+                    candidate_digest=source.manifest.object_digest,
+                    evidence_uris=(transformation_uri,),
+                )
+
+            assurance = Assurance(
+                arithmetic=decision.arithmetic,
+                method=decision.method,
+                coverage=decision.coverage,
+                verification=Verification.VERIFIED,
+                checker_id=checker.checker_id,
+                checker_digest=checker.executable_digest,
+            )
+            record = TransformationVerificationRecord(
+                checker_id=checker.checker_id,
+                checker_digest=checker.executable_digest,
+                transformation_uri=transformation_uri,
+                claim_uri=claim.artifact_uri,
+                bindings=transformation.bindings,
+                relation=transformation.relation,
+                conclusion=decision.conclusion,
+                arithmetic=decision.arithmetic,
+                method=decision.method,
+                coverage=decision.coverage,
+                request_digest=request_digest,
+                environment_digest=_environment_digest(checker.executable_digest),
+            )
+            record_artifact = self._commit_verification_record(
+                checker_id=checker.checker_id,
+                checker_digest=checker.executable_digest,
+                schema_uri=self.transformation_record_schema_uri,
+                semantics_uri=self.record_semantics_uri,
+                payload=record.model_dump(mode="json"),
+                parents=(
+                    claim.artifact_uri,
+                    source.artifact_uri,
+                    target.artifact_uri,
+                    transformation_uri,
+                ),
+                summary="authorized transformation verification",
+            )
+            return ResultEnvelope(
+                execution=Execution(
+                    status=ExecutionStatus.COMPLETED,
+                    runtime_ms=runtime_ms,
+                ),
+                input=InputValidation(status=InputStatus.ACCEPTED),
+                conclusion=decision.conclusion,
+                assurance=assurance,
+                claim_digest=claim.manifest.object_digest,
+                semantics_digest=self._semantics_digest(claim),
+                candidate_digest=source.manifest.object_digest,
+                evidence_uris=(transformation_uri,),
+                verification_record_uri=record_artifact.artifact_uri,
+            )
+        except subprocess.TimeoutExpired:
+            return self._operational_failure(
+                status=ExecutionStatus.TIMEOUT,
+                detail="transformation checker timed out",
                 started=started,
             )
         except CheckerExecutableChangedError as exc:

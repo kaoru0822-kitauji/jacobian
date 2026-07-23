@@ -26,7 +26,7 @@ difficult to diagnose and too easy to contaminate through public solutions.
 ## Why more than one reference plugin is required
 
 A single domain can accidentally bake its own assumptions into apparently
-generic interfaces. Jacobian therefore does not stabilize the v0.1 capability
+generic interfaces. Jacobian therefore does not stabilize the v0.2 capability
 interfaces until at least two structurally different plugins use them.
 
 ## Reference A: finite directed graphs and path languages
@@ -59,14 +59,14 @@ It should test that the kernel does not assume:
 ## Third-domain candidate: finite magmas
 
 `MAGMA-IMPL-001` adds finite operation tables, equational-law evaluation, and a
-model-plus-assignment witness. It is the preferred third plugin after the v0.1
+model-plus-assignment witness. It is the preferred third plugin after the v0.2
 capability surface is stable.
 
 ## Historical end-to-end episodes
 
 The Dinitz–Garg–Goemans routing episode remains a valuable later regression
 because it combines semantic closure, adversarial routing, rational arithmetic,
-polyhedral separation, and shrinking. It is not the definition of v0.1 and does
+polyhedral separation, and shrinking. It is not the definition of v0.2 and does
 not block the first verification kernel.
 
 After v0.4, add historical conjecture episodes with temporal knowledge cutoffs.

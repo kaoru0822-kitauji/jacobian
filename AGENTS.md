@@ -38,12 +38,17 @@ to satisfy a reference scenario.
 
 ## Project Structure & Module Organization
 
-Jacobian is currently a specification-first research project; there is no
-implementation tree or stable public API yet. `README.md` provides the project
-overview and document index. Design material lives in `docs/`:
+Jacobian v0.2 alpha is the current cumulative implementation under
+`src/jacobian/`, with independent replay code under
+`src/jacobian_checkers/` and behavioral tests under `tests/`. It is the only
+current release contract; earlier development milestones survive only as
+ordinary regression coverage. The public API and artifact formats remain
+pre-stable.
+`README.md` provides the project overview and document index. Design material
+lives in `docs/`:
 
-- `docs/specifications/` contains versioned release specifications. v0.1 is the
-  only normative implementation target; later versions are provisional.
+- `docs/specifications/` contains the current v0.2 specification and
+  provisional specifications for later releases.
 - `docs/adr/` records architectural decisions using numbered filenames such as
   `0001-python-first-control-plane.md`.
 - Top-level documents cover architecture, tools, conformance, threats,
@@ -82,17 +87,16 @@ Write concise Markdown with ATX headings (`#`, `##`) and descriptive link text.
 Wrap prose at a readable width consistent with nearby files. Preserve the
 project's precise distinction between search or evaluation results and
 independently verified evidence. Name specifications by release
-(`v0.1.md`) and ADRs with a zero-padded sequence plus kebab-case description.
+(`v0.2.md`) and ADRs with a zero-padded sequence plus kebab-case description.
 Update `README.md` when adding a public-facing document.
 
 ## Testing Guidelines
 
-Treat cross-document consistency as the current validation target. Check new
-claims against `docs/specifications/v0.1.md`,
-`docs/conformance-v0.1.md`, and `docs/testing-strategy.md`. Verify relative
-links and ensure provisional roadmap material is not presented as a stable
-contract. Report manual checks accurately; do not claim executable tests that
-were not run.
+Check changes against the applicable release specification,
+`docs/conformance-v0.2.md`, and
+`docs/testing-strategy.md`. Verify relative links and ensure provisional
+roadmap material is not presented as a stable contract. Report only checks
+that actually ran.
 
 ## Commit & Pull Request Guidelines
 
