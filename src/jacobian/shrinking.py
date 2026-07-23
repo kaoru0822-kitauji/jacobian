@@ -40,6 +40,8 @@ from jacobian.verification import VerificationService
 
 
 class ShrinkService:
+    """Reduce evidence while independently replaying every accepted step."""
+
     def __init__(
         self,
         store: ArtifactStore,
@@ -68,6 +70,8 @@ class ShrinkService:
         objectives: tuple[str, ...] | list[str],
         evaluation_budget: int,
     ) -> ShrinkResult:
+        """Run bounded shrinking and report the achieved minimality level."""
+
         kind = ShrinkTargetKind(target_kind)
         requested_reducers = tuple(reducers)
         requested_objectives = tuple(objectives)

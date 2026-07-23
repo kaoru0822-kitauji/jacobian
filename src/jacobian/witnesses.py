@@ -45,6 +45,8 @@ def _conclusion_proving_absence(role: WitnessRole) -> Conclusion:
 
 
 class WitnessSearchService:
+    """Ask an untrusted plugin for adversarial evidence without self-certifying."""
+
     def __init__(
         self,
         store: ArtifactStore,
@@ -75,6 +77,8 @@ class WitnessSearchService:
         witness_role: WitnessRole | str,
         wall_seconds: int,
     ) -> WitnessFindResult:
+        """Find a witness or independently verify a no-witness certificate."""
+
         role = WitnessRole(witness_role)
         validation = self.claims.validate(
             claim_uri=claim_uri,

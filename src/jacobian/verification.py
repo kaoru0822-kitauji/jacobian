@@ -177,6 +177,8 @@ class VerificationService:
         witness_uri: str,
         checker_id: str,
     ) -> ResultEnvelope:
+        """Replay a bound witness with the explicitly selected checker."""
+
         started = time.monotonic()
         try:
             claim = self.store.get(claim_uri)
@@ -349,6 +351,8 @@ class VerificationService:
             )
 
     def verify_certificate(self, *, certificate_uri: str) -> ResultEnvelope:
+        """Select and run the unique checker compatible with a certificate."""
+
         started = time.monotonic()
         try:
             certificate_artifact = self.store.get(certificate_uri)

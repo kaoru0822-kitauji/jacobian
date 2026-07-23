@@ -23,6 +23,8 @@ class PluginRegistryError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class ResolvedCapability:
+    """A plugin capability bound to the source digest measured at resolution."""
+
     plugin_id: str
     name: CapabilityName
     descriptor: CapabilityDescriptor
@@ -56,6 +58,8 @@ class PluginRegistry:
             )
 
     def register_implementation(self, entrypoint: str) -> str:
+        """Record an operator-installed entrypoint and its current source digest."""
+
         try:
             digest = module_source_digest(entrypoint)
         except ImplementationError as exc:
@@ -144,6 +148,8 @@ class PluginRegistry:
         return manifest
 
     def get(self, plugin_id: str) -> PluginManifest:
+        """Return an installed manifest without resolving executable code."""
+
         with self._connect() as connection:
             installed = connection.execute(
                 "SELECT 1 FROM installed_plugins WHERE plugin_id = ?",
@@ -161,6 +167,8 @@ class PluginRegistry:
         plugin_id: str,
         capability: CapabilityName,
     ) -> ResolvedCapability:
+        """Resolve a capability only if its source still matches installation."""
+
         manifest = self.get(plugin_id)
         descriptor = manifest.capabilities.get(capability)
         if descriptor is None:

@@ -52,6 +52,8 @@ class StoreLimitError(StoreError):
 
 @dataclass(frozen=True, slots=True)
 class StoreLimits:
+    """Local artifact and aggregate blob-size limits."""
+
     max_artifact_bytes: int = 10 * 1024 * 1024
     max_parents: int = 4096
     max_summary_chars: int = 512
@@ -60,6 +62,8 @@ class StoreLimits:
 
 @dataclass(frozen=True, slots=True)
 class StoredArtifact:
+    """A verified-on-read manifest, payload, and canonical byte sequence."""
+
     artifact_uri: str
     manifest: ArtifactManifest
     payload: Any
@@ -316,6 +320,8 @@ class ArtifactStore:
         *,
         expected_kind: str | None = None,
     ) -> dict[str, Any]:
+        """Load an infrastructure descriptor and optionally require its kind."""
+
         artifact = self.get(artifact_uri)
         if (
             artifact.manifest.schema_uri != _BOOTSTRAP_SCHEMA_URI
@@ -340,6 +346,8 @@ class ArtifactStore:
         parents: tuple[str, ...] | list[str] = (),
         summary: str = "",
     ) -> ArtifactPutResult:
+        """Commit canonical content whose identity binds schema and semantics."""
+
         return self._put(
             schema_uri=schema_uri,
             semantics_uri=semantics_uri,
@@ -458,6 +466,8 @@ class ArtifactStore:
         return data
 
     def get(self, artifact_uri: str) -> StoredArtifact:
+        """Load an artifact after replaying its content and manifest digests."""
+
         manifest_digest = _digest_from_uri(artifact_uri)
         with self._connect() as connection:
             row = connection.execute(
@@ -515,6 +525,8 @@ class ArtifactStore:
         )
 
     def find_by_object_digest(self, object_digest: str) -> tuple[str, ...]:
+        """Return every artifact URI carrying a mathematical object digest."""
+
         with self._connect() as connection:
             rows = connection.execute(
                 """
