@@ -1,0 +1,165 @@
+"""Bounded canonical JSON for mathematical artifact identity."""
+
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from dataclasses import dataclass
+from fractions import Fraction
+from typing import Any, NoReturn
+
+import rfc8785
+
+_INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
+_MAX_SAFE_JSON_INTEGER = (1 << 53) - 1
+
+
+class CanonicalizationError(ValueError):
+    """The input cannot be represented by Jacobian's canonical JSON profile."""
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalLimits:
+    max_input_bytes: int = 10 * 1024 * 1024
+    max_output_bytes: int = 10 * 1024 * 1024
+    max_depth: int = 64
+    max_integer_digits: int = 4096
+
+
+def _reject_float(_value: str) -> NoReturn:
+    raise CanonicalizationError("JSON floating-point numbers are not allowed")
+
+
+def _reject_constant(value: str) -> NoReturn:
+    raise CanonicalizationError(f"non-finite JSON value is not allowed: {value}")
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise CanonicalizationError(f"duplicate JSON object key: {key!r}")
+        result[key] = value
+    return result
+
+
+def loads_strict_json(
+    value: str | bytes | bytearray,
+    *,
+    limits: CanonicalLimits | None = None,
+) -> Any:
+    """Parse JSON while rejecting duplicate keys, floats, and oversized input."""
+
+    active_limits = limits or CanonicalLimits()
+    raw = value.encode("utf-8") if isinstance(value, str) else bytes(value)
+    if len(raw) > active_limits.max_input_bytes:
+        raise CanonicalizationError("JSON input exceeds the configured size limit")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise CanonicalizationError("JSON input must be valid UTF-8") from exc
+    if text.startswith("\ufeff"):
+        raise CanonicalizationError("JSON input must not contain a UTF-8 BOM")
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=_unique_object,
+            parse_float=_reject_float,
+            parse_constant=_reject_constant,
+        )
+    except CanonicalizationError:
+        raise
+    except (json.JSONDecodeError, RecursionError) as exc:
+        raise CanonicalizationError("invalid or excessively nested JSON") from exc
+
+
+def _normalize_rational(
+    value: dict[str, Any],
+    *,
+    limits: CanonicalLimits,
+) -> dict[str, str] | None:
+    if set(value) != {"num", "den"}:
+        return None
+    numerator = value["num"]
+    denominator = value["den"]
+    if not isinstance(numerator, str) or not isinstance(denominator, str):
+        raise CanonicalizationError(
+            "rational numerator and denominator must be strings"
+        )
+    if not _INTEGER.fullmatch(numerator) or not _INTEGER.fullmatch(denominator):
+        raise CanonicalizationError(
+            "rational components must be canonical decimal integers"
+        )
+    if (
+        len(numerator.lstrip("-")) > limits.max_integer_digits
+        or len(denominator.lstrip("-")) > limits.max_integer_digits
+    ):
+        raise CanonicalizationError("rational component exceeds the digit limit")
+    den = int(denominator)
+    if den == 0:
+        raise CanonicalizationError("rational denominator cannot be zero")
+    fraction = Fraction(int(numerator), den)
+    return {"num": str(fraction.numerator), "den": str(fraction.denominator)}
+
+
+def _normalize(value: Any, *, limits: CanonicalLimits, depth: int) -> Any:
+    if depth > limits.max_depth:
+        raise CanonicalizationError("JSON nesting exceeds the configured depth limit")
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        raise CanonicalizationError("JSON floating-point numbers are not allowed")
+    if isinstance(value, int):
+        if abs(value) > _MAX_SAFE_JSON_INTEGER:
+            raise CanonicalizationError(
+                "JSON integers outside the interoperable range must be encoded as strings"
+            )
+        return value
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value)
+    if isinstance(value, list):
+        return [_normalize(item, limits=limits, depth=depth + 1) for item in value]
+    if isinstance(value, dict):
+        rational = _normalize_rational(value, limits=limits)
+        if rational is not None:
+            return rational
+        result: dict[str, Any] = {}
+        for raw_key, raw_value in value.items():
+            if not isinstance(raw_key, str):
+                raise CanonicalizationError("JSON object keys must be strings")
+            key = unicodedata.normalize("NFC", raw_key)
+            if key in result:
+                raise CanonicalizationError(
+                    "object keys collide after Unicode normalization"
+                )
+            result[key] = _normalize(
+                raw_value,
+                limits=limits,
+                depth=depth + 1,
+            )
+        return result
+    raise CanonicalizationError(f"unsupported JSON value type: {type(value).__name__}")
+
+
+def canonicalize_json(
+    value: Any,
+    *,
+    limits: CanonicalLimits | None = None,
+) -> bytes:
+    """Normalize exact JSON and encode it using RFC 8785 key ordering."""
+
+    active_limits = limits or CanonicalLimits()
+    parsed = (
+        loads_strict_json(value, limits=active_limits)
+        if isinstance(value, (str, bytes, bytearray))
+        else value
+    )
+    normalized = _normalize(parsed, limits=active_limits, depth=0)
+    try:
+        encoded = rfc8785.dumps(normalized)
+    except (rfc8785.CanonicalizationError, RecursionError) as exc:
+        raise CanonicalizationError("value cannot be canonically encoded") from exc
+    if len(encoded) > active_limits.max_output_bytes:
+        raise CanonicalizationError("canonical JSON exceeds the configured size limit")
+    return encoded

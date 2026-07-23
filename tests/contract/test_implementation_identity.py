@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+import importlib
+from pathlib import Path
+
+import pytest
+
+from jacobian.implementation import package_source_digest
+
+
+def test_digest_binds_helper_modules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = tmp_path / "digest_fixture"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "plugin.py").write_text(
+        "from .helper import VALUE\n\ndef run(_request):\n    return VALUE\n",
+        encoding="utf-8",
+    )
+    helper = package / "helper.py"
+    helper.write_text("VALUE = 1\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    importlib.invalidate_caches()
+
+    before = package_source_digest("digest_fixture.plugin:run")
+    helper.write_text("VALUE = 2\n", encoding="utf-8")
+    after = package_source_digest("digest_fixture.plugin:run")
+
+    assert before != after
+
+
+def test_digest_resolution_does_not_execute_package_initializers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "initializer-ran"
+    package = tmp_path / "initializer_fixture"
+    package.mkdir()
+    (package / "__init__.py").write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).touch()\n",
+        encoding="utf-8",
+    )
+    (package / "plugin.py").write_text(
+        "def run(_request):\n    return {}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    importlib.invalidate_caches()
+
+    package_source_digest("initializer_fixture.plugin:run")
+
+    assert not marker.exists()
