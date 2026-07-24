@@ -51,4 +51,4 @@ evaluator output or solver status to a verified conclusion.
 
 ## License
 
-Apache-2.0
+MIT
