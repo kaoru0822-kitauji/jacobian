@@ -50,12 +50,12 @@ class _SourceOnlyFinder(importlib.abc.MetaPathFinder):
         ):
             return None
         specification = importlib.machinery.PathFinder.find_spec(fullname, path)
-        if (
-            specification is None
-            or specification.origin is None
-            or not specification.origin.endswith(".py")
-        ):
+        if specification is None or specification.origin is None:
             return specification
+        if not specification.origin.endswith(".py"):
+            raise ImportError(
+                f"plugin package module is not Python source: {specification.origin}"
+            )
         locations = specification.submodule_search_locations
         return importlib.util.spec_from_file_location(
             fullname,
