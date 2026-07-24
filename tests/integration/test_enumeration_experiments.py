@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -12,9 +13,17 @@ from jacobian.contracts.discovery import (
     ExperimentState,
     SearchEnumerateRequest,
 )
+from jacobian.contracts.evaluation import EvaluationBatchResult, EvaluationProfile
 from jacobian.contracts.plugins import PluginManifest
+from jacobian.contracts.results import (
+    Execution,
+    ExecutionStatus,
+    InputStatus,
+    InputValidation,
+)
 from jacobian.experiments import ExperimentError
 from jacobian.kernel import JacobianKernel
+from jacobian.store import StoreError
 
 
 def _claim(
@@ -51,10 +60,10 @@ def _install_matrix_enumerator_plugin(
     kernel: JacobianKernel,
     *,
     entrypoint: str,
+    evaluator_entrypoint: str = "jacobian.plugins.matrices:evaluate_capability",
 ) -> str:
     matrix = kernel.references["matrices"]
     enumerator = kernel.plugins.register_implementation(entrypoint)
-    evaluator_entrypoint = "jacobian.plugins.matrices:evaluate_capability"
     evaluator = kernel.plugins.register_implementation(evaluator_entrypoint)
     manifest = kernel.artifacts.put(
         schema_uri=kernel.reference_installer.manifest_schema_uri,
@@ -160,6 +169,17 @@ def test_graph_enumeration_deduplicates_isomorphic_candidates(
     assert scope.payload["enumerator_scope"]["arc_rule"] == (
         "v_i_to_v_j_only_when_i_less_than_j"
     )
+    archive = kernel.store.get(snapshot.archive_uri)
+    assert set(archive.manifest.parents) == {
+        snapshot.scope_uri,
+        *snapshot.archive_page_uris,
+    }
+    for page_uri in snapshot.archive_page_uris:
+        page = kernel.store.get(page_uri)
+        assert set(page.manifest.parents) == {
+            *page.payload["candidate_uris"],
+            *page.payload["evaluation_uris"],
+        }
 
 
 @pytest.mark.integration
@@ -258,6 +278,47 @@ def test_matrix_enumeration_uses_the_same_experiment_contract(
     assert snapshot.accounting.unique_candidates == 2
     assert snapshot.accounting.evaluated_candidates == 2
     assert snapshot.verification.value == "UNVERIFIED"
+
+
+@pytest.mark.integration
+def test_enumeration_pages_respect_evaluator_batch_limit(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel.evaluation.max_batch_size = 2
+    claim_uri, plugin_id = _claim(
+        kernel,
+        reference_name="matrices",
+        predicate="is_nonsingular",
+        parameters={},
+    )
+    handle = kernel.experiments.start_enumeration(
+        SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds={"rows": 1, "cols": 1, "entries": [0, 1, 2]},
+            budget=EnumerationBudget(
+                candidates_max=3,
+                wall_seconds=30,
+                page_size=3,
+            ),
+        )
+    )
+
+    snapshot = kernel.experiments.wait(handle.experiment_uri, timeout_seconds=30)
+
+    assert snapshot.state is ExperimentState.COMPLETED
+    assert snapshot.stop_reason is EnumerationStopReason.COMPLETE
+    assert snapshot.accounting.raw_candidates == 3
+    assert snapshot.accounting.evaluated_candidates == 3
+    assert snapshot.accounting.pages == 2
+    assert snapshot.scope_uri is not None
+    assert snapshot.archive_uri is not None
+    archive = kernel.store.get(snapshot.archive_uri)
+    assert set(archive.manifest.parents) == {
+        snapshot.scope_uri,
+        snapshot.archive_page_uris[-1],
+    }
+    second_page = kernel.store.get(snapshot.archive_page_uris[-1])
+    assert snapshot.archive_page_uris[0] in second_page.manifest.parents
 
 
 @pytest.mark.integration
@@ -475,6 +536,141 @@ def test_enumerator_timeout_remains_a_bounded_nonconclusion(tmp_path: Path) -> N
 
 @pytest.mark.integration
 @pytest.mark.subprocess
+def test_evaluator_timeout_prevents_complete_enumeration_result(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    plugin_id = _install_matrix_enumerator_plugin(
+        kernel,
+        entrypoint="jacobian.plugins.matrices:enumerate_candidates_capability",
+        evaluator_entrypoint="tests.fixtures.plugin_functions:wait_forever",
+    )
+    claim_uri = _matrix_claim_for_plugin(
+        kernel,
+        plugin_id=plugin_id,
+    )
+    handle = kernel.experiments.start_enumeration(
+        SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds={"rows": 1, "cols": 1, "entries": [0]},
+            budget=EnumerationBudget(
+                candidates_max=1,
+                wall_seconds=1,
+                page_size=1,
+            ),
+        )
+    )
+
+    snapshot = kernel.experiments.wait(
+        handle.experiment_uri,
+        timeout_seconds=15,
+    )
+
+    assert snapshot.state == ExperimentState.TIMEOUT
+    assert snapshot.stop_reason == EnumerationStopReason.WALL_TIME_LIMIT
+    assert snapshot.enumerator_reported_complete is False
+    assert snapshot.coverage.value == "BOUNDED"
+    assert snapshot.verification.value == "UNVERIFIED"
+
+
+@pytest.mark.integration
+def test_rejected_evaluation_batch_fails_enumeration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    claim_uri, plugin_id = _claim(
+        kernel,
+        reference_name="matrices",
+        predicate="is_nonsingular",
+        parameters={},
+    )
+
+    def reject_batch(**_kwargs: object) -> EvaluationBatchResult:
+        return EvaluationBatchResult(
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            input=InputValidation(
+                status=InputStatus.REJECTED,
+                errors=("simulated incomplete evaluation",),
+            ),
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            profile=EvaluationProfile.EXACT_CANDIDATE,
+            seed=0,
+        )
+
+    monkeypatch.setattr(kernel.evaluation, "evaluate_batch", reject_batch)
+    handle = kernel.experiments.start_enumeration(
+        SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds={"rows": 1, "cols": 1, "entries": [0]},
+            budget=EnumerationBudget(
+                candidates_max=1,
+                wall_seconds=30,
+                page_size=1,
+            ),
+        )
+    )
+
+    snapshot = kernel.experiments.wait(handle.experiment_uri, timeout_seconds=15)
+
+    assert snapshot.state == ExperimentState.ERROR
+    assert snapshot.stop_reason == EnumerationStopReason.ERROR
+    assert snapshot.accounting.evaluated_candidates == 0
+    assert snapshot.archive_page_uris == ()
+    assert "simulated incomplete evaluation" in snapshot.detail
+
+
+@pytest.mark.integration
+def test_terminal_archive_failure_marks_enumeration_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    claim_uri, plugin_id = _claim(
+        kernel,
+        reference_name="matrices",
+        predicate="is_nonsingular",
+        parameters={},
+    )
+    original_put = kernel.experiments._put_internal_artifact
+
+    def fail_terminal_archive(**kwargs: object) -> object:
+        if kwargs.get("summary") == "enumeration archive manifest":
+            raise StoreError("fixture archive failure")
+        return original_put(**kwargs)
+
+    monkeypatch.setattr(
+        kernel.experiments,
+        "_put_internal_artifact",
+        fail_terminal_archive,
+    )
+    handle = kernel.experiments.start_enumeration(
+        SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds={"rows": 1, "cols": 1, "entries": [0]},
+            budget=EnumerationBudget(
+                candidates_max=1,
+                wall_seconds=30,
+                page_size=1,
+            ),
+        )
+    )
+
+    snapshot = kernel.experiments.wait(
+        handle.experiment_uri,
+        timeout_seconds=15,
+    )
+
+    assert snapshot.state == ExperimentState.ERROR
+    assert snapshot.stop_reason == EnumerationStopReason.ERROR
+    assert snapshot.archive_uri is None
+    assert "terminal archive persistence failed" in snapshot.detail
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
 def test_interrupted_experiment_is_recovered_as_an_error(tmp_path: Path) -> None:
     script = """
 import os
@@ -532,3 +728,105 @@ os._exit(0)
     assert recovered.coverage.value == "BOUNDED"
     assert recovered.verification.value == "UNVERIFIED"
     assert "ended before completion" in recovered.detail
+
+
+@pytest.mark.integration
+def test_corrupt_enumeration_snapshot_does_not_block_other_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    claim_uri, plugin_id = _claim(
+        kernel,
+        reference_name="matrices",
+        predicate="is_nonsingular",
+        parameters={},
+    )
+    monkeypatch.setattr(
+        kernel.experiments,
+        "_run_enumeration",
+        lambda _experiment_uri: None,
+    )
+    valid = kernel.experiments.start_enumeration(
+        SearchEnumerateRequest(
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            bounds={"rows": 1, "cols": 1, "entries": [0]},
+            budget=EnumerationBudget(
+                candidates_max=1,
+                wall_seconds=30,
+                page_size=1,
+            ),
+        )
+    )
+    valid_snapshot = kernel.experiments.inspect(valid.experiment_uri)
+    corrupt_uri = "experiment://ffffffffffffffffffffffffffffffff"
+    mismatched_uri = "experiment://eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    invalid_state_uri = "experiment://dddddddddddddddddddddddddddddddd"
+    with sqlite3.connect(kernel.store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO experiments (
+                experiment_uri, state, snapshot_json
+            ) VALUES (?, 'RUNNING', ?)
+            """,
+            (corrupt_uri, b"{"),
+        )
+        connection.execute(
+            """
+            INSERT INTO experiments (
+                experiment_uri, state, snapshot_json
+            ) VALUES (?, 'PENDING', ?)
+            """,
+            (
+                mismatched_uri,
+                valid_snapshot.model_dump_json().encode(),
+            ),
+        )
+        invalid_state_snapshot = valid_snapshot.model_copy(
+            update={"experiment_uri": invalid_state_uri}
+        )
+        connection.execute(
+            """
+            INSERT INTO experiments (
+                experiment_uri, state, snapshot_json
+            ) VALUES (?, 'BROKEN', ?)
+            """,
+            (
+                invalid_state_uri,
+                invalid_state_snapshot.model_dump_json().encode(),
+            ),
+        )
+
+    recovered = JacobianKernel(tmp_path, install_references=True)
+
+    assert recovered.experiments.inspect(valid.experiment_uri).state is (
+        ExperimentState.ERROR
+    )
+    with sqlite3.connect(recovered.store.db_path) as connection:
+        states = connection.execute(
+            """
+            SELECT experiment_uri, state
+            FROM experiments
+            WHERE experiment_uri IN (?, ?, ?)
+            ORDER BY experiment_uri
+            """,
+            (corrupt_uri, mismatched_uri, invalid_state_uri),
+        ).fetchall()
+        failures = connection.execute(
+            """
+            SELECT experiment_uri, snapshot_digest, detail
+            FROM experiment_recovery_failures
+            WHERE experiment_uri IN (?, ?, ?)
+            ORDER BY experiment_uri
+            """,
+            (corrupt_uri, mismatched_uri, invalid_state_uri),
+        ).fetchall()
+    assert states == [
+        (invalid_state_uri, "ERROR"),
+        (mismatched_uri, "ERROR"),
+        (corrupt_uri, "ERROR"),
+    ]
+    assert len(failures) == 3
+    assert all(str(failure[1]).startswith("sha256:") for failure in failures)
+    assert all("invalid" in str(failure[2]) for failure in failures)
