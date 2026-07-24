@@ -1,0 +1,21 @@
+{
+  "name": "jacobian",
+  "version": "0.2.0-alpha.0",
+  "description": "Verifier-centric MCP toolbench for agents working on bounded, executable mathematics",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/morluto/jacobian"
+  },
+  "homepage": "https://github.com/morluto/jacobian",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "jacobian": "bin/jacobian.cjs"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ]
+}
