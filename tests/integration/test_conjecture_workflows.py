@@ -215,6 +215,43 @@ def test_repair_preserves_verified_source_and_falsification_lineage(
     }.issubset(set(kernel.store.get(hypothesis.transformation_uri).manifest.parents))
 
 
+@pytest.mark.subprocess
+def test_repair_replays_the_exact_verification_record(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
+        kernel
+    )
+    verification_record_uri, _, _ = _verified_counterexample(
+        kernel,
+        claim_uri=claim_uri,
+        plugin_id=plugin_id,
+        checker_id=checker_id,
+        candidate_schema_uri=candidate_schema_uri,
+    )
+    genuine = kernel.store.get(verification_record_uri)
+    forged = kernel.store.put(
+        schema_uri=genuine.manifest.schema_uri,
+        semantics_uri=genuine.manifest.semantics_uri,
+        payload=genuine.payload,
+        parents=genuine.manifest.parents,
+        summary="caller-authored verification record",
+    )
+
+    result = kernel.conjectures.run(
+        ConjectureWorkflowRequest(
+            operation=ConjectureOperation.REPAIR,
+            plugin_id=plugin_id,
+            source_uri=claim_uri,
+            verification_record_uri=forged.artifact_uri,
+        )
+    )
+
+    assert result.input.status.value == "REJECTED"
+    assert "did not replay with its authorized checker" in result.detail
+
+
 def test_generation_deduplicates_claims_and_reports_unknown_novelty(
     tmp_path: Path,
 ) -> None:
