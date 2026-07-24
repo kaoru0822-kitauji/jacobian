@@ -25,7 +25,7 @@ def test_project_codex_profile_starts_the_local_stdio_server() -> None:
             "run",
             "jacobian-mcp",
             "--tool-profile",
-            "verification",
+            "capabilities",
         ],
         "cwd": ".",
         "enabled": True,

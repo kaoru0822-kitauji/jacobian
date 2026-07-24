@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.adapters.mcp.server import (
+    CAPABILITY_TOOL_NAMES,
     VERIFICATION_TOOL_NAMES,
     ToolProfile,
     create_server,
@@ -38,6 +39,7 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
             assert set(tools) == {
+                "capability.invoke",
                 "artifact.put",
                 "claim.validate",
                 "evaluate.batch",
@@ -238,6 +240,47 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
 
 
 @pytest.mark.integration
+def test_mcp_capability_profile_has_one_extensible_tool_and_catalog(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(
+            create_server(tmp_path, tool_profile=ToolProfile.CAPABILITIES),
+            raise_exceptions=True,
+        ) as client:
+            listed = await client.list_tools()
+            assert {tool.name for tool in listed.tools} == CAPABILITY_TOOL_NAMES
+            assert listed.tools[0].output_schema is None
+
+            resource = await client.read_resource("capability://catalog")
+            catalog = json.loads(resource.contents[0].text)
+            capability_ids = {
+                descriptor["capability_id"] for descriptor in catalog["capabilities"]
+            }
+            assert capability_ids == {
+                "knowledge.search",
+                "lean.check",
+                "reference.solve",
+            }
+
+            invoked = await client.call_tool(
+                "capability.invoke",
+                {
+                    "capability_id": "knowledge.search",
+                    "mode": "EXPLORE",
+                    "payload": {"query": "counterexample", "limit": 5},
+                },
+            )
+            projection = json.loads(invoked.content[0].text)
+            assert projection["assurance"]["level"] == "COMPUTED"
+            assert projection["output"]["hits"] == []
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
 def test_mcp_verification_profile_projects_compact_tools_and_domain_contract(
     tmp_path: Path,
 ) -> None:
@@ -267,7 +310,7 @@ def test_mcp_verification_profile_projects_compact_tools_and_domain_contract(
             ]
             assert contract["candidate_schema"]["properties"]["vertices"]
             assert contract["workflow"]["witness"][0].startswith(
-                "call verification.run"
+                "call capability.invoke"
             )
             claim_payload = {
                 **contract["claim_contract"]["base"],

@@ -2,16 +2,17 @@
 
 [Documentation home](../index.md)
 
-- Status: Current for v0.2 and the provisional M3/M4 implementation
+- Status: Current for v0.2 and provisional capability, M3, and M4 code
 - Host boundary: Operator-installed code is trusted not to attack the machine
 - Related records: [Architecture](architecture.md) and
   [v0.2 conformance gate](../reference/conformance-v0.2.md)
 
 ## Scope
 
-This document covers the v0.2 release contract and the provisional M3/M4 code
-in the repository. M3/M4 behavior is not part of v0.2 conformance, but it must
-preserve the same mathematical and artifact-integrity boundaries.
+This document covers the v0.2 release contract and provisional capability,
+M3, and M4 code in the repository. Later behavior is not part of v0.2
+conformance, but it must preserve the same mathematical and artifact-integrity
+boundaries.
 
 The implemented code accepts pure data plus operator-installed local plugins
 and checkers.
@@ -34,6 +35,8 @@ Jacobian protects:
   plugin, runtime, checkpoint, or experiment;
 - parameter-region promotion bound to the exact subject and claim artifacts,
   not merely an equal payload.
+- remote tenant separation for artifacts, episodes, experiments, plugins, and
+  checker metadata.
 
 Availability is important but secondary to integrity: resource exhaustion may
 produce timeout or error, never a false mathematical conclusion.
@@ -209,6 +212,34 @@ Controls:
   equality and inequality;
 - changed coefficients, margins, bindings, or scopes are rejected.
 
+### Remote client or tenant
+
+A remote caller may omit authentication, present an invalid token, choose a
+malicious tenant string, guess another tenant's content-addressed URI, or try
+to use an adapter to self-promote evidence.
+
+Controls:
+
+- remote transports fail closed unless a token file is configured or the
+  operator explicitly selects anonymous development mode;
+- opaque tokens are compared in constant time and bind an authenticated
+  subject plus required scope;
+- tenant IDs are syntax-checked and hashed before they contribute to a state
+  path;
+- tool and resource handlers route through the same authenticated subject;
+- each subject receives a separate artifact store and SQLite metadata
+  database;
+- capability adapters cannot return verified assurance without a valid
+  verification record, complete bound parent set, and matching conclusion in
+  that tenant's store;
+- TLS, rate limits, host isolation, and network policy are supplied by the
+  deployment platform.
+
+Static bearer tokens do not provide rotation without restart, delegated
+authorization, user consent, or a full identity lifecycle. They are an initial
+controlled-deployment mechanism. Hosted deployments should replace the token
+verifier with OAuth/OIDC while retaining subject-bound tenant routing.
+
 ## Trust assumptions
 
 The implemented releases assume:
@@ -241,8 +272,8 @@ verification tools.
 - Hostile executable plugin code
 - Kernel or hypervisor compromise
 - Side-channel resistance
-- Multi-tenant authorization
-- Remote identity and signing infrastructure
+- v0.2 conformance for multi-tenant authorization
+- Hosted OAuth/OIDC lifecycle and remote signing infrastructure
 - Distributed worker leases or multiple active Jacobian coordinators sharing a
   state directory
 - Formal verification of the artifact store

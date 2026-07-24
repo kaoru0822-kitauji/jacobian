@@ -1,0 +1,8 @@
+.git
+.jacobian
+.venv
+benchmarks/results
+build
+dist
+lean/.lake
+__pycache__

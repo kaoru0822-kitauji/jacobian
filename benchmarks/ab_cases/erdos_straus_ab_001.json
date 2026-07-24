@@ -1,0 +1,14 @@
+{
+  "case_id": "ERDOS-STRAUS-AB-001",
+  "version": "1",
+  "reference_name": "erdos_straus",
+  "title": "Bounded Erdős-Straus decision",
+  "prompt": "Determine whether every integer n from 2 through 120 inclusive has positive integer x, y, z satisfying 4/n = 1/x + 1/y + 1/z. Check the complete finite interval, report the number of checked integers and the first failure if one exists, and do not generalize beyond the interval.",
+  "expected": {
+    "conclusion": "TRUE",
+    "lower_bound": 2,
+    "upper_bound": 120,
+    "checked_count": 119,
+    "first_failure": null
+  }
+}

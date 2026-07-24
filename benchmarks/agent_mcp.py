@@ -477,6 +477,16 @@ def _run_case(
         "mcp_servers.jacobian_local.env.JACOBIAN_STATE_DIR="
         + json.dumps(str(state_dir)),
         "-c",
+        "mcp_servers.jacobian_local.args="
+        + json.dumps(
+            [
+                "run",
+                "jacobian-mcp",
+                "--tool-profile",
+                "verification",
+            ]
+        ),
+        "-c",
         "model_reasoning_effort=" + json.dumps(reasoning_effort),
     ]
     if model is not None:

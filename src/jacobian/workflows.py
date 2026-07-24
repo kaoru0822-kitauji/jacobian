@@ -17,7 +17,7 @@ from jacobian.witnesses import WitnessSearchService
 
 
 class VerificationWorkflowService:
-    """Compose discovery stages without creating another verification authority."""
+    """Compose exploration and verification without creating new authority."""
 
     def __init__(
         self,
@@ -48,6 +48,57 @@ class VerificationWorkflowService:
         seed: int = 0,
         evaluation_wall_seconds: int = 60,
         witness_wall_seconds: int = 300,
+    ) -> WitnessVerificationWorkflowResult:
+        return self._run_witness(
+            reference_name=reference_name,
+            claim_payload=claim_payload,
+            candidate_payload=candidate_payload,
+            witness_role=witness_role,
+            profile=profile,
+            seed=seed,
+            evaluation_wall_seconds=evaluation_wall_seconds,
+            witness_wall_seconds=witness_wall_seconds,
+            verify=True,
+        )
+
+    def explore_witness(
+        self,
+        *,
+        reference_name: str,
+        claim_payload: dict[str, Any],
+        candidate_payload: dict[str, Any],
+        witness_role: WitnessRole,
+        profile: EvaluationProfile = EvaluationProfile.FAST,
+        seed: int = 0,
+        evaluation_wall_seconds: int = 60,
+        witness_wall_seconds: int = 300,
+    ) -> WitnessVerificationWorkflowResult:
+        """Run the fast lane and leave proposed evidence explicitly unverified."""
+
+        return self._run_witness(
+            reference_name=reference_name,
+            claim_payload=claim_payload,
+            candidate_payload=candidate_payload,
+            witness_role=witness_role,
+            profile=profile,
+            seed=seed,
+            evaluation_wall_seconds=evaluation_wall_seconds,
+            witness_wall_seconds=witness_wall_seconds,
+            verify=False,
+        )
+
+    def _run_witness(
+        self,
+        *,
+        reference_name: str,
+        claim_payload: dict[str, Any],
+        candidate_payload: dict[str, Any],
+        witness_role: WitnessRole,
+        profile: EvaluationProfile,
+        seed: int,
+        evaluation_wall_seconds: int,
+        witness_wall_seconds: int,
+        verify: bool,
     ) -> WitnessVerificationWorkflowResult:
         try:
             reference = self.references[reference_name]
@@ -92,6 +143,14 @@ class VerificationWorkflowService:
             wall_seconds=witness_wall_seconds,
         )
         if found.witness_uri is None:
+            return WitnessVerificationWorkflowResult(
+                claim_uri=claim.artifact_uri,
+                candidate_uri=candidate.artifact_uri,
+                claim_validation=validation,
+                evaluation=evaluation,
+                witness_search=found,
+            )
+        if not verify:
             return WitnessVerificationWorkflowResult(
                 claim_uri=claim.artifact_uri,
                 candidate_uri=candidate.artifact_uri,

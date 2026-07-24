@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "jacobian-research-kernel"
 version = "0.2.0a0"
-description = "A verifier-centric research kernel for bounded, executable mathematics"
+description = "A capability-first MCP workbench for executable mathematics"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 license = { text = "Apache-2.0" }

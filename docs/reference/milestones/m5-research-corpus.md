@@ -1,21 +1,22 @@
-# Milestone 5 specification: research corpus integration
+# Milestone 5 specification: federated research corpus
 
 [Documentation home](../../index.md)
 
 - Status: Provisional
-- Theme: Retrieve prior work without confusing memory with proof
+- Theme: Extend local memory without confusing retrieval with proof
 
 ## 1. Entry gate
 
-The search and conjecture tools must have produced a sufficiently diverse
-corpus of verified successes, verified failures, and unverified runs to
-evaluate retrieval quality and establish useful query patterns.
+The local capability-episode database must have produced a sufficiently
+diverse corpus of verified successes, verified failures, computed results, and
+unverified runs to evaluate cross-project retrieval quality.
 
 ## 2. Integration boundary
 
-Jacobian owns immutable artifacts, verification records, checker authority, and
-the local experiment ledger required for replay. A corpus provider is optional
-and may run in another process, package, or service.
+Jacobian owns immutable artifacts, verification records, checker authority,
+the local research-memory index, and the experiment ledger required for
+replay. A federated corpus provider is optional and may run in another process,
+package, or service.
 
 The provider may ingest versioned research episodes and return ranked records.
 It cannot:
@@ -31,9 +32,10 @@ referenced local artifacts independently.
 
 ## 3. New tools
 
-### `memory.search`
+### `knowledge.search`
 
-Retrieve prior records using independently selectable indexes:
+The local implementation retrieves trust-labeled capability episodes. M5
+extends it with independently selectable provider indexes:
 
 - natural-language text;
 - normalized formula structure and quantifier skeleton;

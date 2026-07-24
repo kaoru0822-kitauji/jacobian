@@ -338,18 +338,22 @@ for 19 tools to 4,400 characters for six tools; adding `lean.verify` changed
 the compact surface to seven tools and 4,875 characters. Adding the generic
 `verification.run` workflow and explicit Lean input guidance changed it to
 eight tools and 6,899 characters. Adding the pinned `MATHLIB` environment
-and compact result projection changed the current compact descriptor to 7,883
-characters; the corresponding full 22-tool descriptor is 103,382 characters.
-The compact descriptor remains below the 25 KB first-stage target.
-These are descriptor measurements, not model token counts, and must be
-remeasured when contracts change.
+and compact result projection changed that compact descriptor to 7,883
+characters; the corresponding 22-tool descriptor was 103,382 characters.
+
+The capability-first change was remeasured with compact sorted JSON on
+2026-07-24. The default `capabilities` profile advertises one tool in 779
+characters. Its three-entry `capability://catalog` is 2,663 characters. The
+compatibility `verification` profile is eight tools and 7,171 characters; the
+23-tool `full` profile is 105,187 characters. The default descriptor remains
+well below the 25 KB first-stage target. These are descriptor measurements,
+not model token counts, and must be remeasured when contracts change.
 
 The domain bootstrap projection reduced the serialized `graph_paths` resource
 from 7,317 to 2,402 characters, `matrices` from 7,290 to 2,197, and `lean4`
 from 4,106 to 1,810. The bounded `erdos_straus` bootstrap is 1,906 characters.
-Adding that domain did not change the tool descriptors: the compact profile
-remains 7,883 characters and the full profile remains 103,382. The positive
-graph workflow response reduced from 6,098 to 1,314 characters. The full
+Adding that domain did not change the historical verification descriptors. The
+positive graph workflow response reduced from 6,098 to 1,314 characters. Full
 schemas and workflow results remain available through the canonical registry
 and `full` MCP profile; only model-facing projection changed.
 
@@ -380,3 +384,70 @@ This is an initial known-answer integration pilot, not the held-out comparative
 evaluation described above. It currently has no no-tool baseline, model seed
 control, hidden oracle, or multi-attempt aggregate. Results must therefore be
 reported per run and must not be used as a capability or performance claim.
+
+## Executable capability A/B pilot
+
+`benchmarks/agent_ab.py` implements the control/treatment comparison separately
+from the integration pilot. It launches Codex with `--ignore-user-config` so a
+personal or project MCP server cannot leak into the control condition.
+
+For every case and repetition:
+
+- control receives an empty writable workspace, no MCP configuration, and may
+  construct its own local computation;
+- treatment receives the same task and model settings plus only the compact
+  `capabilities` MCP profile;
+- condition order is shuffled from a recorded seed;
+- both conditions use the same structured report schema and independent
+  known-answer scorer;
+- treatment verification records and exact finite evidence are replayed from
+  its isolated Jacobian state;
+- raw transcript, stderr, report, usage, MCP calls, shell calls, generated-file
+  count, and elapsed time are retained;
+- the summary reports per-condition pass rate and paired token, time, shell,
+  and MCP-call deltas.
+
+Run the default three-pair pilot with:
+
+```sh
+uv run python benchmarks/agent_ab.py --case ERDOS-STRAUS-AB-001
+```
+
+The initial public case is an executable harness check, not a sufficient
+product claim. Product conclusions require multiple held-out cases and
+repetitions. Report all runs, use paired deltas, and reject any treatment that
+improves efficiency by increasing unsupported mathematical conclusions.
+
+### Initial A/B development result
+
+One dirty-worktree development pair on 2026-07-24 used Codex CLI `0.144.1`,
+the configured default model, medium reasoning effort, and
+`ERDOS-STRAUS-AB-001`. Both conditions passed their independent scorers.
+
+The first treatment design required cold catalog and domain-contract discovery.
+It used three MCP calls and 116,112 input tokens, compared with 49,907 for its
+control. This exposed a product-interface problem: the agent still had to
+assemble a complete internal `ClaimSpec`.
+
+`reference.solve` was then changed to accept only a reference name, predicate,
+candidate, and witness role; the adapter builds the formal claim internally.
+The targeted rerun produced:
+
+| Metric | Control | Capability treatment | Paired delta |
+| --- | ---: | ---: | ---: |
+| Passed | 1 | 1 | 0 |
+| Elapsed seconds | 38.041 | 26.216 | -11.825 |
+| Input tokens | 49,954 | 51,878 | +1,924 |
+| Output tokens | 1,199 | 387 | -812 |
+| Shell calls | 2 | 0 | -2 |
+| MCP calls | 0 | 1 | +1 |
+
+The treatment also produced a durable verification record that the scorer
+replayed against the complete exact interval. The treatment agent reported no
+tooling gap. The control agent classified writing and running its local exact
+checker as infrastructure work and noted the absence of independent
+verification.
+
+This pair validates the benchmark path and demonstrates why direct,
+task-shaped capabilities matter. One public, easy case with one attempt does
+not establish a general improvement in reasoning, pass rate, or cost.
