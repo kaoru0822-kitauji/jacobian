@@ -45,6 +45,10 @@ Controls:
 - plugin output remains unverified;
 - checker authorization is outside plugin manifests;
 - evidence binds claim, semantics, candidate, and scope;
+- installation snapshots bind every regular file in the plugin package,
+  capability contracts, runtime/build identity, and platform compatibility;
+  discovery measures packages without importing them, and workers reject
+  bytecode-only or compiled package modules;
 - plugin workers have bounded process/output lifetime for operational
   containment, but run locally with the operator's environment and are not a
   security sandbox;
@@ -82,6 +86,8 @@ Controls:
 
 - explicit digest bindings in evidence;
 - checker-side binding validation before mathematical replay;
+- conjecture repair and generalization replay the cited verification record
+  with its authorized checker and require the reproduced record identity;
 - no caller-controlled checker executable.
 
 ### Buggy or compromised checker
@@ -125,6 +131,9 @@ Controls:
 
 - execution status is orthogonal to conclusion;
 - incomplete writes use staging paths and atomic commit;
+- idempotency keys select one durable search invocation, append-only event
+  chains preserve retries and runtime identity, and interrupted invocations
+  recover from immutable checkpoints;
 - reached limits downgrade coverage;
 - tool errors cannot be translated into false, infeasible, or exhaustive.
 
