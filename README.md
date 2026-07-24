@@ -178,7 +178,7 @@ authorized `certificate.verify` boundary. Both bundled environments pin Lean
 - `MATHLIB` generates exactly `import Mathlib`, pins mathlib commit
   `fabf563a7c95a166b8d7b6efca11c8b4dc9d911f`, and permits only the declared
   standard trust base `Classical.choice`, `Quot.sound`, and `propext`. Its
-  operator-installed checker profile has a 75-second cold-start ceiling;
+  operator-installed checker profile has a 105-second cold-start ceiling;
   normal checkers retain the 30-second default.
 
 Prepare the pinned local runtime with:

@@ -174,7 +174,7 @@ class ReferenceInstaller:
                     "Quot.sound",
                     "propext",
                 ),
-                75,
+                105,
             ),
         }
         installations: dict[LeanEnvironment, LeanCheckerInstallation] = {}

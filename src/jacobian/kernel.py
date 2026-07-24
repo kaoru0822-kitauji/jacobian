@@ -97,7 +97,7 @@ class JacobianKernel:
         self.verification = VerificationService(
             self.store,
             self.checkers,
-            checker_timeout_seconds=75,
+            checker_timeout_seconds=105,
         )
         self.witnesses = WitnessSearchService(
             self.store,

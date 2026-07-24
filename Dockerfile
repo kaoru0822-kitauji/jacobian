@@ -11,5 +11,5 @@ RUN uv sync --locked --no-dev
 EXPOSE 8000
 VOLUME ["/var/lib/jacobian"]
 
-ENTRYPOINT ["uv", "run", "jacobian-mcp"]
+ENTRYPOINT ["uv", "run", "--no-sync", "jacobian-mcp"]
 CMD ["--help"]

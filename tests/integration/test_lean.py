@@ -42,7 +42,7 @@ def test_mathlib_sqrt_two_proof_creates_bound_verification_record(
 ) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     assert kernel.lean is not None
-    assert kernel.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds == 75
+    assert kernel.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds == 105
 
     verified = kernel.lean.verify(
         environment=LeanEnvironment.MATHLIB,
