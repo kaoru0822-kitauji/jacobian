@@ -7,12 +7,15 @@ from pathlib import Path
 from jacobian.artifacts import ArtifactService
 from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
+from jacobian.contracts.lean import LeanEnvironment
 from jacobian.evaluation import EvaluationService
 from jacobian.experiments import ExperimentService
+from jacobian.lean import LeanService
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.polytope import PolytopeService
 from jacobian.references import (
+    LeanCheckerInstallation,
     PolytopeCheckerInstallation,
     ReferenceInstallation,
     ReferenceInstaller,
@@ -26,6 +29,7 @@ from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
+from jacobian.workflows import VerificationWorkflowService
 
 
 class JacobianKernel:
@@ -80,6 +84,7 @@ class JacobianKernel:
         self.verification = VerificationService(
             self.store,
             self.checkers,
+            checker_timeout_seconds=75,
         )
         self.witnesses = WitnessSearchService(
             self.store,
@@ -126,10 +131,29 @@ class JacobianKernel:
         )
         self.references: dict[str, ReferenceInstallation] = {}
         self.polytope_checkers: PolytopeCheckerInstallation | None = None
+        self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
+        self.lean: LeanService | None = None
+        self.verification_workflows: VerificationWorkflowService | None = None
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(
                 claim_schema_uri=self.polytope.claim_schema_uri,
                 semantics_uri=self.polytope.semantics_uri,
                 point_schema_uri=self.polytope.point_schema_uri,
+            )
+            self.lean_checkers = self.reference_installer.install_lean_checkers()
+            self.lean = LeanService(
+                self.store,
+                self.artifacts,
+                self.verification,
+                self.lean_checkers,
+            )
+            self.verification_workflows = VerificationWorkflowService(
+                self.store,
+                self.artifacts,
+                self.claims,
+                self.evaluation,
+                self.witnesses,
+                self.verification,
+                self.references,
             )

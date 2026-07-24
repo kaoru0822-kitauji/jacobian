@@ -70,6 +70,7 @@ def initialize(context: typer.Context) -> None:
             state.kernel.references,
             polytope=state.kernel.polytope,
             polytope_checkers=state.kernel.polytope_checkers,
+            lean=state.kernel.lean_checkers,
         )
     )
 

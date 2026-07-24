@@ -9,9 +9,11 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
+from mcp_types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from jacobian import __version__
@@ -35,6 +37,7 @@ from jacobian.contracts.evaluation import (
     EvaluationProfile,
 )
 from jacobian.contracts.evidence import WitnessRole
+from jacobian.contracts.lean import LeanEnvironment, LeanVerifyResult
 from jacobian.contracts.polytope import (
     PolytopeSeparateRequest,
     PolytopeSeparateResult,
@@ -49,14 +52,82 @@ from jacobian.contracts.search import (
     SearchRunRequest,
 )
 from jacobian.contracts.shrinking import ShrinkResult
-from jacobian.contracts.transformations import TransformationApplyResult
+from jacobian.contracts.transformations import (
+    TransformationApplyResult,
+    TransformationRelation,
+)
 from jacobian.contracts.witness_search import WitnessFindResult
+from jacobian.contracts.workflows import WitnessVerificationWorkflowResult
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
     from jacobian.kernel import JacobianKernel
+    from jacobian.workflows import VerificationWorkflowService
+
+
+SERVER_INSTRUCTIONS = (
+    "When a bundled domain name is known, read reference://domain/{name} directly; "
+    "otherwise use reference://catalog to discover its agent_contract_uri. Copy claim "
+    "required_capabilities only from that plugin's available_capabilities list. Treat "
+    "search, evaluation, generated witnesses, conjectures, transformations, and "
+    "polytope evidence as unverified unless the returned assurance.verification field "
+    "is VERIFIED. Operational completion, failure to find a witness, and exhausted or "
+    "bounded search are not mathematical proof. Use witness.verify, certificate.verify, "
+    "or transform.verify for independent replay, and follow returned artifact:// and "
+    "experiment:// resource URIs instead of asking tools to inline large content."
+)
+
+VERIFICATION_TOOL_NAMES = frozenset(
+    {
+        "artifact.put",
+        "claim.validate",
+        "evaluate.batch",
+        "lean.verify",
+        "verification.run",
+        "witness.find",
+        "witness.verify",
+        "certificate.verify",
+    }
+)
+NON_VERIFICATION_TOOL_NAMES = frozenset(
+    {
+        "conjecture.generate",
+        "conjecture.repair",
+        "experiment.cancel",
+        "experiment.pause",
+        "experiment.resume",
+        "parameter.generalize",
+        "parameter.region.promote",
+        "polytope.separate",
+        "search.enumerate",
+        "search.run",
+        "shrink.run",
+        "structure.canonicalize",
+        "transform.apply",
+        "transform.verify",
+    }
+)
+
+
+class ToolProfile(StrEnum):
+    FULL = "full"
+    VERIFICATION = "verification"
+
+
+def _tool_annotations(
+    *,
+    read_only: bool = False,
+    destructive: bool = False,
+    idempotent: bool = False,
+) -> ToolAnnotations:
+    return ToolAnnotations(
+        read_only_hint=read_only,
+        destructive_hint=destructive,
+        idempotent_hint=idempotent,
+        open_world_hint=False,
+    )
 
 
 class AdapterModel(BaseModel):
@@ -91,7 +162,7 @@ class SearchBudgetInput(AdapterModel):
 
 class FalsificationPlanInput(AdapterModel):
     initial_state: dict[str, Any] = Field(default_factory=dict)
-    witness_role: str | None = None
+    witness_role: WitnessRole | None = None
     counterexample_checker_id: str | None = None
     budget: SearchBudgetInput = Field(default_factory=SearchBudgetInput)
 
@@ -109,6 +180,7 @@ def create_server(
     state_dir: str | Path | None = None,
     *,
     install_references: bool = True,
+    tool_profile: ToolProfile | str = ToolProfile.FULL,
 ) -> MCPServer[AppState]:
     """Create the thin MCP adapter over one local Jacobian kernel."""
 
@@ -126,6 +198,8 @@ def create_server(
             "JacobianKernel": JacobianKernel,
         }
     )
+    selected_profile = ToolProfile(tool_profile)
+    structured_output = selected_profile is ToolProfile.FULL
     configured_root = _configured_root(state_dir)
     kernel = JacobianKernel(
         configured_root,
@@ -140,6 +214,7 @@ def create_server(
         name="jacobian",
         title="Jacobian Research Kernel",
         description=("Verifier-centric tools for bounded executable mathematics"),
+        instructions=SERVER_INSTRUCTIONS,
         version=__version__,
         lifespan=lifespan,
     )
@@ -149,7 +224,8 @@ def create_server(
         description=(
             "Store schema-validated immutable content and return its address."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def artifact_put(
         schema_uri: str,
@@ -165,7 +241,7 @@ def create_server(
             schema_uri=schema_uri,
             semantics_uri=semantics_uri,
             payload=payload,
-            parents=tuple(parents or ()),
+            parents=_optional_tuple(parents),
             summary=summary,
         )
 
@@ -175,7 +251,8 @@ def create_server(
             "Validate claim structure and installed semantic capabilities; "
             "this does not prove correspondence or truth."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(read_only=True, idempotent=True),
+        structured_output=structured_output,
     )
     async def claim_validate(
         claim_uri: str,
@@ -195,13 +272,14 @@ def create_server(
             "Evaluate candidates with an installed plugin. Results are always "
             "unverified, even for exact exhaustive evaluation."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(read_only=True, idempotent=True),
+        structured_output=structured_output,
     )
     async def evaluate_batch(
         claim_uri: str,
         candidate_uris: list[str],
         plugin_id: str,
-        profile: str = "FAST",
+        profile: EvaluationProfile = EvaluationProfile.FAST,
         seed: int = 0,
         budget: EvaluationBudget | None = None,
         ctx: Context[AppState, Any] | None = None,
@@ -213,7 +291,7 @@ def create_server(
             claim_uri=claim_uri,
             candidate_uris=tuple(candidate_uris),
             plugin_id=plugin_id,
-            profile=EvaluationProfile(profile),
+            profile=profile,
             seed=seed,
             wall_seconds=active_budget.wall_seconds,
         )
@@ -225,13 +303,14 @@ def create_server(
             "Search adversarially for a concrete witness. Found evidence "
             "remains unverified until witness.verify accepts it."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def witness_find(
         claim_uri: str,
         candidate_uri: str,
         plugin_id: str,
-        witness_role: str = "DEFEATS_CANDIDATE",
+        witness_role: WitnessRole = WitnessRole.DEFEATS_CANDIDATE,
         budget: WitnessBudget | None = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> WitnessFindResult:
@@ -242,9 +321,7 @@ def create_server(
             claim_uri=claim_uri,
             candidate_uri=candidate_uri,
             plugin_id=plugin_id,
-            witness_role=(
-                WitnessRole(witness_role) if witness_role is not None else None
-            ),
+            witness_role=witness_role,
             wall_seconds=active_budget.wall_seconds,
         )
         return WitnessFindResult.model_validate(result.model_dump(mode="json"))
@@ -254,7 +331,8 @@ def create_server(
         description=(
             "Replay a bound witness with an operator-authorized independent checker."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def witness_verify(
         claim_uri: str,
@@ -279,7 +357,8 @@ def create_server(
             "Reduce a candidate or witness, accepting steps only after "
             "authorized preservation replay."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def shrink_run(
         target_kind: str,
@@ -313,7 +392,8 @@ def create_server(
             "Replay a self-describing certificate with the uniquely "
             "authorized compatible checker."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def certificate_verify(
         certificate_uri: str,
@@ -327,12 +407,88 @@ def create_server(
         return validate_result_envelope(result)
 
     @server.tool(
+        name="lean.verify",
+        description=(
+            "Bind and check one Lean proposition with the pinned kernel. CORE allows "
+            "no imports or axioms; MATHLIB uses the pinned repository and an explicit "
+            "standard trust-base allowlist."
+        ),
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
+    )
+    async def lean_verify(
+        statement: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=2_000,
+                description="One exact Lean proposition in the selected environment.",
+            ),
+        ],
+        proof: Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=20_000,
+                description=(
+                    "Tactic proof body only; omit the leading `by`. User-supplied "
+                    "imports, axioms, sorry, native_decide, and metaprogramming "
+                    "are forbidden."
+                ),
+            ),
+        ],
+        environment: LeanEnvironment = LeanEnvironment.CORE,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> LeanVerifyResult:
+        kernel = _kernel(ctx)
+        service = _lean_service(kernel)
+        return await asyncio.to_thread(
+            service.verify,
+            statement=statement,
+            proof=proof,
+            environment=environment,
+        )
+
+    async def execute_verification_run(
+        reference_name: str,
+        claim_payload: dict[str, Any],
+        candidate_payload: dict[str, Any],
+        witness_role: WitnessRole,
+        profile: EvaluationProfile = EvaluationProfile.FAST,
+        seed: int = 0,
+        evaluation_budget: EvaluationBudget | None = None,
+        witness_budget: WitnessBudget | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> WitnessVerificationWorkflowResult:
+        kernel = _kernel(ctx)
+        service = _verification_workflow_service(kernel)
+        return await asyncio.to_thread(
+            _run_verification_workflow,
+            service,
+            reference_name=reference_name,
+            claim_payload=claim_payload,
+            candidate_payload=candidate_payload,
+            witness_role=witness_role,
+            profile=profile,
+            seed=seed,
+            evaluation_budget=evaluation_budget,
+            witness_budget=witness_budget,
+        )
+
+    _register_verification_run_tool(
+        server,
+        profile=selected_profile,
+        execute=execute_verification_run,
+    )
+
+    @server.tool(
         name="structure.canonicalize",
         description=(
             "Compute an untrusted domain canonical form and symmetry metadata "
             "for search deduplication."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def structure_canonicalize(
         structure_uri: str,
@@ -358,14 +514,15 @@ def create_server(
             "Launch a persistent bounded candidate-enumeration experiment and "
             "return a handle immediately. Search results remain unverified."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def search_enumerate(
         claim_uri: str,
         plugin_id: str,
         bounds: dict[str, Any],
         quotient_by_isomorphism: bool = False,
-        profile: str = "EXACT_CANDIDATE",
+        profile: EvaluationProfile = EvaluationProfile.EXACT_CANDIDATE,
         seed: int = 0,
         budget: EnumerationBudgetInput | None = None,
         ctx: Context[AppState, Any] | None = None,
@@ -377,7 +534,7 @@ def create_server(
             plugin_id=plugin_id,
             bounds=bounds,
             quotient_by_isomorphism=quotient_by_isomorphism,
-            profile=EvaluationProfile(profile),
+            profile=profile,
             seed=seed,
             budget=EnumerationBudget(
                 candidates_max=active_budget.candidates_max,
@@ -396,16 +553,17 @@ def create_server(
             "Launch one idempotent, strategy-neutral search experiment. "
             "Proposals and nominations remain unverified."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def search_run(
         idempotency_key: str,
         claim_uri: str,
         plugin_id: str,
         initial_state: dict[str, Any] | None = None,
-        profile: str = "EXACT_CANDIDATE",
+        profile: EvaluationProfile = EvaluationProfile.EXACT_CANDIDATE,
         seed: int = 0,
-        witness_role: str | None = None,
+        witness_role: WitnessRole | None = None,
         counterexample_checker_id: str | None = None,
         budget: SearchBudgetInput | None = None,
         ctx: Context[AppState, Any] | None = None,
@@ -417,11 +575,9 @@ def create_server(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
             initial_state=initial_state or {},
-            profile=EvaluationProfile(profile),
+            profile=profile,
             seed=seed,
-            witness_role=(
-                WitnessRole(witness_role) if witness_role is not None else None
-            ),
+            witness_role=witness_role,
             counterexample_checker_id=counterexample_checker_id,
             budget=SearchBudget(
                 candidates_max=active_budget.candidates_max,
@@ -439,7 +595,8 @@ def create_server(
             "Request cooperative cancellation of a persistent experiment; "
             "already committed artifacts remain immutable."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(destructive=True, idempotent=True),
+        structured_output=structured_output,
     )
     async def experiment_cancel(
         experiment_uri: str,
@@ -456,7 +613,8 @@ def create_server(
     @server.tool(
         name="experiment.pause",
         description="Pause a strategy search at its next checkpoint boundary.",
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def experiment_pause(
         experiment_uri: str,
@@ -468,7 +626,8 @@ def create_server(
     @server.tool(
         name="experiment.resume",
         description="Resume a paused strategy search from its immutable checkpoint.",
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def experiment_resume(
         experiment_uri: str,
@@ -477,7 +636,11 @@ def create_server(
         kernel = _kernel(ctx)
         return await asyncio.to_thread(kernel.search.resume, experiment_uri)
 
-    _register_conjecture_tools(server, kernel)
+    _register_conjecture_tools(
+        server,
+        kernel,
+        structured_output=structured_output,
+    )
 
     @server.tool(
         name="transform.apply",
@@ -485,14 +648,15 @@ def create_server(
             "Run an untrusted representation transformer and emit an explicit "
             "relation and proof obligation."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def transform_apply(
         source_uri: str,
         plugin_id: str,
         target_schema_uri: str,
         target_semantics_uri: str,
-        requested_relation: str,
+        requested_relation: TransformationRelation,
         budget: OperationBudget | None = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> TransformationApplyResult:
@@ -515,7 +679,8 @@ def create_server(
             "Replay a representation relation with the uniquely compatible "
             "operator-authorized independent checker."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=structured_output,
     )
     async def transform_verify(
         transformation_uri: str,
@@ -534,7 +699,8 @@ def create_server(
             "Generate exact finite convex-hull membership evidence or a "
             "strict rational separator. Evidence remains unverified until replay."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def polytope_separate(
         point_uri: str,
@@ -591,7 +757,29 @@ def create_server(
                 kernel.references,
                 polytope=kernel.polytope,
                 polytope_checkers=kernel.polytope_checkers,
+                lean=kernel.lean_checkers,
             ),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "reference://domain/{name}",
+        name="reference-domain-agent-contract",
+        description=(
+            "Read one bundled domain's exact identifiers and model-facing schemas."
+        ),
+        mime_type="application/json",
+    )
+    async def reference_domain_resource(name: str) -> str:
+        catalog = reference_catalog(
+            kernel.references,
+            polytope=kernel.polytope,
+            polytope_checkers=kernel.polytope_checkers,
+            lean=kernel.lean_checkers,
+        )
+        return json.dumps(
+            _reference_domain_contract(kernel, name, catalog),
             ensure_ascii=False,
             sort_keys=True,
         )
@@ -656,25 +844,10 @@ def create_server(
             kernel,
             f"experiment://{experiment_id}",
         )
-        scope_uri = getattr(snapshot, "scope_uri", None)
-        if scope_uri is None:
-            return json.dumps(
-                {
-                    "experiment_uri": snapshot.experiment_uri,
-                    "scope_uri": None,
-                },
-                sort_keys=True,
-            )
-        scope = await asyncio.to_thread(kernel.store.get, scope_uri)
-        return json.dumps(
-            {
-                "experiment_uri": snapshot.experiment_uri,
-                "scope_uri": scope.artifact_uri,
-                "manifest": scope.manifest.model_dump(mode="json"),
-                "payload": scope.payload,
-            },
-            ensure_ascii=False,
-            sort_keys=True,
+        return await asyncio.to_thread(
+            _experiment_scope_content,
+            kernel,
+            snapshot,
         )
 
     @server.resource(
@@ -710,12 +883,16 @@ def create_server(
             sort_keys=True,
         )
 
+    _project_tool_profile(server, selected_profile)
+
     return server
 
 
 def _register_conjecture_tools(
     server: MCPServer[AppState],
     kernel: JacobianKernel,
+    *,
+    structured_output: bool,
 ) -> None:
     @server.tool(
         name="conjecture.repair",
@@ -723,7 +900,8 @@ def _register_conjecture_tools(
             "Propose unverified claim repairs from an independently verified "
             "counterexample and optionally run the ordinary falsification loop."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def conjecture_repair(
         source_claim_uri: str,
@@ -758,7 +936,8 @@ def _register_conjecture_tools(
             "Generate deduplicated unverified formal hypotheses and optionally "
             "run the ordinary falsification loop."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def conjecture_generate(
         plugin_id: str,
@@ -793,7 +972,8 @@ def _register_conjecture_tools(
             "Propose an exact parameter-region hypothesis from a verified "
             "construction; sampled and proposed regions remain unverified."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
     )
     async def parameter_generalize(
         source_uri: str,
@@ -828,7 +1008,8 @@ def _register_conjecture_tools(
             "Replay an authorized certificate bound to an immutable parameter "
             "region before labeling it verified sufficient or necessary."
         ),
-        structured_output=True,
+        annotations=_tool_annotations(read_only=True, idempotent=True),
+        structured_output=structured_output,
     )
     async def parameter_region_promote(
         subject_uri: str,
@@ -872,11 +1053,7 @@ def _falsification_plan(
         return None
     return FalsificationPlan(
         initial_state=selected.initial_state,
-        witness_role=(
-            WitnessRole(selected.witness_role)
-            if selected.witness_role is not None
-            else None
-        ),
+        witness_role=selected.witness_role,
         counterexample_checker_id=selected.counterexample_checker_id,
         budget=SearchBudget(
             candidates_max=selected.budget.candidates_max,
@@ -903,6 +1080,362 @@ def _configured_root(state_dir: str | Path | None) -> Path:
     return Path(os.environ.get("JACOBIAN_STATE_DIR", ".jacobian"))
 
 
+def _optional_tuple(values: list[str] | None) -> tuple[str, ...]:
+    return tuple(values or ())
+
+
+def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
+    scope_uri = getattr(snapshot, "scope_uri", None)
+    if scope_uri is None:
+        return json.dumps(
+            {
+                "experiment_uri": snapshot.experiment_uri,
+                "scope_uri": None,
+            },
+            sort_keys=True,
+        )
+    scope = kernel.store.get(scope_uri)
+    return json.dumps(
+        {
+            "experiment_uri": snapshot.experiment_uri,
+            "scope_uri": scope.artifact_uri,
+            "manifest": scope.manifest.model_dump(mode="json"),
+            "payload": scope.payload,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
+def _lean_service(kernel: JacobianKernel) -> Any:
+    if kernel.lean is None:
+        raise RuntimeError("the bundled Lean checker is not installed")
+    return kernel.lean
+
+
+def _verification_workflow_service(kernel: JacobianKernel) -> Any:
+    if kernel.verification_workflows is None:
+        raise RuntimeError("bundled verification workflows are not installed")
+    return kernel.verification_workflows
+
+
+def _run_verification_workflow(
+    service: VerificationWorkflowService,
+    *,
+    reference_name: str,
+    claim_payload: dict[str, Any],
+    candidate_payload: dict[str, Any],
+    witness_role: WitnessRole,
+    profile: EvaluationProfile,
+    seed: int,
+    evaluation_budget: EvaluationBudget | None,
+    witness_budget: WitnessBudget | None,
+) -> WitnessVerificationWorkflowResult:
+    return service.verify_witness(
+        reference_name=reference_name,
+        claim_payload=claim_payload,
+        candidate_payload=candidate_payload,
+        witness_role=witness_role,
+        profile=profile,
+        seed=seed,
+        evaluation_wall_seconds=(evaluation_budget or EvaluationBudget()).wall_seconds,
+        witness_wall_seconds=(witness_budget or WitnessBudget()).wall_seconds,
+    )
+
+
+def _compact_result(result: ResultEnvelope) -> dict[str, Any]:
+    return {
+        "execution_status": result.execution.status.value,
+        "input_status": result.input.status.value,
+        "input_errors": list(result.input.errors),
+        "conclusion": result.conclusion.value,
+        "verification": result.assurance.verification.value,
+    }
+
+
+def _compact_workflow_result(
+    result: WitnessVerificationWorkflowResult,
+) -> dict[str, Any]:
+    evaluation_result = (
+        result.evaluation.items[0].result
+        if result.evaluation is not None and result.evaluation.items
+        else None
+    )
+    witness_search = result.witness_search
+    verification = result.verification
+    return {
+        "schema_version": result.schema_version,
+        "claim_uri": result.claim_uri,
+        "candidate_uri": result.candidate_uri,
+        "claim_validation": {
+            "valid": result.claim_validation.valid,
+            "input_status": result.claim_validation.input.status.value,
+            "errors": list(result.claim_validation.input.errors),
+        },
+        "evaluation": (
+            _compact_result(evaluation_result)
+            if evaluation_result is not None
+            else None
+        ),
+        "witness_search": (
+            {
+                **_compact_result(witness_search.result),
+                "status": witness_search.status.value,
+                "evidence_uri": (
+                    witness_search.witness_uri or witness_search.certificate_uri
+                ),
+            }
+            if witness_search is not None
+            else None
+        ),
+        "verification": (
+            {
+                **_compact_result(verification),
+                "evidence_uri": (
+                    verification.evidence_uris[0]
+                    if verification.evidence_uris
+                    else None
+                ),
+                "verification_record_uri": verification.verification_record_uri,
+                "checker_id": verification.assurance.checker_id,
+            }
+            if verification is not None
+            else None
+        ),
+    }
+
+
+def _register_verification_run_tool(
+    server: MCPServer[AppState],
+    *,
+    profile: ToolProfile,
+    execute: Any,
+) -> None:
+    description = (
+        "Preferred bundled-domain witness workflow: store a claim and candidate, "
+        "validate, evaluate, search, and independently verify discovered evidence. "
+        "Intermediate evaluation and search stages remain UNVERIFIED."
+    )
+    if profile is ToolProfile.FULL:
+
+        @server.tool(
+            name="verification.run",
+            description=description,
+            annotations=_tool_annotations(),
+            structured_output=True,
+        )
+        async def verification_run_full(
+            reference_name: str,
+            claim_payload: dict[str, Any],
+            candidate_payload: dict[str, Any],
+            witness_role: WitnessRole,
+            profile: EvaluationProfile = EvaluationProfile.FAST,
+            seed: int = 0,
+            evaluation_budget: EvaluationBudget | None = None,
+            witness_budget: WitnessBudget | None = None,
+            ctx: Context[AppState, Any] | None = None,
+        ) -> WitnessVerificationWorkflowResult:
+            return cast(
+                WitnessVerificationWorkflowResult,
+                await execute(
+                    reference_name=reference_name,
+                    claim_payload=claim_payload,
+                    candidate_payload=candidate_payload,
+                    witness_role=witness_role,
+                    profile=profile,
+                    seed=seed,
+                    evaluation_budget=evaluation_budget,
+                    witness_budget=witness_budget,
+                    ctx=ctx,
+                ),
+            )
+
+    else:
+
+        @server.tool(
+            name="verification.run",
+            description=description,
+            annotations=_tool_annotations(),
+            structured_output=False,
+        )
+        async def verification_run_compact(
+            reference_name: str,
+            claim_payload: dict[str, Any],
+            candidate_payload: dict[str, Any],
+            witness_role: WitnessRole,
+            profile: EvaluationProfile = EvaluationProfile.FAST,
+            seed: int = 0,
+            evaluation_budget: EvaluationBudget | None = None,
+            witness_budget: WitnessBudget | None = None,
+            ctx: Context[AppState, Any] | None = None,
+        ) -> dict[str, Any]:
+            result = await execute(
+                reference_name=reference_name,
+                claim_payload=claim_payload,
+                candidate_payload=candidate_payload,
+                witness_role=witness_role,
+                profile=profile,
+                seed=seed,
+                evaluation_budget=evaluation_budget,
+                witness_budget=witness_budget,
+                ctx=ctx,
+            )
+            return _compact_workflow_result(result)
+
+
+def _compact_schema(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _compact_schema(item)
+            for key, item in value.items()
+            if key not in {"$schema", "default", "description", "title"}
+        }
+    if isinstance(value, list):
+        return [_compact_schema(item) for item in value]
+    return value
+
+
+def _predicate_parameter_contract(claim_schema: dict[str, Any]) -> dict[str, Any]:
+    try:
+        predicate_definition = claim_schema["$defs"]["PredicateSpec"]
+        names = predicate_definition["properties"]["name"]["enum"]
+        rules = claim_schema["allOf"]
+        parameters = {
+            rule["if"]["properties"]["predicate"]["properties"]["name"]["const"]: (
+                rule["then"]["properties"]["predicate"]["properties"]["parameters"]
+            )
+            for rule in rules
+        }
+    except (KeyError, TypeError) as exc:
+        raise ValueError("claim schema has no compact predicate projection") from exc
+    if (
+        not isinstance(names, list)
+        or not all(isinstance(name, str) for name in names)
+        or set(names) != set(parameters)
+    ):
+        raise ValueError("claim schema predicate projection is incomplete")
+    return {name: _compact_schema(parameters[name]) for name in names}
+
+
+def _reference_domain_contract(
+    kernel: JacobianKernel,
+    name: str,
+    catalog: dict[str, Any],
+) -> dict[str, Any]:
+    entry = catalog.get(name)
+    if entry is None:
+        raise ValueError(f"unknown bundled reference domain: {name}")
+
+    def definition(uri: str) -> Any:
+        payload = kernel.store.get(uri).payload
+        if not isinstance(payload, dict) or "definition" not in payload:
+            raise ValueError(f"reference descriptor has no definition: {uri}")
+        return payload["definition"]
+
+    if name in kernel.references:
+        reference = kernel.references[name]
+        claim_schema = definition(reference.claim_schema_uri)
+        candidate_schema = definition(reference.candidate_schema_uri)
+        if not isinstance(claim_schema, dict) or not isinstance(candidate_schema, dict):
+            raise ValueError("reference schemas must be JSON objects")
+        available_capabilities = set(entry["available_capabilities"])
+        workflow_capabilities = ["Evaluator", "WitnessOracle"]
+        if not set(workflow_capabilities).issubset(available_capabilities):
+            raise ValueError("reference does not support the verification workflow")
+        return {
+            "name": name,
+            "identity": {
+                "domain_id": reference.domain_id,
+                "domain_version": reference.domain_version,
+                "semantics_uri": reference.semantics_uri,
+            },
+            "semantics": definition(reference.semantics_uri),
+            "claim_contract": {
+                "base": {
+                    "claim_schema_version": "1",
+                    "domain_id": reference.domain_id,
+                    "domain_version": reference.domain_version,
+                    "semantics_uri": reference.semantics_uri,
+                    "quantifiers": [],
+                    "bounds": {},
+                    "required_capabilities": workflow_capabilities,
+                    "correspondence_status": "UNREVIEWED",
+                },
+                "predicates": _predicate_parameter_contract(claim_schema),
+                "instruction": (
+                    "copy base and add predicate={name, parameters} using exactly "
+                    "one declared predicate"
+                ),
+            },
+            "candidate_schema": _compact_schema(candidate_schema),
+            "workflow": {
+                "assurance_rule": (
+                    "Evaluation and witness search are UNVERIFIED. Only an "
+                    "authorized compatible checker may return VERIFIED."
+                ),
+                "witness": [
+                    "call verification.run once with the claim and candidate payloads",
+                    "inspect each returned stage separately",
+                    "accept a decisive result only when verification is VERIFIED",
+                ],
+            },
+        }
+    if name == "lean4" and kernel.lean_checkers:
+        return {
+            "name": name,
+            "runtime": {
+                "lean_version": entry["lean_version"],
+                "lean_commit": entry["lean_commit"],
+                "profiles": {
+                    environment.value: {
+                        "semantics_uri": installation.semantics_uri,
+                        "import_name": installation.import_name,
+                        "mathlib_commit": installation.mathlib_commit,
+                        "allowed_axioms": installation.allowed_axioms,
+                        "checker_timeout_seconds": (
+                            installation.checker_timeout_seconds
+                        ),
+                    }
+                    for environment, installation in sorted(
+                        kernel.lean_checkers.items(),
+                        key=lambda item: item[0].value,
+                    )
+                },
+            },
+            "semantics": {
+                environment.value: definition(installation.semantics_uri)
+                for environment, installation in sorted(
+                    kernel.lean_checkers.items(),
+                    key=lambda item: item[0].value,
+                )
+            },
+            "workflow": {
+                "assurance_rule": (
+                    "Only a pinned Lean kernel acceptance with the exact statement, "
+                    "proof source, selected environment, declared trust base, and "
+                    "durable certificate is VERIFIED."
+                ),
+                "certificate": [
+                    "choose CORE or MATHLIB from the declared profiles",
+                    "call lean.verify with one proposition, environment, and a proof "
+                    "body that omits the leading `by`",
+                    "retain the returned claim, candidate, certificate, and "
+                    "verification-record URIs",
+                ],
+            },
+        }
+    raise ValueError(f"reference domain has no agent contract: {name}")
+
+
+def _project_tool_profile(
+    server: MCPServer[AppState],
+    profile: ToolProfile,
+) -> None:
+    if profile is ToolProfile.VERIFICATION:
+        for tool_name in sorted(NON_VERIFICATION_TOOL_NAMES):
+            server.remove_tool(tool_name)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="jacobian-mcp",
@@ -913,8 +1446,14 @@ def main() -> None:
         action="version",
         version=f"%(prog)s {__version__}",
     )
-    parser.parse_args()
-    create_server().run("stdio")
+    parser.add_argument(
+        "--tool-profile",
+        choices=tuple(profile.value for profile in ToolProfile),
+        default=ToolProfile.FULL.value,
+        help="project the canonical tool registry for a specific host workflow",
+    )
+    args = parser.parse_args()
+    create_server(tool_profile=args.tool_profile).run("stdio")
 
 
 if __name__ == "__main__":

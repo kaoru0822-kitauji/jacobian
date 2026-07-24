@@ -33,3 +33,5 @@ __pycache__/
 build/
 dist/
 htmlcov/
+benchmarks/results/
+lean/.lake/

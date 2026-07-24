@@ -313,3 +313,49 @@ persuasive narrative from substituting for evidence.
 Model evaluations are reported as empirical capability evidence. They never
 upgrade a conjecture, transformation, witness, or certificate to verified
 status.
+
+## Executable known-answer pilot
+
+`benchmarks/agent_mcp.py` runs the public `PATH-CLOSURE-001`,
+`MAT-KERNEL-001`, `GRAPH-BIP-TRUE-001`, `LEAN-NAT-INDUCTION-001`, and
+`LEAN-SQRT2-001` cases through a real Codex CLI using the project
+`jacobian_local` MCP profile. Each case receives an isolated state directory.
+The runner retains the raw JSONL transcript and structured agent report, then
+scores the durable verification record, evidence, exact bindings, claim, and
+candidate directly from the Jacobian store. Lean cases additionally bind and
+score the selected runtime environment and declared trust base.
+
+The local profile uses the registry-derived `verification` projection. At its
+introduction this reduced the advertised descriptor from 82,820 characters
+for 19 tools to 4,400 characters for six tools; adding `lean.verify` changed
+the compact surface to seven tools and 4,875 characters. Adding the generic
+`verification.run` workflow and explicit Lean input guidance changed it to
+eight tools and 6,899 characters. Adding the pinned `MATHLIB` environment
+and compact result projection changed the current compact descriptor to 7,883
+characters; the corresponding full 22-tool descriptor is 103,382 characters.
+The compact descriptor remains below the 25 KB first-stage target.
+These are descriptor measurements, not model token counts, and must be
+remeasured when contracts change.
+
+The domain bootstrap projection reduced the serialized `graph_paths` resource
+from 7,317 to 2,402 characters, `matrices` from 7,290 to 2,197, and `lean4`
+from 4,106 to 1,810. The positive graph workflow response reduced from 6,098
+to 1,314 characters. The full schemas and workflow results remain available
+through the canonical registry and `full` MCP profile; only model-facing
+projection changed.
+
+Run the kernel condition with:
+
+```sh
+uv run python benchmarks/agent_mcp.py
+```
+
+The runner explicitly fixes Codex reasoning effort to `medium` by default and
+records it in run metadata. Use `--reasoning-effort high` only as a separately
+reported condition; otherwise a user's global Codex setting makes token and
+latency comparisons ambiguous.
+
+This is an initial known-answer integration pilot, not the held-out comparative
+evaluation described above. It currently has no no-tool baseline, model seed
+control, hidden oracle, or multi-attempt aggregate. Results must therefore be
+reported per run and must not be used as a capability or performance claim.

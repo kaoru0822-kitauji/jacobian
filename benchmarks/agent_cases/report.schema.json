@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "conclusion": {
+      "enum": ["TRUE", "FALSE", "UNKNOWN", "NOT_APPLICABLE"]
+    },
+    "evaluation_verification": {
+      "enum": ["UNVERIFIED", "VERIFIED"]
+    },
+    "witness_search_verification": {
+      "enum": ["UNVERIFIED", "VERIFIED"]
+    },
+    "final_verification": {
+      "enum": ["UNVERIFIED", "VERIFIED"]
+    },
+    "claim_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "candidate_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "evidence_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "verification_record_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "witness_summary": {
+      "type": "string"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "case_id",
+    "conclusion",
+    "evaluation_verification",
+    "witness_search_verification",
+    "final_verification",
+    "claim_uri",
+    "candidate_uri",
+    "evidence_uri",
+    "verification_record_uri",
+    "witness_summary",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

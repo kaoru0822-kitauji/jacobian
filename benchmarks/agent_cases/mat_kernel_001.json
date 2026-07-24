@@ -1,0 +1,25 @@
+{
+  "case_id": "MAT-KERNEL-001",
+  "version": "1",
+  "reference_name": "matrices",
+  "title": "Exact matrix kernel witness",
+  "prompt": "Using the bundled matrices reference domain, formalize and test the claim that the 2 by 2 integer matrix with rows [2, 4] and [1, 2] is nonsingular. Validate the claim, evaluate the candidate, search for a defeating nonzero kernel-vector witness, and independently verify any witness with the compatible authorized checker.",
+  "required_tools": [
+    "verification.run"
+  ],
+  "expected": {
+    "domain_id": "jacobian.integer-matrices",
+    "predicate": "is_nonsingular",
+    "conclusion": "FALSE",
+    "witness_format": "matrix.kernel_vector",
+    "candidate": {
+      "kind": "matrix",
+      "rows": 2,
+      "cols": 2,
+      "entries": [
+        [2, 4],
+        [1, 2]
+      ]
+    }
+  }
+}
