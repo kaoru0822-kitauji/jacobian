@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -118,6 +119,107 @@ def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
 
     with pytest.raises(ArtifactIntegrityError):
         store.get(artifact.artifact_uri)
+
+
+@pytest.mark.integration
+@pytest.mark.conformance
+@pytest.mark.parametrize("column", ["manifest_digest", "summary"])
+def test_modified_artifact_metadata_is_rejected_on_read(
+    tmp_path: Path,
+    column: str,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    schema = store.register_descriptor(
+        kind="schema",
+        name="example.candidate",
+        version="1",
+        definition={"type": "object"},
+    )
+    semantics = store.register_descriptor(
+        kind="semantics",
+        name="example.meaning",
+        version="1",
+        definition={"description": "meaning"},
+    )
+    artifact = store.put(
+        schema_uri=schema,
+        semantics_uri=semantics,
+        payload={"value": "original"},
+        summary="original summary",
+    )
+
+    replacement = (
+        "sha256:" + "0" * 64 if column == "manifest_digest" else "tampered summary"
+    )
+    with sqlite3.connect(store.db_path) as connection:
+        if column == "manifest_digest":
+            connection.execute(
+                """
+                UPDATE artifacts
+                SET manifest_digest = ?
+                WHERE artifact_uri = ?
+                """,
+                (replacement, artifact.artifact_uri),
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE artifacts
+                SET summary = ?
+                WHERE artifact_uri = ?
+                """,
+                (replacement, artifact.artifact_uri),
+            )
+
+    with pytest.raises(ArtifactIntegrityError, match="manifest differs"):
+        store.get(artifact.artifact_uri)
+
+
+@pytest.mark.integration
+@pytest.mark.conformance
+@pytest.mark.parametrize("missing_reference", ["parent", "schema", "semantics"])
+def test_missing_reference_metadata_is_rejected_on_read(
+    tmp_path: Path,
+    missing_reference: str,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    schema = store.register_descriptor(
+        kind="schema",
+        name="example.candidate",
+        version="1",
+        definition={"type": "object"},
+    )
+    semantics = store.register_descriptor(
+        kind="semantics",
+        name="example.meaning",
+        version="1",
+        definition={"description": "meaning"},
+    )
+    parent = store.put(
+        schema_uri=schema,
+        semantics_uri=semantics,
+        payload={"kind": "parent"},
+    )
+    child = store.put(
+        schema_uri=schema,
+        semantics_uri=semantics,
+        payload={"kind": "child"},
+        parents=(parent.artifact_uri,),
+    )
+
+    deleted_uri = {
+        "parent": parent.artifact_uri,
+        "schema": schema,
+        "semantics": semantics,
+    }[missing_reference]
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            "DELETE FROM artifacts WHERE artifact_uri = ?",
+            (deleted_uri,),
+        )
+
+    with pytest.raises(ArtifactIntegrityError, match="is not committed"):
+        store.get(child.artifact_uri)
 
 
 @pytest.mark.integration

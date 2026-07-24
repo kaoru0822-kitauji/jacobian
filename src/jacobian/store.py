@@ -479,6 +479,7 @@ class ArtifactStore:
         """Load an artifact after replaying its content and manifest digests."""
 
         manifest_digest = _digest_from_uri(artifact_uri)
+        committed_references: set[str] = set()
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM artifacts WHERE artifact_uri = ?",
@@ -486,13 +487,29 @@ class ArtifactStore:
             ).fetchone()
             parent_rows = connection.execute(
                 """
-                SELECT parent_uri
-                FROM artifact_parents
-                WHERE artifact_uri = ?
-                ORDER BY position
+                SELECT
+                    parent.parent_uri,
+                    committed.artifact_uri AS committed_parent_uri
+                FROM artifact_parents AS parent
+                LEFT JOIN artifacts AS committed
+                    ON committed.artifact_uri = parent.parent_uri
+                WHERE parent.artifact_uri = ?
+                ORDER BY parent.position
                 """,
                 (artifact_uri,),
             ).fetchall()
+            if row is not None:
+                committed_references = {
+                    str(reference["artifact_uri"])
+                    for reference in connection.execute(
+                        """
+                        SELECT artifact_uri
+                        FROM artifacts
+                        WHERE artifact_uri IN (?, ?)
+                        """,
+                        (row["schema_uri"], row["semantics_uri"]),
+                    ).fetchall()
+                }
         if row is None:
             raise ArtifactNotFoundError(f"artifact is not committed: {artifact_uri}")
 
@@ -503,16 +520,30 @@ class ArtifactStore:
         )
         manifest = ArtifactManifest.model_validate(manifest_data)
         database_parents = tuple(parent["parent_uri"] for parent in parent_rows)
+        if any(parent["committed_parent_uri"] is None for parent in parent_rows):
+            raise ArtifactIntegrityError("manifest parent is not committed")
         if manifest.parents != database_parents:
             raise ArtifactIntegrityError("manifest parents differ from metadata")
         if (
-            manifest.object_digest != row["object_digest"]
+            manifest_digest != row["manifest_digest"]
+            or manifest.object_digest != row["object_digest"]
             or manifest.payload_digest != row["payload_digest"]
             or manifest.schema_uri != row["schema_uri"]
             or manifest.semantics_uri != row["semantics_uri"]
             or manifest.canonicalizer_digest != row["canonicalizer_digest"]
+            or manifest.summary != row["summary"]
         ):
             raise ArtifactIntegrityError("manifest differs from committed metadata")
+        if (
+            manifest.schema_uri,
+            manifest.semantics_uri,
+        ) != (_BOOTSTRAP_SCHEMA_URI, _BOOTSTRAP_SEMANTICS_URI) and {
+            manifest.schema_uri,
+            manifest.semantics_uri,
+        } != committed_references:
+            raise ArtifactIntegrityError(
+                "manifest schema or semantics is not committed"
+            )
 
         canonical_bytes = self._read_blob(manifest.payload_digest)
         recomputed_object_digest = _framed_digest(
