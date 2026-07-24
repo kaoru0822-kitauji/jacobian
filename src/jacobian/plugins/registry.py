@@ -212,6 +212,7 @@ class PluginRegistry:
         )
 
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """
                 INSERT OR IGNORE INTO installed_plugins (
@@ -241,13 +242,13 @@ class PluginRegistry:
                 """,
                 (plugin_id,),
             ).fetchone()
-        if row is None or (
-            row["domain_id"],
-            row["domain_version"],
-        ) != (manifest.domain_id, manifest.domain_version):
-            raise PluginRegistryError("installed plugin metadata mismatch")
-        if row["registry_snapshot_uri"] != stored_snapshot.artifact_uri:
-            raise PluginRegistryError("installed plugin snapshot mismatch")
+            if row is None or (
+                row["domain_id"],
+                row["domain_version"],
+            ) != (manifest.domain_id, manifest.domain_version):
+                raise PluginRegistryError("installed plugin metadata mismatch")
+            if row["registry_snapshot_uri"] != stored_snapshot.artifact_uri:
+                raise PluginRegistryError("installed plugin snapshot mismatch")
         return manifest
 
     def get(self, plugin_id: str) -> PluginManifest:
