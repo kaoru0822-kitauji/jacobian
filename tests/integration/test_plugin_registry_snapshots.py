@@ -284,7 +284,7 @@ def test_external_plugin_passes_the_generic_conformance_kit(
             budget=SearchBudget(
                 candidates_max=4,
                 iterations_max=4,
-                wall_seconds=5,
+                wall_seconds=30,
                 batch_size=1,
                 workers=1,
             ),

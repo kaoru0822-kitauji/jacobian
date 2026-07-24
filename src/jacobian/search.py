@@ -45,7 +45,10 @@ from jacobian.contracts.search import (
     SearchStopReason,
 )
 from jacobian.contracts.witness_search import WitnessSearchStatus
-from jacobian.evaluation import EvaluationService
+from jacobian.evaluation import (
+    EvaluationService,
+    require_complete_evaluation_batch,
+)
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import (
     PluginRegistry,
@@ -410,7 +413,10 @@ class SearchService:
         except PluginRegistryError as exc:
             raise SearchError(str(exc)) from exc
 
-        effective_budget = self._effective_budget(selected.budget)
+        effective_budget = self._effective_budget(
+            selected.budget,
+            include_witness_lineage=selected.witness_role is not None,
+        )
         registry_snapshot_uri = proposer.registry_snapshot_uri
         resolved_snapshot_uris = {
             proposer.registry_snapshot_uri,
@@ -665,14 +671,33 @@ class SearchService:
             previous = event.event_digest
         return events
 
-    def _effective_budget(self, requested: SearchBudget) -> SearchBudget:
+    def _effective_budget(
+        self,
+        requested: SearchBudget,
+        *,
+        include_witness_lineage: bool,
+    ) -> SearchBudget:
         """Apply the restrictive intersection of request and operator limits."""
 
+        fixed_page_parents = 3  # claim, plugin, and one shared evaluation
+        parents_per_candidate = 3 if include_witness_lineage else 1
+        lineage_batch_size = (
+            self.store.limits.max_parents - fixed_page_parents
+        ) // parents_per_candidate
+        if lineage_batch_size < 1:
+            raise SearchError(
+                "store parent limit cannot represent one search archive record"
+            )
         return SearchBudget(
             candidates_max=min(requested.candidates_max, self.max_candidates),
             iterations_max=min(requested.iterations_max, self.max_iterations),
             wall_seconds=min(requested.wall_seconds, self.max_wall_seconds),
-            batch_size=min(requested.batch_size, self.max_batch_size),
+            batch_size=min(
+                requested.batch_size,
+                self.max_batch_size,
+                self.evaluation.max_batch_size,
+                lineage_batch_size,
+            ),
             workers=requested.workers,
         )
 
@@ -880,7 +905,7 @@ class SearchService:
                         seed=request.seed,
                         wall_seconds=remaining_seconds,
                     )
-                    _require_complete_evaluation(evaluation, selected_uris)
+                    require_complete_evaluation_batch(evaluation, selected_uris)
                     evaluated += len(selected_uris)
                     partial_accounting = _updated_accounting(
                         partial_accounting,
@@ -1215,11 +1240,23 @@ class SearchService:
             snapshot.request.plugin_id,
             CapabilityName.REFINER,
         )
+        evaluator = self.plugins.resolve(
+            snapshot.request.plugin_id,
+            CapabilityName.EVALUATOR,
+        )
+        if {
+            proposer.registry_snapshot_uri,
+            refiner.registry_snapshot_uri,
+            evaluator.registry_snapshot_uri,
+        } != {snapshot.registry_snapshot_uri}:
+            raise SearchError("resolved strategy uses a different registry snapshot")
         if proposer.implementation_digest != snapshot.proposer_digest:
             raise SearchError("proposer identity changed after request acceptance")
         if refiner.implementation_digest != snapshot.refiner_digest:
             raise SearchError("refiner identity changed after request acceptance")
-        return proposer, refiner, snapshot.evaluator_digest
+        if evaluator.implementation_digest != snapshot.evaluator_digest:
+            raise SearchError("evaluator identity changed after request acceptance")
+        return proposer, refiner, evaluator.implementation_digest
 
     def _restore(
         self,
@@ -1243,18 +1280,52 @@ class SearchService:
         page_uris = list(snapshot.archive_page_uris)
         seen_uris: set[str] = set()
         nominated_uris: set[str] = set()
-        for page_uri in page_uris:
-            page = SearchArchivePage.model_validate(self.store.get(page_uri).payload)
+        seen_page_uris: set[str] = set()
+        verified_counterexamples = 0
+        last_page: SearchArchivePage | None = None
+        for iteration, page_uri in enumerate(page_uris, start=1):
+            if page_uri in seen_page_uris:
+                raise SearchError("search archive contains a repeated page")
+            seen_page_uris.add(page_uri)
+            page_artifact = self.store.get(page_uri)
+            if (
+                page_artifact.manifest.schema_uri != self.archive_page_schema_uri
+                or page_artifact.manifest.semantics_uri != self.semantics_uri
+            ):
+                raise SearchError("archive page uses the wrong contract")
+            page = SearchArchivePage.model_validate(page_artifact.payload)
             if (
                 page.experiment_uri != snapshot.experiment_uri
                 or page.request_digest != snapshot.request_digest
+                or page.claim_uri != snapshot.request.claim_uri
+                or page.plugin_id != snapshot.request.plugin_id
                 or page.registry_snapshot_uri != snapshot.registry_snapshot_uri
+                or page.proposer_digest != snapshot.proposer_digest
+                or page.refiner_digest != snapshot.refiner_digest
+                or page.evaluator_digest != snapshot.evaluator_digest
             ):
-                raise SearchError("archive page does not belong to this search")
-            seen_uris.update(record.candidate_uri for record in page.records)
-            nominated_uris.update(
-                nomination.candidate_uri for nomination in page.nominations
-            )
+                raise SearchError("archive page identity does not match the search")
+            if page.iteration != iteration:
+                raise SearchError("archive page iteration sequence is invalid")
+            required_parents = {
+                snapshot.request.claim_uri,
+                snapshot.request.plugin_id,
+                *_record_parents(list(page.records), page.nominations),
+            }
+            if not required_parents.issubset(page_artifact.manifest.parents):
+                raise SearchError("archive page is missing its declared lineage")
+            for record in page.records:
+                if record.candidate_uri in seen_uris:
+                    raise SearchError("candidate appears in multiple archive pages")
+                seen_uris.add(record.candidate_uri)
+                verified_counterexamples += int(record.counterexample_verified)
+            for nomination in page.nominations:
+                if nomination.candidate_uri not in seen_uris:
+                    raise SearchError("archive page nominates an unknown candidate")
+                if nomination.candidate_uri in nominated_uris:
+                    raise SearchError("candidate is nominated more than once")
+                nominated_uris.add(nomination.candidate_uri)
+            last_page = page
         if snapshot.checkpoint_uri is None:
             if page_uris or snapshot.accounting != SearchAccounting():
                 raise SearchError("search progress is missing its checkpoint")
@@ -1265,9 +1336,13 @@ class SearchService:
                 nominated_uris,
                 snapshot.accounting,
             )
-        checkpoint = SearchCheckpoint.model_validate(
-            self.store.get(snapshot.checkpoint_uri).payload
-        )
+        checkpoint_artifact = self.store.get(snapshot.checkpoint_uri)
+        if (
+            checkpoint_artifact.manifest.schema_uri != self.checkpoint_schema_uri
+            or checkpoint_artifact.manifest.semantics_uri != self.semantics_uri
+        ):
+            raise SearchError("checkpoint uses the wrong contract")
+        checkpoint = SearchCheckpoint.model_validate(checkpoint_artifact.payload)
         checkpoint_counts = checkpoint.accounting.model_copy(
             update={"wall_time_ms": snapshot.accounting.wall_time_ms}
         )
@@ -1284,6 +1359,33 @@ class SearchService:
             or checkpoint.environment_digest != snapshot.environment_digest
         ):
             raise SearchError("checkpoint identity does not match the search")
+        if (
+            last_page is None
+            or checkpoint.iteration != len(page_uris)
+            or checkpoint.accounting.iterations != len(page_uris)
+            or checkpoint.accounting.checkpoints != len(page_uris)
+            or checkpoint.latest_records != last_page.records
+            or checkpoint.nominations != last_page.nominations
+        ):
+            raise SearchError("checkpoint progress does not match the archive")
+        checkpoint_parents = {page_uris[-1]}
+        if checkpoint.previous_checkpoint_uri is not None:
+            checkpoint_parents.add(checkpoint.previous_checkpoint_uri)
+        if not checkpoint_parents.issubset(checkpoint_artifact.manifest.parents):
+            raise SearchError("checkpoint is missing its declared lineage")
+        if (checkpoint.previous_checkpoint_uri is None) != (len(page_uris) == 1):
+            raise SearchError("checkpoint predecessor does not match the archive")
+        expected_attacks = (
+            len(seen_uris) if snapshot.request.witness_role is not None else 0
+        )
+        if (
+            snapshot.accounting.unique_candidates != len(seen_uris)
+            or snapshot.accounting.evaluated_candidates != len(seen_uris)
+            or snapshot.accounting.attacked_candidates != expected_attacks
+            or snapshot.accounting.verified_counterexamples != verified_counterexamples
+            or snapshot.accounting.nominations != len(nominated_uris)
+        ):
+            raise SearchError("search accounting does not match the archive")
         return (
             checkpoint.state,
             page_uris,
@@ -1507,8 +1609,69 @@ class SearchService:
                 wall_time_ms=wall_time_ms,
                 accounting_override=accounting_override,
             )
-        except (SearchError, StoreError, SchemaRegistryError, ValidationError):
-            return
+        except (
+            SearchError,
+            StoreError,
+            SchemaRegistryError,
+            ValidationError,
+        ) as exc:
+            self._record_terminal_persistence_failure(
+                experiment_uri,
+                detail=detail,
+                error=exc,
+                wall_time_ms=wall_time_ms,
+                accounting_override=accounting_override,
+            )
+
+    def _record_terminal_persistence_failure(
+        self,
+        experiment_uri: str,
+        *,
+        detail: str,
+        error: Exception,
+        wall_time_ms: int,
+        accounting_override: SearchAccounting | None,
+    ) -> None:
+        """Fail closed when the terminal archive cannot be committed."""
+
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            current = self._read_snapshot(connection, experiment_uri)
+            if current.state in _TERMINAL_STATES:
+                return
+            terminal_detail = (
+                f"{detail}; terminal archive persistence failed: {type(error).__name__}"
+            )
+            terminal = _updated_snapshot(
+                current,
+                state=ExperimentState.ERROR,
+                updated_at=_now(),
+                stop_reason=SearchStopReason.ERROR,
+                strategy_reported_complete=False,
+                verification=Verification.UNVERIFIED,
+                archive_uri=None,
+                accounting=_updated_accounting(
+                    accounting_override or current.accounting,
+                    wall_time_ms=max(
+                        current.accounting.wall_time_ms,
+                        wall_time_ms,
+                    ),
+                ),
+                detail=terminal_detail,
+            )
+            self._update_snapshot(connection, terminal)
+            self._append_event(
+                connection,
+                experiment_uri,
+                event_type=ExperimentState.ERROR.value,
+                payload={
+                    "stop_reason": terminal.stop_reason,
+                    "archive_uri": None,
+                    "checkpoint_uri": terminal.checkpoint_uri,
+                    "accounting": terminal.accounting.model_dump(mode="json"),
+                    "detail": terminal.detail,
+                },
+            )
 
     def _request_control(
         self,
@@ -1740,23 +1903,6 @@ def _used_wall_ms(
     started: float,
 ) -> int:
     return accounting.wall_time_ms + math.ceil((time.monotonic() - started) * 1000)
-
-
-def _require_complete_evaluation(
-    evaluation: EvaluationBatchResult,
-    candidate_uris: list[str],
-) -> None:
-    if (
-        evaluation.input.status is not InputStatus.ACCEPTED
-        or len(evaluation.items) != len(candidate_uris)
-        or tuple(item.candidate_uri for item in evaluation.items)
-        != tuple(candidate_uris)
-    ):
-        detail = (
-            "; ".join(evaluation.input.errors)
-            or "evaluation did not cover the selected candidates"
-        )
-        raise SearchError(detail)
 
 
 def _is_verified_counterexample(result: ResultEnvelope) -> bool:
