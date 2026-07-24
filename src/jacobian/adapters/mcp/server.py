@@ -63,6 +63,7 @@ from jacobian.contracts.transformations import (
 )
 from jacobian.contracts.witness_search import WitnessFindResult
 from jacobian.contracts.workflows import WitnessVerificationWorkflowResult
+from jacobian_checkers.matrices import MAX_ENUMERATED_MATRICES
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
@@ -240,6 +241,8 @@ def create_server(  # noqa: C901
 
     @asynccontextmanager
     async def lifespan(_server: MCPServer[AppState]) -> AsyncIterator[AppState]:
+        if kernel is not None:
+            _start_lean_warmup(kernel)
         yield AppState(kernel=kernel, tenant_router=tenant_router)
 
     server: MCPServer[AppState] = MCPServer(
@@ -317,6 +320,24 @@ def create_server(  # noqa: C901
                         "message": str(exc),
                         "available_reference_names": sorted(active_kernel.references),
                     }
+        elif capability_id == "lean.check" and active_kernel.lean_checkers:
+            catalog = reference_catalog(
+                active_kernel.references,
+                polytope=active_kernel.polytope,
+                polytope_checkers=active_kernel.polytope_checkers,
+                lean=active_kernel.lean_checkers,
+            )
+            lean_contract = _reference_domain_contract(
+                active_kernel,
+                "lean4",
+                catalog,
+            )
+            response["runtime"] = lean_contract["runtime"]
+            response["cache"] = {
+                "key": "exact content-addressed certificate and active checker digest",
+                "max_entries": 128,
+                "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
+            }
         return response
 
     @server.tool(
@@ -1244,10 +1265,17 @@ def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
 
         access_token = get_access_token()
         subject = access_token.subject if access_token is not None else None
-        return state.tenant_router.kernel_for(subject)
+        kernel = state.tenant_router.kernel_for(subject)
+        _start_lean_warmup(kernel)
+        return kernel
     if state.kernel is None:
         raise RuntimeError("MCP lifespan has no kernel")
     return state.kernel
+
+
+def _start_lean_warmup(kernel: JacobianKernel) -> None:
+    if kernel.lean is not None and os.environ.get("JACOBIAN_LEAN_WARMUP") == "1":
+        kernel.lean.start_mathlib_warmup()
 
 
 def _resource_kernel(
@@ -1569,6 +1597,20 @@ def _reference_domain_contract(
                 "The predicate parameters define the claim scope. The candidate is "
                 "a separate checked object; repeated scope fields must agree exactly. "
                 "Never substitute aliases or silently choose one copy."
+            ),
+            "verification_limits": (
+                {
+                    "maximize_absolute_determinant": {
+                        "max_enumerated_candidates": MAX_ENUMERATED_MATRICES,
+                        "scope_cardinality": "len(entries) ** (rows * cols)",
+                        "on_excess": "REJECTED_WITHOUT_CONCLUSION",
+                        "checker_timeout_seconds": (
+                            kernel.verification.checker_timeout_seconds
+                        ),
+                    }
+                }
+                if name == "matrices"
+                else {}
             ),
             "invocation_examples": _reference_invocation_examples(name),
             "workflow": {

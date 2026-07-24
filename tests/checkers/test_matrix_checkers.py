@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from jacobian_checkers import matrices as matrix_checkers
 from jacobian_checkers.matrices import (
     check_kernel_vector,
     check_maxdet_enumeration,
@@ -152,7 +153,35 @@ def test_maximizer_witness_checker_replays_scope() -> None:
 
 
 @pytest.mark.contract
-def test_maximizer_witness_checker_rejects_different_bound_candidate() -> None:
+def test_maximizer_witness_checker_accepts_an_alternative_bound_maximizer() -> None:
+    bindings = _bindings()
+    proposed = {
+        "rows": 3,
+        "cols": 3,
+        "entries": [[1, 1, 0], [1, 0, 1], [0, 1, 1]],
+    }
+    alternative = {
+        "rows": 3,
+        "cols": 3,
+        "entries": [[1, 0, 1], [0, 1, 1], [1, 1, 0]],
+    }
+
+    decision = check_maximizer_witness(
+        _maximizer_request(
+            scope={"rows": 3, "cols": 3, "entries": [0, 1]},
+            candidate=alternative,
+            proposed=proposed,
+            objective_value=2,
+            bindings=bindings,
+        )
+    )
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
+@pytest.mark.contract
+def test_maximizer_witness_checker_rejects_nonmaximal_bound_candidate() -> None:
     bindings = {
         "claim_digest": "sha256:" + "a" * 64,
         "semantics_digest": "sha256:" + "b" * 64,
@@ -203,6 +232,106 @@ def test_maximizer_witness_checker_rejects_different_bound_candidate() -> None:
     )
 
     assert decision["accepted"] is False
+
+
+@pytest.mark.contract
+def test_maximizer_witness_checker_replays_all_65536_matrices() -> None:
+    matrix = {
+        "rows": 4,
+        "cols": 4,
+        "entries": [
+            [1, 1, 1, 1],
+            [1, -1, 1, -1],
+            [1, 1, -1, -1],
+            [1, -1, -1, 1],
+        ],
+    }
+
+    decision = check_maximizer_witness(
+        _maximizer_request(
+            scope={"rows": 4, "cols": 4, "entries": [-1, 1]},
+            candidate=matrix,
+            proposed=matrix,
+            objective_value=16,
+            bindings=_bindings(),
+        )
+    )
+
+    assert decision["accepted"] is True
+    assert decision["detail"] == "replayed all 65536 matrices in the declared scope"
+
+
+@pytest.mark.contract
+def test_maximizer_witness_checker_rejects_over_budget_before_enumeration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_determinant(_: list[list[int]]) -> int:
+        raise AssertionError("over-budget scope must not be enumerated")
+
+    monkeypatch.setattr(matrix_checkers, "_determinant", unexpected_determinant)
+    matrix = {
+        "rows": 5,
+        "cols": 5,
+        "entries": [[1] * 5 for _ in range(5)],
+    }
+
+    decision = check_maximizer_witness(
+        _maximizer_request(
+            scope={"rows": 5, "cols": 5, "entries": [-1, 1]},
+            candidate=matrix,
+            proposed=matrix,
+            objective_value=0,
+            bindings=_bindings(),
+        )
+    )
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+    assert decision["detail"] == "scope exceeds the independent checker limit"
+
+
+def _bindings() -> dict[str, object]:
+    return {
+        "claim_digest": "sha256:" + "a" * 64,
+        "semantics_digest": "sha256:" + "b" * 64,
+        "candidate_digest": "sha256:" + "c" * 64,
+        "scope_digest": None,
+        "encoding_digest": None,
+    }
+
+
+def _maximizer_request(
+    *,
+    scope: dict[str, object],
+    candidate: dict[str, object],
+    proposed: dict[str, object],
+    objective_value: int,
+    bindings: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "request_version": "1",
+        "claim": {
+            "payload": {
+                "predicate": "maximize_absolute_determinant",
+                "scope": scope,
+            }
+        },
+        "candidate": {"payload": candidate},
+        "witness": {
+            "payload": {
+                "witness_format": "matrix.maximizer",
+                "format_version": "1",
+                "role": "SUPPORTS_CLAIM",
+                "bindings": bindings,
+                "payload": {
+                    "matrix": proposed,
+                    "objective_value": {"num": str(objective_value), "den": "1"},
+                    "index": 0,
+                },
+            }
+        },
+        "expected_bindings": bindings,
+    }
 
 
 def _witness_request(

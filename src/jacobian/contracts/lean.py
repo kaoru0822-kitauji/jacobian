@@ -35,3 +35,4 @@ class LeanVerifyResult(ContractModel):
     candidate_uri: ArtifactUri
     certificate_uri: ArtifactUri
     result: ResultEnvelope
+    cache_hit: bool = False

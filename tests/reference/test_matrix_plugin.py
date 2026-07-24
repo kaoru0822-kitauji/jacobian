@@ -5,6 +5,9 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any
 
+import pytest
+
+from jacobian.plugins import matrices as matrix_plugin
 from jacobian.plugins.matrices import (
     evaluate,
     find_witness,
@@ -186,6 +189,26 @@ def test_find_witness_maxdet_requires_supporting_role() -> None:
     )
 
     assert resp["input"]["status"] == "REJECTED"
+
+
+def test_find_witness_maxdet_rejects_over_budget_before_search(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_iterator(_: dict[str, object]) -> object:
+        raise AssertionError("over-budget scope must not be enumerated")
+
+    monkeypatch.setattr(matrix_plugin, "_scope_iterator", unexpected_iterator)
+    claim = {
+        "predicate": "maximize_absolute_determinant",
+        "scope": {"rows": 5, "cols": 5, "entries": [-1, 1]},
+    }
+
+    response = find_witness({"claim": claim, "witness_role": "SUPPORTS_CLAIM"})
+
+    assert response["input"]["status"] == "REJECTED"
+    assert response["input"]["errors"] == [
+        "scope exceeds witness search limit of 65536 candidates"
+    ]
 
 
 def test_materialize_maxdet_scope_count() -> None:

@@ -17,6 +17,8 @@ from copy import deepcopy
 from fractions import Fraction
 from typing import Any, cast
 
+MAX_SEARCHED_MATRICES = 65_536
+
 # ---------------------------------------------------------------------------
 # Canonical helpers
 # ---------------------------------------------------------------------------
@@ -605,6 +607,14 @@ def find_witness(request: dict[str, Any]) -> dict[str, Any]:
         scope_errors = _validate_scope(scope)
         if scope_errors:
             return _rejected(scope_errors, start)
+        if _scope_total(scope) > MAX_SEARCHED_MATRICES:
+            return _rejected(
+                [
+                    "scope exceeds witness search limit of "
+                    f"{MAX_SEARCHED_MATRICES} candidates"
+                ],
+                start,
+            )
 
         best_value = Fraction(-1)
         best_index = -1

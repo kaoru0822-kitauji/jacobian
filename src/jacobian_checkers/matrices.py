@@ -8,7 +8,7 @@ from fractions import Fraction
 from typing import Any
 
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
-_MAX_ENUMERATED_MATRICES = 4096
+MAX_ENUMERATED_MATRICES = 65_536
 
 
 def _reject(
@@ -204,7 +204,7 @@ def check_maximizer_witness(request: dict[str, Any]) -> dict[str, Any]:
                 method="EXHAUSTIVE_FINITE",
             )
         total = len(values) ** (rows * cols)
-        if total > _MAX_ENUMERATED_MATRICES:
+        if total > MAX_ENUMERATED_MATRICES:
             return _reject(
                 "scope exceeds the independent checker limit",
                 method="EXHAUSTIVE_FINITE",
@@ -218,9 +218,14 @@ def check_maximizer_witness(request: dict[str, Any]) -> dict[str, Any]:
             )
         proposed = _parse_matrix(inner.get("matrix"))
         candidate = _parse_matrix(request["candidate"]["payload"])
-        if candidate != proposed:
+        if len(candidate) != rows or len(candidate[0]) != cols:
             return _reject(
-                "proposed maximizer is not the bound candidate",
+                "candidate dimensions do not match scope",
+                method="EXHAUSTIVE_FINITE",
+            )
+        if any(entry not in values for row in candidate for entry in row):
+            return _reject(
+                "candidate entry is outside scope",
                 method="EXHAUSTIVE_FINITE",
             )
         if len(proposed) != rows or len(proposed[0]) != cols:
@@ -247,9 +252,14 @@ def check_maximizer_witness(request: dict[str, Any]) -> dict[str, Any]:
             ]
             maximum = max(maximum, abs(_determinant(matrix)))
         proposed_value = abs(_determinant(proposed))
-        if proposed_value != maximum or declared != maximum:
+        candidate_value = abs(_determinant(candidate))
+        if (
+            proposed_value != maximum
+            or candidate_value != maximum
+            or declared != maximum
+        ):
             return _reject(
-                "proposed matrix is not a scoped maximizer",
+                "proposed matrix or bound candidate is not a scoped maximizer",
                 method="EXHAUSTIVE_FINITE",
             )
         return {
@@ -317,7 +327,7 @@ def check_maxdet_enumeration(request: dict[str, Any]) -> dict[str, Any]:
                 method="EXHAUSTIVE_FINITE",
             )
         total = len(values) ** (rows * cols)
-        if total > _MAX_ENUMERATED_MATRICES:
+        if total > MAX_ENUMERATED_MATRICES:
             return _reject(
                 "scope exceeds the independent checker limit",
                 method="EXHAUSTIVE_FINITE",

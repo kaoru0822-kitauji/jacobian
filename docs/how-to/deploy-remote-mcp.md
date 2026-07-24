@@ -55,6 +55,19 @@ uv run jacobian-mcp \
 
 Do not expose anonymous mode to a network.
 
+## Warm the Mathlib profile
+
+Set `JACOBIAN_LEAN_WARMUP=1` on a host that serves `lean.check`. Jacobian then
+checks a small pinned Mathlib theorem in the background when each tenant kernel
+is first used. This warms Lean and filesystem caches without delaying MCP
+startup.
+
+Lean results are cached only for an exact content-addressed certificate and
+the currently active checker digest. The bounded in-memory cache holds 128
+entries; a changed proof, statement, environment, checker, or authorization
+state cannot reuse an entry. `capability.describe` for `lean.check` reports the
+configured checker timeouts and cache policy.
+
 ## Container deployment
 
 Build the repository image:

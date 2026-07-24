@@ -300,6 +300,42 @@ def test_mcp_capability_profile_describes_and_invokes_exact_domain_contract(
                 item["payload"]["predicate"]["name"]
                 for item in graph_contract["invocation_examples"]
             } == set(graph_contract["claim_contract"]["predicates"])
+            matrix_description = await client.call_tool(
+                "capability.describe",
+                {
+                    "capability_id": "reference.solve",
+                    "reference_name": "matrices",
+                },
+            )
+            matrix_contract = json.loads(matrix_description.content[0].text)["domain"]
+            matrix_limit = matrix_contract["verification_limits"][
+                "maximize_absolute_determinant"
+            ]
+            assert matrix_limit["max_enumerated_candidates"] == 65536
+            assert matrix_limit["scope_cardinality"] == (
+                "len(entries) ** (rows * cols)"
+            )
+            assert matrix_limit["on_excess"] == "REJECTED_WITHOUT_CONCLUSION"
+            lean_description = await client.call_tool(
+                "capability.describe",
+                {"capability_id": "lean.check"},
+            )
+            lean_contract = json.loads(lean_description.content[0].text)
+            assert (
+                lean_contract["runtime"]["profiles"]["CORE"]["checker_timeout_seconds"]
+                == 30
+            )
+            assert (
+                lean_contract["runtime"]["profiles"]["MATHLIB"][
+                    "checker_timeout_seconds"
+                ]
+                == 105
+            )
+            assert lean_contract["cache"]["max_entries"] == 128
+            assert (
+                lean_contract["cache"]["warmup_environment_variable"]
+                == "JACOBIAN_LEAN_WARMUP=1"
+            )
 
             invoked = await client.call_tool(
                 "capability.invoke",

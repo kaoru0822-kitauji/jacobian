@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,7 +15,15 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
     CapabilityResult,
 )
-from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.contracts.checkers import CheckerDecision
+from jacobian.contracts.results import (
+    Arithmetic,
+    Conclusion,
+    Coverage,
+    Execution,
+    ExecutionStatus,
+    Method,
+)
 from jacobian.kernel import JacobianKernel
 
 
@@ -257,6 +266,15 @@ def test_reference_capability_has_distinct_explore_and_verify_lanes(
     )
     assert verified.output["verification"]["checker_id"].startswith("checker://sha256/")
     assert verified.output["verification"]["arithmetic"] == "EXACT_INTEGER"
+    assert verified.output["verification"]["input"] == {
+        "status": "ACCEPTED",
+        "errors": [],
+        "warnings": [],
+    }
+    assert (
+        "checked exact three-unit-fraction decompositions"
+        in (verified.output["verification"]["checker_detail"])
+    )
     assert verified.output["stages"]["independent_verification"] == "COMPLETED"
     assert "bounds" not in verified.scope
     assert {hit.assurance_level for hit in kernel.memory.search(limit=10).hits} >= {
@@ -344,3 +362,114 @@ def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.assurance.verification_record_uri is not None
     assert result.output["conclusion"] == "TRUE"
+
+
+@pytest.mark.integration
+def test_reference_capability_projects_checker_rejection_detail(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    monkeypatch.setattr(
+        kernel.verification,
+        "_run_checker",
+        lambda **_: CheckerDecision(
+            accepted=False,
+            conclusion=Conclusion.UNKNOWN,
+            arithmetic=Arithmetic.EXACT_INTEGER,
+            method=Method.EXHAUSTIVE_FINITE,
+            coverage=Coverage.EXHAUSTIVE,
+            detail="candidate is not globally maximal",
+        ),
+    )
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="reference.solve",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "reference_name": "matrices",
+                "predicate": {
+                    "name": "maximize_absolute_determinant",
+                    "parameters": {"scope": {"rows": 2, "cols": 2, "entries": [-1, 1]}},
+                },
+                "candidate": {
+                    "rows": 2,
+                    "cols": 2,
+                    "entries": [[1, 1], [1, -1]],
+                },
+                "witness_role": "SUPPORTS_CLAIM",
+            },
+        )
+    )
+
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.output["verification"]["input"]["status"] == "REJECTED"
+    assert result.output["verification"]["input"]["errors"] == [
+        "candidate is not globally maximal"
+    ]
+    assert (
+        result.output["verification"]["checker_detail"]
+        == "candidate is not globally maximal"
+    )
+
+
+@pytest.mark.integration
+def test_reference_checker_timeout_is_projected_and_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    def time_out(**_: object) -> CheckerDecision:
+        raise subprocess.TimeoutExpired(cmd=["checker"], timeout=1)
+
+    monkeypatch.setattr(kernel.verification, "_run_checker", time_out)
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="reference.solve",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "reference_name": "matrices",
+                "predicate": {
+                    "name": "maximize_absolute_determinant",
+                    "parameters": {"scope": {"rows": 2, "cols": 2, "entries": [-1, 1]}},
+                },
+                "candidate": {
+                    "rows": 2,
+                    "cols": 2,
+                    "entries": [[1, 1], [1, -1]],
+                },
+                "witness_role": "SUPPORTS_CLAIM",
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["verification"]["execution"]["detail"] == "checker timed out"
+    assert result.assurance.verification_record_uri is None
+
+
+@pytest.mark.integration
+def test_lean_capability_projects_repairable_checker_diagnostics(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.check",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "statement": "1 + 1 = 2",
+                "proof": "sorry",
+                "environment": "CORE",
+            },
+        )
+    )
+
+    assert result.output["input"]["status"] == "REJECTED"
+    assert "forbidden Lean command" in result.output["input"]["errors"][0]
+    assert result.output["diagnostics"] == result.output["input"]["errors"]
+    assert result.assurance.verification_record_uri is None

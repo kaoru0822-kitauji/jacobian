@@ -268,10 +268,14 @@ class LeanCheckAdapter:
             execution=checked.result.execution,
             output={
                 "conclusion": checked.result.conclusion.value,
+                "execution": checked.result.execution.model_dump(mode="json"),
+                "input": checked.result.input.model_dump(mode="json"),
+                "diagnostics": list(checked.result.input.errors),
                 "claim_uri": checked.claim_uri,
                 "candidate_uri": checked.candidate_uri,
                 "certificate_uri": checked.certificate_uri,
                 "verification_record_uri": checked.result.verification_record_uri,
+                "cache_hit": checked.cache_hit,
             },
             assurance=CapabilityAssurance(
                 level=(
@@ -388,6 +392,13 @@ def _reference_result(
             },
             "verification": (
                 {
+                    "execution": verification.execution.model_dump(mode="json"),
+                    "input": verification.input.model_dump(mode="json"),
+                    "checker_detail": (
+                        verification.input.errors[0]
+                        if verification.input.errors
+                        else verification.execution.detail
+                    ),
                     "arithmetic": verification.assurance.arithmetic.value,
                     "method": verification.assurance.method.value,
                     "coverage": verification.assurance.coverage.value,
