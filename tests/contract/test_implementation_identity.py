@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.implementation import package_source_digest
+from jacobian.implementation import ImplementationError, package_source_digest
 
 
 def test_digest_binds_helper_modules(
@@ -50,3 +50,35 @@ def test_digest_resolution_does_not_execute_package_initializers(
     package_source_digest("initializer_fixture.plugin:run")
 
     assert not marker.exists()
+
+
+def test_digest_rejects_package_symlinks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = tmp_path / "symlink_fixture"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    outside = tmp_path / "outside.py"
+    outside.write_text("def run(_request):\n    return {}\n", encoding="utf-8")
+    link = package / "plugin.py"
+    try:
+        link.symlink_to(outside)
+    except OSError:
+        pytest.skip("this platform cannot create test symlinks")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    importlib.invalidate_caches()
+
+    with pytest.raises(
+        ImplementationError,
+        match=r"cannot resolve module|symlink",
+    ):
+        package_source_digest("symlink_fixture.plugin:run")
+
+
+def test_digest_rejects_entrypoint_path_traversal() -> None:
+    with pytest.raises(
+        ImplementationError,
+        match="entrypoint must use the form",
+    ):
+        package_source_digest("../outside:run")

@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints
 
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 
 Entrypoint = Annotated[
@@ -37,6 +37,9 @@ class CapabilityName(StrEnum):
     CANDIDATE_ENUMERATOR = "CandidateEnumerator"
     CANONICALIZER = "Canonicalizer"
     TRANSFORMER = "Transformer"
+    PROPOSER = "Proposer"
+    REFINER = "Refiner"
+    HYPOTHESIS_TRANSFORMER = "HypothesisTransformer"
 
 
 class CapabilityDescriptor(ContractModel):
@@ -61,3 +64,31 @@ class PluginManifest(ContractModel):
     witness_schema_uris: tuple[ArtifactUri, ...] = ()
     certificate_schema_uris: tuple[ArtifactUri, ...] = ()
     capabilities: dict[CapabilityName, CapabilityDescriptor]
+
+
+class PluginRuntimeIdentity(ContractModel):
+    python_implementation: str = Field(min_length=1, max_length=64)
+    python_version: str = Field(min_length=1, max_length=64)
+    platform_tag: str = Field(min_length=1, max_length=256)
+    system: str = Field(min_length=1, max_length=128)
+    machine: str = Field(min_length=1, max_length=128)
+
+
+class SealedCapabilityBinding(ContractModel):
+    descriptor: CapabilityDescriptor
+    implementation_digest: Sha256Digest
+
+
+class PluginRegistrySnapshot(ContractModel):
+    """Immutable installation record used without importing plugin code."""
+
+    registry_snapshot_version: Literal["1"] = "1"
+    plugin_id: ArtifactUri
+    plugin_manifest_digest: Sha256Digest
+    domain_id: DomainIdentifier
+    domain_version: str = Field(min_length=1, max_length=64)
+    claim_schema_uri: ArtifactUri
+    candidate_schema_uri: ArtifactUri
+    capabilities: dict[CapabilityName, SealedCapabilityBinding]
+    runtime_identity: PluginRuntimeIdentity
+    build_identity_digest: Sha256Digest
