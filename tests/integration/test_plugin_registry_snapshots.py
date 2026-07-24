@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -34,6 +35,11 @@ def _install_external_plugin(
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
+    existing_path = os.environ.get("PYTHONPATH")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        str(tmp_path) if not existing_path else f"{tmp_path}:{existing_path}",
+    )
     sys.modules.pop("external_plugin", None)
     sys.modules.pop("external_plugin.entry", None)
 
@@ -122,6 +128,15 @@ def test_registry_snapshot_binds_contract_source_runtime_and_platform(
     resolved = kernel.plugins.resolve(plugin_id, CapabilityName.EVALUATOR)
     assert resolved.registry_snapshot_uri == snapshot_uri
     assert not marker.exists()
+    execution = kernel.plugin_executor.run(
+        entrypoint=resolved.descriptor.entrypoint,
+        implementation_digest=resolved.implementation_digest,
+        request={"request_version": "1"},
+        timeout_seconds=5,
+    )
+    assert execution.status.value == "COMPLETED"
+    assert execution.output == {"seen": "1"}
+    assert marker.exists()
 
 
 @pytest.mark.integration
