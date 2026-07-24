@@ -112,24 +112,23 @@ def _package_entries(module_name: str) -> list[tuple[str, Path]]:
                 )
             for directory, names, files in os.walk(root, followlinks=False):
                 directory_path = Path(directory)
+                names[:] = [name for name in names if name != "__pycache__"]
                 for name in names:
                     child = directory_path / name
                     if child.is_symlink():
                         raise ImplementationError(
-                            f"package source contains a symlink: {child}"
+                            f"package contains a symlink: {child}"
                         )
                 for name in files:
-                    if not name.endswith(".py"):
-                        continue
-                    source = directory_path / name
-                    if source.is_symlink() or not source.is_file():
+                    entry = directory_path / name
+                    if entry.is_symlink() or not entry.is_file():
                         raise ImplementationError(
-                            f"package source is not a regular file: {source}"
+                            f"package entry is not a regular file: {entry}"
                         )
-                    relative = source.relative_to(root).as_posix()
-                    entries.append((f"{root_index}:{top_level}/{relative}", source))
+                    relative = entry.relative_to(root).as_posix()
+                    entries.append((f"{root_index}:{top_level}/{relative}", entry))
         if not entries:
-            raise ImplementationError(f"package {top_level!r} has no Python source")
+            raise ImplementationError(f"package {top_level!r} has no files")
         return sorted(entries)
 
     if specification.origin is None:
@@ -160,15 +159,16 @@ def _module_exists_in_roots(roots: list[Path], remaining: list[str]) -> bool:
 
 
 def package_source_digest(entrypoint: str) -> str:
-    """Hash all Python source in an entrypoint's top-level package.
+    """Hash every regular file in an entrypoint's top-level package.
 
     Binding the package rather than only the named module prevents unchecked
-    helper-module edits from changing an authorized implementation.
+    helper modules and data files from changing an authorized implementation.
+    Bytecode caches are excluded because workers execute measured source.
     """
 
     module_name, _ = split_entrypoint(entrypoint)
     digest = hashlib.sha256()
-    digest.update(b"jacobian.python-package.v1\x00")
+    digest.update(b"jacobian.python-package.v2\x00")
     digest.update(module_name.split(".", 1)[0].encode("utf-8"))
     digest.update(b"\x00")
     for relative_name, source in _package_entries(module_name):

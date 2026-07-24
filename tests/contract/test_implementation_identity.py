@@ -30,6 +30,29 @@ def test_digest_binds_helper_modules(
     assert before != after
 
 
+def test_digest_binds_package_data(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = tmp_path / "data_digest_fixture"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "plugin.py").write_text(
+        "def run(_request):\n    return {}\n",
+        encoding="utf-8",
+    )
+    data = package / "parameters.json"
+    data.write_text('{"limit": 1}\n', encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    importlib.invalidate_caches()
+
+    before = package_source_digest("data_digest_fixture.plugin:run")
+    data.write_text('{"limit": 2}\n', encoding="utf-8")
+    after = package_source_digest("data_digest_fixture.plugin:run")
+
+    assert before != after
+
+
 def test_digest_resolution_does_not_execute_package_initializers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

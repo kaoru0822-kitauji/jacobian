@@ -116,9 +116,7 @@ def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None
     marker = tmp_path / "detached-descendant-survived"
 
     result = PluginExecutor().run(
-        entrypoint=(
-            "tests.fixtures.plugin_functions:spawn_detached_child_then_return"
-        ),
+        entrypoint=("tests.fixtures.plugin_functions:spawn_detached_child_then_return"),
         request={"marker": str(marker)},
         timeout_seconds=5,
     )
@@ -129,7 +127,7 @@ def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None
 
 
 @pytest.mark.integration
-def test_plugin_worker_rejects_unmeasured_bytecode_modules(
+def test_plugin_worker_rejects_bytecode_modules(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -137,9 +135,7 @@ def test_plugin_worker_rejects_unmeasured_bytecode_modules(
     package.mkdir()
     (package / "__init__.py").write_text("", encoding="utf-8")
     (package / "entry.py").write_text(
-        "from .helper import VALUE\n"
-        "def run(_request):\n"
-        "    return {'value': VALUE}\n",
+        "from .helper import VALUE\ndef run(_request):\n    return {'value': VALUE}\n",
         encoding="utf-8",
     )
     helper = package / "helper.py"
