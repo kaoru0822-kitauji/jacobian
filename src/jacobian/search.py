@@ -25,6 +25,7 @@ from jacobian.contracts.results import (
     ExecutionStatus,
     InputStatus,
     InputValidation,
+    ResultEnvelope,
     Verification,
 )
 from jacobian.contracts.search import (
@@ -46,7 +47,11 @@ from jacobian.contracts.search import (
 from jacobian.contracts.witness_search import WitnessSearchStatus
 from jacobian.evaluation import EvaluationService
 from jacobian.plugin_execution import PluginExecutor
-from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
+from jacobian.plugins.registry import (
+    PluginRegistry,
+    PluginRegistryError,
+    ResolvedCapability,
+)
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
@@ -577,24 +582,7 @@ class SearchService:
 
             snapshot = self.inspect(experiment_uri)
             request = snapshot.request
-            if (
-                snapshot.proposer_digest is None
-                or snapshot.refiner_digest is None
-                or snapshot.evaluator_digest is None
-            ):
-                raise SearchError("search snapshot is missing implementation identity")
-            proposer = self.plugins.resolve(
-                request.plugin_id,
-                CapabilityName.PROPOSER,
-            )
-            refiner = self.plugins.resolve(
-                request.plugin_id,
-                CapabilityName.REFINER,
-            )
-            if proposer.implementation_digest != snapshot.proposer_digest:
-                raise SearchError("proposer identity changed after request acceptance")
-            if refiner.implementation_digest != snapshot.refiner_digest:
-                raise SearchError("refiner identity changed after request acceptance")
+            proposer, refiner = self._resolve_strategy(snapshot)
 
             (
                 strategy_state,
@@ -747,6 +735,7 @@ class SearchService:
                         seed=request.seed,
                         wall_seconds=remaining_seconds,
                     )
+                    _require_complete_evaluation(evaluation, selected_uris)
                     evaluated += len(selected_uris)
                     evaluation_artifact = self._put_internal_artifact(
                         schema_uri=self.evaluation_schema_uri,
@@ -808,11 +797,7 @@ class SearchService:
                                     checker_id=checker_id,
                                     timeout_seconds=checker_remaining,
                                 )
-                                if (
-                                    verified.assurance.verification
-                                    == Verification.VERIFIED
-                                    and verified.conclusion is Conclusion.FALSE
-                                ):
+                                if _is_verified_counterexample(verified):
                                     counterexample_verified = True
                                     verification_record_uri = (
                                         verified.verification_record_uri
@@ -1034,6 +1019,30 @@ class SearchService:
         finally:
             with self._thread_lock:
                 self._threads.pop(experiment_uri, None)
+
+    def _resolve_strategy(
+        self,
+        snapshot: SearchExperimentSnapshot,
+    ) -> tuple[ResolvedCapability, ResolvedCapability]:
+        if (
+            snapshot.proposer_digest is None
+            or snapshot.refiner_digest is None
+            or snapshot.evaluator_digest is None
+        ):
+            raise SearchError("search snapshot is missing implementation identity")
+        proposer = self.plugins.resolve(
+            snapshot.request.plugin_id,
+            CapabilityName.PROPOSER,
+        )
+        refiner = self.plugins.resolve(
+            snapshot.request.plugin_id,
+            CapabilityName.REFINER,
+        )
+        if proposer.implementation_digest != snapshot.proposer_digest:
+            raise SearchError("proposer identity changed after request acceptance")
+        if refiner.implementation_digest != snapshot.refiner_digest:
+            raise SearchError("refiner identity changed after request acceptance")
+        return proposer, refiner
 
     def _restore(
         self,
@@ -1528,6 +1537,30 @@ def _used_wall_ms(
     started: float,
 ) -> int:
     return accounting.wall_time_ms + math.ceil((time.monotonic() - started) * 1000)
+
+
+def _require_complete_evaluation(
+    evaluation: EvaluationBatchResult,
+    candidate_uris: list[str],
+) -> None:
+    if (
+        evaluation.input.status is not InputStatus.ACCEPTED
+        or len(evaluation.items) != len(candidate_uris)
+        or tuple(item.candidate_uri for item in evaluation.items)
+        != tuple(candidate_uris)
+    ):
+        detail = (
+            "; ".join(evaluation.input.errors)
+            or "evaluation did not cover the selected candidates"
+        )
+        raise SearchError(detail)
+
+
+def _is_verified_counterexample(result: ResultEnvelope) -> bool:
+    return (
+        result.assurance.verification is Verification.VERIFIED
+        and result.conclusion is Conclusion.FALSE
+    )
 
 
 def _require_remaining_seconds(
