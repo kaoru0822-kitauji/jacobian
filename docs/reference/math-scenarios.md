@@ -1,5 +1,7 @@
 # Mathematical scenario catalog
 
+[Documentation home](../index.md)
+
 - Status: Draft
 - Purpose: Exact public fixtures, reference-plugin workloads, and held-out
   model evaluations

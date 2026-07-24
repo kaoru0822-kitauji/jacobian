@@ -44,6 +44,7 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
                 "conjecture.repair",
                 "conjecture.generate",
                 "parameter.generalize",
+                "parameter.region.promote",
                 "transform.apply",
                 "transform.verify",
                 "polytope.separate",

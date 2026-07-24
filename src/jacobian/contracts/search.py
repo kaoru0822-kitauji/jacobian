@@ -43,14 +43,18 @@ class SearchStopReason(StrEnum):
 
 
 class SearchBudget(ContractModel):
+    """Hard strategy limits; the provisional scheduler supports one worker."""
+
     candidates_max: StrictInt = Field(ge=1, le=10_000_000)
     iterations_max: StrictInt = Field(ge=1, le=10_000_000)
     wall_seconds: StrictInt = Field(ge=1, le=86_400)
     batch_size: StrictInt = Field(default=32, ge=1, le=4096)
-    workers: StrictInt = Field(default=1, ge=1, le=32)
+    workers: StrictInt = Field(default=1, ge=1, le=1)
 
 
 class SearchRunRequest(ContractModel):
+    """One canonical request bound durably by its idempotency key."""
+
     request_version: Literal["1"] = "1"
     idempotency_key: IdempotencyKey
     claim_uri: ArtifactUri
@@ -140,6 +144,8 @@ class PluginRefinementResponse(ContractModel):
 
 
 class SearchAccounting(ContractModel):
+    """Committed operation counts and measured checkpoint-boundary wall time."""
+
     proposed_candidates: StrictInt = Field(default=0, ge=0)
     unique_candidates: StrictInt = Field(default=0, ge=0)
     duplicate_candidates: StrictInt = Field(default=0, ge=0)
@@ -176,6 +182,8 @@ class SearchAccounting(ContractModel):
 
 
 class SearchCheckpoint(ContractModel):
+    """Immutable opaque strategy state rebound to all execution identities."""
+
     schema_version: Literal["1"] = "1"
     experiment_uri: ExperimentUri
     request_digest: Sha256Digest
@@ -227,6 +235,8 @@ class SearchArchiveManifest(ContractModel):
 
 
 class SearchExperimentSnapshot(ContractModel):
+    """Mutable lifecycle index whose mathematical assurance stays unverified."""
+
     schema_version: Literal["1"] = "1"
     experiment_uri: ExperimentUri
     kind: Literal["SEARCH"] = "SEARCH"

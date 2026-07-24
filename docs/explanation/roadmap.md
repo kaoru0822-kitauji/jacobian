@@ -1,5 +1,12 @@
 # Roadmap
 
+[Documentation home](../index.md)
+
+- Status: Active planning document
+- Scheduling policy: Milestone gates are not promised dates or package versions
+- Related records: [Architecture](architecture.md) and
+  [architecture decision log](adr/index.md)
+
 ## Release and milestone policy
 
 Each milestone is gated by evidence, not by a calendar date. Later milestone
@@ -54,6 +61,10 @@ facet tooling remain optional backend work rather than release-gate claims.
 
 ## M3 — Scalable search
 
+Implementation status: a provisional local single-worker implementation is in
+the repository. It is not part of the v0.2 release contract. Distributed
+execution and multi-process leases remain conditional on measured need.
+
 ### Entry gate
 
 Bounded enumeration and transformation APIs have proved useful in two different
@@ -73,9 +84,11 @@ exact-verification boundaries.
 - Verified-counterexample feedback through the existing witness boundary
 - Candidate nomination that routes every mathematical promotion through the
   existing verification boundary
-- Exact budget, scope, runtime-identity, and resource accounting
+- Exact budget, scope, and runtime identity, with measured wall time and
+  durable operation accounting
 - Resumable, cancellable, and recoverable experiments
-- Local multi-process execution followed by distributed workers when justified
+- Bounded local child-process execution; multi-process scheduling only after a
+  lease model and measured need
 - Resource-bounded local execution for operator-approved generated candidate
   code, without claiming a security sandbox
 - Sealed, versioned plugin packages and immutable registry snapshots binding
@@ -85,13 +98,17 @@ exact-verification boundaries.
   malformed output, timeout, path and symlink attacks, changed implementation
   bytes, and unsupported evidence promotion
 - A no-core-change extension gate exercised by a synthetic third plugin
-- Idempotent, reconstructable worker invocations with append-only lifecycle
+- Idempotent, reconstructable search invocations with append-only lifecycle
   events binding the exact request, plugin and runtime identity, effective
-  policy, inputs, outputs, resource usage, and retry lineage
+  policy, inputs, outputs, configured limits, observed runtimes, and retry
+  lineage
 
-Effective worker authority is the restrictive intersection of the plugin
-contract, operator policy, and invocation request. No layer may widen resource,
-network, filesystem, artifact, or checker authority.
+For authority represented by Jacobian, the effective worker policy is the
+restrictive intersection of the plugin contract, operator policy, and
+invocation request. Local workers inherit the operator process's network and
+filesystem boundary; Jacobian does not widen it and does not claim to narrow it
+without an external OS or container sandbox. No plugin or invocation may widen
+budget, artifact, capability, or checker authority.
 
 Exact enumeration, counterexample-guided refinement, constraint solving,
 parameter sweeps, beam or tree search, evolutionary search, and agent-driven
@@ -103,15 +120,20 @@ records or trust rules into the generic kernel.
 Long-running experiments survive interruption and resumption, retain complete
 lineage, feed independently verified counterexamples into later refinement,
 and route nominated candidates through the verification boundary.
-Sequential reference results are preserved under multi-process execution,
-worker failure, cancellation, and resume. A new sealed plugin passes the
-generic conformance suite without kernel or MCP changes. Concurrent or
+Sequential reference results are preserved across child-process failure,
+cancellation, and resume. If multi-process scheduling is introduced, it must
+preserve the same result and lineage. A new sealed plugin passes the generic
+conformance suite without kernel or MCP changes. Concurrent or
 transport-retried requests create one durable invocation. After process loss,
 an invocation can be reconstructed without chat state and resumed without
 losing or duplicating lineage. Workers cannot widen execution policy or
 influence checker authorization.
 
 ## M4 — Conjecture workflows
+
+Implementation status: the provisional hypothesis-transformation and
+parameter-region promotion paths are in the repository. They remain pre-stable
+and are not part of v0.2 conformance.
 
 ### Entry gate
 
@@ -223,6 +245,6 @@ All releases preserve these invariants:
 
 The cross-release evidence plan is defined in:
 
-- [Testing strategy](testing-strategy.md)
-- [Performance benchmarks](performance-benchmarks.md)
-- [Agent evaluations](agent-evaluations.md)
+- [Testing strategy](../reference/testing-strategy.md)
+- [Performance benchmarks](../reference/performance-benchmarks.md)
+- [Agent evaluations](../reference/agent-evaluations.md)

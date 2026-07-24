@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
 
+from jacobian.canonical import canonicalize_json
+from jacobian.conjectures import ConjectureError
 from jacobian.contracts.claims import ClaimSpec
 from jacobian.contracts.conjectures import (
     ConjectureOperation,
@@ -12,8 +15,13 @@ from jacobian.contracts.conjectures import (
     HypothesisTransformationRecord,
     NoveltyAssessment,
     ParameterRegionEvidence,
+    ParameterRegionSubject,
 )
-from jacobian.contracts.evidence import WitnessRole
+from jacobian.contracts.evidence import (
+    CertificateEnvelope,
+    EvidenceBindings,
+    WitnessRole,
+)
 from jacobian.contracts.plugins import PluginManifest
 from jacobian.contracts.results import ExecutionStatus, Verification
 from jacobian.contracts.search import SearchBudget
@@ -338,12 +346,164 @@ def test_parameter_generalization_keeps_sampled_region_unverified(
     assert region is not None
     assert region.evidence is ParameterRegionEvidence.SAMPLED
     assert region.sample_uris == (witness_uri,)
+    assert region.subject_uri is not None
     assert region.verification_record_uri is None
     assert result.hypotheses[0].verification is Verification.UNVERIFIED
     transformation = HypothesisTransformationRecord.model_validate(
         kernel.store.get(result.hypotheses[0].transformation_uri).payload
     )
     assert transformation.parameter_region == region
+
+
+@pytest.mark.parametrize(
+    ("region_kind", "expected_evidence"),
+    [
+        ("SUFFICIENT", ParameterRegionEvidence.VERIFIED_SUFFICIENT),
+        ("NECESSARY", ParameterRegionEvidence.VERIFIED_NECESSARY),
+    ],
+)
+@pytest.mark.subprocess
+def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
+    tmp_path: Path,
+    region_kind: str,
+    expected_evidence: ParameterRegionEvidence,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
+        kernel
+    )
+    source_record_uri, _, candidate_uri = _verified_counterexample(
+        kernel,
+        claim_uri=claim_uri,
+        plugin_id=plugin_id,
+        checker_id=checker_id,
+        candidate_schema_uri=candidate_schema_uri,
+        witness_role=WitnessRole.RESCUES_CANDIDATE,
+    )
+    result = kernel.conjectures.run(
+        ConjectureWorkflowRequest(
+            operation=ConjectureOperation.PARAMETER_GENERALIZE,
+            plugin_id=plugin_id,
+            source_uri=candidate_uri,
+            verification_record_uri=source_record_uri,
+            constraints={
+                "claim_template": kernel.store.get(claim_uri).payload,
+                "region_kind": region_kind,
+            },
+        )
+    )
+    region = result.hypotheses[0].parameter_region
+    assert region is not None
+    assert region.subject_uri is not None
+    subject_artifact = kernel.store.get(region.subject_uri)
+    subject = ParameterRegionSubject.model_validate(subject_artifact.payload)
+    target_claim = kernel.store.get(subject.claim_uri)
+    semantics = kernel.store.get(target_claim.manifest.semantics_uri)
+    certificate_schema_uri = kernel.schemas.register(
+        name="fixture.parameter-region-certificate",
+        version="1",
+        schema=CertificateEnvelope.model_json_schema(),
+    )
+    region_checker = kernel.checkers.authorize(
+        name=f"fixture-parameter-region-{region_kind.lower()}-v1",
+        entrypoint=(
+            "tests.fixtures.checker_functions:check_parameter_region_certificate"
+        ),
+        evidence_kind="CERTIFICATE",
+        format_id="fixture.parameter_region",
+        format_version="1",
+        claim_schema_uris=(target_claim.manifest.schema_uri,),
+        semantics_uris=(target_claim.manifest.semantics_uri,),
+        candidate_schema_uris=(kernel.conjectures.parameter_region_subject_schema_uri,),
+        reason="parameter-region promotion conformance fixture",
+    )
+    proof = {
+        "kind": region_kind,
+        "conditions": subject.conditions,
+    }
+    certificate = CertificateEnvelope(
+        certificate_type="fixture.parameter_region",
+        format_version="1",
+        bindings=EvidenceBindings(
+            claim_digest=target_claim.manifest.object_digest,
+            semantics_digest=semantics.manifest.object_digest,
+            candidate_digest=subject_artifact.manifest.object_digest,
+        ),
+        payload_digest=(
+            "sha256:" + hashlib.sha256(canonicalize_json(proof)).hexdigest()
+        ),
+        payload=proof,
+    )
+    stored_certificate = kernel.store.put(
+        schema_uri=certificate_schema_uri,
+        semantics_uri=target_claim.manifest.semantics_uri,
+        payload=certificate.model_dump(mode="json"),
+        parents=(target_claim.artifact_uri, subject_artifact.artifact_uri),
+        summary="parameter-region certificate fixture",
+    )
+    verified = kernel.verification.verify_certificate(
+        certificate_uri=stored_certificate.artifact_uri
+    )
+    assert verified.verification_record_uri is not None
+    kernel.checkers.authorize(
+        name=f"fixture-parameter-region-{region_kind.lower()}-v2",
+        entrypoint=(
+            "tests.fixtures.checker_functions:check_parameter_region_certificate"
+        ),
+        evidence_kind="CERTIFICATE",
+        format_id="fixture.parameter_region",
+        format_version="1",
+        claim_schema_uris=(target_claim.manifest.schema_uri,),
+        semantics_uris=(target_claim.manifest.semantics_uri,),
+        candidate_schema_uris=(kernel.conjectures.parameter_region_subject_schema_uri,),
+        reason="compatible checker must not change recorded-checker replay",
+    )
+
+    promoted = kernel.conjectures.promote_parameter_region(
+        subject_uri=subject_artifact.artifact_uri,
+        verification_record_uri=verified.verification_record_uri,
+    )
+
+    assert promoted.evidence is expected_evidence
+    assert promoted.conditions == region.conditions
+    assert promoted.sample_uris == region.sample_uris
+    assert promoted.subject_uri == region.subject_uri
+    assert promoted.verification_record_uri == verified.verification_record_uri
+
+    substituted_subject = kernel.store.put(
+        schema_uri=kernel.conjectures.parameter_region_subject_schema_uri,
+        semantics_uri=target_claim.manifest.semantics_uri,
+        payload=subject.model_dump(mode="json"),
+        parents=subject_artifact.manifest.parents,
+        summary="same parameter-region payload in a different carrier",
+    )
+    substituted_subject_artifact = kernel.store.get(substituted_subject.artifact_uri)
+    assert (
+        substituted_subject_artifact.manifest.object_digest
+        == subject_artifact.manifest.object_digest
+    )
+    assert substituted_subject.artifact_uri != subject_artifact.artifact_uri
+    with pytest.raises(
+        ConjectureError,
+        match="does not bind the supplied subject artifact",
+    ):
+        kernel.conjectures.promote_parameter_region(
+            subject_uri=substituted_subject.artifact_uri,
+            verification_record_uri=verified.verification_record_uri,
+        )
+
+    kernel.checkers.revoke(
+        region_checker.checker_id,
+        reason="recorded checker revocation must block replay",
+    )
+    with pytest.raises(
+        ConjectureError,
+        match="did not replay with its authorized checker",
+    ):
+        kernel.conjectures.promote_parameter_region(
+            subject_uri=subject_artifact.artifact_uri,
+            verification_record_uri=verified.verification_record_uri,
+        )
 
 
 @pytest.mark.subprocess

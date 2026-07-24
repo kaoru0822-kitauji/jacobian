@@ -1,5 +1,7 @@
 # ADR 0001: Use a Python-first control plane
 
+[Documentation home](../../index.md) · [Decision log](index.md)
+
 - Status: Accepted for v0.2
 - Date: 2026-07-23
 

@@ -46,3 +46,30 @@ def check_fixture_value_as_true(request: dict[str, Any]) -> dict[str, Any]:
     if decision["accepted"]:
         decision["conclusion"] = "TRUE"
     return decision
+
+
+def check_parameter_region_certificate(request: dict[str, Any]) -> dict[str, Any]:
+    candidate = request["candidate"]["payload"]
+    certificate = request["certificate"]["payload"]
+    proof = certificate.get("payload", {})
+    accepted = (
+        request.get("request_version") == "1"
+        and certificate.get("certificate_type") == "fixture.parameter_region"
+        and certificate.get("format_version") == "1"
+        and certificate.get("bindings") == request.get("expected_bindings")
+        and proof.get("kind") == candidate.get("kind")
+        and proof.get("conditions") == candidate.get("conditions")
+        and candidate.get("claim_uri") == request["claim"]["artifact_uri"]
+    )
+    return {
+        "accepted": accepted,
+        "conclusion": "TRUE" if accepted else "UNKNOWN",
+        "arithmetic": "SYMBOLIC",
+        "method": "CHECKED_CERTIFICATE",
+        "coverage": "EXHAUSTIVE",
+        "detail": (
+            "certificate proves the exact parameter-region subject"
+            if accepted
+            else "certificate does not prove the bound parameter region"
+        ),
+    }

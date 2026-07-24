@@ -44,15 +44,16 @@ Jacobian v0.2 alpha is the current cumulative implementation under
 current release contract; earlier development milestones survive only as
 ordinary regression coverage. The public API and artifact formats remain
 pre-stable.
-`README.md` provides the project overview and document index. Design material
-lives in `docs/`:
+`README.md` provides the project overview, while `docs/index.md` is the
+documentation home. Design material lives in `docs/`:
 
-- `docs/specifications/` contains the current v0.2 specification and
-  provisional specifications for later releases.
-- `docs/adr/` records architectural decisions using numbered filenames such as
-  `0001-python-first-control-plane.md`.
-- Top-level documents cover architecture, tools, conformance, threats,
-  benchmarks, testing strategy, and the roadmap.
+- `docs/tutorials/` contains guided learning paths.
+- `docs/how-to/` contains task-oriented operating guides.
+- `docs/reference/` contains tools, conformance requirements, specifications,
+  milestone contracts, benchmarks, and testing protocols.
+- `docs/explanation/` contains architecture, threats, the roadmap, runtime
+  design, and numbered ADRs.
+- `docs/contributing/` contains maintainer-facing planning material.
 
 Keep `deep_review.md` local; it is intentionally ignored as design source
 material.
@@ -93,10 +94,10 @@ Update `README.md` when adding a public-facing document.
 ## Testing Guidelines
 
 Check changes against the applicable release specification,
-`docs/conformance-v0.2.md`, and
-`docs/testing-strategy.md`. Verify relative links and ensure provisional
-roadmap material is not presented as a stable contract. Report only checks
-that actually ran.
+`docs/reference/conformance-v0.2.md`, and
+`docs/reference/testing-strategy.md`. Verify relative links and ensure
+provisional roadmap material is not presented as a stable contract. Report
+only checks that actually ran.
 
 ## Commit & Pull Request Guidelines
 
@@ -114,4 +115,4 @@ or diagrams materially change, and list the exact validation performed.
 Do not weaken the central invariant: evidence becomes verified only after an
 authorized checker accepts data bound to the exact claim, semantics, candidate,
 and checker version. Discuss changes affecting trust boundaries alongside
-`docs/threat-model.md`.
+`docs/explanation/threat-model.md`.

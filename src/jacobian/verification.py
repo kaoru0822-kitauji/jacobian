@@ -396,8 +396,13 @@ class VerificationService:
                 started=started,
             )
 
-    def verify_certificate(self, *, certificate_uri: str) -> ResultEnvelope:
-        """Select and run the unique checker compatible with a certificate."""
+    def verify_certificate(
+        self,
+        *,
+        certificate_uri: str,
+        checker_id: str | None = None,
+    ) -> ResultEnvelope:
+        """Run a specified compatible checker or uniquely select one."""
 
         started = time.monotonic()
         try:
@@ -452,14 +457,25 @@ class VerificationService:
                     "claim, candidate, certificate, and scope semantics differ"
                 )
 
-            checker = self.checker_registry.select_compatible(
-                evidence_kind=EvidenceKind.CERTIFICATE,
-                format_id=certificate.certificate_type,
-                format_version=certificate.format_version,
-                claim_schema_uri=claim.manifest.schema_uri,
-                semantics_uri=candidate.manifest.semantics_uri,
-                candidate_schema_uri=candidate.manifest.schema_uri,
-            )
+            if checker_id is None:
+                checker = self.checker_registry.select_compatible(
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id=certificate.certificate_type,
+                    format_version=certificate.format_version,
+                    claim_schema_uri=claim.manifest.schema_uri,
+                    semantics_uri=candidate.manifest.semantics_uri,
+                    candidate_schema_uri=candidate.manifest.schema_uri,
+                )
+            else:
+                checker = self.checker_registry.require_compatible(
+                    checker_id,
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id=certificate.certificate_type,
+                    format_version=certificate.format_version,
+                    claim_schema_uri=claim.manifest.schema_uri,
+                    semantics_uri=candidate.manifest.semantics_uri,
+                    candidate_schema_uri=candidate.manifest.schema_uri,
+                )
             request = {
                 "request_version": "1",
                 "claim": self._checker_artifact(claim),

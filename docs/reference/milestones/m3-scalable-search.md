@@ -1,6 +1,8 @@
 # Milestone 3 specification: scalable search
 
-- Status: Provisional
+[Documentation home](../../index.md)
+
+- Status: Provisional implementation; outside v0.2 conformance
 - Theme: Run typed search strategies through one durable experiment loop
 
 ## 1. Entry gate
@@ -95,7 +97,7 @@ evaluation envelopes and optional strategy metrics
 proposed counterexamples and verified witness records
 candidate nominations and resulting verification records
 checkpoint state and random-state identity
-scope, budget, timestamps, and resource accounting
+scope, budget, timestamps, measured wall time, and operation accounting
 typed failures, cancellation, timeout, and recovery events
 ```
 
@@ -103,10 +105,23 @@ Strategy metrics may be scalar, vector-valued, ordered, or absent. They cannot
 replace hard validity constraints or assurance labels. A complete experiment
 can be reconstructed without a host transcript.
 
-Worker invocations are idempotent. Concurrent or transport-retried requests
-resolve to one accepted invocation, and append-only lifecycle events bind the
-exact inputs, outputs, runtime identity, effective policy, resource use, and
-retry lineage.
+Search acceptance is idempotent. Concurrent or transport-retried submissions
+with the same idempotency key and request digest resolve to one experiment URI.
+The key cannot be rebound to another request. Append-only lifecycle events bind
+the accepted request, operation inputs and outputs, runtime identity, effective
+policy, configured limits, observed runtimes, and retry lineage.
+
+Plugin work after the last committed checkpoint may execute again after process
+loss. That repeat is an attempt in the same durable invocation, not a second
+accepted experiment. Only atomically committed archive pages, checkpoints, and
+events become lineage.
+
+Wall accounting includes plugin execution and artifact persistence through
+creation of each immutable checkpoint. Jacobian samples the measurement
+immediately after that artifact is created and before the following SQLite
+metadata transaction; lifecycle events record the transaction's ordering.
+Jacobian does not claim CPU, memory, network-byte, or filesystem-byte metering
+that the local runtime does not observe.
 
 ## 6. Plugin packaging and conformance
 
@@ -126,6 +141,15 @@ timeout, path and symlink attacks, changed implementation bytes, and
 unsupported evidence promotion. A synthetic third plugin must pass without
 kernel or MCP changes.
 
+`jacobian.plugin_conformance` provides a standard runner over a sealed,
+conformance-only plugin package in isolated test state, a search request, and
+disposable package attack fixtures. Each suite execution uses a fresh
+idempotency namespace. The runner drives declared search capabilities and the
+conjecture workflow itself, performs registry attacks with fresh fixture state,
+runs every generic check, and reports all failures together. Fault injection
+belongs only in this disposable synthetic package; production plugins do not
+expose conformance crash, malformed-output, or timeout controls.
+
 ## 7. Execution
 
 Scale only as evidence requires:
@@ -137,6 +161,8 @@ Scale only as evidence requires:
 
 The first three stages use ordinary process boundaries, SQLite state, and the
 existing artifact store. Distributed infrastructure is not an M3 requirement.
+The reference scheduler currently accepts exactly one strategy worker; asking
+for more fails validation rather than being silently clamped.
 
 Local workers use explicit wall-clock and output limits, fixed seeds where the
 backend supports them, and recorded environment identities. These are
@@ -144,23 +170,56 @@ operational and reproducibility controls, not a security sandbox. Jacobian does
 not accept arbitrary executable uploads; operators install plugins and checkers
 they consider safe to run locally.
 
-Effective worker authority is the restrictive intersection of the plugin
-contract, operator policy, and invocation request. No layer may widen resource,
-network, filesystem, artifact, or checker authority.
+For authority represented by Jacobian, effective worker policy is the
+restrictive intersection of the plugin contract, operator policy, and
+invocation request. A local worker inherits the network and filesystem boundary
+of the operator process. Jacobian neither widens that boundary nor claims to
+narrow it; operators requiring isolation must launch Jacobian under an
+appropriate OS or container policy. Plugins and requests cannot widen budget,
+artifact, capability, or checker authority.
 
-## 8. Exit gate
+## 8. Implemented scope and limits
+
+The provisional reference implementation provides:
+
+- proposer, evaluator, optional witness-oracle, refiner, and nomination flow;
+- transactional idempotent request acceptance;
+- immutable archive pages, checkpoints, and terminal archives;
+- append-only lifecycle events;
+- pause, resume, cancellation, timeout, and startup recovery;
+- per-row quarantine for malformed recovery state;
+- whole-package plugin snapshots and the synthetic conformance suite.
+
+The scheduler accepts exactly one strategy worker. One active Jacobian process
+must own a state directory; there is no lease protocol for multiple
+coordinators. Plugin calls run in bounded child processes, but network and
+filesystem access are inherited from the operator process. Accounting records
+exact operation counts and measured wall time at the documented checkpoint
+boundary; it does not claim CPU, memory, network-byte, or filesystem-byte
+metering.
+
+Operational detail and rationale are recorded in:
+
+- [Durable search runtime](../../explanation/search-runtime.md)
+- [Sealed plugin package ADR](../../explanation/adr/0002-sealed-plugin-packages.md)
+- [Durable invocation ADR](../../explanation/adr/0003-durable-search-invocations.md)
+- [Plugin conformance kit](../plugin-conformance.md)
+
+## 9. Exit gate
 
 Milestone 3 is complete when:
 
 - a long strategy-neutral search can pause, resume, and reproduce its archive
-  lineage and exact accounting;
+  lineage and measured accounting at the documented persistence boundary;
 - independently verified counterexamples influence subsequent refinement;
 - nominated candidates cross the existing checker boundary;
 - concurrent or retried requests create one durable invocation;
 - process loss can be reconstructed without chat state and resumed without
   losing or duplicating lineage;
+- one malformed persisted invocation is quarantined without preventing
+  unrelated invocations from recovering;
 - a sealed synthetic plugin passes generic conformance without kernel or MCP
   changes;
-- worker timeout, output-limit, and resource-exhaustion tests fail safely;
+- worker timeout and output-limit tests fail safely;
 - workers cannot widen execution policy or checker authority;
 - distributed execution, if present, cannot forge checker authorization.
