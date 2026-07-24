@@ -42,8 +42,14 @@ The first command is the full suite. It uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
 wait on isolated subprocesses. The second command is the fast local loop. Use
 `-n 0` for debugger-friendly, single-process execution and `--durations=25`
-when investigating regressions. Parallel workers retain separate `tmp_path`
+when investigating regressions. A 120-second per-test backstop prevents local
+deadlocks from hanging indefinitely and is disabled automatically by
+`pytest-timeout` while debugging. Parallel workers retain separate `tmp_path`
 roots; tests that add shared external state must coordinate it explicitly.
+CI collects coverage once on Python 3.12 and runs the full compatibility suite
+without duplicate instrumentation on Python 3.13. Coverage.py's subprocess
+patch includes plugin and checker workers so clean-process execution is not
+misreported as uncovered.
 
 ## Criticality classes
 

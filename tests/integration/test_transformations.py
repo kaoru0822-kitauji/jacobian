@@ -30,7 +30,7 @@ def test_matrix_representation_change_is_independently_verified(
         target_schema_uri=reference.representation_schema_uris["row_major"],
         target_semantics_uri=reference.representation_semantics_uris["row_major"],
         requested_relation="EQUIVALENT",
-        wall_seconds=5,
+        wall_seconds=30,
     )
 
     assert applied.transformation_uri is not None
@@ -61,7 +61,7 @@ def test_transformation_target_rebinding_fails_closed(tmp_path: Path) -> None:
         target_schema_uri=reference.representation_schema_uris["row_major"],
         target_semantics_uri=reference.representation_semantics_uris["row_major"],
         requested_relation="EQUIVALENT",
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert applied.transformation_uri is not None
     transformation = kernel.store.get(applied.transformation_uri)
@@ -109,7 +109,7 @@ def test_transformation_relation_rebinding_fails_closed(tmp_path: Path) -> None:
         target_schema_uri=reference.representation_schema_uris["row_major"],
         target_semantics_uri=reference.representation_semantics_uris["row_major"],
         requested_relation="EQUIVALENT",
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert applied.transformation_uri is not None
     transformation = kernel.store.get(applied.transformation_uri)
@@ -148,7 +148,7 @@ def test_transformation_obligation_tampering_fails_closed(tmp_path: Path) -> Non
         target_schema_uri=reference.representation_schema_uris["row_major"],
         target_semantics_uri=reference.representation_semantics_uris["row_major"],
         requested_relation="EQUIVALENT",
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert applied.transformation_uri is not None
     transformation = kernel.store.get(applied.transformation_uri)

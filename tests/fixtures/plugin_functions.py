@@ -20,7 +20,7 @@ def wait_forever(_request: dict[str, Any]) -> dict[str, Any]:
 
 def emit_large_diagnostic(_request: dict[str, Any]) -> dict[str, Any]:
     print("x" * 4096)
-    time.sleep(3)
+    time.sleep(60)
     return {"status": "otherwise valid"}
 
 

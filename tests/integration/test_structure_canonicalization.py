@@ -31,12 +31,12 @@ def test_isomorphic_graphs_share_one_canonical_object(tmp_path: Path) -> None:
     first_result = kernel.structures.canonicalize(
         structure_uri=first.artifact_uri,
         plugin_id=reference.plugin_id,
-        wall_seconds=5,
+        wall_seconds=30,
     )
     second_result = kernel.structures.canonicalize(
         structure_uri=relabeled.artifact_uri,
         plugin_id=reference.plugin_id,
-        wall_seconds=5,
+        wall_seconds=30,
     )
 
     assert first_result.canonical_uri == second_result.canonical_uri
@@ -68,12 +68,12 @@ def test_nonisomorphic_graphs_have_distinct_canonical_keys(tmp_path: Path) -> No
     path_result = kernel.structures.canonicalize(
         structure_uri=path.artifact_uri,
         plugin_id=reference.plugin_id,
-        wall_seconds=5,
+        wall_seconds=30,
     )
     cycle_result = kernel.structures.canonicalize(
         structure_uri=cycle.artifact_uri,
         plugin_id=reference.plugin_id,
-        wall_seconds=5,
+        wall_seconds=30,
     )
 
     assert path_result.canonical_key != cycle_result.canonical_key

@@ -66,7 +66,7 @@ def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
         plugin_id=reference.plugin_id,
         profile="EXACT_CANDIDATE",
         seed=0,
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert evaluation.items[0].result.conclusion.value == "FALSE"
     assert evaluation.items[0].result.assurance.verification.value == "UNVERIFIED"
@@ -76,7 +76,7 @@ def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
         witness_role="DEFEATS_CANDIDATE",
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert found.witness_uri is not None
     verified = kernel.verification.verify_witness(
@@ -155,7 +155,7 @@ def test_matrix_kernel_witness_and_independent_replay(tmp_path: Path) -> None:
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
         witness_role="DEFEATS_CANDIDATE",
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert found.witness_uri is not None
     verified = kernel.verification.verify_witness(
@@ -216,7 +216,7 @@ def test_matrix_maxdet_certificate_replays_full_scope(tmp_path: Path) -> None:
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
         witness_role="SUPPORTS_CLAIM",
-        wall_seconds=5,
+        wall_seconds=30,
     )
     assert found.witness_uri is not None
     verified_witness = kernel.verification.verify_witness(

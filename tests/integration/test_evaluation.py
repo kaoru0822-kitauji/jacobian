@@ -26,7 +26,7 @@ def test_exact_exhaustive_evaluation_remains_unverified(tmp_path: Path) -> None:
         plugin_id=plugin_id,
         profile="EXACT_CANDIDATE",
         seed=7,
-        wall_seconds=5,
+        wall_seconds=30,
     )
 
     assert response.input.status.value == "ACCEPTED"

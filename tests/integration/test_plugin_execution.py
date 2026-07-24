@@ -13,7 +13,7 @@ def test_plugin_executor_returns_only_canonical_result() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:echo",
         request={"candidate": {"value": 3}},
-        timeout_seconds=5,
+        timeout_seconds=30,
     )
 
     assert result.status.value == "COMPLETED"
@@ -27,7 +27,7 @@ def test_plugin_executor_rejects_changed_implementation_digest() -> None:
         entrypoint="tests.fixtures.plugin_functions:echo",
         implementation_digest="sha256:" + "0" * 64,
         request={"candidate": {"value": 3}},
-        timeout_seconds=5,
+        timeout_seconds=30,
     )
 
     assert result.status.value == "ERROR"
@@ -40,7 +40,7 @@ def test_module_import_diagnostics_do_not_corrupt_worker_protocol() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.noisy_module:echo",
         request={"value": 7},
-        timeout_seconds=5,
+        timeout_seconds=30,
     )
 
     assert result.status.value == "COMPLETED"
@@ -66,10 +66,10 @@ def test_plugin_diagnostic_limit_fails_closed() -> None:
     result = PluginExecutor(max_diagnostic_bytes=32).run(
         entrypoint="tests.fixtures.plugin_functions:emit_large_diagnostic",
         request={},
-        timeout_seconds=5,
+        timeout_seconds=30,
     )
 
-    assert time.monotonic() - start < 2
+    assert time.monotonic() - start < 10
     assert result.status.value == "ERROR"
     assert result.output is None
     assert result.detail == "plugin diagnostics exceed the configured limit"

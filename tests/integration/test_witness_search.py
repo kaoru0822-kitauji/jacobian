@@ -41,7 +41,7 @@ def test_witness_search_stores_bound_unverified_evidence(tmp_path: Path) -> None
         candidate_uri=candidate_uri,
         plugin_id=plugin_id,
         witness_role="DEFEATS_CANDIDATE",
-        wall_seconds=5,
+        wall_seconds=30,
     )
 
     assert response.status.value == "FOUND"
@@ -123,7 +123,7 @@ def test_none_certified_requires_certificate_verification(
         candidate_uri=candidate_uri,
         plugin_id=plugin_id,
         witness_role="DEFEATS_CANDIDATE",
-        wall_seconds=5,
+        wall_seconds=30,
     )
 
     assert response.status.value == expected_status

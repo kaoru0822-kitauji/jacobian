@@ -8,9 +8,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from mcp import Client, StdioServerParameters, stdio_client
 
 from jacobian.adapters.mcp.server import create_server
+
+# Keep MCP SDK imports inside scenarios. Every xdist worker collects this module,
+# while only workers assigned these integration tests need the expensive runtime.
 
 
 @pytest.mark.integration
@@ -18,6 +20,8 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:
+        from mcp import Client
+
         async with Client(
             create_server(tmp_path),
             raise_exceptions=True,
@@ -155,6 +159,8 @@ def test_mcp_stdio_entrypoint_starts_in_a_clean_process(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:
+        from mcp import Client, StdioServerParameters, stdio_client
+
         environment = dict(os.environ)
         environment["JACOBIAN_STATE_DIR"] = str(tmp_path)
         parameters = StdioServerParameters(
