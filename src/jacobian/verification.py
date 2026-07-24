@@ -134,10 +134,9 @@ class VerificationService:
     ) -> CheckerDecision:
         environment = dict(os.environ)
         environment.update({"PYTHONHASHSEED": "0", "TZ": "UTC"})
-        effective_timeout = (
-            self.checker_timeout_seconds
-            if timeout_seconds is None
-            else min(timeout_seconds, self.checker_timeout_seconds)
+        effective_timeout = min(
+            30 if timeout_seconds is None else timeout_seconds,
+            self.checker_timeout_seconds,
         )
         completed = run_bounded_process(
             [
@@ -401,6 +400,7 @@ class VerificationService:
         *,
         certificate_uri: str,
         checker_id: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> ResultEnvelope:
         """Run a specified compatible checker or uniquely select one."""
 
@@ -492,6 +492,7 @@ class VerificationService:
                 entrypoint=checker.entrypoint,
                 expected_digest=checker.executable_digest,
                 request=request,
+                timeout_seconds=timeout_seconds,
             )
             runtime_ms = int((time.monotonic() - started) * 1000)
             if not decision.accepted:

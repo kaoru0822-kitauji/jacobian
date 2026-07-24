@@ -1,0 +1,42 @@
+{
+  "case_id": "PATH-CLOSURE-001",
+  "version": "1",
+  "reference_name": "graph_paths",
+  "title": "Complete path semantics",
+  "prompt": "Using the bundled graph_paths reference domain, formalize and test the claim that the two listed intended paths are complete for this directed graph. Vertices: s, a, b, x, t1, t2. Arcs: s->a, a->x, s->b, b->x, x->t1, x->t2. Source: s. Terminals: t1 and t2. Intended paths: s-a-x-t1 and s-b-x-t2. Validate the claim, evaluate the candidate, search for a defeating witness, and independently verify any witness with the compatible authorized checker.",
+  "required_tools": [
+    "verification.run"
+  ],
+  "expected": {
+    "domain_id": "jacobian.graph-paths",
+    "predicate": "intended_paths_complete",
+    "conclusion": "FALSE",
+    "witness_format": "graph.omitted_path",
+    "candidate": {
+      "kind": "graph_paths",
+      "vertices": ["s", "a", "b", "x", "t1", "t2"],
+      "arcs": [
+        ["s", "a"],
+        ["a", "x"],
+        ["s", "b"],
+        ["b", "x"],
+        ["x", "t1"],
+        ["x", "t2"]
+      ],
+      "source": "s",
+      "terminals": ["t1", "t2"],
+      "intended_paths": [
+        ["s", "a", "x", "t1"],
+        ["s", "b", "x", "t2"]
+      ]
+    },
+    "accepted_witness_payloads": [
+      {
+        "path": ["s", "a", "x", "t2"]
+      },
+      {
+        "path": ["s", "b", "x", "t1"]
+      }
+    ]
+  }
+}

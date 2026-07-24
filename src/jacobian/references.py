@@ -12,6 +12,7 @@ from jacobian.contracts.evidence import (
     CertificateEnvelope,
     WitnessEnvelope,
 )
+from jacobian.contracts.lean import LeanCandidate, LeanClaim, LeanEnvironment
 from jacobian.contracts.plugins import PluginManifest
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.registry import CheckerRegistry
@@ -22,6 +23,9 @@ from jacobian.store import ArtifactStore
 @dataclass(frozen=True, slots=True)
 class ReferenceInstallation:
     name: str
+    domain_id: str
+    domain_version: str
+    available_capabilities: tuple[str, ...]
     plugin_id: str
     semantics_uri: str
     claim_schema_uri: str
@@ -40,6 +44,22 @@ class ReferenceInstallation:
 class PolytopeCheckerInstallation:
     witness_checker_id: str
     certificate_checker_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class LeanCheckerInstallation:
+    environment: LeanEnvironment
+    lean_version: str
+    lean_commit: str
+    import_name: str | None
+    mathlib_commit: str | None
+    allowed_axioms: tuple[str, ...]
+    checker_timeout_seconds: int
+    semantics_uri: str
+    claim_schema_uri: str
+    candidate_schema_uri: str
+    certificate_schema_uri: str
+    checker_id: str
 
 
 class ReferenceInstaller:
@@ -117,6 +137,90 @@ class ReferenceInstaller:
             witness_checker_id=witness_checker_id,
             certificate_checker_id=certificate_checker_id,
         )
+
+    def install_lean_checkers(
+        self,
+    ) -> dict[LeanEnvironment, LeanCheckerInstallation]:
+        """Authorize the pinned core and mathlib Lean certificate profiles."""
+
+        mathlib_commit = "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
+        lean_version = "4.31.0"
+        lean_commit = "68218e876d2a38b1985b8590fff244a83c321783"
+        claim_schema_uri = self.schemas.register(
+            name="jacobian.lean4.claim",
+            version="1",
+            schema=LeanClaim.model_json_schema(),
+        )
+        candidate_schema_uri = self.schemas.register(
+            name="jacobian.lean4.candidate",
+            version="1",
+            schema=LeanCandidate.model_json_schema(),
+        )
+        configurations: dict[
+            LeanEnvironment,
+            tuple[str | None, str | None, tuple[str, ...], int],
+        ] = {
+            LeanEnvironment.CORE: (None, None, (), 30),
+            LeanEnvironment.MATHLIB: (
+                "Mathlib",
+                mathlib_commit,
+                (
+                    "Classical.choice",
+                    "Quot.sound",
+                    "propext",
+                ),
+                75,
+            ),
+        }
+        installations: dict[LeanEnvironment, LeanCheckerInstallation] = {}
+        for environment, (
+            import_name,
+            pinned_mathlib,
+            allowed_axioms,
+            checker_timeout_seconds,
+        ) in configurations.items():
+            semantics_uri = self.store.register_descriptor(
+                kind="semantics",
+                name=f"jacobian.lean4-{environment.value.lower()}",
+                version="1",
+                definition={
+                    "description": (
+                        "exact Lean proposition checked by the pinned Lean kernel"
+                    ),
+                    "environment": environment.value,
+                    "lean_version": lean_version,
+                    "lean_commit": lean_commit,
+                    "import_name": import_name,
+                    "mathlib_commit": pinned_mathlib,
+                    "allowed_axioms": list(allowed_axioms),
+                    "checker_timeout_seconds": checker_timeout_seconds,
+                    "trust_level": 0,
+                },
+            )
+            checker_id = self._authorize_checker(
+                name=f"pinned {environment.value} Lean kernel checker",
+                entrypoint="jacobian_checkers.lean4:check_kernel_certificate",
+                evidence_kind="CERTIFICATE",
+                format_id="lean4.kernel",
+                claim_schema=claim_schema_uri,
+                semantics=semantics_uri,
+                candidate_schema=candidate_schema_uri,
+            )
+            installations[environment] = LeanCheckerInstallation(
+                environment=environment,
+                lean_version=lean_version,
+                lean_commit=lean_commit,
+                import_name=import_name,
+                mathlib_commit=pinned_mathlib,
+                allowed_axioms=allowed_axioms,
+                checker_timeout_seconds=checker_timeout_seconds,
+                semantics_uri=semantics_uri,
+                claim_schema_uri=claim_schema_uri,
+                candidate_schema_uri=candidate_schema_uri,
+                certificate_schema_uri=self.certificate_schema_uri,
+                checker_id=checker_id,
+            )
+        return installations
 
     def install_graph_paths(self) -> ReferenceInstallation:
         domain = "jacobian.graph-paths"
@@ -240,6 +344,9 @@ class ReferenceInstaller:
         }
         return ReferenceInstallation(
             name="graph_paths",
+            domain_id=domain,
+            domain_version="1",
+            available_capabilities=tuple(sorted(capabilities)),
             plugin_id=plugin_id,
             semantics_uri=semantics,
             claim_schema_uri=claim_schema,
@@ -407,6 +514,9 @@ class ReferenceInstaller:
         }
         return ReferenceInstallation(
             name="matrices",
+            domain_id=domain,
+            domain_version="1",
+            available_capabilities=tuple(sorted(capabilities)),
             plugin_id=plugin_id,
             semantics_uri=semantics,
             claim_schema_uri=claim_schema,
@@ -499,11 +609,16 @@ def reference_catalog(
     *,
     polytope: Any | None = None,
     polytope_checkers: PolytopeCheckerInstallation | None = None,
+    lean: dict[LeanEnvironment, LeanCheckerInstallation] | None = None,
 ) -> dict[str, Any]:
     """Return stable operator-facing identifiers for installed references."""
 
     catalog: dict[str, Any] = {
         name: {
+            "agent_contract_uri": f"reference://domain/{name}",
+            "domain_id": reference.domain_id,
+            "domain_version": reference.domain_version,
+            "available_capabilities": reference.available_capabilities,
             "plugin_id": reference.plugin_id,
             "semantics_uri": reference.semantics_uri,
             "claim_schema_uri": reference.claim_schema_uri,
@@ -535,6 +650,33 @@ def reference_catalog(
                 if polytope_checkers is not None
                 else None
             ),
+        }
+    if lean is not None:
+        core = lean[LeanEnvironment.CORE]
+        catalog["lean4"] = {
+            "agent_contract_uri": "reference://domain/lean4",
+            "domain_id": "jacobian.lean4",
+            "domain_version": "1",
+            "lean_version": core.lean_version,
+            "lean_commit": core.lean_commit,
+            "claim_schema_uri": core.claim_schema_uri,
+            "candidate_schema_uri": core.candidate_schema_uri,
+            "certificate_schema_uri": core.certificate_schema_uri,
+            "certificate_type": "lean4.kernel",
+            "profiles": {
+                environment.value: {
+                    "semantics_uri": installation.semantics_uri,
+                    "certificate_checker_id": installation.checker_id,
+                    "import_name": installation.import_name,
+                    "mathlib_commit": installation.mathlib_commit,
+                    "allowed_axioms": installation.allowed_axioms,
+                    "checker_timeout_seconds": (installation.checker_timeout_seconds),
+                }
+                for environment, installation in sorted(
+                    lean.items(),
+                    key=lambda item: item[0].value,
+                )
+            },
         }
     return catalog
 

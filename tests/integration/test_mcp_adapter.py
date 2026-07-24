@@ -9,7 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.adapters.mcp.server import create_server
+from jacobian.adapters.mcp.server import (
+    VERIFICATION_TOOL_NAMES,
+    ToolProfile,
+    create_server,
+)
 
 # Keep MCP SDK imports inside scenarios. Every xdist worker collects this module,
 # while only workers assigned these integration tests need the expensive runtime.
@@ -19,15 +23,21 @@ from jacobian.adapters.mcp.server import create_server
 def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
     tmp_path: Path,
 ) -> None:
+    server = create_server(tmp_path)
+    assert server.instructions is not None
+    assert "reference://catalog" in server.instructions
+    assert "assurance.verification" in server.instructions
+
     async def scenario() -> None:
         from mcp import Client
 
         async with Client(
-            create_server(tmp_path),
+            server,
             raise_exceptions=True,
         ) as client:
             listed = await client.list_tools()
-            assert {tool.name for tool in listed.tools} == {
+            tools = {tool.name: tool for tool in listed.tools}
+            assert set(tools) == {
                 "artifact.put",
                 "claim.validate",
                 "evaluate.batch",
@@ -35,6 +45,8 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
                 "witness.verify",
                 "shrink.run",
                 "certificate.verify",
+                "lean.verify",
+                "verification.run",
                 "structure.canonicalize",
                 "search.enumerate",
                 "search.run",
@@ -49,12 +61,58 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
                 "transform.verify",
                 "polytope.separate",
             }
+            assert all(
+                tool.annotations is not None
+                and tool.annotations.open_world_hint is False
+                for tool in tools.values()
+            )
+            assert tools["claim.validate"].annotations is not None
+            assert tools["claim.validate"].annotations.read_only_hint is True
+            assert tools["artifact.put"].annotations is not None
+            assert tools["artifact.put"].annotations.read_only_hint is False
+            assert tools["artifact.put"].annotations.destructive_hint is False
+            assert tools["artifact.put"].annotations.idempotent_hint is True
+            assert tools["search.run"].annotations is not None
+            assert tools["search.run"].annotations.idempotent_hint is True
+            assert tools["experiment.cancel"].annotations is not None
+            assert tools["experiment.cancel"].annotations.destructive_hint is True
+            assert tools["evaluate.batch"].input_schema["$defs"]["EvaluationProfile"][
+                "enum"
+            ] == ["FAST", "EXACT_CANDIDATE"]
+            assert tools["witness.find"].input_schema["$defs"]["WitnessRole"][
+                "enum"
+            ] == [
+                "DEFEATS_CANDIDATE",
+                "RESCUES_CANDIDATE",
+                "SUPPORTS_CLAIM",
+                "REFUTES_CLAIM",
+            ]
+            assert tools["transform.apply"].input_schema["$defs"][
+                "TransformationRelation"
+            ]["enum"] == [
+                "EQUIVALENT",
+                "OVER_APPROXIMATION",
+                "UNDER_APPROXIMATION",
+                "HEURISTIC",
+            ]
             catalog_result = await client.read_resource("reference://catalog")
             catalog = json.loads(catalog_result.contents[0].text)
             matrix = catalog["matrices"]
+            assert matrix["agent_contract_uri"] == "reference://domain/matrices"
+            assert matrix["domain_id"] == "jacobian.integer-matrices"
+            assert matrix["domain_version"] == "1"
+            assert matrix["available_capabilities"] == [
+                "CandidateEnumerator",
+                "Evaluator",
+                "Reducer",
+                "SemanticEnumerator",
+                "Transformer",
+                "WitnessOracle",
+            ]
             assert catalog["finite_polytopes"]["certificate_checker_id"].startswith(
                 "checker://sha256/"
             )
+            assert catalog["lean4"]["certificate_type"] == "lean4.kernel"
             stored = await client.call_tool(
                 "artifact.put",
                 {
@@ -161,6 +219,71 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
 
 
 @pytest.mark.integration
+def test_mcp_verification_profile_projects_compact_tools_and_domain_contract(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(
+            create_server(tmp_path, tool_profile=ToolProfile.VERIFICATION),
+            raise_exceptions=True,
+        ) as client:
+            listed = await client.list_tools()
+            tools = {tool.name: tool for tool in listed.tools}
+            assert set(tools) == VERIFICATION_TOOL_NAMES
+            assert all(tool.output_schema is None for tool in tools.values())
+
+            result = await client.read_resource("reference://domain/graph_paths")
+            contract = json.loads(result.contents[0].text)
+            assert contract["name"] == "graph_paths"
+            assert contract["identity"]["domain_id"] == "jacobian.graph-paths"
+            assert set(contract["claim_contract"]["predicates"]) == {
+                "intended_paths_complete",
+                "is_bipartite",
+            }
+            assert contract["claim_contract"]["base"]["required_capabilities"] == [
+                "Evaluator",
+                "WitnessOracle",
+            ]
+            assert contract["candidate_schema"]["properties"]["vertices"]
+            assert contract["workflow"]["witness"][0].startswith(
+                "call verification.run"
+            )
+            claim_payload = {
+                **contract["claim_contract"]["base"],
+                "predicate": {"name": "is_bipartite", "parameters": {}},
+            }
+            response = await client.call_tool(
+                "verification.run",
+                {
+                    "reference_name": "graph_paths",
+                    "claim_payload": claim_payload,
+                    "candidate_payload": {
+                        "vertices": ["a", "b", "c", "d"],
+                        "arcs": [
+                            ["a", "b"],
+                            ["b", "c"],
+                            ["c", "d"],
+                            ["d", "a"],
+                        ],
+                    },
+                    "witness_role": "SUPPORTS_CLAIM",
+                },
+            )
+            projection = json.loads(response.content[0].text)
+            assert projection["evaluation"]["verification"] == "UNVERIFIED"
+            assert projection["witness_search"]["verification"] == "UNVERIFIED"
+            assert projection["verification"]["verification"] == "VERIFIED"
+            assert projection["verification"]["verification_record_uri"].startswith(
+                "artifact://sha256/"
+            )
+            assert "plugin_id" not in projection
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
 @pytest.mark.subprocess
 def test_mcp_stdio_entrypoint_starts_in_a_clean_process(
     tmp_path: Path,
@@ -172,7 +295,12 @@ def test_mcp_stdio_entrypoint_starts_in_a_clean_process(
         environment["JACOBIAN_STATE_DIR"] = str(tmp_path)
         parameters = StdioServerParameters(
             command=sys.executable,
-            args=["-m", "jacobian.adapters.mcp.server"],
+            args=[
+                "-m",
+                "jacobian.adapters.mcp.server",
+                "--tool-profile",
+                "verification",
+            ],
             env=environment,
             cwd=Path.cwd(),
         )
@@ -181,7 +309,7 @@ def test_mcp_stdio_entrypoint_starts_in_a_clean_process(
             raise_exceptions=True,
         ) as client:
             listed = await client.list_tools()
-            assert "certificate.verify" in {tool.name for tool in listed.tools}
+            assert {tool.name for tool in listed.tools} == VERIFICATION_TOOL_NAMES
 
     asyncio.run(scenario())
 

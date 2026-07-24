@@ -121,6 +121,69 @@ Exact finite-polytope generation uses Z3 rational constraints. Z3 output is
 always unverified until the separate `Fraction`-based checker accepts the
 bound witness or certificate.
 
+### Local Codex
+
+The repository includes a trusted-project Codex profile at
+`.codex/config.toml`. Run Codex from the repository root and inspect
+`jacobian_local` with `/mcp`; the profile starts `uv run jacobian-mcp` over
+STDIO with the compact `verification` tool profile and stores durable local
+state under the ignored `.jacobian/` directory. The profile projects eight
+verification tools from the canonical registry and omits redundant MCP output
+schemas. Domain resources expose compact claim contracts instead of repeating
+the canonical stored schemas, and composite workflows return a concise stage
+projection while leaving all durable artifacts unchanged. Start
+`uv run jacobian-mcp --tool-profile full` when the research, transformation,
+and experiment tools or complete wire results are needed.
+
+This profile is local development configuration. It does not expose an HTTP
+endpoint or provide remote authentication, tenant isolation, or hosted-service
+authorization.
+
+The public known-answer agent pilot launches a real Codex CLI against this
+profile and validates the resulting durable verification records rather than
+trusting the model's summary:
+
+```sh
+uv run python benchmarks/agent_mcp.py
+```
+
+Raw transcripts, isolated Jacobian state, reports, and scores are written to
+the ignored `benchmarks/results/` directory.
+
+### Lean certificates
+
+`lean.verify` binds an exact Lean proposition and proof body into immutable
+claim, candidate, and certificate artifacts, then invokes the ordinary
+authorized `certificate.verify` boundary. Both bundled environments pin Lean
+`4.31.0` commit `68218e876d2a38b1985b8590fff244a83c321783` and run with
+`--trust=0`:
+
+- `CORE` permits no import or axiom and is suitable for self-contained
+  propositions such as elementary induction.
+- `MATHLIB` generates exactly `import Mathlib`, pins mathlib commit
+  `fabf563a7c95a166b8d7b6efca11c8b4dc9d911f`, and permits only the declared
+  standard trust base `Classical.choice`, `Quot.sound`, and `propext`. Its
+  operator-installed checker profile has a 75-second cold-start ceiling;
+  normal checkers retain the 30-second default.
+
+Prepare the pinned local runtime with:
+
+```sh
+cd lean
+lake update
+lake build
+```
+
+The checker rejects user-supplied imports, `sorry`, `admit`, `native_decide`,
+unsafe declarations, and metaprogram execution. It verifies the requested
+toolchain and mathlib commits and parses Lean's actual `#print axioms` result;
+the result must be a subset of the selected environment's allowlist.
+
+This is a trusted local Lean integration, not a broker sandbox. The mathlib
+profile executes the repository's pinned Lake environment with host-local
+runtime access. Arbitrary package ingestion and arbitrary imports are not
+supported.
+
 ## Distribution
 
 Jacobian is a Python package with an installed CLI and MCP server entry point.

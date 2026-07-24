@@ -24,9 +24,23 @@ as a verifier.
 | `witness.verify` | Independently check that a witness is in-domain and has the claimed logical effect on the stated candidate or claim. |
 | `shrink.run` | Reduce a candidate or witness while repeatedly invoking an authorized preservation checker. Report the achieved minimality class. |
 | `certificate.verify` | Independently verify an exhaustive table, SAT/PB proof, LP dual, Farkas certificate, separator, interval proof, Lean proof term, or another registered certificate format. |
+| `lean.verify` | Build a claim-bound Lean certificate in the pinned `CORE` or `MATHLIB` environment and replay it with the authorized kernel checker. This is a workflow over `certificate.verify`, not a second trust boundary. |
+| `verification.run` | Compose artifact storage, claim validation, evaluation, witness search, and authorized witness replay for one bundled domain. Every stage retains its own assurance label. |
 
 `evaluate.batch` is the central experimental interface.
 `witness.verify` and `certificate.verify` are the public trust boundary.
+
+The local MCP adapter provides `full` and `verification` projections from this
+same registry. The compact verification projection omits unrelated research
+tools and redundant output schemas. Its bootstrap resources project minimal
+claim contracts and its composite workflow result projects only stage status,
+assurance, evidence, and durable record URIs. Canonical registry schemas,
+artifacts, tool semantics, and checker authority are unchanged.
+
+`lean.verify` never accepts an import string or package path from a model.
+`CORE` has no import and authorizes no axioms. `MATHLIB` has one
+operator-pinned `Mathlib` import and an explicit standard trust-base allowlist;
+the checker rejects any additional axiom reported by Lean.
 
 `witness.find` may orchestrate verification and return `NONE_CERTIFIED`, but
 only when the response references a `VERIFIED` record from
