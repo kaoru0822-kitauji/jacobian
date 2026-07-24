@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import platform
 import time
+from collections.abc import Sequence
 
 from pydantic import ValidationError
 
@@ -320,6 +321,25 @@ class EvaluationService:
             profile=profile,
             seed=seed,
         )
+
+
+def require_complete_evaluation_batch(
+    evaluation: EvaluationBatchResult,
+    candidate_uris: Sequence[str],
+) -> None:
+    """Reject a batch that does not cover the requested candidates in order."""
+
+    if (
+        evaluation.input.status is not InputStatus.ACCEPTED
+        or len(evaluation.items) != len(candidate_uris)
+        or tuple(item.candidate_uri for item in evaluation.items)
+        != tuple(candidate_uris)
+    ):
+        detail = (
+            "; ".join(evaluation.input.errors)
+            or "evaluation did not cover the selected candidates"
+        )
+        raise ValueError(detail)
 
 
 def _evaluation_environment_digest(evaluator_digest: str) -> str:

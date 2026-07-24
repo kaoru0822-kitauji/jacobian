@@ -13,6 +13,7 @@ from jacobian.contracts.discovery import ExperimentState
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.plugins import PluginManifest
 from jacobian.contracts.search import (
+    SearchArchivePage,
     SearchBudget,
     SearchCheckpoint,
     SearchExperimentSnapshot,
@@ -21,6 +22,7 @@ from jacobian.contracts.search import (
 )
 from jacobian.kernel import JacobianKernel
 from jacobian.search import SearchError
+from jacobian.store import StoreError, StoreLimits
 
 pytestmark = pytest.mark.conformance
 
@@ -171,6 +173,62 @@ def test_search_run_checkpoints_strategy_neutral_lineage(tmp_path: Path) -> None
     )
     assert proposer_event.payload["request_digest"].startswith("sha256:")
     assert proposer_event.payload["output_digest"].startswith("sha256:")
+
+
+@pytest.mark.integration
+def test_resume_rejects_archive_page_rebound_to_another_plugin(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-rebound-page-001",
+            batch_size=4,
+        )
+    )
+    completed = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
+    original_page = kernel.store.get(completed.archive_page_uris[0])
+    rebound_page = SearchArchivePage.model_validate(original_page.payload).model_copy(
+        update={"plugin_id": claim_uri}
+    )
+    stored_rebound_page = kernel.search._put_internal_artifact(
+        schema_uri=kernel.search.archive_page_schema_uri,
+        payload=rebound_page.model_dump(mode="json"),
+        parents=original_page.manifest.parents,
+        summary="search archive page",
+    )
+    paused = completed.model_copy(
+        update={
+            "state": ExperimentState.PAUSED,
+            "stop_reason": None,
+            "strategy_reported_complete": False,
+            "archive_uri": None,
+            "archive_page_uris": (stored_rebound_page.artifact_uri,),
+        }
+    )
+    with sqlite3.connect(kernel.store.db_path) as connection:
+        connection.execute(
+            """
+            UPDATE search_experiments
+            SET state = ?, snapshot_json = ?
+            WHERE experiment_uri = ?
+            """,
+            (
+                paused.state.value,
+                canonicalize_json(paused.model_dump(mode="json")),
+                paused.experiment_uri,
+            ),
+        )
+
+    resumed = kernel.search.resume(handle.experiment_uri)
+    assert resumed.accepted is True
+    recovered = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
+
+    assert recovered.state is ExperimentState.ERROR
+    assert "archive page identity does not match the search" in recovered.detail
 
 
 @pytest.mark.integration
@@ -710,6 +768,35 @@ def test_search_plugin_failures_remain_operational(
 
 
 @pytest.mark.integration
+def test_terminal_archive_failure_marks_search_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+
+    def fail_archive(*_args: object, **_kwargs: object) -> object:
+        raise StoreError("fixture archive failure")
+
+    monkeypatch.setattr(kernel.search, "_store_archive", fail_archive)
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-terminal-archive-failure-001",
+            batch_size=4,
+        )
+    )
+
+    snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=15)
+
+    assert snapshot.state is ExperimentState.ERROR
+    assert snapshot.stop_reason is SearchStopReason.ERROR
+    assert snapshot.archive_uri is None
+    assert "terminal archive persistence failed" in snapshot.detail
+
+
+@pytest.mark.integration
 def test_plugin_cannot_widen_operator_batch_policy(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     kernel.search.max_batch_size = 1
@@ -734,6 +821,53 @@ def test_plugin_cannot_widen_operator_batch_policy(tmp_path: Path) -> None:
     assert snapshot.state is ExperimentState.ERROR
     assert "more candidates than authorized" in snapshot.detail
     assert snapshot.accounting.proposed_candidates == 0
+
+
+@pytest.mark.integration
+def test_search_batch_respects_evaluator_limit(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    kernel.evaluation.max_batch_size = 2
+    kernel.search.max_batch_size = 3
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-evaluator-batch-policy-001",
+            batch_size=3,
+        )
+    )
+
+    snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
+
+    assert snapshot.state is ExperimentState.COMPLETED
+    assert snapshot.effective_budget.batch_size == 2
+    assert snapshot.accounting.unique_candidates == 4
+    assert snapshot.accounting.iterations == 2
+
+
+@pytest.mark.integration
+def test_search_batch_respects_archive_parent_limit(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+    kernel.store.limits = StoreLimits(max_parents=6)
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-archive-parent-policy-001",
+            batch_size=4,
+        )
+    )
+
+    snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
+
+    assert snapshot.state is ExperimentState.COMPLETED
+    assert snapshot.effective_budget.batch_size == 3
+    assert snapshot.accounting.unique_candidates == 4
+    assert snapshot.accounting.iterations == 2
+    for page_uri in snapshot.archive_page_uris:
+        assert len(kernel.store.get(page_uri).manifest.parents) <= 6
 
 
 @pytest.mark.integration
@@ -788,6 +922,7 @@ def test_verified_counterexample_feedback_reaches_refiner(
         candidate_schema_uris=(manifest.candidate_schema_uri,),
         reason="search orchestration conformance fixture",
     )
+    kernel.store.limits = StoreLimits(max_parents=9)
     handle = kernel.search.start(
         _request(
             claim_uri,
@@ -802,6 +937,8 @@ def test_verified_counterexample_feedback_reaches_refiner(
     snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
 
     assert snapshot.state is ExperimentState.COMPLETED
+    assert snapshot.effective_budget.batch_size == 2
+    assert snapshot.accounting.iterations == 2
     assert snapshot.accounting.attacked_candidates == 4
     assert snapshot.accounting.verified_counterexamples == 4
     assert snapshot.checkpoint_uri is not None

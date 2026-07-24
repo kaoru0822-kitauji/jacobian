@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import threading
 import time
@@ -35,7 +36,10 @@ from jacobian.contracts.results import (
     InputValidation,
     Verification,
 )
-from jacobian.evaluation import EvaluationService
+from jacobian.evaluation import (
+    EvaluationService,
+    require_complete_evaluation_batch,
+)
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
@@ -138,30 +142,61 @@ class ExperimentService:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.store.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     def _initialize_database(self) -> None:
         with self._connect() as connection:
-            connection.execute(
+            connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS experiments (
                     experiment_uri TEXT PRIMARY KEY,
                     state TEXT NOT NULL,
                     snapshot_json BLOB NOT NULL
-                )
+                );
+                CREATE TABLE IF NOT EXISTS experiment_recovery_failures (
+                    experiment_uri TEXT PRIMARY KEY,
+                    detected_at TEXT NOT NULL,
+                    snapshot_digest TEXT NOT NULL,
+                    detail TEXT NOT NULL,
+                    FOREIGN KEY (experiment_uri)
+                        REFERENCES experiments(experiment_uri)
+                        ON DELETE RESTRICT
+                );
                 """
             )
+            connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """
-                SELECT experiment_uri, snapshot_json
+                SELECT experiment_uri, state, snapshot_json
                 FROM experiments
                 WHERE state IN ('PENDING', 'RUNNING', 'CANCEL_REQUESTED')
+                OR state NOT IN (
+                    'PENDING', 'RUNNING', 'COMPLETED',
+                    'CANCEL_REQUESTED', 'CANCELLED', 'TIMEOUT', 'ERROR'
+                )
                 """
             ).fetchall()
             for row in rows:
-                snapshot = ExperimentSnapshot.model_validate(
-                    loads_strict_json(row["snapshot_json"])
-                )
+                try:
+                    snapshot = ExperimentSnapshot.model_validate(
+                        loads_strict_json(row["snapshot_json"])
+                    )
+                except (TypeError, ValidationError, ValueError) as exc:
+                    self._quarantine_recovery_snapshot(connection, row, exc)
+                    continue
+                if snapshot.experiment_uri != str(
+                    row["experiment_uri"]
+                ) or snapshot.state.value != str(row["state"]):
+                    self._quarantine_recovery_snapshot(
+                        connection,
+                        row,
+                        ValueError(
+                            "stored enumeration snapshot identity or state differs "
+                            "from its database index"
+                        ),
+                    )
+                    continue
                 interrupted = _updated(
                     snapshot,
                     state=ExperimentState.ERROR,
@@ -181,6 +216,46 @@ class ExperimentService:
                         row["experiment_uri"],
                     ),
                 )
+
+    @staticmethod
+    def _quarantine_recovery_snapshot(
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        error: Exception,
+    ) -> None:
+        """Isolate one invalid recovery row without blocking valid experiments."""
+
+        experiment_uri = str(row["experiment_uri"])
+        raw = row["snapshot_json"]
+        if isinstance(raw, bytes):
+            raw_bytes = raw
+        elif isinstance(raw, str):
+            raw_bytes = raw.encode("utf-8")
+        else:
+            raw_bytes = repr(raw).encode("utf-8")
+        snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
+        detail = f"stored enumeration snapshot is invalid: {type(error).__name__}"
+        connection.execute(
+            """
+            UPDATE experiments
+            SET state = 'ERROR'
+            WHERE experiment_uri = ?
+            """,
+            (experiment_uri,),
+        )
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO experiment_recovery_failures (
+                experiment_uri, detected_at, snapshot_digest, detail
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (
+                experiment_uri,
+                _now().isoformat(),
+                snapshot_digest,
+                detail,
+            ),
+        )
 
     def start_enumeration(
         self,
@@ -342,7 +417,6 @@ class ExperimentService:
         cursor: dict[str, Any] | None = None
         scope_bytes: bytes | None = None
         scope_uri: str | None = None
-        enumerator_reported_complete = False
 
         try:
             enumerator = self.plugins.resolve(
@@ -453,6 +527,8 @@ class ExperimentService:
                 page_size = min(
                     request.budget.page_size,
                     remaining_candidates,
+                    self.evaluation.max_batch_size,
+                    self.store.limits.max_parents - 2,
                 )
                 execution = self.executor.run(
                     entrypoint=enumerator.descriptor.entrypoint,
@@ -589,6 +665,7 @@ class ExperimentService:
                             ),
                         ),
                     )
+                    require_complete_evaluation_batch(evaluation, selected_uris)
                     evaluated_candidates += len(selected_uris)
                     evaluation_artifact = self._put_internal_artifact(
                         schema_uri=self.evaluation_schema_uri,
@@ -608,6 +685,11 @@ class ExperimentService:
                     stored_page = self._put_internal_artifact(
                         schema_uri=self.archive_page_schema_uri,
                         payload=archive_page.model_dump(mode="json"),
+                        parents=(
+                            evaluation_artifact.artifact_uri,
+                            *selected_uris,
+                            *page_uris[-1:],
+                        ),
                         summary="enumeration archive page",
                     )
                     page_uris.append(stored_page.artifact_uri)
@@ -643,8 +725,21 @@ class ExperimentService:
                         detail="experiment cancelled",
                     )
                     return
+                if time.monotonic() - started >= request.budget.wall_seconds:
+                    self._finish(
+                        experiment_uri,
+                        state=ExperimentState.TIMEOUT,
+                        stop_reason=EnumerationStopReason.WALL_TIME_LIMIT,
+                        started=started,
+                        request=request,
+                        scope_uri=scope_uri,
+                        page_uris=page_uris,
+                        complete=False,
+                        accounting=accounting,
+                        detail="experiment wall-clock budget exhausted",
+                    )
+                    return
                 if page.complete:
-                    enumerator_reported_complete = True
                     self._finish(
                         experiment_uri,
                         state=ExperimentState.COMPLETED,
@@ -672,15 +767,11 @@ class ExperimentService:
             ValidationError,
             ValueError,
         ) as exc:
-            self._finish(
+            self._finish_if_possible(
                 experiment_uri,
-                state=ExperimentState.ERROR,
-                stop_reason=EnumerationStopReason.ERROR,
                 started=started,
-                request=request,
                 scope_uri=scope_uri,
                 page_uris=page_uris,
-                complete=enumerator_reported_complete,
                 accounting=EnumerationAccounting(
                     raw_candidates=raw_candidates,
                     unique_candidates=unique_candidates,
@@ -716,6 +807,10 @@ class ExperimentService:
         archive = self._put_internal_artifact(
             schema_uri=self.archive_manifest_schema_uri,
             payload=manifest.model_dump(mode="json"),
+            parents=(
+                *((scope_uri,) if scope_uri is not None else ()),
+                *page_uris[-1:],
+            ),
             summary="enumeration archive manifest",
         )
         current = self.inspect(experiment_uri)
@@ -740,6 +835,109 @@ class ExperimentService:
             detail=(f"{detail}; runtime_ms={int((time.monotonic() - started) * 1000)}"),
         )
         self._commit_terminal(terminal)
+
+    def _finish_if_possible(
+        self,
+        experiment_uri: str,
+        *,
+        started: float,
+        scope_uri: str | None,
+        page_uris: list[str],
+        accounting: EnumerationAccounting,
+        detail: str,
+    ) -> None:
+        try:
+            current = self.inspect(experiment_uri)
+            if current.state in _TERMINAL_STATES:
+                return
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.ERROR,
+                stop_reason=EnumerationStopReason.ERROR,
+                started=started,
+                request=current.request,
+                scope_uri=scope_uri,
+                page_uris=page_uris,
+                complete=False,
+                accounting=accounting,
+                detail=detail,
+            )
+        except (
+            ExperimentError,
+            StoreError,
+            SchemaRegistryError,
+            ValidationError,
+        ) as exc:
+            self._record_terminal_persistence_failure(
+                experiment_uri,
+                started=started,
+                scope_uri=scope_uri,
+                page_uris=page_uris,
+                accounting=accounting,
+                detail=detail,
+                error=exc,
+            )
+
+    def _record_terminal_persistence_failure(
+        self,
+        experiment_uri: str,
+        *,
+        started: float,
+        scope_uri: str | None,
+        page_uris: list[str],
+        accounting: EnumerationAccounting,
+        detail: str,
+        error: Exception,
+    ) -> None:
+        """Fail closed when the terminal archive cannot be committed."""
+
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT snapshot_json
+                FROM experiments
+                WHERE experiment_uri = ?
+                """,
+                (experiment_uri,),
+            ).fetchone()
+            if row is None:
+                raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
+            current = ExperimentSnapshot.model_validate(
+                loads_strict_json(row["snapshot_json"])
+            )
+            if current.state in _TERMINAL_STATES:
+                return
+            terminal = _updated(
+                current,
+                state=ExperimentState.ERROR,
+                updated_at=_now(),
+                stop_reason=EnumerationStopReason.ERROR,
+                enumerator_reported_complete=False,
+                coverage=Coverage.BOUNDED,
+                verification=Verification.UNVERIFIED,
+                scope_uri=scope_uri,
+                archive_uri=None,
+                archive_page_uris=tuple(page_uris),
+                accounting=accounting,
+                detail=(
+                    f"{detail}; terminal archive persistence failed: "
+                    f"{type(error).__name__}; "
+                    f"runtime_ms={int((time.monotonic() - started) * 1000)}"
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE experiments
+                SET state = ?, snapshot_json = ?
+                WHERE experiment_uri = ?
+                """,
+                (
+                    terminal.state.value,
+                    canonicalize_json(terminal.model_dump(mode="json")),
+                    experiment_uri,
+                ),
+            )
 
     def _cancel_requested(self, experiment_uri: str) -> bool:
         return self.inspect(experiment_uri).state == ExperimentState.CANCEL_REQUESTED

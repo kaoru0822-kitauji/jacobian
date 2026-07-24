@@ -130,30 +130,24 @@ class CheckerRegistry:
     ) -> CheckerRegistration:
         """Authorize one measured checker for explicit evidence compatibility."""
 
+        selected_kind = EvidenceKind(evidence_kind)
+        scope_error = _compatibility_scope_error(
+            evidence_kind=selected_kind,
+            claim_schema_uris=claim_schema_uris,
+            semantics_uris=semantics_uris,
+            candidate_schema_uris=candidate_schema_uris,
+            target_schema_uris=target_schema_uris,
+            target_semantics_uris=target_semantics_uris,
+        )
+        if scope_error is not None:
+            raise CheckerRegistryError(scope_error)
         executable_digest = compute_entrypoint_digest(entrypoint)
-        identity_payload = {
-            "checker_schema_version": "1",
-            "name": name,
-            "entrypoint": entrypoint,
-            "executable_digest": executable_digest,
-            "evidence_kind": EvidenceKind(evidence_kind).value,
-            "format_id": format_id,
-            "format_version": format_version,
-            "claim_schema_uris": sorted(claim_schema_uris),
-            "semantics_uris": sorted(semantics_uris),
-            "candidate_schema_uris": sorted(candidate_schema_uris),
-            "target_schema_uris": sorted(target_schema_uris),
-            "target_semantics_uris": sorted(target_semantics_uris),
-        }
-        identifier = hashlib.sha256(
-            b"jacobian.checker.v1\x00" + canonicalize_json(identity_payload)
-        ).hexdigest()
-        registration = CheckerRegistration(
-            checker_id=f"checker://sha256/{identifier}",
+        unbound_registration = CheckerRegistration(
+            checker_id="checker://sha256/" + "0" * 64,
             name=name,
             entrypoint=entrypoint,
             executable_digest=executable_digest,
-            evidence_kind=EvidenceKind(evidence_kind),
+            evidence_kind=selected_kind,
             format_id=format_id,
             format_version=format_version,
             claim_schema_uris=tuple(sorted(claim_schema_uris)),
@@ -163,11 +157,18 @@ class CheckerRegistry:
             target_semantics_uris=tuple(sorted(target_semantics_uris)),
             authorized=True,
         )
+        registration = unbound_registration.model_copy(
+            update={"checker_id": _checker_identifier(unbound_registration)}
+        )
         encoded = canonicalize_json(registration.model_dump(mode="json"))
 
         with self._connect() as connection:
             existing = connection.execute(
-                "SELECT registration_json, authorized FROM checkers WHERE checker_id = ?",
+                """
+                SELECT registration_json, authorized, executable_digest
+                FROM checkers
+                WHERE checker_id = ?
+                """,
                 (registration.checker_id,),
             ).fetchone()
             if existing is None:
@@ -193,7 +194,10 @@ class CheckerRegistry:
                     """,
                     (registration.checker_id, reason),
                 )
-            elif bytes(existing["registration_json"]) != encoded:
+            elif (
+                bytes(existing["registration_json"]) != encoded
+                or existing["executable_digest"] != executable_digest
+            ):
                 raise CheckerRegistryError(
                     "checker identifier collides with another registration"
                 )
@@ -209,7 +213,7 @@ class CheckerRegistry:
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT registration_json, authorized
+                SELECT registration_json, authorized, executable_digest
                 FROM checkers
                 WHERE checker_id = ?
                 """,
@@ -217,9 +221,19 @@ class CheckerRegistry:
             ).fetchone()
         if row is None:
             raise CheckerNotFoundError(f"checker is not registered: {checker_id}")
-        data = loads_strict_json(bytes(row["registration_json"]))
-        data["authorized"] = bool(row["authorized"])
-        return CheckerRegistration.model_validate(data)
+        try:
+            data = loads_strict_json(bytes(row["registration_json"]))
+            data["authorized"] = bool(row["authorized"])
+            registration = CheckerRegistration.model_validate(data)
+        except (TypeError, ValueError) as exc:
+            raise CheckerRegistryError("stored checker metadata is invalid") from exc
+        if (
+            registration.checker_id != checker_id
+            or _checker_identifier(registration) != checker_id
+            or registration.executable_digest != row["executable_digest"]
+        ):
+            raise CheckerRegistryError("stored checker metadata is inconsistent")
+        return registration
 
     def require_active(self, checker_id: str) -> CheckerRegistration:
         """Return a checker only while it may create new verified records."""
@@ -251,6 +265,16 @@ class CheckerRegistry:
 
         registration = self.require_active(checker_id)
         expected_kind = EvidenceKind(evidence_kind)
+        scope_error = _compatibility_scope_error(
+            evidence_kind=registration.evidence_kind,
+            claim_schema_uris=registration.claim_schema_uris,
+            semantics_uris=registration.semantics_uris,
+            candidate_schema_uris=registration.candidate_schema_uris,
+            target_schema_uris=registration.target_schema_uris,
+            target_semantics_uris=registration.target_semantics_uris,
+        )
+        if scope_error is not None:
+            raise CheckerCompatibilityError(scope_error)
         if registration.evidence_kind is not expected_kind:
             raise CheckerCompatibilityError("checker evidence kind is incompatible")
         if (
@@ -377,6 +401,39 @@ class CheckerRegistry:
                 (checker_id,),
             ).fetchall()
         return tuple(CheckerAuditEvent.model_validate(dict(row)) for row in rows)
+
+
+def _checker_identifier(registration: CheckerRegistration) -> str:
+    identity_payload = registration.model_dump(mode="json")
+    del identity_payload["checker_id"]
+    del identity_payload["authorized"]
+    identifier = hashlib.sha256(
+        b"jacobian.checker.v1\x00" + canonicalize_json(identity_payload)
+    ).hexdigest()
+    return f"checker://sha256/{identifier}"
+
+
+def _compatibility_scope_error(
+    *,
+    evidence_kind: EvidenceKind,
+    claim_schema_uris: tuple[str, ...],
+    semantics_uris: tuple[str, ...],
+    candidate_schema_uris: tuple[str, ...],
+    target_schema_uris: tuple[str, ...],
+    target_semantics_uris: tuple[str, ...],
+) -> str | None:
+    if not claim_schema_uris or not semantics_uris or not candidate_schema_uris:
+        return "checker authorization requires explicit compatibility allowlists"
+    if evidence_kind is EvidenceKind.TRANSFORMATION and (
+        not target_schema_uris or not target_semantics_uris
+    ):
+        return (
+            "transformation checker authorization requires explicit compatibility "
+            "allowlists for target schemas and semantics"
+        )
+    if bool(target_schema_uris) != bool(target_semantics_uris):
+        return "checker target compatibility allowlists must be supplied together"
+    return None
 
 
 def _lock_file(lock_file: BinaryIO) -> None:
