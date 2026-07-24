@@ -30,7 +30,9 @@ The current local validation commands are:
 
 ```sh
 uv run pytest
-uv run pytest -n 0 -m "not integration and not end_to_end"
+uv run pytest --lf
+uv run pytest --sw
+uv run pytest -m "not integration and not end_to_end"
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
@@ -40,7 +42,8 @@ uv build
 
 The first command is the full suite. It uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
-wait on isolated subprocesses. The second command is the fast local loop. Use
+wait on isolated subprocesses. The `--lf` and `--sw` commands are failure
+recovery shortcuts; the marker-filtered command is the fast local loop. Use
 `-n 0` for debugger-friendly, single-process execution and `--durations=25`
 when investigating regressions. A 120-second per-test backstop prevents local
 deadlocks from hanging indefinitely and is disabled automatically by
@@ -484,9 +487,10 @@ artifact and replay tests. Do not use an in-memory filesystem or `pyfakefs` to
 claim evidence about atomic rename, SQLite WAL recovery, symlink handling, or
 durability. Those behaviors require a real filesystem.
 
-Do not add `pytest-xdist` until sequential behavior is stable. Parallelizing a
-test suite too early can obscure shared-state bugs; concurrency is introduced
-through explicit state-machine and integration scenarios first. Similarly,
+Run the affected tests sequentially while developing lifecycle and concurrency
+behavior, then use the bounded xdist lane for the full suite. Parallelizing a
+test suite can obscure shared-state bugs; concurrency is introduced through
+explicit state-machine and integration scenarios first. Similarly,
 select a mutation-testing tool only after the C0 suite is stable enough that
 surviving mutants are actionable rather than noise.
 
@@ -654,15 +658,22 @@ domain-specific completeness certificate and checker.
 ### M3
 
 - deterministic single-worker lineage before concurrency;
-- resumability, idempotency, queue, and worker-crash state machines;
+- resumability, idempotency, durable lifecycle, and worker-crash state
+  machines;
 - local worker timeout, output-limit, and dependency-pinning tests;
-- distributed duplicate-work and stale-lease tests;
-- search never bypasses promotion through v0.2 verification.
+- concurrent-retry and duplicate-work tests for every supported execution
+  mode;
+- search never bypasses candidate nomination and v0.2 verification;
+- no strategy-specific score, exhaustion state, or failure becomes a
+  mathematical conclusion.
 
 ### M4
 
 - generated and repaired conjectures always remain hypotheses;
+- repair requires an authorized verification record for an exact
+  `REFUTES_CLAIM` witness;
 - falsification pipelines cannot self-promote claims;
+- hypothesis plugins cannot label parameter regions as proved;
 - parameter-region certificates bind the original claim and encoding;
 - corpus-free workflows report global novelty as unknown.
 

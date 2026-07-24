@@ -7,6 +7,8 @@ import pytest
 from jacobian.artifacts import ArtifactValidationError
 from jacobian.kernel import JacobianKernel
 
+pytestmark = [pytest.mark.contract, pytest.mark.integration]
+
 
 def _claim_payload(
     *,
@@ -31,7 +33,6 @@ def _claim_payload(
     }
 
 
-@pytest.mark.contract
 def test_path_closure_claim_requires_simple_path_semantics(
     tmp_path: Path,
 ) -> None:
@@ -51,7 +52,6 @@ def test_path_closure_claim_requires_simple_path_semantics(
         )
 
 
-@pytest.mark.contract
 def test_maxdet_claim_requires_a_bounded_matrix_scope(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]
@@ -69,7 +69,6 @@ def test_maxdet_claim_requires_a_bounded_matrix_scope(tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.contract
 def test_graph_candidate_schema_rejects_incomplete_arc(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]

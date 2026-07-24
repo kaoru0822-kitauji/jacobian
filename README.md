@@ -27,7 +27,7 @@ The central invariant is:
 | Milestone | Theme | Primary outcome |
 | --- | --- | --- |
 | Current release | Verification and bounded discovery | v0.2 alpha stores, evaluates, attacks, shrinks, independently verifies, enumerates structures, verifies representation changes, and computes exact separators |
-| M3 | Scalable search | Run evolutionary, CEGIS, and tree search as resumable experiments |
+| M3 | Scalable search | Run typed search strategies through one resumable experiment loop |
 | M4 | Conjecture workflows | Repair, generate, falsify, and parametrically generalize conjectures |
 | M5 | Research corpus integration | Retrieve prior solutions, failures, witnesses, and certificates through an optional provider |
 | Stability target | Stable research platform | Publish a v1.0 API with formal-checking and collaboration support |
@@ -78,7 +78,9 @@ multi-process leases and resumable ownership belong to M3.
 ```sh
 uv sync --dev
 uv run pytest
-uv run pytest -n 0 -m "not integration and not end_to_end"
+uv run pytest --lf
+uv run pytest --sw
+uv run pytest -m "not integration and not end_to_end"
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
@@ -90,8 +92,10 @@ uv run jacobian-mcp
 
 The full suite uses up to four `pytest-xdist` workers with work stealing. Use
 the marker-filtered command for the fast development loop, or add `-n 0` when
-debugging one test in a single process. Pre-commit keeps commit-time checks
-fast; the full type, dependency, test, and build gates remain explicit.
+debugging one test in a single process. After a failure, `--lf` reruns only
+the last failures; `--sw` stops at the first failure and resumes from it on the
+next invocation. Pre-commit keeps commit-time checks fast; the full type,
+dependency, test, and build gates remain explicit.
 
 The MCP adapter is pinned to the official Python SDK `2.0.0b2`. It remains
 isolated from the mathematical kernel because that SDK release is a beta.
