@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -34,6 +35,25 @@ def _reject_external_references(value: Any) -> None:
             _reject_external_references(nested)
 
 
+@lru_cache(maxsize=128)
+def _validated_schema(canonical_schema: bytes) -> Draft202012Validator:
+    """Validate and compile one exact schema definition per process.
+
+    Kernel construction registers the same contract schemas repeatedly across
+    isolated stores, especially in tests. The canonical bytes are the cache
+    key, so a changed schema cannot reuse an older validation result or
+    validator. The returned validator is read-only during validation.
+    """
+
+    normalized = loads_strict_json(canonical_schema)
+    _reject_external_references(normalized)
+    try:
+        Draft202012Validator.check_schema(normalized)
+    except SchemaError as exc:
+        raise SchemaRegistryError("invalid Draft 2020-12 JSON Schema") from exc
+    return Draft202012Validator(normalized, format_checker=FormatChecker())
+
+
 class SchemaRegistry:
     """Store and apply closed local JSON Schemas used by artifact contracts."""
 
@@ -43,12 +63,9 @@ class SchemaRegistry:
     def register(self, *, name: str, version: str, schema: dict[str, Any]) -> str:
         """Register a schema after rejecting unsupported external references."""
 
-        normalized = loads_strict_json(canonicalize_json(schema))
-        _reject_external_references(normalized)
-        try:
-            Draft202012Validator.check_schema(normalized)
-        except SchemaError as exc:
-            raise SchemaRegistryError("invalid Draft 2020-12 JSON Schema") from exc
+        canonical_schema = canonicalize_json(schema)
+        normalized = loads_strict_json(canonical_schema)
+        _validated_schema(canonical_schema)
         return self.store.register_descriptor(
             kind="schema",
             name=name,
@@ -77,7 +94,7 @@ class SchemaRegistry:
 
         normalized = loads_strict_json(canonicalize_json(payload))
         schema = self.resolve(schema_uri)
-        validator = Draft202012Validator(schema, format_checker=FormatChecker())
+        validator = _validated_schema(canonicalize_json(schema))
         errors = sorted(
             validator.iter_errors(normalized),
             key=lambda error: tuple(str(part) for part in error.absolute_path),
