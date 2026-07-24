@@ -82,3 +82,20 @@ def test_graph_candidate_schema_rejects_incomplete_arc(tmp_path: Path) -> None:
                 "arcs": [["s"]],
             },
         )
+
+
+def test_erdos_straus_claim_requires_a_bounded_range(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    reference = kernel.references["erdos_straus"]
+
+    with pytest.raises(ArtifactValidationError, match="upper_bound"):
+        kernel.artifacts.put(
+            schema_uri=reference.claim_schema_uri,
+            semantics_uri=reference.semantics_uri,
+            payload=_claim_payload(
+                domain_id="jacobian.erdos-straus",
+                semantics_uri=reference.semantics_uri,
+                predicate="erdos_straus_range",
+                parameters={"lower_bound": 2},
+            ),
+        )

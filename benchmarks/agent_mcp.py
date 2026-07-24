@@ -40,8 +40,8 @@ witness search as
 UNVERIFIED. A decisive result is VERIFIED only after the compatible independent
 checker accepts the exact bound evidence. Do not reread returned evidence or
 verification-record resources merely to prepare the final report; the benchmark
-scorer validates them directly. For graph_paths and matrices cases, use
-verification.run instead of manually calling its five component tools.
+scorer validates them directly. For bundled witness cases, use verification.run
+instead of manually calling its five component tools.
 
 Complete public known-answer case {case_id}. Set report case_id exactly to
 {case_id}.
@@ -51,6 +51,9 @@ Complete public known-answer case {case_id}. Set report case_id exactly to
 Return the required JSON report. Report the exact durable URIs returned by the
 tools. Do not infer verification from operational completion, exhaustive
 evaluation, or failure to find a witness. State any remaining limitations.
+Record concise feedback grounded in this run: useful tooling, tooling gaps,
+missing domain knowledge, and concrete improvements. Empty feedback lists are
+valid when the run exposed no issue.
 """
 
 
@@ -213,6 +216,12 @@ def _check_candidate(
         if not isinstance(proof, str) or not proof.strip():
             raise BenchmarkError("Lean candidate proof is empty")
         return
+    if kind == "integer_range":
+        if actual.get("lower_bound") != expected.get("lower_bound") or actual.get(
+            "upper_bound"
+        ) != expected.get("upper_bound"):
+            raise BenchmarkError("candidate integer range differs from the case")
+        return
     raise BenchmarkError(f"unsupported candidate expectation kind: {kind!r}")
 
 
@@ -234,6 +243,10 @@ def _check_claim(
         raise BenchmarkError("claim domain differs from the case")
     if predicate.get("name") != expected.get("predicate"):
         raise BenchmarkError("claim predicate differs from the case")
+    if "parameters" in expected and predicate.get("parameters") != expected.get(
+        "parameters"
+    ):
+        raise BenchmarkError("claim predicate parameters differ from the case")
 
 
 def _check_evidence(
@@ -251,6 +264,50 @@ def _check_evidence(
             and evidence.get("payload") not in accepted_payloads
         ):
             raise BenchmarkError("witness payload does not match the public oracle")
+        if expected.get("witness_format") == "erdos_straus.decomposition_table":
+            payload = _as_object(evidence.get("payload"), "witness payload")
+            table = payload.get("decompositions")
+            if not isinstance(table, list):
+                raise BenchmarkError("Erdős-Straus witness table is missing")
+            expected_candidate = _as_object(
+                expected.get("candidate"),
+                "expected candidate",
+            )
+            expected_ns = set(
+                range(
+                    int(expected_candidate["lower_bound"]),
+                    int(expected_candidate["upper_bound"]) + 1,
+                )
+            )
+            actual_ns: set[int] = set()
+            for row_value in table:
+                row = _as_object(row_value, "Erdős-Straus witness row")
+                try:
+                    n, x, y, z = (
+                        int(row["n"]),
+                        int(row["x"]),
+                        int(row["y"]),
+                        int(row["z"]),
+                    )
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise BenchmarkError(
+                        "Erdős-Straus witness row is malformed"
+                    ) from exc
+                if min(x, y, z) <= 0:
+                    raise BenchmarkError(
+                        "Erdős-Straus witness has a nonpositive denominator"
+                    )
+                if 4 * x * y * z != n * (x * y + x * z + y * z):
+                    raise BenchmarkError(
+                        "Erdős-Straus witness fails the exact identity"
+                    )
+                if n in actual_ns:
+                    raise BenchmarkError("Erdős-Straus witness contains duplicate n")
+                actual_ns.add(n)
+            if actual_ns != expected_ns:
+                raise BenchmarkError(
+                    "Erdős-Straus witness does not cover the exact range"
+                )
         return evidence_kind
     if evidence_kind == "CERTIFICATE":
         if evidence.get("certificate_type") != expected.get("certificate_type"):
@@ -290,6 +347,21 @@ def score_run(
     if report.get("final_verification") != "VERIFIED":
         raise BenchmarkError("final result was not reported as VERIFIED")
     checks.append("agent assurance labels")
+
+    feedback = _as_object(report.get("feedback"), "agent feedback")
+    feedback_fields = {
+        "tooling_strengths",
+        "tooling_gaps",
+        "domain_knowledge_gaps",
+        "suggested_improvements",
+    }
+    if set(feedback) != feedback_fields or not all(
+        isinstance(feedback[field], list)
+        and all(isinstance(item, str) for item in feedback[field])
+        for field in feedback_fields
+    ):
+        raise BenchmarkError("agent feedback has an invalid structure")
+    checks.append("structured agent feedback")
 
     required_tools = case.get("required_tools")
     if not isinstance(required_tools, list) or not all(
@@ -380,6 +452,7 @@ def _run_case(
     transcript = case_root / "transcript.jsonl"
     stderr_path = case_root / "codex.stderr.log"
     report_path = case_root / "agent-report.json"
+    feedback_path = case_root / "feedback.json"
     case_root.mkdir(parents=True)
     state_dir.mkdir()
     prompt = SYSTEM_TASK.format(
@@ -403,6 +476,16 @@ def _run_case(
         "-c",
         "mcp_servers.jacobian_local.env.JACOBIAN_STATE_DIR="
         + json.dumps(str(state_dir)),
+        "-c",
+        "mcp_servers.jacobian_local.args="
+        + json.dumps(
+            [
+                "run",
+                "jacobian-mcp",
+                "--tool-profile",
+                "verification",
+            ]
+        ),
         "-c",
         "model_reasoning_effort=" + json.dumps(reasoning_effort),
     ]
@@ -448,6 +531,11 @@ def _run_case(
     else:
         try:
             report = _load_json_object(report_path)
+            feedback = _as_object(report.get("feedback"), "agent feedback")
+            feedback_path.write_text(
+                json.dumps(feedback, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
             score = score_run(
                 case,
                 report,
@@ -476,6 +564,7 @@ def _run_case(
             "transcript": str(transcript.relative_to(run_root)),
             "stderr": str(stderr_path.relative_to(run_root)),
             "agent_report": str(report_path.relative_to(run_root)),
+            "feedback": str(feedback_path.relative_to(run_root)),
         },
     }
     (case_root / "result.json").write_text(

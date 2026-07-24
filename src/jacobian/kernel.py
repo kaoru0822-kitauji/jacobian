@@ -5,12 +5,23 @@ from __future__ import annotations
 from pathlib import Path
 
 from jacobian.artifacts import ArtifactService
+from jacobian.builtin_capabilities import (
+    KnowledgeSearchAdapter,
+    LeanCheckAdapter,
+    ReferenceSolveAdapter,
+)
+from jacobian.capabilities import (
+    CapabilityAdapter,
+    CapabilityService,
+    load_capability_adapter,
+)
 from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.evaluation import EvaluationService
 from jacobian.experiments import ExperimentService
 from jacobian.lean import LeanService
+from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.polytope import PolytopeService
@@ -40,10 +51,12 @@ class JacobianKernel:
         root: str | Path,
         *,
         install_references: bool = False,
+        capability_adapter_entrypoints: tuple[str, ...] = (),
     ) -> None:
         self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
+        self.memory = ResearchMemory(self.store, self.schemas)
         self.plugins = PluginRegistry(self.store)
         self.checkers = CheckerRegistry(self.store.db_path)
         self.claims = ClaimValidationService(
@@ -84,7 +97,7 @@ class JacobianKernel:
         self.verification = VerificationService(
             self.store,
             self.checkers,
-            checker_timeout_seconds=75,
+            checker_timeout_seconds=105,
         )
         self.witnesses = WitnessSearchService(
             self.store,
@@ -134,6 +147,8 @@ class JacobianKernel:
         self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
         self.lean: LeanService | None = None
         self.verification_workflows: VerificationWorkflowService | None = None
+        self.capabilities = CapabilityService(self.store, self.memory)
+        self.capabilities.register(KnowledgeSearchAdapter(self.memory))
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(
@@ -157,3 +172,14 @@ class JacobianKernel:
                 self.verification,
                 self.references,
             )
+            self.capabilities.register(
+                ReferenceSolveAdapter(self.verification_workflows)
+            )
+            self.capabilities.register(LeanCheckAdapter(self.lean))
+        for entrypoint in capability_adapter_entrypoints:
+            self.capabilities.register(load_capability_adapter(entrypoint, self))
+
+    def register_capability(self, adapter: CapabilityAdapter) -> None:
+        """Install an operator-owned adapter without changing the kernel or MCP."""
+
+        self.capabilities.register(adapter)

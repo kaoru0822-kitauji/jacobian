@@ -171,6 +171,55 @@ def test_matrix_kernel_witness_and_independent_replay(tmp_path: Path) -> None:
 
 
 @pytest.mark.end_to_end
+def test_erdos_straus_range_witness_and_independent_replay(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    reference = kernel.references["erdos_straus"]
+    claim = kernel.artifacts.put(
+        schema_uri=reference.claim_schema_uri,
+        semantics_uri=reference.semantics_uri,
+        payload={
+            "claim_schema_version": "1",
+            "domain_id": "jacobian.erdos-straus",
+            "domain_version": "1",
+            "semantics_uri": reference.semantics_uri,
+            "quantifiers": [],
+            "predicate": {
+                "name": "erdos_straus_range",
+                "parameters": {"lower_bound": 2, "upper_bound": 1000},
+            },
+            "bounds": {},
+            "required_capabilities": ["Evaluator", "WitnessOracle"],
+            "correspondence_status": "HUMAN_REVIEWED",
+        },
+    )
+    candidate = kernel.artifacts.put(
+        schema_uri=reference.candidate_schema_uri,
+        semantics_uri=reference.semantics_uri,
+        payload={"lower_bound": 2, "upper_bound": 1000},
+    )
+
+    found = kernel.witnesses.find(
+        claim_uri=claim.artifact_uri,
+        candidate_uri=candidate.artifact_uri,
+        plugin_id=reference.plugin_id,
+        witness_role="SUPPORTS_CLAIM",
+        wall_seconds=30,
+    )
+    assert found.witness_uri is not None
+    verified = kernel.verification.verify_witness(
+        claim_uri=claim.artifact_uri,
+        candidate_uri=candidate.artifact_uri,
+        witness_uri=found.witness_uri,
+        checker_id=reference.witness_checker_ids["erdos_straus.decomposition_table"],
+    )
+
+    assert verified.conclusion.value == "TRUE"
+    assert verified.assurance.arithmetic.value == "EXACT_INTEGER"
+    assert verified.assurance.coverage.value == "EXHAUSTIVE"
+    assert verified.assurance.verification.value == "VERIFIED"
+
+
+@pytest.mark.end_to_end
 def test_matrix_maxdet_certificate_replays_full_scope(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]

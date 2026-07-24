@@ -16,6 +16,7 @@ still pre-stable:
 
 | Question | Document | Status |
 | --- | --- | --- |
+| What product is Jacobian building? | [Capability-first product blueprint](explanation/product-blueprint.md) | Active product direction |
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current v0.2 design plus labeled provisional M3/M4 sections |
 | What is implemented, provisional, or planned? | [Roadmap](explanation/roadmap.md) | Active milestone plan; gates are not promised release dates |
 | Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
@@ -39,6 +40,7 @@ complete a specific task.
 
 - [Inspect, pause, and resume a search](how-to/resume-search.md)
 - [Run the plugin conformance kit](how-to/run-plugin-conformance.md)
+- [Deploy the remote MCP server](how-to/deploy-remote-mcp.md)
 
 ## Reference
 
@@ -59,7 +61,7 @@ Later-release contracts are provisional:
 
 - [M3 scalable search](reference/milestones/m3-scalable-search.md)
 - [M4 conjecture workflows](reference/milestones/m4-conjecture-workflows.md)
-- [M5 research corpus integration](reference/milestones/m5-research-corpus.md)
+- [M5 federated research corpus](reference/milestones/m5-research-corpus.md)
 - [v1.0 stability target](reference/specifications/v1.0.md)
 
 ## Explanation
@@ -68,6 +70,7 @@ Explanation documents describe why Jacobian has its current boundaries and
 how its major parts fit together.
 
 - [Architecture](explanation/architecture.md)
+- [Capability-first product blueprint](explanation/product-blueprint.md)
 - [Threat model](explanation/threat-model.md)
 - [Roadmap](explanation/roadmap.md)
 - [Durable search runtime](explanation/search-runtime.md)

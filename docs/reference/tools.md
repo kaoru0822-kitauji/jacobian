@@ -10,8 +10,27 @@ Jacobian is a general research kernel. Its core tools understand artifacts,
 claims, candidates, predicates, witnesses, certificates, reductions, budgets,
 and provenance. Mathematical meaning is supplied by versioned domain plugins.
 
-The public tool surface is layered so a heuristic operation cannot masquerade
-as a verifier.
+The model-facing surface is layered so adapters are easy to add and a
+heuristic operation cannot masquerade as a verifier.
+
+## Capability-first MCP surface
+
+The default local and remote profile advertises one tool:
+
+| Tool | Capability |
+| --- | --- |
+| `capability.invoke` | Invoke an installed operation in `EXPLORE` or `VERIFY` mode. Inputs and outputs are validated against the selected descriptor. Reusable invocations create trust-labeled research episodes. |
+
+Read `capability://catalog` to discover stable IDs, provider versions, supported
+modes, compact JSON Schemas, and tags. Bundled IDs are `reference.solve`,
+`lean.check`, and `knowledge.search`. Operator-installed adapters appear in the
+same catalog without a new MCP tool.
+
+`EXPLORE` returns heuristic or computed assurance and does not require a formal
+claim or checker. `VERIFY` may promote a result only when it carries a valid
+local verification record and the checked evidence. The `full` and
+`verification` profiles retain the lower-level tools below for advanced
+clients and compatibility.
 
 ## Core v0.2 tools
 
@@ -30,8 +49,8 @@ as a verifier.
 `evaluate.batch` is the central experimental interface.
 `witness.verify` and `certificate.verify` are the public trust boundary.
 
-The local MCP adapter provides `full` and `verification` projections from this
-same registry. The compact verification projection omits unrelated research
+The local MCP adapter provides `capabilities`, `full`, and `verification`
+projections. The compact verification projection omits unrelated research
 tools and redundant output schemas. Its bootstrap resources project minimal
 claim contracts and its composite workflow result projects only stage status,
 assurance, evidence, and durable record URIs. Canonical registry schemas,
@@ -102,7 +121,8 @@ separately verified:
 | Provisional M4 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
 | Provisional M4 | `parameter.generalize` | Propose parameter regions around a verified construction and preserve proposed or sampled evidence labels. |
 | Provisional M4 | `parameter.region.promote` | Replay an authorized certificate bound to an immutable region subject before labeling it verified sufficient or necessary. |
-| M5 | `memory.search` | Ask an optional corpus provider for prior experiments, failures, witnesses, certificates, and research episodes with trust labels. |
+| Current product track | `knowledge.search` | Query locally indexed capability episodes while preserving each record's assurance. |
+| M5 | provider-backed `knowledge.search` | Extend local retrieval with cross-project records, temporal cutoffs, review, and retraction. |
 | M5 | `abstraction.extract` | Suggest an abstract mathematical explanation for supplied or retrieved artifacts. |
 | M5 | `episode.compare` | Compare failures and propose recurring obstructions or no-go lemmas. |
 | M5 | `certificate.simplify` | Minimize a certificate while replaying its authorized checker locally. |
@@ -134,6 +154,7 @@ Read-only discovery and large-object access use MCP resources:
 
 ```text
 artifact://sha256/<digest>
+capability://catalog
 reference://catalog
 experiment://<id>
 experiment://<id>/accounting

@@ -9,14 +9,32 @@
 
 ## Purpose
 
-Jacobian separates mathematical discovery from mathematical trust.
+Jacobian gives agents reusable mathematical capabilities and durable research
+memory while separating mathematical discovery from mathematical trust. The
+[capability-first product blueprint](product-blueprint.md) defines the
+model-facing product direction; this document describes the underlying kernel
+and trust zones.
 
 Models, search algorithms, and domain solvers are allowed to be heuristic,
 stochastic, incomplete, and frequently replaced. Verification is performed by
 small, operator-authorized checkers against versioned formal claims and domain
 semantics.
 
-The durable product is the replayable verification contract:
+The agent-facing product has two lanes:
+
+```text
+agent
+  │
+  ├── EXPLORE ──► retrieval, computation, search, solver, candidate, witness
+  │                    │
+  │                    └── HEURISTIC or COMPUTED + research episode
+  │
+  └── VERIFY  ──► the same capability + authorized checker/proof engine
+                       │
+                       └── VERIFIED + immutable verification record
+```
+
+The durable trust contract behind the optional verification lane is:
 
 ```text
 informal statement
@@ -109,34 +127,49 @@ provisional M3 runtime adds append-only lifecycle events, immutable strategy
 checkpoints, archive pages, and archive manifests around one mutable snapshot
 index.
 
-### Curated research record
+### Research episode
 
-A provider-curated reference to an experiment or external source, introduced
-by the optional M5 research-corpus integration. Raw runs never become trusted
-knowledge merely because they were stored, indexed, retrieved, or reviewed.
-The source artifact and verification records remain immutable.
+An immutable, locally indexed record of one capability request and result,
+including adapter version, mode, assurance, artifact lineage, summary, tags,
+and timestamp. Raw runs never become trusted knowledge merely because they
+were stored, indexed, retrieved, or reviewed. Source artifacts and
+verification records remain immutable.
 
-## Optional research-corpus integration
+## Research memory and optional corpus integration
 
-Jacobian's experiment ledger is part of the toolbench: it preserves the local
-lineage and evidence needed to resume and replay work. Corpus-scale indexing,
-ranking, and cross-project retrieval are separate, optional capabilities:
+Jacobian's research memory and experiment ledger are part of the workbench:
+they preserve local episodes, lineage, and evidence needed to retrieve, resume,
+and replay work. Corpus-scale ranking and cross-project retrieval are separate,
+optional capabilities:
 
 ```text
 agent
   │ MCP tools
   ▼
-Jacobian search, conjecture, and verification tools
+Jacobian capabilities and local research memory
   │                         ▲
   │ versioned episodes      │ trust-labeled retrieval
   ▼                         │
 optional research-corpus provider
 ```
 
-The provider may suggest records, motifs, or hypotheses. It is outside the
-verification trust boundary and cannot mutate artifacts, register checkers, or
-promote evidence. Conjecture workflows remain available when no provider is
-configured.
+The local `knowledge.search` adapter and any external provider may suggest
+records, motifs, or hypotheses. Retrieval is outside the verification trust
+boundary and cannot mutate artifacts, register checkers, or promote evidence.
+All local workflows remain available when no provider is configured.
+
+## Model-facing capability API
+
+`CapabilityService` is a registry of operator-installed adapters. Each adapter
+declares a stable operation ID, version, supported `EXPLORE` and `VERIFY`
+modes, input and output JSON Schemas, and discovery metadata. The MCP
+projection exposes the registry through `capability://catalog` and
+`capability.invoke`, so a new Alloy, Lean, SAT/SMT, CAS, or domain adapter does
+not require another MCP tool or a generic-core type.
+
+The service validates both schemas and prevents adapters from self-promoting:
+`VERIFIED` requires a valid local verification record whose checked evidence
+is returned with the capability result.
 
 ## Common result model
 

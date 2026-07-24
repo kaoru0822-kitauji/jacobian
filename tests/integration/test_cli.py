@@ -25,7 +25,7 @@ def test_project_codex_profile_starts_the_local_stdio_server() -> None:
             "run",
             "jacobian-mcp",
             "--tool-profile",
-            "verification",
+            "capabilities",
         ],
         "cwd": ".",
         "enabled": True,
@@ -47,11 +47,15 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
     assert result.exit_code == 0
     catalog = json.loads(result.stdout)
     assert set(catalog) == {
+        "erdos_straus",
         "graph_paths",
         "matrices",
         "finite_polytopes",
         "lean4",
     }
+    assert catalog["erdos_straus"]["witness_checker_ids"][
+        "erdos_straus.decomposition_table"
+    ].startswith("checker://sha256/")
     assert catalog["finite_polytopes"]["certificate_checker_id"].startswith(
         "checker://sha256/"
     )
@@ -59,7 +63,7 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
     assert catalog["lean4"]["profiles"]["MATHLIB"]["mathlib_commit"] == (
         "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
     )
-    assert catalog["lean4"]["profiles"]["MATHLIB"]["checker_timeout_seconds"] == 75
+    assert catalog["lean4"]["profiles"]["MATHLIB"]["checker_timeout_seconds"] == 105
 
 
 @pytest.mark.integration

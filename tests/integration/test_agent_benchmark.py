@@ -12,6 +12,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "agent_mcp.py"))
 
 
+def _feedback() -> dict[str, list[str]]:
+    return {
+        "tooling_strengths": ["one composed verification workflow"],
+        "tooling_gaps": [],
+        "domain_knowledge_gaps": [],
+        "suggested_improvements": [],
+    }
+
+
 def test_transcript_parser_counts_completed_mcp_calls_once(tmp_path: Path) -> None:
     parse_transcript = cast(Any, BENCHMARK["parse_transcript"])
     transcript = tmp_path / "transcript.jsonl"
@@ -122,6 +131,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
         "verification_record_uri": verified.verification_record_uri,
         "witness_summary": "omitted path",
         "limitations": ["one direct witness only"],
+        "feedback": _feedback(),
     }
 
     score = score_run(
@@ -134,6 +144,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     assert score["passed"] is True
     assert score["checks"] == [
         "agent assurance labels",
+        "structured agent feedback",
         "required MCP tool sequence",
         "known case claim and candidate",
         "known-answer evidence and verification record",
@@ -202,6 +213,7 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
         "verification_record_uri": verified.verification_record_uri,
         "witness_summary": "complete two-coloring",
         "limitations": ["exact finite graph only"],
+        "feedback": _feedback(),
     }
 
     score = score_run(
@@ -246,6 +258,65 @@ def test_known_answer_scorer_accepts_bound_lean_certificate(
         "verification_record_uri": verified.result.verification_record_uri,
         "witness_summary": "Lean kernel certificate",
         "limitations": ["pinned core Lean only"],
+        "feedback": _feedback(),
+    }
+
+    score = score_run(
+        case,
+        report,
+        state_dir=tmp_path,
+        tool_calls=case["required_tools"],
+    )
+
+    assert score["passed"] is True
+
+
+def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
+    tmp_path: Path,
+) -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    score_run = cast(Any, BENCHMARK["score_run"])
+    case = next(case for case in load_cases(["ERDOS-STRAUS-001"]) if case["case_id"])
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    assert kernel.verification_workflows is not None
+    result = kernel.verification_workflows.verify_witness(
+        reference_name="erdos_straus",
+        claim_payload={
+            "claim_schema_version": "1",
+            "domain_id": "jacobian.erdos-straus",
+            "domain_version": "1",
+            "semantics_uri": kernel.references["erdos_straus"].semantics_uri,
+            "quantifiers": [],
+            "predicate": {
+                "name": "erdos_straus_range",
+                "parameters": {"lower_bound": 2, "upper_bound": 1000},
+            },
+            "bounds": {},
+            "required_capabilities": ["Evaluator", "WitnessOracle"],
+            "correspondence_status": "HUMAN_REVIEWED",
+        },
+        candidate_payload={"lower_bound": 2, "upper_bound": 1000},
+        witness_role=WitnessRole.SUPPORTS_CLAIM,
+        evaluation_wall_seconds=30,
+        witness_wall_seconds=30,
+    )
+    assert result.witness_search is not None
+    assert result.witness_search.witness_uri is not None
+    assert result.verification is not None
+    assert result.verification.verification_record_uri is not None
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "evaluation_verification": "UNVERIFIED",
+        "witness_search_verification": "UNVERIFIED",
+        "final_verification": "VERIFIED",
+        "claim_uri": result.claim_uri,
+        "candidate_uri": result.candidate_uri,
+        "evidence_uri": result.witness_search.witness_uri,
+        "verification_record_uri": result.verification.verification_record_uri,
+        "witness_summary": "complete bounded decomposition table",
+        "limitations": ["verified only for 2 <= n <= 1000"],
+        "feedback": _feedback(),
     }
 
     score = score_run(

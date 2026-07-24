@@ -41,6 +41,42 @@
       "items": {
         "type": "string"
       }
+    },
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "tooling_strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tooling_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "domain_knowledge_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "suggested_improvements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "tooling_strengths",
+        "tooling_gaps",
+        "domain_knowledge_gaps",
+        "suggested_improvements"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -54,7 +90,8 @@
     "evidence_uri",
     "verification_record_uri",
     "witness_summary",
-    "limitations"
+    "limitations",
+    "feedback"
   ],
   "additionalProperties": false
 }

@@ -1,11 +1,11 @@
 # Jacobian
 
-Jacobian is a verifier-centric MCP toolbench for agents working on bounded,
-executable mathematics.
+Jacobian is a capability-first MCP workbench and research-memory layer for
+agents doing executable mathematics.
 
-It gives agents and researchers executable tools with which to propose
-candidates, search large spaces, receive structured counter-witnesses, repair
-claims, and replay exact certificates. The kernel is not a
+It gives agents and researchers reusable computation, search, retrieval,
+formal-proof, experiment, and verification tools so they can focus on
+mathematical strategy instead of rebuilding infrastructure. The kernel is not a
 `solve_conjecture` endpoint and does not treat model output or solver status as
 mathematical truth.
 
@@ -16,7 +16,9 @@ share the same artifact, evaluation, witness, shrinking, provenance, and
 verification substrate—not that an informal conjecture requires no
 formalization or domain implementation.
 
-The central invariant is:
+Exploration is intentionally low friction. Verification is an optional
+assurance lane for results that must become durable mathematical claims. Its
+central invariant remains:
 
 > Search and evaluation may be wrong. A result becomes verified only when an
 > operator-authorized checker accepts evidence bound to the exact claim,
@@ -42,15 +44,15 @@ CLI or `uv run jacobian-mcp` to start the MCP adapter.
 | Milestone | Theme | Primary outcome |
 | --- | --- | --- |
 | Current release | Verification and bounded discovery | v0.2 alpha stores, evaluates, attacks, shrinks, independently verifies, enumerates structures, verifies representation changes, and computes exact separators |
+| Current product track | Capabilities and research memory | One extensible model-facing API supports fast exploration, optional verification, trust-labeled local episodes, and local or remote MCP hosts |
 | M3 | Scalable search | Provisional implementation runs typed search strategies through one resumable experiment loop |
 | M4 | Conjecture workflows | Provisional implementation repairs, generates, falsifies, and parametrically generalizes conjectures |
-| M5 | Research corpus integration | Retrieve prior solutions, failures, witnesses, and certificates through an optional provider |
+| M5 | Federated research corpus | Extend the implemented local episode database with optional cross-project providers, review, retraction, and temporal retrieval |
 | Stability target | Stable research platform | Publish a v1.0 API with formal-checking and collaboration support |
 
-The roadmap is tool-first: search and conjecture workflows remain useful
-without a shared corpus service. Jacobian records its own experiments for
-replay and lineage; corpus-scale retrieval is an optional integration that
-cannot promote evidence or authorize checkers.
+The roadmap is tool-first and database-first. Local capability episodes are
+recorded and searchable without a shared service. Corpus-scale retrieval is an
+optional integration that cannot promote evidence or authorize checkers.
 
 The only public release contract is v0.2 alpha (`0.2.0a0`). It includes the
 verification kernel and bounded discovery. The repository also contains
@@ -65,6 +67,8 @@ gates are part of the working project record. Start with:
 
 - [Architecture](docs/explanation/architecture.md) for the system shape and
   verification boundary.
+- [Capability-first product blueprint](docs/explanation/product-blueprint.md)
+  for the agent-facing API, memory, remote host, and A/B evaluation direction.
 - [Roadmap](docs/explanation/roadmap.md) for active milestone scope and exit
   gates.
 - [Architecture decision log](docs/explanation/adr/index.md) for accepted
@@ -94,10 +98,19 @@ documentation placement, and pull-request expectations.
 
 ## Current status
 
-v0.2 alpha is implemented as a local Python package, CLI, and MCP adapter. It
-offers seven verification tools alongside bounded enumeration,
+v0.2 alpha is implemented as a Python package, CLI, and local or remote MCP
+adapter. The capability-first projection exposes one stable
+`capability.invoke` tool backed by a discoverable adapter registry and
+trust-labeled research memory. Bundled capabilities provide reference-domain
+exploration and verification, Lean checking, and local episode search.
+
+The advanced surface retains eight verification tools alongside bounded enumeration,
 implementation-bound canonicalization, independently verified representation
 changes, persistent experiment resources, and exact finite-polytope evidence.
+Bundled reference domains cover graph paths and bipartiteness, exact integer
+matrices, and bounded Erdős-Straus decomposition tables. A verified
+Erdős-Straus table establishes only its exact finite interval, never the open
+unbounded conjecture.
 
 The provisional M3/M4 code adds sealed plugin snapshots, a strategy-neutral
 `search.run` service, pause and resume from immutable checkpoints, append-only
@@ -126,18 +139,18 @@ bound witness or certificate.
 The repository includes a trusted-project Codex profile at
 `.codex/config.toml`. Run Codex from the repository root and inspect
 `jacobian_local` with `/mcp`; the profile starts `uv run jacobian-mcp` over
-STDIO with the compact `verification` tool profile and stores durable local
-state under the ignored `.jacobian/` directory. The profile projects eight
-verification tools from the canonical registry and omits redundant MCP output
-schemas. Domain resources expose compact claim contracts instead of repeating
-the canonical stored schemas, and composite workflows return a concise stage
-projection while leaving all durable artifacts unchanged. Start
+STDIO with the compact `capabilities` profile and stores durable local state
+under the ignored `.jacobian/` directory. The profile advertises
+`capability.invoke`; `capability://catalog` supplies the installed operations,
+schemas, and supported `EXPLORE` or `VERIFY` lanes. Start
 `uv run jacobian-mcp --tool-profile full` when the research, transformation,
 and experiment tools or complete wire results are needed.
 
-This profile is local development configuration. It does not expose an HTTP
-endpoint or provide remote authentication, tenant isolation, or hosted-service
-authorization.
+For ChatGPT and other remote clients, the server supports Streamable HTTP and
+SSE, bearer-token authentication, and subject-bound tenant state. Follow
+[Deploy the remote MCP server](docs/how-to/deploy-remote-mcp.md). Static tokens
+are an initial controlled-deployment mechanism, not a full hosted identity
+platform.
 
 The public known-answer agent pilot launches a real Codex CLI against this
 profile and validates the resulting durable verification records rather than
@@ -147,8 +160,10 @@ trusting the model's summary:
 uv run python benchmarks/agent_mcp.py
 ```
 
-Raw transcripts, isolated Jacobian state, reports, and scores are written to
-the ignored `benchmarks/results/` directory.
+Raw transcripts, isolated Jacobian state, reports, structured agent feedback,
+and scores are written to the ignored `benchmarks/results/` directory.
+Use `uv run python benchmarks/agent_ab.py` for paired no-Jacobian versus
+capability-enabled runs once the A/B cases are selected.
 
 ### Lean certificates
 
@@ -163,7 +178,7 @@ authorized `certificate.verify` boundary. Both bundled environments pin Lean
 - `MATHLIB` generates exactly `import Mathlib`, pins mathlib commit
   `fabf563a7c95a166b8d7b6efca11c8b4dc9d911f`, and permits only the declared
   standard trust base `Classical.choice`, `Quot.sound`, and `propext`. Its
-  operator-installed checker profile has a 75-second cold-start ceiling;
+  operator-installed checker profile has a 105-second cold-start ceiling;
   normal checkers retain the 30-second default.
 
 Prepare the pinned local runtime with:
@@ -196,7 +211,7 @@ TypeScript client or adapter.
 
 - Natural-language-to-formal-mathematics automation
 - A universal mathematical ontology
-- A generic public `solver.solve` tool
+- One opaque generic solver that hides backend semantics
 - Arbitrary model-uploaded executable bundles
 - Distributed search infrastructure
 - A theorem prover or SAT/MIP solver implemented from scratch

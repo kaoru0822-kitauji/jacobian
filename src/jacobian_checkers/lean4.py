@@ -214,7 +214,7 @@ def _run_lean(
         lake = _elan_executable("lake")
         command = [lake, "env", "lean"]
         memory_mb = "8192"
-        timeout_seconds = 60
+        timeout_seconds = 90
         cwd_context = tempfile.TemporaryDirectory(prefix="jacobian-lean-home-")
         cwd = runtime
         process_environment = {

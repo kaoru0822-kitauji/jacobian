@@ -17,6 +17,39 @@ M5 are capability milestones, not promised package versions or compatibility
 releases. Their scope and APIs may change. v1.0 remains a stability target
 rather than the next scheduled release.
 
+## Current product track — Capability workbench
+
+Status: initial implementation in the repository; pre-stable and outside the
+v0.2 conformance contract.
+
+### Objective
+
+Make Jacobian useful before verification by giving agents one compact,
+extensible API for mathematical tools and local research memory, while keeping
+checker-backed assurance available when a result must be promoted.
+
+### Deliverables
+
+- One model-facing `capability.invoke` MCP tool and discoverable catalog
+- Adapter registration without kernel or MCP edits
+- Explicit `EXPLORE` and `VERIFY` lanes
+- Heuristic, computed, and verified assurance labels
+- Local searchable research episodes with immutable provenance
+- Streamable HTTP and SSE transports
+- Bearer-token authentication and subject-bound tenant state
+- Container and reverse-proxy deployment guidance
+- Paired control/treatment agent benchmark with transcript-level metrics
+- At least one external Alloy, SAT/SMT, or CAS adapter exercise
+
+### Exit gate
+
+A held-out, repeated A/B evaluation shows that the capability condition
+improves correctness or resource use over the same model without Jacobian,
+without increasing false certification. A synthetic external adapter appears
+through MCP without editing the kernel or MCP server. Authenticated tenant
+tests demonstrate that tools and resources cannot read another tenant's
+artifacts or research episodes.
+
 ## v0.2 — Bounded discovery
 
 Status: implemented in `0.2.0a0`.
@@ -168,7 +201,7 @@ never reported as verification. Parameter claims distinguish proved, sampled,
 and unknown regions. A synthetic plugin supports repair, generation, and
 parameter generalization without core or MCP changes.
 
-## M5 — Research corpus integration
+## M5 — Federated research corpus
 
 ### Entry gate
 
@@ -178,12 +211,13 @@ measurable.
 
 ### Objective
 
-Let agents retrieve prior mathematical work without turning Jacobian into a
-monolithic knowledge platform or confusing retrieval with proof.
+Extend the implemented local research memory with cross-project mathematical
+work without turning Jacobian into a monolithic knowledge platform or
+confusing retrieval with proof.
 
 ### Deliverables
 
-- A versioned research-episode export and provider interface
+- Versioned research-episode export from the local episode database
 - An optional reference provider rather than a required kernel dependency
 - Structural, textual, metadata, ancestry, and temporal retrieval
 - Trust, review, source, retraction, and availability labels

@@ -14,10 +14,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from mcp_types import ToolAnnotations
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
 from jacobian import __version__
 from jacobian.contracts.artifacts import ArtifactPutResult
+from jacobian.contracts.capabilities import (
+    CapabilityMode,
+    CapabilityRequest,
+    CapabilityResult,
+)
 from jacobian.contracts.claims import ClaimValidationResult
 from jacobian.contracts.conjectures import (
     ConjectureOperation,
@@ -63,22 +68,26 @@ if TYPE_CHECKING:
     from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
+    from jacobian.adapters.mcp.remote import TenantKernelRouter
     from jacobian.kernel import JacobianKernel
     from jacobian.workflows import VerificationWorkflowService
 
 
 SERVER_INSTRUCTIONS = (
-    "When a bundled domain name is known, read reference://domain/{name} directly; "
-    "otherwise use reference://catalog to discover its agent_contract_uri. Copy claim "
-    "required_capabilities only from that plugin's available_capabilities list. Treat "
-    "search, evaluation, generated witnesses, conjectures, transformations, and "
-    "polytope evidence as unverified unless the returned assurance.verification field "
-    "is VERIFIED. Operational completion, failure to find a witness, and exhausted or "
-    "bounded search are not mathematical proof. Use witness.verify, certificate.verify, "
-    "or transform.verify for independent replay, and follow returned artifact:// and "
-    "experiment:// resource URIs instead of asking tools to inline large content."
+    "When a capability ID and input are known, invoke it directly; otherwise start "
+    "with capability://catalog. Use "
+    "EXPLORE for low-friction search and VERIFY only when a durable checked conclusion "
+    "is needed. Advanced clients may inspect reference://catalog for lower-level domain "
+    "contracts and assurance.verification details. Retrieved memory, search, evaluation, "
+    "generated witnesses, conjectures, "
+    "transformations, and polytope evidence are not proof. Only assurance level VERIFIED "
+    "with a local verification record is verified. Operational completion, failure to "
+    "find a witness, and exhausted or bounded search are not mathematical conclusions. "
+    "Follow returned artifact:// and experiment:// resources instead of requesting "
+    "large payloads inline."
 )
 
+CAPABILITY_TOOL_NAMES = frozenset({"capability.invoke"})
 VERIFICATION_TOOL_NAMES = frozenset(
     {
         "artifact.put",
@@ -113,6 +122,7 @@ NON_VERIFICATION_TOOL_NAMES = frozenset(
 
 class ToolProfile(StrEnum):
     FULL = "full"
+    CAPABILITIES = "capabilities"
     VERIFICATION = "verification"
 
 
@@ -173,22 +183,29 @@ class OperationBudget(AdapterModel):
 
 @dataclass(frozen=True, slots=True)
 class AppState:
-    kernel: JacobianKernel
+    kernel: JacobianKernel | None
+    tenant_router: TenantKernelRouter | None = None
 
 
-def create_server(
+def create_server(  # noqa: C901
     state_dir: str | Path | None = None,
     *,
     install_references: bool = True,
     tool_profile: ToolProfile | str = ToolProfile.FULL,
+    tenant_isolation: bool = False,
+    allow_anonymous: bool = False,
+    token_verifier: Any | None = None,
+    auth: Any | None = None,
+    capability_adapter_entrypoints: tuple[str, ...] = (),
 ) -> MCPServer[AppState]:
-    """Create the thin MCP adapter over one local Jacobian kernel."""
+    """Create a local or tenant-routed adapter over the Jacobian kernel."""
 
     # Keep ``--help`` and ``--version`` independent of the MCP runtime's
     # heavier imports and shutdown hooks.
     from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
+    from jacobian.adapters.mcp.remote import TenantKernelRouter
     from jacobian.kernel import JacobianKernel
     from jacobian.references import reference_catalog
 
@@ -201,23 +218,68 @@ def create_server(
     selected_profile = ToolProfile(tool_profile)
     structured_output = selected_profile is ToolProfile.FULL
     configured_root = _configured_root(state_dir)
-    kernel = JacobianKernel(
-        configured_root,
-        install_references=install_references,
+    kernel = (
+        None
+        if tenant_isolation
+        else JacobianKernel(
+            configured_root,
+            install_references=install_references,
+            capability_adapter_entrypoints=capability_adapter_entrypoints,
+        )
+    )
+    tenant_router = (
+        TenantKernelRouter(
+            configured_root,
+            install_references=install_references,
+            allow_anonymous=allow_anonymous,
+            capability_adapter_entrypoints=capability_adapter_entrypoints,
+        )
+        if tenant_isolation
+        else None
     )
 
     @asynccontextmanager
     async def lifespan(_server: MCPServer[AppState]) -> AsyncIterator[AppState]:
-        yield AppState(kernel=kernel)
+        yield AppState(kernel=kernel, tenant_router=tenant_router)
 
     server: MCPServer[AppState] = MCPServer(
         name="jacobian",
-        title="Jacobian Research Kernel",
-        description=("Verifier-centric tools for bounded executable mathematics"),
+        title="Jacobian Mathematical Workbench",
+        description=(
+            "Capability-first mathematical tools, research memory, and optional "
+            "verification"
+        ),
         instructions=SERVER_INSTRUCTIONS,
         version=__version__,
         lifespan=lifespan,
+        token_verifier=token_verifier,
+        auth=auth,
     )
+
+    @server.tool(
+        name="capability.invoke",
+        description=(
+            "Invoke an installed mathematical capability in the fast EXPLORE or "
+            "checker-backed VERIFY lane. Read capability://catalog first."
+        ),
+        annotations=_tool_annotations(),
+        structured_output=structured_output,
+    )
+    async def capability_invoke(
+        capability_id: str,
+        payload: dict[str, Any],
+        mode: CapabilityMode = CapabilityMode.EXPLORE,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> CapabilityResult:
+        active_kernel = _kernel(ctx)
+        return await asyncio.to_thread(
+            active_kernel.capabilities.invoke,
+            CapabilityRequest(
+                capability_id=capability_id,
+                mode=mode,
+                input=payload,
+            ),
+        )
 
     @server.tool(
         name="artifact.put",
@@ -638,7 +700,6 @@ def create_server(
 
     _register_conjecture_tools(
         server,
-        kernel,
         structured_output=structured_output,
     )
 
@@ -731,8 +792,9 @@ def create_server(
     async def artifact_resource(
         digest: str,
     ) -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         artifact = await asyncio.to_thread(
-            kernel.store.get,
+            active_kernel.store.get,
             f"artifact://sha256/{digest}",
         )
         return json.dumps(
@@ -746,18 +808,35 @@ def create_server(
         )
 
     @server.resource(
+        "capability://catalog",
+        name="capability-catalog",
+        description=(
+            "Installed model-facing operations, supported lanes, and compact schemas."
+        ),
+        mime_type="application/json",
+    )
+    async def capability_catalog_resource() -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
+        return json.dumps(
+            active_kernel.capabilities.catalog().model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
         "reference://catalog",
         name="reference-catalog",
         description="Installed reference plugin, schema, and checker IDs.",
         mime_type="application/json",
     )
     async def reference_catalog_resource() -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         return json.dumps(
             reference_catalog(
-                kernel.references,
-                polytope=kernel.polytope,
-                polytope_checkers=kernel.polytope_checkers,
-                lean=kernel.lean_checkers,
+                active_kernel.references,
+                polytope=active_kernel.polytope,
+                polytope_checkers=active_kernel.polytope_checkers,
+                lean=active_kernel.lean_checkers,
             ),
             ensure_ascii=False,
             sort_keys=True,
@@ -771,15 +850,18 @@ def create_server(
         ),
         mime_type="application/json",
     )
-    async def reference_domain_resource(name: str) -> str:
+    async def reference_domain_resource(
+        name: str,
+    ) -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         catalog = reference_catalog(
-            kernel.references,
-            polytope=kernel.polytope,
-            polytope_checkers=kernel.polytope_checkers,
-            lean=kernel.lean_checkers,
+            active_kernel.references,
+            polytope=active_kernel.polytope,
+            polytope_checkers=active_kernel.polytope_checkers,
+            lean=active_kernel.lean_checkers,
         )
         return json.dumps(
-            _reference_domain_contract(kernel, name, catalog),
+            _reference_domain_contract(active_kernel, name, catalog),
             ensure_ascii=False,
             sort_keys=True,
         )
@@ -790,10 +872,13 @@ def create_server(
         description="Read the latest durable experiment snapshot.",
         mime_type="application/json",
     )
-    async def experiment_resource(experiment_id: str) -> str:
+    async def experiment_resource(
+        experiment_id: str,
+    ) -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
             _inspect_experiment,
-            kernel,
+            active_kernel,
             f"experiment://{experiment_id}",
         )
         return json.dumps(
@@ -808,10 +893,13 @@ def create_server(
         description="Read durable enumeration accounting and assurance labels.",
         mime_type="application/json",
     )
-    async def experiment_accounting_resource(experiment_id: str) -> str:
+    async def experiment_accounting_resource(
+        experiment_id: str,
+    ) -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
             _inspect_experiment,
-            kernel,
+            active_kernel,
             f"experiment://{experiment_id}",
         )
         coverage = getattr(snapshot, "coverage", None)
@@ -838,15 +926,18 @@ def create_server(
         description="Read the current enumeration scope artifact, when available.",
         mime_type="application/json",
     )
-    async def experiment_scope_resource(experiment_id: str) -> str:
+    async def experiment_scope_resource(
+        experiment_id: str,
+    ) -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
             _inspect_experiment,
-            kernel,
+            active_kernel,
             f"experiment://{experiment_id}",
         )
         return await asyncio.to_thread(
             _experiment_scope_content,
-            kernel,
+            active_kernel,
             snapshot,
         )
 
@@ -856,10 +947,13 @@ def create_server(
         description="Read the immutable archive manifest and page handles.",
         mime_type="application/json",
     )
-    async def experiment_archive_resource(experiment_id: str) -> str:
+    async def experiment_archive_resource(
+        experiment_id: str,
+    ) -> str:
+        active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
             _inspect_experiment,
-            kernel,
+            active_kernel,
             f"experiment://{experiment_id}",
         )
         if snapshot.archive_uri is None:
@@ -871,7 +965,10 @@ def create_server(
                 },
                 sort_keys=True,
             )
-        archive = await asyncio.to_thread(kernel.store.get, snapshot.archive_uri)
+        archive = await asyncio.to_thread(
+            active_kernel.store.get,
+            snapshot.archive_uri,
+        )
         return json.dumps(
             {
                 "experiment_uri": snapshot.experiment_uri,
@@ -890,7 +987,6 @@ def create_server(
 
 def _register_conjecture_tools(
     server: MCPServer[AppState],
-    kernel: JacobianKernel,
     *,
     structured_output: bool,
 ) -> None:
@@ -913,7 +1009,9 @@ def _register_conjecture_tools(
         max_hypotheses: int = 8,
         wall_seconds: int = 60,
         falsification: FalsificationPlanInput | None = None,
+        ctx: Context[AppState, Any] | None = None,
     ) -> ConjectureWorkflowResult:
+        kernel = _kernel(ctx)
         return await asyncio.to_thread(
             kernel.conjectures.run,
             ConjectureWorkflowRequest(
@@ -949,7 +1047,9 @@ def _register_conjecture_tools(
         max_hypotheses: int = 8,
         wall_seconds: int = 60,
         falsification: FalsificationPlanInput | None = None,
+        ctx: Context[AppState, Any] | None = None,
     ) -> ConjectureWorkflowResult:
+        kernel = _kernel(ctx)
         return await asyncio.to_thread(
             kernel.conjectures.run,
             ConjectureWorkflowRequest(
@@ -985,7 +1085,9 @@ def _register_conjecture_tools(
         max_hypotheses: int = 8,
         wall_seconds: int = 60,
         falsification: FalsificationPlanInput | None = None,
+        ctx: Context[AppState, Any] | None = None,
     ) -> ConjectureWorkflowResult:
+        kernel = _kernel(ctx)
         return await asyncio.to_thread(
             kernel.conjectures.run,
             ConjectureWorkflowRequest(
@@ -1014,7 +1116,9 @@ def _register_conjecture_tools(
     async def parameter_region_promote(
         subject_uri: str,
         verification_record_uri: str,
+        ctx: Context[AppState, Any] | None = None,
     ) -> ParameterRegion:
+        kernel = _kernel(ctx)
         return await asyncio.to_thread(
             kernel.conjectures.promote_parameter_region,
             subject_uri=subject_uri,
@@ -1071,7 +1175,36 @@ def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
     state = ctx.request_context.lifespan_context
     if not isinstance(state, AppState):
         raise RuntimeError("MCP lifespan state is invalid")
+    if state.tenant_router is not None:
+        from mcp.server.auth.middleware.auth_context import get_access_token
+
+        access_token = get_access_token()
+        subject = access_token.subject if access_token is not None else None
+        return state.tenant_router.kernel_for(subject)
+    if state.kernel is None:
+        raise RuntimeError("MCP lifespan has no kernel")
     return state.kernel
+
+
+def _resource_kernel(
+    kernel: JacobianKernel | None,
+    tenant_router: TenantKernelRouter | None,
+) -> JacobianKernel:
+    """Route resources through the same auth context as tools.
+
+    MCP 2.0.0b2 does not inject ``Context`` into static resources, but its HTTP
+    authentication middleware still scopes the access token with a contextvar.
+    """
+
+    if tenant_router is not None:
+        from mcp.server.auth.middleware.auth_context import get_access_token
+
+        access_token = get_access_token()
+        subject = access_token.subject if access_token is not None else None
+        return tenant_router.kernel_for(subject)
+    if kernel is None:
+        raise RuntimeError("MCP lifespan has no resource kernel")
+    return kernel
 
 
 def _configured_root(state_dir: str | Path | None) -> Path:
@@ -1374,9 +1507,10 @@ def _reference_domain_contract(
                     "authorized compatible checker may return VERIFIED."
                 ),
                 "witness": [
-                    "call verification.run once with the claim and candidate payloads",
-                    "inspect each returned stage separately",
-                    "accept a decisive result only when verification is VERIFIED",
+                    "call capability.invoke with reference.solve, the predicate, "
+                    "candidate, and witness role",
+                    "use EXPLORE for candidates or VERIFY for a durable conclusion",
+                    "advanced clients may call verification.run with a full claim",
                 ],
             },
         }
@@ -1432,14 +1566,19 @@ def _project_tool_profile(
     profile: ToolProfile,
 ) -> None:
     if profile is ToolProfile.VERIFICATION:
+        for tool_name in sorted(CAPABILITY_TOOL_NAMES):
+            server.remove_tool(tool_name)
         for tool_name in sorted(NON_VERIFICATION_TOOL_NAMES):
+            server.remove_tool(tool_name)
+    elif profile is ToolProfile.CAPABILITIES:
+        for tool_name in sorted(VERIFICATION_TOOL_NAMES | NON_VERIFICATION_TOOL_NAMES):
             server.remove_tool(tool_name)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="jacobian-mcp",
-        description="Run the Jacobian MCP server over stdio.",
+        description="Run the Jacobian MCP server locally or over remote HTTP.",
     )
     parser.add_argument(
         "--version",
@@ -1449,11 +1588,109 @@ def main() -> None:
     parser.add_argument(
         "--tool-profile",
         choices=tuple(profile.value for profile in ToolProfile),
-        default=ToolProfile.FULL.value,
+        default=ToolProfile.CAPABILITIES.value,
         help="project the canonical tool registry for a specific host workflow",
     )
+    parser.add_argument(
+        "--transport",
+        choices=("stdio", "streamable-http", "sse"),
+        default="stdio",
+    )
+    parser.add_argument(
+        "--state-dir",
+        type=Path,
+        help="state root; defaults to JACOBIAN_STATE_DIR or .jacobian",
+    )
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--path", default="/mcp")
+    parser.add_argument(
+        "--stateless-http",
+        action="store_true",
+        help="use stateless Streamable HTTP sessions",
+    )
+    parser.add_argument(
+        "--auth-tokens-file",
+        type=Path,
+        help="JSON secret mapping opaque bearer tokens to tenant IDs",
+    )
+    parser.add_argument(
+        "--public-base-url",
+        help="public issuer/resource base URL advertised to remote clients",
+    )
+    parser.add_argument(
+        "--allow-anonymous",
+        action="store_true",
+        help="development only: permit unauthenticated remote requests",
+    )
+    parser.add_argument(
+        "--capability-adapter",
+        action="append",
+        default=[],
+        help="operator-approved package.module:factory entrypoint; repeatable",
+    )
     args = parser.parse_args()
-    create_server(tool_profile=args.tool_profile).run("stdio")
+    args.path = args.path if args.path.startswith("/") else f"/{args.path}"
+    if args.transport == "stdio":
+        if args.auth_tokens_file is not None or args.allow_anonymous:
+            parser.error("remote authentication options cannot be used with stdio")
+        create_server(
+            state_dir=args.state_dir,
+            tool_profile=args.tool_profile,
+            capability_adapter_entrypoints=tuple(args.capability_adapter),
+        ).run("stdio")
+        return
+
+    if args.auth_tokens_file is None and not args.allow_anonymous:
+        parser.error(
+            "remote transports require --auth-tokens-file or explicit --allow-anonymous"
+        )
+    token_verifier = None
+    auth = None
+    if args.auth_tokens_file is not None:
+        from mcp.server.auth.settings import AuthSettings
+
+        from jacobian.adapters.mcp.remote import (
+            StaticTokenVerifier,
+            load_static_token_file,
+        )
+
+        public_base_url = str(
+            args.public_base_url or f"http://{args.host}:{args.port}"
+        ).rstrip("/")
+        token_verifier = StaticTokenVerifier(
+            load_static_token_file(args.auth_tokens_file)
+        )
+        auth = AuthSettings(
+            issuer_url=AnyHttpUrl(public_base_url),
+            resource_server_url=AnyHttpUrl(f"{public_base_url}{args.path}"),
+            required_scopes=["jacobian:use"],
+        )
+    server = create_server(
+        state_dir=args.state_dir,
+        tool_profile=args.tool_profile,
+        tenant_isolation=True,
+        allow_anonymous=args.allow_anonymous,
+        token_verifier=token_verifier,
+        auth=auth,
+        capability_adapter_entrypoints=tuple(args.capability_adapter),
+    )
+    if args.transport == "streamable-http":
+        server.run(
+            "streamable-http",
+            host=args.host,
+            port=args.port,
+            streamable_http_path=args.path,
+            stateless_http=args.stateless_http,
+        )
+    else:
+        server.run(
+            "sse",
+            host=args.host,
+            port=args.port,
+            sse_path=args.path,
+            message_path="/messages/",
+        )
 
 
 if __name__ == "__main__":
