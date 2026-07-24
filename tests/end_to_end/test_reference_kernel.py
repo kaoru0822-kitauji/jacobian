@@ -306,5 +306,5 @@ def test_graph_counterexample_shrinks_to_the_odd_cycle(tmp_path: Path) -> None:
 
     final = kernel.store.get(shrunk.final_target_uri).payload
     assert set(final["vertices"]) == {"a", "b", "c"}
-    assert shrunk.minimality.value == "LOCAL"
+    assert shrunk.minimality.value == "NONE"
     assert shrunk.result.assurance.verification.value == "VERIFIED"

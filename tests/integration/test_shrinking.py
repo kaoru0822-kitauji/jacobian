@@ -83,10 +83,82 @@ def test_shrinker_rejects_non_improving_proposal(tmp_path: Path) -> None:
     assert "strictly improve" in result.steps[0].detail
 
 
+@pytest.mark.integration
+@pytest.mark.contract
+def test_shrinker_does_not_trust_empty_reducer_response_for_minimality(
+    tmp_path: Path,
+) -> None:
+    (
+        service,
+        store,
+        claim_uri,
+        candidate_uri,
+        plugin_id,
+        checker_id,
+    ) = _shrink_fixture(
+        tmp_path,
+        reducer_entrypoint=(
+            "tests.fixtures.plugin_functions:reduce_once_then_claim_complete"
+        ),
+    )
+
+    result = service.run(
+        target_kind="candidate",
+        target_uri=candidate_uri,
+        claim_uri=claim_uri,
+        plugin_id=plugin_id,
+        preservation_checker_id=checker_id,
+        reducers=("decrement",),
+        objectives=("value",),
+        evaluation_budget=3,
+    )
+
+    assert store.get(result.final_target_uri).payload == {"value": 2}
+    assert result.result.assurance.verification.value == "VERIFIED"
+    assert result.minimality.value == "NONE"
+
+
+@pytest.mark.integration
+@pytest.mark.contract
+def test_shrinker_does_not_treat_checker_error_as_boundary_rejection(
+    tmp_path: Path,
+) -> None:
+    (
+        service,
+        store,
+        claim_uri,
+        candidate_uri,
+        plugin_id,
+        checker_id,
+    ) = _shrink_fixture(
+        tmp_path,
+        checker_entrypoint=(
+            "tests.fixtures.plugin_functions:preserve_positive_except_failed_boundary"
+        ),
+    )
+
+    result = service.run(
+        target_kind="candidate",
+        target_uri=candidate_uri,
+        claim_uri=claim_uri,
+        plugin_id=plugin_id,
+        preservation_checker_id=checker_id,
+        reducers=("decrement",),
+        objectives=("value",),
+        evaluation_budget=4,
+    )
+
+    assert store.get(result.final_target_uri).payload == {"value": 2}
+    assert result.result.assurance.verification.value == "VERIFIED"
+    assert result.minimality.value == "NONE"
+    assert result.steps[-1].accepted is False
+
+
 def _shrink_fixture(
     root: Path,
     *,
     reducer_entrypoint: str = ("tests.fixtures.plugin_functions:reduce_positive_value"),
+    checker_entrypoint: str = ("tests.fixtures.plugin_functions:preserve_positive"),
 ) -> tuple[ShrinkService, ArtifactStore, str, str, str, str]:
     store = ArtifactStore(root)
     schemas = SchemaRegistry(store)
@@ -170,7 +242,7 @@ def _shrink_fixture(
     checkers = CheckerRegistry(store.db_path)
     checker = checkers.authorize(
         name="positive-preservation fixture",
-        entrypoint="tests.fixtures.plugin_functions:preserve_positive",
+        entrypoint=checker_entrypoint,
         evidence_kind="PRESERVATION",
         format_id="fixture.positive",
         format_version="1",

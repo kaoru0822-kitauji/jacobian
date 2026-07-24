@@ -150,8 +150,10 @@ class ShrinkService:
         operational_failure: tuple[ExecutionStatus, str] | None = None
         current_objectives: dict[str, Any] = {}
         expected_objective_values: tuple[Fraction, ...] | None = None
+        checked_boundary_rejection = False
 
         while evaluations < evaluation_budget:
+            checked_boundary_rejection = False
             execution = self.executor.run(
                 entrypoint=reducer_capability.descriptor.entrypoint,
                 implementation_digest=reducer_capability.implementation_digest,
@@ -272,8 +274,13 @@ class ShrinkService:
                         current = self.store.get(proposed.artifact_uri)
                         current_objectives = dict(proposal.objectives)
                         expected_objective_values = proposed_values
+                        checked_boundary_rejection = False
                         accepted_in_round = True
                         break
+                    checked_boundary_rejection = (
+                        decision.execution.status is ExecutionStatus.COMPLETED
+                        and decision.input.status is InputStatus.REJECTED
+                    )
                 except (StoreError, SchemaRegistryError, ValueError) as exc:
                     steps.append(
                         ShrinkStep(
@@ -318,7 +325,11 @@ class ShrinkService:
             )
 
         verified_final = final_result.assurance.verification == Verification.VERIFIED
-        if current.artifact_uri != initial.artifact_uri and verified_final:
+        if (
+            current.artifact_uri != initial.artifact_uri
+            and verified_final
+            and checked_boundary_rejection
+        ):
             minimality = Minimality.LOCAL
         else:
             minimality = Minimality.NONE
