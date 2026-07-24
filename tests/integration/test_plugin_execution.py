@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import py_compile
 import time
 from pathlib import Path
 
@@ -107,3 +109,59 @@ def test_plugin_deadline_covers_descendant_held_output_pipes(tmp_path: Path) -> 
     assert result.status.value == "TIMEOUT"
     assert result.output is None
     assert not marker.exists()
+
+
+@pytest.mark.integration
+def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None:
+    marker = tmp_path / "detached-descendant-survived"
+
+    result = PluginExecutor().run(
+        entrypoint=(
+            "tests.fixtures.plugin_functions:spawn_detached_child_then_return"
+        ),
+        request={"marker": str(marker)},
+        timeout_seconds=5,
+    )
+    time.sleep(1.2)
+
+    assert result.status.value == "COMPLETED"
+    assert not marker.exists()
+
+
+@pytest.mark.integration
+def test_plugin_worker_rejects_unmeasured_bytecode_modules(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = tmp_path / "bytecode_plugin"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "entry.py").write_text(
+        "from .helper import VALUE\n"
+        "def run(_request):\n"
+        "    return {'value': VALUE}\n",
+        encoding="utf-8",
+    )
+    helper = package / "helper.py"
+    helper.write_text("VALUE = 7\n", encoding="utf-8")
+    py_compile.compile(
+        str(helper),
+        cfile=str(package / "helper.pyc"),
+        doraise=True,
+    )
+    helper.unlink()
+    monkeypatch.syspath_prepend(str(tmp_path))
+    existing_path = os.environ.get("PYTHONPATH")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        str(tmp_path) if not existing_path else f"{tmp_path}:{existing_path}",
+    )
+
+    result = PluginExecutor().run(
+        entrypoint="bytecode_plugin.entry:run",
+        request={},
+        timeout_seconds=5,
+    )
+
+    assert result.status.value == "ERROR"
+    assert "not Python source" in result.detail

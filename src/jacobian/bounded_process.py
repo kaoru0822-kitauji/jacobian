@@ -152,6 +152,7 @@ def run_bounded_process(
             _kill_process_tree(process)
             process.wait()
         finally:
+            _kill_process_tree(process)
             for reader in readers:
                 reader.join(timeout=max(0.0, deadline - time.monotonic()))
             if any(reader.is_alive() for reader in readers):

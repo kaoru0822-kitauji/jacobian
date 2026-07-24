@@ -50,6 +50,22 @@ def spawn_child_then_return(request: dict[str, Any]) -> dict[str, Any]:
     return {"worker": "returned"}
 
 
+def spawn_detached_child_then_return(request: dict[str, Any]) -> dict[str, Any]:
+    marker = request["marker"]
+    script = (
+        "import pathlib,time;"
+        "time.sleep(1);"
+        f"pathlib.Path({marker!r}).write_text('survived', encoding='utf-8')"
+    )
+    subprocess.Popen(
+        [sys.executable, "-c", script],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return {"worker": "returned"}
+
+
 def evaluate_candidate(request: dict[str, Any]) -> dict[str, Any]:
     value = request["candidate"]["value"]
     return {
