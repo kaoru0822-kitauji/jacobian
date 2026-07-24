@@ -130,9 +130,15 @@ class VerificationService:
         entrypoint: str,
         expected_digest: str,
         request: dict[str, Any],
+        timeout_seconds: float | None = None,
     ) -> CheckerDecision:
         environment = dict(os.environ)
         environment.update({"PYTHONHASHSEED": "0", "TZ": "UTC"})
+        effective_timeout = (
+            self.checker_timeout_seconds
+            if timeout_seconds is None
+            else min(timeout_seconds, self.checker_timeout_seconds)
+        )
         completed = run_bounded_process(
             [
                 sys.executable,
@@ -142,7 +148,7 @@ class VerificationService:
                 expected_digest,
             ],
             input_bytes=canonicalize_json(request),
-            timeout_seconds=self.checker_timeout_seconds,
+            timeout_seconds=effective_timeout,
             environment=environment,
             stdout_limit=self.max_checker_output_bytes,
             stderr_limit=self.max_checker_diagnostic_bytes,
@@ -150,7 +156,7 @@ class VerificationService:
         if completed.timed_out:
             raise subprocess.TimeoutExpired(
                 cmd=[sys.executable, "-m", "jacobian.checker_worker", entrypoint],
-                timeout=self.checker_timeout_seconds,
+                timeout=effective_timeout,
             )
         if completed.stdout_exceeded:
             raise CheckerExecutionError("checker output exceeds the configured limit")
@@ -187,6 +193,7 @@ class VerificationService:
         candidate_uri: str,
         witness_uri: str,
         checker_id: str,
+        timeout_seconds: float | None = None,
     ) -> ResultEnvelope:
         """Replay a bound witness with the explicitly selected checker."""
 
@@ -284,6 +291,7 @@ class VerificationService:
                 entrypoint=checker.entrypoint,
                 expected_digest=checker.executable_digest,
                 request=request,
+                timeout_seconds=timeout_seconds,
             )
             runtime_ms = int((time.monotonic() - started) * 1000)
             if not decision.accepted:

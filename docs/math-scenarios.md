@@ -579,13 +579,16 @@ semantics:
 
 | ID | Workflow | Exact promotion gate |
 | --- | --- | --- |
-| `CEGIS-AMO-001` | Start from an incomplete at-most-one encoding; add a clause for each defeating assignment | `transform.verify` proves equivalence over all eight assignments |
-| `EVOLVE-DET3-001` | Mutate \(\{-1,1\}\) matrices to maximize absolute determinant | Candidate determinant replay plus the existing 512-row optimum certificate |
-| `TREE-NQUEENS-001` | Explore partial queen placements with backtracking, best-first, or tree search | Direct solution checker or complete bounded search certificate |
-| `PROGRAM-CAPSET-001` | Search for a constructor producing cap sets over small finite fields | Every materialized set receives forbidden-triple replay |
+| `REFINE-AMO-001` | Start from an incomplete at-most-one encoding; refine it with each verified defeating assignment | `transform.verify` proves equivalence over all eight assignments |
+| `SEARCH-DET3-001` | Explore \(\{-1,1\}\) matrices under a plugin-defined proposal strategy | Candidate determinant replay plus the existing 512-row optimum certificate |
+| `SEARCH-NQUEENS-001` | Explore partial queen placements under a plugin-defined search strategy | Direct solution checker or complete bounded search certificate |
+| `SEARCH-CAPSET-001` | Search for a constructor producing cap sets over small finite fields | Every materialized set receives forbidden-triple replay |
 | `RESUME-SEARCH-001` | Interrupt and resume any of the above after a fixed number of evaluations | Identical lineage and promoted verified artifacts after clean replay |
 
 Search score, novelty, or model confidence never replaces the promotion gate.
+The scenario harness may use exact enumeration, refinement, tree search,
+evolutionary search, or another strategy without changing kernel records or
+trust semantics.
 
 ## M4 conjecture-workflow scenarios
 

@@ -233,7 +233,7 @@ Measure:
 
 - candidates evaluated per worker-second;
 - queue and persistence overhead;
-- archive insertion and dominance-query cost;
+- lifecycle-event, checkpoint, and lineage-query cost;
 - lineage storage amplification;
 - checkpoint, cancellation, crash recovery, and resume time;
 - duplicate work under worker failure;

@@ -81,6 +81,8 @@ class StructureCanonicalizationResult(ContractModel):
 class ExperimentState(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
+    PAUSE_REQUESTED = "PAUSE_REQUESTED"
+    PAUSED = "PAUSED"
     COMPLETED = "COMPLETED"
     CANCEL_REQUESTED = "CANCEL_REQUESTED"
     CANCELLED = "CANCELLED"

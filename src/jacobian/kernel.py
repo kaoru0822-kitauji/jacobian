@@ -6,6 +6,7 @@ from pathlib import Path
 
 from jacobian.artifacts import ArtifactService
 from jacobian.claims import ClaimValidationService
+from jacobian.conjectures import ConjectureService
 from jacobian.evaluation import EvaluationService
 from jacobian.experiments import ExperimentService
 from jacobian.plugin_execution import PluginExecutor
@@ -18,6 +19,7 @@ from jacobian.references import (
 )
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
+from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
@@ -85,6 +87,25 @@ class JacobianKernel:
             self.plugins,
             self.claims,
             self.plugin_executor,
+            self.verification,
+        )
+        self.search = SearchService(
+            self.store,
+            self.schemas,
+            self.plugins,
+            self.claims,
+            self.plugin_executor,
+            self.evaluation,
+            self.witnesses,
+            self.verification,
+        )
+        self.conjectures = ConjectureService(
+            self.store,
+            self.schemas,
+            self.plugins,
+            self.claims,
+            self.plugin_executor,
+            self.search,
             self.verification,
         )
         self.shrinking = ShrinkService(

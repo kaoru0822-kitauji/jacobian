@@ -9,9 +9,16 @@ from typing import Annotated, Any
 import typer
 
 from jacobian.canonical import loads_strict_json
+from jacobian.contracts.conjectures import (
+    ConjectureOperation,
+    ConjectureWorkflowRequest,
+)
 from jacobian.contracts.discovery import EnumerationBudget, SearchEnumerateRequest
 from jacobian.contracts.evaluation import EvaluationProfile
+from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.polytope import PolytopeSeparateRequest
+from jacobian.contracts.search import SearchBudget, SearchRunRequest
+from jacobian.experiments import ExperimentNotFoundError
 from jacobian.kernel import JacobianKernel
 from jacobian.references import reference_catalog
 
@@ -244,12 +251,63 @@ def search_enumerate(
     _emit(result.model_dump(mode="json"))
 
 
+@app.command("search-run")
+def search_run(
+    context: typer.Context,
+    idempotency_key: str,
+    claim_uri: str,
+    plugin_id: str,
+    initial_state_file: Path | None = None,
+    profile: str = "EXACT_CANDIDATE",
+    seed: int = 0,
+    witness_role: str | None = None,
+    counterexample_checker_id: str | None = None,
+    candidates_max: int = 100_000,
+    iterations_max: int = 10_000,
+    wall_seconds: int = 300,
+    batch_size: int = 32,
+    workers: int = 1,
+) -> None:
+    """Run an idempotent strategy search; its outputs remain unverified."""
+
+    initial_state = (
+        _read_json_object(initial_state_file) if initial_state_file is not None else {}
+    )
+    search = _state(context).kernel.search
+    handle = search.start(
+        SearchRunRequest(
+            idempotency_key=idempotency_key,
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            initial_state=initial_state,
+            profile=EvaluationProfile(profile),
+            seed=seed,
+            witness_role=(
+                WitnessRole(witness_role) if witness_role is not None else None
+            ),
+            counterexample_checker_id=counterexample_checker_id,
+            budget=SearchBudget(
+                candidates_max=candidates_max,
+                iterations_max=iterations_max,
+                wall_seconds=wall_seconds,
+                batch_size=batch_size,
+                workers=workers,
+            ),
+        )
+    )
+    result = search.wait(
+        handle.experiment_uri,
+        timeout_seconds=wall_seconds + 5,
+    )
+    _emit(result.model_dump(mode="json"))
+
+
 @app.command("experiment-inspect")
 def experiment_inspect(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _state(context).kernel.experiments.inspect(experiment_uri)
+    result = _inspect_experiment(_state(context).kernel, experiment_uri)
     _emit(result.model_dump(mode="json"))
 
 
@@ -259,7 +317,8 @@ def experiment_wait(
     experiment_uri: str,
     timeout_seconds: float = 30,
 ) -> None:
-    result = _state(context).kernel.experiments.wait(
+    result = _wait_experiment(
+        _state(context).kernel,
         experiment_uri,
         timeout_seconds=timeout_seconds,
     )
@@ -271,7 +330,130 @@ def experiment_cancel(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _state(context).kernel.experiments.cancel(experiment_uri)
+    result = _cancel_experiment(_state(context).kernel, experiment_uri)
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("experiment-pause")
+def experiment_pause(
+    context: typer.Context,
+    experiment_uri: str,
+) -> None:
+    result = _state(context).kernel.search.pause(experiment_uri)
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("experiment-resume")
+def experiment_resume(
+    context: typer.Context,
+    experiment_uri: str,
+) -> None:
+    search = _state(context).kernel.search
+    paused = search.inspect(experiment_uri)
+    result = search.resume(experiment_uri)
+    if not result.accepted:
+        _emit(result.model_dump(mode="json"))
+        return
+    snapshot = search.wait(
+        experiment_uri,
+        timeout_seconds=paused.effective_budget.wall_seconds + 5,
+    )
+    _emit(snapshot.model_dump(mode="json"))
+
+
+@app.command("conjecture-repair")
+def conjecture_repair(
+    context: typer.Context,
+    source_claim_uri: str,
+    verification_record_uri: str,
+    plugin_id: str,
+    constraints_file: Path | None = None,
+    evidence: Annotated[list[str] | None, typer.Option("--evidence")] = None,
+    seed: int = 0,
+    max_hypotheses: int = 8,
+    wall_seconds: int = 60,
+) -> None:
+    result = _state(context).kernel.conjectures.run(
+        ConjectureWorkflowRequest(
+            operation=ConjectureOperation.REPAIR,
+            plugin_id=plugin_id,
+            source_uri=source_claim_uri,
+            verification_record_uri=verification_record_uri,
+            constraints=(
+                _read_json_object(constraints_file)
+                if constraints_file is not None
+                else {}
+            ),
+            evidence_uris=tuple(evidence or ()),
+            seed=seed,
+            max_hypotheses=max_hypotheses,
+            wall_seconds=wall_seconds,
+        )
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("conjecture-generate")
+def conjecture_generate(
+    context: typer.Context,
+    plugin_id: str,
+    source_uri: str | None = None,
+    constraints_file: Path | None = None,
+    reference: Annotated[list[str] | None, typer.Option("--reference")] = None,
+    evidence: Annotated[list[str] | None, typer.Option("--evidence")] = None,
+    seed: int = 0,
+    max_hypotheses: int = 8,
+    wall_seconds: int = 60,
+) -> None:
+    result = _state(context).kernel.conjectures.run(
+        ConjectureWorkflowRequest(
+            operation=ConjectureOperation.GENERATE,
+            plugin_id=plugin_id,
+            source_uri=source_uri,
+            constraints=(
+                _read_json_object(constraints_file)
+                if constraints_file is not None
+                else {}
+            ),
+            reference_claim_uris=tuple(reference or ()),
+            evidence_uris=tuple(evidence or ()),
+            seed=seed,
+            max_hypotheses=max_hypotheses,
+            wall_seconds=wall_seconds,
+        )
+    )
+    _emit(result.model_dump(mode="json"))
+
+
+@app.command("parameter-generalize")
+def parameter_generalize(
+    context: typer.Context,
+    source_uri: str,
+    verification_record_uri: str,
+    plugin_id: str,
+    constraints_file: Path | None = None,
+    evidence: Annotated[list[str] | None, typer.Option("--evidence")] = None,
+    seed: int = 0,
+    max_hypotheses: int = 8,
+    wall_seconds: int = 60,
+) -> None:
+    result = _state(context).kernel.conjectures.run(
+        ConjectureWorkflowRequest(
+            operation=ConjectureOperation.PARAMETER_GENERALIZE,
+            plugin_id=plugin_id,
+            source_uri=source_uri,
+            verification_record_uri=verification_record_uri,
+            constraints=(
+                _read_json_object(constraints_file)
+                if constraints_file is not None
+                else {}
+            ),
+            evidence_uris=tuple(evidence or ()),
+            seed=seed,
+            max_hypotheses=max_hypotheses,
+            wall_seconds=wall_seconds,
+        )
+    )
     _emit(result.model_dump(mode="json"))
 
 
@@ -331,6 +513,45 @@ def _state(context: typer.Context) -> CliState:
     if not isinstance(state, CliState):
         raise RuntimeError("CLI state was not initialized")
     return state
+
+
+def _inspect_experiment(
+    kernel: JacobianKernel,
+    experiment_uri: str,
+) -> Any:
+    try:
+        return kernel.experiments.inspect(experiment_uri)
+    except ExperimentNotFoundError:
+        return kernel.search.inspect(experiment_uri)
+
+
+def _wait_experiment(
+    kernel: JacobianKernel,
+    experiment_uri: str,
+    *,
+    timeout_seconds: float,
+) -> Any:
+    try:
+        kernel.experiments.inspect(experiment_uri)
+    except ExperimentNotFoundError:
+        return kernel.search.wait(
+            experiment_uri,
+            timeout_seconds=timeout_seconds,
+        )
+    return kernel.experiments.wait(
+        experiment_uri,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def _cancel_experiment(
+    kernel: JacobianKernel,
+    experiment_uri: str,
+) -> Any:
+    try:
+        return kernel.experiments.cancel(experiment_uri)
+    except ExperimentNotFoundError:
+        return kernel.search.cancel(experiment_uri)
 
 
 def _read_json(path: Path) -> Any:

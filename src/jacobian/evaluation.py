@@ -64,7 +64,7 @@ class EvaluationService:
         plugin_id: str,
         profile: EvaluationProfile | str,
         seed: int,
-        wall_seconds: int,
+        wall_seconds: float,
     ) -> EvaluationBatchResult:
         """Evaluate candidates without promoting any plugin result to verified."""
 

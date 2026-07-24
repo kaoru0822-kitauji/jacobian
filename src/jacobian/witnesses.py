@@ -75,7 +75,7 @@ class WitnessSearchService:
         candidate_uri: str,
         plugin_id: str,
         witness_role: WitnessRole | str,
-        wall_seconds: int,
+        wall_seconds: float,
     ) -> WitnessFindResult:
         """Find a witness or independently verify a no-witness certificate."""
 

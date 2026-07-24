@@ -40,17 +40,18 @@ relationship.
 
 ## Search tools
 
-Search strategies have separate typed operations:
+Search strategies share a typed experiment operation:
 
 | Availability | Tool | Capability |
 | --- | --- | --- |
 | v0.2 | `search.enumerate` | Exhaustively enumerate a bounded candidate class using a domain-provided enumerator and auditable scope. |
-| M3 | `search.evolve` | Run evolutionary or program search with Pareto archives, novelty, lineage, and periodic verification. |
-| M3 | `search.cegis` | Alternate candidate synthesis, verified counter-witnesses, and refinement constraints. |
-| M3 | `search.tree` | Run beam, best-first, Monte Carlo tree, or related state-space search. |
+| M3 | `search.run` | Run a typed proposer, evaluator, counterexample, refinement, and nomination loop as a durable experiment. |
 
 These tools start experiment jobs and return experiment resource handles. They
-do not produce verified conclusions by themselves.
+do not produce verified conclusions by themselves. Exact enumeration, CEGIS,
+constraint solving, parameter sweeps, beam or tree search, evolutionary search,
+and agent-driven loops are strategies behind the common M3 orchestration
+contract rather than separate kernel tools.
 
 The resident MCP server returns the `search.enumerate` handle immediately. The
 local CLI waits for the bounded experiment and prints its terminal snapshot,
@@ -79,7 +80,7 @@ separately verified:
 | --- | --- | --- |
 | M4 | `conjecture.repair` | Propose nearby claims after a counterexample by changing assumptions, constants, domains, or conclusions. |
 | M4 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
-| M4 | `parameter.generalize` | Propose and certify parameter regions around a verified construction. |
+| M4 | `parameter.generalize` | Propose parameter regions around a verified construction and preserve proposed, sampled, or independently verified evidence labels. |
 | M5 | `memory.search` | Ask an optional corpus provider for prior experiments, failures, witnesses, certificates, and research episodes with trust labels. |
 | M5 | `abstraction.extract` | Suggest an abstract mathematical explanation for supplied or retrieved artifacts. |
 | M5 | `episode.compare` | Compare failures and propose recurring obstructions or no-go lemmas. |
@@ -89,6 +90,11 @@ The M4 tools operate without a shared corpus. When no M5 provider is
 configured, they deduplicate against supplied or local experiment records and
 report corpus-wide novelty as unknown. Corpus retrieval can suggest inputs to
 any tool but cannot authorize checkers or promote verification status.
+All three M4 tools share one `HypothesisTransformer` plugin operation and may
+route their outputs through `search.run`; Jacobian does not embed a conjecture
+grammar or synthesis framework. Sample artifacts must enter through the tools'
+explicit evidence inputs before a plugin may cite them in a sampled parameter
+region.
 
 ## Internal backends
 

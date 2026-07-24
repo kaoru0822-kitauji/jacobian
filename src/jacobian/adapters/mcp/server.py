@@ -17,9 +17,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from jacobian import __version__
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.claims import ClaimValidationResult
+from jacobian.contracts.conjectures import (
+    ConjectureOperation,
+    ConjectureWorkflowRequest,
+    ConjectureWorkflowResult,
+    FalsificationPlan,
+)
 from jacobian.contracts.discovery import (
     EnumerationBudget,
-    ExperimentCancelResult,
     ExperimentHandle,
     SearchEnumerateRequest,
     StructureCanonicalizationResult,
@@ -28,6 +33,7 @@ from jacobian.contracts.evaluation import (
     EvaluationBatchResult,
     EvaluationProfile,
 )
+from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.polytope import (
     PolytopeSeparateRequest,
     PolytopeSeparateResult,
@@ -35,6 +41,11 @@ from jacobian.contracts.polytope import (
 from jacobian.contracts.results import (
     ResultEnvelope,
     validate_result_envelope,
+)
+from jacobian.contracts.search import (
+    ExperimentControlResult,
+    SearchBudget,
+    SearchRunRequest,
 )
 from jacobian.contracts.shrinking import ShrinkResult
 from jacobian.contracts.transformations import TransformationApplyResult
@@ -69,6 +80,21 @@ class EnumerationBudgetInput(AdapterModel):
     page_size: int = Field(default=128, ge=1, le=4096)
 
 
+class SearchBudgetInput(AdapterModel):
+    candidates_max: int = Field(default=100_000, ge=1, le=10_000_000)
+    iterations_max: int = Field(default=10_000, ge=1, le=10_000_000)
+    wall_seconds: int = Field(default=300, ge=1, le=86_400)
+    batch_size: int = Field(default=32, ge=1, le=4096)
+    workers: int = Field(default=1, ge=1, le=32)
+
+
+class FalsificationPlanInput(AdapterModel):
+    initial_state: dict[str, Any] = Field(default_factory=dict)
+    witness_role: str | None = None
+    counterexample_checker_id: str | None = None
+    budget: SearchBudgetInput = Field(default_factory=SearchBudgetInput)
+
+
 class OperationBudget(AdapterModel):
     wall_seconds: int = Field(default=30, ge=1, le=86_400)
 
@@ -99,11 +125,7 @@ def create_server(
             "JacobianKernel": JacobianKernel,
         }
     )
-    configured_root = Path(
-        state_dir
-        if state_dir is not None
-        else os.environ.get("JACOBIAN_STATE_DIR", ".jacobian")
-    )
+    configured_root = _configured_root(state_dir)
     kernel = JacobianKernel(
         configured_root,
         install_references=install_references,
@@ -219,7 +241,9 @@ def create_server(
             claim_uri=claim_uri,
             candidate_uri=candidate_uri,
             plugin_id=plugin_id,
-            witness_role=witness_role,
+            witness_role=(
+                WitnessRole(witness_role) if witness_role is not None else None
+            ),
             wall_seconds=active_budget.wall_seconds,
         )
         return WitnessFindResult.model_validate(result.model_dump(mode="json"))
@@ -366,6 +390,49 @@ def create_server(
         )
 
     @server.tool(
+        name="search.run",
+        description=(
+            "Launch one idempotent, strategy-neutral search experiment. "
+            "Proposals and nominations remain unverified."
+        ),
+        structured_output=True,
+    )
+    async def search_run(
+        idempotency_key: str,
+        claim_uri: str,
+        plugin_id: str,
+        initial_state: dict[str, Any] | None = None,
+        profile: str = "EXACT_CANDIDATE",
+        seed: int = 0,
+        witness_role: str | None = None,
+        counterexample_checker_id: str | None = None,
+        budget: SearchBudgetInput | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> ExperimentHandle:
+        kernel = _kernel(ctx)
+        active_budget = budget or SearchBudgetInput()
+        request = SearchRunRequest(
+            idempotency_key=idempotency_key,
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            initial_state=initial_state or {},
+            profile=EvaluationProfile(profile),
+            seed=seed,
+            witness_role=(
+                WitnessRole(witness_role) if witness_role is not None else None
+            ),
+            counterexample_checker_id=counterexample_checker_id,
+            budget=SearchBudget(
+                candidates_max=active_budget.candidates_max,
+                iterations_max=active_budget.iterations_max,
+                wall_seconds=active_budget.wall_seconds,
+                batch_size=active_budget.batch_size,
+                workers=active_budget.workers,
+            ),
+        )
+        return await asyncio.to_thread(kernel.search.start, request)
+
+    @server.tool(
         name="experiment.cancel",
         description=(
             "Request cooperative cancellation of a persistent experiment; "
@@ -376,12 +443,40 @@ def create_server(
     async def experiment_cancel(
         experiment_uri: str,
         ctx: Context[AppState, Any] | None = None,
-    ) -> ExperimentCancelResult:
+    ) -> ExperimentControlResult:
         kernel = _kernel(ctx)
-        return await asyncio.to_thread(
-            kernel.experiments.cancel,
+        result = await asyncio.to_thread(
+            _cancel_experiment,
+            kernel,
             experiment_uri,
         )
+        return ExperimentControlResult.model_validate(result.model_dump(mode="json"))
+
+    @server.tool(
+        name="experiment.pause",
+        description="Pause a strategy search at its next checkpoint boundary.",
+        structured_output=True,
+    )
+    async def experiment_pause(
+        experiment_uri: str,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> ExperimentControlResult:
+        kernel = _kernel(ctx)
+        return await asyncio.to_thread(kernel.search.pause, experiment_uri)
+
+    @server.tool(
+        name="experiment.resume",
+        description="Resume a paused strategy search from its immutable checkpoint.",
+        structured_output=True,
+    )
+    async def experiment_resume(
+        experiment_uri: str,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> ExperimentControlResult:
+        kernel = _kernel(ctx)
+        return await asyncio.to_thread(kernel.search.resume, experiment_uri)
+
+    _register_conjecture_tools(server, kernel)
 
     @server.tool(
         name="transform.apply",
@@ -508,7 +603,8 @@ def create_server(
     )
     async def experiment_resource(experiment_id: str) -> str:
         snapshot = await asyncio.to_thread(
-            kernel.experiments.inspect,
+            _inspect_experiment,
+            kernel,
             f"experiment://{experiment_id}",
         )
         return json.dumps(
@@ -525,9 +621,11 @@ def create_server(
     )
     async def experiment_accounting_resource(experiment_id: str) -> str:
         snapshot = await asyncio.to_thread(
-            kernel.experiments.inspect,
+            _inspect_experiment,
+            kernel,
             f"experiment://{experiment_id}",
         )
+        coverage = getattr(snapshot, "coverage", None)
         return json.dumps(
             {
                 "experiment_uri": snapshot.experiment_uri,
@@ -537,7 +635,7 @@ def create_server(
                     if snapshot.stop_reason is not None
                     else None
                 ),
-                "coverage": snapshot.coverage.value,
+                "coverage": coverage.value if coverage is not None else None,
                 "verification": snapshot.verification.value,
                 "accounting": snapshot.accounting.model_dump(mode="json"),
             },
@@ -553,10 +651,12 @@ def create_server(
     )
     async def experiment_scope_resource(experiment_id: str) -> str:
         snapshot = await asyncio.to_thread(
-            kernel.experiments.inspect,
+            _inspect_experiment,
+            kernel,
             f"experiment://{experiment_id}",
         )
-        if snapshot.scope_uri is None:
+        scope_uri = getattr(snapshot, "scope_uri", None)
+        if scope_uri is None:
             return json.dumps(
                 {
                     "experiment_uri": snapshot.experiment_uri,
@@ -564,7 +664,7 @@ def create_server(
                 },
                 sort_keys=True,
             )
-        scope = await asyncio.to_thread(kernel.store.get, snapshot.scope_uri)
+        scope = await asyncio.to_thread(kernel.store.get, scope_uri)
         return json.dumps(
             {
                 "experiment_uri": snapshot.experiment_uri,
@@ -584,7 +684,8 @@ def create_server(
     )
     async def experiment_archive_resource(experiment_id: str) -> str:
         snapshot = await asyncio.to_thread(
-            kernel.experiments.inspect,
+            _inspect_experiment,
+            kernel,
             f"experiment://{experiment_id}",
         )
         if snapshot.archive_uri is None:
@@ -611,6 +712,163 @@ def create_server(
     return server
 
 
+def _register_conjecture_tools(
+    server: MCPServer[AppState],
+    kernel: JacobianKernel,
+) -> None:
+    @server.tool(
+        name="conjecture.repair",
+        description=(
+            "Propose unverified claim repairs from an independently verified "
+            "counterexample and optionally run the ordinary falsification loop."
+        ),
+        structured_output=True,
+    )
+    async def conjecture_repair(
+        source_claim_uri: str,
+        verification_record_uri: str,
+        plugin_id: str,
+        constraints: dict[str, Any] | None = None,
+        evidence_uris: list[str] | None = None,
+        seed: int = 0,
+        max_hypotheses: int = 8,
+        wall_seconds: int = 60,
+        falsification: FalsificationPlanInput | None = None,
+    ) -> ConjectureWorkflowResult:
+        return await asyncio.to_thread(
+            kernel.conjectures.run,
+            ConjectureWorkflowRequest(
+                operation=ConjectureOperation.REPAIR,
+                plugin_id=plugin_id,
+                source_uri=source_claim_uri,
+                verification_record_uri=verification_record_uri,
+                constraints=constraints or {},
+                evidence_uris=tuple(evidence_uris or ()),
+                seed=seed,
+                max_hypotheses=max_hypotheses,
+                wall_seconds=wall_seconds,
+                falsification=_falsification_plan(falsification),
+            ),
+        )
+
+    @server.tool(
+        name="conjecture.generate",
+        description=(
+            "Generate deduplicated unverified formal hypotheses and optionally "
+            "run the ordinary falsification loop."
+        ),
+        structured_output=True,
+    )
+    async def conjecture_generate(
+        plugin_id: str,
+        source_uri: str | None = None,
+        constraints: dict[str, Any] | None = None,
+        reference_claim_uris: list[str] | None = None,
+        evidence_uris: list[str] | None = None,
+        seed: int = 0,
+        max_hypotheses: int = 8,
+        wall_seconds: int = 60,
+        falsification: FalsificationPlanInput | None = None,
+    ) -> ConjectureWorkflowResult:
+        return await asyncio.to_thread(
+            kernel.conjectures.run,
+            ConjectureWorkflowRequest(
+                operation=ConjectureOperation.GENERATE,
+                plugin_id=plugin_id,
+                source_uri=source_uri,
+                constraints=constraints or {},
+                reference_claim_uris=tuple(reference_claim_uris or ()),
+                evidence_uris=tuple(evidence_uris or ()),
+                seed=seed,
+                max_hypotheses=max_hypotheses,
+                wall_seconds=wall_seconds,
+                falsification=_falsification_plan(falsification),
+            ),
+        )
+
+    @server.tool(
+        name="parameter.generalize",
+        description=(
+            "Propose an exact parameter-region hypothesis from a verified "
+            "construction; sampled and proposed regions remain unverified."
+        ),
+        structured_output=True,
+    )
+    async def parameter_generalize(
+        source_uri: str,
+        verification_record_uri: str,
+        plugin_id: str,
+        constraints: dict[str, Any] | None = None,
+        evidence_uris: list[str] | None = None,
+        seed: int = 0,
+        max_hypotheses: int = 8,
+        wall_seconds: int = 60,
+        falsification: FalsificationPlanInput | None = None,
+    ) -> ConjectureWorkflowResult:
+        return await asyncio.to_thread(
+            kernel.conjectures.run,
+            ConjectureWorkflowRequest(
+                operation=ConjectureOperation.PARAMETER_GENERALIZE,
+                plugin_id=plugin_id,
+                source_uri=source_uri,
+                verification_record_uri=verification_record_uri,
+                constraints=constraints or {},
+                evidence_uris=tuple(evidence_uris or ()),
+                seed=seed,
+                max_hypotheses=max_hypotheses,
+                wall_seconds=wall_seconds,
+                falsification=_falsification_plan(falsification),
+            ),
+        )
+
+
+def _inspect_experiment(
+    kernel: JacobianKernel,
+    experiment_uri: str,
+) -> Any:
+    from jacobian.experiments import ExperimentNotFoundError
+
+    try:
+        return kernel.experiments.inspect(experiment_uri)
+    except ExperimentNotFoundError:
+        return kernel.search.inspect(experiment_uri)
+
+
+def _cancel_experiment(
+    kernel: JacobianKernel,
+    experiment_uri: str,
+) -> Any:
+    from jacobian.experiments import ExperimentNotFoundError
+
+    try:
+        return kernel.experiments.cancel(experiment_uri)
+    except ExperimentNotFoundError:
+        return kernel.search.cancel(experiment_uri)
+
+
+def _falsification_plan(
+    selected: FalsificationPlanInput | None,
+) -> FalsificationPlan | None:
+    if selected is None:
+        return None
+    return FalsificationPlan(
+        initial_state=selected.initial_state,
+        witness_role=(
+            WitnessRole(selected.witness_role)
+            if selected.witness_role is not None
+            else None
+        ),
+        counterexample_checker_id=selected.counterexample_checker_id,
+        budget=SearchBudget(
+            candidates_max=selected.budget.candidates_max,
+            iterations_max=selected.budget.iterations_max,
+            wall_seconds=selected.budget.wall_seconds,
+            batch_size=selected.budget.batch_size,
+            workers=selected.budget.workers,
+        ),
+    )
+
+
 def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
     if ctx is None:
         raise RuntimeError("MCP request context is unavailable")
@@ -618,6 +876,12 @@ def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
     if not isinstance(state, AppState):
         raise RuntimeError("MCP lifespan state is invalid")
     return state.kernel
+
+
+def _configured_root(state_dir: str | Path | None) -> Path:
+    if state_dir is not None:
+        return Path(state_dir)
+    return Path(os.environ.get("JACOBIAN_STATE_DIR", ".jacobian"))
 
 
 def main() -> None:

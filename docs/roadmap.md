@@ -61,28 +61,55 @@ domains.
 
 ### Objective
 
-Run large heuristic and adversarial searches inside the engine while retaining
-lineage, failure evidence, and exact-verification boundaries.
+Run large heuristic, exact, and agent-driven searches through one durable
+orchestration loop while retaining lineage, failure evidence, and
+exact-verification boundaries.
 
 ### Deliverables
 
-- Evolutionary/program search
-- Counterexample-guided inductive synthesis
-- Tree, beam, or best-first search
-- Pareto and novelty archives
-- Compiled semantic families using BDDs, ZDDs, automata, dynamic programs, or
-  oracles
-- Resumable and cancellable experiments
+- Typed proposer, evaluator, counterexample, refinement, and candidate
+  nomination interfaces
+- Strategy-neutral search state, checkpoints, lineage, and failure archives
+- Verified-counterexample feedback through the existing witness boundary
+- Candidate nomination that routes every mathematical promotion through the
+  existing verification boundary
+- Exact budget, scope, runtime-identity, and resource accounting
+- Resumable, cancellable, and recoverable experiments
 - Local multi-process execution followed by distributed workers when justified
 - Resource-bounded local execution for operator-approved generated candidate
   code, without claiming a security sandbox
+- Sealed, versioned plugin packages and immutable registry snapshots binding
+  capability contracts, implementation bytes, runtime and build identity, and
+  platform compatibility; discovery does not import plugin code
+- A generic plugin conformance kit covering success, declared failure,
+  malformed output, timeout, path and symlink attacks, changed implementation
+  bytes, and unsupported evidence promotion
+- A no-core-change extension gate exercised by a synthetic third plugin
+- Idempotent, reconstructable worker invocations with append-only lifecycle
+  events binding the exact request, plugin and runtime identity, effective
+  policy, inputs, outputs, resource usage, and retry lineage
+
+Effective worker authority is the restrictive intersection of the plugin
+contract, operator policy, and invocation request. No layer may widen resource,
+network, filesystem, artifact, or checker authority.
+
+Exact enumeration, counterexample-guided refinement, constraint solving,
+parameter sweeps, beam or tree search, evolutionary search, and agent-driven
+loops are strategy plugins or examples. They do not introduce strategy-specific
+records or trust rules into the generic kernel.
 
 ### Exit gate
 
 Long-running experiments survive interruption and resumption, retain complete
-lineage, and route promoted candidates through the verification boundary.
+lineage, feed independently verified counterexamples into later refinement,
+and route nominated candidates through the verification boundary.
 Sequential reference results are preserved under multi-process execution,
-worker failure, cancellation, and resume.
+worker failure, cancellation, and resume. A new sealed plugin passes the
+generic conformance suite without kernel or MCP changes. Concurrent or
+transport-retried requests create one durable invocation. After process loss,
+an invocation can be reconstructed without chat state and resumed without
+losing or duplicating lineage. Workers cannot widen execution policy or
+influence checker authorization.
 
 ## M4 — Conjecture workflows
 
@@ -94,14 +121,18 @@ their exact transformation lineage.
 ### Objective
 
 Give agents tools to turn verified counterexamples and constructions into
-nearby statements, parameter families, and new experiments.
+nearby statements, parameter families, and new experiments through the same
+validation and falsification loop used by M3.
 
 ### Deliverables
 
-- Conjecture repair across assumptions, constants, domains, and conclusions
-- Candidate conjecture generation under typed grammars
+- One typed hypothesis-transformation capability with repair, generation, and
+  parameter-generalization operations
+- Plugin-owned conjecture grammars and repair strategies rather than a
+  kernel-level synthesis framework
 - Deduplication within the active experiment or supplied reference set
-- Exact or certified parameter-region extraction
+- Exact proposed, sampled, sufficient, and necessary parameter-region labels;
+  only independent checker records may use the verified labels
 - Falsification pipelines for generated statements
 - Explicit source and transformation records for every proposal
 - Honest `UNKNOWN` novelty when no research-corpus provider is configured
@@ -112,7 +143,8 @@ Every generated or repaired claim is explicitly labeled as a hypothesis and
 can re-enter the ordinary validation, search, and verification pipeline.
 Held-out evaluations confirm that failure to falsify a generated statement is
 never reported as verification. Parameter claims distinguish proved, sampled,
-and unknown regions.
+and unknown regions. A synthetic plugin supports repair, generation, and
+parameter generalization without core or MCP changes.
 
 ## M5 — Research corpus integration
 

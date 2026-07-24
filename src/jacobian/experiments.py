@@ -54,6 +54,10 @@ class ExperimentError(RuntimeError):
     """A requested experiment is missing or invalid."""
 
 
+class ExperimentNotFoundError(ExperimentError):
+    """A requested enumeration experiment does not exist."""
+
+
 class ExperimentService:
     """Run local enumeration jobs while persisting auditable progress."""
 
@@ -243,7 +247,7 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
         if row is None:
-            raise ExperimentError(f"experiment not found: {experiment_uri}")
+            raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
         try:
             return ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
@@ -288,7 +292,9 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentError(f"experiment not found: {experiment_uri}")
+                raise ExperimentNotFoundError(
+                    f"experiment not found: {experiment_uri}"
+                )
             snapshot = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -759,7 +765,9 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentError(f"experiment not found: {experiment_uri}")
+                raise ExperimentNotFoundError(
+                    f"experiment not found: {experiment_uri}"
+                )
             snapshot = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -820,7 +828,7 @@ class ExperimentService:
                 (snapshot.experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentError(
+                raise ExperimentNotFoundError(
                     f"experiment not found: {snapshot.experiment_uri}"
                 )
             current = ExperimentSnapshot.model_validate(
