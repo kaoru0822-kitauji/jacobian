@@ -14,11 +14,14 @@ jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v8
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --frozen --dev
@@ -30,20 +33,30 @@ jobs:
   test:
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        include:
+          - python-version: "3.12"
+            coverage: true
+          - python-version: "3.13"
+            coverage: false
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v8
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --frozen --dev
-      - run: uv run pytest --cov --cov-report=xml --cov-report=term --durations=10
+      - if: matrix.coverage
+        run: uv run pytest --cov --cov-report=xml --cov-report=term --durations=10
+      - if: ${{ !matrix.coverage }}
+        run: uv run pytest --durations=10
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && matrix.coverage }}
         with:
           name: coverage-${{ matrix.python-version }}
           path: coverage.xml
@@ -51,6 +64,7 @@ jobs:
   duplicate-code:
     name: Duplicate Code Detection
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
@@ -61,11 +75,14 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v8
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: |
@@ -85,6 +102,7 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: needs.release-please.outputs.release_created == 'true'
     needs: [release-please, build]
     environment: pypi
@@ -100,6 +118,7 @@ jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.ref == 'refs/heads/main'
     needs: [lint, test, duplicate-code, build]
     outputs:
