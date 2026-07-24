@@ -412,9 +412,15 @@ def test_interrupted_cancellation_remains_cancelled_after_recovery(
     assert recovered.state is ExperimentState.CANCELLED
     assert recovered.stop_reason is SearchStopReason.CANCELLED
     assert recovered.checkpoint_uri == paused.checkpoint_uri
-    assert recovered_kernel.search.events(handle.experiment_uri)[-1].event_type == (
-        "RECOVERED_CANCELLED"
-    )
+    assert recovered.archive_uri is not None
+    event_types = [
+        event.event_type
+        for event in recovered_kernel.search.events(handle.experiment_uri)
+    ]
+    assert event_types[-2:] == [
+        "RECOVERED_CANCELLED",
+        "RECOVERY_ARCHIVE_COMMITTED",
+    ]
 
 
 @pytest.mark.integration
@@ -469,6 +475,35 @@ def test_malformed_proposal_fails_without_evidence_promotion(
     assert snapshot.verification.value == "UNVERIFIED"
     assert "proposer must return candidates" in snapshot.detail
     assert snapshot.archive_page_uris == ()
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_partial_iteration_accounting_survives_malformed_candidate(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(
+        kernel,
+        proposer_entrypoint=(
+            "tests.fixtures.plugin_functions:propose_partially_invalid_search"
+        ),
+    )
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-partial-accounting-001",
+            batch_size=2,
+        )
+    )
+
+    snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=15)
+
+    assert snapshot.state is ExperimentState.ERROR
+    assert snapshot.accounting.proposed_candidates == 1
+    assert snapshot.accounting.unique_candidates == 1
+    assert snapshot.accounting.evaluated_candidates == 0
 
 
 @pytest.mark.integration
@@ -637,9 +672,7 @@ def test_supporting_checker_decision_is_not_counted_as_counterexample(
     manifest = kernel.plugins.get(plugin_id)
     checker = kernel.checkers.authorize(
         name="fixture-value-true-v1",
-        entrypoint=(
-            "tests.fixtures.checker_functions:check_fixture_value_as_true"
-        ),
+        entrypoint=("tests.fixtures.checker_functions:check_fixture_value_as_true"),
         evidence_kind="WITNESS",
         format_id="fixture.value",
         format_version="1",

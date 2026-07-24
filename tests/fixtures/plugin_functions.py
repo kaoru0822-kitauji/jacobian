@@ -195,6 +195,15 @@ def propose_beyond_authority(_request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def propose_partially_invalid_search(_request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "response_version": "1",
+        "candidates": [{"value": 1}, {"not_value": 2}],
+        "state": {},
+        "complete": True,
+    }
+
+
 def refine_with_verification_claim(request: dict[str, Any]) -> dict[str, Any]:
     return {
         "response_version": "1",

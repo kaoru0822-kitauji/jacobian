@@ -107,7 +107,6 @@ class SearchService:
         self.max_batch_size = max_batch_size
         self._threads: dict[str, threading.Thread] = {}
         self._thread_lock = threading.Lock()
-        self._initialize_database()
         self.semantics_uri = store.register_descriptor(
             kind="semantics",
             name="jacobian.search-experiment",
@@ -138,6 +137,7 @@ class SearchService:
             version="1",
             schema=EvaluationBatchResult.model_json_schema(),
         )
+        self._initialize_database()
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.store.db_path, timeout=30)
@@ -148,6 +148,7 @@ class SearchService:
     def _initialize_database(self) -> None:
         """Create metadata tables and recover interrupted runs as paused."""
 
+        archive_recoveries: list[SearchExperimentSnapshot] = []
         with self._connect() as connection:
             connection.executescript(
                 """
@@ -193,7 +194,7 @@ class SearchService:
                 FROM search_experiments
                 WHERE state IN (
                     'PENDING', 'RUNNING', 'PAUSE_REQUESTED',
-                    'CANCEL_REQUESTED'
+                    'CANCEL_REQUESTED', 'CANCELLED'
                 )
                 """
             ).fetchall()
@@ -201,6 +202,10 @@ class SearchService:
                 snapshot = SearchExperimentSnapshot.model_validate(
                     loads_strict_json(row["snapshot_json"])
                 )
+                if snapshot.state is ExperimentState.CANCELLED:
+                    if snapshot.archive_uri is None:
+                        archive_recoveries.append(snapshot)
+                    continue
                 cancelled = snapshot.state is ExperimentState.CANCEL_REQUESTED
                 recovered = _updated_snapshot(
                     snapshot,
@@ -233,6 +238,36 @@ class SearchService:
                         "accounting": recovered.accounting.model_dump(mode="json"),
                     },
                 )
+                if cancelled:
+                    archive_recoveries.append(recovered)
+        for snapshot in archive_recoveries:
+            self._commit_recovery_archive(snapshot)
+
+    def _commit_recovery_archive(
+        self,
+        snapshot: SearchExperimentSnapshot,
+    ) -> None:
+        archive = self._store_archive(snapshot, snapshot.accounting)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            latest = self._read_snapshot(connection, snapshot.experiment_uri)
+            if (
+                latest.state is not ExperimentState.CANCELLED
+                or latest.archive_uri is not None
+            ):
+                return
+            archived = _updated_snapshot(
+                latest,
+                archive_uri=archive.artifact_uri,
+                updated_at=_now(),
+            )
+            self._update_snapshot(connection, archived)
+            self._append_event(
+                connection,
+                archived.experiment_uri,
+                event_type="RECOVERY_ARCHIVE_COMMITTED",
+                payload={"archive_uri": archive.artifact_uri},
+            )
 
     def start(
         self,
@@ -564,6 +599,7 @@ class SearchService:
     def _run(self, experiment_uri: str) -> None:
         started = time.monotonic()
         accounting = SearchAccounting()
+        partial_accounting = accounting
         try:
             snapshot = self.inspect(experiment_uri)
             transition = self._mark_running(snapshot)
@@ -582,7 +618,7 @@ class SearchService:
 
             snapshot = self.inspect(experiment_uri)
             request = snapshot.request
-            proposer, refiner = self._resolve_strategy(snapshot)
+            proposer, refiner, evaluator_digest = self._resolve_strategy(snapshot)
 
             (
                 strategy_state,
@@ -591,6 +627,7 @@ class SearchService:
                 nominated_uris,
                 accounting,
             ) = self._restore(snapshot)
+            partial_accounting = accounting
             claim = self.store.get(request.claim_uri)
             manifest = self.plugins.get(request.plugin_id)
             semantics = self.store.get(manifest.semantics_uri)
@@ -712,10 +749,22 @@ class SearchService:
                     )
                     if candidate.artifact_uri in seen_uris:
                         duplicates += 1
+                        partial_accounting = _updated_accounting(
+                            accounting,
+                            proposed_candidates=unique + duplicates,
+                            unique_candidates=unique,
+                            duplicate_candidates=duplicates,
+                        )
                         continue
                     seen_uris.add(candidate.artifact_uri)
                     selected_uris.append(candidate.artifact_uri)
                     unique += 1
+                    partial_accounting = _updated_accounting(
+                        accounting,
+                        proposed_candidates=unique + duplicates,
+                        unique_candidates=unique,
+                        duplicate_candidates=duplicates,
+                    )
 
                 records: list[SearchCandidateRecord] = []
                 evaluated = accounting.evaluated_candidates
@@ -737,6 +786,10 @@ class SearchService:
                     )
                     _require_complete_evaluation(evaluation, selected_uris)
                     evaluated += len(selected_uris)
+                    partial_accounting = _updated_accounting(
+                        partial_accounting,
+                        evaluated_candidates=evaluated,
+                    )
                     evaluation_artifact = self._put_internal_artifact(
                         schema_uri=self.evaluation_schema_uri,
                         payload=evaluation.model_dump(mode="json"),
@@ -750,7 +803,7 @@ class SearchService:
                             "iteration": accounting.iterations + 1,
                             "candidate_uris": selected_uris,
                             "evaluation_uri": evaluation_artifact.artifact_uri,
-                            "evaluator_digest": snapshot.evaluator_digest,
+                            "evaluator_digest": evaluator_digest,
                             "status": evaluation.execution.status.value,
                             "runtime_ms": evaluation.execution.runtime_ms,
                         },
@@ -767,6 +820,10 @@ class SearchService:
                                 started,
                             )
                             attacked += 1
+                            partial_accounting = _updated_accounting(
+                                partial_accounting,
+                                attacked_candidates=attacked,
+                            )
                             witness_result = self.witnesses.find(
                                 claim_uri=request.claim_uri,
                                 candidate_uri=candidate_uri,
@@ -803,6 +860,12 @@ class SearchService:
                                         verified.verification_record_uri
                                     )
                                     verified_counterexamples += 1
+                                    partial_accounting = _updated_accounting(
+                                        partial_accounting,
+                                        verified_counterexamples=(
+                                            verified_counterexamples
+                                        ),
+                                    )
                             self._record_operation(
                                 experiment_uri,
                                 event_type="COUNTEREXAMPLE_ATTEMPTED",
@@ -879,6 +942,7 @@ class SearchService:
                         refinement_execution.status,
                         refinement_execution.detail or "refiner execution failed",
                         wall_time_ms=_used_wall_ms(accounting, started),
+                        accounting_override=partial_accounting,
                     )
                     return
                 refinement = PluginRefinementResponse.model_validate(
@@ -910,6 +974,7 @@ class SearchService:
                     nominations=accounting.nominations + len(nominations),
                     wall_time_ms=completed_wall_ms,
                 )
+                partial_accounting = next_accounting
                 page = SearchArchivePage(
                     experiment_uri=experiment_uri,
                     request_digest=snapshot.request_digest,
@@ -919,7 +984,7 @@ class SearchService:
                     iteration=next_accounting.iterations,
                     proposer_digest=proposer.implementation_digest,
                     refiner_digest=refiner.implementation_digest,
-                    evaluator_digest=snapshot.evaluator_digest,
+                    evaluator_digest=evaluator_digest,
                     records=tuple(records),
                     nominations=nominations,
                 )
@@ -943,7 +1008,7 @@ class SearchService:
                     registry_snapshot_uri=snapshot.registry_snapshot_uri,
                     proposer_digest=proposer.implementation_digest,
                     refiner_digest=refiner.implementation_digest,
-                    evaluator_digest=snapshot.evaluator_digest,
+                    evaluator_digest=evaluator_digest,
                     environment_digest=snapshot.environment_digest,
                     previous_checkpoint_uri=snapshot.checkpoint_uri,
                 )
@@ -1000,6 +1065,7 @@ class SearchService:
                 stop_reason=SearchStopReason.WALL_TIME_LIMIT,
                 detail=str(exc),
                 wall_time_ms=_used_wall_ms(accounting, started),
+                accounting_override=partial_accounting,
             )
         except (
             SearchError,
@@ -1015,6 +1081,7 @@ class SearchService:
                 stop_reason=SearchStopReason.ERROR,
                 detail=str(exc),
                 wall_time_ms=_used_wall_ms(accounting, started),
+                accounting_override=partial_accounting,
             )
         finally:
             with self._thread_lock:
@@ -1023,7 +1090,7 @@ class SearchService:
     def _resolve_strategy(
         self,
         snapshot: SearchExperimentSnapshot,
-    ) -> tuple[ResolvedCapability, ResolvedCapability]:
+    ) -> tuple[ResolvedCapability, ResolvedCapability, str]:
         if (
             snapshot.proposer_digest is None
             or snapshot.refiner_digest is None
@@ -1042,7 +1109,7 @@ class SearchService:
             raise SearchError("proposer identity changed after request acceptance")
         if refiner.implementation_digest != snapshot.refiner_digest:
             raise SearchError("refiner identity changed after request acceptance")
-        return proposer, refiner
+        return proposer, refiner, snapshot.evaluator_digest
 
     def _restore(
         self,
@@ -1189,6 +1256,7 @@ class SearchService:
         detail: str,
         *,
         wall_time_ms: int,
+        accounting_override: SearchAccounting | None = None,
     ) -> None:
         if execution_status == ExecutionStatus.TIMEOUT:
             self._finish(
@@ -1198,6 +1266,7 @@ class SearchService:
                 strategy_complete=False,
                 detail=detail,
                 wall_time_ms=wall_time_ms,
+                accounting_override=accounting_override,
             )
             return
         self._finish(
@@ -1207,6 +1276,34 @@ class SearchService:
             strategy_complete=False,
             detail=detail,
             wall_time_ms=wall_time_ms,
+            accounting_override=accounting_override,
+        )
+
+    def _store_archive(
+        self,
+        snapshot: SearchExperimentSnapshot,
+        accounting: SearchAccounting,
+    ) -> ArtifactPutResult:
+        manifest = SearchArchiveManifest(
+            experiment_uri=snapshot.experiment_uri,
+            request_digest=snapshot.request_digest,
+            claim_uri=snapshot.request.claim_uri,
+            plugin_id=snapshot.request.plugin_id,
+            registry_snapshot_uri=snapshot.registry_snapshot_uri,
+            page_uris=snapshot.archive_page_uris,
+            accounting=accounting,
+            effective_budget=snapshot.effective_budget,
+            environment_digest=snapshot.environment_digest,
+        )
+        return self._put_internal_artifact(
+            schema_uri=self.archive_manifest_schema_uri,
+            payload=manifest.model_dump(mode="json"),
+            parents=(
+                snapshot.request.claim_uri,
+                snapshot.request.plugin_id,
+                *((snapshot.checkpoint_uri,) if snapshot.checkpoint_uri else ()),
+            ),
+            summary="search archive manifest",
         )
 
     def _finish(
@@ -1218,33 +1315,14 @@ class SearchService:
         strategy_complete: bool,
         detail: str,
         wall_time_ms: int,
+        accounting_override: SearchAccounting | None = None,
     ) -> None:
         current = self.inspect(experiment_uri)
         terminal_accounting = _updated_accounting(
-            current.accounting,
+            accounting_override or current.accounting,
             wall_time_ms=max(current.accounting.wall_time_ms, wall_time_ms),
         )
-        manifest = SearchArchiveManifest(
-            experiment_uri=experiment_uri,
-            request_digest=current.request_digest,
-            claim_uri=current.request.claim_uri,
-            plugin_id=current.request.plugin_id,
-            registry_snapshot_uri=current.registry_snapshot_uri,
-            page_uris=current.archive_page_uris,
-            accounting=terminal_accounting,
-            effective_budget=current.effective_budget,
-            environment_digest=current.environment_digest,
-        )
-        archive = self._put_internal_artifact(
-            schema_uri=self.archive_manifest_schema_uri,
-            payload=manifest.model_dump(mode="json"),
-            parents=(
-                current.request.claim_uri,
-                current.request.plugin_id,
-                *((current.checkpoint_uri,) if current.checkpoint_uri else ()),
-            ),
-            summary="search archive manifest",
-        )
+        archive = self._store_archive(current, terminal_accounting)
         terminal = _updated_snapshot(
             current,
             state=state,
@@ -1291,6 +1369,7 @@ class SearchService:
         stop_reason: SearchStopReason,
         detail: str,
         wall_time_ms: int,
+        accounting_override: SearchAccounting | None = None,
     ) -> None:
         try:
             snapshot = self.inspect(experiment_uri)
@@ -1303,6 +1382,7 @@ class SearchService:
                 strategy_complete=False,
                 detail=detail,
                 wall_time_ms=wall_time_ms,
+                accounting_override=accounting_override,
             )
         except (SearchError, StoreError, SchemaRegistryError, ValidationError):
             return
