@@ -39,6 +39,7 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
             assert set(tools) == {
+                "capability.describe",
                 "capability.invoke",
                 "artifact.put",
                 "claim.validate",
@@ -240,7 +241,7 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
 
 
 @pytest.mark.integration
-def test_mcp_capability_profile_has_one_extensible_tool_and_catalog(
+def test_mcp_capability_profile_describes_and_invokes_exact_domain_contract(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:
@@ -252,7 +253,10 @@ def test_mcp_capability_profile_has_one_extensible_tool_and_catalog(
         ) as client:
             listed = await client.list_tools()
             assert {tool.name for tool in listed.tools} == CAPABILITY_TOOL_NAMES
-            assert listed.tools[0].output_schema is None
+            assert all(tool.output_schema is None for tool in listed.tools)
+            tools = {tool.name: tool for tool in listed.tools}
+            assert tools["capability.describe"].annotations is not None
+            assert tools["capability.describe"].annotations.read_only_hint is True
 
             resource = await client.read_resource("capability://catalog")
             catalog = json.loads(resource.contents[0].text)
@@ -265,6 +269,38 @@ def test_mcp_capability_profile_has_one_extensible_tool_and_catalog(
                 "reference.solve",
             }
 
+            described = await client.call_tool(
+                "capability.describe",
+                {
+                    "capability_id": "reference.solve",
+                    "reference_name": "erdos_straus",
+                },
+            )
+            contract = json.loads(described.content[0].text)
+            assert contract["capability"]["capability_id"] == "reference.solve"
+            assert set(contract["domain"]["claim_contract"]["predicates"]) == {
+                "erdos_straus_range"
+            }
+            example = contract["domain"]["invocation_examples"][0]
+            assert example["capability_id"] == "reference.solve"
+            assert example["mode"] == "VERIFY"
+            assert example["payload"]["candidate"] == {
+                "lower_bound": 2,
+                "upper_bound": 20,
+            }
+            graph_description = await client.call_tool(
+                "capability.describe",
+                {
+                    "capability_id": "reference.solve",
+                    "reference_name": "graph_paths",
+                },
+            )
+            graph_contract = json.loads(graph_description.content[0].text)["domain"]
+            assert {
+                item["payload"]["predicate"]["name"]
+                for item in graph_contract["invocation_examples"]
+            } == set(graph_contract["claim_contract"]["predicates"])
+
             invoked = await client.call_tool(
                 "capability.invoke",
                 {
@@ -276,6 +312,11 @@ def test_mcp_capability_profile_has_one_extensible_tool_and_catalog(
             projection = json.loads(invoked.content[0].text)
             assert projection["assurance"]["level"] == "COMPUTED"
             assert projection["output"]["hits"] == []
+
+            verified = await client.call_tool("capability.invoke", example)
+            verification = json.loads(verified.content[0].text)
+            assert verification["execution"]["status"] == "COMPLETED"
+            assert verification["assurance"]["level"] == "VERIFIED"
 
     asyncio.run(scenario())
 

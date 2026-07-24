@@ -251,10 +251,78 @@ def test_reference_capability_has_distinct_explore_and_verify_lanes(
     assert explored.output["verification_record_uri"] is None
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert verified.assurance.verification_record_uri is not None
+    assert verified.assurance.verification_record_uri in verified.artifact_uris
+    assert verified.output["artifacts"]["verification_record"] == (
+        verified.assurance.verification_record_uri
+    )
+    assert verified.output["verification"]["checker_id"].startswith("checker://sha256/")
+    assert verified.output["verification"]["arithmetic"] == "EXACT_INTEGER"
+    assert verified.output["stages"]["independent_verification"] == "COMPLETED"
+    assert "bounds" not in verified.scope
     assert {hit.assurance_level for hit in kernel.memory.search(limit=10).hits} >= {
         CapabilityAssuranceLevel.HEURISTIC,
         CapabilityAssuranceLevel.VERIFIED,
     }
+
+
+@pytest.mark.integration
+def test_invalid_reference_candidate_is_actionable_and_not_remembered(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="reference.solve",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "reference_name": "erdos_straus",
+                "predicate": {
+                    "name": "erdos_straus_range",
+                    "parameters": {"lower_bound": 2, "upper_bound": 20},
+                },
+                "candidate": {"minimum": 2, "maximum": 20},
+                "witness_role": "SUPPORTS_CLAIM",
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.assurance.verification_record_uri is None
+    assert result.episode_uri is None
+    assert result.diagnostics[0].code == "INVALID_CANDIDATE"
+    assert result.diagnostics[0].stage == "candidate_validation"
+    assert result.diagnostics[0].path == "$"
+    assert result.diagnostics[0].schema_uri is not None
+    assert "capability.describe" in result.diagnostics[0].hint
+    assert result.output["error"]["code"] == "INVALID_CANDIDATE"
+    assert kernel.memory.search(limit=10).hits == ()
+
+
+@pytest.mark.integration
+def test_unknown_reference_error_is_classified_and_not_remembered(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="reference.solve",
+            input={
+                "reference_name": "not-installed",
+                "predicate": {"name": "anything", "parameters": {}},
+                "candidate": {},
+                "witness_role": "SUPPORTS_CLAIM",
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "UNKNOWN_REFERENCE"
+    assert result.diagnostics[0].stage == "reference_resolution"
+    assert result.episode_uri is None
+    assert kernel.memory.search(limit=10).hits == ()
 
 
 @pytest.mark.integration

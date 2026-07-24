@@ -98,6 +98,19 @@ class CapabilityAssurance(ContractModel):
         return self
 
 
+class CapabilityDiagnostic(ContractModel):
+    """Actionable, stage-aware failure information without a truth claim."""
+
+    code: str = Field(pattern=r"^[A-Z][A-Z0-9_]{2,63}$")
+    stage: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    message: str = Field(min_length=1, max_length=1024)
+    path: str | None = Field(default=None, max_length=512)
+    schema_uri: ArtifactUri | None = None
+    expected: str | None = Field(default=None, max_length=1024)
+    actual_type: str | None = Field(default=None, max_length=128)
+    hint: str | None = Field(default=None, max_length=1024)
+
+
 class CapabilityResult(ContractModel):
     """Compact result shared by local, MCP, and remote capability adapters."""
 
@@ -108,6 +121,7 @@ class CapabilityResult(ContractModel):
     execution: Execution
     output: dict[str, Any] = Field(default_factory=dict)
     scope: dict[str, Any] = Field(default_factory=dict)
+    diagnostics: tuple[CapabilityDiagnostic, ...] = ()
     assurance: CapabilityAssurance
     artifact_uris: tuple[ArtifactUri, ...] = ()
     episode_uri: ArtifactUri | None = None
@@ -116,6 +130,8 @@ class CapabilityResult(ContractModel):
     def enforce_lane_and_canonical_output(self) -> Self:
         canonicalize_json(self.output)
         canonicalize_json(self.scope)
+        if self.execution.status.value == "COMPLETED" and self.diagnostics:
+            raise ValueError("completed capability execution cannot carry diagnostics")
         if (
             self.assurance.level is CapabilityAssuranceLevel.VERIFIED
             and self.mode is not CapabilityMode.VERIFY

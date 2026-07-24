@@ -144,8 +144,10 @@ The lower-level v0.2 verification tools remain available through the `full` and
 
 ## Database-first memory
 
-Every reusable capability invocation is stored as an immutable research
-episode and indexed locally. An episode binds:
+Every operationally completed, reusable capability invocation is stored as an
+immutable research episode and indexed locally. Invalid requests,
+infrastructure errors, timeouts, and cancellations are returned with their
+operational status but do not enter research memory. An episode binds:
 
 - capability and adapter version;
 - exact request and result;
@@ -165,7 +167,8 @@ authority.
 ## Local and remote hosts
 
 The local Codex profile uses STDIO and the `capabilities` tool profile. It
-advertises one extensible tool rather than every backend operation.
+advertises one read-only discovery tool and one extensible invocation tool
+rather than every backend operation.
 
 Remote hosts use Streamable HTTP by default. A remote deployment:
 

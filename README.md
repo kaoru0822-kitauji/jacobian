@@ -100,9 +100,10 @@ documentation placement, and pull-request expectations.
 
 v0.2 alpha is implemented as a Python package, CLI, and local or remote MCP
 adapter. The capability-first projection exposes one stable
-`capability.invoke` tool backed by a discoverable adapter registry and
-trust-labeled research memory. Bundled capabilities provide reference-domain
-exploration and verification, Lean checking, and local episode search.
+`capability.describe` discovery tool and one stable `capability.invoke` tool
+backed by an extensible adapter registry and trust-labeled research memory.
+Bundled capabilities provide reference-domain exploration and verification,
+Lean checking, and local episode search.
 
 The advanced surface retains eight verification tools alongside bounded enumeration,
 implementation-bound canonicalization, independently verified representation
@@ -141,8 +142,10 @@ The repository includes a trusted-project Codex profile at
 `jacobian_local` with `/mcp`; the profile starts `uv run jacobian-mcp` over
 STDIO with the compact `capabilities` profile and stores durable local state
 under the ignored `.jacobian/` directory. The profile advertises
-`capability.invoke`; `capability://catalog` supplies the installed operations,
-schemas, and supported `EXPLORE` or `VERIFY` lanes. Start
+`capability.describe` and `capability.invoke`. Describe an unfamiliar
+capability before invoking it; reference domains include exact predicate and
+candidate schemas plus executable examples. `capability://catalog` remains a
+resource-level catalog for clients that support MCP resources. Start
 `uv run jacobian-mcp --tool-profile full` when the research, transformation,
 and experiment tools or complete wire results are needed.
 

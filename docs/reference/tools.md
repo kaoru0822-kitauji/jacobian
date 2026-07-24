@@ -15,16 +15,24 @@ heuristic operation cannot masquerade as a verifier.
 
 ## Capability-first MCP surface
 
-The default local and remote profile advertises one tool:
+The default local and remote profile advertises two tools:
 
 | Tool | Capability |
 | --- | --- |
-| `capability.invoke` | Invoke an installed operation in `EXPLORE` or `VERIFY` mode. Inputs and outputs are validated against the selected descriptor. Reusable invocations create trust-labeled research episodes. |
+| `capability.describe` | Read an installed capability's exact schema. `reference.solve` descriptions add domain predicate and candidate schemas, binding rules, and executable examples. |
+| `capability.invoke` | Invoke an installed operation in `EXPLORE` or `VERIFY` mode. Inputs and outputs are validated against the selected descriptor. Completed reusable invocations create trust-labeled research episodes. |
 
 Read `capability://catalog` to discover stable IDs, provider versions, supported
 modes, compact JSON Schemas, and tags. Bundled IDs are `reference.solve`,
 `lean.check`, and `knowledge.search`. Operator-installed adapters appear in the
-same catalog without a new MCP tool.
+same catalog without a new MCP tool. Tool-only clients should call
+`capability.describe` before invoking an unfamiliar capability rather than
+guessing payload fields.
+
+Failed invocations carry stage-aware diagnostics with a stable code, JSON path
+when available, schema URI when applicable, and a corrective hint. Invalid
+requests, adapter failures, timeouts, and cancellations do not become research
+episodes and never carry a mathematical conclusion.
 
 `EXPLORE` returns heuristic or computed assurance and does not require a formal
 claim or checker. `VERIFY` may promote a result only when it carries a valid
