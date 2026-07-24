@@ -95,9 +95,13 @@ documentation placement, and pull-request expectations.
 ## Current status
 
 v0.2 alpha is implemented as a local Python package, CLI, and MCP adapter. It
-offers seven verification tools alongside bounded enumeration,
+offers eight verification tools alongside bounded enumeration,
 implementation-bound canonicalization, independently verified representation
 changes, persistent experiment resources, and exact finite-polytope evidence.
+Bundled reference domains cover graph paths and bipartiteness, exact integer
+matrices, and bounded Erdős-Straus decomposition tables. A verified
+Erdős-Straus table establishes only its exact finite interval, never the open
+unbounded conjecture.
 
 The provisional M3/M4 code adds sealed plugin snapshots, a strategy-neutral
 `search.run` service, pause and resume from immutable checkpoints, append-only
@@ -147,8 +151,8 @@ trusting the model's summary:
 uv run python benchmarks/agent_mcp.py
 ```
 
-Raw transcripts, isolated Jacobian state, reports, and scores are written to
-the ignored `benchmarks/results/` directory.
+Raw transcripts, isolated Jacobian state, reports, structured agent feedback,
+and scores are written to the ignored `benchmarks/results/` directory.
 
 ### Lean certificates
 

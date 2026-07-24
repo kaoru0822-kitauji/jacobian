@@ -318,12 +318,19 @@ status.
 
 `benchmarks/agent_mcp.py` runs the public `PATH-CLOSURE-001`,
 `MAT-KERNEL-001`, `GRAPH-BIP-TRUE-001`, `LEAN-NAT-INDUCTION-001`, and
-`LEAN-SQRT2-001` cases through a real Codex CLI using the project
+`LEAN-SQRT2-001` cases, plus the bounded `ERDOS-STRAUS-001` research pilot,
+through a real Codex CLI using the project
 `jacobian_local` MCP profile. Each case receives an isolated state directory.
 The runner retains the raw JSONL transcript and structured agent report, then
 scores the durable verification record, evidence, exact bindings, claim, and
 candidate directly from the Jacobian store. Lean cases additionally bind and
 score the selected runtime environment and declared trust base.
+
+Every agent report also records structured observations in four non-scoring
+categories: useful tooling, tooling gaps, domain-knowledge gaps, and concrete
+improvements. The runner writes these observations to a per-case
+`feedback.json`. Feedback is empirical input for tool design; it is not
+mathematical evidence and cannot affect the durable correctness score.
 
 The local profile uses the registry-derived `verification` projection. At its
 introduction this reduced the advertised descriptor from 82,820 characters
@@ -339,10 +346,24 @@ remeasured when contracts change.
 
 The domain bootstrap projection reduced the serialized `graph_paths` resource
 from 7,317 to 2,402 characters, `matrices` from 7,290 to 2,197, and `lean4`
-from 4,106 to 1,810. The positive graph workflow response reduced from 6,098
-to 1,314 characters. The full schemas and workflow results remain available
-through the canonical registry and `full` MCP profile; only model-facing
-projection changed.
+from 4,106 to 1,810. The bounded `erdos_straus` bootstrap is 1,906 characters.
+Adding that domain did not change the tool descriptors: the compact profile
+remains 7,883 characters and the full profile remains 103,382. The positive
+graph workflow response reduced from 6,098 to 1,314 characters. The full
+schemas and workflow results remain available through the canonical registry
+and `full` MCP profile; only model-facing projection changed.
+
+An exploratory local `ERDOS-STRAUS-001` run on 2026-07-24 passed all durable
+scorer checks for the interval \(2\leq n\leq1000\). It used two MCP calls
+(`read_mcp_resource` and `verification.run`), took 97.891 seconds, and reported
+93,325 input tokens, including 69,632 cached input tokens, plus 2,088 output
+tokens. The agent identified the compact domain identity, exact checker
+identity, finite-scope rule, composed workflow, assurance separation, and
+durable URIs as useful. It reported no tooling gaps, domain-knowledge gaps, or
+suggested improvements in that run. This was a dirty-worktree development run
+against commit `990d26a`; it is implementation feedback, not a frozen
+comparative baseline. The total input remains close enough to the 100,000-token
+first-stage target that future multi-case runs should continue to track it.
 
 Run the kernel condition with:
 

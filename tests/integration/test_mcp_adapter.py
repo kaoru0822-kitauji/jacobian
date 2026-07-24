@@ -109,6 +109,25 @@ def test_mcp_exposes_v02_tool_surface_and_persistent_resources(
                 "Transformer",
                 "WitnessOracle",
             ]
+            erdos_straus = catalog["erdos_straus"]
+            assert erdos_straus["agent_contract_uri"] == (
+                "reference://domain/erdos_straus"
+            )
+            assert erdos_straus["domain_id"] == "jacobian.erdos-straus"
+            assert erdos_straus["available_capabilities"] == [
+                "Evaluator",
+                "WitnessOracle",
+            ]
+            erdos_contract_result = await client.read_resource(
+                "reference://domain/erdos_straus"
+            )
+            erdos_contract = json.loads(erdos_contract_result.contents[0].text)
+            assert set(erdos_contract["claim_contract"]["predicates"]) == {
+                "erdos_straus_range"
+            }
+            assert erdos_contract["semantics"]["checker_identity"] == (
+                "4*x*y*z = n*(x*y + x*z + y*z)"
+            )
             assert catalog["finite_polytopes"]["certificate_checker_id"].startswith(
                 "checker://sha256/"
             )

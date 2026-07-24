@@ -1,4 +1,4 @@
-"""Operator bootstrap for the two v0.2 reference domains."""
+"""Operator bootstrap for the bundled v0.2 reference domains."""
 
 from __future__ import annotations
 
@@ -104,7 +104,12 @@ class ReferenceInstaller:
     def install_all(self) -> dict[str, ReferenceInstallation]:
         graph = self.install_graph_paths()
         matrix = self.install_matrices()
-        return {graph.name: graph, matrix.name: matrix}
+        erdos_straus = self.install_erdos_straus()
+        return {
+            graph.name: graph,
+            matrix.name: matrix,
+            erdos_straus.name: erdos_straus,
+        }
 
     def install_polytope_checkers(
         self,
@@ -531,6 +536,88 @@ class ReferenceInstaller:
             representation_semantics_uris={"row_major": row_major_semantics},
         )
 
+    def install_erdos_straus(self) -> ReferenceInstallation:
+        domain = "jacobian.erdos-straus"
+        semantics = self.store.register_descriptor(
+            kind="semantics",
+            name=domain,
+            version="1",
+            definition={
+                "description": (
+                    "bounded Erdős-Straus claims over every integer n in one "
+                    "closed interval"
+                ),
+                "equation": "4/n = 1/x + 1/y + 1/z",
+                "variables": "positive integers n, x, y, z",
+                "scope_rule": (
+                    "a verified result covers only the exact finite interval "
+                    "bound to the claim and candidate"
+                ),
+                "checker_identity": "4*x*y*z = n*(x*y + x*z + y*z)",
+                "reference_limit": 10_000,
+            },
+        )
+        range_schema = _erdos_straus_range_schema()
+        claim_schema = self.schemas.register(
+            name=f"{domain}.claim",
+            version="1",
+            schema=_claim_schema(
+                predicate_parameters={"erdos_straus_range": range_schema}
+            ),
+        )
+        candidate_schema = self.schemas.register(
+            name=f"{domain}.candidate",
+            version="1",
+            schema={
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                **range_schema,
+            },
+        )
+        capabilities = self._capabilities(
+            {
+                "Evaluator": ("jacobian.plugins.erdos_straus:evaluate_capability"),
+                "WitnessOracle": (
+                    "jacobian.plugins.erdos_straus:find_witness_capability"
+                ),
+            }
+        )
+        plugin_id = self._install_manifest(
+            domain=domain,
+            semantics_uri=semantics,
+            claim_schema_uri=claim_schema,
+            candidate_schema_uri=candidate_schema,
+            capabilities=capabilities,
+        )
+        witness_checkers = {
+            "erdos_straus.decomposition_table": self._authorize_checker(
+                name="bounded Erdős-Straus decomposition-table checker",
+                entrypoint=("jacobian_checkers.erdos_straus:check_decomposition_table"),
+                evidence_kind="WITNESS",
+                format_id="erdos_straus.decomposition_table",
+                claim_schema=claim_schema,
+                semantics=semantics,
+                candidate_schema=candidate_schema,
+            )
+        }
+        return ReferenceInstallation(
+            name="erdos_straus",
+            domain_id=domain,
+            domain_version="1",
+            available_capabilities=tuple(sorted(capabilities)),
+            plugin_id=plugin_id,
+            semantics_uri=semantics,
+            claim_schema_uri=claim_schema,
+            candidate_schema_uri=candidate_schema,
+            witness_schema_uri=self.witness_schema_uri,
+            certificate_schema_uri=self.certificate_schema_uri,
+            witness_checker_ids=witness_checkers,
+            certificate_checker_ids={},
+            preservation_checker_ids={},
+            transformation_checker_ids={},
+            representation_schema_uris={},
+            representation_semantics_uris={},
+        )
+
     def _capabilities(
         self,
         entrypoints: dict[str, str],
@@ -731,6 +818,18 @@ def _matrix_scope_schema() -> dict[str, Any]:
             },
         },
         "required": ["rows", "cols", "entries"],
+        "additionalProperties": False,
+    }
+
+
+def _erdos_straus_range_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "lower_bound": {"type": "integer", "minimum": 2, "maximum": 10_000},
+            "upper_bound": {"type": "integer", "minimum": 2, "maximum": 10_000},
+        },
+        "required": ["lower_bound", "upper_bound"],
         "additionalProperties": False,
     }
 

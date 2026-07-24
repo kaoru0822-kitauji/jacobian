@@ -58,11 +58,20 @@ It should test that the kernel does not assume:
 - every search uses mutation;
 - witnesses have the same representation as candidates.
 
-## Third-domain candidate: finite magmas
+## Reference C: bounded Erdős-Straus decompositions
+
+The third bundled plugin verifies finite intervals of the Erdős-Straus
+unit-fraction statement. `ERDOS-STRAUS-001` binds the interval, a complete
+decomposition table, and exact integer replay. Its checker is independent of
+the table-generation routine. The case tests positive exhaustive witnesses and
+the requirement that a bounded result not be generalized to the open
+conjecture.
+
+## Later-domain candidate: finite magmas
 
 `MAGMA-IMPL-001` adds finite operation tables, equational-law evaluation, and a
-model-plus-assignment witness. It is the preferred third plugin after the v0.2
-capability surface is stable.
+model-plus-assignment witness. It remains a candidate after the v0.2 capability
+surface is stable.
 
 ## Historical end-to-end episodes
 

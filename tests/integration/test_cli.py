@@ -47,11 +47,15 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
     assert result.exit_code == 0
     catalog = json.loads(result.stdout)
     assert set(catalog) == {
+        "erdos_straus",
         "graph_paths",
         "matrices",
         "finite_polytopes",
         "lean4",
     }
+    assert catalog["erdos_straus"]["witness_checker_ids"][
+        "erdos_straus.decomposition_table"
+    ].startswith("checker://sha256/")
     assert catalog["finite_polytopes"]["certificate_checker_id"].startswith(
         "checker://sha256/"
     )

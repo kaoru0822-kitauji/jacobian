@@ -356,6 +356,48 @@ There are \(2^9=512\) labeled candidates. A complete labeled enumeration finds
 
 This is the initial non-graph reference-plugin optimization workload.
 
+### ERDOS-STRAUS-001 — Bounded unit-fraction verification
+
+**Bounded claim**
+
+For every integer \(n\) in the exact closed interval \(2\leq n\leq1000\),
+there are positive integers \(x,y,z\) such that
+
+\[
+\frac4n=\frac1x+\frac1y+\frac1z.
+\]
+
+This is a finite executable instance of the Erdős-Straus conjecture. It is not
+a proof of the unbounded conjecture.
+
+**Evidence**
+
+The search plugin proposes one row \((n,x,y,z)\) for every integer in the
+interval. The independent checker requires exactly the declared set of
+\(n\)-values, rejects duplicates and nonpositive denominators, and checks each
+row using only the integer identity
+
+\[
+4xyz=n(xy+xz+yz).
+\]
+
+**Capabilities**
+
+- `evaluate.batch` performs unverified exact bounded search;
+- `witness.find` proposes a complete decomposition table;
+- `witness.verify` independently replays every row and the exact interval;
+- `verification.run` composes those stages without merging their assurance
+  labels.
+
+**Adversarial variants**
+
+- omit one value of \(n\) while claiming exhaustive coverage;
+- duplicate one valid row to preserve the row count;
+- use a valid table for a nearby upper bound;
+- accept zero or negative denominators;
+- promote timeout or failure to find a row into a counterexample;
+- report the finite result as a proof of the full conjecture.
+
 ### MAGMA-IMPL-001 — A finite countermodel to a false implication
 
 **Claim**
