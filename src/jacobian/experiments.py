@@ -292,9 +292,7 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentNotFoundError(
-                    f"experiment not found: {experiment_uri}"
-                )
+                raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
             snapshot = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -765,9 +763,7 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentNotFoundError(
-                    f"experiment not found: {experiment_uri}"
-                )
+                raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
             snapshot = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )

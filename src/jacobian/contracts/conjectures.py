@@ -135,9 +135,7 @@ class FalsificationPlan(ContractModel):
             WitnessRole.DEFEATS_CANDIDATE,
             WitnessRole.REFUTES_CLAIM,
         }:
-            raise ValueError(
-                "falsification requires a defeating or refuting witness"
-            )
+            raise ValueError("falsification requires a defeating or refuting witness")
         return self
 
 

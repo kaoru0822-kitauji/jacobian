@@ -62,9 +62,7 @@ def test_falsification_plan_rejects_supporting_witness_roles() -> None:
     ):
         FalsificationPlan(
             witness_role="SUPPORTS_CLAIM",
-            counterexample_checker_id=(
-                "checker://sha256/" + "c" * 64
-            ),
+            counterexample_checker_id=("checker://sha256/" + "c" * 64),
             budget=_budget(),
         )
 
