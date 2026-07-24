@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -123,7 +124,7 @@ def _request(
             iterations_max=8,
             wall_seconds=wall_seconds,
             batch_size=batch_size,
-            workers=4,
+            workers=1,
         ),
     )
 
@@ -170,6 +171,69 @@ def test_search_run_checkpoints_strategy_neutral_lineage(tmp_path: Path) -> None
     )
     assert proposer_event.payload["request_digest"].startswith("sha256:")
     assert proposer_event.payload["output_digest"].startswith("sha256:")
+
+
+@pytest.mark.integration
+def test_checkpoint_persistence_is_included_in_wall_accounting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+    original_put = kernel.search._put_internal_artifact
+
+    def delayed_put(**kwargs: object) -> object:
+        if kwargs.get("summary") == "immutable search checkpoint":
+            time.sleep(1)
+        return original_put(**kwargs)
+
+    monkeypatch.setattr(kernel.search, "_put_internal_artifact", delayed_put)
+    started = time.monotonic()
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-accounting-persistence-001",
+            batch_size=4,
+        )
+    )
+    snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+
+    assert snapshot.state is ExperimentState.COMPLETED
+    assert snapshot.accounting.wall_time_ms >= elapsed_ms - 400
+
+
+@pytest.mark.integration
+def test_checkpoint_persistence_cannot_complete_past_wall_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+    original_put = kernel.search._put_internal_artifact
+
+    def delayed_put(**kwargs: object) -> object:
+        if kwargs.get("summary") == "immutable search checkpoint":
+            time.sleep(5.1)
+        return original_put(**kwargs)
+
+    monkeypatch.setattr(kernel.search, "_put_internal_artifact", delayed_put)
+    handle = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-accounting-timeout-001",
+            batch_size=4,
+            wall_seconds=5,
+        )
+    )
+    snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
+
+    assert snapshot.state is ExperimentState.TIMEOUT
+    assert snapshot.stop_reason is SearchStopReason.WALL_TIME_LIMIT
+    assert snapshot.strategy_reported_complete is False
+    assert snapshot.accounting.wall_time_ms >= 5_000
 
 
 @pytest.mark.integration
@@ -421,6 +485,100 @@ def test_interrupted_cancellation_remains_cancelled_after_recovery(
         "RECOVERED_CANCELLED",
         "RECOVERY_ARCHIVE_COMMITTED",
     ]
+
+
+@pytest.mark.integration
+def test_corrupt_snapshot_is_quarantined_without_blocking_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    claim_uri, plugin_id = _install_search_plugin(kernel)
+    monkeypatch.setattr(kernel.search, "_launch", lambda _experiment_uri: None)
+    valid = kernel.search.start(
+        _request(
+            claim_uri,
+            plugin_id,
+            idempotency_key="search-recovery-valid-001",
+        )
+    )
+    valid_snapshot = kernel.search.inspect(valid.experiment_uri)
+    corrupt_uri = "experiment://ffffffffffffffffffffffffffffffff"
+    mismatched_uri = "experiment://eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    invalid_state_uri = "experiment://dddddddddddddddddddddddddddddddd"
+    with sqlite3.connect(kernel.store.db_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute(
+            """
+            INSERT INTO search_experiments (
+                experiment_uri, state, snapshot_json
+            ) VALUES (?, 'RUNNING', ?)
+            """,
+            (corrupt_uri, b"{"),
+        )
+        connection.execute(
+            """
+            INSERT INTO search_experiments (
+                experiment_uri, state, snapshot_json
+            ) VALUES (?, 'PENDING', ?)
+            """,
+            (
+                mismatched_uri,
+                canonicalize_json(valid_snapshot.model_dump(mode="json")),
+            ),
+        )
+        invalid_state_snapshot = valid_snapshot.model_copy(
+            update={"experiment_uri": invalid_state_uri}
+        )
+        connection.execute(
+            """
+            INSERT INTO search_experiments (
+                experiment_uri, state, snapshot_json
+            ) VALUES (?, 'BROKEN', ?)
+            """,
+            (
+                invalid_state_uri,
+                canonicalize_json(invalid_state_snapshot.model_dump(mode="json")),
+            ),
+        )
+
+    recovered = JacobianKernel(tmp_path)
+
+    assert (
+        recovered.search.inspect(valid.experiment_uri).state is ExperimentState.PAUSED
+    )
+    with sqlite3.connect(recovered.store.db_path) as connection:
+        states = connection.execute(
+            """
+            SELECT experiment_uri, state
+            FROM search_experiments
+            WHERE experiment_uri IN (?, ?, ?)
+            ORDER BY experiment_uri
+            """,
+            (corrupt_uri, mismatched_uri, invalid_state_uri),
+        ).fetchall()
+        failures = connection.execute(
+            """
+            SELECT experiment_uri, snapshot_digest, detail
+            FROM search_recovery_failures
+            WHERE experiment_uri IN (?, ?, ?)
+            ORDER BY experiment_uri
+            """,
+            (corrupt_uri, mismatched_uri, invalid_state_uri),
+        ).fetchall()
+    assert states == [
+        (invalid_state_uri, "ERROR"),
+        (mismatched_uri, "ERROR"),
+        (corrupt_uri, "ERROR"),
+    ]
+    assert len(failures) == 3
+    assert all(str(failure[1]).startswith("sha256:") for failure in failures)
+    assert all("invalid" in str(failure[2]) for failure in failures)
+    assert recovered.search.events(corrupt_uri)[-1].event_type == "RECOVERY_REJECTED"
+    assert recovered.search.events(mismatched_uri)[-1].event_type == "RECOVERY_REJECTED"
+    assert (
+        recovered.search.events(invalid_state_uri)[-1].event_type == "RECOVERY_REJECTED"
+    )
 
 
 @pytest.mark.integration

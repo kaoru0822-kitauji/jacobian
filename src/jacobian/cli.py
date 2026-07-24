@@ -457,6 +457,19 @@ def parameter_generalize(
     _emit(result.model_dump(mode="json"))
 
 
+@app.command("parameter-region-promote")
+def parameter_region_promote(
+    context: typer.Context,
+    subject_uri: str,
+    verification_record_uri: str,
+) -> None:
+    result = _state(context).kernel.conjectures.promote_parameter_region(
+        subject_uri=subject_uri,
+        verification_record_uri=verification_record_uri,
+    )
+    _emit(result.model_dump(mode="json"))
+
+
 @app.command("transform-apply")
 def transform_apply(
     context: typer.Context,

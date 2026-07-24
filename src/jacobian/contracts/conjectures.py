@@ -43,6 +43,11 @@ class ParameterRegionEvidence(StrEnum):
     VERIFIED_NECESSARY = "VERIFIED_NECESSARY"
 
 
+class ParameterRegionKind(StrEnum):
+    SUFFICIENT = "SUFFICIENT"
+    NECESSARY = "NECESSARY"
+
+
 class HypothesisEdit(ContractModel):
     kind: str = Field(min_length=1, max_length=128)
     description: str = Field(min_length=1, max_length=512)
@@ -57,9 +62,13 @@ class HypothesisEdit(ContractModel):
 
 
 class ParameterRegion(ContractModel):
+    """Proposed, sampled, or independently verified parameter conditions."""
+
+    kind: ParameterRegionKind
     conditions: dict[str, Any]
     evidence: ParameterRegionEvidence
     sample_uris: tuple[ArtifactUri, ...] = ()
+    subject_uri: ArtifactUri | None = None
     verification_record_uri: ArtifactUri | None = None
 
     @model_validator(mode="after")
@@ -69,18 +78,32 @@ class ParameterRegion(ContractModel):
             ParameterRegionEvidence.VERIFIED_SUFFICIENT,
             ParameterRegionEvidence.VERIFIED_NECESSARY,
         }
-        if verified and self.verification_record_uri is None:
-            raise ValueError("verified parameter regions require a verification record")
+        if verified and (
+            self.subject_uri is None or self.verification_record_uri is None
+        ):
+            raise ValueError(
+                "verified parameter regions require a subject and verification record"
+            )
         if not verified and self.verification_record_uri is not None:
             raise ValueError(
                 "unverified parameter regions cannot cite a verification record"
             )
         if self.evidence is ParameterRegionEvidence.SAMPLED and not self.sample_uris:
             raise ValueError("sampled parameter regions require sample artifacts")
+        if (
+            self.evidence is ParameterRegionEvidence.VERIFIED_SUFFICIENT
+            and self.kind is not ParameterRegionKind.SUFFICIENT
+        ) or (
+            self.evidence is ParameterRegionEvidence.VERIFIED_NECESSARY
+            and self.kind is not ParameterRegionKind.NECESSARY
+        ):
+            raise ValueError("verified parameter-region label differs from its kind")
         return self
 
 
 class PluginHypothesisProposal(ContractModel):
+    """Untrusted hypothesis output that cannot bind or promote verification."""
+
     claim: dict[str, Any]
     edit: HypothesisEdit
     metrics: dict[str, Any] = Field(default_factory=dict)
@@ -98,6 +121,11 @@ class PluginHypothesisProposal(ContractModel):
             raise ValueError(
                 "hypothesis plugins cannot promote parameter-region evidence"
             )
+        if (
+            self.parameter_region is not None
+            and self.parameter_region.subject_uri is not None
+        ):
+            raise ValueError("hypothesis plugins cannot bind parameter-region subjects")
         return self
 
 
@@ -173,6 +201,21 @@ class ConjectureWorkflowRequest(ContractModel):
             raise ValueError(
                 "conjecture generation does not accept a source verification record"
             )
+        return self
+
+
+class ParameterRegionSubject(ContractModel):
+    """Immutable claim, relation, conditions, and samples certified as a unit."""
+
+    subject_version: Literal["1"] = "1"
+    claim_uri: ArtifactUri
+    kind: ParameterRegionKind
+    conditions: dict[str, Any]
+    sample_uris: tuple[ArtifactUri, ...] = ()
+
+    @model_validator(mode="after")
+    def require_canonical_conditions(self) -> Self:
+        canonicalize_json(self.conditions)
         return self
 
 

@@ -22,6 +22,7 @@ from jacobian.contracts.conjectures import (
     ConjectureWorkflowRequest,
     ConjectureWorkflowResult,
     FalsificationPlan,
+    ParameterRegion,
 )
 from jacobian.contracts.discovery import (
     EnumerationBudget,
@@ -85,7 +86,7 @@ class SearchBudgetInput(AdapterModel):
     iterations_max: int = Field(default=10_000, ge=1, le=10_000_000)
     wall_seconds: int = Field(default=300, ge=1, le=86_400)
     batch_size: int = Field(default=32, ge=1, le=4096)
-    workers: int = Field(default=1, ge=1, le=32)
+    workers: int = Field(default=1, ge=1, le=1)
 
 
 class FalsificationPlanInput(AdapterModel):
@@ -819,6 +820,24 @@ def _register_conjecture_tools(
                 wall_seconds=wall_seconds,
                 falsification=_falsification_plan(falsification),
             ),
+        )
+
+    @server.tool(
+        name="parameter.region.promote",
+        description=(
+            "Replay an authorized certificate bound to an immutable parameter "
+            "region before labeling it verified sufficient or necessary."
+        ),
+        structured_output=True,
+    )
+    async def parameter_region_promote(
+        subject_uri: str,
+        verification_record_uri: str,
+    ) -> ParameterRegion:
+        return await asyncio.to_thread(
+            kernel.conjectures.promote_parameter_region,
+            subject_uri=subject_uri,
+            verification_record_uri=verification_record_uri,
         )
 
 

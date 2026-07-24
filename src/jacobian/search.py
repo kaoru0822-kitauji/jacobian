@@ -75,7 +75,17 @@ class _SearchBudgetExhaustedError(SearchError):
 
 
 class SearchService:
-    """Coordinate untrusted strategies over existing verification boundaries."""
+    """Coordinate untrusted strategies over durable verification boundaries.
+
+    SQLite owns idempotent request acceptance, current lifecycle state, and
+    append-only events. Immutable artifacts own checkpoints and archive
+    lineage. The service may replay work after the last committed checkpoint,
+    but it never derives a mathematical conclusion from strategy completion,
+    timeout, cancellation, or recovery state.
+
+    The reference scheduler assumes one active coordinator per state directory
+    and accepts exactly one strategy worker.
+    """
 
     def __init__(
         self,
@@ -146,7 +156,13 @@ class SearchService:
         return connection
 
     def _initialize_database(self) -> None:
-        """Create metadata tables and recover interrupted runs as paused."""
+        """Create metadata tables and isolate recovery one row at a time.
+
+        Active runs recover as paused, pending cancellation recovers as
+        cancelled, and malformed or index-inconsistent snapshots are
+        quarantined as errors. A corrupt row must not prevent unrelated
+        experiments from recovering.
+        """
 
         archive_recoveries: list[SearchExperimentSnapshot] = []
         with self._connect() as connection:
@@ -175,6 +191,15 @@ class SearchService:
                         REFERENCES search_experiments(experiment_uri)
                         ON DELETE RESTRICT
                 );
+                CREATE TABLE IF NOT EXISTS search_recovery_failures (
+                    experiment_uri TEXT PRIMARY KEY,
+                    detected_at TEXT NOT NULL,
+                    snapshot_digest TEXT NOT NULL,
+                    detail TEXT NOT NULL,
+                    FOREIGN KEY (experiment_uri)
+                        REFERENCES search_experiments(experiment_uri)
+                        ON DELETE RESTRICT
+                );
                 CREATE TRIGGER IF NOT EXISTS search_events_no_update
                 BEFORE UPDATE ON search_events
                 BEGIN
@@ -190,18 +215,39 @@ class SearchService:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """
-                SELECT experiment_uri, snapshot_json
+                SELECT experiment_uri, state, snapshot_json
                 FROM search_experiments
                 WHERE state IN (
                     'PENDING', 'RUNNING', 'PAUSE_REQUESTED',
                     'CANCEL_REQUESTED', 'CANCELLED'
                 )
+                OR state NOT IN (
+                    'PENDING', 'RUNNING', 'PAUSE_REQUESTED', 'PAUSED',
+                    'COMPLETED', 'CANCEL_REQUESTED', 'CANCELLED',
+                    'TIMEOUT', 'ERROR'
+                )
                 """
             ).fetchall()
             for row in rows:
-                snapshot = SearchExperimentSnapshot.model_validate(
-                    loads_strict_json(row["snapshot_json"])
-                )
+                try:
+                    snapshot = SearchExperimentSnapshot.model_validate(
+                        loads_strict_json(row["snapshot_json"])
+                    )
+                except (TypeError, ValidationError, ValueError) as exc:
+                    self._quarantine_recovery_snapshot(connection, row, exc)
+                    continue
+                if snapshot.experiment_uri != str(
+                    row["experiment_uri"]
+                ) or snapshot.state.value != str(row["state"]):
+                    self._quarantine_recovery_snapshot(
+                        connection,
+                        row,
+                        ValueError(
+                            "stored search snapshot identity or state differs "
+                            "from its database index"
+                        ),
+                    )
+                    continue
                 if snapshot.state is ExperimentState.CANCELLED:
                     if snapshot.archive_uri is None:
                         archive_recoveries.append(snapshot)
@@ -242,6 +288,56 @@ class SearchService:
                     archive_recoveries.append(recovered)
         for snapshot in archive_recoveries:
             self._commit_recovery_archive(snapshot)
+
+    def _quarantine_recovery_snapshot(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        error: Exception,
+    ) -> None:
+        """Isolate one corrupt row without blocking unrelated recovery."""
+
+        experiment_uri = str(row["experiment_uri"])
+        raw = row["snapshot_json"]
+        if isinstance(raw, bytes):
+            raw_bytes = raw
+        elif isinstance(raw, str):
+            raw_bytes = raw.encode("utf-8")
+        else:
+            raw_bytes = repr(raw).encode("utf-8")
+        snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
+        detail = f"stored search snapshot is invalid: {type(error).__name__}"
+        detected_at = _now()
+        connection.execute(
+            """
+            UPDATE search_experiments
+            SET state = 'ERROR'
+            WHERE experiment_uri = ?
+            """,
+            (experiment_uri,),
+        )
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO search_recovery_failures (
+                experiment_uri, detected_at, snapshot_digest, detail
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (experiment_uri, detected_at.isoformat(), snapshot_digest, detail),
+        )
+        try:
+            self._append_event(
+                connection,
+                experiment_uri,
+                event_type="RECOVERY_REJECTED",
+                payload={
+                    "snapshot_digest": snapshot_digest,
+                    "detail": detail,
+                },
+            )
+        except ValidationError:
+            # The quarantine row remains authoritative when the corrupt
+            # experiment identifier cannot itself satisfy the event contract.
+            return
 
     def _commit_recovery_archive(
         self,
@@ -577,7 +673,7 @@ class SearchService:
             iterations_max=min(requested.iterations_max, self.max_iterations),
             wall_seconds=min(requested.wall_seconds, self.max_wall_seconds),
             batch_size=min(requested.batch_size, self.max_batch_size),
-            workers=1,
+            workers=requested.workers,
         )
 
     def _launch(self, experiment_uri: str) -> None:
@@ -1021,6 +1117,10 @@ class SearchService:
                     parents=tuple(checkpoint_parents),
                     summary="immutable search checkpoint",
                 )
+                persisted_accounting = next_accounting.model_copy(
+                    update={"wall_time_ms": _used_wall_ms(accounting, started)}
+                )
+                partial_accounting = persisted_accounting
                 current = self.inspect(experiment_uri)
                 progress = _updated_snapshot(
                     current,
@@ -1028,13 +1128,13 @@ class SearchService:
                     updated_at=_now(),
                     checkpoint_uri=stored_checkpoint.artifact_uri,
                     archive_page_uris=tuple(page_uris),
-                    accounting=next_accounting,
+                    accounting=persisted_accounting,
                     detail=proposal.detail or refinement.detail,
                 )
                 control_state = self._commit_progress(progress)
                 snapshot = self.inspect(experiment_uri)
                 strategy_state = refinement.state
-                accounting = next_accounting
+                accounting = persisted_accounting
                 started = time.monotonic()
                 if control_state == ExperimentState.PAUSED:
                     return
@@ -1045,6 +1145,16 @@ class SearchService:
                         stop_reason=SearchStopReason.CANCELLED,
                         strategy_complete=False,
                         detail="search cancelled",
+                        wall_time_ms=accounting.wall_time_ms,
+                    )
+                    return
+                if accounting.wall_time_ms >= budget.wall_seconds * 1000:
+                    self._finish(
+                        experiment_uri,
+                        state=ExperimentState.TIMEOUT,
+                        stop_reason=SearchStopReason.WALL_TIME_LIMIT,
+                        strategy_complete=False,
+                        detail="search wall-clock budget exhausted",
                         wall_time_ms=accounting.wall_time_ms,
                     )
                     return
@@ -1121,6 +1231,15 @@ class SearchService:
         set[str],
         SearchAccounting,
     ]:
+        """Rebind immutable progress before returning opaque strategy state.
+
+        Archive pages and the checkpoint must agree with the experiment,
+        request, installed registry snapshot, implementation identities,
+        environment, effective budget, and committed accounting. The snapshot's
+        later wall-time sample may exceed the checkpoint payload because it
+        includes checkpoint artifact persistence.
+        """
+
         page_uris = list(snapshot.archive_page_uris)
         seen_uris: set[str] = set()
         nominated_uris: set[str] = set()
@@ -1149,10 +1268,14 @@ class SearchService:
         checkpoint = SearchCheckpoint.model_validate(
             self.store.get(snapshot.checkpoint_uri).payload
         )
+        checkpoint_counts = checkpoint.accounting.model_copy(
+            update={"wall_time_ms": snapshot.accounting.wall_time_ms}
+        )
         if (
             checkpoint.experiment_uri != snapshot.experiment_uri
             or checkpoint.request_digest != snapshot.request_digest
-            or checkpoint.accounting != snapshot.accounting
+            or checkpoint_counts != snapshot.accounting
+            or checkpoint.accounting.wall_time_ms > snapshot.accounting.wall_time_ms
             or checkpoint.effective_budget != snapshot.effective_budget
             or checkpoint.registry_snapshot_uri != snapshot.registry_snapshot_uri
             or checkpoint.proposer_digest != snapshot.proposer_digest
@@ -1166,7 +1289,7 @@ class SearchService:
             page_uris,
             seen_uris,
             nominated_uris,
-            checkpoint.accounting,
+            snapshot.accounting,
         )
 
     def _mark_running(

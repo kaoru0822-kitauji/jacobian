@@ -237,6 +237,7 @@ def transform_fixture_hypothesis(request: dict[str, Any]) -> dict[str, Any]:
     }
     if operation == "PARAMETER_GENERALIZE":
         proposal["parameter_region"] = {
+            "kind": request["constraints"].get("region_kind", "SUFFICIENT"),
             "conditions": {"n": {"minimum": "1"}},
             "evidence": "SAMPLED",
             "sample_uris": [request["evidence"][-1]["artifact_uri"]],
@@ -267,8 +268,10 @@ def transform_with_unsupported_region_promotion(
                     "description": "unsupported promotion attempt",
                 },
                 "parameter_region": {
+                    "kind": "SUFFICIENT",
                     "conditions": {"n": {"minimum": "1"}},
                     "evidence": "VERIFIED_SUFFICIENT",
+                    "subject_uri": request["evidence"][0]["artifact_uri"],
                     "verification_record_uri": (request["evidence"][0]["artifact_uri"]),
                 },
             }
@@ -284,6 +287,7 @@ def transform_with_unbound_region_sample(
     response = transform_fixture_hypothesis(request)
     for proposal in response["proposals"]:
         proposal["parameter_region"] = {
+            "kind": "SUFFICIENT",
             "conditions": {"n": {"minimum": "1"}},
             "evidence": "SAMPLED",
             "sample_uris": [request["constraints"]["sample_uri"]],

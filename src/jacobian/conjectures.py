@@ -18,6 +18,10 @@ from jacobian.contracts.conjectures import (
     HypothesisRecord,
     HypothesisTransformationRecord,
     NoveltyAssessment,
+    ParameterRegion,
+    ParameterRegionEvidence,
+    ParameterRegionKind,
+    ParameterRegionSubject,
     PluginHypothesisResponse,
 )
 from jacobian.contracts.evidence import WitnessEnvelope, WitnessRole
@@ -49,7 +53,12 @@ class ConjectureError(RuntimeError):
 
 
 class ConjectureService:
-    """Create unverified hypotheses and optionally route them through M3."""
+    """Create unverified hypotheses and optionally route them through M3.
+
+    Hypothesis plugins own domain grammar and heuristics. This service owns
+    exact source/evidence replay, immutable edit lineage, schema validation,
+    deduplication, and the rule that plugin output cannot promote evidence.
+    """
 
     def __init__(
         self,
@@ -80,6 +89,11 @@ class ConjectureService:
             name="jacobian.hypothesis-transformation",
             version="1",
             schema=HypothesisTransformationRecord.model_json_schema(),
+        )
+        self.parameter_region_subject_schema_uri = schemas.register(
+            name="jacobian.parameter-region-subject",
+            version="1",
+            schema=ParameterRegionSubject.model_json_schema(),
         )
 
     def run(
@@ -207,6 +221,99 @@ class ConjectureService:
             hypotheses=hypotheses,
             verification=Verification.UNVERIFIED,
             detail=response.detail,
+        )
+
+    def promote_parameter_region(
+        self,
+        *,
+        subject_uri: str,
+        verification_record_uri: str,
+    ) -> ParameterRegion:
+        """Replay an exact certificate record before promoting a region.
+
+        Promotion requires both object-digest bindings and the exact subject
+        and claim artifact URIs in the verification record's parents. The URI
+        checks prevent substitution of an equal payload carried by different
+        lineage metadata. Replay must reproduce the supplied record URI, which
+        binds the authorized checker, evidence, request, and environment.
+        """
+
+        try:
+            subject_artifact = self.store.get(subject_uri)
+            if (
+                subject_artifact.manifest.schema_uri
+                != self.parameter_region_subject_schema_uri
+            ):
+                raise ConjectureError(
+                    "parameter-region subject uses an unexpected schema"
+                )
+            subject = ParameterRegionSubject.model_validate(subject_artifact.payload)
+            claim = self.store.get(subject.claim_uri)
+            subject_parents = set(subject_artifact.manifest.parents)
+            if subject.claim_uri not in subject_parents or not set(
+                subject.sample_uris
+            ).issubset(subject_parents):
+                raise ConjectureError(
+                    "parameter-region subject is missing its declared lineage"
+                )
+            if claim.manifest.semantics_uri != subject_artifact.manifest.semantics_uri:
+                raise ConjectureError(
+                    "parameter-region subject and target claim semantics differ"
+                )
+            record_artifact = self.store.get(verification_record_uri)
+            record = VerificationRecord.model_validate(record_artifact.payload)
+            record_parents = set(record_artifact.manifest.parents)
+            if subject_artifact.artifact_uri not in record_parents:
+                raise ConjectureError(
+                    "parameter-region verification does not bind the supplied "
+                    "subject artifact"
+                )
+            if subject.claim_uri not in record_parents:
+                raise ConjectureError(
+                    "parameter-region verification does not bind the declared "
+                    "claim artifact"
+                )
+            if record.evidence_kind is not EvidenceKind.CERTIFICATE:
+                raise ConjectureError(
+                    "verified parameter regions require certificate evidence"
+                )
+            if record.conclusion is not Conclusion.TRUE:
+                raise ConjectureError(
+                    "parameter-region certificate must establish a true conclusion"
+                )
+            if record.bindings.claim_digest != claim.manifest.object_digest:
+                raise ConjectureError(
+                    "parameter-region verification binds a different target claim"
+                )
+            if (
+                record.bindings.candidate_digest
+                != subject_artifact.manifest.object_digest
+            ):
+                raise ConjectureError(
+                    "parameter-region verification binds different conditions"
+                )
+            self._replay_verification_record(
+                source=subject_artifact,
+                record_artifact=record_artifact,
+                record=record,
+            )
+        except ConjectureError:
+            raise
+        except (StoreError, ValidationError, ValueError) as exc:
+            raise ConjectureError(str(exc)) from exc
+
+        evidence = (
+            ParameterRegionEvidence.VERIFIED_SUFFICIENT
+            if subject.kind is ParameterRegionKind.SUFFICIENT
+            else ParameterRegionEvidence.VERIFIED_NECESSARY
+        )
+        return ParameterRegion(
+            kind=subject.kind,
+            conditions=subject.conditions,
+            evidence=evidence,
+            sample_uris=subject.sample_uris,
+            subject_uri=subject_artifact.artifact_uri,
+            verification_record_uri=record_artifact.artifact_uri,
         )
 
     def _prepare(
@@ -399,6 +506,7 @@ class ConjectureService:
         elif record.evidence_kind is EvidenceKind.CERTIFICATE:
             replay = self.verification.verify_certificate(
                 certificate_uri=record.evidence_uri,
+                checker_id=record.checker_id,
             )
         else:
             raise ConjectureError(
@@ -490,13 +598,41 @@ class ConjectureService:
                     "generated claim is invalid: " + "; ".join(validation.input.errors)
                 )
             seen_digests.add(claim.object_digest)
+            committed_region = proposal.parameter_region
+            if committed_region is not None:
+                subject = ParameterRegionSubject(
+                    claim_uri=claim.artifact_uri,
+                    kind=committed_region.kind,
+                    conditions=committed_region.conditions,
+                    sample_uris=committed_region.sample_uris,
+                )
+                stored_subject = self.store.put(
+                    schema_uri=self.parameter_region_subject_schema_uri,
+                    semantics_uri=manifest.semantics_uri,
+                    payload=self.schemas.validate(
+                        self.parameter_region_subject_schema_uri,
+                        subject.model_dump(mode="json"),
+                    ),
+                    parents=_deduplicate_uris(
+                        (
+                            claim.artifact_uri,
+                            selected.plugin_id,
+                            capability.registry_snapshot_uri,
+                            *committed_region.sample_uris,
+                        )
+                    ),
+                    summary="immutable parameter-region verification subject",
+                )
+                committed_region = committed_region.model_copy(
+                    update={"subject_uri": stored_subject.artifact_uri}
+                )
             transformation = HypothesisTransformationRecord(
                 operation=selected.operation,
                 source_uri=source.artifact_uri if source is not None else None,
                 target_claim_uri=claim.artifact_uri,
                 edit=proposal.edit,
                 metrics=proposal.metrics,
-                parameter_region=proposal.parameter_region,
+                parameter_region=committed_region,
                 evidence_uris=tuple(artifact.artifact_uri for artifact in evidence),
                 plugin_id=selected.plugin_id,
                 registry_snapshot_uri=capability.registry_snapshot_uri,
@@ -506,9 +642,10 @@ class ConjectureService:
             transformation_parents = (
                 claim.artifact_uri,
                 *parents,
+                *(committed_region.sample_uris if committed_region is not None else ()),
                 *(
-                    proposal.parameter_region.sample_uris
-                    if proposal.parameter_region is not None
+                    (committed_region.subject_uri,)
+                    if committed_region is not None
                     else ()
                 ),
             )
@@ -526,7 +663,7 @@ class ConjectureService:
                 claim_uri=claim.artifact_uri,
                 transformation_uri=stored_transformation.artifact_uri,
                 novelty=NoveltyAssessment.UNKNOWN,
-                parameter_region=proposal.parameter_region,
+                parameter_region=committed_region,
                 detail=proposal.detail,
             )
             if selected.falsification is not None:

@@ -64,6 +64,16 @@ def _snapshot(**changes: object) -> SearchExperimentSnapshot:
     return SearchExperimentSnapshot.model_validate(values)
 
 
+def test_search_budget_rejects_unimplemented_parallel_workers() -> None:
+    with pytest.raises(ValidationError, match="less than or equal to 1"):
+        SearchBudget(
+            candidates_max=10,
+            iterations_max=5,
+            wall_seconds=30,
+            workers=2,
+        )
+
+
 def test_search_request_requires_complete_counterexample_verification_policy() -> None:
     with pytest.raises(
         ValidationError,

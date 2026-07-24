@@ -41,7 +41,14 @@ class ResolvedCapability:
 
 
 class PluginRegistry:
-    """Operator-installed plugin metadata without checker authorization."""
+    """Seal operator-installed packages without granting checker authority.
+
+    Installation binds the manifest and every capability to its implementation
+    package digest plus runtime, build, and platform identity. Discovery reads
+    source without importing package code; resolution remeasures it before
+    execution. This establishes implementation identity, not host isolation or
+    mathematical trust.
+    """
 
     def __init__(self, store: ArtifactStore) -> None:
         self.store = store
@@ -115,7 +122,12 @@ class PluginRegistry:
         )
 
     def install(self, plugin_id: str) -> PluginManifest:
-        """Install a manifest after resolving every immutable dependency."""
+        """Validate dependencies and publish one immutable registry snapshot.
+
+        Every capability must resolve to its measured entrypoint, and the
+        snapshot freezes that collection of implementation bindings. Plugin
+        manifests have no field or side channel that can authorize a checker.
+        """
 
         try:
             artifact = self.store.get(plugin_id)

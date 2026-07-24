@@ -79,8 +79,10 @@ def test_plugin_cannot_promote_parameter_region() -> None:
                 description="widen a finite range",
             ),
             parameter_region=ParameterRegion(
+                kind="SUFFICIENT",
                 conditions={"n": {"minimum": 1}},
                 evidence="VERIFIED_SUFFICIENT",
+                subject_uri=ARTIFACT,
                 verification_record_uri=ARTIFACT,
             ),
         )
@@ -92,6 +94,7 @@ def test_sampled_parameter_region_requires_sample_artifacts() -> None:
         match="sampled parameter regions require sample artifacts",
     ):
         ParameterRegion(
+            kind="SUFFICIENT",
             conditions={"n": {"minimum": 1}},
             evidence="SAMPLED",
         )
