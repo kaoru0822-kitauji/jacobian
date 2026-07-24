@@ -37,6 +37,7 @@ Every v0.2 operation preserves the core result model:
 | `ART-005` | Modify a stored blob | Digest verification failure |
 | `ART-006` | Insert duplicate JSON keys or a disallowed float | Input rejected |
 | `ART-007` | Exceed artifact size or nesting limits | Bounded rejection without partial commit |
+| `ART-008` | Change committed manifest metadata without changing its blobs | Integrity verification failure |
 
 ## Operational and mathematical state
 
@@ -69,6 +70,7 @@ Every v0.2 operation preserves the core result model:
 | `CRT-005` | Use a revoked checker for new verification | Verification denied by policy |
 | `CRT-006` | Corrupt the certificate payload | Verification failure |
 | `CRT-007` | Return `NONE_CERTIFIED` without a verified certificate record | Protocol violation |
+| `CRT-008` | Authorize a checker with an empty schema or semantics allowlist | Authorization rejected; omission is not a wildcard |
 
 ## Plugin isolation
 
@@ -89,6 +91,7 @@ Every v0.2 operation preserves the core result model:
 | `SHR-003` | Budget ends before checked neighborhood exhaustion | Honest minimality class |
 | `SHR-004` | Tool claims global minimality without certificate | Protocol violation |
 | `SHR-005` | Final target lacks a fresh verification record | Output remains unverified |
+| `SHR-006` | Reducer returns no proposals after an accepted reduction | `NONE`; reducer silence does not establish local minimality |
 
 ## Record and replay
 
