@@ -312,6 +312,11 @@ class ConjectureService:
             raise ConjectureError(
                 "source verification record does not bind the source artifact"
             )
+        self._replay_verification_record(
+            source=source,
+            record_artifact=record_artifact,
+            record=record,
+        )
         source_digest = source.manifest.object_digest
         semantics_digest = self.store.get(
             source.manifest.semantics_uri
@@ -353,6 +358,78 @@ class ConjectureService:
                 raise ConjectureError(
                     "parameter generalization witness must rescue the construction"
                 )
+
+    def _replay_verification_record(
+        self,
+        *,
+        source: StoredArtifact,
+        record_artifact: StoredArtifact,
+        record: VerificationRecord,
+    ) -> None:
+        if record.evidence_kind is EvidenceKind.WITNESS:
+            claim_uri = (
+                source.artifact_uri
+                if record.bindings.claim_digest == source.manifest.object_digest
+                else self._record_parent_for_digest(
+                    record_artifact,
+                    record.bindings.claim_digest,
+                    label="claim",
+                )
+            )
+            candidate_digest = record.bindings.candidate_digest
+            if candidate_digest is None:
+                raise ConjectureError(
+                    "witness verification record is missing a candidate binding"
+                )
+            candidate_uri = (
+                source.artifact_uri
+                if candidate_digest == source.manifest.object_digest
+                else self._record_parent_for_digest(
+                    record_artifact,
+                    candidate_digest,
+                    label="candidate",
+                )
+            )
+            replay = self.verification.verify_witness(
+                claim_uri=claim_uri,
+                candidate_uri=candidate_uri,
+                witness_uri=record.evidence_uri,
+                checker_id=record.checker_id,
+            )
+        elif record.evidence_kind is EvidenceKind.CERTIFICATE:
+            replay = self.verification.verify_certificate(
+                certificate_uri=record.evidence_uri,
+            )
+        else:
+            raise ConjectureError(
+                "source verification record uses unsupported evidence"
+            )
+        if (
+            replay.assurance.verification is not Verification.VERIFIED
+            or replay.verification_record_uri != record_artifact.artifact_uri
+        ):
+            raise ConjectureError(
+                "source verification record did not replay with its authorized checker"
+            )
+
+    def _record_parent_for_digest(
+        self,
+        record_artifact: StoredArtifact,
+        object_digest: str,
+        *,
+        label: str,
+    ) -> str:
+        parent_uris = set(record_artifact.manifest.parents)
+        matches = [
+            uri
+            for uri in self.store.find_by_object_digest(object_digest)
+            if uri in parent_uris
+        ]
+        if len(matches) != 1:
+            raise ConjectureError(
+                f"source verification record has an ambiguous {label} binding"
+            )
+        return matches[0]
 
     def _commit_hypotheses(
         self,
