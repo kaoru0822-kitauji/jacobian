@@ -1,12 +1,20 @@
 # Threat model
 
+[Documentation home](../index.md)
+
+- Status: Current for v0.2 and the provisional M3/M4 implementation
+- Host boundary: Operator-installed code is trusted not to attack the machine
+- Related records: [Architecture](architecture.md) and
+  [v0.2 conformance gate](../reference/conformance-v0.2.md)
+
 ## Scope
 
-This document defines the v0.2 threats to mathematical integrity,
-artifact integrity, and service availability.
+This document covers the v0.2 release contract and the provisional M3/M4 code
+in the repository. M3/M4 behavior is not part of v0.2 conformance, but it must
+preserve the same mathematical and artifact-integrity boundaries.
 
-The implemented releases accept pure data plus operator-installed local
-plugins and checkers.
+The implemented code accepts pure data plus operator-installed local plugins
+and checkers.
 Jacobian does not provide a security sandbox. Code installed by the operator is
 assumed safe to execute on that machine.
 
@@ -22,6 +30,10 @@ Jacobian protects:
 - the distinction between unverified evidence and verified results;
 - the distinction between execution state and mathematical conclusion;
 - reproducible replay of completed verification records.
+- durable search lineage that cannot be silently rebound to another request,
+  plugin, runtime, checkpoint, or experiment;
+- parameter-region promotion bound to the exact subject and claim artifacts,
+  not merely an equal payload.
 
 Availability is important but secondary to integrity: resource exhaustion may
 produce timeout or error, never a false mathematical conclusion.
@@ -30,8 +42,8 @@ produce timeout or error, never a false mathematical conclusion.
 
 ### Mathematically untrusted problem plugin
 
-v0.2 plugins are operator-installed and trusted not to attack the host. They
-are not trusted to establish mathematical truth. A plugin may:
+Plugins are operator-installed and trusted not to attack the host. They are not
+trusted to establish mathematical truth. A plugin may:
 
 - omit legal semantic objects;
 - misreport arithmetic or coverage;
@@ -51,8 +63,14 @@ Controls:
   bytecode-only or compiled package modules;
 - plugin workers have bounded process/output lifetime for operational
   containment, but run locally with the operator's environment and are not a
-  security sandbox;
+  security sandbox; network and filesystem authority are inherited from the
+  operator process and must be narrowed by an OS or container policy when
+  required;
 - reference plugins are tested against adversarial fixtures.
+
+The deliberate crash, malformed-output, and timeout behaviors used by the
+generic conformance kit exist only in a disposable synthetic package and
+isolated state. They are not a required production-plugin interface.
 
 ### Malformed or ambiguous artifact
 
@@ -88,6 +106,9 @@ Controls:
 - checker-side binding validation before mathematical replay;
 - conjecture repair and generalization replay the cited verification record
   with its authorized checker and require the reproduced record identity;
+- parameter-region promotion requires the exact subject and declared claim
+  artifact URIs in the verification record's parents; equal object digests in
+  different artifact carriers are insufficient;
 - no caller-controlled checker executable.
 
 ### Buggy or compromised checker
@@ -125,7 +146,8 @@ Controls:
 ### Operational failure
 
 Processes may time out, crash, be cancelled, lose output, or exceed resource
-limits.
+limits. Durable metadata may also be truncated, malformed, or internally
+inconsistent after a storage or software failure.
 
 Controls:
 
@@ -134,6 +156,12 @@ Controls:
 - idempotency keys select one durable search invocation, append-only event
   chains preserve retries and runtime identity, and interrupted invocations
   recover from immutable checkpoints;
+- recovery validates a snapshot against its database key and indexed state;
+  malformed rows are quarantined as `ERROR` without stopping unrelated
+  recovery;
+- checkpoint restoration rebinds request, package snapshot, implementation,
+  environment, budget, archive, and accounting identity before opaque strategy
+  state is reused;
 - reached limits downgrade coverage;
 - tool errors cannot be translated into false, infeasible, or exhaustive.
 
@@ -215,6 +243,8 @@ verification tools.
 - Side-channel resistance
 - Multi-tenant authorization
 - Remote identity and signing infrastructure
+- Distributed worker leases or multiple active Jacobian coordinators sharing a
+  state directory
 - Formal verification of the artifact store
 - Proof that a formal statement matches informal mathematical intent
 

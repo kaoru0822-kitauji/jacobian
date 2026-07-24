@@ -1,8 +1,17 @@
 # v0.2 conformance specification
 
+[Documentation home](../index.md)
+
+- Status: Normative release gate for `0.2.0a0`
+- Release specification: [v0.2 bounded discovery](specifications/v0.2.md)
+
 This document defines the complete normative conformance suite for Jacobian
 v0.2. Search, evaluation, canonicalization, transformation proposal, and solver
 output are untrusted unless an authorized checker accepts their bound evidence.
+
+The provisional M3 strategy-search and M4 conjecture APIs present in the
+repository are outside this release gate. They must preserve these invariants,
+but passing their tests does not extend the v0.2 public contract.
 
 ## Result invariants
 

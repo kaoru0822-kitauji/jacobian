@@ -1,5 +1,7 @@
 # Issue index
 
+[Documentation home](../index.md)
+
 GitHub is the source of truth for implementation issues. This file records the
 small amount of repository context that should remain stable across issue
 updates; it does not duplicate full issue bodies.
@@ -20,12 +22,12 @@ as:
 
 Their descriptions reflect the repository state when filed. The current
 normative behavior is defined by the
-[v0.2 specification](specifications/v0.2.md) and
-[v0.2 conformance suite](conformance-v0.2.md).
+[v0.2 specification](../reference/specifications/v0.2.md) and
+[v0.2 conformance suite](../reference/conformance-v0.2.md).
 
 ## Current implementation
 
-The v0.2 branch implements the verification kernel together with:
+The v0.2 release contract implements the verification kernel together with:
 
 - bounded enumeration experiments and cancellation;
 - implementation-bound canonicalization;
@@ -33,6 +35,12 @@ The v0.2 branch implements the verification kernel together with:
 - exact finite rational convex-hull membership and separation;
 - CLI and MCP `2.0.0b2` adapters;
 - graph/path and integer-matrix reference domains.
+
+The repository also contains provisional M3/M4 work: sealed plugin snapshots,
+durable strategy search with pause/resume and restart recovery, conjecture
+transformations, and verified parameter-region promotion. These features are
+documented by their milestone specifications and ADRs, but are not part of the
+v0.2 conformance contract.
 
 Do not open umbrella issues that merely repeat these release deliverables.
 
@@ -51,4 +59,4 @@ specific unresolved behavior. Each issue should:
 
 Later-roadmap work should become issues only when its dependencies and success
 criteria are concrete. The provisional direction remains in
-[the roadmap](roadmap.md).
+[the roadmap](../explanation/roadmap.md).

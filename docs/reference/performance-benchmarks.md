@@ -1,5 +1,7 @@
 # Performance benchmarks
 
+[Documentation home](../index.md)
+
 ## Purpose
 
 Performance benchmarks answer operational questions: how quickly and at what
@@ -238,7 +240,8 @@ Measure:
 - checkpoint, cancellation, crash recovery, and resume time;
 - duplicate work under worker failure;
 - local worker cold start, warm start, and process-limit overhead;
-- single-process versus multi-process scaling efficiency.
+- single-worker baseline cost and, only if a lease-based scheduler is added,
+  multi-process scaling efficiency.
 
 Establish a correct sequential reference run before interpreting parallel
 speedups.

@@ -1,5 +1,12 @@
 # Architecture
 
+[Documentation home](../index.md)
+
+- Status: Current design map for v0.2 and the provisional M3/M4 implementation
+- Normative sources:
+  [v0.2 specification](../reference/specifications/v0.2.md) and
+  [conformance gate](../reference/conformance-v0.2.md)
+
 ## Purpose
 
 Jacobian separates mathematical discovery from mathematical trust.
@@ -32,6 +39,11 @@ The formal claim may still be a poor translation of the informal conjecture.
 Jacobian records that correspondence and its review status; it does not pretend
 that schema validation can establish it automatically.
 
+The v0.2 kernel and bounded-discovery behavior are the current release
+contract. Sections describing resumable strategy search and conjecture
+workflows document provisional M3/M4 implementations and do not extend v0.2
+conformance.
+
 ## Trust zones
 
 ### Trusted inputs and services
@@ -51,7 +63,7 @@ that schema validation can establish it automatically.
 - Representation transformers
 - SAT, SMT, LP, MIP, and polyhedral solvers
 - Language-model output
-- Model-uploaded code introduced in later milestones
+- Operator-installed plugin code as a source of mathematical claims
 
 A solver or evaluator can produce evidence. It cannot promote its own evidence
 to `VERIFIED`.
@@ -82,12 +94,20 @@ different meaning under another schema or semantics version.
 An immutable, content-addressed record connecting an object to its media type,
 schema, parent artifacts, and a short summary.
 
+Object identity and artifact identity answer different questions. The object
+digest binds canonical payload, schema, semantics, and canonicalizer. The
+artifact URI also binds carrier metadata such as parents and summary. Code that
+authorizes replay or promotion must require the exact artifact URI when lineage
+matters; equal object digests do not make two carriers interchangeable.
+
 ### Run record
 
 Execution metadata such as runtime, seed, environment, limits, logs, and tool
 version. A run record does not change the identity of the mathematical object.
-v0.2 persists verification records and adds durable mutable experiment
-snapshots plus immutable scope, archive-page, and archive-manifest artifacts.
+v0.2 persists verification records and bounded-enumeration snapshots. The
+provisional M3 runtime adds append-only lifecycle events, immutable strategy
+checkpoints, archive pages, and archive manifests around one mutable snapshot
+index.
 
 ### Curated research record
 
@@ -238,11 +258,40 @@ class TransformationChecker(Protocol):
 
 class CertificateChecker(Protocol):
     def verify(self, certificate: JSON) -> Verification: ...
+
+class Proposer(Protocol):
+    def propose(self, request: SearchProposalRequest) -> SearchProposal: ...
+
+class Refiner(Protocol):
+    def refine(self, request: SearchRefinementRequest) -> SearchRefinement: ...
+
+class HypothesisTransformer(Protocol):
+    def transform(
+        self, request: HypothesisRequest
+    ) -> HypothesisResponse: ...
 ```
 
 Search plugins cannot register themselves as trusted checkers. The checker
 registry is operator-managed and binds checker digests to supported claim,
 semantics, and certificate versions.
+
+### Sealed plugin identity
+
+Installation creates one immutable registry snapshot that binds the manifest,
+capability entrypoints, each implementation package digest, runtime and build
+identity, and platform compatibility. Discovery inspects source files without
+importing the package. Capability resolution remeasures the package before
+execution, so a changed file cannot continue under the installed snapshot.
+
+The initial package format hashes regular package files, while declared and
+imported modules must be Python source. Symlinks, traversal outside the
+package, bytecode-only module execution, and native extension-module execution
+are rejected. This protects registry identity; it does not sandbox
+operator-installed code once a worker executes it.
+
+The generic fault matrix runs against a disposable, conformance-only package in
+isolated state. Production plugins are not expected to expose inputs that
+deliberately crash, hang, or emit malformed responses.
 
 ## Search and checker separation
 
@@ -287,6 +336,53 @@ The initial `polytope.separate` backend covers finite rational V-represented
 polytopes. Z3 proposes exact convex weights or an exact separator. Independent
 checkers replay those objects using `Fraction` arithmetic and do not import
 Z3.
+
+## Resumable strategy search
+
+The provisional M3 service keeps coordination deliberately local:
+
+```text
+idempotent request
+    → SQLite acceptance row + append-only event
+    → proposer/evaluator/oracle/refiner child processes
+    → immutable archive page + checkpoint
+    → atomic snapshot update
+    → pause, resume, or terminal archive
+```
+
+An idempotency key binds one exact request digest to one experiment URI.
+Concurrent submissions of that request reuse the accepted experiment; the same
+key cannot be rebound to another request. Plugin work performed after the last
+checkpoint may run again after process loss, but only committed pages and
+checkpoints become durable lineage.
+
+On startup, active experiments are changed to `PAUSED`, while pending
+cancellation becomes `CANCELLED`. A malformed snapshot is moved to `ERROR` and
+recorded in `search_recovery_failures` without preventing unrelated rows from
+recovering. Checkpoint restoration rebinds the request, plugin snapshot,
+implementation digests, effective budget, environment, archive pages, and
+accounting before opaque strategy state is accepted.
+
+The reference scheduler accepts one strategy worker and requires one active
+Jacobian process per state directory. SQLite provides transactional request
+acceptance, not a distributed worker lease.
+
+## Conjecture transformations and parameter regions
+
+The three hypothesis-producing M4 operations share an untrusted
+`HypothesisTransformer`. The service validates source evidence, stores each
+claim and edit as immutable artifacts, deduplicates by content identity, and
+may route a hypothesis through M3 falsification. Generated, repaired, and
+generalized statements remain `UNVERIFIED`.
+
+A parameter-region plugin may return `PROPOSED` or `SAMPLED` evidence only.
+Jacobian commits an immutable `ParameterRegionSubject` binding the target claim,
+region kind, exact conditions, and sample artifacts. Promotion requires an
+authorized certificate record whose exact claim and subject artifact URIs are
+parents of that record. The service replays the certificate and accepts the
+promotion only if replay reproduces the same verification-record URI.
+Mathematical interpretation of the region remains in the authorized checker;
+the generic kernel only enforces bindings and evidence state.
 
 ## MCP boundary
 

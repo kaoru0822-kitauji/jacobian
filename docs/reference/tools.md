@@ -1,5 +1,11 @@
 # Tool surface
 
+[Documentation home](../index.md)
+
+- Status: v0.2 surface plus explicitly labeled provisional and planned tools
+- Normative sources: [v0.2 specification](specifications/v0.2.md) and
+  [conformance gate](conformance-v0.2.md)
+
 Jacobian is a general research kernel. Its core tools understand artifacts,
 claims, candidates, predicates, witnesses, certificates, reductions, budgets,
 and provenance. Mathematical meaning is supplied by versioned domain plugins.
@@ -45,7 +51,7 @@ Search strategies share a typed experiment operation:
 | Availability | Tool | Capability |
 | --- | --- | --- |
 | v0.2 | `search.enumerate` | Exhaustively enumerate a bounded candidate class using a domain-provided enumerator and auditable scope. |
-| M3 | `search.run` | Run a typed proposer, evaluator, counterexample, refinement, and nomination loop as a durable experiment. |
+| Provisional M3 | `search.run` | Run a typed proposer, evaluator, counterexample, refinement, and nomination loop as a durable experiment. |
 
 These tools start experiment jobs and return experiment resource handles. They
 do not produce verified conclusions by themselves. Exact enumeration, CEGIS,
@@ -53,9 +59,9 @@ constraint solving, parameter sweeps, beam or tree search, evolutionary search,
 and agent-driven loops are strategies behind the common M3 orchestration
 contract rather than separate kernel tools.
 
-The resident MCP server returns the `search.enumerate` handle immediately. The
-local CLI waits for the bounded experiment and prints its terminal snapshot,
-because a daemon worker cannot outlive a short-lived CLI process.
+The resident MCP server returns `search.enumerate` and `search.run` handles
+immediately. The local CLI waits for the bounded experiment and prints its
+settled snapshot because a worker cannot outlive a short-lived CLI process.
 
 ## Optional domain tools
 
@@ -78,9 +84,10 @@ separately verified:
 
 | Milestone | Tool | Capability |
 | --- | --- | --- |
-| M4 | `conjecture.repair` | Propose nearby claims after a counterexample by changing assumptions, constants, domains, or conclusions. |
-| M4 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
-| M4 | `parameter.generalize` | Propose parameter regions around a verified construction and preserve proposed, sampled, or independently verified evidence labels. |
+| Provisional M4 | `conjecture.repair` | Propose nearby claims after a counterexample by changing assumptions, constants, domains, or conclusions. |
+| Provisional M4 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
+| Provisional M4 | `parameter.generalize` | Propose parameter regions around a verified construction and preserve proposed or sampled evidence labels. |
+| Provisional M4 | `parameter.region.promote` | Replay an authorized certificate bound to an immutable region subject before labeling it verified sufficient or necessary. |
 | M5 | `memory.search` | Ask an optional corpus provider for prior experiments, failures, witnesses, certificates, and research episodes with trust labels. |
 | M5 | `abstraction.extract` | Suggest an abstract mathematical explanation for supplied or retrieved artifacts. |
 | M5 | `episode.compare` | Compare failures and propose recurring obstructions or no-go lemmas. |
@@ -90,11 +97,12 @@ The M4 tools operate without a shared corpus. When no M5 provider is
 configured, they deduplicate against supplied or local experiment records and
 report corpus-wide novelty as unknown. Corpus retrieval can suggest inputs to
 any tool but cannot authorize checkers or promote verification status.
-All three M4 tools share one `HypothesisTransformer` plugin operation and may
-route their outputs through `search.run`; Jacobian does not embed a conjecture
-grammar or synthesis framework. Sample artifacts must enter through the tools'
-explicit evidence inputs before a plugin may cite them in a sampled parameter
-region.
+The three hypothesis-producing M4 tools share one `HypothesisTransformer`
+plugin operation and may route their outputs through `search.run`; Jacobian
+does not embed a conjecture grammar or synthesis framework.
+`parameter.region.promote` is a kernel verification operation, not a fourth
+plugin transformation. Sample artifacts must enter through explicit workflow
+evidence before a plugin may cite them in a sampled parameter region.
 
 ## Internal backends
 
@@ -125,9 +133,10 @@ records are all ordinary artifacts and use the artifact resource template.
 reference fixtures. Checker administration remains outside the model-facing
 MCP surface.
 
-v0.2 experiment resources expose durable snapshots and compact artifact
-handles. `experiment.cancel` is a tool because it changes state. Pause and
-resume remain later work.
+Experiment resources expose durable snapshots and compact artifact handles.
+`experiment.cancel`, `experiment.pause`, and `experiment.resume` change
+provisional M3 strategy-search state. Pause takes effect at a committed
+checkpoint; resume continues the same invocation and lineage.
 
 ## Operator actions, not model tools
 

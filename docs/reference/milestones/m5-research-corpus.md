@@ -1,5 +1,7 @@
 # Milestone 5 specification: research corpus integration
 
+[Documentation home](../../index.md)
+
 - Status: Provisional
 - Theme: Retrieve prior work without confusing memory with proof
 

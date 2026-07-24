@@ -1,5 +1,7 @@
 # Reference benchmarks
 
+[Documentation home](../index.md)
+
 Benchmarks validate the generic kernel; they do not define its public API.
 
 This document defines pass/fail mathematical workloads. Operational speed and

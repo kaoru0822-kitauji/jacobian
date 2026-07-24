@@ -1,5 +1,7 @@
 # Agent evaluations
 
+[Documentation home](../index.md)
+
 ## Purpose
 
 Jacobian is useful only if it changes research behavior, not merely if its APIs

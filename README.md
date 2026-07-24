@@ -22,13 +22,28 @@ The central invariant is:
 > operator-authorized checker accepts evidence bound to the exact claim,
 > semantics, candidate, and checker version.
 
+## Get started
+
+Jacobian uses Python 3.12 and `uv`. Initialize the locked development
+environment and a local state directory:
+
+```sh
+uv sync --dev
+uv run jacobian --state-dir .jacobian init
+```
+
+Then follow
+[Find and verify a counterexample](docs/tutorials/first-verified-result.md)
+for a complete first experiment. Run `uv run jacobian --help` to inspect the
+CLI or `uv run jacobian-mcp` to start the MCP adapter.
+
 ## Roadmap
 
 | Milestone | Theme | Primary outcome |
 | --- | --- | --- |
 | Current release | Verification and bounded discovery | v0.2 alpha stores, evaluates, attacks, shrinks, independently verifies, enumerates structures, verifies representation changes, and computes exact separators |
-| M3 | Scalable search | Run typed search strategies through one resumable experiment loop |
-| M4 | Conjecture workflows | Repair, generate, falsify, and parametrically generalize conjectures |
+| M3 | Scalable search | Provisional implementation runs typed search strategies through one resumable experiment loop |
+| M4 | Conjecture workflows | Provisional implementation repairs, generates, falsifies, and parametrically generalizes conjectures |
 | M5 | Research corpus integration | Retrieve prior solutions, failures, witnesses, and certificates through an optional provider |
 | Stability target | Stable research platform | Publish a v1.0 API with formal-checking and collaboration support |
 
@@ -37,65 +52,68 @@ without a shared corpus service. Jacobian records its own experiments for
 replay and lineage; corpus-scale retrieval is an optional integration that
 cannot promote evidence or authorize checkers.
 
-The only current implementation and public release contract is v0.2 alpha
-(`0.2.0a0`). It includes both the verification kernel and bounded discovery.
-Earlier development milestones are covered by the current regression suite,
-not presented as separately supported releases. Future milestone plans remain
-provisional and do not determine package version numbers.
+The only public release contract is v0.2 alpha (`0.2.0a0`). It includes the
+verification kernel and bounded discovery. The repository also contains
+provisional M3 and M4 implementations so their contracts can be exercised
+before a later release is declared. Those APIs and artifacts are not part of
+v0.2 conformance and remain free to change.
 
-## Documents
+## Design and documentation
 
-- [Architecture](docs/architecture.md)
-- [Tool surface](docs/tools.md)
-- [Roadmap and milestone gates](docs/roadmap.md)
-- [Reference benchmarks](docs/benchmarks.md)
-- [Mathematical scenario catalog](docs/math-scenarios.md)
-- [Testing strategy and critical areas](docs/testing-strategy.md)
-- [Performance benchmarks](docs/performance-benchmarks.md)
-- [Model-in-the-loop evaluations](docs/agent-evaluations.md)
-- [Threat model](docs/threat-model.md)
-- [v0.2 conformance specification](docs/conformance-v0.2.md)
-- [v0.2 specification](docs/specifications/v0.2.md)
-- [M3 scalable-search milestone](docs/milestones/m3-scalable-search.md)
-- [M4 conjecture-workflows milestone](docs/milestones/m4-conjecture-workflows.md)
-- [M5 research-corpus milestone](docs/milestones/m5-research-corpus.md)
-- [v1.0 specification](docs/specifications/v1.0.md)
-- [Why the control plane is Python-first](docs/adr/0001-python-first-control-plane.md)
-- [Proposed implementation issues](docs/issues.md)
+Jacobian is pre-stable, so the architecture, trust boundaries, and milestone
+gates are part of the working project record. Start with:
+
+- [Architecture](docs/explanation/architecture.md) for the system shape and
+  verification boundary.
+- [Roadmap](docs/explanation/roadmap.md) for active milestone scope and exit
+  gates.
+- [Architecture decision log](docs/explanation/adr/index.md) for accepted
+  cross-cutting decisions and their release scope.
+- [Threat model](docs/explanation/threat-model.md) for protected properties,
+  trust assumptions, and explicit exclusions.
+- [Durable search runtime](docs/explanation/search-runtime.md) for the
+  provisional M3 ownership, persistence, and recovery model.
+
+Release contracts and engineering evidence are:
+
+- [Tool surface](docs/reference/tools.md)
+- [v0.2 specification](docs/reference/specifications/v0.2.md) and
+  [conformance gate](docs/reference/conformance-v0.2.md)
+- [M3](docs/reference/milestones/m3-scalable-search.md) and
+  [M4](docs/reference/milestones/m4-conjecture-workflows.md) provisional
+  contracts
+- [Testing strategy](docs/reference/testing-strategy.md),
+  [scenario catalog](docs/reference/math-scenarios.md), and
+  [performance benchmark protocol](docs/reference/performance-benchmarks.md)
+- [Plugin conformance contract](docs/reference/plugin-conformance.md)
+
+The [documentation home](docs/index.md) provides the complete catalog,
+organized into tutorials, how-to guides, reference, and explanation. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) for development setup, verification rules,
+documentation placement, and pull-request expectations.
 
 ## Current status
 
-v0.2 alpha is implemented as a local Python package, CLI, and MCP adapter.
-It offers seven verification tools alongside bounded enumeration,
+v0.2 alpha is implemented as a local Python package, CLI, and MCP adapter. It
+offers seven verification tools alongside bounded enumeration,
 implementation-bound canonicalization, independently verified representation
 changes, persistent experiment resources, and exact finite-polytope evidence.
-All public contracts and artifact formats remain pre-stable.
 
-The alpha experiment runner is local and single-process. A state directory
-must not be opened by another Jacobian process while an experiment is running;
-multi-process leases and resumable ownership belong to M3.
+The provisional M3/M4 code adds sealed plugin snapshots, a strategy-neutral
+`search.run` service, pause and resume from immutable checkpoints, append-only
+lifecycle events, conjecture transformations, and verified parameter-region
+promotion. The scheduler accepts one strategy worker. Plugin calls run in
+bounded child processes, but the search coordinator and durable state owner
+remain local to one Jacobian process.
 
-```sh
-uv sync --dev
-uv run pytest
-uv run pytest --lf
-uv run pytest --sw
-uv run pytest -m "not integration and not end_to_end"
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv run deptry .
-uv run pre-commit install
-uv run jacobian --help
-uv run jacobian-mcp
-```
+Use one active Jacobian process per state directory. Restarting that process
+reconstructs interrupted searches as paused or cancelled from durable state;
+it does not provide a multi-process lease or distributed queue. All public
+contracts and artifact formats remain pre-stable.
 
-The full suite uses up to four `pytest-xdist` workers with work stealing. Use
-the marker-filtered command for the fast development loop, or add `-n 0` when
-debugging one test in a single process. After a failure, `--lf` reruns only
-the last failures; `--sw` stops at the first failure and resumes from it on the
-next invocation. Pre-commit keeps commit-time checks fast; the full type,
-dependency, test, and build gates remain explicit.
+Development commands and test-selection guidance live in
+[CONTRIBUTING.md](CONTRIBUTING.md) and the
+[testing strategy](docs/reference/testing-strategy.md).
 
 The MCP adapter is pinned to the official Python SDK `2.0.0b2`. It remains
 isolated from the mathematical kernel because that SDK release is a beta.

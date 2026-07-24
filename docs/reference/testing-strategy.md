@@ -1,5 +1,7 @@
 # Testing strategy
 
+[Documentation home](../index.md)
+
 ## Purpose
 
 Jacobian is a fail-closed verification system. Its tests must establish more
@@ -291,10 +293,20 @@ Required tests:
 - capability resolution is deterministic and version-aware;
 - manifests bind their semantics and implementation digests;
 - a changed implementation cannot retain the old manifest identity;
+- discovery measures a package without importing its code;
+- registry snapshots bind all declared capabilities to the whole-package source
+  digest, runtime/build identity, and platform compatibility;
+- path traversal, symlinks, bytecode-only or native module execution, and
+  changed package bytes fail closed;
 - domain-specific graph, matrix, solver, or proof types never enter the core
   manifest;
 - a manifest cannot authorize, replace, or revoke a checker;
-- two structurally different plugins use the same generic dispatch path.
+- two structurally different plugins use the same generic dispatch path;
+- a disposable synthetic third plugin passes success, declared-failure,
+  malformed-output, timeout, package-attack, and unsupported-promotion checks
+  without kernel or MCP changes;
+- each conformance-suite run uses fresh invocation identities and executes the
+  plugin again rather than reusing prior durable results.
 
 ### Checker registry
 
@@ -372,6 +384,54 @@ Required tests:
 - changing evaluator, scope, limits, seed when semantically relevant, or
   environment invalidates the corresponding cache entry;
 - evaluator and oracle bugs cannot write to the checker registry.
+
+### Durable strategy search
+
+Required tests:
+
+- concurrent submissions with one idempotency key and request digest select one
+  accepted experiment URI;
+- reusing an idempotency key with a different request fails before execution;
+- every lifecycle event binds its predecessor and update/delete attempts fail;
+- process recovery pauses active work at the last committed checkpoint and
+  preserves archive and retry lineage;
+- corrupt JSON, a row/snapshot identity mismatch, and an invalid indexed state
+  are quarantined independently without blocking a valid experiment;
+- restoration rejects changes to request, registry snapshot, proposer, refiner,
+  evaluator, environment, budget, archive, or accounting identity;
+- plugin work after an uncommitted checkpoint may repeat, but committed
+  archive pages and nominations are not duplicated;
+- checkpoint artifact persistence is included in measured wall time, and a
+  strategy cannot report completion after that measurement exceeds the wall
+  budget;
+- `workers > 1` fails validation instead of being silently clamped;
+- pause, cancellation, timeout, strategy completion, candidate limits, and
+  iteration limits remain distinct operational outcomes;
+- verified counterexample feedback cites an authorized verification record,
+  while heuristic feedback remains unverified;
+- workers and plugins cannot authorize a checker or widen any
+  Jacobian-represented budget or capability.
+
+### Conjecture workflows
+
+Required tests:
+
+- repair requires an exact authorized `REFUTES_CLAIM` record for the source
+  claim;
+- parameter generalization requires an exact verified construction source;
+- plugin proposals can produce only proposed or sampled parameter-region
+  evidence and cannot bind a region subject;
+- sampled regions cite only artifacts supplied as workflow evidence;
+- each committed hypothesis records its source, edit, plugin snapshot, and
+  implementation identity;
+- identical claim payloads deduplicate without losing transformation lineage;
+- falsification routes through `search.run` and cannot turn non-falsification
+  into verification;
+- promotion accepts sufficient and necessary labels only after authorized
+  certificate replay reproduces the exact verification-record URI;
+- promotion rejects a same-object/different-artifact subject carrier and a
+  record that omits the exact declared claim or subject parent;
+- CLI, MCP, and Python service paths preserve the same verification boundary.
 
 ### Shrinking
 
@@ -653,29 +713,31 @@ The normative attack matrix is
 unverified; a theorem inferred from the absence of a candidate needs a
 domain-specific completeness certificate and checker.
 
-## Planned-milestone test additions
+## Provisional and planned milestone coverage
 
 ### M3
 
-- deterministic single-worker lineage before concurrency;
-- resumability, idempotency, durable lifecycle, and worker-crash state
-  machines;
-- local worker timeout, output-limit, and dependency-pinning tests;
-- concurrent-retry and duplicate-work tests for every supported execution
-  mode;
-- search never bypasses candidate nomination and v0.2 verification;
-- no strategy-specific score, exhaustion state, or failure becomes a
-  mathematical conclusion.
+The current provisional suite covers deterministic single-worker lineage,
+pause/resume, startup recovery, idempotent concurrent submission, corrupt-row
+quarantine, plugin timeouts, package identity, generic conformance, verified
+counterexample feedback, and candidate nomination through existing verification
+services.
+
+Before an M3 release, add process-kill tests at each persistence boundary and,
+if multi-process or distributed scheduling is introduced, lease-expiry and
+duplicate-acceptance state machines. No strategy-specific score, exhaustion
+state, or failure may become a mathematical conclusion.
 
 ### M4
 
-- generated and repaired conjectures always remain hypotheses;
-- repair requires an authorized verification record for an exact
-  `REFUTES_CLAIM` witness;
-- falsification pipelines cannot self-promote claims;
-- hypothesis plugins cannot label parameter regions as proved;
-- parameter-region certificates bind the original claim and encoding;
-- corpus-free workflows report global novelty as unknown.
+The current provisional suite covers all three hypothesis operations, exact
+source-record replay, duplicate claims, sampled-evidence lineage, optional M3
+falsification, unsupported promotion attempts, and sufficient/necessary region
+promotion through exact certificate replay.
+
+Before an M4 release, add broader cross-domain fixtures and clean-process
+replay for every authorized parameter-region certificate format. Corpus-free
+workflows must continue to report global novelty as unknown.
 
 ### M5
 
