@@ -412,7 +412,7 @@ Required tests:
 - workers and plugins cannot authorize a checker or widen any
   Jacobian-represented budget or capability.
 
-### Conjecture workflows
+### Claim-transformation workflows
 
 Required tests:
 

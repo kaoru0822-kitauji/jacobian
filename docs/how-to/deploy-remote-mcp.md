@@ -55,7 +55,7 @@ uv run jacobian-mcp \
 
 Do not expose anonymous mode to a network.
 
-## Warm the Mathlib profile
+## Warm the Mathlib profile when serving `lean.check`
 
 Set `JACOBIAN_LEAN_WARMUP=1` on a host that serves `lean.check`. Jacobian then
 checks a small pinned Mathlib theorem in the background when each tenant kernel

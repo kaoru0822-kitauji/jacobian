@@ -246,7 +246,7 @@ Measure:
 Establish a correct sequential reference run before interpreting parallel
 speedups.
 
-### M4 — Conjecture workflows
+### M4 — Claim-transformation primitives
 
 Measure:
 

@@ -9,11 +9,9 @@
 
 ## Purpose
 
-Jacobian gives agents reusable mathematical capabilities and durable research
-memory while separating mathematical discovery from mathematical trust. The
-[capability-first product blueprint](product-blueprint.md) defines the
-model-facing product direction; this document describes the underlying kernel
-and trust zones.
+The [product model](product-blueprint.md) defines Jacobian's composable
+mathematical primitives and their intended users. This document describes the
+kernel, ownership boundaries, and trust zones that support that model.
 
 Models, search algorithms, and domain solvers are allowed to be heuristic,
 stochastic, incomplete, and frequently replaced. Verification is performed by
@@ -61,6 +59,21 @@ The v0.2 kernel and bounded-discovery behavior are the current release
 contract. Sections describing resumable strategy search and conjecture
 workflows document provisional M3/M4 implementations and do not extend v0.2
 conformance.
+
+## Ownership boundaries
+
+The kernel owns artifact identity, execution state, assurance, budgets,
+provenance, and checker authorization. Capability adapters translate between
+the primitive contract and external mathematical systems. Domain plugins own
+schemas, transformations, invariants, witness meanings, and required checker
+roles. Independent checker packages implement replay and are authorized by an
+operator, never by the plugin or adapter whose output they check.
+
+Agent workflows and skills own multi-step exploration and proof strategies.
+The kernel may provide durable execution and compatibility façades, but those
+workflows must retain their stage artifacts and assurance labels. Worked cases
+and expected outcomes belong in the scenario and benchmark documents, not in
+generic kernel types.
 
 ## Trust zones
 
@@ -174,7 +187,12 @@ The service validates both schemas and prevents adapters from self-promoting:
 `VERIFIED` requires a valid local verification record whose checked evidence
 is returned with the capability result. Stage-aware diagnostics separate
 invalid input, reference resolution, adapter execution, and checker outcomes.
-Only completed invocations are eligible for research-memory recording.
+Only completed invocations are eligible for research memory recording.
+
+A registered capability should expose one observable mathematical operation.
+Broad tasks are workflows over multiple capability invocations. Current
+composite tools remain available for compatibility, but they do not define the
+granularity expected of new capabilities.
 
 ## Common result model
 
@@ -253,10 +271,12 @@ authorized checker replays them. Such proof certificates may use
 `coverage = NOT_APPLICABLE`; direct finite enumeration must instead report
 `EXHAUSTIVE`.
 
-## Plugin capabilities
+## Domain plugin operations
 
-Domains implement small optional capabilities instead of one mandatory
-`ProblemPlugin` interface:
+Domains implement small optional operations instead of one mandatory
+`ProblemPlugin` interface. The stable v0.2 operations cover problem
+specification, candidate encoding, evaluation, witness search and checking,
+reduction, enumeration, transformation, and certificate replay:
 
 ```python
 class ProblemSpec(Protocol):
@@ -296,7 +316,12 @@ class TransformationChecker(Protocol):
 
 class CertificateChecker(Protocol):
     def verify(self, certificate: JSON) -> Verification: ...
+```
 
+The provisional M3 and M4 operations add strategy and hypothesis
+transformation hooks:
+
+```python
 class Proposer(Protocol):
     def propose(self, request: SearchProposalRequest) -> SearchProposal: ...
 
@@ -312,6 +337,11 @@ class HypothesisTransformer(Protocol):
 Search plugins cannot register themselves as trusted checkers. The checker
 registry is operator-managed and binds checker digests to supported claim,
 semantics, and certificate versions.
+
+These typed plugin operations are dispatched by capability adapters. A plugin
+defines mathematical meaning; an adapter presents an operation through
+`capability.describe` and `capability.invoke`; the kernel enforces the common
+artifact and assurance contract.
 
 ### Sealed plugin identity
 
@@ -405,13 +435,15 @@ The reference scheduler accepts one strategy worker and requires one active
 Jacobian process per state directory. SQLite provides transactional request
 acceptance, not a distributed worker lease.
 
-## Conjecture transformations and parameter regions
+## Claim transformations and parameter regions
 
-The three hypothesis-producing M4 operations share an untrusted
-`HypothesisTransformer`. The service validates source evidence, stores each
-claim and edit as immutable artifacts, deduplicates by content identity, and
-may route a hypothesis through M3 falsification. Generated, repaired, and
-generalized statements remain `UNVERIFIED`.
+The provisional M4 implementation currently projects repair, generation, and
+parameter generalization through one untrusted `HypothesisTransformer`. These
+are compatibility façades while the product contract is decomposed into
+smaller claim derivation, deduplication, scoring, falsification, and parameter
+analysis operations. The service validates source evidence, stores each claim
+and edit as immutable artifacts, and preserves stage lineage. Generated,
+repaired, and generalized statements remain `UNVERIFIED`.
 
 A parameter-region plugin may return `PROPOSED` or `SAMPLED` evidence only.
 Jacobian commits an immutable `ParameterRegionSubject` binding the target claim,

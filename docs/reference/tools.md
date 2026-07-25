@@ -6,12 +6,39 @@
 - Normative sources: [v0.2 specification](specifications/v0.2.md) and
   [conformance gate](conformance-v0.2.md)
 
-Jacobian is a general research kernel. Its core tools understand artifacts,
-claims, candidates, predicates, witnesses, certificates, reductions, budgets,
-and provenance. Mathematical meaning is supplied by versioned domain plugins.
+Jacobian is a workbench of composable mathematical primitives. The generic
+kernel understands artifacts, claims, candidates, predicates, witnesses,
+certificates, reductions, budgets, and provenance. Mathematical meaning is
+supplied by versioned domain plugins.
 
 The model-facing surface is layered so adapters are easy to add and a
 heuristic operation cannot masquerade as a verifier.
+
+## Primitives, workflows, and adapters
+
+The target primitive contract is a versioned capability with one observable
+operation. It consumes typed artifacts and returns typed artifacts, explicit
+relationships, new proof obligations when applicable, execution status,
+assurance, and provenance. Agents and proof strategies compose primitives into
+workflows without merging the assurance of their stages.
+
+The current `CapabilityResult` has a typed operation-specific output and
+artifact URIs but no generic first-class relationship or proof-obligation
+fields. Until those fields are versioned, adapters must keep that information
+inside their output schema. This is an active product-contract gap, not a
+property callers should infer.
+
+A capability adapter connects an external engine or domain operation to this
+contract and registers it behind a capability ID. A domain plugin defines the
+mathematical schemas, invariants, transformations, and witness meanings used by
+that operation. An internal backend is an implementation detail used by an
+adapter or plugin. None of these may authorize a checker; checker
+authorization is an operator-controlled kernel action.
+
+Some current lower-level MCP commands are composite compatibility workflows.
+They remain documented because current clients use them, but new mathematical
+operations should normally appear as capability IDs behind
+`capability.describe` and `capability.invoke`.
 
 ## Capability-first MCP surface
 
@@ -40,7 +67,7 @@ local verification record and the checked evidence. The `full` and
 `verification` profiles retain the lower-level tools below for advanced
 clients and compatibility.
 
-## Core v0.2 tools
+## Core v0.2 operation tools
 
 | Tool | Capability |
 | --- | --- |
@@ -51,11 +78,19 @@ clients and compatibility.
 | `witness.verify` | Independently check that a witness is in-domain and has the claimed logical effect on the stated candidate or claim. |
 | `shrink.run` | Reduce a candidate or witness while repeatedly invoking an authorized preservation checker. Report the achieved minimality class. |
 | `certificate.verify` | Independently verify an exhaustive table, SAT/PB proof, LP dual, Farkas certificate, separator, interval proof, Lean proof term, or another registered certificate format. |
-| `lean.verify` | Build a claim-bound Lean certificate in the pinned `CORE` or `MATHLIB` environment and replay it with the authorized kernel checker. This is a workflow over `certificate.verify`, not a second trust boundary. |
-| `verification.run` | Compose artifact storage, claim validation, evaluation, witness search, and authorized witness replay for one bundled domain. Every stage retains its own assurance label. |
 
 `evaluate.batch` is the central experimental interface.
 `witness.verify` and `certificate.verify` are the public trust boundary.
+
+## Current compatibility workflows
+
+These workflows ship in the repository but are not additional v0.2 trust
+boundaries or part of the frozen v0.2 conformance tool list:
+
+| Tool | Composition |
+| --- | --- |
+| `lean.verify` | Used by the `lean.check` capability. It builds a claim-bound Lean certificate in the pinned `CORE` or `MATHLIB` environment, then replays it through `certificate.verify`. |
+| `verification.run` | Composes artifact storage, claim validation, evaluation, witness search, and authorized witness replay for one bundled domain. Every stage retains its own assurance label. |
 
 The local MCP adapter provides `capabilities`, `full`, and `verification`
 projections. The compact verification projection omits unrelated research
@@ -64,7 +99,9 @@ claim contracts and its composite workflow result projects only stage status,
 assurance, evidence, and durable record URIs. Canonical registry schemas,
 artifacts, tool semantics, and checker authority are unchanged.
 
-`lean.verify` never accepts an import string or package path from a model.
+`lean.check` is the capability ID used through `capability.invoke`;
+`lean.verify` is the lower-level compatibility workflow. `lean.verify` never
+accepts an import string or package path from a model.
 `CORE` has no import and authorizes no axioms. `MATHLIB` has one
 operator-pinned `Mathlib` import and an explicit standard trust-base allowlist;
 the checker rejects any additional axiom reported by Lean.
@@ -118,24 +155,27 @@ These are plugin capabilities, not mandatory universal tools. A numerical
 analysis plugin need not implement graph canonicalization; a Lean proof plugin
 need not implement mutation.
 
-## Conjecture and corpus tools
+## Claim-transformation and corpus operations
 
-These tools produce hypotheses or research records unless their outputs are
-separately verified:
+The provisional implementation exposes several named workflow façades. Their
+stage outputs are hypotheses or research records unless separately verified:
 
 | Milestone | Tool | Capability |
 | --- | --- | --- |
 | Provisional M4 | `conjecture.repair` | Propose nearby claims after a counterexample by changing assumptions, constants, domains, or conclusions. |
-| Provisional M4 | `conjecture.generate` | Generate, deduplicate, falsify, and rank candidate statements. |
+| Provisional M4 | `conjecture.generate` | Compatibility workflow that generates candidate statements, deduplicates them, requests bounded falsification, and ranks survivors while retaining stage evidence. |
 | Provisional M4 | `parameter.generalize` | Propose parameter regions around a verified construction and preserve proposed or sampled evidence labels. |
 | Provisional M4 | `parameter.region.promote` | Replay an authorized certificate bound to an immutable region subject before labeling it verified sufficient or necessary. |
-| Current product track | `knowledge.search` | Query locally indexed capability episodes while preserving each record's assurance. |
+| Current product track | `knowledge.search` capability ID | Query locally indexed capability episodes through `capability.invoke` while preserving each record's assurance. |
 | M5 | provider-backed `knowledge.search` | Extend local retrieval with cross-project records, temporal cutoffs, review, and retraction. |
 | M5 | `abstraction.extract` | Suggest an abstract mathematical explanation for supplied or retrieved artifacts. |
 | M5 | `episode.compare` | Compare failures and propose recurring obstructions or no-go lemmas. |
 | M5 | `certificate.simplify` | Minimize a certificate while replaying its authorized checker locally. |
 
-The M4 tools operate without a shared corpus. When no M5 provider is
+The M4 workflows operate without a shared corpus. Their intended primitive
+operations are claim derivation, deduplication, scoring, bounded falsification,
+and parameter analysis; agents may compose them differently from the bundled
+façades. When no M5 provider is
 configured, they deduplicate against supplied or local experiment records and
 report corpus-wide novelty as unknown. Corpus retrieval can suggest inputs to
 any tool but cannot authorize checkers or promote verification status.

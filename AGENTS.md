@@ -1,23 +1,40 @@
 # Repository Guidelines
 
-## Project Purpose and Decision Rules
+## Product Model
 
-Jacobian is a verifier-centric research workbench for bounded, executable
-mathematics. It gives models and researchers a laboratory in which they can
-propose candidates, search finite spaces, receive structured counter-witnesses,
-shrink discoveries, and replay independently checked certificates.
+Jacobian is a verifier-centric workbench for investigating mathematical
+problems, including research-level conjectures, through bounded, executable
+steps. Mathematician agents and human researchers compose small capabilities to
+transform claims, construct and explore mathematical objects, search for
+counterexamples, build candidate proofs, and submit evidence to independent
+checkers.
 
-Jacobian is not a `solve_conjecture` endpoint, a universal mathematics
-ontology, or a replacement for existing SAT, SMT, optimization, and proof
-engines. Search, generation, evaluation, and interpretation may be heuristic
-or wrong. Only an operator-authorized checker may promote evidence to a
-verified result.
+A mathematical primitive is a versioned capability that performs one
+observable operation. It consumes typed artifacts and returns typed artifacts,
+their explicit relationships, any new proof obligations, and the execution,
+assurance, and provenance needed to inspect or replay the step. A primitive may
+search, generate, transform, retrieve, or evaluate; it cannot promote its own
+output to verified evidence.
 
-The generic kernel understands artifacts, claims, candidates, predicates,
-witnesses, certificates, reductions, budgets, and provenance. Mathematical
-semantics belong in versioned domain plugins. Do not add graph-, matrix-,
-routing-, solver-, or proof-system-specific types to the generic core merely
-to satisfy a reference scenario.
+Primitive operations include deriving related claims; constructing,
+enumerating, mutating, or searching mathematical objects; computing properties
+and invariants; partitioning cases; decomposing goals; retrieving and
+instantiating premises; and replaying or cross-checking certificates. This list
+does not define a universal mathematical ontology. Domain plugins define the
+meaning of each operation for their objects and claims.
+
+Proof strategies and research agents compose primitives into workflows.
+External SAT, SMT, CAS, optimization, retrieval, and proof systems connect
+through capability adapters. Prefer a capability ID behind
+`capability.describe` and `capability.invoke` over a new top-level MCP tool.
+
+The kernel owns artifact identity, execution status, assurance, checker
+authorization, budgets, and provenance. Capability adapters own external
+integrations. Domain plugins own mathematical schemas, transformations,
+invariants, witness meanings, and required checker roles. Independent checker
+packages implement replay; operators authorize them. Agent workflows and
+skills own multi-step exploration policies. Worked cases belong in reference
+scenarios and benchmarks.
 
 ## Fail-Closed Verification Rules
 

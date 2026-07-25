@@ -2,6 +2,9 @@
 
 [Documentation home](../index.md)
 
+This guide covers the provisional M3 search runtime. Its commands and artifact
+formats are outside v0.2 conformance and may change.
+
 Use these commands when a `search-run` request has returned an experiment URI
 and you need to inspect or control that experiment. Keep the same
 `--state-dir` for every command; the state directory is the durable owner of

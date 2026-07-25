@@ -1,13 +1,16 @@
 # Jacobian
 
-Jacobian is a capability-first MCP workbench and research-memory layer for
-agents doing executable mathematics.
+Jacobian is a verifier-centric workbench of composable mathematical primitives
+for mathematician agents and human researchers. It supports research-level
+problems and conjectures by turning an investigation into bounded, executable
+steps that produce inspectable artifacts.
 
-It gives agents and researchers reusable computation, search, retrieval,
-formal-proof, experiment, and verification tools so they can focus on
-mathematical strategy instead of rebuilding infrastructure. The kernel is not a
-`solve_conjecture` endpoint and does not treat model output or solver status as
-mathematical truth.
+A primitive performs one observable operation: transform a claim, construct or
+search mathematical objects, compute an invariant, decompose a goal, retrieve
+a premise, or replay a certificate. Proof strategies compose these operations
+into larger investigations. Jacobian preserves the inputs, outputs,
+relationships, obligations, execution status, assurance, and provenance of
+each step instead of presenting the workflow as one opaque solver call.
 
 The public kernel is domain-agnostic. Graphs, matrices, finite algebra,
 optimization problems, numerical claims, and formal proof goals acquire their
@@ -16,9 +19,9 @@ share the same artifact, evaluation, witness, shrinking, provenance, and
 verification substrate—not that an informal conjecture requires no
 formalization or domain implementation.
 
-Exploration is intentionally low friction. Verification is an optional
-assurance lane for results that must become durable mathematical claims. Its
-central invariant remains:
+Exploration may use models, heuristics, solvers, and external mathematical
+systems through capability adapters. Verification is a separate assurance lane
+for evidence that should become a durable mathematical result:
 
 > Search and evaluation may be wrong. A result becomes verified only when an
 > operator-authorized checker accepts evidence bound to the exact claim,
@@ -70,15 +73,16 @@ CLI or `uv run jacobian-mcp` to start the MCP adapter.
 | Milestone | Theme | Primary outcome |
 | --- | --- | --- |
 | Current release | Verification and bounded discovery | v0.2 alpha stores, evaluates, attacks, shrinks, independently verifies, enumerates structures, verifies representation changes, and computes exact separators |
-| Current product track | Capabilities and research memory | One extensible model-facing API supports fast exploration, optional verification, trust-labeled local episodes, and local or remote MCP hosts |
+| Current product track | Composable mathematical primitives | One extensible model-facing API exposes typed operations for exploration, composition, replay, and optional verification |
 | M3 | Scalable search | Provisional implementation runs typed search strategies through one resumable experiment loop |
-| M4 | Conjecture workflows | Provisional implementation repairs, generates, falsifies, and parametrically generalizes conjectures |
+| M4 | Claim transformation | Decompose broad claim-development workflows into typed generation, repair, ranking, falsification, and parameter-analysis operations |
 | M5 | Federated research corpus | Extend the implemented local episode database with optional cross-project providers, review, retraction, and temporal retrieval |
 | Stability target | Stable research platform | Publish a v1.0 API with formal-checking and collaboration support |
 
-The roadmap is tool-first and database-first. Local capability episodes are
-recorded and searchable without a shared service. Corpus-scale retrieval is an
-optional integration that cannot promote evidence or authorize checkers.
+The roadmap is primitive-first and artifact-first. Agent workflows may compose
+primitives, and completed capability episodes are recorded and searchable
+without a shared service. Corpus-scale retrieval is optional and cannot
+promote evidence or authorize checkers.
 
 The only public release contract is v0.2 alpha (`0.2.0a0`). It includes the
 verification kernel and bounded discovery. The repository also contains
@@ -93,8 +97,8 @@ gates are part of the working project record. Start with:
 
 - [Architecture](docs/explanation/architecture.md) for the system shape and
   verification boundary.
-- [Capability-first product blueprint](docs/explanation/product-blueprint.md)
-  for the agent-facing API, memory, remote host, and A/B evaluation direction.
+- [Product model](docs/explanation/product-blueprint.md) for the primitive
+  contract, ownership boundaries, agent-facing API, and evaluation direction.
 - [Roadmap](docs/explanation/roadmap.md) for active milestone scope and exit
   gates.
 - [Architecture decision log](docs/explanation/adr/index.md) for accepted
@@ -109,13 +113,15 @@ Release contracts and engineering evidence are:
 - [Tool surface](docs/reference/tools.md)
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
-- [M3](docs/reference/milestones/m3-scalable-search.md) and
-  [M4](docs/reference/milestones/m4-conjecture-workflows.md) provisional
-  contracts
+- [M3](docs/reference/milestones/m3-scalable-search.md),
+  [M4](docs/reference/milestones/m4-conjecture-workflows.md), and
+  [M5](docs/reference/milestones/m5-research-corpus.md) provisional contracts
+- [v1.0 stability target](docs/reference/specifications/v1.0.md)
 - [Testing strategy](docs/reference/testing-strategy.md),
   [scenario catalog](docs/reference/math-scenarios.md), and
   [performance benchmark protocol](docs/reference/performance-benchmarks.md)
-- [Plugin conformance contract](docs/reference/plugin-conformance.md)
+- [Plugin conformance contract](docs/reference/plugin-conformance.md) and
+  [agent evaluation protocol](docs/reference/agent-evaluations.md)
 
 The [documentation home](docs/index.md) provides the complete catalog,
 organized into tutorials, how-to guides, reference, and explanation. Read
@@ -125,19 +131,19 @@ documentation placement, and pull-request expectations.
 ## Current status
 
 v0.2 alpha is implemented as a Python package, CLI, and local or remote MCP
-adapter. The capability-first projection exposes one stable
-`capability.describe` discovery tool and one stable `capability.invoke` tool
-backed by an extensible adapter registry and trust-labeled research memory.
+adapter. The compact projection exposes `capability.describe` for discovery
+and `capability.invoke` for execution, backed by an extensible adapter registry
+and trust-labeled research memory.
 Bundled capabilities provide reference-domain exploration and verification,
 Lean checking, and local episode search.
 
-The advanced surface retains eight verification tools alongside bounded enumeration,
-implementation-bound canonicalization, independently verified representation
-changes, persistent experiment resources, and exact finite-polytope evidence.
-Bundled reference domains cover graph paths and bipartiteness, exact integer
-matrices, and bounded Erdős-Straus decomposition tables. A verified
-Erdős-Straus table establishes only its exact finite interval, never the open
-unbounded conjecture.
+The advanced profiles expose the lower-level operations documented in the
+[tool reference](docs/reference/tools.md), including bounded enumeration,
+independently checked representation changes, persistent experiments, and
+exact finite-polytope evidence. Bundled reference domains cover graph paths and
+bipartiteness, exact integer matrices, and bounded Erdős-Straus decomposition
+tables. A verified Erdős-Straus table establishes only its exact finite
+interval, never the open unbounded conjecture.
 
 The provisional M3/M4 code adds sealed plugin snapshots, a strategy-neutral
 `search.run` service, pause and resume from immutable checkpoints, append-only
@@ -155,11 +161,10 @@ Development commands and test-selection guidance live in
 [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [testing strategy](docs/reference/testing-strategy.md).
 
-The MCP adapter is pinned to the official Python SDK `2.0.0b2`. It remains
-isolated from the mathematical kernel because that SDK release is a beta.
-Exact finite-polytope generation uses Z3 rational constraints. Z3 output is
-always unverified until the separate `Fraction`-based checker accepts the
-bound witness or certificate.
+The MCP adapter remains isolated from the mathematical kernel. Exact
+finite-polytope generation uses Z3 rational constraints, but Z3 output remains
+unverified until the separate `Fraction`-based checker accepts the bound
+witness or certificate.
 
 ### Local Codex
 
@@ -196,19 +201,11 @@ capability-enabled runs once the A/B cases are selected.
 
 ### Lean certificates
 
-`lean.verify` binds an exact Lean proposition and proof body into immutable
-claim, candidate, and certificate artifacts, then invokes the ordinary
-authorized `certificate.verify` boundary. Both bundled environments pin Lean
-`4.31.0` commit `68218e876d2a38b1985b8590fff244a83c321783` and run with
-`--trust=0`:
-
-- `CORE` permits no import or axiom and is suitable for self-contained
-  propositions such as elementary induction.
-- `MATHLIB` generates exactly `import Mathlib`, pins mathlib commit
-  `fabf563a7c95a166b8d7b6efca11c8b4dc9d911f`, and permits only the declared
-  standard trust base `Classical.choice`, `Quot.sound`, and `propext`. Its
-  operator-installed checker profile has a 105-second cold-start ceiling;
-  normal checkers retain the 30-second default.
+The `lean.check` capability uses the `lean.verify` compatibility workflow to
+bind an exact proposition and proof body into immutable artifacts, then replay
+them through the authorized `certificate.verify` boundary. The bundled `CORE`
+and `MATHLIB` environments pin Lean, their imports, and their allowed trust
+bases; model-supplied imports and packages are rejected.
 
 Prepare the pinned local runtime with:
 
@@ -219,20 +216,10 @@ lake update
 lake build
 ```
 
-Jacobian selects that exact toolchain explicitly when it runs Lean, so it does
-not depend on the shell's current directory or require a global Elan default.
-If setup is incomplete, confirm the pinned toolchain from any directory with
-`elan run leanprover/lean4:v4.31.0 lean -V`.
-
-The checker rejects user-supplied imports, `sorry`, `admit`, `native_decide`,
-unsafe declarations, and metaprogram execution. It verifies the requested
-toolchain and mathlib commits and parses Lean's actual `#print axioms` result;
-the result must be a subset of the selected environment's allowlist.
-
-This is a trusted local Lean integration, not a broker sandbox. The mathlib
-profile executes the repository's pinned Lake environment with host-local
-runtime access. Arbitrary package ingestion and arbitrary imports are not
-supported.
+The operation and trust-boundary mapping are documented under
+[`lean.check` and `lean.verify`](docs/reference/tools.md). This is a trusted
+local integration, not a broker sandbox; the pinned Lake environment still has
+host-local runtime access.
 
 ## Distribution
 
@@ -244,7 +231,7 @@ TypeScript client or adapter.
 
 ## Initial non-goals
 
-- Natural-language-to-formal-mathematics automation
+- A universal natural-language-to-formal-mathematics translator in the kernel
 - A universal mathematical ontology
 - One opaque generic solver that hides backend semantics
 - Arbitrary model-uploaded executable bundles

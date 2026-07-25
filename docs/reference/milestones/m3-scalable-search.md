@@ -145,10 +145,10 @@ kernel or MCP changes.
 conformance-only plugin package in isolated test state, a search request, and
 disposable package attack fixtures. Each suite execution uses a fresh
 idempotency namespace. The runner drives declared search capabilities and the
-conjecture workflow itself, performs registry attacks with fresh fixture state,
-runs every generic check, and reports all failures together. Fault injection
-belongs only in this disposable synthetic package; production plugins do not
-expose conformance crash, malformed-output, or timeout controls.
+hypothesis-transformation operations, performs registry attacks with fresh
+fixture state, runs every generic check, and reports all failures together.
+Fault injection belongs only in this disposable synthetic package; production
+plugins do not expose conformance crash, malformed-output, or timeout controls.
 
 ## 7. Execution
 
