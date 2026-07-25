@@ -8,16 +8,24 @@ from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
+    CapabilityCompleteness,
+    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
+    CapabilityScope,
 )
 from jacobian.contracts.evaluation import EvaluationProfile
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.contracts.results import Execution, ExecutionStatus, Verification
+from jacobian.contracts.results import (
+    Coverage,
+    Execution,
+    ExecutionStatus,
+    Verification,
+)
 from jacobian.contracts.workflows import WitnessVerificationWorkflowResult
 from jacobian.lean import LeanService
 from jacobian.memory import ResearchMemory
@@ -325,6 +333,11 @@ def _reference_result(
         witness.witness_uri or witness.certificate_uri if witness is not None else None
     )
     scope_uri = verification.assurance.scope_uri if verification is not None else None
+    exhaustive = (
+        verified
+        and verification is not None
+        and verification.assurance.coverage is Coverage.EXHAUSTIVE
+    )
     artifacts = tuple(
         uri
         for uri in (
@@ -428,7 +441,30 @@ def _reference_result(
                 ),
             },
         },
-        scope=_scope_from_claim(claim_payload),
+        scope=CapabilityScope(
+            description="exact domain, predicate, and bounds supplied to the workflow",
+            parameters=_scope_from_claim(claim_payload),
+            artifact_uri=scope_uri or workflow.claim_uri,
+        ),
+        completeness=CapabilityCompleteness(
+            status=(
+                CapabilityCompletenessStatus.COMPLETE
+                if exhaustive
+                else CapabilityCompletenessStatus.UNKNOWN
+            ),
+            basis=(
+                "authorized checker accepted exhaustive finite coverage"
+                if exhaustive
+                else "candidate evaluation or direct-witness search does not "
+                "establish exhaustive coverage"
+            ),
+            assurance_level=(
+                CapabilityAssuranceLevel.VERIFIED
+                if exhaustive
+                else CapabilityAssuranceLevel.HEURISTIC
+            ),
+            verification_record_uri=(verification_record_uri if exhaustive else None),
+        ),
         assurance=CapabilityAssurance(
             level=(
                 CapabilityAssuranceLevel.VERIFIED
