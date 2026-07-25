@@ -7,8 +7,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from jacobian.cli import app
+from jacobian.cli import _public_error, app
 from jacobian.kernel import JacobianKernel
+from jacobian.store import StoreLimitError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -87,6 +88,122 @@ def test_cli_help_exposes_v02_operations() -> None:
         "polytope-separate",
     ):
         assert command in result.stdout
+
+
+@pytest.mark.integration
+def test_cli_missing_input_file_returns_an_actionable_json_error(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing.json"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "artifact-put",
+            "schema://missing",
+            "semantics://missing",
+            str(missing),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert json.loads(result.stderr) == {
+        "error": {
+            "code": "INPUT_FILE_UNAVAILABLE",
+            "message": "Jacobian could not read the input file.",
+            "hint": "Check that the path exists and is readable, then retry.",
+        }
+    }
+    assert "Traceback" not in result.stderr
+    assert str(missing) not in result.stderr
+
+
+@pytest.mark.integration
+def test_cli_invalid_json_returns_an_actionable_json_error(tmp_path: Path) -> None:
+    payload = tmp_path / "payload.json"
+    payload.write_text('{"value": NaN}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "artifact-put",
+            "schema://missing",
+            "semantics://missing",
+            str(payload),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert json.loads(result.stderr) == {
+        "error": {
+            "code": "INVALID_INPUT",
+            "message": "Jacobian could not use the supplied input.",
+            "hint": (
+                "Check the command arguments and JSON payload against the "
+                "documented schema, then retry."
+            ),
+        }
+    }
+    assert "NaN" not in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("as_directory", "expected_code"),
+    [
+        (False, "INVALID_INPUT"),
+        (True, "INPUT_FILE_UNAVAILABLE"),
+    ],
+)
+def test_cli_json_shape_and_read_errors_use_the_json_envelope(
+    tmp_path: Path,
+    *,
+    as_directory: bool,
+    expected_code: str,
+) -> None:
+    payload = tmp_path / "payload.json"
+    if as_directory:
+        payload.mkdir()
+    else:
+        payload.write_text("[]", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "artifact-put",
+            "schema://missing",
+            "semantics://missing",
+            str(payload),
+        ],
+    )
+
+    assert result.exit_code in {1, 2}
+    assert json.loads(result.stderr)["error"]["code"] == expected_code
+    assert "Traceback" not in result.stderr
+    assert "Usage:" not in result.stderr
+
+
+def test_cli_storage_limit_has_a_capacity_recovery_action() -> None:
+    error, exit_code = _public_error(StoreLimitError("fixture internal limit"))
+
+    assert exit_code == 1
+    assert error == {
+        "code": "STORAGE_LIMIT_REACHED",
+        "message": "The input or stored data exceeds a configured size limit.",
+        "hint": (
+            "Reduce the payload size or free space in the state directory, then retry."
+        ),
+    }
+    assert "fixture" not in str(error)
 
 
 @pytest.mark.integration

@@ -7,8 +7,14 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from pydantic import ValidationError
+from typer import _click
+from typer.core import TyperGroup
 
-from jacobian.canonical import loads_strict_json
+from jacobian.artifacts import ArtifactValidationError
+from jacobian.canonical import CanonicalizationError, loads_strict_json
+from jacobian.capabilities import CapabilityError
+from jacobian.conjectures import ConjectureError
 from jacobian.contracts.conjectures import (
     ConjectureOperation,
     ConjectureWorkflowRequest,
@@ -18,15 +24,206 @@ from jacobian.contracts.evaluation import EvaluationProfile
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.contracts.search import SearchBudget, SearchRunRequest
-from jacobian.experiments import ExperimentNotFoundError
+from jacobian.experiments import ExperimentError, ExperimentNotFoundError
+from jacobian.implementation import ImplementationError
 from jacobian.kernel import JacobianKernel
+from jacobian.plugins.registry import PluginRegistryError
 from jacobian.references import reference_catalog
+from jacobian.registry import (
+    CheckerCompatibilityError,
+    CheckerExecutableChangedError,
+    CheckerNotFoundError,
+    CheckerRegistryError,
+    CheckerRevokedError,
+)
+from jacobian.schema_registry import SchemaRegistryError, SchemaValidationError
+from jacobian.search import SearchError
+from jacobian.store import (
+    ArtifactIntegrityError,
+    ArtifactNotFoundError,
+    StoreError,
+    StoreLimitError,
+)
+from jacobian.verification import CheckerExecutionError
+
+
+class JacobianGroup(TyperGroup):
+    """Translate application failures into a stable agent-readable envelope."""
+
+    def invoke(self, ctx: _click.Context) -> Any:
+        try:
+            return super().invoke(ctx)
+        except (_click.ClickException, typer.Abort, typer.Exit):
+            raise
+        except Exception as exc:
+            payload, exit_code = _public_error(exc)
+            typer.echo(
+                json.dumps({"error": payload}, ensure_ascii=False, sort_keys=True),
+                err=True,
+            )
+            raise typer.Exit(code=exit_code) from None
+
 
 app = typer.Typer(
     name="jacobian",
+    cls=JacobianGroup,
     help="Verifier-centric workbench for bounded executable mathematics.",
     no_args_is_help=True,
 )
+
+
+def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
+    if isinstance(exc, FileNotFoundError):
+        return (
+            {
+                "code": "INPUT_FILE_UNAVAILABLE",
+                "message": "Jacobian could not read the input file.",
+                "hint": "Check that the path exists and is readable, then retry.",
+            },
+            1,
+        )
+    if isinstance(
+        exc,
+        (ArtifactNotFoundError, CheckerNotFoundError, ExperimentNotFoundError),
+    ):
+        return (
+            {
+                "code": "RESOURCE_NOT_FOUND",
+                "message": "Jacobian could not find the requested resource.",
+                "hint": "Check the supplied URI or identifier, then retry.",
+            },
+            1,
+        )
+    if isinstance(
+        exc,
+        StoreLimitError,
+    ):
+        return (
+            {
+                "code": "STORAGE_LIMIT_REACHED",
+                "message": "The input or stored data exceeds a configured size limit.",
+                "hint": (
+                    "Reduce the payload size or free space in the state directory, "
+                    "then retry."
+                ),
+            },
+            1,
+        )
+    if isinstance(
+        exc,
+        (
+            ArtifactValidationError,
+            CanonicalizationError,
+            SchemaValidationError,
+            ValidationError,
+            ValueError,
+        ),
+    ):
+        return (
+            {
+                "code": "INVALID_INPUT",
+                "message": "Jacobian could not use the supplied input.",
+                "hint": (
+                    "Check the command arguments and JSON payload against the "
+                    "documented schema, then retry."
+                ),
+            },
+            2,
+        )
+    if isinstance(
+        exc,
+        (
+            ArtifactIntegrityError,
+            CheckerExecutableChangedError,
+            CheckerRevokedError,
+        ),
+    ):
+        return (
+            {
+                "code": "VERIFICATION_UNAVAILABLE",
+                "message": "Jacobian stopped because trusted data or code changed.",
+                "hint": (
+                    "Inspect the local state, then authorize or register the current "
+                    "component version before retrying."
+                ),
+            },
+            1,
+        )
+    if isinstance(exc, TimeoutError):
+        return (
+            {
+                "code": "OPERATION_TIMED_OUT",
+                "message": "The operation did not finish within the allowed time.",
+                "hint": (
+                    "Inspect the operation state, then retry with a larger time "
+                    "budget or a smaller request."
+                ),
+            },
+            1,
+        )
+    if isinstance(
+        exc,
+        (
+            CapabilityError,
+            CheckerCompatibilityError,
+            CheckerRegistryError,
+            ImplementationError,
+            PluginRegistryError,
+            SchemaRegistryError,
+        ),
+    ):
+        return (
+            {
+                "code": "CONFIGURATION_ERROR",
+                "message": "Jacobian is not configured for this operation.",
+                "hint": (
+                    "Call the relevant describe or catalog operation, then install "
+                    "or authorize the missing component before retrying."
+                ),
+            },
+            1,
+        )
+    if isinstance(exc, PermissionError):
+        return (
+            {
+                "code": "PERMISSION_DENIED",
+                "message": "Jacobian does not have permission to complete the operation.",
+                "hint": "Check access to the local state and input files, then retry.",
+            },
+            1,
+        )
+    if isinstance(exc, StoreError):
+        return (
+            {
+                "code": "STORAGE_ERROR",
+                "message": "Jacobian could not read or update its local state.",
+                "hint": "Check the state directory and available disk space, then retry.",
+            },
+            1,
+        )
+    if isinstance(
+        exc,
+        (CheckerExecutionError, ConjectureError, ExperimentError, SearchError),
+    ):
+        return (
+            {
+                "code": "OPERATION_FAILED",
+                "message": "Jacobian could not complete the operation.",
+                "hint": (
+                    "Inspect any returned experiment state or diagnostics, correct "
+                    "the request, and retry."
+                ),
+            },
+            1,
+        )
+    return (
+        {
+            "code": "INTERNAL_ERROR",
+            "message": "Jacobian encountered an unexpected error.",
+            "hint": "Retry once. If it happens again, inspect the local Jacobian log.",
+        },
+        1,
+    )
 
 
 class CliState:
@@ -569,13 +766,17 @@ def _cancel_experiment(
 
 
 def _read_json(path: Path) -> Any:
-    return loads_strict_json(path.read_bytes())
+    try:
+        source = path.read_bytes()
+    except OSError as exc:
+        raise FileNotFoundError(path) from exc
+    return loads_strict_json(source)
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:
     value = _read_json(path)
     if not isinstance(value, dict):
-        raise typer.BadParameter("JSON input must be an object")
+        raise ValueError("JSON input must be an object")
     return value
 
 

@@ -101,16 +101,20 @@ function ensureEnvironment(runtime) {
     if (runtime.kind === "uv") {
       const result = run(runtime.path, ["venv", join(root, VENV_NAME), "--python", "3.12"]);
       if (result.error || result.status !== 0) {
-        console.error("Failed to create the Jacobian virtual environment with uv.");
         process.exitCode = 1;
-        throw new Error("venv creation failed");
+        throw new Error(
+          `Jacobian could not create its local Python environment in ${root}. ` +
+            "Check write access and that Python 3.12 is available, then retry.",
+        );
       }
     } else {
       const result = run(runtime.path, ["-m", "venv", join(root, VENV_NAME)]);
       if (result.error || result.status !== 0) {
-        console.error("Failed to create the Jacobian virtual environment.");
         process.exitCode = 1;
-        throw new Error("venv creation failed");
+        throw new Error(
+          `Jacobian could not create its local Python environment in ${root}. ` +
+            "Check write access and install Python's venv support, then retry.",
+        );
       }
     }
   }
@@ -121,16 +125,20 @@ function ensureEnvironment(runtime) {
     if (runtime.kind === "uv") {
       const result = run(runtime.path, ["pip", "install", "--python", python, PACKAGE_SPEC]);
       if (result.error || result.status !== 0) {
-        console.error(`Failed to install ${PACKAGE_NAME}.`);
         process.exitCode = 1;
-        throw new Error("package install failed");
+        throw new Error(
+          "Jacobian could not install its Python package. Check network and package " +
+            "index access, then retry `npx jacobian doctor`.",
+        );
       }
     } else {
       const result = run(python, ["-m", "pip", "install", PACKAGE_SPEC]);
       if (result.error || result.status !== 0) {
-        console.error(`Failed to install ${PACKAGE_NAME}.`);
         process.exitCode = 1;
-        throw new Error("package install failed");
+        throw new Error(
+          "Jacobian could not install its Python package. Check network and package " +
+            "index access, then retry `npx jacobian doctor`.",
+        );
       }
     }
   }
@@ -148,11 +156,11 @@ function ensureEnvironment(runtime) {
 function resolvePython() {
   const runtime = detectRuntime();
   if (!runtime) {
-    console.error(
-      "Jacobian requires Python 3.12+ or uv. Install uv from https://docs.astral.sh/uv/ or Python from https://www.python.org/",
-    );
     process.exitCode = 1;
-    throw new Error("no Python runtime found");
+    throw new Error(
+      "Jacobian requires Python 3.12 or uv on PATH. Install one, then retry " +
+        "`npx jacobian doctor`.",
+    );
   }
   return ensureEnvironment(runtime);
 }
@@ -195,7 +203,10 @@ function launch(module, extraArgs, options = {}) {
   for (const [signal, handler] of handlers) process.on(signal, handler);
 
   child.once("error", (error) => {
-    console.error(`Failed to start Jacobian: ${error.message}`);
+    console.error(
+      `Jacobian could not start: ${error.message}. Run \`npx jacobian doctor\` ` +
+        "to check the local installation.",
+    );
     process.exitCode = 1;
   });
 

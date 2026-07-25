@@ -18,27 +18,23 @@ const HANDSHAKE_TIMEOUT_MS = 60_000;
 const RESPONSE_TIMEOUT_MS = 10_000;
 
 const EXPECTED_TOOLS = [
-  "artifact.put",
-  "claim.validate",
-  "evaluate.batch",
-  "witness.find",
-  "witness.verify",
-  "shrink.run",
-  "certificate.verify",
-  "structure.canonicalize",
-  "search.enumerate",
-  "search.run",
-  "experiment.cancel",
-  "experiment.pause",
-  "experiment.resume",
-  "transform.apply",
-  "transform.verify",
-  "polytope.separate",
-  "conjecture.repair",
-  "conjecture.generate",
-  "parameter.generalize",
-  "parameter.region.promote",
+  "capability.describe",
+  "capability.invoke",
 ];
+
+function timeoutMessage(timeoutMs) {
+  return (
+    `Jacobian did not answer within ${timeoutMs} ms. Retry this command once; ` +
+    "if it happens again, run `npx jacobian setup` and retry."
+  );
+}
+
+function handshakeFailure(stage) {
+  return (
+    `Jacobian could not complete the MCP ${stage}. Run \`npx jacobian setup\`, ` +
+    "restart the configured client, and retry `npx jacobian doctor`."
+  );
+}
 
 /**
  * @typedef {object} DoctorReport
@@ -79,7 +75,7 @@ function waitForResponse(child, id, timeoutMs) {
   return new Promise((resolve, reject) => {
     let buffer = "";
     const timer = setTimeout(() => {
-      reject(new Error(`timed out after ${timeoutMs}ms waiting for response id=${id}`));
+      reject(new Error(timeoutMessage(timeoutMs)));
     }, timeoutMs);
 
     child.stdout.on("data", (chunk) => {
@@ -108,7 +104,12 @@ function waitForResponse(child, id, timeoutMs) {
 
     child.once("close", (code) => {
       clearTimeout(timer);
-      reject(new Error(`server exited with code ${code} before responding`));
+      reject(
+        new Error(
+          "Jacobian stopped before responding. Run `npx jacobian setup`, then retry " +
+            "`npx jacobian doctor`.",
+        ),
+      );
     });
   });
 }
@@ -185,7 +186,7 @@ async function run(options = {}) {
 
     const initResponse = await waitForResponse(child, 1, HANDSHAKE_TIMEOUT_MS);
     if (initResponse.error) {
-      throw new Error(`initialize failed: ${JSON.stringify(initResponse.error)}`);
+      throw new Error(handshakeFailure("initialization handshake"));
     }
     const result = initResponse.result;
     const serverName = result?.serverInfo?.name ?? "";
@@ -193,7 +194,10 @@ async function run(options = {}) {
     const instructionsLoaded = typeof result?.instructions === "string";
 
     if (serverName !== "jacobian") {
-      throw new Error(`MCP identified itself as "${serverName}", expected "jacobian"`);
+      throw new Error(
+        "The configured MCP server is not Jacobian. Run `npx jacobian setup`, " +
+          "restart the configured client, and retry `npx jacobian doctor`.",
+      );
     }
 
     // 2. Send initialized notification.
@@ -213,7 +217,7 @@ async function run(options = {}) {
 
     const toolsResponse = await waitForResponse(child, 2, RESPONSE_TIMEOUT_MS);
     if (toolsResponse.error) {
-      throw new Error(`tools/list failed: ${JSON.stringify(toolsResponse.error)}`);
+      throw new Error(handshakeFailure("tool-catalog request"));
     }
     const tools = (toolsResponse.result?.tools ?? []).map((t) => t.name);
     const missingTools = EXPECTED_TOOLS.filter((t) => !tools.includes(t));
@@ -283,4 +287,9 @@ async function run(options = {}) {
   }
 }
 
-module.exports = { run, EXPECTED_TOOLS };
+module.exports = {
+  run,
+  EXPECTED_TOOLS,
+  timeoutMessage,
+  handshakeFailure,
+};
