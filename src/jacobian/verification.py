@@ -353,6 +353,7 @@ class VerificationService:
                 execution=Execution(
                     status=ExecutionStatus.COMPLETED,
                     runtime_ms=runtime_ms,
+                    detail=decision.detail,
                 ),
                 input=InputValidation(status=InputStatus.ACCEPTED),
                 conclusion=decision.conclusion,
@@ -555,6 +556,7 @@ class VerificationService:
                 execution=Execution(
                     status=ExecutionStatus.COMPLETED,
                     runtime_ms=runtime_ms,
+                    detail=decision.detail,
                 ),
                 input=InputValidation(status=InputStatus.ACCEPTED),
                 conclusion=decision.conclusion,

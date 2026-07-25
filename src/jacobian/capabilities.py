@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import re
+import time
 from typing import TYPE_CHECKING, Protocol, cast
 
 from jsonschema import Draft202012Validator
@@ -15,6 +17,7 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCatalog,
     CapabilityDescriptor,
+    CapabilityDiagnostic,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -28,10 +31,19 @@ if TYPE_CHECKING:
     from jacobian.kernel import JacobianKernel
 
 _ENTRYPOINT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
+_LOGGER = logging.getLogger(__name__)
 
 
 class CapabilityError(RuntimeError):
     """A capability descriptor, request, or assurance boundary is invalid."""
+
+
+class CapabilityInvocationError(RuntimeError):
+    """An expected adapter failure that is safe to return to a model."""
+
+    def __init__(self, diagnostic: CapabilityDiagnostic) -> None:
+        super().__init__(diagnostic.message)
+        self.diagnostic = diagnostic
 
 
 class CapabilityAdapter(Protocol):
@@ -69,6 +81,7 @@ class CapabilityService:
         )
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        started = time.monotonic()
         try:
             adapter = self._adapters[request.capability_id]
         except KeyError as exc:
@@ -80,22 +93,45 @@ class CapabilityService:
             raise CapabilityError(
                 f"{request.capability_id} does not support {request.mode.value}"
             )
-        normalized_input = _validate_payload(descriptor.input_schema, request.input)
+        try:
+            normalized_input = _validate_payload(descriptor.input_schema, request.input)
+        except CapabilityError as exc:
+            result = _failed_result(
+                descriptor=descriptor,
+                request=request,
+                diagnostic=CapabilityDiagnostic(
+                    code="INVALID_REQUEST",
+                    stage="capability_input_validation",
+                    message=str(exc),
+                    path=_error_path(exc),
+                    expected="input matching the capability descriptor JSON Schema",
+                    actual_type="object",
+                    hint="Call capability.describe and follow the advertised input schema.",
+                ),
+            )
+            _log_invocation(result, started)
+            return result
         normalized_request = request.model_copy(update={"input": normalized_input})
         try:
             result = CapabilityResult.model_validate(adapter.invoke(normalized_request))
+        except CapabilityInvocationError as exc:
+            result = _failed_result(
+                descriptor=descriptor,
+                request=request,
+                diagnostic=exc.diagnostic,
+            )
         except Exception as exc:
-            result = CapabilityResult(
-                capability_id=descriptor.capability_id,
-                capability_version=descriptor.version,
-                mode=request.mode,
-                execution=Execution(
-                    status=ExecutionStatus.ERROR,
-                    detail=f"capability adapter failed: {type(exc).__name__}",
-                ),
-                assurance=CapabilityAssurance(
-                    level=CapabilityAssuranceLevel.HEURISTIC,
-                    basis="adapter execution failed; no mathematical conclusion",
+            result = _failed_result(
+                descriptor=descriptor,
+                request=request,
+                diagnostic=CapabilityDiagnostic(
+                    code="ADAPTER_EXECUTION_FAILED",
+                    stage="adapter_execution",
+                    message=f"Capability adapter failed: {type(exc).__name__}",
+                    hint=(
+                        "Retry only if the service is healthy; this result carries "
+                        "no mathematical conclusion."
+                    ),
                 ),
             )
         if (
@@ -104,10 +140,16 @@ class CapabilityService:
             or result.mode is not request.mode
         ):
             raise CapabilityError("adapter result identity differs from its request")
-        normalized_output = _validate_payload(descriptor.output_schema, result.output)
-        result = result.model_copy(update={"output": normalized_output})
+        if result.execution.status is ExecutionStatus.COMPLETED:
+            normalized_output = _validate_payload(
+                descriptor.output_schema, result.output
+            )
+            result = result.model_copy(update={"output": normalized_output})
         self._validate_verified_result(result)
-        if descriptor.records_episode:
+        if (
+            descriptor.records_episode
+            and result.execution.status is ExecutionStatus.COMPLETED
+        ):
             episode_uri = self.memory.record(
                 ResearchEpisode(
                     capability_id=result.capability_id,
@@ -123,6 +165,7 @@ class CapabilityService:
                 )
             )
             result = result.model_copy(update={"episode_uri": episode_uri})
+        _log_invocation(result, started)
         return result
 
     def _validate_verified_result(self, result: CapabilityResult) -> None:
@@ -217,4 +260,65 @@ def _episode_summary(result: CapabilityResult) -> str:
         f"{result.capability_id} {result.mode.value.lower()} "
         f"{result.execution.status.value.lower()} "
         f"({result.assurance.level.value.lower()})"
+    )
+
+
+def _failed_result(
+    *,
+    descriptor: CapabilityDescriptor,
+    request: CapabilityRequest,
+    diagnostic: CapabilityDiagnostic,
+) -> CapabilityResult:
+    return CapabilityResult(
+        capability_id=descriptor.capability_id,
+        capability_version=descriptor.version,
+        mode=request.mode,
+        execution=Execution(
+            status=ExecutionStatus.ERROR,
+            detail=diagnostic.message,
+        ),
+        output={"error": diagnostic.model_dump(mode="json", exclude_none=True)},
+        diagnostics=(diagnostic,),
+        assurance=CapabilityAssurance(
+            level=CapabilityAssuranceLevel.HEURISTIC,
+            basis="execution or input failure; no mathematical conclusion",
+        ),
+    )
+
+
+def _error_path(exc: Exception) -> str | None:
+    path, separator, _ = str(exc).partition(": ")
+    return path if separator else None
+
+
+def _log_invocation(result: CapabilityResult, started: float) -> None:
+    elapsed_ms = round((time.monotonic() - started) * 1000)
+    diagnostic_codes = (
+        ",".join(diagnostic.code for diagnostic in result.diagnostics) or "-"
+    )
+    _LOGGER.info(
+        (
+            "capability invocation capability_id=%s version=%s mode=%s "
+            "status=%s assurance=%s elapsed_ms=%d diagnostics=%s episode=%s"
+        ),
+        result.capability_id,
+        result.capability_version,
+        result.mode.value,
+        result.execution.status.value,
+        result.assurance.level.value,
+        elapsed_ms,
+        diagnostic_codes,
+        result.episode_uri or "-",
+        extra={
+            "jacobian_capability_id": result.capability_id,
+            "jacobian_capability_version": result.capability_version,
+            "jacobian_mode": result.mode.value,
+            "jacobian_execution_status": result.execution.status.value,
+            "jacobian_assurance_level": result.assurance.level.value,
+            "jacobian_elapsed_ms": elapsed_ms,
+            "jacobian_diagnostic_codes": tuple(
+                diagnostic.code for diagnostic in result.diagnostics
+            ),
+            "jacobian_episode_uri": result.episode_uri,
+        },
     )

@@ -342,10 +342,12 @@ and compact result projection changed that compact descriptor to 7,883
 characters; the corresponding 22-tool descriptor was 103,382 characters.
 
 The capability-first change was remeasured with compact sorted JSON on
-2026-07-24. The default `capabilities` profile advertises one tool in 779
-characters. Its three-entry `capability://catalog` is 2,663 characters. The
+2026-07-24. After adding tool-callable exact schema discovery, the default
+`capabilities` profile advertises two tools in 1,492 characters. Its
+three-entry `capability://catalog` is 2,663 characters, and an exact
+Erdős-Straus `capability.describe` result is 5,347 characters. The
 compatibility `verification` profile is eight tools and 7,171 characters; the
-23-tool `full` profile is 105,187 characters. The default descriptor remains
+24-tool `full` profile is 107,034 characters. The default descriptor remains
 well below the 25 KB first-stage target. These are descriptor measurements,
 not model token counts, and must be remeasured when contracts change.
 

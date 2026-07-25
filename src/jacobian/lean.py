@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import threading
+import weakref
+from collections import OrderedDict
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -13,9 +17,15 @@ from jacobian.contracts.lean import (
     LeanEnvironment,
     LeanVerifyResult,
 )
+from jacobian.contracts.results import Execution, ExecutionStatus, ResultEnvelope
+from jacobian.contracts.verification import VerificationRecord
 from jacobian.references import LeanCheckerInstallation
-from jacobian.store import ArtifactStore
+from jacobian.registry import CheckerRegistryError
+from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
+
+_LOGGER = logging.getLogger(__name__)
+_RESULT_CACHE_SIZE = 128
 
 
 class LeanService:
@@ -32,6 +42,12 @@ class LeanService:
         self.artifacts = artifacts
         self.verification = verification
         self.installations = installations
+        self._cache: OrderedDict[str, tuple[str, ResultEnvelope]] = OrderedDict()
+        self._cache_lock = threading.Lock()
+        self._certificate_locks: weakref.WeakValueDictionary[str, threading.Lock] = (
+            weakref.WeakValueDictionary()
+        )
+        self._warmup_started = False
 
     def verify(
         self,
@@ -101,13 +117,116 @@ class LeanService:
             parents=(claim.artifact_uri, candidate.artifact_uri),
             summary=f"{environment.value} Lean proof certificate",
         )
-        result = self.verification.verify_certificate(
-            certificate_uri=certificate.artifact_uri,
-            timeout_seconds=installation.checker_timeout_seconds,
-        )
+        with self._cache_lock:
+            certificate_lock = self._certificate_locks.setdefault(
+                certificate.artifact_uri,
+                threading.Lock(),
+            )
+        with certificate_lock:
+            result = self._cached_result(
+                certificate_uri=certificate.artifact_uri,
+                installation=installation,
+            )
+            cache_hit = result is not None
+            if result is None:
+                result = self.verification.verify_certificate(
+                    certificate_uri=certificate.artifact_uri,
+                    checker_id=installation.checker_id,
+                    timeout_seconds=installation.checker_timeout_seconds,
+                )
+                if result.execution.status is ExecutionStatus.COMPLETED:
+                    try:
+                        registration = (
+                            self.verification.checker_registry.require_active(
+                                installation.checker_id
+                            )
+                        )
+                    except CheckerRegistryError:
+                        pass
+                    else:
+                        with self._cache_lock:
+                            self._cache[certificate.artifact_uri] = (
+                                registration.executable_digest,
+                                result,
+                            )
+                            self._cache.move_to_end(certificate.artifact_uri)
+                            while len(self._cache) > _RESULT_CACHE_SIZE:
+                                self._cache.popitem(last=False)
         return LeanVerifyResult(
             claim_uri=claim.artifact_uri,
             candidate_uri=candidate.artifact_uri,
             certificate_uri=certificate.artifact_uri,
             result=result,
+            cache_hit=cache_hit,
+        )
+
+    def start_mathlib_warmup(self) -> bool:
+        """Warm the pinned Mathlib runtime once without delaying server startup."""
+
+        with self._cache_lock:
+            if self._warmup_started:
+                return False
+            self._warmup_started = True
+        thread = threading.Thread(
+            target=self._warm_mathlib,
+            name="jacobian-lean-mathlib-warmup",
+            daemon=True,
+        )
+        thread.start()
+        return True
+
+    def _warm_mathlib(self) -> None:
+        try:
+            self.verify(
+                statement="1 + 1 = 2",
+                proof="rfl",
+                environment=LeanEnvironment.MATHLIB,
+            )
+        except Exception:
+            _LOGGER.exception("Lean Mathlib warm-up failed")
+
+    def _cached_result(
+        self,
+        *,
+        certificate_uri: str,
+        installation: LeanCheckerInstallation,
+    ) -> ResultEnvelope | None:
+        with self._cache_lock:
+            cached = self._cache.get(certificate_uri)
+            if cached is not None:
+                self._cache.move_to_end(certificate_uri)
+        if cached is None:
+            return None
+        checker_digest, result = cached
+        try:
+            registration = self.verification.checker_registry.require_active(
+                installation.checker_id
+            )
+            if registration.executable_digest != checker_digest:
+                return None
+            certificate_artifact = self.store.get(certificate_uri)
+            certificate = CertificateEnvelope.model_validate(
+                certificate_artifact.payload
+            )
+            if result.verification_record_uri is not None:
+                record = VerificationRecord.model_validate(
+                    self.store.get(result.verification_record_uri).payload
+                )
+                if (
+                    record.checker_id != installation.checker_id
+                    or record.checker_digest != checker_digest
+                    or record.evidence_uri != certificate_uri
+                    or record.bindings != certificate.bindings
+                ):
+                    return None
+        except (CheckerRegistryError, StoreError, ValueError):
+            return None
+        return result.model_copy(
+            update={
+                "execution": Execution(
+                    status=ExecutionStatus.COMPLETED,
+                    runtime_ms=0,
+                    detail="reused exact certificate result from active-checker cache",
+                )
+            }
         )

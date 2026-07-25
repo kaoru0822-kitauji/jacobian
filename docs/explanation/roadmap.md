@@ -30,7 +30,7 @@ checker-backed assurance available when a result must be promoted.
 
 ### Deliverables
 
-- One model-facing `capability.invoke` MCP tool and discoverable catalog
+- Model-facing `capability.describe` and `capability.invoke` MCP tools
 - Adapter registration without kernel or MCP edits
 - Explicit `EXPLORE` and `VERIFY` lanes
 - Heuristic, computed, and verified assurance labels

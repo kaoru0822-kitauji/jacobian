@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import runpy
+import shutil
 from pathlib import Path
 from typing import Any, cast
+
+import pytest
 
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.kernel import JacobianKernel
@@ -226,6 +229,11 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     assert score["passed"] is True
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    shutil.which("lean") is None,
+    reason="Lean is not installed",
+)
 def test_known_answer_scorer_accepts_bound_lean_certificate(
     tmp_path: Path,
 ) -> None:

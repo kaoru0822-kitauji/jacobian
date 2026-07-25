@@ -164,12 +164,17 @@ All local workflows remain available when no provider is configured.
 declares a stable operation ID, version, supported `EXPLORE` and `VERIFY`
 modes, input and output JSON Schemas, and discovery metadata. The MCP
 projection exposes the registry through `capability://catalog` and
-`capability.invoke`, so a new Alloy, Lean, SAT/SMT, CAS, or domain adapter does
-not require another MCP tool or a generic-core type.
+the tool-callable `capability.describe` and `capability.invoke` pair, so a new
+Alloy, Lean, SAT/SMT, CAS, or domain adapter does not require another MCP tool
+or a generic-core type. Domain descriptions project exact schemas, binding
+rules, and executable examples without moving mathematical semantics into the
+generic kernel.
 
 The service validates both schemas and prevents adapters from self-promoting:
 `VERIFIED` requires a valid local verification record whose checked evidence
-is returned with the capability result.
+is returned with the capability result. Stage-aware diagnostics separate
+invalid input, reference resolution, adapter execution, and checker outcomes.
+Only completed invocations are eligible for research-memory recording.
 
 ## Common result model
 

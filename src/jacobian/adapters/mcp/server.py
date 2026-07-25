@@ -63,6 +63,7 @@ from jacobian.contracts.transformations import (
 )
 from jacobian.contracts.witness_search import WitnessFindResult
 from jacobian.contracts.workflows import WitnessVerificationWorkflowResult
+from jacobian_checkers.matrices import MAX_ENUMERATED_MATRICES
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
@@ -74,8 +75,8 @@ if TYPE_CHECKING:
 
 
 SERVER_INSTRUCTIONS = (
-    "When a capability ID and input are known, invoke it directly; otherwise start "
-    "with capability://catalog. Use "
+    "Call capability.describe before the first invocation of an unfamiliar "
+    "capability or reference domain; do not guess payload fields. Use "
     "EXPLORE for low-friction search and VERIFY only when a durable checked conclusion "
     "is needed. Advanced clients may inspect reference://catalog for lower-level domain "
     "contracts and assurance.verification details. Retrieved memory, search, evaluation, "
@@ -87,7 +88,7 @@ SERVER_INSTRUCTIONS = (
     "large payloads inline."
 )
 
-CAPABILITY_TOOL_NAMES = frozenset({"capability.invoke"})
+CAPABILITY_TOOL_NAMES = frozenset({"capability.describe", "capability.invoke"})
 VERIFICATION_TOOL_NAMES = frozenset(
     {
         "artifact.put",
@@ -240,6 +241,8 @@ def create_server(  # noqa: C901
 
     @asynccontextmanager
     async def lifespan(_server: MCPServer[AppState]) -> AsyncIterator[AppState]:
+        if kernel is not None:
+            _start_lean_warmup(kernel)
         yield AppState(kernel=kernel, tenant_router=tenant_router)
 
     server: MCPServer[AppState] = MCPServer(
@@ -257,10 +260,92 @@ def create_server(  # noqa: C901
     )
 
     @server.tool(
+        name="capability.describe",
+        description=(
+            "Read an installed capability's exact input schema. For reference.solve, "
+            "provide reference_name to receive its predicate schema, candidate schema, "
+            "binding rule, and executable examples. Call this before guessing fields."
+        ),
+        annotations=_tool_annotations(read_only=True, idempotent=True),
+        structured_output=structured_output,
+    )
+    async def capability_describe(
+        capability_id: str | None = None,
+        reference_name: str | None = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> dict[str, Any]:
+        active_kernel = _kernel(ctx)
+        capability_catalog = active_kernel.capabilities.catalog()
+        descriptors = {
+            item.capability_id: item for item in capability_catalog.capabilities
+        }
+        if capability_id is None:
+            return capability_catalog.model_dump(mode="json")
+        try:
+            descriptor = descriptors[capability_id]
+        except KeyError:
+            return {
+                "error": {
+                    "code": "UNKNOWN_CAPABILITY",
+                    "stage": "capability_resolution",
+                    "message": f"Unknown capability: {capability_id}",
+                    "available_capability_ids": sorted(descriptors),
+                }
+            }
+        response: dict[str, Any] = {"capability": descriptor.model_dump(mode="json")}
+        if capability_id == "reference.solve":
+            catalog = reference_catalog(
+                active_kernel.references,
+                polytope=active_kernel.polytope,
+                polytope_checkers=active_kernel.polytope_checkers,
+                lean=active_kernel.lean_checkers,
+            )
+            if reference_name is None:
+                response["available_reference_names"] = sorted(
+                    name
+                    for name, entry in catalog.items()
+                    if "agent_contract_uri" in entry and name != "lean4"
+                )
+            else:
+                try:
+                    response["domain"] = _reference_domain_contract(
+                        active_kernel,
+                        reference_name,
+                        catalog,
+                    )
+                except ValueError as exc:
+                    response["error"] = {
+                        "code": "UNKNOWN_REFERENCE",
+                        "stage": "reference_resolution",
+                        "message": str(exc),
+                        "available_reference_names": sorted(active_kernel.references),
+                    }
+        elif capability_id == "lean.check" and active_kernel.lean_checkers:
+            catalog = reference_catalog(
+                active_kernel.references,
+                polytope=active_kernel.polytope,
+                polytope_checkers=active_kernel.polytope_checkers,
+                lean=active_kernel.lean_checkers,
+            )
+            lean_contract = _reference_domain_contract(
+                active_kernel,
+                "lean4",
+                catalog,
+            )
+            response["runtime"] = lean_contract["runtime"]
+            response["cache"] = {
+                "key": "exact content-addressed certificate and active checker digest",
+                "max_entries": 128,
+                "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
+            }
+        return response
+
+    @server.tool(
         name="capability.invoke",
         description=(
             "Invoke an installed mathematical capability in the fast EXPLORE or "
-            "checker-backed VERIFY lane. Read capability://catalog first."
+            "checker-backed VERIFY lane. Call capability.describe first for exact "
+            "payload fields; do not guess aliases."
         ),
         annotations=_tool_annotations(),
         structured_output=structured_output,
@@ -1180,10 +1265,17 @@ def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
 
         access_token = get_access_token()
         subject = access_token.subject if access_token is not None else None
-        return state.tenant_router.kernel_for(subject)
+        kernel = state.tenant_router.kernel_for(subject)
+        _start_lean_warmup(kernel)
+        return kernel
     if state.kernel is None:
         raise RuntimeError("MCP lifespan has no kernel")
     return state.kernel
+
+
+def _start_lean_warmup(kernel: JacobianKernel) -> None:
+    if kernel.lean is not None and os.environ.get("JACOBIAN_LEAN_WARMUP") == "1":
+        kernel.lean.start_mathlib_warmup()
 
 
 def _resource_kernel(
@@ -1501,6 +1593,26 @@ def _reference_domain_contract(
                 ),
             },
             "candidate_schema": _compact_schema(candidate_schema),
+            "binding_rule": (
+                "The predicate parameters define the claim scope. The candidate is "
+                "a separate checked object; repeated scope fields must agree exactly. "
+                "Never substitute aliases or silently choose one copy."
+            ),
+            "verification_limits": (
+                {
+                    "maximize_absolute_determinant": {
+                        "max_enumerated_candidates": MAX_ENUMERATED_MATRICES,
+                        "scope_cardinality": "len(entries) ** (rows * cols)",
+                        "on_excess": "REJECTED_WITHOUT_CONCLUSION",
+                        "checker_timeout_seconds": (
+                            kernel.verification.checker_timeout_seconds
+                        ),
+                    }
+                }
+                if name == "matrices"
+                else {}
+            ),
+            "invocation_examples": _reference_invocation_examples(name),
             "workflow": {
                 "assurance_rule": (
                     "Evaluation and witness search are UNVERIFIED. Only an "
@@ -1559,6 +1671,132 @@ def _reference_domain_contract(
             },
         }
     raise ValueError(f"reference domain has no agent contract: {name}")
+
+
+def _reference_invocation_examples(name: str) -> list[dict[str, Any]]:
+    if name == "graph_paths":
+        return [
+            {
+                "capability_id": "reference.solve",
+                "mode": "VERIFY",
+                "payload": {
+                    "reference_name": "graph_paths",
+                    "predicate": {
+                        "name": "intended_paths_complete",
+                        "parameters": {"simple": True},
+                    },
+                    "candidate": {
+                        "vertices": ["s", "a", "b", "x", "t1", "t2"],
+                        "arcs": [
+                            ["s", "a"],
+                            ["a", "x"],
+                            ["s", "b"],
+                            ["b", "x"],
+                            ["x", "t1"],
+                            ["x", "t2"],
+                        ],
+                        "source": "s",
+                        "terminals": ["t1", "t2"],
+                        "intended_paths": [
+                            ["s", "a", "x", "t1"],
+                            ["s", "b", "x", "t2"],
+                        ],
+                    },
+                    "witness_role": "DEFEATS_CANDIDATE",
+                },
+            },
+            {
+                "capability_id": "reference.solve",
+                "mode": "VERIFY",
+                "payload": {
+                    "reference_name": "graph_paths",
+                    "predicate": {
+                        "name": "is_bipartite",
+                        "parameters": {},
+                    },
+                    "candidate": {
+                        "vertices": ["a", "b", "c", "d"],
+                        "arcs": [
+                            ["a", "b"],
+                            ["b", "c"],
+                            ["c", "d"],
+                            ["d", "a"],
+                        ],
+                    },
+                    "witness_role": "SUPPORTS_CLAIM",
+                },
+            },
+        ]
+    if name == "matrices":
+        return [
+            {
+                "capability_id": "reference.solve",
+                "mode": "VERIFY",
+                "payload": {
+                    "reference_name": "matrices",
+                    "predicate": {
+                        "name": "is_nonsingular",
+                        "parameters": {},
+                    },
+                    "candidate": {
+                        "rows": 2,
+                        "cols": 2,
+                        "entries": [["2", "4"], ["1", "2"]],
+                    },
+                    "witness_role": "DEFEATS_CANDIDATE",
+                },
+            },
+            {
+                "capability_id": "reference.solve",
+                "mode": "VERIFY",
+                "payload": {
+                    "reference_name": "matrices",
+                    "predicate": {
+                        "name": "maximize_absolute_determinant",
+                        "parameters": {
+                            "scope": {
+                                "rows": 3,
+                                "cols": 3,
+                                "entries": [-1, 1],
+                            }
+                        },
+                    },
+                    "candidate": {
+                        "rows": 3,
+                        "cols": 3,
+                        "entries": [
+                            [-1, -1, -1],
+                            [-1, -1, 1],
+                            [-1, 1, -1],
+                        ],
+                    },
+                    "witness_role": "SUPPORTS_CLAIM",
+                },
+            },
+        ]
+    if name == "erdos_straus":
+        return [
+            {
+                "capability_id": "reference.solve",
+                "mode": "VERIFY",
+                "payload": {
+                    "reference_name": "erdos_straus",
+                    "predicate": {
+                        "name": "erdos_straus_range",
+                        "parameters": {
+                            "lower_bound": 2,
+                            "upper_bound": 20,
+                        },
+                    },
+                    "candidate": {
+                        "lower_bound": 2,
+                        "upper_bound": 20,
+                    },
+                    "witness_role": "SUPPORTS_CLAIM",
+                },
+            }
+        ]
+    return []
 
 
 def _project_tool_profile(

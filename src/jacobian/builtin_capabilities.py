@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
+    CapabilityDiagnostic,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -19,6 +21,7 @@ from jacobian.contracts.results import Execution, ExecutionStatus, Verification
 from jacobian.contracts.workflows import WitnessVerificationWorkflowResult
 from jacobian.lean import LeanService
 from jacobian.memory import ResearchMemory
+from jacobian.schema_registry import SchemaValidationError
 from jacobian.workflows import VerificationWorkflowService
 
 _OBJECT_SCHEMA: dict[str, Any] = {"type": "object"}
@@ -153,7 +156,19 @@ class ReferenceSolveAdapter:
         try:
             reference = self.workflows.references[reference_name]
         except KeyError as exc:
-            raise ValueError(f"unknown reference domain: {reference_name}") from exc
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="UNKNOWN_REFERENCE",
+                    stage="reference_resolution",
+                    message=f"Unknown reference domain: {reference_name}",
+                    path="reference_name",
+                    actual_type="string",
+                    hint=(
+                        "Call capability.describe for reference.solve without a "
+                        "reference_name to list installed domains."
+                    ),
+                )
+            ) from exc
         claim_payload = {
             "claim_schema_version": "1",
             "domain_id": reference.domain_id,
@@ -165,6 +180,20 @@ class ReferenceSolveAdapter:
             "required_capabilities": list(reference.available_capabilities),
             "correspondence_status": "UNREVIEWED",
         }
+        _validate_reference_payload(
+            self.workflows,
+            schema_uri=reference.claim_schema_uri,
+            payload=claim_payload,
+            code="INVALID_CLAIM",
+            stage="claim_validation",
+        )
+        _validate_reference_payload(
+            self.workflows,
+            schema_uri=reference.candidate_schema_uri,
+            payload=payload["candidate"],
+            code="INVALID_CANDIDATE",
+            stage="candidate_validation",
+        )
         arguments = {
             "reference_name": reference_name,
             "claim_payload": claim_payload,
@@ -239,10 +268,14 @@ class LeanCheckAdapter:
             execution=checked.result.execution,
             output={
                 "conclusion": checked.result.conclusion.value,
+                "execution": checked.result.execution.model_dump(mode="json"),
+                "input": checked.result.input.model_dump(mode="json"),
+                "diagnostics": list(checked.result.input.errors),
                 "claim_uri": checked.claim_uri,
                 "candidate_uri": checked.candidate_uri,
                 "certificate_uri": checked.certificate_uri,
                 "verification_record_uri": checked.result.verification_record_uri,
+                "cache_hit": checked.cache_hit,
             },
             assurance=CapabilityAssurance(
                 level=(
@@ -299,6 +332,7 @@ def _reference_result(
             workflow.candidate_uri,
             evidence_uri,
             scope_uri,
+            verification_record_uri,
         )
         if uri is not None
     )
@@ -349,6 +383,50 @@ def _reference_result(
             "candidate_uri": workflow.candidate_uri,
             "evidence_uri": evidence_uri,
             "verification_record_uri": (verification_record_uri),
+            "artifacts": {
+                "claim": workflow.claim_uri,
+                "candidate": workflow.candidate_uri,
+                "evidence": evidence_uri,
+                "scope": scope_uri,
+                "verification_record": verification_record_uri,
+            },
+            "verification": (
+                {
+                    "execution": verification.execution.model_dump(mode="json"),
+                    "input": verification.input.model_dump(mode="json"),
+                    "checker_detail": (
+                        verification.input.errors[0]
+                        if verification.input.errors
+                        else verification.execution.detail
+                    ),
+                    "arithmetic": verification.assurance.arithmetic.value,
+                    "method": verification.assurance.method.value,
+                    "coverage": verification.assurance.coverage.value,
+                    "checker_id": verification.assurance.checker_id,
+                    "checker_digest": verification.assurance.checker_digest,
+                    "scope_uri": verification.assurance.scope_uri,
+                }
+                if verification is not None
+                else None
+            ),
+            "stages": {
+                "claim_validation": workflow.claim_validation.execution.status.value,
+                "evaluation": (
+                    workflow.evaluation.execution.status.value
+                    if workflow.evaluation is not None
+                    else "NOT_RUN"
+                ),
+                "witness_search": (
+                    witness.result.execution.status.value
+                    if witness is not None
+                    else "NOT_RUN"
+                ),
+                "independent_verification": (
+                    verification.execution.status.value
+                    if verification is not None
+                    else "NOT_RUN"
+                ),
+            },
         },
         scope=_scope_from_claim(claim_payload),
         assurance=CapabilityAssurance(
@@ -374,5 +452,34 @@ def _scope_from_claim(claim: object) -> dict[str, Any]:
     return {
         key: claim[key]
         for key in ("domain_id", "domain_version", "predicate", "bounds")
-        if key in claim
+        if key in claim and claim[key] not in ({}, [], None)
     }
+
+
+def _validate_reference_payload(
+    workflows: VerificationWorkflowService,
+    *,
+    schema_uri: str,
+    payload: object,
+    code: str,
+    stage: str,
+) -> None:
+    try:
+        workflows.artifacts.schemas.validate(schema_uri, payload)
+    except SchemaValidationError as exc:
+        path, separator, message = str(exc).partition(": ")
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code=code,
+                stage=stage,
+                message=message if separator else str(exc),
+                path=path if separator else None,
+                schema_uri=schema_uri,
+                expected=f"payload conforming to {schema_uri}",
+                actual_type=type(payload).__name__,
+                hint=(
+                    "Call capability.describe with this reference_name and use the "
+                    "advertised domain schema and invocation example exactly."
+                ),
+            )
+        ) from exc
