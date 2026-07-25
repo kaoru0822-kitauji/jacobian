@@ -50,9 +50,10 @@ def spawn_child_then_return(request: dict[str, Any]) -> dict[str, Any]:
     """Exit the worker while a descendant still owns its output pipes."""
 
     marker = request["marker"]
+    delay_seconds = request.get("delay_seconds", 1)
     script = (
         "import pathlib,time;"
-        "time.sleep(1);"
+        f"time.sleep({delay_seconds!r});"
         f"pathlib.Path({marker!r}).write_text('survived', encoding='utf-8')"
     )
     subprocess.Popen([sys.executable, "-c", script])
