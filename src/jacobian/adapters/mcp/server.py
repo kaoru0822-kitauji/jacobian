@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -13,6 +14,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.shared.exceptions import MCPError
 from mcp_types import ToolAnnotations
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
@@ -64,6 +67,8 @@ from jacobian.contracts.transformations import (
 from jacobian.contracts.witness_search import WitnessFindResult
 from jacobian.contracts.workflows import WitnessVerificationWorkflowResult
 from jacobian_checkers.matrices import MAX_ENUMERATED_MATRICES
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
@@ -125,6 +130,10 @@ class ToolProfile(StrEnum):
     FULL = "full"
     CAPABILITIES = "capabilities"
     VERIFICATION = "verification"
+
+
+class AgentRecoveryError(RuntimeError):
+    """A safe, actionable failure intended for an agent tool response."""
 
 
 def _tool_annotations(
@@ -216,6 +225,26 @@ def create_server(  # noqa: C901
             "JacobianKernel": JacobianKernel,
         }
     )
+
+    class JacobianMCPServer(MCPServer[AppState]):
+        async def call_tool(
+            self,
+            name: str,
+            arguments: dict[str, Any],
+            context: Context[AppState, Any] | None = None,
+        ) -> Any:
+            try:
+                return await super().call_tool(name, arguments, context)
+            except MCPError:
+                raise
+            except Exception as exc:
+                _LOGGER.warning(
+                    "MCP tool %s failed",
+                    name,
+                    exc_info=exc,
+                )
+                raise ValueError(_public_tool_error(name, exc)) from None
+
     selected_profile = ToolProfile(tool_profile)
     structured_output = selected_profile is ToolProfile.FULL
     configured_root = _configured_root(state_dir)
@@ -245,7 +274,7 @@ def create_server(  # noqa: C901
             _start_lean_warmup(kernel)
         yield AppState(kernel=kernel, tenant_router=tenant_router)
 
-    server: MCPServer[AppState] = MCPServer(
+    server: MCPServer[AppState] = JacobianMCPServer(
         name="jacobian",
         title="Jacobian Mathematical Workbench",
         description=(
@@ -289,6 +318,10 @@ def create_server(  # noqa: C901
                     "code": "UNKNOWN_CAPABILITY",
                     "stage": "capability_resolution",
                     "message": f"Unknown capability: {capability_id}",
+                    "hint": (
+                        "Call capability.describe without a capability_id to list "
+                        "installed capabilities."
+                    ),
                     "available_capability_ids": sorted(descriptors),
                 }
             }
@@ -318,6 +351,11 @@ def create_server(  # noqa: C901
                         "code": "UNKNOWN_REFERENCE",
                         "stage": "reference_resolution",
                         "message": str(exc),
+                        "hint": (
+                            "Call capability.describe with capability_id="
+                            "'reference.solve' and no reference_name to list "
+                            "available references."
+                        ),
                         "available_reference_names": sorted(active_kernel.references),
                     }
         elif capability_id == "lean.check" and active_kernel.lean_checkers:
@@ -1256,10 +1294,16 @@ def _falsification_plan(
 
 def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
     if ctx is None:
-        raise RuntimeError("MCP request context is unavailable")
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this request. Retry once; if it fails "
+            "again, inspect the local Jacobian log."
+        )
     state = ctx.request_context.lifespan_context
     if not isinstance(state, AppState):
-        raise RuntimeError("MCP lifespan state is invalid")
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this request. Retry once; if it fails "
+            "again, inspect the local Jacobian log."
+        )
     if state.tenant_router is not None:
         from mcp.server.auth.middleware.auth_context import get_access_token
 
@@ -1269,7 +1313,10 @@ def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
         _start_lean_warmup(kernel)
         return kernel
     if state.kernel is None:
-        raise RuntimeError("MCP lifespan has no kernel")
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this request. Retry once; if it fails "
+            "again, inspect the local Jacobian log."
+        )
     return state.kernel
 
 
@@ -1295,7 +1342,10 @@ def _resource_kernel(
         subject = access_token.subject if access_token is not None else None
         return tenant_router.kernel_for(subject)
     if kernel is None:
-        raise RuntimeError("MCP lifespan has no resource kernel")
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this resource request. Retry once; if it "
+            "fails again, inspect the local Jacobian log."
+        )
     return kernel
 
 
@@ -1307,6 +1357,63 @@ def _configured_root(state_dir: str | Path | None) -> Path:
 
 def _optional_tuple(values: list[str] | None) -> tuple[str, ...]:
     return tuple(values or ())
+
+
+def _public_tool_error(tool_name: str, exc: Exception) -> str:
+    from jacobian.adapters.mcp.remote import AuthenticationError
+    from jacobian.experiments import ExperimentNotFoundError
+    from jacobian.registry import CheckerNotFoundError
+    from jacobian.store import ArtifactNotFoundError
+
+    tool_error = exc.__cause__ if isinstance(exc, ToolError) else exc
+    if not isinstance(tool_error, Exception):
+        tool_error = exc
+    if isinstance(tool_error, AgentRecoveryError):
+        code = "SERVICE_UNAVAILABLE"
+        message = str(tool_error)
+        hint = "Follow the recovery action in the message, then retry the tool."
+    elif isinstance(tool_error, TimeoutError):
+        code = "OPERATION_TIMED_OUT"
+        message = "The operation did not finish within the allowed time."
+        hint = "Retry with a larger time budget or a smaller request."
+    elif isinstance(tool_error, AuthenticationError):
+        code = "AUTHENTICATION_REQUIRED"
+        message = str(tool_error)
+        hint = "Authenticate with a configured bearer token, then retry."
+    elif isinstance(tool_error, PermissionError):
+        code = "PERMISSION_DENIED"
+        message = "Jacobian could not access the required local resource."
+        hint = "Check the state-directory permissions, then retry."
+    elif isinstance(
+        tool_error,
+        (ArtifactNotFoundError, CheckerNotFoundError, ExperimentNotFoundError),
+    ):
+        code = "RESOURCE_NOT_FOUND"
+        message = "A required Jacobian resource was not found."
+        hint = (
+            "Check the artifact or experiment URI returned by the earlier tool call, "
+            "then retry."
+        )
+    elif isinstance(tool_error, ValueError):
+        code = "INVALID_INPUT"
+        message = "The tool input is not valid for this operation."
+        hint = "Check the tool input schema or call capability.describe, then retry."
+    else:
+        code = "OPERATION_FAILED"
+        message = "Jacobian could not complete the operation."
+        hint = "Retry once; if it fails again, inspect the local Jacobian log."
+    return json.dumps(
+        {
+            "error": {
+                "code": code,
+                "stage": tool_name,
+                "message": message,
+                "hint": hint,
+            }
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
 
 
 def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
@@ -1334,13 +1441,23 @@ def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
 
 def _lean_service(kernel: JacobianKernel) -> Any:
     if kernel.lean is None:
-        raise RuntimeError("the bundled Lean checker is not installed")
+        raise AgentRecoveryError(
+            "Lean checking is not available on this server. Call "
+            "capability.describe with capability_id='lean.check' to confirm "
+            "availability. If it is absent, prepare the pinned Lean runtime and "
+            "restart Jacobian."
+        )
     return kernel.lean
 
 
 def _verification_workflow_service(kernel: JacobianKernel) -> Any:
     if kernel.verification_workflows is None:
-        raise RuntimeError("bundled verification workflows are not installed")
+        raise AgentRecoveryError(
+            "Bundled verification workflows are not available on this server. "
+            "Call capability.describe without a capability_id to see what is "
+            "installed. Restart Jacobian with bundled references enabled before "
+            "retrying."
+        )
     return kernel.verification_workflows
 
 
@@ -1549,12 +1666,18 @@ def _reference_domain_contract(
 ) -> dict[str, Any]:
     entry = catalog.get(name)
     if entry is None:
-        raise ValueError(f"unknown bundled reference domain: {name}")
+        raise ValueError(
+            "The reference domain is unavailable. List available reference names "
+            "before retrying."
+        )
 
     def definition(uri: str) -> Any:
         payload = kernel.store.get(uri).payload
         if not isinstance(payload, dict) or "definition" not in payload:
-            raise ValueError(f"reference descriptor has no definition: {uri}")
+            raise ValueError(
+                "The installed reference is incomplete. Reinstall bundled references "
+                "before retrying."
+            )
         return payload["definition"]
 
     if name in kernel.references:
@@ -1670,7 +1793,10 @@ def _reference_domain_contract(
                 ],
             },
         }
-    raise ValueError(f"reference domain has no agent contract: {name}")
+    raise ValueError(
+        "The reference domain has no agent contract. List available reference names "
+        "before retrying."
+    )
 
 
 def _reference_invocation_examples(name: str) -> list[dict[str, Any]]:

@@ -467,19 +467,38 @@ def _validate_reference_payload(
     try:
         workflows.artifacts.schemas.validate(schema_uri, payload)
     except SchemaValidationError as exc:
-        path, separator, message = str(exc).partition(": ")
+        path = exc.path
         raise CapabilityInvocationError(
             CapabilityDiagnostic(
                 code=code,
                 stage=stage,
-                message=message if separator else str(exc),
-                path=path if separator else None,
+                message=(
+                    "The input does not match the reference schema"
+                    + (f" at {path}." if path else ".")
+                ),
+                path=path,
                 schema_uri=schema_uri,
                 expected=f"payload conforming to {schema_uri}",
-                actual_type=type(payload).__name__,
+                actual_type=_json_type_name(payload),
                 hint=(
                     "Call capability.describe with this reference_name and use the "
                     "advertised domain schema and invocation example exactly."
                 ),
             )
         ) from exc
+
+
+def _json_type_name(value: object) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, (int, float)):
+        return "number"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return "unsupported JSON value"

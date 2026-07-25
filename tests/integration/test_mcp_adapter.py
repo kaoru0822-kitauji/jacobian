@@ -13,6 +13,7 @@ from jacobian.adapters.mcp.server import (
     CAPABILITY_TOOL_NAMES,
     VERIFICATION_TOOL_NAMES,
     ToolProfile,
+    _public_tool_error,
     create_server,
 )
 
@@ -349,12 +350,149 @@ def test_mcp_capability_profile_describes_and_invokes_exact_domain_contract(
             assert projection["assurance"]["level"] == "COMPUTED"
             assert projection["output"]["hits"] == []
 
+            unknown = await client.call_tool(
+                "capability.invoke",
+                {
+                    "capability_id": "missing.capability",
+                    "mode": "EXPLORE",
+                    "payload": {},
+                },
+            )
+            unknown_projection = json.loads(unknown.content[0].text)
+            assert unknown.is_error is False
+            assert unknown_projection["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
+            assert (
+                "capability.describe" in (unknown_projection["output"]["error"]["hint"])
+            )
+
             verified = await client.call_tool("capability.invoke", example)
             verification = json.loads(verified.content[0].text)
             assert verification["execution"]["status"] == "COMPLETED"
             assert verification["assurance"]["level"] == "VERIFIED"
 
     asyncio.run(scenario())
+
+
+@pytest.mark.integration
+def test_mcp_missing_bundled_services_explain_how_to_recover(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(
+            create_server(tmp_path, install_references=False),
+            raise_exceptions=False,
+        ) as client:
+            lean = await client.call_tool(
+                "lean.verify",
+                {
+                    "statement": "1 + 1 = 2",
+                    "proof": "rfl",
+                    "environment": "CORE",
+                },
+            )
+            assert lean.is_error is True
+            assert "capability.describe" in lean.content[0].text
+            assert "prepare the pinned Lean runtime" in lean.content[0].text
+            assert "RuntimeError" not in lean.content[0].text
+
+            workflow = await client.call_tool(
+                "verification.run",
+                {
+                    "reference_name": "graph_paths",
+                    "claim_payload": {},
+                    "candidate_payload": {},
+                    "witness_role": "SUPPORTS_CLAIM",
+                },
+            )
+            assert workflow.is_error is True
+            assert "capability.describe" in workflow.content[0].text
+            assert "bundled references enabled" in workflow.content[0].text
+            assert "RuntimeError" not in workflow.content[0].text
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
+def test_mcp_tool_failures_return_safe_actionable_errors(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        missing_uri = "artifact://sha256/" + "a" * 64
+        async with Client(
+            create_server(tmp_path),
+            raise_exceptions=False,
+        ) as client:
+            result = await client.call_tool(
+                "artifact.put",
+                {
+                    "schema_uri": missing_uri,
+                    "semantics_uri": missing_uri,
+                    "payload": {},
+                },
+            )
+            assert result.is_error is True
+            error_text = result.content[0].text
+            assert '"code": "INVALID_INPUT"' in error_text
+            assert "Check the tool input schema" in error_text
+            assert missing_uri not in error_text
+            assert "ArtifactNotFoundError" not in error_text
+
+            unknown_reference = await client.call_tool(
+                "capability.describe",
+                {
+                    "capability_id": "reference.solve",
+                    "reference_name": "missing-reference",
+                },
+            )
+            response = json.loads(unknown_reference.content[0].text)
+            assert response["error"]["code"] == "UNKNOWN_REFERENCE"
+            assert "list available references" in response["error"]["hint"]
+            assert "missing-reference" not in response["error"]["message"]
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
+def test_mcp_protocol_errors_are_not_converted_to_tool_errors(tmp_path: Path) -> None:
+    from mcp.shared.exceptions import MCPError
+
+    server = create_server(tmp_path)
+
+    @server.tool(name="fixture.protocol-error")
+    async def protocol_error() -> None:
+        raise MCPError(123, "protocol action required")
+
+    with pytest.raises(MCPError, match="protocol action required"):
+        asyncio.run(server.call_tool("fixture.protocol-error", {}))
+
+
+@pytest.mark.integration
+def test_mcp_authentication_and_internal_lookup_failures_are_distinct(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(
+            create_server(
+                tmp_path,
+                tenant_isolation=True,
+                allow_anonymous=False,
+            ),
+            raise_exceptions=False,
+        ) as client:
+            response = await client.call_tool("capability.describe", {})
+            assert response.is_error is True
+            assert '"code": "AUTHENTICATION_REQUIRED"' in response.content[0].text
+            assert "bearer token" in response.content[0].text
+            assert "state-directory permissions" not in response.content[0].text
+
+    asyncio.run(scenario())
+
+    internal = json.loads(_public_tool_error("fixture", KeyError("internal")))
+    assert internal["error"]["code"] == "OPERATION_FAILED"
 
 
 @pytest.mark.integration

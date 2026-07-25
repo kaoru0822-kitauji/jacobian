@@ -67,6 +67,23 @@ class ComputedAdapter:
 
 
 @dataclass(frozen=True)
+class CrashingAdapter:
+    descriptor = CapabilityDescriptor(
+        capability_id="example.crash",
+        version="1",
+        title="Crash during execution",
+        description="Fixture for testing public adapter-failure diagnostics.",
+        provider="tests",
+        modes=(CapabilityMode.EXPLORE,),
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+    def invoke(self, _request: CapabilityRequest) -> CapabilityResult:
+        raise RuntimeError("provider=fixture internal-adapter-id=secret")
+
+
+@dataclass(frozen=True)
 class ForgedVerifiedAdapter:
     descriptor = CapabilityDescriptor(
         capability_id="example.forged",
@@ -146,6 +163,95 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert result.episode_uri is not None
     hits = kernel.memory.search(query="double computed").hits
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
+
+
+@pytest.mark.integration
+def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="missing.capability",
+            input={},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.episode_uri is None
+    assert result.diagnostics[0].code == "UNKNOWN_CAPABILITY"
+    assert result.diagnostics[0].stage == "capability_resolution"
+    assert result.diagnostics[0].message == (
+        "Capability 'missing.capability' is not installed."
+    )
+    assert "capability.describe" in (result.diagnostics[0].hint or "")
+    assert result.output["available_capability_ids"]
+
+
+@pytest.mark.integration
+def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    kernel.register_capability(ComputedAdapter())
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="example.double",
+            mode=CapabilityMode.VERIFY,
+            input={"value": 21},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "UNSUPPORTED_MODE"
+    assert "capability.describe" in (result.diagnostics[0].hint or "")
+    assert result.output["available_modes"] == ["EXPLORE"]
+
+
+@pytest.mark.integration
+def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    kernel.register_capability(ComputedAdapter())
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="example.double",
+            input={"value": "fixture-secret-value"},
+        )
+    )
+
+    diagnostic = result.diagnostics[0]
+    assert diagnostic.code == "INVALID_REQUEST"
+    assert diagnostic.path == "value"
+    assert diagnostic.message == (
+        "The capability input does not match its advertised schema at value."
+    )
+    assert "fixture-secret-value" not in diagnostic.message
+
+
+@pytest.mark.integration
+def test_adapter_failure_does_not_expose_internal_exception_text(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    kernel.register_capability(CrashingAdapter())
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="example.crash",
+            input={},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "ADAPTER_EXECUTION_FAILED"
+    assert result.diagnostics[0].message == (
+        "The capability stopped before returning a result."
+    )
+    assert result.diagnostics[0].hint == (
+        "Retry once. If it fails again, inspect the local Jacobian log for this "
+        "capability."
+    )
+    assert "fixture" not in result.execution.detail
+    assert "RuntimeError" not in result.execution.detail
 
 
 @pytest.mark.integration
@@ -452,7 +558,11 @@ def test_reference_checker_timeout_is_projected_and_fails_closed(
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output["conclusion"] == "UNKNOWN"
-    assert result.output["verification"]["execution"]["detail"] == "checker timed out"
+    assert result.output["verification"]["execution"]["detail"] == (
+        "The checker did not finish within the allowed time. "
+        "Retry with a smaller input and inspect the local checker log if it times "
+        "out again."
+    )
     assert result.assurance.verification_record_uri is None
 
 
