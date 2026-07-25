@@ -142,6 +142,63 @@ Run a paired control without the new capability and a treatment with it under
 the same model and reasoning budget. Repeat enough times to expose variance.
 Freeze the tree and oracle before the comparison.
 
+## Development pilot evidence
+
+The 2026-07-25 development pilot used the same configured model, medium
+reasoning effort, prompt, and output contract within each pair. The runner
+randomized condition order and recorded the fixture/order seed. The Codex
+provider does not expose a generation seed, so provider sampling was not
+deterministic. These single-pair results validate the harness and expose tool
+friction; they are not a statistically powered performance claim.
+
+| Case | Condition | Correct | False certification | Seconds | Input tokens | Output tokens | Tool calls | Tool/parameter errors |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| six-vertex path | control | yes | 0 | 15.117 | 20,294 | 300 | 0 | 0 / 0 |
+| six-vertex path | graph capabilities | yes | 0 | 67.443 | 195,524 | 901 | 5 | 0 / 0 |
+| triangle-free counterexample | control | yes | 0 | 11.567 | 20,299 | 450 | 0 | 0 / 0 |
+| triangle-free counterexample | graph capabilities | yes | 0 | 82.879 | 141,165 | 750 | 4 | 0 / 0 |
+| finite residue partition | control | yes | 0 | 8.070 | 20,176 | 221 | 0 | 0 / 0 |
+| finite residue partition | verified capability | yes | 0 | 48.071 | 90,425 | 744 | 2 | 0 / 0 |
+
+The initial counterexample treatment found the right artifact and exact
+properties but failed provenance scoring: `graph.search.atlas` returned an
+artifact URI and properties without the graph payload, so the agent supplied a
+valid isomorphic relabeling it could not bind to that URI. Returning the small
+typed graph payload inline removed the ambiguity, and the repeated treatment
+passed without parameter errors or false certification.
+
+This transcript evidence supports keeping `graph.search.atlas` and
+`graph.compute.properties` separate: the second call consumed the first call's
+exact graph artifact, and the scorer observed the ordered dataflow. It also
+supports making returned artifacts inspectable without another generic storage
+tool. It does **not** justify graph mutation or Z3 construction: both held-out
+tasks were solved within Graph Atlas with zero parameter errors. Treatment was
+substantially slower and more token-intensive in this pilot, so the current
+slice has correctness/provenance value but no demonstrated efficiency benefit.
+Run more repetitions before making a comparative performance claim.
+
+The finite-partition slice is exposed as `case.partition.finite`. Explore mode
+materializes the scope, proposed partition relationship, and open coverage
+obligation. Verify mode creates a certificate bound to the exact scope, claim,
+and partition; an operator-authorized checker in `jacobian_checkers` recomputes
+membership, coverage, and optional disjointness without importing the
+generator. Missing, outside, and overlapping elements remain unverified and
+cannot discharge the obligation. Its single paired pilot passed both
+conditions; only the treatment produced an exhaustive checker-bound record.
+As with the graph pilot, this establishes correctness and assurance behavior,
+not an efficiency improvement.
+
+The pinned Lean REPL spike used upstream tag `v4.31.0`, commit
+`0cc60263319308000bbaa5354427f775fe3dc7d0`, against Lean 4.31.0 commit
+`68218e876d2a38b1985b8590fff244a83c321783`. Two protocol tasks completed in
+2.196 seconds with no parameter errors: `constructor` exposed two child goals
+and local-premise application closed its goal. The REPL currently cannot turn a
+completed tactic state back into the originating command or a replayable proof
+artifact. This is enough to retain the pinned spike, but not enough to add
+`goal.decompose` or premise-retrieval capabilities. A later paired agent
+evaluation must show outcome value; completed source must still go through
+`lean.check`.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:

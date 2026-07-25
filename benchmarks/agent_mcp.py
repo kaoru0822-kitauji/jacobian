@@ -25,6 +25,7 @@ from typing import Any
 
 import networkx as nx
 
+from jacobian.eval_telemetry import parse_agent_transcript
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 
@@ -34,17 +35,6 @@ DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results")
 REPORT_SCHEMA = CASES_ROOT / "report.schema.json"
 GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
 ARTIFACT_PREFIX = "artifact://sha256/"
-PARAMETER_ERROR_CODES = frozenset(
-    {
-        -32602,
-        "INVALID_ARGUMENT",
-        "INVALID_CONSTRAINT_RANGE",
-        "INVALID_PARAMS",
-        "INVALID_REQUEST",
-        "SCHEMA_VALIDATION",
-        "invalid_params",
-    }
-)
 
 SYSTEM_TASK = """\
 Use only the jacobian_local MCP tools and resources for the mathematical work.
@@ -146,123 +136,22 @@ def _artifact_uri(value: object, field: str) -> str:
     return value
 
 
-def _contains_parameter_error(value: object) -> bool:
-    if isinstance(value, Mapping):
-        if value.get("code") in PARAMETER_ERROR_CODES:
-            return True
-        return any(_contains_parameter_error(item) for item in value.values())
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return any(_contains_parameter_error(item) for item in value)
-    return False
-
-
-def _contains_execution_error(value: object) -> bool:
-    if isinstance(value, Mapping):
-        if value.get("status") in {"CANCELLED", "ERROR", "TIMEOUT"}:
-            return True
-        return any(_contains_execution_error(item) for item in value.values())
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return any(_contains_execution_error(item) for item in value)
-    return False
-
-
-def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
-    result = item.get("result")
-    if not isinstance(result, dict):
-        return None
-    content = result.get("content")
-    if not isinstance(content, list):
-        return None
-    for block in content:
-        if not isinstance(block, dict) or not isinstance(block.get("text"), str):
-            continue
-        try:
-            payload = json.loads(block["text"])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(payload, dict):
-            return payload
-    return None
-
-
 def parse_transcript(
     path: Path,
 ) -> tuple[list[str], dict[str, Any] | None, dict[str, Any]]:
-    calls: list[str] = []
-    successful_calls: list[str] = []
-    usage: dict[str, Any] | None = None
-    tool_error_count = 0
-    parameter_error_count = 0
-    capability_ids: list[str] = []
-    capability_invocations: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        item = event.get("item") if isinstance(event, dict) else None
-        if (
-            isinstance(event, dict)
-            and event.get("type") == "item.completed"
-            and isinstance(item, dict)
-            and item.get("type") == "mcp_tool_call"
-            and isinstance(item.get("tool"), str)
-        ):
-            calls.append(item["tool"])
-            result = item.get("result")
-            failed = bool(
-                item.get("status") in {"error", "failed"}
-                or item.get("error")
-                or (isinstance(result, dict) and result.get("isError") is True)
-                or _contains_execution_error(item)
-            )
-            if failed:
-                tool_error_count += 1
-            else:
-                successful_calls.append(item["tool"])
-                arguments = item.get("arguments")
-                response = _mcp_text_payload(item)
-                execution = (
-                    response.get("execution") if isinstance(response, dict) else None
-                )
-                if (
-                    item["tool"] == "capability.invoke"
-                    and isinstance(arguments, dict)
-                    and isinstance(arguments.get("capability_id"), str)
-                    and isinstance(response, dict)
-                    and response.get("capability_id") == arguments["capability_id"]
-                    and isinstance(execution, dict)
-                    and execution.get("status") == "COMPLETED"
-                ):
-                    capability_id = arguments["capability_id"]
-                    capability_ids.append(capability_id)
-                    capability_invocations.append(
-                        {
-                            "capability_id": capability_id,
-                            "input": arguments.get("payload"),
-                            "output": response.get("output"),
-                            "artifact_uris": response.get("artifact_uris"),
-                            "assurance": response.get("assurance"),
-                            "completeness": response.get("completeness"),
-                        }
-                    )
-            if _contains_parameter_error(item):
-                parameter_error_count += 1
-        if (
-            isinstance(event, dict)
-            and event.get("type") == "turn.completed"
-            and isinstance(event.get("usage"), dict)
-        ):
-            usage = event["usage"]
+    telemetry = parse_agent_transcript(path)
     return (
-        calls,
-        usage,
+        telemetry["mcp_calls"],
+        telemetry["usage"],
         {
-            "tool_error_count": tool_error_count,
-            "parameter_error_count": parameter_error_count,
-            "successful_tool_calls": successful_calls,
-            "capability_ids": capability_ids,
-            "capability_invocations": capability_invocations,
+            key: telemetry[key]
+            for key in (
+                "tool_error_count",
+                "parameter_error_count",
+                "successful_tool_calls",
+                "capability_ids",
+                "capability_invocations",
+            )
         },
     )
 
@@ -641,7 +530,7 @@ def _score_graph_capability_run(
         normalized_edges.append((source, target))
     if len(set(normalized_edges)) != len(normalized_edges):
         raise BenchmarkError("graph contains duplicate edges")
-    graph = nx.Graph()
+    graph: nx.Graph[str] = nx.Graph()
     graph.add_nodes_from(vertices)
     graph.add_edges_from(normalized_edges)
     degree_sequence = sorted((degree for _, degree in graph.degree), reverse=True)

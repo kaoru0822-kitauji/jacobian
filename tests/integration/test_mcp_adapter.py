@@ -265,6 +265,7 @@ def test_mcp_capability_profile_describes_and_invokes_exact_domain_contract(
                 descriptor["capability_id"] for descriptor in catalog["capabilities"]
             }
             assert capability_ids == {
+                "case.partition.finite",
                 "graph.compute.properties",
                 "graph.search.atlas",
                 "knowledge.search",

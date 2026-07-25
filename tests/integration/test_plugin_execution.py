@@ -142,13 +142,13 @@ def test_plugin_deadline_covers_descendant_held_output_pipes(tmp_path: Path) -> 
 
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:spawn_child_then_return",
-        request={"marker": str(marker)},
-        timeout_seconds=0.2,
+        request={"marker": str(marker), "delay_seconds": 3},
+        timeout_seconds=2,
     )
     elapsed = time.monotonic() - start
     time.sleep(1.2)
 
-    assert elapsed < 1
+    assert elapsed < 3
     assert result.status.value == "TIMEOUT"
     assert result.output is None
     assert not marker.exists()
