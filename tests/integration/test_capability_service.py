@@ -11,8 +11,11 @@ from jacobian.capabilities import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
+    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityMode,
+    CapabilityRelationship,
+    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -111,6 +114,80 @@ class ForgedVerifiedAdapter:
 
 
 @dataclass(frozen=True)
+class OmittedRelationshipArtifactAdapter:
+    descriptor = CapabilityDescriptor(
+        capability_id="example.relationship",
+        version="1",
+        title="Return an unbound relationship",
+        description="Adversarial adapter that omits a relationship endpoint.",
+        provider="tests",
+        modes=(CapabilityMode.EXPLORE,),
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="example.relation.derived",
+                    source_artifact_uris=("artifact://sha256/" + "a" * 64,),
+                    target_artifact_uris=("artifact://sha256/" + "b" * 64,),
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis="adapter proposed a relationship",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ForgedRelationshipVerificationAdapter:
+    verification_record_uri: str
+    artifact_uris: tuple[str, ...]
+    source_uri: str
+    target_uri: str
+    descriptor = CapabilityDescriptor(
+        capability_id="example.forged-relationship",
+        version="1",
+        title="Mislabel a checked result as a verified relationship",
+        description="Adversarial adapter that reuses an unrelated valid record.",
+        provider="tests",
+        modes=(CapabilityMode.VERIFY,),
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="claim.relation.specialization",
+                    source_artifact_uris=(self.source_uri,),
+                    target_artifact_uris=(self.target_uri,),
+                    status=CapabilityRelationshipStatus.VERIFIED,
+                    verification_record_uri=self.verification_record_uri,
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.VERIFIED,
+                basis="reused a record that did not check this relation",
+                verification_record_uri=self.verification_record_uri,
+            ),
+            artifact_uris=self.artifact_uris,
+        )
+
+
+@dataclass(frozen=True)
 class MisboundVerifiedAdapter:
     verification_record_uri: str
     evidence_uri: str
@@ -161,6 +238,9 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert result.output == {"value": 42}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.episode_uri is not None
+    episode = kernel.store.get(result.episode_uri)
+    assert episode.payload["result"]["response_version"] == "2"
+    assert episode.payload["result"]["completeness"]["status"] == "NOT_APPLICABLE"
     hits = kernel.memory.search(query="double computed").hits
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
 
@@ -291,7 +371,23 @@ def test_adapter_cannot_promote_without_a_local_verification_record(
 
 
 @pytest.mark.integration
-def test_adapter_cannot_reuse_a_record_without_its_bound_artifacts(
+def test_first_class_relationship_endpoints_must_be_exposed(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    kernel.register_capability(OmittedRelationshipArtifactAdapter())
+
+    with pytest.raises(CapabilityError, match="missing from artifact_uris"):
+        kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="example.relationship",
+                input={},
+            )
+        )
+
+
+@pytest.mark.integration
+def test_adapter_cannot_reuse_a_record_for_unchecked_bindings(
     tmp_path: Path,
 ) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
@@ -325,6 +421,23 @@ def test_adapter_cannot_reuse_a_record_without_its_bound_artifacts(
         kernel.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.misbound",
+                mode=CapabilityMode.VERIFY,
+                input={},
+            )
+        )
+
+    kernel.register_capability(
+        ForgedRelationshipVerificationAdapter(
+            verification_record_uri=record_uri,
+            artifact_uris=legitimate.artifact_uris,
+            source_uri=str(legitimate.output["claim_uri"]),
+            target_uri=str(legitimate.output["candidate_uri"]),
+        )
+    )
+    with pytest.raises(CapabilityError, match="checked relation"):
+        kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="example.forged-relationship",
                 mode=CapabilityMode.VERIFY,
                 input={},
             )
@@ -364,9 +477,15 @@ def test_reference_capability_has_distinct_explore_and_verify_lanes(
     )
 
     assert explored.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert explored.completeness.status is CapabilityCompletenessStatus.UNKNOWN
     assert explored.output["verification_record_uri"] is None
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert verified.assurance.verification_record_uri is not None
+    assert verified.completeness.status is CapabilityCompletenessStatus.COMPLETE
+    assert (
+        verified.completeness.verification_record_uri
+        == verified.assurance.verification_record_uri
+    )
     assert verified.assurance.verification_record_uri in verified.artifact_uris
     assert verified.output["artifacts"]["verification_record"] == (
         verified.assurance.verification_record_uri
@@ -383,7 +502,8 @@ def test_reference_capability_has_distinct_explore_and_verify_lanes(
         in (verified.output["verification"]["checker_detail"])
     )
     assert verified.output["stages"]["independent_verification"] == "COMPLETED"
-    assert "bounds" not in verified.scope
+    assert verified.scope is not None
+    assert "bounds" not in verified.scope.parameters
     assert {hit.assurance_level for hit in kernel.memory.search(limit=10).hits} >= {
         CapabilityAssuranceLevel.HEURISTIC,
         CapabilityAssuranceLevel.VERIFIED,

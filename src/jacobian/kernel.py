@@ -20,6 +20,7 @@ from jacobian.conjectures import ConjectureService
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.evaluation import EvaluationService
 from jacobian.experiments import ExperimentService
+from jacobian.graph_capabilities import install_graph_capabilities
 from jacobian.lean import LeanService
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
@@ -149,6 +150,12 @@ class JacobianKernel:
         self.verification_workflows: VerificationWorkflowService | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         self.capabilities.register(KnowledgeSearchAdapter(self.memory))
+        for adapter in install_graph_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        ):
+            self.capabilities.register(adapter)
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(

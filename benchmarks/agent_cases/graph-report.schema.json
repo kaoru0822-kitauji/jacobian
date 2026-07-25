@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "assurance": {
+      "enum": ["HEURISTIC", "COMPUTED", "VERIFIED"]
+    },
+    "completeness": {
+      "enum": ["NOT_APPLICABLE", "UNKNOWN", "PARTIAL", "COMPLETE"]
+    },
+    "final_verification": {
+      "enum": ["UNVERIFIED", "VERIFIED"]
+    },
+    "graph_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "property_artifact_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "properties": {
+      "type": "object",
+      "properties": {
+        "order": {
+          "type": "integer"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "bipartite": {
+          "type": "boolean"
+        },
+        "degree_sequence": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "triangle_count": {
+          "type": "integer"
+        },
+        "independence_number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order",
+        "size",
+        "connected",
+        "bipartite",
+        "degree_sequence",
+        "triangle_count",
+        "independence_number"
+      ],
+      "additionalProperties": false
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "tooling_strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tooling_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "domain_knowledge_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "suggested_improvements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "tooling_strengths",
+        "tooling_gaps",
+        "domain_knowledge_gaps",
+        "suggested_improvements"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "case_id",
+    "assurance",
+    "completeness",
+    "final_verification",
+    "graph_uri",
+    "property_artifact_uri",
+    "properties",
+    "limitations",
+    "feedback"
+  ],
+  "additionalProperties": false
+}

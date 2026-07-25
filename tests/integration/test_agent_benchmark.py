@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pytest
 
+from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.kernel import JacobianKernel
 
@@ -22,6 +23,100 @@ def _feedback() -> dict[str, list[str]]:
         "domain_knowledge_gaps": [],
         "suggested_improvements": [],
     }
+
+
+@pytest.mark.integration
+def test_graph_capability_scorer_checks_multi_call_artifacts(
+    tmp_path: Path,
+) -> None:
+    case = BENCHMARK["load_cases"](["GRAPH-ATLAS-PATH-001"])[0]
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    searched = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.search.atlas",
+            input={
+                "order": 5,
+                "constraints": {"tree": True, "maximum_degree": 2},
+                "limit": 1,
+            },
+        )
+    )
+    graph_uri = searched.output["candidates"][0]["graph_uri"]
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.compute.properties",
+            input={
+                "graph_uri": graph_uri,
+                "properties": list(case["expected"]["properties"]),
+            },
+        )
+    )
+    report = {
+        "case_id": case["case_id"],
+        "assurance": "COMPUTED",
+        "completeness": "COMPLETE",
+        "final_verification": "UNVERIFIED",
+        "graph_uri": graph_uri,
+        "property_artifact_uri": computed.output["property_artifact_uri"],
+        "properties": computed.output["properties"],
+        "limitations": ["Graph Atlas contains graphs only through order 7."],
+        "feedback": _feedback(),
+    }
+
+    score = BENCHMARK["score_run"](
+        case,
+        report,
+        state_dir=tmp_path,
+        tool_calls=["capability.invoke", "capability.invoke"],
+        capability_ids=[
+            "graph.search.atlas",
+            "graph.compute.properties",
+        ],
+        capability_invocations=[
+            {
+                "capability_id": "graph.search.atlas",
+                "input": {
+                    "order": 5,
+                    "constraints": {"tree": True, "maximum_degree": 2},
+                    "limit": 1,
+                },
+                "output": searched.output,
+                "artifact_uris": list(searched.artifact_uris),
+                "assurance": searched.assurance.model_dump(mode="json"),
+                "completeness": searched.completeness.model_dump(mode="json"),
+            },
+            {
+                "capability_id": "graph.compute.properties",
+                "input": {
+                    "graph_uri": graph_uri,
+                    "properties": list(case["expected"]["properties"]),
+                },
+                "output": computed.output,
+                "artifact_uris": list(computed.artifact_uris),
+                "assurance": computed.assurance.model_dump(mode="json"),
+                "completeness": computed.completeness.model_dump(mode="json"),
+            },
+        ],
+    )
+
+    assert score["passed"] is True
+    assert score["case_id"] == case["case_id"]
+
+    with pytest.raises(
+        BENCHMARK["BenchmarkError"],
+        match="successful search-to-property artifact flow",
+    ):
+        BENCHMARK["score_run"](
+            case,
+            report,
+            state_dir=tmp_path,
+            tool_calls=["capability.invoke", "capability.invoke"],
+            capability_ids=[
+                "graph.search.atlas",
+                "graph.compute.properties",
+            ],
+            capability_invocations=[],
+        )
 
 
 def test_transcript_parser_counts_completed_mcp_calls_once(tmp_path: Path) -> None:
@@ -45,6 +140,63 @@ def test_transcript_parser_counts_completed_mcp_calls_once(tmp_path: Path) -> No
             },
         },
         {
+            "type": "item.completed",
+            "item": {
+                "type": "mcp_tool_call",
+                "tool": "capability.invoke",
+                "status": "completed",
+                "result": {
+                    "isError": True,
+                    "content": [{"code": "INVALID_PARAMS"}],
+                },
+            },
+        },
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "mcp_tool_call",
+                "tool": "capability.invoke",
+                "status": "completed",
+                "arguments": {
+                    "capability_id": "graph.search.atlas",
+                },
+                "result": {
+                    "execution": {"status": "ERROR"},
+                    "diagnostics": [{"code": "INVALID_CONSTRAINT_RANGE"}],
+                },
+            },
+        },
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "mcp_tool_call",
+                "tool": "capability.invoke",
+                "status": "completed",
+                "arguments": {
+                    "capability_id": "graph.compute.properties",
+                    "payload": {"graph_uri": "artifact://example"},
+                },
+                "result": {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {
+                                    "capability_id": "graph.compute.properties",
+                                    "execution": {"status": "COMPLETED"},
+                                    "output": {"property_artifact_uri": "artifact://p"},
+                                    "artifact_uris": ["artifact://p"],
+                                    "assurance": {"level": "COMPUTED"},
+                                    "completeness": {"status": "COMPLETE"},
+                                }
+                            ),
+                        }
+                    ],
+                    "structured_content": None,
+                },
+            },
+        },
+        {
             "type": "turn.completed",
             "usage": {"input_tokens": 12, "output_tokens": 3},
         },
@@ -54,10 +206,31 @@ def test_transcript_parser_counts_completed_mcp_calls_once(tmp_path: Path) -> No
         encoding="utf-8",
     )
 
-    calls, usage = parse_transcript(transcript)
+    calls, usage, metrics = parse_transcript(transcript)
 
-    assert calls == ["artifact.put"]
+    assert calls == [
+        "artifact.put",
+        "capability.invoke",
+        "capability.invoke",
+        "capability.invoke",
+    ]
     assert usage == {"input_tokens": 12, "output_tokens": 3}
+    assert metrics == {
+        "tool_error_count": 2,
+        "parameter_error_count": 2,
+        "successful_tool_calls": ["artifact.put", "capability.invoke"],
+        "capability_ids": ["graph.compute.properties"],
+        "capability_invocations": [
+            {
+                "capability_id": "graph.compute.properties",
+                "input": {"graph_uri": "artifact://example"},
+                "output": {"property_artifact_uri": "artifact://p"},
+                "artifact_uris": ["artifact://p"],
+                "assurance": {"level": "COMPUTED"},
+                "completeness": {"status": "COMPLETE"},
+            }
+        ],
+    }
 
 
 def test_known_answer_scorer_replays_durable_witness_bindings(

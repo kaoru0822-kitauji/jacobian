@@ -16,13 +16,16 @@ from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityCatalog,
+    CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityObligationStatus,
+    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
 )
 from jacobian.contracts.memory import ResearchEpisode
-from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.contracts.results import Coverage, Execution, ExecutionStatus
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.memory import ResearchMemory
 from jacobian.store import ArtifactStore, StoreError
@@ -187,6 +190,7 @@ class CapabilityService:
                 descriptor.output_schema, result.output
             )
             result = result.model_copy(update={"output": normalized_output})
+        self._validate_artifact_references(result)
         self._validate_verified_result(result)
         if (
             descriptor.records_episode
@@ -198,7 +202,10 @@ class CapabilityService:
                     capability_version=result.capability_version,
                     mode=result.mode,
                     request=normalized_request.input,
-                    result=result.output,
+                    result=result.model_dump(
+                        mode="json",
+                        exclude={"episode_uri"},
+                    ),
                     assurance_level=result.assurance.level,
                     verification_record_uri=(result.assurance.verification_record_uri),
                     artifact_uris=result.artifact_uris,
@@ -209,6 +216,30 @@ class CapabilityService:
             result = result.model_copy(update={"episode_uri": episode_uri})
         _log_invocation(result, started)
         return result
+
+    @staticmethod
+    def _validate_artifact_references(result: CapabilityResult) -> None:
+        exposed = set(result.artifact_uris)
+        referenced: set[str] = set()
+        if result.scope is not None and result.scope.artifact_uri is not None:
+            referenced.add(result.scope.artifact_uri)
+        if result.completeness.verification_record_uri is not None:
+            referenced.add(result.completeness.verification_record_uri)
+        for relationship in result.relationships:
+            referenced.update(relationship.source_artifact_uris)
+            referenced.update(relationship.target_artifact_uris)
+            referenced.update(relationship.obligation_uris)
+            if relationship.verification_record_uri is not None:
+                referenced.add(relationship.verification_record_uri)
+        for obligation in result.obligations:
+            referenced.add(obligation.obligation_uri)
+            if obligation.verification_record_uri is not None:
+                referenced.add(obligation.verification_record_uri)
+        missing = referenced - exposed
+        if missing:
+            raise CapabilityError(
+                "capability result has first-class references missing from artifact_uris"
+            )
 
     def _validate_verified_result(self, result: CapabilityResult) -> None:
         if result.assurance.level is not CapabilityAssuranceLevel.VERIFIED:
@@ -246,6 +277,50 @@ class CapabilityService:
             raise CapabilityError(
                 "verified capability output differs from the checked conclusion"
             )
+        record_parents = set(record_artifact.manifest.parents)
+        for relationship in result.relationships:
+            if relationship.status is not CapabilityRelationshipStatus.VERIFIED:
+                continue
+            bound_artifacts = {
+                *relationship.source_artifact_uris,
+                *relationship.target_artifact_uris,
+                *relationship.obligation_uris,
+            }
+            if not bound_artifacts.issubset(record_parents):
+                raise CapabilityError(
+                    "verified relationship record does not bind its artifacts"
+                )
+            if record_artifact.payload.get("relation_id") != relationship.relation_id:
+                raise CapabilityError(
+                    "verified relationship differs from the checked relation"
+                )
+        for obligation in result.obligations:
+            if obligation.status is not CapabilityObligationStatus.DISCHARGED:
+                continue
+            if (
+                obligation.obligation_uri not in record_parents
+                or record_artifact.payload.get("obligation_uri")
+                != obligation.obligation_uri
+            ):
+                raise CapabilityError(
+                    "discharged obligation differs from the checked obligation"
+                )
+        if (
+            result.completeness.status is CapabilityCompletenessStatus.COMPLETE
+            and result.completeness.assurance_level is CapabilityAssuranceLevel.VERIFIED
+        ):
+            if (
+                result.scope is None
+                or result.scope.artifact_uri is None
+                or result.scope.artifact_uri not in record_parents
+            ):
+                raise CapabilityError(
+                    "verified completeness requires a checker-bound scope artifact"
+                )
+            if record.coverage not in {Coverage.EXHAUSTIVE, Coverage.BOUNDED}:
+                raise CapabilityError(
+                    "verified completeness differs from checked coverage"
+                )
 
 
 def load_capability_adapter(

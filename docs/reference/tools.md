@@ -23,11 +23,13 @@ new proof obligations when applicable, execution status, assurance, and
 provenance. Agents and proof strategies compose tools into workflows without
 merging the assurance of their stages.
 
-The current `CapabilityResult` has a typed operation-specific output and
-artifact URIs but no generic first-class relationship or proof-obligation
-fields. Until those fields are versioned, adapters must keep that information
-inside their output schema. This is an active product-contract gap, not a
-property callers should infer.
+`CapabilityResult` version 2 keeps the typed operation-specific output and
+adds first-class scope, completeness, relationship, and proof-obligation
+fields. Mathematical relationship IDs and scope parameters remain
+domain-owned; the shared contract defines their artifact bindings and
+assurance lifecycle without introducing a universal mathematical ontology.
+Checker-backed lifecycle states require exact bindings in the accepted record;
+an adapter cannot reuse an unrelated valid verification record.
 
 A capability adapter connects an external engine or domain operation to this
 contract and registers it behind a capability ID. A domain plugin defines the
@@ -51,9 +53,10 @@ The default local and remote profile advertises two tools:
 | `capability.invoke` | Invoke an installed operation in `EXPLORE` or `VERIFY` mode. Inputs and outputs are validated against the selected descriptor. Completed reusable invocations create trust-labeled research episodes. |
 
 Read `capability://catalog` to discover stable IDs, provider versions, supported
-modes, compact JSON Schemas, and tags. Bundled IDs are `reference.solve`,
-`lean.check`, and `knowledge.search`. Operator-installed adapters appear in the
-same catalog without a new MCP tool. Tool-only clients should call
+modes, compact JSON Schemas, and tags. Bundled IDs are `graph.search.atlas`,
+`graph.compute.properties`, `reference.solve`, `lean.check`, and
+`knowledge.search`. Operator-installed adapters appear in the same catalog
+without a new MCP tool. Tool-only clients should call
 `capability.describe` before invoking an unfamiliar capability rather than
 guessing payload fields.
 

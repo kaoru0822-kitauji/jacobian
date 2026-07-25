@@ -69,6 +69,7 @@ expectations.
 - [Performance benchmark protocol](reference/performance-benchmarks.md)
 - [Testing strategy](reference/testing-strategy.md)
 - [Agent evaluation protocol](reference/agent-evaluations.md)
+- [Capability workflow evaluation plan](reference/capability-workflow-evaluations.md)
 
 Later-release contracts are provisional:
 

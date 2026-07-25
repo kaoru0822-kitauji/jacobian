@@ -23,13 +23,28 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import networkx as nx
+
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASES_ROOT = Path(__file__).with_name("agent_cases")
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results")
 REPORT_SCHEMA = CASES_ROOT / "report.schema.json"
+GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
 ARTIFACT_PREFIX = "artifact://sha256/"
+PARAMETER_ERROR_CODES = frozenset(
+    {
+        -32602,
+        "INVALID_ARGUMENT",
+        "INVALID_CONSTRAINT_RANGE",
+        "INVALID_PARAMS",
+        "INVALID_REQUEST",
+        "SCHEMA_VALIDATION",
+        "invalid_params",
+    }
+)
 
 SYSTEM_TASK = """\
 Use only the jacobian_local MCP tools and resources for the mathematical work.
@@ -56,6 +71,22 @@ missing domain knowledge, and concrete improvements. Empty feedback lists are
 valid when the run exposed no issue.
 """
 
+GRAPH_SYSTEM_TASK = """\
+Use only the jacobian_local MCP tools for mathematical work. Do not run shell
+commands, read repository files, edit files, or use network retrieval. Describe
+unfamiliar capabilities before invoking them.
+
+Complete public workflow case {case_id}. Set report case_id exactly to
+{case_id}.
+
+{prompt}
+
+Use graph.search.atlas, then graph.compute.properties on one returned graph.
+Report exact durable URIs. NetworkX computation is COMPUTED, not VERIFIED.
+Complete Atlas coverage does not authorize mathematical promotion. State
+limits. Record concise feedback; empty feedback lists are valid.
+"""
+
 
 class BenchmarkError(RuntimeError):
     """The runner or durable benchmark evidence is invalid."""
@@ -72,7 +103,7 @@ def load_cases(selected: Sequence[str]) -> list[dict[str, Any]]:
     cases = [
         _load_json_object(path)
         for path in sorted(CASES_ROOT.glob("*.json"))
-        if path.name != REPORT_SCHEMA.name
+        if not path.name.endswith("schema.json")
     ]
     by_id = {str(case.get("case_id")): case for case in cases}
     if len(by_id) != len(cases):
@@ -115,9 +146,55 @@ def _artifact_uri(value: object, field: str) -> str:
     return value
 
 
-def parse_transcript(path: Path) -> tuple[list[str], dict[str, Any] | None]:
+def _contains_parameter_error(value: object) -> bool:
+    if isinstance(value, Mapping):
+        if value.get("code") in PARAMETER_ERROR_CODES:
+            return True
+        return any(_contains_parameter_error(item) for item in value.values())
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return any(_contains_parameter_error(item) for item in value)
+    return False
+
+
+def _contains_execution_error(value: object) -> bool:
+    if isinstance(value, Mapping):
+        if value.get("status") in {"CANCELLED", "ERROR", "TIMEOUT"}:
+            return True
+        return any(_contains_execution_error(item) for item in value.values())
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return any(_contains_execution_error(item) for item in value)
+    return False
+
+
+def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
+    result = item.get("result")
+    if not isinstance(result, dict):
+        return None
+    content = result.get("content")
+    if not isinstance(content, list):
+        return None
+    for block in content:
+        if not isinstance(block, dict) or not isinstance(block.get("text"), str):
+            continue
+        try:
+            payload = json.loads(block["text"])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def parse_transcript(
+    path: Path,
+) -> tuple[list[str], dict[str, Any] | None, dict[str, Any]]:
     calls: list[str] = []
+    successful_calls: list[str] = []
     usage: dict[str, Any] | None = None
+    tool_error_count = 0
+    parameter_error_count = 0
+    capability_ids: list[str] = []
+    capability_invocations: list[dict[str, Any]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             event = json.loads(line)
@@ -132,13 +209,62 @@ def parse_transcript(path: Path) -> tuple[list[str], dict[str, Any] | None]:
             and isinstance(item.get("tool"), str)
         ):
             calls.append(item["tool"])
+            result = item.get("result")
+            failed = bool(
+                item.get("status") in {"error", "failed"}
+                or item.get("error")
+                or (isinstance(result, dict) and result.get("isError") is True)
+                or _contains_execution_error(item)
+            )
+            if failed:
+                tool_error_count += 1
+            else:
+                successful_calls.append(item["tool"])
+                arguments = item.get("arguments")
+                response = _mcp_text_payload(item)
+                execution = (
+                    response.get("execution") if isinstance(response, dict) else None
+                )
+                if (
+                    item["tool"] == "capability.invoke"
+                    and isinstance(arguments, dict)
+                    and isinstance(arguments.get("capability_id"), str)
+                    and isinstance(response, dict)
+                    and response.get("capability_id") == arguments["capability_id"]
+                    and isinstance(execution, dict)
+                    and execution.get("status") == "COMPLETED"
+                ):
+                    capability_id = arguments["capability_id"]
+                    capability_ids.append(capability_id)
+                    capability_invocations.append(
+                        {
+                            "capability_id": capability_id,
+                            "input": arguments.get("payload"),
+                            "output": response.get("output"),
+                            "artifact_uris": response.get("artifact_uris"),
+                            "assurance": response.get("assurance"),
+                            "completeness": response.get("completeness"),
+                        }
+                    )
+            if _contains_parameter_error(item):
+                parameter_error_count += 1
         if (
             isinstance(event, dict)
             and event.get("type") == "turn.completed"
             and isinstance(event.get("usage"), dict)
         ):
             usage = event["usage"]
-    return calls, usage
+    return (
+        calls,
+        usage,
+        {
+            "tool_error_count": tool_error_count,
+            "parameter_error_count": parameter_error_count,
+            "successful_tool_calls": successful_calls,
+            "capability_ids": capability_ids,
+            "capability_invocations": capability_invocations,
+        },
+    )
 
 
 def _as_object(value: Any, field: str) -> dict[str, Any]:
@@ -327,13 +453,262 @@ def _check_evidence(
     raise BenchmarkError(f"unsupported evidence kind: {evidence_kind}")
 
 
+def _property_values(value: object) -> dict[str, Any]:
+    properties = _as_object(value, "graph properties")
+    normalized: dict[str, Any] = {}
+    for name, result in properties.items():
+        if isinstance(result, dict) and "value" in result:
+            if result.get("exactness") != "EXACT":
+                raise BenchmarkError(f"graph property {name} is not labeled exact")
+            normalized[name] = result["value"]
+        else:
+            normalized[name] = result
+    return normalized
+
+
+def _require_descriptor(
+    store: ArtifactStore,
+    uri: str,
+    *,
+    kind: str,
+    name: str,
+) -> None:
+    descriptor = _as_object(store.get(uri).payload, f"{name} descriptor")
+    if (
+        descriptor.get("descriptor_version") != "1"
+        or descriptor.get("kind") != kind
+        or descriptor.get("name") != name
+        or descriptor.get("version") != "1"
+    ):
+        raise BenchmarkError(f"artifact does not use {name}@1")
+
+
+def _find_graph_invocations(
+    invocations: Sequence[Mapping[str, Any]],
+    *,
+    graph_uri: str,
+    property_uri: str,
+) -> Mapping[str, Any]:
+    for search_index, search in enumerate(invocations):
+        if search.get("capability_id") != "graph.search.atlas":
+            continue
+        search_output = search.get("output")
+        search_artifacts = search.get("artifact_uris")
+        search_assurance = search.get("assurance")
+        search_completeness = search.get("completeness")
+        if (
+            not isinstance(search_output, dict)
+            or not isinstance(search_artifacts, list)
+            or graph_uri not in search_artifacts
+            or not isinstance(search_output.get("candidates"), list)
+            or not any(
+                isinstance(candidate, dict) and candidate.get("graph_uri") == graph_uri
+                for candidate in search_output["candidates"]
+            )
+            or not isinstance(search_assurance, dict)
+            or search_assurance.get("level") != "COMPUTED"
+            or not isinstance(search_completeness, dict)
+            or search_completeness.get("status") != "COMPLETE"
+        ):
+            continue
+        for computed in invocations[search_index + 1 :]:
+            if computed.get("capability_id") != "graph.compute.properties":
+                continue
+            computed_input = computed.get("input")
+            computed_output = computed.get("output")
+            computed_artifacts = computed.get("artifact_uris")
+            computed_assurance = computed.get("assurance")
+            computed_completeness = computed.get("completeness")
+            if (
+                isinstance(computed_input, dict)
+                and computed_input.get("graph_uri") == graph_uri
+                and isinstance(computed_output, dict)
+                and computed_output.get("graph_uri") == graph_uri
+                and computed_output.get("property_artifact_uri") == property_uri
+                and isinstance(computed_artifacts, list)
+                and graph_uri in computed_artifacts
+                and property_uri in computed_artifacts
+                and isinstance(computed_assurance, dict)
+                and computed_assurance.get("level") == "COMPUTED"
+                and isinstance(computed_completeness, dict)
+                and computed_completeness.get("status") == "COMPLETE"
+            ):
+                return computed
+    raise BenchmarkError(
+        "transcript lacks a successful search-to-property artifact flow"
+    )
+
+
+def _score_graph_capability_run(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    state_dir: Path,
+    tool_calls: Sequence[str],
+    capability_ids: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    expected = _as_object(case.get("expected"), "case expected")
+    if report.get("case_id") != case.get("case_id"):
+        raise BenchmarkError("agent report case_id does not match the case")
+    if report.get("assurance") != expected.get("assurance"):
+        raise BenchmarkError("graph computation assurance differs from the case")
+    if report.get("completeness") != expected.get("completeness"):
+        raise BenchmarkError("graph search completeness differs from the case")
+    if report.get("final_verification") != "UNVERIFIED":
+        raise BenchmarkError("computed graph workflow was falsely certified")
+    required_tools = case.get("required_tools")
+    if not isinstance(required_tools, list):
+        raise BenchmarkError("case required_tools must be a list")
+    missing_tools = sorted(set(required_tools) - set(tool_calls))
+    if missing_tools:
+        raise BenchmarkError(
+            f"transcript is missing MCP calls: {', '.join(missing_tools)}"
+        )
+    required_capabilities = case.get("required_capability_ids")
+    if not isinstance(required_capabilities, list):
+        raise BenchmarkError("case required_capability_ids must be a list")
+    missing_capabilities = sorted(set(required_capabilities) - set(capability_ids))
+    if missing_capabilities:
+        raise BenchmarkError(
+            "transcript is missing capability invocations: "
+            + ", ".join(missing_capabilities)
+        )
+
+    graph_uri = _artifact_uri(report.get("graph_uri"), "graph_uri")
+    property_uri = _artifact_uri(
+        report.get("property_artifact_uri"),
+        "property_artifact_uri",
+    )
+    store = ArtifactStore(state_dir)
+    try:
+        graph_artifact = store.get(graph_uri)
+        property_artifact = store.get(property_uri)
+        _require_descriptor(
+            store,
+            graph_artifact.manifest.schema_uri,
+            kind="schema",
+            name="jacobian.simple-undirected-graph",
+        )
+        _require_descriptor(
+            store,
+            graph_artifact.manifest.semantics_uri,
+            kind="semantics",
+            name="jacobian.simple-undirected-graph",
+        )
+        _require_descriptor(
+            store,
+            property_artifact.manifest.schema_uri,
+            kind="schema",
+            name="jacobian.graph-property-batch",
+        )
+        if (
+            property_artifact.manifest.semantics_uri
+            != graph_artifact.manifest.semantics_uri
+        ):
+            raise BenchmarkError("property artifact uses different graph semantics")
+        schemas = SchemaRegistry(store)
+        schemas.validate(graph_artifact.manifest.schema_uri, graph_artifact.payload)
+        schemas.validate(
+            property_artifact.manifest.schema_uri,
+            property_artifact.payload,
+        )
+    except (SchemaRegistryError, StoreError) as exc:
+        raise BenchmarkError(
+            "reported graph artifacts fail contract validation"
+        ) from exc
+    graph_payload = _as_object(graph_artifact.payload, "graph payload")
+    vertices = graph_payload.get("vertices")
+    edges = graph_payload.get("edges")
+    if not isinstance(vertices, list) or not isinstance(edges, list):
+        raise BenchmarkError("graph payload is malformed")
+    if len(set(vertices)) != len(vertices) or any(
+        not isinstance(vertex, str) for vertex in vertices
+    ):
+        raise BenchmarkError("graph vertices are malformed")
+    vertex_set = set(vertices)
+    normalized_edges: list[tuple[str, str]] = []
+    for edge in edges:
+        if (
+            not isinstance(edge, list)
+            or len(edge) != 2
+            or not all(isinstance(endpoint, str) for endpoint in edge)
+        ):
+            raise BenchmarkError("graph edge payload is malformed")
+        source, target = edge
+        if source not in vertex_set or target not in vertex_set or source >= target:
+            raise BenchmarkError("graph edge violates simple-graph semantics")
+        normalized_edges.append((source, target))
+    if len(set(normalized_edges)) != len(normalized_edges):
+        raise BenchmarkError("graph contains duplicate edges")
+    graph = nx.Graph()
+    graph.add_nodes_from(vertices)
+    graph.add_edges_from(normalized_edges)
+    degree_sequence = sorted((degree for _, degree in graph.degree), reverse=True)
+    if (
+        graph.number_of_nodes() != 5
+        or graph.number_of_edges() != 4
+        or not nx.is_connected(graph)
+        or degree_sequence != [2, 2, 2, 1, 1]
+    ):
+        raise BenchmarkError("reported graph is not the five-vertex path")
+
+    if graph_uri not in property_artifact.manifest.parents:
+        raise BenchmarkError("property artifact is not bound to the graph")
+    property_payload = _as_object(property_artifact.payload, "property payload")
+    if property_payload.get("graph_uri") != graph_uri:
+        raise BenchmarkError("property payload names another graph")
+    wanted_properties = _as_object(expected.get("properties"), "expected properties")
+    artifact_properties = _property_values(property_payload.get("properties"))
+    report_properties = _property_values(report.get("properties"))
+    property_invocation = _find_graph_invocations(
+        capability_invocations,
+        graph_uri=graph_uri,
+        property_uri=property_uri,
+    )
+    invocation_output = _as_object(
+        property_invocation.get("output"),
+        "property invocation output",
+    )
+    invocation_properties = _property_values(invocation_output.get("properties"))
+    if (
+        artifact_properties != wanted_properties
+        or report_properties != wanted_properties
+        or invocation_properties != wanted_properties
+    ):
+        raise BenchmarkError("graph properties differ from the frozen oracle")
+    return {
+        "passed": True,
+        "checks": [
+            "computed assurance without false certification",
+            "required multi-call capability sequence",
+            "five-vertex path up to relabeling",
+            "bound exact property artifact",
+        ],
+        "case_id": case["case_id"],
+        "graph_uri": graph_uri,
+        "property_artifact_uri": property_uri,
+    }
+
+
 def score_run(
     case: Mapping[str, Any],
     report: Mapping[str, Any],
     *,
     state_dir: Path,
     tool_calls: Sequence[str],
+    capability_ids: Sequence[str] = (),
+    capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("case_type") == "graph_capability":
+        return _score_graph_capability_run(
+            case,
+            report,
+            state_dir=state_dir,
+            tool_calls=tool_calls,
+            capability_ids=capability_ids,
+            capability_invocations=capability_invocations,
+        )
     expected = _as_object(case.get("expected"), "case expected")
     checks: list[str] = []
     if report.get("case_id") != case.get("case_id"):
@@ -455,11 +830,22 @@ def _run_case(
     feedback_path = case_root / "feedback.json"
     case_root.mkdir(parents=True)
     state_dir.mkdir()
-    prompt = SYSTEM_TASK.format(
-        agent_contract_uri=f"reference://domain/{case['reference_name']}",
-        case_id=case_id,
-        prompt=case["prompt"],
-    )
+    graph_case = case.get("case_type") == "graph_capability"
+    if graph_case:
+        prompt = GRAPH_SYSTEM_TASK.format(
+            case_id=case_id,
+            prompt=case["prompt"],
+        )
+        report_schema = GRAPH_REPORT_SCHEMA
+        tool_profile = "capabilities"
+    else:
+        prompt = SYSTEM_TASK.format(
+            agent_contract_uri=f"reference://domain/{case['reference_name']}",
+            case_id=case_id,
+            prompt=case["prompt"],
+        )
+        report_schema = REPORT_SCHEMA
+        tool_profile = "verification"
     command = [
         codex_command,
         "exec",
@@ -470,7 +856,7 @@ def _run_case(
         "never",
         "--json",
         "--output-schema",
-        str(REPORT_SCHEMA),
+        str(report_schema),
         "--output-last-message",
         str(report_path),
         "-c",
@@ -483,7 +869,7 @@ def _run_case(
                 "run",
                 "jacobian-mcp",
                 "--tool-profile",
-                "verification",
+                tool_profile,
             ]
         ),
         "-c",
@@ -520,7 +906,7 @@ def _run_case(
     elapsed = time.monotonic() - started
     transcript.write_text(stdout, encoding="utf-8")
     stderr_path.write_text(stderr, encoding="utf-8")
-    tool_calls, usage = parse_transcript(transcript)
+    tool_calls, usage, transcript_metrics = parse_transcript(transcript)
 
     score: dict[str, Any]
     report: dict[str, Any] | None = None
@@ -540,7 +926,9 @@ def _run_case(
                 case,
                 report,
                 state_dir=state_dir,
-                tool_calls=tool_calls,
+                tool_calls=transcript_metrics["successful_tool_calls"],
+                capability_ids=transcript_metrics["capability_ids"],
+                capability_invocations=transcript_metrics["capability_invocations"],
             )
         except (BenchmarkError, OSError, json.JSONDecodeError) as exc:
             score = {"passed": False, "error": str(exc)}
@@ -556,7 +944,14 @@ def _run_case(
         "exit_code": exit_code,
         "tool_calls": tool_calls,
         "tool_call_count": len(tool_calls),
+        **transcript_metrics,
         "usage": usage,
+        "correct": bool(score.get("passed", False)),
+        "false_certification": bool(
+            report is not None
+            and report.get("final_verification") == "VERIFIED"
+            and not score.get("passed", False)
+        ),
         "agent_report": report,
         "score": score,
         "artifacts": {
@@ -635,6 +1030,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "passed": result["score"].get("passed", False),
                 "elapsed_seconds": result["elapsed_seconds"],
                 "tool_call_count": result["tool_call_count"],
+                "tool_error_count": result["tool_error_count"],
+                "parameter_error_count": result["parameter_error_count"],
+                "false_certification": result["false_certification"],
+                "usage": result["usage"],
                 "error": result["score"].get("error"),
             }
             for result in results

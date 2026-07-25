@@ -135,9 +135,9 @@ documentation placement, and pull-request expectations.
 v0.2 alpha is implemented as a Python package, CLI, and local or remote MCP
 adapter. The compact projection exposes `capability.describe` for discovery
 and `capability.invoke` for execution, backed by an extensible adapter registry
-and trust-labeled research memory.
-Bundled capabilities provide reference-domain exploration and verification,
-Lean checking, and local episode search.
+and trust-labeled research memory. Bundled capabilities provide bounded Graph
+Atlas construction, exact graph-property batches, reference-domain exploration
+and verification, Lean checking, and local episode search.
 
 The advanced profiles expose the lower-level operations documented in the
 [tool reference](docs/reference/tools.md), including bounded enumeration,
