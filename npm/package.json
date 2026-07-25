@@ -1,7 +1,7 @@
 {
   "name": "jacobian",
   "version": "0.2.0-alpha.0",
-  "description": "Verifier-centric MCP toolbench for agents working on bounded, executable mathematics",
+  "description": "Composable mathematical capabilities for AI agents, exposed through MCP and a CLI",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,6 +13,9 @@
   },
   "bin": {
     "jacobian": "bin/jacobian.cjs"
+  },
+  "scripts": {
+    "test": "node --test npm-packaging.test.mjs"
   },
   "files": [
     "bin",

@@ -664,6 +664,7 @@ A v0.2 release requires:
 - every normative conformance test;
 - both structurally different reference plugins;
 - package installation and replay in a clean environment;
+- synchronized Python and npm versions with both packages built and tested;
 - no unresolved C0 failure or accepted flake;
 - a replayable artifact bundle for each reference result;
 - recorded checker identities and dependency versions;

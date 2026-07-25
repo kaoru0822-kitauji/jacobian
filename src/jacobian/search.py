@@ -9,7 +9,7 @@ import platform
 import sqlite3
 import threading
 import time
-import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -50,6 +50,7 @@ from jacobian.evaluation import (
     EvaluationService,
     require_complete_evaluation_batch,
 )
+from jacobian.experiment_runtime import new_experiment_uri, open_experiment_database
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import (
     PluginRegistry,
@@ -108,6 +109,7 @@ class SearchService:
         max_iterations: int = 10_000_000,
         max_wall_seconds: int = 86_400,
         max_batch_size: int = 256,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.store = store
         self.schemas = schemas
@@ -121,6 +123,7 @@ class SearchService:
         self.max_iterations = max_iterations
         self.max_wall_seconds = max_wall_seconds
         self.max_batch_size = max_batch_size
+        self._clock = clock
         self._threads: dict[str, threading.Thread] = {}
         self._thread_lock = threading.Lock()
         self.semantics_uri = store.register_descriptor(
@@ -156,10 +159,7 @@ class SearchService:
         self._initialize_database()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.store.db_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        return open_experiment_database(self.store.db_path)
 
     def _initialize_database(self) -> None:
         """Create metadata tables and isolate recovery one row at a time.
@@ -444,7 +444,7 @@ class SearchService:
         if resolved_snapshot_uris != {registry_snapshot_uri}:
             raise SearchError("resolved capabilities use different registry snapshots")
         environment_digest = _environment_digest()
-        experiment_uri = f"experiment://{uuid.uuid4().hex}"
+        experiment_uri = new_experiment_uri()
         now = _now()
         snapshot = SearchExperimentSnapshot(
             experiment_uri=experiment_uri,
@@ -568,6 +568,20 @@ class SearchService:
 
         with self._connect() as connection:
             return self._read_snapshot(connection, experiment_uri)
+
+    def contains(self, experiment_uri: str) -> bool:
+        """Return whether this service owns the experiment identity."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT 1
+                FROM search_experiments
+                WHERE experiment_uri = ?
+                """,
+                (experiment_uri,),
+            ).fetchone()
+        return row is not None
 
     def wait(
         self,
@@ -744,7 +758,7 @@ class SearchService:
             thread.start()
 
     def _run(self, experiment_uri: str) -> None:
-        started = time.monotonic()
+        started = self._clock()
         accounting = SearchAccounting()
         partial_accounting = accounting
         try:
@@ -759,7 +773,7 @@ class SearchService:
                     stop_reason=SearchStopReason.CANCELLED,
                     strategy_complete=False,
                     detail="search cancelled before execution",
-                    wall_time_ms=_used_wall_ms(accounting, started),
+                    wall_time_ms=_used_wall_ms(accounting, started, self._clock),
                 )
                 return
 
@@ -780,7 +794,7 @@ class SearchService:
             semantics = self.store.get(manifest.semantics_uri)
 
             while True:
-                total_wall_ms = _used_wall_ms(accounting, started)
+                total_wall_ms = _used_wall_ms(accounting, started, self._clock)
                 budget = snapshot.effective_budget
                 if total_wall_ms >= budget.wall_seconds * 1000:
                     self._finish(
@@ -867,7 +881,7 @@ class SearchService:
                         experiment_uri,
                         proposal_execution.status,
                         proposal_execution.detail or "proposer execution failed",
-                        wall_time_ms=_used_wall_ms(accounting, started),
+                        wall_time_ms=_used_wall_ms(accounting, started, self._clock),
                     )
                     return
                 proposal = PluginProposalResponse.model_validate(
@@ -922,6 +936,7 @@ class SearchService:
                         budget,
                         accounting,
                         started,
+                        self._clock,
                     )
                     evaluation = self.evaluation.evaluate_batch(
                         claim_uri=request.claim_uri,
@@ -965,6 +980,7 @@ class SearchService:
                                 budget,
                                 accounting,
                                 started,
+                                self._clock,
                             )
                             attacked += 1
                             partial_accounting = _updated_accounting(
@@ -996,6 +1012,7 @@ class SearchService:
                                     budget,
                                     accounting,
                                     started,
+                                    self._clock,
                                 )
                                 verified = self.verification.verify_witness(
                                     claim_uri=request.claim_uri,
@@ -1059,6 +1076,7 @@ class SearchService:
                     budget,
                     accounting,
                     started,
+                    self._clock,
                 )
                 refinement_execution = self.executor.run(
                     entrypoint=refiner.descriptor.entrypoint,
@@ -1091,7 +1109,7 @@ class SearchService:
                         experiment_uri,
                         refinement_execution.status,
                         refinement_execution.detail or "refiner execution failed",
-                        wall_time_ms=_used_wall_ms(accounting, started),
+                        wall_time_ms=_used_wall_ms(accounting, started, self._clock),
                         accounting_override=partial_accounting,
                     )
                     return
@@ -1111,7 +1129,7 @@ class SearchService:
                 nominated_uris.update(
                     nomination.candidate_uri for nomination in nominations
                 )
-                completed_wall_ms = _used_wall_ms(accounting, started)
+                completed_wall_ms = _used_wall_ms(accounting, started, self._clock)
                 next_accounting = SearchAccounting(
                     proposed_candidates=proposed,
                     unique_candidates=unique,
@@ -1172,7 +1190,13 @@ class SearchService:
                     summary="immutable search checkpoint",
                 )
                 persisted_accounting = next_accounting.model_copy(
-                    update={"wall_time_ms": _used_wall_ms(accounting, started)}
+                    update={
+                        "wall_time_ms": _used_wall_ms(
+                            accounting,
+                            started,
+                            self._clock,
+                        )
+                    }
                 )
                 partial_accounting = persisted_accounting
                 current = self.inspect(experiment_uri)
@@ -1189,7 +1213,7 @@ class SearchService:
                 snapshot = self.inspect(experiment_uri)
                 strategy_state = refinement.state
                 accounting = persisted_accounting
-                started = time.monotonic()
+                started = self._clock()
                 if control_state == ExperimentState.PAUSED:
                     return
                 if control_state == ExperimentState.CANCEL_REQUESTED:
@@ -1228,7 +1252,7 @@ class SearchService:
                 state=ExperimentState.TIMEOUT,
                 stop_reason=SearchStopReason.WALL_TIME_LIMIT,
                 detail=str(exc),
-                wall_time_ms=_used_wall_ms(accounting, started),
+                wall_time_ms=_used_wall_ms(accounting, started, self._clock),
                 accounting_override=partial_accounting,
             )
         except (
@@ -1245,7 +1269,7 @@ class SearchService:
                 state=ExperimentState.ERROR,
                 stop_reason=SearchStopReason.ERROR,
                 detail=detail,
-                wall_time_ms=_used_wall_ms(accounting, started),
+                wall_time_ms=_used_wall_ms(accounting, started, self._clock),
                 accounting_override=partial_accounting,
             )
         finally:
@@ -1968,8 +1992,9 @@ def _updated_accounting(
 def _used_wall_ms(
     accounting: SearchAccounting,
     started: float,
+    clock: Callable[[], float] = time.monotonic,
 ) -> int:
-    return accounting.wall_time_ms + math.ceil((time.monotonic() - started) * 1000)
+    return accounting.wall_time_ms + math.ceil((clock() - started) * 1000)
 
 
 def _is_verified_counterexample(result: ResultEnvelope) -> bool:
@@ -1983,8 +2008,9 @@ def _require_remaining_seconds(
     budget: SearchBudget,
     accounting: SearchAccounting,
     started: float,
+    clock: Callable[[], float] = time.monotonic,
 ) -> float:
-    remaining = budget.wall_seconds - _used_wall_ms(accounting, started) / 1000
+    remaining = budget.wall_seconds - _used_wall_ms(accounting, started, clock) / 1000
     if remaining < 1:
         raise _SearchBudgetExhaustedError("search wall-clock budget exhausted")
     return remaining

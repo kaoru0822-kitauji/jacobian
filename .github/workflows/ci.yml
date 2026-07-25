@@ -76,6 +76,21 @@ jobs:
           node-version: "20"
       - run: npx --yes jscpd@5.0.12 --config .jscpd.json .
 
+  npm-package:
+    name: npm Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm test
+        working-directory: npm
+      - run: npm pack --dry-run
+        working-directory: npm
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -121,17 +136,36 @@ jobs:
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 
+  publish-npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: needs.release-please.outputs.release_created == 'true'
+    needs: [release-please, npm-package]
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+      - run: npm test
+        working-directory: npm
+      - run: npm publish --access public
+        working-directory: npm
+
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.ref == 'refs/heads/main'
-    needs: [lint, test, duplicate-code, build]
+    needs: [lint, test, duplicate-code, npm-package, build]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
-        with:
-          release-type: python
-          package-name: jacobian-research-kernel

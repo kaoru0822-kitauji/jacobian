@@ -1,0 +1,155 @@
+"""Atomic transformation and specialized-domain capability registrations."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from jacobian.atomic_capability_builders import AdapterFactory, SchemaBuilder
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityMode,
+)
+from jacobian.contracts.conjectures import ParameterRegion
+from jacobian.contracts.polytope import PolytopeSeparateRequest, PolytopeSeparateResult
+from jacobian.contracts.results import ResultEnvelope
+from jacobian.contracts.transformations import (
+    TransformationApplyResult,
+    TransformationRelation,
+)
+
+if TYPE_CHECKING:
+    from jacobian.atomic_capabilities import AtomicServiceAdapter
+    from jacobian.kernel import JacobianKernel
+
+
+def build_domain_adapters(
+    kernel: JacobianKernel,
+    *,
+    adapter: AdapterFactory,
+    schema: SchemaBuilder,
+    artifact_uri: dict[str, Any],
+) -> tuple[AtomicServiceAdapter, ...]:
+    """Build transformation, polytope, and parameter-region adapters."""
+
+    return (
+        adapter(
+            capability_id="transform.apply",
+            title="Apply one representation transformation",
+            description=(
+                "Materialize a plugin-proposed transformation and its verification "
+                "obligation."
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=schema(
+                {
+                    "source_uri": artifact_uri,
+                    "plugin_id": artifact_uri,
+                    "target_schema_uri": artifact_uri,
+                    "target_semantics_uri": artifact_uri,
+                    "requested_relation": {
+                        "enum": [
+                            "EQUIVALENT",
+                            "OVER_APPROXIMATION",
+                            "UNDER_APPROXIMATION",
+                            "HEURISTIC",
+                        ]
+                    },
+                    "wall_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 86400,
+                    },
+                },
+                required=(
+                    "source_uri",
+                    "plugin_id",
+                    "target_schema_uri",
+                    "target_semantics_uri",
+                    "requested_relation",
+                    "wall_seconds",
+                ),
+            ),
+            output_schema=TransformationApplyResult.model_json_schema(),
+            invoke=lambda p: kernel.transformations.apply(
+                **{
+                    **p,
+                    "requested_relation": TransformationRelation(
+                        p["requested_relation"]
+                    ),
+                }
+            ),
+            unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
+            unverified_basis=(
+                "plugin transformation output remains an open verification obligation"
+            ),
+            tags=("transform",),
+        ),
+        adapter(
+            capability_id="transform.verify",
+            title="Verify one transformation",
+            description=(
+                "Replay one transformation relation with its compatible authorized "
+                "checker."
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=schema(
+                {"transformation_uri": artifact_uri},
+                required=("transformation_uri",),
+            ),
+            output_schema=ResultEnvelope.model_json_schema(),
+            invoke=lambda p: kernel.verification.verify_transformation(**p),
+            unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
+            unverified_basis=("the checker did not accept the transformation relation"),
+            tags=("transform", "verification"),
+        ),
+        adapter(
+            capability_id="polytope.separate",
+            title="Separate a rational point from a convex hull",
+            description=(
+                "Compute exact membership evidence or a separator; replay is separate."
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=schema(
+                {
+                    "point_uri": artifact_uri,
+                    "generator_set_uri": artifact_uri,
+                    "projection": {
+                        "type": "array",
+                        "items": {"type": "integer", "minimum": 0},
+                        "minItems": 1,
+                        "maxItems": 256,
+                        "uniqueItems": True,
+                    },
+                    "wall_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 86400,
+                    },
+                },
+                required=("point_uri", "generator_set_uri"),
+            ),
+            output_schema=PolytopeSeparateResult.model_json_schema(),
+            invoke=lambda p: kernel.polytope.separate(PolytopeSeparateRequest(**p)),
+            tags=("polytope", "exact"),
+        ),
+        adapter(
+            capability_id="parameter.region.promote",
+            title="Promote one verified parameter region",
+            description=(
+                "Replay a record bound to an immutable region before marking it "
+                "verified."
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=schema(
+                {
+                    "subject_uri": artifact_uri,
+                    "verification_record_uri": artifact_uri,
+                },
+                required=("subject_uri", "verification_record_uri"),
+            ),
+            output_schema=ParameterRegion.model_json_schema(),
+            invoke=lambda p: kernel.conjectures.promote_parameter_region(**p),
+            read_only=True,
+            tags=("parameter", "verification"),
+        ),
+    )

@@ -203,4 +203,5 @@ v0.2 is conformant only when:
    bounded-enumeration operations through `capability.invoke`;
 3. one transformation and one exact separator replay to `VERIFIED`;
 4. cancellation and reached limits remain inspectable and unverified;
-5. the CLI, MCP adapter, and built wheel expose the same release version.
+5. the CLI, MCP adapter, built wheel, and npm launcher expose equivalent
+   release versions.

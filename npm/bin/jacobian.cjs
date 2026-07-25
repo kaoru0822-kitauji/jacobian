@@ -16,7 +16,7 @@ const { stderr } = require("node:process");
  * Everything else is forwarded to the Python `jacobian` CLI.
  */
 
-const HELP = `Jacobian — verifier-centric MCP toolbench for bounded executable mathematics
+const HELP = `Jacobian — composable mathematical capabilities for AI agents
 
 Usage:
   jacobian setup [--client <id>...] [--all] [--yes] [--dry-run] [--json]

@@ -300,8 +300,7 @@ def create_server(
     ) -> str:
         active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
-            _inspect_experiment,
-            active_kernel,
+            active_kernel.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         return json.dumps(
@@ -321,8 +320,7 @@ def create_server(
     ) -> str:
         active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
-            _inspect_experiment,
-            active_kernel,
+            active_kernel.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         coverage = getattr(snapshot, "coverage", None)
@@ -354,8 +352,7 @@ def create_server(
     ) -> str:
         active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
-            _inspect_experiment,
-            active_kernel,
+            active_kernel.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         return await asyncio.to_thread(
@@ -375,8 +372,7 @@ def create_server(
     ) -> str:
         active_kernel = _resource_kernel(kernel, tenant_router)
         snapshot = await asyncio.to_thread(
-            _inspect_experiment,
-            active_kernel,
+            active_kernel.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         if snapshot.archive_uri is None:
@@ -404,18 +400,6 @@ def create_server(
         )
 
     return server
-
-
-def _inspect_experiment(
-    kernel: JacobianKernel,
-    experiment_uri: str,
-) -> Any:
-    from jacobian.experiments import ExperimentNotFoundError
-
-    try:
-        return kernel.experiments.inspect(experiment_uri)
-    except ExperimentNotFoundError:
-        return kernel.search.inspect(experiment_uri)
 
 
 def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
