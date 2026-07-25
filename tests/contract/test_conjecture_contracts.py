@@ -47,7 +47,7 @@ def test_repair_requires_verified_source_lineage() -> None:
 def test_falsification_plan_requires_complete_checker_policy() -> None:
     with pytest.raises(
         ValidationError,
-        match="witness role and counterexample checker must be configured together",
+        match="Set both witness_role and counterexample_checker_id, or omit both",
     ):
         FalsificationPlan(
             witness_role="REFUTES_CLAIM",
@@ -58,7 +58,7 @@ def test_falsification_plan_requires_complete_checker_policy() -> None:
 def test_falsification_plan_rejects_supporting_witness_roles() -> None:
     with pytest.raises(
         ValidationError,
-        match="falsification requires a defeating or refuting witness",
+        match="requires witness_role DEFEATS_CANDIDATE or REFUTES_CLAIM",
     ):
         FalsificationPlan(
             witness_role="SUPPORTS_CLAIM",

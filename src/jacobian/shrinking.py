@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from fractions import Fraction
 from typing import Any
@@ -37,6 +38,8 @@ from jacobian.registry import CheckerRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ShrinkService:
@@ -79,19 +82,28 @@ class ShrinkService:
             return self._rejected(
                 kind=kind,
                 target_uri=target_uri,
-                detail="evaluation budget must be positive",
+                detail=(
+                    "The shrinking evaluation budget must be at least 1. Increase "
+                    "evaluation_budget, then retry."
+                ),
             )
         if not requested_reducers:
             return self._rejected(
                 kind=kind,
                 target_uri=target_uri,
-                detail="at least one reducer must be requested",
+                detail=(
+                    "No reducer was requested. Choose at least one reducer from the "
+                    "reference contract, then retry."
+                ),
             )
         if not requested_objectives:
             return self._rejected(
                 kind=kind,
                 target_uri=target_uri,
-                detail="at least one ordered objective must be requested",
+                detail=(
+                    "No shrinking objective was requested. Provide at least one "
+                    "ordered objective from the reference contract, then retry."
+                ),
             )
         validation = self.claims.validate(
             claim_uri=claim_uri,
@@ -141,7 +153,7 @@ class ShrinkService:
             return self._rejected(
                 kind=kind,
                 target_uri=target_uri,
-                detail=str(exc),
+                detail=_shrink_failure_detail(exc),
             )
 
         current = initial
@@ -193,13 +205,21 @@ class ShrinkService:
                     )
                 current_objectives = dict(response.current_objectives)
             except ValidationError as exc:
+                _LOGGER.warning("reducer returned an invalid response", exc_info=exc)
                 operational_failure = (
                     ExecutionStatus.ERROR,
-                    f"reducer returned an invalid response: {exc}",
+                    (
+                        "The reducer returned an invalid response. Check the "
+                        "reference contract and inspect the local plugin log."
+                    ),
                 )
                 break
             except ValueError as exc:
-                operational_failure = (ExecutionStatus.ERROR, str(exc))
+                _LOGGER.warning("reducer objective validation failed", exc_info=exc)
+                operational_failure = (
+                    ExecutionStatus.ERROR,
+                    _shrink_failure_detail(exc),
+                )
                 break
             if not response.reductions:
                 break
@@ -289,7 +309,7 @@ class ShrinkService:
                             from_uri=current.artifact_uri,
                             accepted=False,
                             objectives=proposal.objectives,
-                            detail=str(exc),
+                            detail=_shrink_failure_detail(exc),
                         )
                     )
             if accepted_in_round:
@@ -380,6 +400,26 @@ class ShrinkService:
             evaluations=0,
             objectives={},
         )
+
+
+def _shrink_failure_detail(exc: Exception) -> str:
+    if isinstance(exc, (ValueError, CheckerRegistryError)):
+        return str(exc)
+    _LOGGER.warning("shrinking step failed", exc_info=exc)
+    if isinstance(exc, StoreError):
+        return (
+            "A required shrinking artifact is unavailable. Check the artifact URIs "
+            "and state directory, then retry."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The reducer plugin is unavailable. Call capability.describe, choose an "
+            "installed reference domain, and retry."
+        )
+    return (
+        "The reduction does not match the target schema. Check the reference "
+        "contract and retry with a valid reduction."
+    )
 
 
 def _unverified_result(

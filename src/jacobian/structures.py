@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 
 from pydantic import ValidationError
@@ -30,6 +31,8 @@ from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class StructureService:
@@ -62,17 +65,24 @@ class StructureService:
                 structure_uri,
                 started,
                 InputStatus.REJECTED,
-                "wall_seconds must be positive",
+                (
+                    "The canonicalization time budget must be at least 1 second. "
+                    "Set wall_seconds to 1 or more, then retry."
+                ),
             )
         try:
             structure = self.store.get(structure_uri)
             manifest = self.plugins.get(plugin_id)
             if structure.manifest.schema_uri != manifest.candidate_schema_uri:
                 raise ValueError(
-                    "structure schema does not match plugin candidate schema"
+                    "The structure uses the wrong schema for this plugin. Use a "
+                    "structure from the same reference domain, then retry."
                 )
             if structure.manifest.semantics_uri != manifest.semantics_uri:
-                raise ValueError("structure semantics do not match plugin semantics")
+                raise ValueError(
+                    "The structure and plugin use different semantics. Choose the "
+                    "plugin from the structure's reference domain, then retry."
+                )
             self.schemas.validate(
                 structure.manifest.schema_uri,
                 structure.payload,
@@ -158,7 +168,7 @@ class StructureService:
                 structure_uri,
                 started,
                 InputStatus.REJECTED,
-                str(exc),
+                _structure_failure_detail(exc),
             )
 
     @staticmethod
@@ -214,3 +224,25 @@ class StructureService:
                 ),
             ),
         )
+
+
+def _structure_failure_detail(exc: Exception) -> str:
+    if isinstance(exc, ValueError) and not isinstance(
+        exc,
+        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+    ):
+        return str(exc)
+    _LOGGER.warning("structure canonicalization failed", exc_info=exc)
+    if isinstance(exc, StoreError):
+        return (
+            "The structure artifact is unavailable. Check its artifact URI, then retry."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The canonicalizer plugin is unavailable. Call capability.describe, "
+            "choose an installed reference domain, and retry."
+        )
+    return (
+        "The structure or canonicalizer response is invalid. Check the reference "
+        "contract and retry."
+    )

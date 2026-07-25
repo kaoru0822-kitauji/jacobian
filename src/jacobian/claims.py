@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from jacobian.contracts.claims import (
     ClaimSpec,
     ClaimValidationResult,
@@ -16,6 +18,8 @@ from jacobian.contracts.results import (
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ClaimValidationService:
@@ -85,7 +89,22 @@ class ClaimValidationService:
             PluginRegistryError,
             ValueError,
         ) as exc:
-            errors.append(str(exc))
+            _LOGGER.warning("claim validation failed", exc_info=exc)
+            if isinstance(exc, StoreError):
+                errors.append(
+                    "The claim or its semantics artifact is unavailable. Check the "
+                    "artifact URI, then retry."
+                )
+            elif isinstance(exc, PluginRegistryError):
+                errors.append(
+                    "The selected plugin is unavailable. Call capability.describe, "
+                    "choose an installed reference domain, and retry."
+                )
+            else:
+                errors.append(
+                    "The claim does not match the selected reference contract. "
+                    "Recreate it from that contract, then retry."
+                )
 
         missing = tuple(
             sorted(
@@ -95,8 +114,10 @@ class ClaimValidationService:
         )
         if missing:
             errors.append(
-                "missing required capabilities: "
+                "The selected plugin is missing required capabilities: "
                 + ", ".join(item.value for item in missing)
+                + ". Call capability.describe and choose a plugin that advertises "
+                "all required capabilities."
             )
         valid = not errors
         return ClaimValidationResult(

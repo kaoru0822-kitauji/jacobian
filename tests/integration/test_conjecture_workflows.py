@@ -257,7 +257,7 @@ def test_repair_replays_the_exact_verification_record(
     )
 
     assert result.input.status.value == "REJECTED"
-    assert "did not replay with its authorized checker" in result.detail
+    assert "Re-run verification with an active checker" in result.detail
 
 
 def test_generation_deduplicates_claims_and_reports_unknown_novelty(
@@ -485,7 +485,7 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
     assert substituted_subject.artifact_uri != subject_artifact.artifact_uri
     with pytest.raises(
         ConjectureError,
-        match="does not bind the supplied subject artifact",
+        match="does not cover this parameter region",
     ):
         kernel.conjectures.promote_parameter_region(
             subject_uri=substituted_subject.artifact_uri,
@@ -498,7 +498,7 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
     )
     with pytest.raises(
         ConjectureError,
-        match="did not replay with its authorized checker",
+        match="Re-run verification with an active checker",
     ):
         kernel.conjectures.promote_parameter_region(
             subject_uri=subject_artifact.artifact_uri,
@@ -542,7 +542,8 @@ def test_hypothesis_plugin_cannot_promote_parameter_region(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.verification is Verification.UNVERIFIED
     assert result.hypotheses == ()
-    assert "cannot promote parameter-region evidence" in result.detail
+    assert "Plugin output must remain unverified" in result.detail
+    assert "remove the promoted evidence field" in result.detail
 
 
 @pytest.mark.subprocess
@@ -569,4 +570,5 @@ def test_hypothesis_plugin_cannot_cite_unbound_region_samples(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.verification is Verification.UNVERIFIED
     assert result.hypotheses == ()
-    assert "must be supplied as workflow evidence" in result.detail
+    assert "not supplied as workflow evidence" in result.detail
+    assert "evidence_uris" in result.detail

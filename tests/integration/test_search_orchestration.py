@@ -376,7 +376,10 @@ def test_idempotency_key_cannot_be_rebound(tmp_path: Path) -> None:
 
     with pytest.raises(
         SearchError,
-        match="idempotency key is already bound to a different request",
+        match=(
+            r"This idempotency key is already bound to a different request\. "
+            r"Reuse the original request or choose a new idempotency key\."
+        ),
     ):
         kernel.search.start(
             first.model_copy(
@@ -656,6 +659,12 @@ def test_proposer_timeout_fails_closed(tmp_path: Path) -> None:
         )
     )
 
+    with pytest.raises(
+        TimeoutError,
+        match="Inspect the experiment or wait again with a larger timeout",
+    ):
+        kernel.search.wait(handle.experiment_uri, timeout_seconds=0)
+
     snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=10)
 
     assert snapshot.state is ExperimentState.TIMEOUT
@@ -689,7 +698,9 @@ def test_malformed_proposal_fails_without_evidence_promotion(
 
     assert snapshot.state is ExperimentState.ERROR
     assert snapshot.verification.value == "UNVERIFIED"
-    assert "proposer must return candidates" in snapshot.detail
+    assert "artifact or plugin response was invalid" in snapshot.detail
+    assert "reference contract" in snapshot.detail
+    assert "input_value" not in snapshot.detail
     assert snapshot.archive_page_uris == ()
 
 
@@ -728,12 +739,15 @@ def test_partial_iteration_accounting_survives_malformed_candidate(
     [
         (
             "tests.fixtures.plugin_functions:propose_declared_failure",
-            "declared fixture failure",
+            (
+                "The plugin stopped before returning a result. Retry once; "
+                "if it happens again, inspect the local plugin log."
+            ),
             "declared",
         ),
         (
             "tests.fixtures.plugin_functions:propose_large_search_output",
-            "plugin output exceeds the configured limit",
+            "The plugin returned too much data. Retry with a smaller request.",
             "output",
         ),
     ],
@@ -771,6 +785,7 @@ def test_search_plugin_failures_remain_operational(
 def test_terminal_archive_failure_marks_search_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
@@ -793,7 +808,11 @@ def test_terminal_archive_failure_marks_search_error(
     assert snapshot.state is ExperimentState.ERROR
     assert snapshot.stop_reason is SearchStopReason.ERROR
     assert snapshot.archive_uri is None
-    assert "terminal archive persistence failed" in snapshot.detail
+    assert "could not save the final experiment archive" in snapshot.detail
+    assert "experiment remains unverified" in snapshot.detail
+    assert "StoreError" not in snapshot.detail
+    assert "fixture archive failure" not in snapshot.detail
+    assert "fixture archive failure" in caplog.text
 
 
 @pytest.mark.integration
@@ -892,7 +911,8 @@ def test_refiner_cannot_claim_verification(tmp_path: Path) -> None:
 
     assert snapshot.state is ExperimentState.ERROR
     assert snapshot.verification.value == "UNVERIFIED"
-    assert "Extra inputs are not permitted" in snapshot.detail
+    assert "artifact or plugin response was invalid" in snapshot.detail
+    assert "verification" not in snapshot.detail
     assert snapshot.archive_page_uris == ()
 
 

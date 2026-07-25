@@ -71,14 +71,16 @@ class SearchRunRequest(ContractModel):
         canonicalize_json(self.initial_state)
         if (self.witness_role is None) != (self.counterexample_checker_id is None):
             raise ValueError(
-                "witness role and counterexample checker must be configured together"
+                "Set both witness_role and counterexample_checker_id, or omit both. "
+                "Use the reference contract to choose the checker."
             )
         if self.witness_role is not None and self.witness_role not in {
             WitnessRole.DEFEATS_CANDIDATE,
             WitnessRole.REFUTES_CLAIM,
         }:
             raise ValueError(
-                "search counterexample feedback requires a defeating or refuting witness"
+                "Search counterexample feedback requires witness_role "
+                "DEFEATS_CANDIDATE or REFUTES_CLAIM."
             )
         return self
 
