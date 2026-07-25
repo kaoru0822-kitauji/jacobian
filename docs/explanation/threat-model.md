@@ -2,17 +2,26 @@
 
 [Documentation home](../index.md)
 
-- Status: Current for v0.2 and provisional capability, M3, and M4 code
+- Status: Current
 - Host boundary: Operator-installed code is trusted not to attack the machine
-- Related records: [Architecture](architecture.md) and
-  [v0.2 conformance gate](../reference/conformance-v0.2.md)
+- Related record: [Architecture](architecture.md)
 
 ## Scope
 
-This document covers the v0.2 release contract and provisional capability,
-M3, and M4 code in the repository. Later behavior is not part of v0.2
-conformance, but it must preserve the same mathematical and artifact-integrity
-boundaries.
+This document covers Jacobian's capability surface, local and remote hosts,
+artifact store, domain plugins, and independent checkers. Every installed
+capability and future adapter must preserve these mathematical and
+artifact-integrity boundaries.
+
+The kernel owns trust and execution policy — artifact identity, execution
+status, assurance, checker authorization, budgets, and provenance — not
+mathematical strategy. Namespaced capability adapters expose a broad portfolio
+of operations; domain plugins own mathematical semantics; agents compose
+operations into research strategies. The independent checker boundary is
+unchanged across these layers: search, generation, evaluation, and
+transformation output never self-certifies, and `VERIFIED` requires an
+operator-authorized checker independent of the proposing, searching, or
+evaluating implementation.
 
 The implemented code accepts pure data plus operator-installed local plugins
 and checkers.
@@ -61,7 +70,7 @@ Controls:
 - checker authorization is outside plugin manifests;
 - evidence binds claim, semantics, candidate, and scope;
 - installation snapshots bind every regular file in the plugin package,
-  capability contracts, runtime/build identity, and platform compatibility;
+  capability contracts, runtime/build identity, and platform identity;
   discovery measures packages without importing them, and workers reject
   bytecode-only or compiled package modules;
 - plugin workers have bounded process/output lifetime for operational
@@ -107,8 +116,9 @@ Controls:
 
 - explicit digest bindings in evidence;
 - checker-side binding validation before mathematical replay;
-- conjecture repair and generalization replay the cited verification record
-  with its authorized checker and require the reproduced record identity;
+- any capability or workflow that relies on a verified result replays the cited
+  verification record with its authorized checker and requires the reproduced
+  record identity;
 - parameter-region promotion requires the exact subject and declared claim
   artifact URIs in the verification record's parents; equal object digests in
   different artifact carriers are insufficient;
@@ -156,7 +166,7 @@ Controls:
 
 - execution status is orthogonal to conclusion;
 - incomplete writes use staging paths and atomic commit;
-- idempotency keys select one durable search invocation, append-only event
+- idempotency keys select one durable capability invocation, append-only event
   chains preserve retries and runtime identity, and interrupted invocations
   recover from immutable checkpoints;
 - recovery validates a snapshot against its database key and indexed state;
@@ -264,15 +274,14 @@ expected ranking policy, or attempt to relabel evidence. Provider responses
 therefore carry source, corpus, temporal-cutoff, review, retraction, and
 verification metadata; Jacobian independently resolves local artifacts and
 verification records. The provider cannot authorize checkers or write verified
-results, and its absence must not disable the core search, conjecture, or
-verification tools.
+results, and its absence must not disable local capability discovery,
+invocation, artifact access, or verification replay.
 
-## Out of scope for v0.2
+## Out of scope
 
 - Hostile executable plugin code
 - Kernel or hypervisor compromise
 - Side-channel resistance
-- v0.2 conformance for multi-tenant authorization
 - Hosted OAuth/OIDC lifecycle and remote signing infrastructure
 - Distributed worker leases or multiple active Jacobian coordinators sharing a
   state directory

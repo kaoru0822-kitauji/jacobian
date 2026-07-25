@@ -2,23 +2,26 @@
 
 [Documentation home](../index.md)
 
-- Status: Provisional M3 implementation
-- Python API: `jacobian.plugin_conformance`
+- Status: Capability-package conformance requirements
 
 The conformance kit tests whether an independently installed package crosses
-Jacobian's registry, execution, search, and conjecture boundaries without core
+Jacobian's registry, execution, artifact, and assurance boundaries without core
 or MCP changes. It is an executable extension gate, not a second unit-test
-framework.
+framework. A conforming package exposes namespaced capability IDs through the
+installed catalog; agents inspect them with `capability.describe` and execute
+them with `capability.invoke`.
 
 ## Scope
 
 The kit proves that:
 
 - discovery and capability resolution use the sealed installed package;
-- declared capabilities can complete one ordinary strategy search;
+- every declared capability has a valid descriptor and schema-valid successful
+  invocation case;
 - failure, malformed output, and timeout remain operational states;
 - traversal, symlink, and changed-byte attacks fail closed;
-- an untrusted hypothesis transformer cannot promote evidence.
+- an untrusted proposing, transforming, searching, or evaluating capability
+  cannot promote evidence.
 
 It does not prove that the plugin's mathematics is correct, that its search is
 complete, or that installed code is safe for the host. Those properties require
@@ -30,9 +33,12 @@ Fault injection belongs in a separate conformance-only package installed into
 isolated test state. Do not expose the conformance selector from a production
 plugin.
 
-The synthetic package declares ordinary `Proposer`, `Refiner`, `Evaluator`, and
-`HypothesisTransformer` capabilities. Its proposer reads
-`state["conformance_case"]` only inside this disposable package:
+The synthetic package declares ordinary internal `Proposer`, `Refiner`,
+`Evaluator`, and `HypothesisTransformer` implementations. A fixture-owned
+adapter exposes coherent test operations through namespaced capability IDs; it
+does not expose each backend role as a separate agent-facing tool. Fault
+selection remains private to this disposable package and is passed through the
+invocation payload:
 
 | Value | Required behavior |
 | --- | --- |
@@ -43,62 +49,43 @@ The synthetic package declares ordinary `Proposer`, `Refiner`, `Evaluator`, and
 
 The refiner and evaluator return valid ordinary contract responses. The
 hypothesis transformer attempts a verified parameter-region label so the
-workflow can demonstrate fail-closed rejection.
+invocation can demonstrate fail-closed rejection.
 
 ## Runner inputs
 
-`SyntheticPluginConformanceTarget` requires:
+The conformance runner requires:
 
 - an isolated `JacobianKernel`;
 - the installed synthetic plugin artifact URI;
-- a valid base `SearchRunRequest`;
+- the expected capability IDs and their successful invocation payloads;
+- fault-injection payloads for declared failure, malformed output, and timeout;
 - the package implementation file to modify and restore;
 - a disposable in-package symlink path and an outside target;
 - optionally, an import marker written by the package's `__init__.py`.
 
-The current interface is a Python operator/test API:
-
-```python
-from jacobian.plugin_conformance import (
-    SyntheticPluginConformanceTarget,
-    require_plugin_conformance,
-)
-
-target = SyntheticPluginConformanceTarget(
-    kernel=kernel,
-    plugin_id=plugin_id,
-    search_request=request,
-    implementation_file=package / "entry.py",
-    symlink_path=package / "escape.py",
-    symlink_target=outside_file,
-    import_marker=import_marker,
-)
-
-observations = require_plugin_conformance(target)
-```
-
-The runner executes all checks and raises one `PluginConformanceError`
-containing every failure. `run_plugin_conformance` returns the observations
-without raising.
+For each expected ID, the runner reads the installed descriptor before
+invocation. It rejects a missing descriptor, an invalid schema, an invocation
+that bypasses the capability registry, or a result that violates the common
+execution and assurance contract.
 
 ## Standard matrix
 
 | Check | Boundary exercised | Passing result |
 | --- | --- | --- |
-| Execution success | Registry resolution and `SearchService` | Strategy completion with no verification promotion |
-| Declared failure | Worker and search lifecycle | `ERROR` with the declared detail |
-| Malformed output | Worker JSON boundary | `ERROR`; response is not accepted as a proposal |
+| Discovery | Installed catalog and `capability.describe` | Exact descriptor for each declared namespaced capability ID |
+| Execution success | Registry resolution and `capability.invoke` | Schema-valid result with no verification promotion |
+| Declared failure | Capability worker lifecycle | `ERROR` with the declared detail |
+| Malformed output | Capability worker JSON boundary | `ERROR`; response is not accepted as mathematical evidence |
 | Timeout | Worker and durable budget | `TIMEOUT` with wall-limit stop reason |
 | Path attack | Implementation registration | Traversal is rejected |
 | Symlink attack | Whole-package measurement | Package symlink is rejected |
 | Changed bytes | Capability resolution | Installed snapshot refuses changed source |
-| Evidence promotion | `ConjectureService` | `ERROR`, no hypotheses, `UNVERIFIED` |
+| Evidence promotion | Assurance boundary | Rejected result, no verification record, and `UNVERIFIED` assurance |
 
-Each suite execution creates a fresh idempotency namespace. Repeated runs
-therefore execute proposer, evaluator, and refiner code again instead of
-returning earlier durable search results. The runner removes only the supplied
-disposable import marker and symlink, and restores the implementation file
-after the changed-byte check.
+Each suite execution uses isolated state so repeated runs execute the installed
+capabilities again instead of returning earlier durable results. The runner
+removes only the supplied disposable import marker and symlink, and restores
+the implementation file after the changed-byte check.
 
 ## Discovery without import
 
@@ -113,6 +100,5 @@ resolution.
 ## Related decisions
 
 - [Sealed package ADR](../explanation/adr/0002-sealed-plugin-packages.md)
-- [Milestone 3 specification](milestones/m3-scalable-search.md)
 - [Testing strategy](testing-strategy.md)
 - [Threat model](../explanation/threat-model.md)

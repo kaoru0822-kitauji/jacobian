@@ -2,7 +2,7 @@
 
 [Documentation home](../../index.md) · [Decision log](index.md)
 
-- Status: Accepted for the provisional M4 implementation
+- Status: Accepted
 - Date: 2026-07-24
 
 ## Decision

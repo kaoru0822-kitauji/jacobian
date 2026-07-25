@@ -2,71 +2,94 @@
 
 ## Product Model
 
-Jacobian provides composable mathematical tools for AI agents investigating
-conjectures and other mathematically specified problems. Agents use these tools
-to search for counterexamples, construct and compare mathematical objects,
-compute invariants, decompose proof goals, retrieve premises, develop candidate
-proofs, and replay certificates.
+Jacobian is an MCP server, CLI, and Python library that exposes a toolbox of
+composable mathematical capabilities to AI agents. Its purpose is to help
+agents and human researchers make trustworthy progress on conjectures and
+other problems that benefit from executable search and checkable evidence.
 
-Each mathematical tool performs one observable construction, transformation,
-computation, retrieval, search, or verification operation over typed artifacts.
-It reports its explicit scope and completeness, execution status, assurance,
-and provenance. A capability that proposes, generates, or searches for evidence
-cannot promote its own result; verification requires an operator-authorized
-checker independent of the proposing or search implementation.
+The product follows five design principles:
 
-Existing mathematical software and domain plugins supply mathematical
-operations; capability adapters expose them through a common contract. Jacobian
-provides the composition, artifact, execution, and assurance layer.
+- broad portfolio of mathematical capabilities;
+- mathematically atomic, agent-visible outcomes;
+- agent-owned composition and research strategy;
+- optional workflows with inspectable intermediate artifacts;
+- independent verification of exact claims and evidence.
 
-Jacobian's long-term goal is to help agents and human researchers make genuine,
-trustworthy progress on open conjectures and other problems that benefit from
-executable search and checkable evidence.
+Each capability provides one clear mathematical operation, such as retrieving
+premises, constructing an object, computing an invariant, transforming a
+claim, searching for a witness, or checking a certificate. It returns typed
+results and, where materialized, durable artifacts with explicit execution
+status, provenance, scope, completeness, exactness, and assurance. Descriptors
+and results must distinguish exact from approximate, bounded from exhaustive,
+and deterministic from heuristic behavior. They must also state completion,
+certificate availability, and any checker required for promotion. Search,
+generation, and computation produce evidence; they do not verify their own
+conclusions.
 
-These operation names are descriptive capability families, not a closed
-taxonomy, required interface, or shared mathematical ontology. Do not introduce
-a universal operation enum, generic mathematical object schema, one capability
-for every mathematical verb, or one-to-one wrappers for every backend API.
-Design a small set of distinct, namespaced agent-facing capabilities around
-realistic mathematical workflows. Prefer specific capability IDs and
-domain-owned contracts, such as `graph.enumerate.nonisomorphic` or
+Agents compose capabilities into higher-level strategies, much as
+mathematicians combine definitions, examples, computations, constructions,
+lemmas, transformations, and proof techniques. Agents may discover, combine,
+repeat, compare, or abandon capabilities. Jacobian supplies mathematical
+operations and trust boundaries; it does not prescribe a proof workflow.
+Better models should be able to use the same portfolio more effectively
+without kernel changes.
+
+Prefer capabilities with one observable mathematical outcome. Do not hide
+useful intermediate objects, computations, failures, relationships, or proof
+obligations inside opaque workflow tools. Agent-visible mathematical atomicity
+matters; backend-call atomicity does not. A capability may coordinate several
+backend operations when they jointly produce one coherent outcome.
+
+Higher-level workflows belong in agent strategies and reusable skills. A
+workflow exposed as a capability must preserve its intermediate artifacts,
+relationships, obligations, scope, assurance, and independent verification
+boundaries.
+
+Installed capabilities are currently exposed through
+`capability://catalog`; agents inspect exact contracts with
+`capability.describe` and execute them with `capability.invoke`. As the
+portfolio grows, discovery should return compact summaries first and add
+catalog search and ranking instead of injecting every installed schema into
+the agent's initial context. Prefer a namespaced capability ID over a new
+top-level MCP tool.
+
+Capability availability, recommendation, compatibility, and verification
+authority are separate:
+
+- Available capabilities may be discovered and invoked.
+- Recommendations are evidence-based routing hints, not access restrictions.
+- Experimental capabilities may use version-breaking contracts.
+- Compatibility applies only to explicitly supported contract versions.
+- `VERIFIED` requires an operator-authorized checker independent of the
+  proposing, searching, or evaluating implementation.
+
+Use held-out evaluations and real transcripts to improve discovery, examples,
+ranking, defaults, consolidation, and retirement. Evaluate complete portfolios
+and ablations as well as individual capabilities. Let agents choose tools when
+measuring autonomous composition; prescribed-tool cases test contract usability
+and conformance, not portfolio value.
+
+Capability names are descriptive, not a closed taxonomy, universal operation
+enum, or shared mathematical ontology. Do not create a generic mathematical
+object schema, one capability for every mathematical verb, or mechanical
+wrappers for every backend function. Prefer specific IDs and domain-owned
+contracts, such as `graph.enumerate.nonisomorphic` or
 `polynomial.compute.groebner_basis`.
 
-An agent-facing capability may coordinate multiple backend operations when
-they produce one coherent mathematical outcome. It must still preserve the
-intermediate artifacts, relationships, obligations, scope, assurance, and
-independent verification boundaries. Add, split, or consolidate capabilities
-using held-out agent evaluations rather than API completeness or taxonomic
-symmetry; measure correctness, false certification, tool errors, tool calls,
-latency, and context use.
-
-Before implementing a mathematical algorithm or abstraction, check whether a
-maintained proof assistant, CAS, solver, optimization system, mathematical
-database, or domain library already provides it. Prefer a thin, version-pinned
-capability adapter over reimplementation. Examples include Lean/mathlib,
-SageMath, GAP, OSCAR, SymPy, SAT/SMT solvers, and specialized domain systems.
-Thin means delegating mathematics while preserving clear contracts and trust
-boundaries, not mechanically exposing every backend function.
-
-Capability descriptors and results must make relevant semantic limits
-explicit, including exact versus approximate computation, bounded versus
-exhaustive scope, deterministic versus heuristic behavior, completion status,
-certificate availability, and the checker required for promotion. A successful
-computation, evaluator, or solver invocation remains unverified unless an
-authorized independent checker accepts appropriately bound evidence.
-
-Proof strategies and research agents compose tools into workflows.
-External SAT, SMT, CAS, optimization, retrieval, and proof systems connect
-through capability adapters. Prefer a capability ID behind
-`capability.describe` and `capability.invoke` over a new top-level MCP tool.
+Before implementing mathematics, check whether a maintained proof assistant,
+CAS, solver, optimization system, mathematical database, or domain library
+already provides it. Prefer thin adapters over reimplementation. Pin backend
+versions wherever reproducibility, certificates, or verification depend on
+their behavior. Examples include Lean/mathlib, SageMath, GAP, OSCAR, SymPy,
+SAT/SMT solvers, and specialized domain systems.
 
 The kernel owns artifact identity, execution status, assurance, checker
-authorization, budgets, and provenance. Capability adapters own external
-integrations. Domain plugins own mathematical schemas, transformations,
-invariants, witness meanings, and required checker roles. Independent checker
-packages implement replay; operators authorize them. Agent workflows and
-skills own multi-step exploration policies. Worked cases belong in reference
-scenarios and benchmarks.
+authorization, budgets, and provenance. It governs trust and execution policy,
+not mathematical strategy. Capability adapters own external integrations.
+Domain plugins own mathematical schemas, transformations, invariants, witness
+meanings, and required checker roles. Independent checker packages implement
+replay; operators authorize them. Agent workflows and skills own multi-step
+exploration. Worked cases belong in reference scenarios and benchmarks.
 
 ## Fail-Closed Verification Rules
 
@@ -87,30 +110,30 @@ scenarios and benchmarks.
 
 ## Project Structure & Module Organization
 
-Jacobian v0.2 alpha is the current cumulative implementation under
-`src/jacobian/`, with independent replay code under
-`src/jacobian_checkers/` and behavioral tests under `tests/`. It is the only
-current release contract; earlier development milestones survive only as
-ordinary regression coverage. The public API and artifact formats remain
-pre-stable.
-`README.md` provides the project overview, while `docs/index.md` is the
-documentation home. Design material lives in `docs/`:
+Jacobian is pre-stable. Release specifications describe supported snapshots;
+they do not prescribe the order in which mathematical capabilities are
+researched or exposed.
 
+- `src/jacobian/` contains the kernel, contracts, adapters, and domain code.
+- `src/jacobian_checkers/` contains independent replay code.
+- `tests/` contains behavioral and conformance tests.
+- `README.md` provides the project overview.
+- `docs/index.md` is the documentation home.
 - `docs/tutorials/` contains guided learning paths.
 - `docs/how-to/` contains task-oriented operating guides.
 - `docs/reference/` contains tools, conformance requirements, specifications,
-  milestone contracts, benchmarks, and testing protocols.
-- `docs/explanation/` contains architecture, threats, the roadmap, runtime
+  benchmarks, and testing protocols.
+- `docs/explanation/` contains architecture, threats, product goals, runtime
   design, and numbered ADRs.
 - `docs/contributing/` contains maintainer-facing planning material.
 
-Keep `deep_review.md` local; it is intentionally ignored as design source
-material.
+Keep `deep_review.md` local. It is intentionally ignored and is not design
+source material.
 
 ## Build, Test, and Development Commands
 
 The project uses Python 3.12 and `uv`. Install the locked development
-environment and run the required checks with:
+environment, then run:
 
 ```sh
 uv sync --dev
@@ -121,47 +144,51 @@ uv run mypy
 uv build
 ```
 
-For documentation-only changes, also use:
+For documentation changes, also run:
 
 ```sh
 git diff --check
-git diff -- README.md docs/
+git diff -- AGENTS.md README.md docs/
 ```
 
-The first command catches whitespace errors. The second supports a focused
-review of public documentation.
+`git diff --check` catches whitespace errors. The focused diff supports review
+of public documentation.
 
 ## Writing Style & Naming Conventions
 
 Write concise Markdown with ATX headings (`#`, `##`) and descriptive link text.
+Lead with the concrete decision, behavior, or invariant. Cut generic
+introductions, repeated summaries, and direction claims unsupported by current
+code or a named plan.
+
 Wrap prose at a readable width consistent with nearby files. Preserve the
-project's precise distinction between search or evaluation results and
-independently verified evidence. Name specifications by release
-(`v0.2.md`) and ADRs with a zero-padded sequence plus kebab-case description.
-Update `README.md` when adding a public-facing document.
+distinction between search or evaluation results and independently verified
+evidence. Name specifications by release (`v0.2.md`) and ADRs with a
+zero-padded sequence plus kebab-case description. Update `README.md` when
+adding a public-facing document.
 
 ## Testing Guidelines
 
 Check changes against the applicable release specification,
 `docs/reference/conformance-v0.2.md`, and
-`docs/reference/testing-strategy.md`. Verify relative links and ensure
-provisional roadmap material is not presented as a stable contract. Report
-only checks that actually ran.
+`docs/reference/testing-strategy.md`. Verify relative links. Do not present
+rolling product goals as a stable contract. Report only checks that
+actually ran.
 
 ## Commit & Pull Request Guidelines
 
-Recent commits use short, imperative subjects, commonly scoped as
-`docs: <outcome>`, for example `docs: define verification kernel roadmap`.
-Keep each commit focused on one coherent documentation outcome.
+Use short, imperative commit subjects. Scope them when useful, for example
+`docs: clarify capability trust boundaries`. Keep each commit focused on one
+coherent outcome.
 
-Pull requests should explain the problem, the resulting specification or
-documentation change, and any compatibility or normative impact. Link the
-relevant issue when one exists. Include rendered screenshots only when layout
-or diagrams materially change, and list the exact validation performed.
+Pull requests must explain the problem, the resulting change, and any
+compatibility or normative impact. Link the relevant issue when one exists.
+Include screenshots only when layout or diagrams materially change. List the
+exact validation performed.
 
 ## Security & Verification
 
-Do not weaken the central invariant: evidence becomes verified only after an
-authorized checker accepts data bound to the exact claim, semantics, candidate,
-and checker version. Discuss changes affecting trust boundaries alongside
-`docs/explanation/threat-model.md`.
+Evidence becomes verified only after an authorized checker accepts data bound
+to the exact claim, semantics, candidate, scope, certificate format, and
+checker version. Do not weaken this invariant. Discuss trust-boundary changes
+alongside `docs/explanation/threat-model.md`.

@@ -1,14 +1,20 @@
-# Durable search runtime
+# Durable search capability runtime
 
 [Documentation home](../index.md)
 
-- Status: Provisional M3 implementation
-- Release scope: Not part of v0.2 conformance
+- Status: Architecture note
 
-This document describes the operational contract of `SearchService` and
-`search.run`. Mathematical search semantics remain in domain plugins; this
-runtime owns request acceptance, lifecycle state, persistence, accounting, and
-routing to existing verification services.
+This document describes the operational design available to long-running search
+capability adapters. Mathematical search semantics remain in domain plugins;
+the runtime owns request acceptance, lifecycle state, persistence, accounting,
+and routing to authorized verification services. It is execution and trust
+policy, not mathematical strategy. The kernel does not prescribe how an agent
+composes search, evaluation, transformation, or verification capabilities, and
+search output never self-certifies.
+
+This runtime is not a separate public MCP workflow. Agents discover the
+namespaced capability with `capability.describe`, invoke it with
+`capability.invoke`, and inspect returned experiment and artifact resources.
 
 ## Ownership model
 
@@ -16,13 +22,13 @@ Use one active Jacobian process per state directory. SQLite serializes
 transactions inside that process and makes request acceptance durable, but the
 current implementation has no lease protocol for multiple coordinators.
 
-The scheduler accepts `workers = 1`. Values above one fail validation. Plugin
+The scheduler accepts `workers = 1`. Values above one fail validation. Adapter
 operations execute in bounded child processes; the coordinator, lifecycle
 threads, and SQLite connection remain local.
 
 ## Request acceptance
 
-`SearchRunRequest.idempotency_key` identifies one exact canonical request:
+An invocation's idempotency key identifies one exact canonical request:
 
 ```text
 new key + request digest
@@ -37,8 +43,8 @@ same key + different digest
 
 Acceptance uses a SQLite `BEGIN IMMEDIATE` transaction. Concurrent submissions
 cannot create two accepted experiments for the same key. The accepted snapshot
-binds the claim, plugin manifest and registry snapshot, proposer/refiner/
-evaluator implementation digests, effective budget, and environment digest.
+binds the claim, plugin manifest and registry snapshot, adapter and dependency
+implementation digests, effective budget, and environment digest.
 
 ## Lifecycle
 
@@ -56,7 +62,7 @@ experiment URI, idempotency binding, archive lineage, and accounting. Cancelled
 or timed-out work keeps all committed artifacts and events.
 
 Operational state never supplies a mathematical conclusion. In particular,
-`COMPLETED` with `STRATEGY_COMPLETE` means only that the strategy stopped.
+`COMPLETED` means only that the adapter stopped.
 
 ## Durable data
 
@@ -68,8 +74,8 @@ The runtime combines a small mutable index with immutable evidence:
 | Idempotency binding | `search_idempotency` SQLite row | One key/request/experiment mapping |
 | Lifecycle events | Append-only `search_events` rows | Ordered request, operation, control, retry, and recovery history |
 | Recovery failures | `search_recovery_failures` SQLite row | Quarantine evidence for one malformed snapshot |
-| Archive page | Immutable artifact | Candidate, evaluation, counterexample, and nomination records for one iteration |
-| Checkpoint | Immutable artifact | Opaque strategy state plus identity, budget, accounting, and prior-checkpoint link |
+| Archive page | Immutable artifact | Candidate, evaluation, witness, and result records for one iteration |
+| Checkpoint | Immutable artifact | Opaque adapter state plus identity, budget, accounting, and prior-checkpoint link |
 | Terminal archive | Immutable artifact | Root for the completed committed lineage |
 
 SQLite triggers reject lifecycle-event updates and deletes. Event digests bind
@@ -79,7 +85,7 @@ the predecessor so readers can validate the chain.
 
 For each successful iteration, the runtime:
 
-1. stores candidates, evaluations, witnesses, and nominations;
+1. stores candidates, evaluations, witnesses, and results;
 2. stores an immutable archive page;
 3. stores an immutable checkpoint;
 4. samples wall time;
@@ -87,7 +93,7 @@ For each successful iteration, the runtime:
 
 The wall-time sample includes checkpoint artifact creation and excludes the
 following metadata transaction. If artifact persistence crosses the wall
-budget, the experiment becomes `TIMEOUT` even when the proposer reported
+budget, the experiment becomes `TIMEOUT` even when the adapter reported
 completion.
 
 Operation counts are exact for committed lineage. Wall time is measured at the
@@ -96,8 +102,8 @@ or filesystem-byte metering.
 
 ## Restart recovery
 
-Constructing `SearchService` examines recoverable, cancelled, and unknown
-indexed states in one transaction:
+Runtime startup examines recoverable, cancelled, and unknown indexed states in
+one transaction:
 
 - `PENDING`, `RUNNING`, and `PAUSE_REQUESTED` become `PAUSED`;
 - `CANCEL_REQUESTED` becomes `CANCELLED`;
@@ -132,7 +138,6 @@ stronger isolation.
 
 ## Related decisions
 
-- [Milestone 3 specification](../reference/milestones/m3-scalable-search.md)
 - [Durable invocation ADR](adr/0003-durable-search-invocations.md)
 - [Plugin conformance kit](../reference/plugin-conformance.md)
 - [Threat model](threat-model.md)

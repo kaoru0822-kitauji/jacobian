@@ -5,28 +5,28 @@
 - Status: Active product direction
 - Scope: Mathematical tools, agent workflows, capability adapters, research
   memory, and optional mathematical assurance
-- Compatibility: v0.2 verification records remain valid; this document changes
-  the product entry point, not the meaning of `VERIFIED`
 
 ## Product definition
 
-Jacobian provides composable mathematical tools for AI agents investigating
-conjectures and other mathematically specified problems. Agents use these tools
-to search for counterexamples, construct and compare mathematical objects,
-compute invariants, decompose proof goals, retrieve premises, develop candidate
-proofs, and replay certificates.
+Jacobian is an MCP server, CLI, and Python library that exposes a toolbox of
+composable mathematical capabilities to AI agents. Its goal is to help agents
+and human researchers make trustworthy progress on conjectures and other
+problems that benefit from executable search and checkable evidence.
 
-Each tool performs a bounded, observable operation and returns typed,
-inspectable artifacts with explicit relationships, scope, execution status,
-assurance, and provenance. Existing mathematical software and domain plugins
-supply mathematical operations; capability adapters expose them through a
-common contract. Jacobian provides the composition, artifact, execution, and
-assurance layer. Evidence that needs to become a trusted conclusion must be
-accepted by an operator-authorized independent checker.
+The product direction is:
 
-Jacobian's long-term goal is to help agents and human researchers make genuine,
-trustworthy progress on open conjectures and other problems that benefit from
-executable search and checkable evidence.
+- broad portfolio of mathematical capabilities;
+- mathematically atomic, agent-visible outcomes;
+- agent-owned composition and research strategy;
+- optional workflows with inspectable intermediate artifacts;
+- independent verification of exact claims and evidence.
+
+Each capability performs one observable mathematical operation and returns
+typed, inspectable results with explicit relationships, scope, execution
+status, assurance, and provenance. Existing mathematical software and domain
+plugins supply the mathematics; capability adapters expose it through a common
+contract. Jacobian supplies operations, artifacts, execution policy, and trust
+boundaries—not a prescribed research strategy.
 
 The product is the mathematical toolset and its shared capability runtime:
 versioned contracts, artifact and provenance storage, execution and budget
@@ -43,8 +43,10 @@ proof of that product outcome.
 ## Tool and primitive contract
 
 At the product level these capabilities are tools. Internally, the target
-mathematical primitive contract is a versioned capability with one observable
-operation. It consumes typed artifacts and returns:
+mathematical primitive contract is a versioned capability with one observable,
+agent-visible outcome. Backend-call atomicity is not required: an adapter may
+coordinate several backend calls when they jointly produce that outcome. A
+capability consumes typed artifacts and returns:
 
 - typed output artifacts;
 - explicit relationships to its inputs;
@@ -61,9 +63,9 @@ checker identity.
 
 Broad actions such as “investigate this conjecture” are workflows, not
 primitives. A workflow may coordinate many primitive calls, but it must expose
-the stage artifacts and preserve their separate assurance labels. Composite
-compatibility tools in the current implementation are convenience façades over
-this model, not templates for adding more monolithic tools.
+the stage artifacts and preserve their separate assurance labels. Jacobian does
+not retain parallel top-level MCP tools or compatibility façades for these
+workflows; agents and reusable skills compose the namespaced capabilities.
 
 ## Ownership model
 
@@ -130,7 +132,7 @@ class CapabilityAdapter(Protocol):
 
 The descriptor declares:
 
-- stable capability ID and version;
+- namespaced capability ID and adapter contract version;
 - provider and concise model-facing description;
 - supported `EXPLORE` and `VERIFY` modes;
 - closed input and output JSON Schemas;
@@ -150,8 +152,10 @@ states; domain adapters still define the mathematical meaning of relation IDs,
 scope parameters, and obligation artifacts.
 
 The [capability workflow evaluation plan](../reference/capability-workflow-evaluations.md)
-defines the first four held-out workflows and the evidence required before
-adding more capability IDs.
+defines held-out workflows used to evaluate discovery, routing, defaults,
+consolidation, and retirement. Experimental and version-breaking adapters may
+be exposed before those evaluations show lift; prescribed-tool cases test
+contract conformance, not autonomous portfolio value.
 
 Deploy an operator-approved adapter package with a repeatable
 `--capability-adapter package.module:factory` option. The factory receives the
@@ -159,17 +163,32 @@ tenant's `JacobianKernel` and returns a `CapabilityAdapter`. Loading Python code
 is an operator action, never a model tool; it establishes availability, not
 mathematical trust.
 
-The initial bundled catalog contains:
+The always-available bundled catalog contains:
 
+- `artifact.put` for storing a typed mathematical object as an immutable
+  artifact;
+- `claim.validate` for checking a claim against its declared domain semantics;
+- `evaluate.batch` for applying an evaluator to an explicit candidate batch;
+- `witness.find` for bounded witness search;
+- `witness.verify` for independently replaying witness evidence;
+- `certificate.verify` for independently replaying certificate evidence;
+- `case.partition.finite` for finite partition construction and independent
+  coverage replay when an operator authorizes the bundled checker;
 - `graph.search.atlas` for bounded exact-order construction from NetworkX's
   maintained Graph Atlas;
 - `graph.compute.properties` for exact batched properties over Jacobian graph
   artifacts;
-- `reference.solve` for bundled reference-domain exploration and verification;
-- `lean.check` for checker-backed Lean proof replay;
 - `knowledge.search` for trust-labeled local episode retrieval.
 
-These are reference adapters, not a closed ontology.
+When the operator enables bundled references, the catalog also contains
+`lean.check` for checker-backed Lean proof replay. These capabilities are not a
+closed ontology.
+
+A reference-domain investigation composes the atomic operations rather than
+calling an opaque solver workflow: store the object with `artifact.put`,
+validate the claim with `claim.validate`, evaluate candidates with
+`evaluate.batch`, search with `witness.find`, and independently replay the
+result with `witness.verify` or `certificate.verify`.
 
 ## Two lanes
 
@@ -197,9 +216,6 @@ An adapter cannot create verified authority. `CapabilityService` accepts
 artifact and exposes its checked evidence. Failure falls closed to a
 non-verified result or operational error.
 
-The lower-level v0.2 verification tools remain available through the `full` and
-`verification` MCP profiles for advanced workflows and replay.
-
 ## Database-first memory
 
 Every operationally completed, reusable capability invocation is stored as an
@@ -224,9 +240,9 @@ authority.
 
 ## Local and remote hosts
 
-The local Codex profile uses STDIO and the `capabilities` tool profile. It
-advertises one read-only discovery tool and one extensible invocation tool
-rather than every backend operation.
+The local Codex host uses STDIO. It exposes `capability://catalog`,
+`capability.describe`, and `capability.invoke` rather than projecting backend
+operations or workflows as additional top-level MCP tools.
 
 Remote hosts use Streamable HTTP and subject-bound tenant state. Authentication,
 tenant isolation, persistence, and TLS are deployment responsibilities, not
@@ -242,12 +258,16 @@ edits. Authenticated hosting, local research memory, and compact tool
 projection support that work; they are not substitutes for useful mathematical
 operations.
 
-Agent evaluations should measure held-out mathematical tasks, including
-counterexample search, claim transformation, proof decomposition, premise
-retrieval, and independent replay. Cross-project corpus providers should follow
-only after local episode queries are empirically useful. The
-[agent evaluation protocol](../reference/agent-evaluations.md) defines the
-controls, retained evidence, and scoring required for a product claim.
+Agent evaluations measure held-out mathematical tasks, including counterexample
+search, claim transformation, proof decomposition, premise retrieval, and
+independent replay. Their role is to improve discovery, routing, defaults,
+consolidation, and retirement of capabilities, not to gate exposure of
+experimental adapters. Prescribed-tool cases test contract conformance; only
+agent-chosen-tool cases measure autonomous portfolio value. Cross-project
+corpus providers follow only after local episode queries are empirically
+useful. The [agent evaluation protocol](../reference/agent-evaluations.md)
+defines the controls, retained evidence, and scoring required for a product
+claim.
 
 ## Non-goals
 

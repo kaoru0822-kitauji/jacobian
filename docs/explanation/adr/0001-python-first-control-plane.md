@@ -120,7 +120,7 @@ schemas or verification code.
 - SoPlex for exact rational LP
 - `gmpy2.mpq` if `Fraction` becomes a measured bottleneck
 
-Planned for M3 and later:
+Candidate backends to evaluate when a capability needs them:
 
 - PySAT for SAT, MaxSAT, and MUS/MCS workflows
 - cvc5 for SMT and SyGuS

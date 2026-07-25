@@ -2,7 +2,7 @@
 
 [Documentation home](../index.md)
 
-- Status: Current design map for v0.2 and the provisional M3/M4 implementation
+- Status: Current architecture
 - Normative sources:
   [v0.2 specification](../reference/specifications/v0.2.md) and
   [conformance gate](../reference/conformance-v0.2.md)
@@ -18,7 +18,11 @@ stochastic, incomplete, and frequently replaced. Verification is performed by
 small, operator-authorized checkers against versioned formal claims and domain
 semantics.
 
-The agent-facing product has two lanes:
+The agent-facing product has two assurance lanes. They are invocation modes,
+not a prescribed workflow: agents compose `EXPLORE` and `VERIFY` calls in
+whatever order a research strategy requires, and the kernel does not prescribe
+that order. A checker-backed verification capability may be distinct from the
+capability that produced its evidence.
 
 ```text
 agent
@@ -27,7 +31,7 @@ agent
   │                    │
   │                    └── HEURISTIC or COMPUTED + research episode
   │
-  └── VERIFY  ──► the same capability + authorized checker/proof engine
+  └── VERIFY  ──► checker-backed capability + authorized checker/proof engine
                        │
                        └── VERIFIED + immutable verification record
 ```
@@ -55,25 +59,25 @@ The formal claim may still be a poor translation of the informal conjecture.
 Jacobian records that correspondence and its review status; it does not pretend
 that schema validation can establish it automatically.
 
-The v0.2 kernel and bounded-discovery behavior are the current release
-contract. Sections describing resumable strategy search and conjecture
-workflows document provisional M3/M4 implementations and do not extend v0.2
-conformance.
-
 ## Ownership boundaries
 
-The kernel owns artifact identity, execution state, assurance, budgets,
-provenance, and checker authorization. Capability adapters translate between
-the primitive contract and external mathematical systems. Domain plugins own
-schemas, transformations, invariants, witness meanings, and required checker
-roles. Independent checker packages implement replay and are authorized by an
+The kernel owns artifact identity, execution status, assurance, checker
+authorization, budgets, and provenance. It governs trust and execution policy,
+not mathematical strategy. Capability adapters translate between the primitive
+contract and external mathematical systems and expose a broad portfolio of
+installed capabilities through one registry. Domain plugins own schemas,
+transformations, invariants, witness meanings, and required checker roles.
+Independent checker packages implement replay and are authorized by an
 operator, never by the plugin or adapter whose output they check.
 
 Agent workflows and skills own multi-step exploration and proof strategies.
-The kernel may provide durable execution and compatibility façades, but those
-workflows must retain their stage artifacts and assurance labels. Worked cases
-and expected outcomes belong in the scenario and benchmark documents, not in
-generic kernel types.
+Capability adapters may provide durable execution or coordinate backend calls
+that jointly produce one coherent mathematical outcome. They must not hide a
+multi-step research strategy behind an opaque operation: material stage
+artifacts, relationships, proof obligations, scope, assurance, and independent
+verification boundaries stay visible to the agent. Worked cases and expected
+outcomes belong in scenario and benchmark documents, not in generic kernel
+types.
 
 ## Trust zones
 
@@ -135,10 +139,9 @@ matters; equal object digests do not make two carriers interchangeable.
 
 Execution metadata such as runtime, seed, environment, limits, logs, and tool
 version. A run record does not change the identity of the mathematical object.
-v0.2 persists verification records and bounded-enumeration snapshots. The
-provisional M3 runtime adds append-only lifecycle events, immutable strategy
-checkpoints, archive pages, and archive manifests around one mutable snapshot
-index.
+Long-running capability adapters may additionally persist append-only lifecycle
+events, immutable checkpoints, archive pages, and archive manifests around a
+small mutable snapshot index.
 
 ### Research episode
 
@@ -169,19 +172,22 @@ optional research-corpus provider
 The local `knowledge.search` adapter and any external provider may suggest
 records, motifs, or hypotheses. Retrieval is outside the verification trust
 boundary and cannot mutate artifacts, register checkers, or promote evidence.
-All local workflows remain available when no provider is configured.
+Local capability invocation remains available when no provider is configured.
 
 ## Model-facing capability API
 
-`CapabilityService` is a registry of operator-installed adapters. Each adapter
-declares a stable operation ID, version, supported `EXPLORE` and `VERIFY`
-modes, input and output JSON Schemas, and discovery metadata. The MCP
-projection exposes the registry through `capability://catalog` and
-the tool-callable `capability.describe` and `capability.invoke` pair, so a new
-Alloy, Lean, SAT/SMT, CAS, or domain adapter does not require another MCP tool
-or a generic-core type. Domain descriptions project exact schemas, binding
-rules, and executable examples without moving mathematical semantics into the
-generic kernel.
+`CapabilityService` is a registry of operator-installed adapters exposing a
+broad portfolio of mathematical capabilities. Each adapter declares a
+namespaced operation ID, version, supported `EXPLORE` and `VERIFY` modes, input
+and output JSON Schemas, and discovery metadata. The MCP projection exposes the
+installed descriptors through `capability://catalog` and the tool-callable
+`capability.describe` and `capability.invoke` pair, so a new Alloy, Lean,
+SAT/SMT, CAS, or domain adapter does not require another MCP tool or a
+generic-core type. The current catalog returns full descriptors. As the
+portfolio grows, discovery should add compact summaries, search, and ranking
+rather than placing every schema in the agent's initial context. Domain
+descriptions project exact schemas, binding rules, and executable examples
+without moving mathematical semantics into the generic kernel.
 
 The service validates both schemas and prevents adapters from self-promoting:
 `VERIFIED` requires a valid local verification record whose checked evidence
@@ -190,9 +196,10 @@ invalid input, reference resolution, adapter execution, and checker outcomes.
 Only completed invocations are eligible for research memory recording.
 
 A registered capability should expose one observable mathematical operation.
-Broad tasks are workflows over multiple capability invocations. Current
-composite tools remain available for compatibility, but they do not define the
-granularity expected of new capabilities.
+Broad tasks are workflows over multiple capability invocations owned by the
+agent, not by the kernel. A capability may coordinate several backend calls
+when they implement that one operation, but material intermediate artifacts
+and verification obligations remain visible.
 
 ## Common result model
 
@@ -262,7 +269,8 @@ verification:
     UNVERIFIED | VERIFIED
 ```
 
-Only authorized verification tools may return `verification = VERIFIED`.
+Only an operator-authorized independent checker may produce
+`verification = VERIFIED`.
 `TIMEOUT` and `ERROR` are execution states, not mathematical conclusions.
 A verified result is not limited to rational exhaustive enumeration:
 kernel-checked symbolic proofs, exact algebraic certificates, and
@@ -271,75 +279,27 @@ authorized checker replays them. Such proof certificates may use
 `coverage = NOT_APPLICABLE`; direct finite enumeration must instead report
 `EXHAUSTIVE`.
 
-## Domain plugin operations
+## Domain capability adapters
 
-Domains implement small optional operations instead of one mandatory
-`ProblemPlugin` interface. The stable v0.2 operations cover problem
-specification, candidate encoding, evaluation, witness search and checking,
-reduction, enumeration, transformation, and certificate replay:
+Domains expose distinct, optional capabilities rather than implementing one
+mandatory problem interface. Capability IDs are descriptive and domain-owned,
+for example `graph.enumerate.nonisomorphic` or
+`polynomial.compute.groebner_basis`. Their input and output contracts may use
+domain-specific schemas for candidates, invariants, transformations, witnesses,
+or certificates. The kernel does not impose a universal operation enum or
+shared mathematical object ontology.
 
-```python
-class ProblemSpec(Protocol):
-    ...
-
-class CandidateCodec(Protocol):
-    def validate(self, candidate: JSON) -> None: ...
-    def canonicalize(self, candidate: JSON) -> bytes: ...
-
-class Evaluator(Protocol):
-    def evaluate(self, candidate: JSON, profile: str) -> Evaluation: ...
-
-class WitnessOracle(Protocol):
-    def find(self, candidate: JSON, budget: Budget) -> WitnessSearch: ...
-
-class WitnessChecker(Protocol):
-    def verify(self, candidate: JSON, witness: JSON) -> Verification: ...
-
-class Reducer(Protocol):
-    def reductions(self, target: JSON) -> Iterable[JSON]: ...
-
-class SemanticEnumerator(Protocol):
-    def enumerate_family(
-        self, candidate: JSON, family: JSON
-    ) -> Iterable[JSON]: ...
-
-class CandidateEnumerator(Protocol):
-    def enumerate_candidates(self, bounds: JSON) -> Iterable[JSON]: ...
-
-class Transformer(Protocol):
-    def transform(
-        self, source: JSON, target_kind: str
-    ) -> Transformation: ...
-
-class TransformationChecker(Protocol):
-    def verify(self, transformation: Transformation) -> Verification: ...
-
-class CertificateChecker(Protocol):
-    def verify(self, certificate: JSON) -> Verification: ...
-```
-
-The provisional M3 and M4 operations add strategy and hypothesis
-transformation hooks:
-
-```python
-class Proposer(Protocol):
-    def propose(self, request: SearchProposalRequest) -> SearchProposal: ...
-
-class Refiner(Protocol):
-    def refine(self, request: SearchRefinementRequest) -> SearchRefinement: ...
-
-class HypothesisTransformer(Protocol):
-    def transform(
-        self, request: HypothesisRequest
-    ) -> HypothesisResponse: ...
-```
+A domain adapter may delegate its operation to a proof assistant, CAS, solver,
+database, or domain library. It may also coordinate several backend calls when
+they produce one coherent mathematical result. It must return the typed result,
+material artifacts, provenance, semantic limits, and any remaining proof
+obligation through the common capability contract.
 
 Search plugins cannot register themselves as trusted checkers. The checker
 registry is operator-managed and binds checker digests to supported claim,
 semantics, and certificate versions.
 
-These typed plugin operations are dispatched by capability adapters. A plugin
-defines mathematical meaning; an adapter presents an operation through
+Plugins define mathematical meaning; adapters present their operations through
 `capability.describe` and `capability.invoke`; the kernel enforces the common
 artifact and assurance contract.
 
@@ -363,9 +323,14 @@ deliberately crash, hang, or emit malformed responses.
 
 ## Search and checker separation
 
-The independent checker may share stable wire schemas and primitive exact
-arithmetic types with the search side. It must not import the search evaluator,
-oracle, canonicalizer, or solver integration.
+The independent checker boundary is unchanged by search, transformation, or
+other capability adapters. The independent checker may share stable wire
+schemas and primitive exact arithmetic types with the search side. It must not
+import candidate-generation, search, canonicalization, or solver
+implementations. Search, generation, evaluation, and transformation output
+never self-certifies;
+`VERIFIED` requires an operator-authorized checker independent of the
+proposing, searching, or evaluating implementation.
 
 Higher assurance may add a second implementation using a different algorithm or
 a proof-assistant kernel. Different programming languages are useful for
@@ -374,10 +339,10 @@ independence.
 
 ## Bounded discovery
 
-`search.enumerate` validates a claim and the plugin's optional enumerator,
-evaluator, and canonicalizer capabilities before creating a durable experiment
-handle. The local worker pages through a declared scope, commits candidate and
-evaluation artifacts, and maintains exact accounting:
+A bounded enumeration capability validates its claim, domain contract, scope,
+and implementation identity before creating a durable experiment handle. Its
+adapter may page through the declared scope, commit candidate and evaluation
+artifacts, and maintain exact accounting:
 
 ```text
 enumerator page
@@ -395,24 +360,25 @@ unverified. Canonical mathematical objects retain ordinary artifact identity;
 the search key separately hashes the canonical object digest together with the
 canonicalizer implementation digest.
 
-Representation changes follow a proposer/checker split. A transformer stores
-the target, relation label, implementation digest, and proof obligation.
-`transform.verify` rebinds both source and target schemas, semantics, and
-digests before dispatching to an operator-authorized checker.
+Representation-changing capabilities follow a producer/checker split. A
+transformer stores the target, relation label, implementation digest, and proof
+obligation. An independently checked invocation rebinds both source and target
+schemas, semantics, and digests before dispatching to an operator-authorized
+checker.
 
-The initial `polytope.separate` backend covers finite rational V-represented
-polytopes. Z3 proposes exact convex weights or an exact separator. Independent
-checkers replay those objects using `Fraction` arithmetic and do not import
-Z3.
+For example, a polytope separation adapter may ask Z3 to propose exact convex
+weights or an exact separator. An independent checker can replay that object
+using exact rational arithmetic without importing Z3.
 
-## Resumable strategy search
+## Durable capability execution
 
-The provisional M3 service keeps coordination deliberately local:
+Long-running capability adapters may use the durable runtime described in
+[Durable search capability runtime](search-runtime.md):
 
 ```text
 idempotent request
     → SQLite acceptance row + append-only event
-    → proposer/evaluator/oracle/refiner child processes
+    → bounded adapter work in child processes
     → immutable archive page + checkpoint
     → atomic snapshot update
     → pause, resume, or terminal archive
@@ -429,21 +395,20 @@ cancellation becomes `CANCELLED`. A malformed snapshot is moved to `ERROR` and
 recorded in `search_recovery_failures` without preventing unrelated rows from
 recovering. Checkpoint restoration rebinds the request, plugin snapshot,
 implementation digests, effective budget, environment, archive pages, and
-accounting before opaque strategy state is accepted.
+accounting before opaque adapter state is accepted.
 
-The reference scheduler accepts one strategy worker and requires one active
-Jacobian process per state directory. SQLite provides transactional request
-acceptance, not a distributed worker lease.
+The local scheduler accepts one worker and requires one active Jacobian process
+per state directory. SQLite provides transactional request acceptance, not a
+distributed worker lease.
 
-## Claim transformations and parameter regions
+## Transformations and parameter regions
 
-The provisional M4 implementation currently projects repair, generation, and
-parameter generalization through one untrusted `HypothesisTransformer`. These
-are compatibility façades while the product contract is decomposed into
-smaller claim derivation, deduplication, scoring, falsification, and parameter
-analysis operations. The service validates source evidence, stores each claim
-and edit as immutable artifacts, and preserves stage lineage. Generated,
-repaired, and generalized statements remain `UNVERIFIED`.
+Claim derivation, deduplication, scoring, falsification, and parameter analysis
+are separate mathematical operations with domain-owned contracts. Agents
+compose them into generation, repair, or generalization strategies. Each
+operation validates its inputs, stores material claims and edits as immutable
+artifacts, and preserves lineage. Generated, repaired, and generalized
+statements remain `UNVERIFIED`.
 
 A parameter-region plugin may return `PROPOSED` or `SAMPLED` evidence only.
 Jacobian commits an immutable `ParameterRegionSubject` binding the target claim,
@@ -456,9 +421,12 @@ the generic kernel only enforces bindings and evidence state.
 
 ## MCP boundary
 
-The engine is a normal Python library and CLI. MCP is a thin adapter:
+The engine is also available as a Python library and CLI. The public MCP
+surface is deliberately small:
 
-- Tools perform bounded computations or state changes.
+- `capability.describe` returns the exact contract for an installed capability.
+- `capability.invoke` performs the selected bounded operation.
+- `capability://catalog` exposes installed capability descriptors.
 - Resources expose large artifacts, traces, and experiment state.
 - Tool responses contain only compact structured summaries and resource URIs.
 - Long-running searches return an experiment handle.

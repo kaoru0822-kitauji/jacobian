@@ -18,22 +18,24 @@ Jacobian distinguishes:
 
 1. contract and adversarial conformance cases;
 2. small public mathematical scenarios;
-3. reference-plugin workflows;
+3. domain capability workflows;
 4. held-out structural variants for models;
 5. historical end-to-end research episodes.
 
 A famous conjecture is not a substitute for the first three layers. It is too
 difficult to diagnose and too easy to contaminate through public solutions.
 
-## Why more than one reference plugin is required
+## Cross-domain coverage
 
 A single domain can accidentally bake its own assumptions into apparently
-generic interfaces. Jacobian therefore does not stabilize the v0.2 capability
-interfaces until at least two structurally different plugins use them.
+generic interfaces. The benchmark portfolio therefore includes structurally
+different domains and representations. This is evidence about kernel
+generality and agent composition, not a gate on which experimental
+capabilities may be installed.
 
 ## Reference A: finite directed graphs and path languages
 
-The first plugin uses tiny directed graphs to test:
+The graph benchmark family uses tiny directed graphs to test:
 
 - complete semantic closure rather than intended path lists;
 - structured path and odd-cycle witnesses;
@@ -42,13 +44,13 @@ The first plugin uses tiny directed graphs to test:
 - finite enumeration certificates.
 
 `PATH-CLOSURE-001` and `GRAPH-BIP-001` are the initial public cases. Their
-checker implementation does not import the search plugin's graph routines.
+checker implementation does not import the graph search implementation.
 
 ## Reference B: bounded integer matrices
 
-The second plugin uses integer-matrix candidates, kernel-vector witnesses, and
-finite determinant certificates. `MAT-KERNEL-001` and `MAT-MAXDET3-001` are the
-initial public cases.
+The matrix benchmark family uses integer-matrix candidates, kernel-vector
+witnesses, and finite determinant certificates. `MAT-KERNEL-001` and
+`MAT-MAXDET3-001` are the initial public cases.
 
 It should test that the kernel does not assume:
 
@@ -60,29 +62,30 @@ It should test that the kernel does not assume:
 
 ## Reference C: bounded Erdős-Straus decompositions
 
-The third bundled plugin verifies finite intervals of the Erdős-Straus
+The Erdős-Straus benchmark family verifies finite intervals of the
 unit-fraction statement. `ERDOS-STRAUS-001` binds the interval, a complete
 decomposition table, and exact integer replay. Its checker is independent of
 the table-generation routine. The case tests positive exhaustive witnesses and
 the requirement that a bounded result not be generalized to the open
 conjecture.
 
-## Later-domain candidate: finite magmas
+## Finite magmas
 
 `MAGMA-IMPL-001` adds finite operation tables, equational-law evaluation, and a
-model-plus-assignment witness. It remains a candidate after the v0.2 capability
-surface is stable.
+model-plus-assignment witness. It broadens the portfolio beyond graphs and
+linear algebra and can be enabled whenever its capability and oracle are ready.
 
 ## Historical end-to-end episodes
 
-The Dinitz–Garg–Goemans routing episode remains a valuable later regression
+The Dinitz–Garg–Goemans routing episode remains a valuable regression
 because it combines semantic closure, adversarial routing, rational arithmetic,
-polyhedral separation, and shrinking. It is not the definition of v0.2 and does
-not block the first verification kernel.
+polyhedral separation, and shrinking. It tests whether an agent can compose
+several operations while preserving artifacts and verification boundaries.
 
-After M5, add historical conjecture episodes with temporal knowledge cutoffs.
-The optional corpus provider must not retrieve information published after a
-benchmark's cutoff date.
+Add historical conjecture episodes with temporal knowledge cutoffs as their
+inputs and independent oracles become available. A corpus provider used in
+these evaluations must not retrieve information published after a benchmark's
+cutoff date.
 
 Public known answers are suitable for conformance and regression. Held-out
 model evaluation uses generated structural variants with separate hidden

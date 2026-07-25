@@ -3,15 +3,19 @@
 [Documentation home](../index.md)
 
 - Status: Normative release gate for `0.2.0a0`
-- Release specification: [v0.2 bounded discovery](specifications/v0.2.md)
+- Release specification:
+  [v0.2 capability-first mathematical operations](specifications/v0.2.md)
 
 This document defines the complete normative conformance suite for Jacobian
 v0.2. Search, evaluation, canonicalization, transformation proposal, and solver
 output are untrusted unless an authorized checker accepts their bound evidence.
 
-The provisional M3 strategy-search and M4 conjecture APIs present in the
-repository are outside this release gate. They must preserve these invariants,
-but passing their tests does not extend the v0.2 public contract.
+The agent-facing MCP surface consists of `capability.describe` and
+`capability.invoke`. Operation names in this document, such as
+`witness.verify`, are capability IDs rather than additional top-level MCP
+tools. Clients inspect an installed capability's exact schema with
+`capability.describe`, then pass that ID and a schema-valid payload to
+`capability.invoke`.
 
 ## Result invariants
 
@@ -22,9 +26,11 @@ Every v0.2 operation preserves the core result model:
 - cancellation, timeout, malformed plugin output, and reached limits never
   imply a mathematical conclusion;
 - search experiments and canonicalization results are always `UNVERIFIED`;
-- `transform.apply` and `polytope.separate` cannot create verification records;
-- only `transform.verify`, `witness.verify`, and `certificate.verify` may
-  return `VERIFIED`.
+- invoking `transform.apply` or `polytope.separate` cannot create verification
+  records;
+- a capability may return `VERIFIED` only when its descriptor supports
+  `VERIFY` and an authorized independent checker accepts the exact bound
+  evidence.
 
 ## Artifact identity
 
@@ -80,7 +86,7 @@ Every v0.2 operation preserves the core result model:
 | `PLG-002` | Plugin omits a required capability | Failure before execution |
 | `PLG-003` | Plugin changes semantics without changing its digest | Manifest or digest validation failure |
 | `PLG-004` | Verification package imports search implementation | Dependency-boundary test failure |
-| `PLG-005` | Two domains expose different optional capabilities | Core tools remain usable in both |
+| `PLG-005` | Two domains expose different optional capabilities | Capability discovery and invocation remain usable in both |
 
 ## Shrinking
 
@@ -89,7 +95,7 @@ Every v0.2 operation preserves the core result model:
 | `SHR-001` | Reducer proposes a smaller preserving target | Accepted after checker replay |
 | `SHR-002` | Reducer breaks the predicate | Rejected |
 | `SHR-003` | Budget ends before checked neighborhood exhaustion | Honest minimality class |
-| `SHR-004` | Tool claims global minimality without certificate | Protocol violation |
+| `SHR-004` | Capability result claims global minimality without a certificate | Protocol violation |
 | `SHR-005` | Final target lacks a fresh verification record | Output remains unverified |
 | `SHR-006` | Reducer returns no proposals after an accepted reduction | `NONE`; reducer silence does not establish local minimality |
 
@@ -173,10 +179,11 @@ implementation.
 
 | ID | Scenario | Required result |
 | --- | --- | --- |
-| `ADP-001` | List MCP tools using SDK `2.0.0b2` | Core tools plus `structure.canonicalize`, `search.enumerate`, `experiment.cancel`, `transform.apply`, `transform.verify`, and `polytope.separate` |
+| `ADP-001` | List MCP tools using SDK `2.0.0b2` | Exactly `capability.describe` and `capability.invoke`; installed mathematical operations are capability IDs, not top-level tools |
 | `ADP-002` | Read `experiment://<id>` | Latest durable snapshot |
 | `ADP-003` | Read experiment accounting, scope, or archive resources | Compact metadata and artifact handles; large pages remain artifact resources |
-| `ADP-004` | Invoke the corresponding CLI commands | Same validated Python contracts and assurance labels |
+| `ADP-004` | Describe and invoke an installed capability through MCP | The descriptor schema is enforced and the result preserves execution, assurance, evidence, artifact, and provenance fields |
+| `ADP-005` | Invoke the same capability through CLI or Python | Same capability contract, validation, and assurance labels |
 
 ## Cross-domain gate
 
@@ -185,15 +192,15 @@ matrix reference domains. The matrix plugin deliberately has no graph
 canonicalizer; requesting graph-style quotienting from it must fail cleanly.
 The row-major matrix transformation and finite-polytope evidence must use the
 same artifact, checker registry, result, and verification-record substrate as
-the verification tools.
+the verification capabilities.
 
 ## Release gate
 
 v0.2 is conformant only when:
 
 1. every applicable case above has a behavioral test;
-2. both reference plugins complete verification and bounded-enumeration
-   workflows;
+2. both reference plugins expose capability IDs that complete verification and
+   bounded-enumeration operations through `capability.invoke`;
 3. one transformation and one exact separator replay to `VERIFIED`;
 4. cancellation and reached limits remain inspectable and unverified;
 5. the CLI, MCP adapter, and built wheel expose the same release version.

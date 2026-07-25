@@ -18,13 +18,21 @@ kernel is better at:
 These evaluations are downstream product tests. They do not replace checker
 conformance, and a model's correct answer does not validate the kernel.
 
+They evaluate complete portfolios and ablations as well as individual
+capabilities. Prescribed-tool cases test contract usability and conformance,
+not portfolio value; autonomous portfolio evaluations let agents choose tools
+and measure how well the portfolio supports composition. Results guide
+discovery, examples, ranking, defaults, consolidation, and retirement; they do
+not gate experimental capability availability and never upgrade evidence to
+verified status.
+
 ## Experimental conditions
 
 Each scenario compares at least:
 
 1. **Baseline:** the same model and task without Jacobian tools.
-2. **Kernel:** the same model and task with the release-appropriate Jacobian
-   tools.
+2. **Portfolio treatment:** the same model and task with the declared Jacobian
+   capability portfolio.
 
 Hold constant:
 
@@ -40,13 +48,20 @@ Use multiple seeds and report every run. Do not select the best transcript.
 When model versions change, establish a new baseline rather than combining
 incomparable results.
 
+A case is either prescribed-tool or autonomous-portfolio. Prescribed-tool
+cases fix the allowed tool set and score contract usability and conformance;
+they do not measure portfolio value. Autonomous-portfolio cases expose the
+installed capability catalog and let the agent discover, compose, and abandon
+capabilities; they measure composition behavior. Report which mode each case
+uses and do not mix the two interpretations in one aggregate.
+
 ## Eval-case contract
 
 Every case contains:
 
 - stable ID, title, version, and owner;
 - frozen public task artifacts;
-- declared baseline and kernel conditions;
+- declared baseline and portfolio-treatment conditions;
 - hidden oracle and independently replayable expected facts;
 - one critical discriminator;
 - at least one tempting but wrong path;
@@ -124,7 +139,7 @@ held-out research benchmark.
 
 ### EVAL-SEM-001 — Complete semantics
 
-**Release:** v0.2
+**Goal area:** semantic closure and witness verification
 
 The public candidate describes intended legal objects but the underlying
 structure induces an additional legal object that defeats it. The names and
@@ -132,15 +147,15 @@ topology should be synthetic variants, not a copy of a published benchmark.
 
 The critical discriminator is whether the agent asks the oracle to attack the
 candidate under the declared complete semantics and then uses
-`witness.verify`. A tempting wrong path evaluates only the listed objects and
-reports a positive result.
+`graph.verify.path` on an omitted path. A tempting wrong path evaluates only
+the listed objects and reports a positive result.
 
 The hidden oracle contains the minimal unexpected object and an independent
 direct-witness replay.
 
 ### EVAL-TRUST-002 — Operational failure is not a conclusion
 
-**Release:** v0.2
+**Goal area:** fail-closed execution
 
 An evaluator or oracle times out after returning partial promising evidence.
 The critical discriminator is preserving `execution = TIMEOUT`, incomplete
@@ -149,22 +164,24 @@ absence of a found witness as proof of nonexistence.
 
 ### EVAL-BIND-003 — Evidence substitution
 
-**Release:** v0.2
+**Goal area:** exact evidence binding
 
 The workspace contains a valid certificate for a nearby candidate and an
 uncertified target candidate. Payloads are similar enough to invite reuse.
 
-The correct behavior is to call `certificate.verify`, observe the binding
-failure, and leave the target unverified. The hidden oracle records every
-binding dimension and the valid source certificate.
+The correct behavior is to call the scenario's domain-owned certificate
+checker, such as `boolean.verify.truth_table`, observe the binding failure, and
+leave the target unverified. The hidden oracle records every binding dimension
+and the valid source certificate.
 
 ### EVAL-SHRINK-004 — Checked minimization
 
-**Release:** v0.2
+**Goal area:** checked counterexample minimization
 
 A large counterexample contains redundant elements and at least one attractive
-reduction that breaks the predicate. The agent should use `shrink.run`, retain
-only checked steps, report the achieved minimality class, and hand off the
+reduction that breaks the predicate. The agent should use the scenario's
+domain-owned minimizer, such as `graph.minimize.counterexample`, retain only
+checked steps, report the achieved minimality class, and hand off the
 accepted-step trace.
 
 Score minimality only within the declared reducer set and budget. Do not require
@@ -172,7 +189,7 @@ one canonical human-preferred form when several incomparable minima exist.
 
 ### EVAL-XDOM-005 — Domain independence
 
-**Release:** v0.2
+**Goal area:** cross-domain capability composition
 
 Give the agent a non-graph reference plugin with a different witness type. The
 task checks whether it uses generic artifacts and verification tools rather
@@ -180,19 +197,20 @@ than assuming paths, vertices, or graph canonicalization.
 
 ### EVAL-TRANS-006 — Transformation direction
 
-**Release:** v0.2
+**Goal area:** claim transformation
 
 Two proposed transformations are available: one is an equivalence and one is
 only an over-approximation or restriction. Both yield an attractive derived
 result.
 
-The agent must distinguish `transform.apply` from `transform.verify`, discharge
-the appropriate proof obligation, and avoid transporting a conclusion in an
-invalid direction.
+The agent must distinguish a transformation such as
+`boolean.transform.at_most_one_cnf` from its independent relation checker
+`boolean.verify.encoding_relation`, discharge the appropriate proof
+obligation, and avoid transporting a conclusion in an invalid direction.
 
 ### EVAL-ENUM-007 — Exhaustive bounded search
 
-**Release:** v0.2
+**Goal area:** bounded exhaustive search
 
 An enumeration reaches either its true finite scope or a configured limit. The
 critical discriminator is whether the agent uses the scope certificate and
@@ -200,16 +218,16 @@ reports exhaustive coverage only in the former case.
 
 ### EVAL-RESUME-008 — Search lineage under failure
 
-**Milestone:** M3
+**Goal area:** resumable search and lineage
 
 A long-running experiment is interrupted after producing useful candidates and
 failed branches. The agent should resume from the experiment handle, preserve
 lineage, avoid double-promoting duplicate candidates, and route final evidence
-through v0.2 verification.
+through the applicable domain-owned checker.
 
 ### EVAL-REPAIR-009 — Nearby claim repair
 
-**Milestone:** M4
+**Goal area:** claim repair
 
 A verified counterexample defeats the original claim. The agent should propose
 nearby statements, falsify easy failures, and return survivors as hypotheses
@@ -218,7 +236,7 @@ did not refute it.
 
 ### EVAL-GENERALIZE-010 — Parameter regions preserve uncertainty
 
-**Milestone:** M4
+**Goal area:** parameter exploration
 
 A verified finite construction supports a proposed parameter family. The agent
 must separate proved necessary and sufficient conditions from sampled and
@@ -226,7 +244,7 @@ unknown regions, then send any proof-bearing claim through its checker.
 
 ### EVAL-MEM-011 — Temporal provider retrieval
 
-**Milestone:** M5
+**Goal area:** knowledge retrieval
 
 An optional corpus provider contains relevant material before and after a
 declared historical cutoff. The agent must retrieve useful pre-cutoff episodes
@@ -235,16 +253,16 @@ provider is absent.
 
 ### EVAL-ABS-012 — Abstraction remains a hypothesis
 
-**Milestone:** M5
+**Goal area:** cross-episode comparison
 
 Several retrieved failures share a likely obstruction, while a minority fail
-for another reason. The agent may use `episode.compare` or
-`abstraction.extract`, but must state the proposed abstraction as a hypothesis
-and test it against held-out instances.
+for another reason. The agent may retrieve relevant episodes with
+`knowledge.search` and compare them in its own strategy, but must state the
+proposed abstraction as a hypothesis and test it against held-out instances.
 
 ### EVAL-HANDOFF-013 — Independent replication
 
-**Release:** v1.0
+**Goal area:** independent replication
 
 The agent must export the minimal artifact, claim, semantics, evidence,
 checker, and provenance set needed by an independent installation. The reviewer
@@ -318,7 +336,7 @@ persuasive narrative from substituting for evidence.
 4. Freeze public artifacts.
 5. Run a no-tool baseline and confirm the case is neither universally trivial
    nor impossible.
-6. Run the kernel condition over multiple seeds.
+6. Run the portfolio treatment over multiple seeds.
 7. Review hard failures before interpreting efficiency.
 8. Revise ambiguous prompts or oracles, not scores after seeing a favored
    model's answer.
@@ -335,7 +353,7 @@ status.
 `MAT-KERNEL-001`, `GRAPH-BIP-TRUE-001`, `LEAN-NAT-INDUCTION-001`, and
 `LEAN-SQRT2-001` cases, plus the bounded `ERDOS-STRAUS-001` research pilot,
 through a real Codex CLI using the project
-`jacobian_local` MCP profile. Each case receives an isolated state directory.
+`jacobian_local` MCP server. Each case receives an isolated state directory.
 The runner retains the raw JSONL transcript and structured agent report, then
 scores the durable verification record, evidence, exact bindings, claim, and
 candidate directly from the Jacobian store. Lean cases additionally bind and
@@ -383,8 +401,8 @@ For every case and repetition:
 
 - control receives an empty writable workspace, no MCP configuration, and may
   construct its own local computation;
-- treatment receives the same task and model settings plus only the compact
-  `capabilities` MCP profile;
+- treatment receives the same task and model settings plus the capability
+  catalog, `capability.describe`, and `capability.invoke`;
 - condition order is shuffled from a recorded seed;
 - both conditions use the same structured report schema and independent
   known-answer scorer;
