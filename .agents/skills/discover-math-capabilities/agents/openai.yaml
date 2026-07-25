@@ -1,4 +1,4 @@
 interface:
   display_name: "Discover Math Capabilities"
-  short_description: "Derive Jacobian capabilities from evidence"
-  default_prompt: "Use $discover-math-capabilities to audit these traces and propose evidence-backed additions or changes to Jacobian’s capability portfolio."
+  short_description: "Mine mathematical work for capability proposals"
+  default_prompt: "Use $discover-math-capabilities to mine these mathematical cases for reusable Jacobian capabilities."
