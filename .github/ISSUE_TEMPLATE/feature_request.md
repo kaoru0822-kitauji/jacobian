@@ -1,28 +1,28 @@
 ---
 name: Feature request
-about: Propose a new capability for the Jacobian kernel
+about: Propose or improve a mathematical capability
 title: "[Feature]: "
 labels: ["feature"]
 assignees: []
 ---
 
-**Priority**
-<!-- Select one: P0 (critical), P1 (high), P2 (medium), P3 (low) -->
-
 **Area**
-<!-- Which area does this feature target? kernel, checker, cli, mcp, docs, ci, deps, security -->
+<!-- Which mathematical domain, capability family, adapter, or shared surface is affected? -->
 
-**Problem**
-<!-- What problem does this feature solve? Is it a missing verification primitive, a search gap, or a workflow improvement? -->
+**Observed need**
+<!-- Which agent trace, evaluation, dataset, research case, or user workflow exposes the gap? -->
 
-**Proposed solution**
-<!-- Describe the capability you would like to see. Which release version should it target? -->
+**Mathematical outcome**
+<!-- What single agent-visible result should the capability produce? Include representative inputs and outputs when possible. -->
 
-**Alternatives considered**
-<!-- What workarounds or alternative approaches have you considered? -->
+**Existing tools and backends**
+<!-- Which current Jacobian capabilities, maintained libraries, proof assistants, CASs, solvers, or databases were considered? -->
 
-**Impact on trust boundaries**
-<!-- Does this change affect the verification kernel, checker registry, or trust model? Reference docs/explanation/threat-model.md if relevant. -->
+**Evidence and verification boundary**
+<!-- Is the result heuristic, approximate, bounded, exhaustive, exact, or independently checkable? What certificate or checker can verify it? -->
 
-**Additional context**
-<!-- Reference relevant specifications, benchmarks, or mathematical scenarios. -->
+**Evaluation**
+<!-- How would we tell whether this improves agent correctness, coverage, efficiency, or tool composition? Note any held-out cases or independent oracle. -->
+
+**Compatibility and additional context**
+<!-- Note public contract impact and link relevant issues, specifications, transcripts, benchmarks, or mathematical scenarios. -->

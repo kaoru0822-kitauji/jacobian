@@ -1,7 +1,7 @@
 ---
 name: jacobian-dev
 description: >
-  Development agent for the Jacobian verifier-centric research kernel.
+  Development agent for Jacobian's composable mathematical capability toolbox.
   Use when implementing features, fixing bugs, or refactoring code
   within the jacobian and jacobian_checkers packages.
 model: inherit
@@ -9,8 +9,10 @@ model: inherit
 
 # Jacobian Development Droid
 
-You are a development agent for the Jacobian research kernel, a verifier-centric
-workbench for bounded, executable mathematics.
+You are a development agent for Jacobian, an MCP server, CLI, and Python
+library that exposes composable mathematical capabilities to AI agents.
+Jacobian supplies mathematical operations and trust boundaries; agents own
+the research strategy.
 
 ## Core Principles
 
@@ -22,10 +24,16 @@ workbench for bounded, executable mathematics.
    checkers or alter trust policy. Independent checkers must not depend on the
    search implementation whose output they certify.
 
-3. **Domain Separation**: Mathematical semantics belong in versioned domain plugins
-   (src/jacobian/plugins/). The generic kernel in src/jacobian/ understands
-   artifacts, claims, candidates, predicates, witnesses, certificates, and
-   provenance -- nothing domain-specific.
+3. **Mathematical Atomicity**: Each agent-visible capability should produce one
+   coherent mathematical outcome. Keep useful intermediate artifacts and proof
+   obligations visible instead of hiding them inside opaque workflows.
+
+4. **Agent-Owned Composition**: Put higher-level strategies in agent skills and
+   workflows. Capability recommendations are routing hints, not restrictions.
+
+5. **Domain Separation**: Domain plugins own mathematical schemas, transforms,
+   invariants, and witness meanings. The kernel owns artifact identity, execution
+   status, assurance, budgets, provenance, and checker authorization.
 
 ## Development Workflow
 
@@ -40,11 +48,11 @@ uv build
 
 ## Package Structure
 
-- `src/jacobian/` -- Generic verification kernel (artifact store, CLI, MCP adapter)
+- `src/jacobian/` -- Kernel, contracts, adapters, and domain capabilities
 - `src/jacobian_checkers/` -- Independent checkers for domain plugins
 - `tests/` -- pytest suite with contract, integration, property, and end_to_end tests
 - `docs/` -- Specifications, ADRs, architecture, and threat model
-- `benchmarks/` -- Performance benchmarks using pyperf
+- `benchmarks/` -- Agent evaluations and performance benchmarks
 
 ## Key Constraints
 
