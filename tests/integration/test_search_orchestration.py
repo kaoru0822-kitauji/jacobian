@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -239,14 +238,19 @@ def test_checkpoint_persistence_is_included_in_wall_accounting(
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
     original_put = kernel.search._put_internal_artifact
+    current_time = 0.0
+
+    def clock() -> float:
+        return current_time
 
     def delayed_put(**kwargs: object) -> object:
+        nonlocal current_time
         if kwargs.get("summary") == "immutable search checkpoint":
-            time.sleep(1)
+            current_time += 1
         return original_put(**kwargs)
 
+    monkeypatch.setattr(kernel.search, "_clock", clock)
     monkeypatch.setattr(kernel.search, "_put_internal_artifact", delayed_put)
-    started = time.monotonic()
     handle = kernel.search.start(
         _request(
             claim_uri,
@@ -256,10 +260,9 @@ def test_checkpoint_persistence_is_included_in_wall_accounting(
         )
     )
     snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
-    elapsed_ms = int((time.monotonic() - started) * 1000)
 
     assert snapshot.state is ExperimentState.COMPLETED
-    assert snapshot.accounting.wall_time_ms >= elapsed_ms - 400
+    assert snapshot.accounting.wall_time_ms == 1_000
 
 
 @pytest.mark.integration
@@ -270,12 +273,18 @@ def test_checkpoint_persistence_cannot_complete_past_wall_budget(
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
     original_put = kernel.search._put_internal_artifact
+    current_time = 0.0
+
+    def clock() -> float:
+        return current_time
 
     def delayed_put(**kwargs: object) -> object:
+        nonlocal current_time
         if kwargs.get("summary") == "immutable search checkpoint":
-            time.sleep(5.1)
+            current_time += 5.1
         return original_put(**kwargs)
 
+    monkeypatch.setattr(kernel.search, "_clock", clock)
     monkeypatch.setattr(kernel.search, "_put_internal_artifact", delayed_put)
     handle = kernel.search.start(
         _request(

@@ -7,7 +7,6 @@ import logging
 import sqlite3
 import threading
 import time
-import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -41,6 +40,7 @@ from jacobian.evaluation import (
     EvaluationService,
     require_complete_evaluation_batch,
 )
+from jacobian.experiment_runtime import new_experiment_uri, open_experiment_database
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
@@ -147,10 +147,7 @@ class ExperimentService:
         )
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.store.db_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        return open_experiment_database(self.store.db_path)
 
     def _initialize_database(self) -> None:
         with self._connect() as connection:
@@ -309,7 +306,7 @@ class ExperimentService:
                 f"{capability_hint}, then retry."
             ) from exc
 
-        experiment_uri = f"experiment://{uuid.uuid4().hex}"
+        experiment_uri = new_experiment_uri()
         now = _now()
         snapshot = ExperimentSnapshot(
             experiment_uri=experiment_uri,
@@ -355,6 +352,20 @@ class ExperimentService:
             )
         except (ValidationError, ValueError) as exc:
             raise ExperimentError("stored experiment snapshot is invalid") from exc
+
+    def contains(self, experiment_uri: str) -> bool:
+        """Return whether this service owns the experiment identity."""
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT 1
+                FROM experiments
+                WHERE experiment_uri = ?
+                """,
+                (experiment_uri,),
+            ).fetchone()
+        return row is not None
 
     def wait(
         self,

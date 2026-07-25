@@ -59,7 +59,7 @@ def test_mathlib_sqrt_two_proof_creates_bound_verification_record(
         proof="exact irrational_sqrt_two",
     )
 
-    assert verified.result.conclusion is Conclusion.TRUE
+    assert verified.result.conclusion is Conclusion.TRUE, verified.result.input.errors
     assert verified.result.assurance.verification is Verification.VERIFIED
     certificate = kernel.store.get(verified.certificate_uri)
     assert certificate.payload["payload"]["environment"] == "MATHLIB"

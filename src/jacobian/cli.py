@@ -505,7 +505,7 @@ def experiment_inspect(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _inspect_experiment(_state(context).kernel, experiment_uri)
+    result = _state(context).kernel.experiment_router.inspect(experiment_uri)
     _emit(result.model_dump(mode="json"))
 
 
@@ -515,8 +515,7 @@ def experiment_wait(
     experiment_uri: str,
     timeout_seconds: float = 30,
 ) -> None:
-    result = _wait_experiment(
-        _state(context).kernel,
+    result = _state(context).kernel.experiment_router.wait(
         experiment_uri,
         timeout_seconds=timeout_seconds,
     )
@@ -528,7 +527,7 @@ def experiment_cancel(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _cancel_experiment(_state(context).kernel, experiment_uri)
+    result = _state(context).kernel.experiment_router.cancel(experiment_uri)
     _emit(result.model_dump(mode="json"))
 
 
@@ -724,45 +723,6 @@ def _state(context: typer.Context) -> CliState:
     if not isinstance(state, CliState):
         raise RuntimeError("CLI state was not initialized")
     return state
-
-
-def _inspect_experiment(
-    kernel: JacobianKernel,
-    experiment_uri: str,
-) -> Any:
-    try:
-        return kernel.experiments.inspect(experiment_uri)
-    except ExperimentNotFoundError:
-        return kernel.search.inspect(experiment_uri)
-
-
-def _wait_experiment(
-    kernel: JacobianKernel,
-    experiment_uri: str,
-    *,
-    timeout_seconds: float,
-) -> Any:
-    try:
-        kernel.experiments.inspect(experiment_uri)
-    except ExperimentNotFoundError:
-        return kernel.search.wait(
-            experiment_uri,
-            timeout_seconds=timeout_seconds,
-        )
-    return kernel.experiments.wait(
-        experiment_uri,
-        timeout_seconds=timeout_seconds,
-    )
-
-
-def _cancel_experiment(
-    kernel: JacobianKernel,
-    experiment_uri: str,
-) -> Any:
-    try:
-        return kernel.experiments.cancel(experiment_uri)
-    except ExperimentNotFoundError:
-        return kernel.search.cancel(experiment_uri)
 
 
 def _read_json(path: Path) -> Any:

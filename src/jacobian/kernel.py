@@ -19,6 +19,7 @@ from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.evaluation import EvaluationService
+from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
 from jacobian.finite_partition import (
     FinitePartitionInstallation,
@@ -121,6 +122,7 @@ class JacobianKernel:
             self.witnesses,
             self.verification,
         )
+        self.experiment_router = ExperimentRouter(self.experiments, self.search)
         self.conjectures = ConjectureService(
             self.store,
             self.schemas,
