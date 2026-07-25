@@ -5,7 +5,14 @@
   "title": "Verified bounded Erdős-Straus range",
   "prompt": "Using the bundled erdos_straus reference domain, verify the bounded statement that every integer n from 2 through 1000 inclusive has positive integer x, y, z satisfying 4/n = 1/x + 1/y + 1/z. Use the exact candidate range [2, 1000] and a SUPPORTS_CLAIM witness. Report only the bounded conclusion; do not generalize it to the open conjecture. In feedback, record which exposed tools and domain-contract facts made the run efficient, what was missing or confusing, and concrete tool or domain-knowledge improvements.",
   "required_tools": [
-    "verification.run"
+    "capability.invoke"
+  ],
+  "required_capability_ids": [
+    "artifact.put",
+    "claim.validate",
+    "evaluate.batch",
+    "witness.find",
+    "witness.verify"
   ],
   "expected": {
     "domain_id": "jacobian.erdos-straus",

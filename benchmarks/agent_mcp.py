@@ -39,14 +39,14 @@ ARTIFACT_PREFIX = "artifact://sha256/"
 SYSTEM_TASK = """\
 Use only the jacobian_local MCP tools and resources for the mathematical work.
 Do not run shell commands, read repository files, edit files, or use network
-retrieval. Start with {agent_contract_uri}; it contains the selected domain's
-compact input contract and exact semantic identity. Treat evaluation and
-witness search as
-UNVERIFIED. A decisive result is VERIFIED only after the compatible independent
+retrieval. Start with reference://catalog to obtain the selected domain's
+schemas, plugin, checker, and semantic identity, then describe unfamiliar
+capabilities. Treat evaluation and witness search as UNVERIFIED. A decisive
+result is VERIFIED only after the compatible independent
 checker accepts the exact bound evidence. Do not reread returned evidence or
 verification-record resources merely to prepare the final report; the benchmark
-scorer validates them directly. For bundled witness cases, use verification.run
-instead of manually calling its five component tools.
+scorer validates them directly. Compose the atomic capabilities yourself and
+preserve the intermediate artifact URIs.
 
 Complete public known-answer case {case_id}. Set report case_id exactly to
 {case_id}.
@@ -638,6 +638,18 @@ def score_run(
             f"transcript is missing MCP calls: {', '.join(missing_tools)}"
         )
     checks.append("required MCP tool sequence")
+    required_capabilities = case.get("required_capability_ids")
+    if not isinstance(required_capabilities, list) or not all(
+        isinstance(capability_id, str) for capability_id in required_capabilities
+    ):
+        raise BenchmarkError("case required_capability_ids must be a string list")
+    missing_capabilities = sorted(set(required_capabilities) - set(capability_ids))
+    if missing_capabilities:
+        raise BenchmarkError(
+            "transcript is missing capability invocations: "
+            + ", ".join(missing_capabilities)
+        )
+    checks.append("required capability composition")
 
     claim_uri = _artifact_uri(report.get("claim_uri"), "claim_uri")
     candidate_uri = _artifact_uri(report.get("candidate_uri"), "candidate_uri")
@@ -726,15 +738,12 @@ def _run_case(
             prompt=case["prompt"],
         )
         report_schema = GRAPH_REPORT_SCHEMA
-        tool_profile = "capabilities"
     else:
         prompt = SYSTEM_TASK.format(
-            agent_contract_uri=f"reference://domain/{case['reference_name']}",
             case_id=case_id,
             prompt=case["prompt"],
         )
         report_schema = REPORT_SCHEMA
-        tool_profile = "verification"
     command = [
         codex_command,
         "exec",
@@ -752,15 +761,7 @@ def _run_case(
         "mcp_servers.jacobian_local.env.JACOBIAN_STATE_DIR="
         + json.dumps(str(state_dir)),
         "-c",
-        "mcp_servers.jacobian_local.args="
-        + json.dumps(
-            [
-                "run",
-                "jacobian-mcp",
-                "--tool-profile",
-                tool_profile,
-            ]
-        ),
+        "mcp_servers.jacobian_local.args=" + json.dumps(["run", "jacobian-mcp"]),
         "-c",
         "model_reasoning_effort=" + json.dumps(reasoning_effort),
     ]
