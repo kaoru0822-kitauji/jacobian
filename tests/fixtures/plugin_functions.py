@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import subprocess
 import sys
 import time
@@ -17,6 +18,14 @@ def echo(request: dict[str, Any]) -> dict[str, Any]:
 def wait_forever(_request: dict[str, Any]) -> dict[str, Any]:
     time.sleep(60)
     return {"unreachable": True}
+
+
+def exit_without_response(_request: dict[str, Any]) -> dict[str, Any]:
+    os._exit(0)
+
+
+def imitate_source_change(_request: dict[str, Any]) -> dict[str, Any]:
+    raise ValueError("plugin source changed during execution")
 
 
 def emit_large_diagnostic(_request: dict[str, Any]) -> dict[str, Any]:

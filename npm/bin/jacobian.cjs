@@ -79,7 +79,11 @@ function main() {
       }
     }
     setup.run(options).catch((error) => {
-      stderr.write(`Setup failed: ${error.message}\n`);
+      stderr.write(
+        `Jacobian setup did not finish: ${error.message}\n` +
+          "No additional setup changes will be made. Correct the reported problem, " +
+          "then retry `npx jacobian setup`.\n",
+      );
       process.exitCode = 1;
     });
     return;
@@ -109,7 +113,10 @@ function main() {
       }
     }
     setup.run(options).catch((error) => {
-      stderr.write(`Remove failed: ${error.message}\n`);
+      stderr.write(
+        `Jacobian removal did not finish: ${error.message}\n` +
+          "Inspect the named client configuration, then retry `npx jacobian remove`.\n",
+      );
       process.exitCode = 1;
     });
     return;
@@ -120,7 +127,10 @@ function main() {
     const rest = args.slice(1);
     const json = rest.includes("--json") || rest.includes("-j");
     doctor.run({ json }).catch((error) => {
-      stderr.write(`Doctor failed: ${error.message}\n`);
+      stderr.write(
+        `Jacobian diagnostics did not finish: ${error.message}\n` +
+          "Run `npx jacobian setup`, then retry `npx jacobian doctor`.\n",
+      );
       process.exitCode = 1;
     });
     return;
@@ -128,13 +138,23 @@ function main() {
 
   if (command === "mcp") {
     const { launch } = require("./launcher.cjs");
-    launch("jacobian.adapters.mcp.server", args.slice(1));
+    try {
+      launch("jacobian.adapters.mcp.server", args.slice(1));
+    } catch (error) {
+      stderr.write(`Jacobian MCP could not start: ${error.message}\n`);
+      process.exitCode = 1;
+    }
     return;
   }
 
   // Forward everything else to the Python CLI.
   const { launch } = require("./launcher.cjs");
-  launch("jacobian.cli", args);
+  try {
+    launch("jacobian.cli", args);
+  } catch (error) {
+    stderr.write(`Jacobian could not start: ${error.message}\n`);
+    process.exitCode = 1;
+  }
 }
 
 main();

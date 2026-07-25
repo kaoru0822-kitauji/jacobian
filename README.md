@@ -213,10 +213,16 @@ authorized `certificate.verify` boundary. Both bundled environments pin Lean
 Prepare the pinned local runtime with:
 
 ```sh
+elan toolchain install leanprover/lean4:v4.31.0
 cd lean
 lake update
 lake build
 ```
+
+Jacobian selects that exact toolchain explicitly when it runs Lean, so it does
+not depend on the shell's current directory or require a global Elan default.
+If setup is incomplete, confirm the pinned toolchain from any directory with
+`elan run leanprover/lean4:v4.31.0 lean -V`.
 
 The checker rejects user-supplied imports, `sorry`, `admit`, `native_decide`,
 unsafe declarations, and metaprogram execution. It verifies the requested

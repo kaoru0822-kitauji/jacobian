@@ -13,6 +13,7 @@ from typing import Any
 
 LEAN_VERSION = "4.31.0"
 LEAN_COMMIT = "68218e876d2a38b1985b8590fff244a83c321783"
+LEAN_TOOLCHAIN = f"leanprover/lean4:v{LEAN_VERSION}"
 MATHLIB_COMMIT = "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
 MATHLIB_AXIOMS = frozenset({"Classical.choice", "Quot.sound", "propext"})
 _FORBIDDEN = re.compile(
@@ -21,6 +22,29 @@ _FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 _AXIOMS = re.compile(r"'jacobian_theorem' depends on axioms: \[([^\]]*)\]")
+_LEAN_ERROR = re.compile(
+    r"^[^\r\n]+:(?P<line>\d+):(?P<column>\d+):\s*error:\s*(?P<message>.+)$",
+    re.MULTILINE,
+)
+_QUOTED_LOCAL_PATH = re.compile(
+    r"""(?:
+        "(?:[A-Za-z]:[\\/]|/|~[\\/]|\\\\)[^"\r\n]*"
+        |'(?:[A-Za-z]:[\\/]|/|~[\\/]|\\\\)[^'\r\n]*'
+    )""",
+    re.VERBOSE,
+)
+_UNQUOTED_LOCAL_PATH = re.compile(
+    r"(?:[A-Za-z]:[\\/]|/|~[\\/]|\\\\).*$",
+)
+_INTERNAL_LABEL = re.compile(
+    r"""\b(?:provider|internal[-_ ]?id|request[-_ ]?id)
+        \s*(?:=|:)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+class _LeanSetupError(RuntimeError):
+    """A locally actionable Lean setup failure safe to return to the caller."""
 
 
 def _reject(detail: str) -> dict[str, Any]:
@@ -32,6 +56,25 @@ def _reject(detail: str) -> dict[str, Any]:
         "coverage": "NOT_APPLICABLE",
         "detail": detail,
     }
+
+
+def _lean_rejection(diagnostics: str) -> str:
+    match = _LEAN_ERROR.search(diagnostics)
+    if match is None:
+        return (
+            "Lean rejected the proof. Check the statement and proof body, then retry."
+        )
+    message = _QUOTED_LOCAL_PATH.sub("<local-path>", match.group("message"))
+    message = _UNQUOTED_LOCAL_PATH.sub("<local-path>", message)
+    message = " ".join(_INTERNAL_LABEL.sub("", message).split())
+    if not message:
+        return (
+            "Lean rejected the proof. Check the statement and proof body, then retry."
+        )
+    return (
+        f"Lean rejected the proof at line {match.group('line')}, column "
+        f"{match.group('column')}: {message[:400]}. Correct the proof body and retry."
+    )
 
 
 def _text(value: object, *, name: str, limit: int) -> str:
@@ -66,48 +109,60 @@ def _source(statement: str, proof: str, import_name: str | None) -> str:
     return "\n".join(lines)
 
 
-def _elan_executable(name: str) -> str:
+def _lean_command(name: str) -> tuple[str, ...]:
+    elan = shutil.which("elan")
+    if elan is not None:
+        return (elan, "run", LEAN_TOOLCHAIN, name)
     launcher = shutil.which(name)
     if launcher is None:
-        raise RuntimeError(f"the pinned {name} executable is unavailable")
-    elan = shutil.which("elan")
-    if elan is None:
-        return launcher
-    executable = subprocess.run(
-        [elan, "which", name],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=5,
-    ).stdout.strip()
-    if not Path(executable).is_file():
-        raise RuntimeError(f"elan returned an invalid {name} executable")
-    return executable
+        raise _LeanSetupError(
+            f"The pinned Lean {LEAN_VERSION} toolchain is unavailable. Install "
+            f"it with `elan toolchain install {LEAN_TOOLCHAIN}`, then retry."
+        )
+    return (launcher,)
 
 
-def _validate_lean(executable: str) -> None:
-    if (
-        subprocess.run(
-            [executable, "-V"],
+def _validate_lean(
+    command: tuple[str, ...],
+    *,
+    cwd: Path | None = None,
+) -> None:
+    try:
+        version = subprocess.run(
+            [*command, "-V"],
+            cwd=cwd,
             check=True,
             capture_output=True,
             text=True,
             timeout=5,
         ).stdout.strip()
-        != LEAN_VERSION
-    ):
-        raise RuntimeError("the installed Lean version is not authorized")
-    if (
-        subprocess.run(
-            [executable, "-g"],
+        commit = subprocess.run(
+            [*command, "-g"],
+            cwd=cwd,
             check=True,
             capture_output=True,
             text=True,
             timeout=5,
         ).stdout.strip()
-        != LEAN_COMMIT
-    ):
-        raise RuntimeError("the installed Lean commit is not authorized")
+    except subprocess.SubprocessError as exc:
+        raise _LeanSetupError(
+            f"The pinned Lean {LEAN_VERSION} toolchain is unavailable. Install "
+            f"it with `elan toolchain install {LEAN_TOOLCHAIN}`, then retry."
+        ) from exc
+    if version != LEAN_VERSION or commit != LEAN_COMMIT:
+        raise _LeanSetupError(
+            f"The installed Lean toolchain does not match Jacobian's pinned "
+            f"{LEAN_VERSION} release. Reinstall it with `elan toolchain install "
+            f"{LEAN_TOOLCHAIN}`, then retry."
+        )
+
+
+def _elan_home(command: tuple[str, ...]) -> str | None:
+    configured = os.environ.get("ELAN_HOME")
+    if configured is not None or len(command) == 1:
+        return configured
+    original_home = os.environ.get("HOME")
+    return str(Path(original_home) / ".elan") if original_home is not None else None
 
 
 def _validate_package_checkout(
@@ -195,36 +250,38 @@ def _run_lean(
     *,
     environment_name: str,
 ) -> subprocess.CompletedProcess[str]:
-    executable = _elan_executable("lean")
-    _validate_lean(executable)
     if environment_name == "CORE":
-        command = [executable]
+        command = list(_lean_command("lean"))
+        _validate_lean(tuple(command))
         memory_mb = "1024"
         timeout_seconds = 25
         cwd_context = tempfile.TemporaryDirectory(prefix="jacobian-lean-")
         cwd = Path(cwd_context.name)
-        process_environment = {
-            "HOME": cwd_context.name,
-            "LANG": "C.UTF-8",
-            "LC_ALL": "C.UTF-8",
-            "PATH": str(Path(executable).parent),
-        }
+        runtime_home = cwd_context.name
     elif environment_name == "MATHLIB":
         runtime = _mathlib_runtime()
-        lake = _elan_executable("lake")
-        command = [lake, "env", "lean"]
+        lake_command = _lean_command("lake")
+        command = [*lake_command, "env", "lean"]
+        _validate_lean(tuple(command), cwd=runtime)
         memory_mb = "8192"
         timeout_seconds = 90
         cwd_context = tempfile.TemporaryDirectory(prefix="jacobian-lean-home-")
         cwd = runtime
-        process_environment = {
-            "HOME": os.environ.get("HOME", cwd_context.name),
-            "LANG": "C.UTF-8",
-            "LC_ALL": "C.UTF-8",
-            "PATH": os.environ.get("PATH", str(Path(executable).parent)),
-        }
+        runtime_home = os.environ.get("HOME", cwd_context.name)
     else:
         raise ValueError("unknown Lean environment")
+    elan_home = _elan_home(tuple(command))
+    process_environment = {
+        "HOME": runtime_home,
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": (
+            os.environ.get("PATH", str(Path(command[0]).parent))
+            if environment_name == "MATHLIB"
+            else str(Path(command[0]).parent)
+        ),
+        **({"ELAN_HOME": elan_home} if elan_home is not None else {}),
+    }
     with cwd_context:
         return subprocess.run(
             [
@@ -321,7 +378,7 @@ def check_kernel_certificate(request: dict[str, Any]) -> dict[str, Any]:
         )
         diagnostics = (completed.stdout + completed.stderr).strip()
         if completed.returncode != 0:
-            return _reject("Lean rejected the proof: " + diagnostics[:2_000])
+            return _reject(_lean_rejection(diagnostics))
         reported_axioms = _reported_axioms(diagnostics)
         if not reported_axioms.issubset(allowed_axioms):
             return _reject("Lean proof has an unapproved trust base")
@@ -339,11 +396,17 @@ def check_kernel_certificate(request: dict[str, Any]) -> dict[str, Any]:
                 f"under {environment_name} with {trust_base}"
             ),
         }
-    except (
-        KeyError,
-        OSError,
-        subprocess.SubprocessError,
-        TypeError,
-        ValueError,
-    ) as exc:
+    except ValueError as exc:
         return _reject(str(exc))
+    except (KeyError, TypeError):
+        return _reject(
+            "The Lean certificate is incomplete or invalid. Recreate it from the "
+            "statement and proof body, then retry."
+        )
+    except _LeanSetupError as exc:
+        return _reject(str(exc))
+    except (OSError, subprocess.SubprocessError):
+        return _reject(
+            f"Lean {LEAN_VERSION} could not run locally. Confirm the pinned "
+            f"toolchain with `elan run {LEAN_TOOLCHAIN} lean -V`, then retry."
+        )

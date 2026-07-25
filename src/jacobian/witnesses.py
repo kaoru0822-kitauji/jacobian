@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from pydantic import ValidationError
 
 from jacobian.claims import ClaimValidationService
@@ -34,6 +36,8 @@ from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _conclusion_proving_absence(role: WitnessRole) -> Conclusion:
@@ -96,7 +100,10 @@ class WitnessSearchService:
                 claim_uri=claim_uri,
                 candidate_uri=candidate_uri,
                 plugin_id=plugin_id,
-                detail="wall_seconds must be positive",
+                detail=(
+                    "The witness-search time budget must be at least 1 second. "
+                    "Set wall_seconds to 1 or more, then retry."
+                ),
             )
         try:
             claim = self.store.get(claim_uri)
@@ -104,10 +111,14 @@ class WitnessSearchService:
             manifest = self.plugins.get(plugin_id)
             if candidate.manifest.schema_uri != manifest.candidate_schema_uri:
                 raise ValueError(
-                    "candidate schema does not match plugin candidate schema"
+                    "The candidate uses the wrong schema for this plugin. Use a "
+                    "candidate returned by the same reference domain, then retry."
                 )
             if candidate.manifest.semantics_uri != manifest.semantics_uri:
-                raise ValueError("candidate semantics do not match plugin semantics")
+                raise ValueError(
+                    "The candidate and plugin use different semantics. Choose the "
+                    "plugin from the candidate's reference domain, then retry."
+                )
             self.schemas.validate(
                 manifest.candidate_schema_uri,
                 candidate.payload,
@@ -185,20 +196,24 @@ class WitnessSearchService:
                         detail=response.detail,
                     )
                 raise ValueError(
-                    "proposed no-witness certificate was not verified for "
-                    "this claim and candidate"
+                    "The no-witness certificate was not verified for this claim and "
+                    "candidate. Verify a certificate bound to these exact artifacts."
                 )
             if response.status == WitnessSearchStatus.FOUND:
                 if response.role != role:
                     raise ValueError(
-                        "plugin witness role differs from the requested role"
+                        "The plugin returned a different witness role than requested. "
+                        "Call capability.describe and retry with a supported role."
                     )
                 if (
                     response.witness is None
                     or response.witness_format is None
                     or response.format_version is None
                 ):
-                    raise ValueError("FOUND response is missing witness data")
+                    raise ValueError(
+                        "The plugin reported FOUND without complete witness data. "
+                        "Retry once; if it repeats, inspect the local plugin log."
+                    )
                 witness = WitnessEnvelope(
                     witness_format=response.witness_format,
                     format_version=response.format_version,
@@ -263,11 +278,12 @@ class WitnessSearchService:
             ValidationError,
             ValueError,
         ) as exc:
+            detail = _witness_failure_detail(exc)
             return self._rejected(
                 claim_uri=claim_uri,
                 candidate_uri=candidate_uri,
                 plugin_id=plugin_id,
-                detail=str(exc),
+                detail=detail,
             )
 
     @staticmethod
@@ -313,3 +329,26 @@ def _proposed_conclusion(
     }:
         return Conclusion.FALSE
     return Conclusion.TRUE
+
+
+def _witness_failure_detail(exc: Exception) -> str:
+    if isinstance(exc, ValueError) and not isinstance(
+        exc,
+        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+    ):
+        return str(exc)
+    _LOGGER.warning("witness search failed", exc_info=exc)
+    if isinstance(exc, StoreError):
+        return (
+            "A required claim or candidate artifact is unavailable. Check the "
+            "artifact URIs, then retry."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The witness plugin is unavailable. Call capability.describe, choose "
+            "an installed reference domain, and retry."
+        )
+    return (
+        "The claim, candidate, or plugin response is invalid. Check the reference "
+        "contract and retry with matching artifacts."
+    )

@@ -56,7 +56,13 @@ class LeanService:
         proof: str,
         environment: LeanEnvironment = LeanEnvironment.CORE,
     ) -> LeanVerifyResult:
-        installation = self.installations[environment]
+        installation = self.installations.get(environment)
+        if installation is None:
+            raise ValueError(
+                f"Lean environment {environment.value} is not installed. Call "
+                "capability.describe with capability_id='lean.check' to list "
+                "installed environments."
+            )
         claim_payload = LeanClaim(
             environment=environment,
             statement=statement,

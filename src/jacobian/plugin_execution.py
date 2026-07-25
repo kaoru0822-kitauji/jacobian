@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import time
@@ -12,6 +13,32 @@ from jacobian.bounded_process import run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.implementation import package_source_digest
+
+_LOGGER = logging.getLogger(__name__)
+
+_PLUGIN_TIMEOUT = (
+    "The plugin did not finish within the allowed time. "
+    "Retry with a larger time budget or a smaller request."
+)
+_PLUGIN_OUTPUT_TOO_LARGE = (
+    "The plugin returned too much data. Retry with a smaller request."
+)
+_PLUGIN_DIAGNOSTICS_TOO_LARGE = (
+    "The plugin produced too many diagnostics. Retry with a smaller request "
+    "and inspect the local plugin log if the limit is reached again."
+)
+_PLUGIN_UNREADABLE_RESPONSE = (
+    "The plugin returned an unreadable response. Retry once; "
+    "if it happens again, inspect the local plugin log."
+)
+_PLUGIN_CHANGED = (
+    "The plugin changed after it was registered. "
+    "Reload Jacobian to register the current plugin version, then retry."
+)
+_PLUGIN_STOPPED = (
+    "The plugin stopped before returning a result. Retry once; "
+    "if it happens again, inspect the local plugin log."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +110,7 @@ class PluginExecutor:
                 status=ExecutionStatus.TIMEOUT,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin execution timed out",
+                detail=_PLUGIN_TIMEOUT,
                 runtime_ms=_elapsed_ms(started),
             )
 
@@ -92,7 +119,7 @@ class PluginExecutor:
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin output exceeds the configured limit",
+                detail=_PLUGIN_OUTPUT_TOO_LARGE,
                 runtime_ms=_elapsed_ms(started),
             )
         if completed.stderr_exceeded:
@@ -100,7 +127,7 @@ class PluginExecutor:
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin diagnostics exceed the configured limit",
+                detail=_PLUGIN_DIAGNOSTICS_TOO_LARGE,
                 runtime_ms=_elapsed_ms(started),
             )
         try:
@@ -110,20 +137,20 @@ class PluginExecutor:
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin returned invalid JSON",
+                detail=_PLUGIN_UNREADABLE_RESPONSE,
                 runtime_ms=_elapsed_ms(started),
             )
         if completed.returncode != 0:
-            detail = (
-                output.get("detail", "plugin execution failed")
-                if isinstance(output, dict)
-                else "plugin execution failed"
+            _LOGGER.warning(
+                "plugin worker stopped: response=%r diagnostics=%s",
+                output,
+                diagnostics,
             )
             return PluginExecutionResult(
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail=str(detail),
+                detail=_plugin_failure_detail(output),
                 runtime_ms=_elapsed_ms(started),
             )
         if not isinstance(output, dict):
@@ -131,15 +158,19 @@ class PluginExecutor:
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin response must be a JSON object",
+                detail=_PLUGIN_UNREADABLE_RESPONSE,
                 runtime_ms=_elapsed_ms(started),
             )
         if output.get("measured_implementation_digest") != expected_digest:
+            _LOGGER.warning(
+                "plugin worker measured an unexpected implementation: %r",
+                output,
+            )
             return PluginExecutionResult(
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin worker did not execute the resolved implementation",
+                detail=_PLUGIN_CHANGED,
                 runtime_ms=_elapsed_ms(started),
             )
         response = output.get("response")
@@ -148,7 +179,7 @@ class PluginExecutor:
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
-                detail="plugin response must be a JSON object",
+                detail=_PLUGIN_UNREADABLE_RESPONSE,
                 runtime_ms=_elapsed_ms(started),
             )
         return PluginExecutionResult(
@@ -162,6 +193,12 @@ class PluginExecutor:
 
 def _elapsed_ms(started: float) -> int:
     return int((time.monotonic() - started) * 1000)
+
+
+def _plugin_failure_detail(output: Any) -> str:
+    if isinstance(output, dict) and output.get("error_code") == "SOURCE_CHANGED":
+        return _PLUGIN_CHANGED
+    return _PLUGIN_STOPPED
 
 
 def _bounded_text(value: bytes | str | None, *, limit: int) -> str:

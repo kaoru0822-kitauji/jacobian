@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import sqlite3
 import threading
 import time
@@ -46,12 +47,18 @@ from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.structures import StructureService
 
+_LOGGER = logging.getLogger(__name__)
+
 _TERMINAL_STATES = {
     ExperimentState.COMPLETED,
     ExperimentState.CANCELLED,
     ExperimentState.TIMEOUT,
     ExperimentState.ERROR,
 }
+_EXPERIMENT_NOT_FOUND = (
+    "The experiment was not found. Check the URI returned by search.run or "
+    "search.enumerate, or start a new experiment."
+)
 
 
 class ExperimentError(RuntimeError):
@@ -234,7 +241,15 @@ class ExperimentService:
         else:
             raw_bytes = repr(raw).encode("utf-8")
         snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
-        detail = f"stored enumeration snapshot is invalid: {type(error).__name__}"
+        detail = (
+            "Stored experiment state is invalid. Restore the Jacobian state "
+            "directory from a trusted backup or start a new experiment."
+        )
+        _LOGGER.warning(
+            "quarantining invalid enumeration snapshot for %s",
+            experiment_uri,
+            exc_info=error,
+        )
         connection.execute(
             """
             UPDATE experiments
@@ -282,7 +297,17 @@ class ExperimentService:
                     CapabilityName.CANONICALIZER,
                 )
         except PluginRegistryError as exc:
-            raise ExperimentError(str(exc)) from exc
+            _LOGGER.warning("enumeration capability resolution failed", exc_info=exc)
+            capability_hint = (
+                "enumeration, evaluation, and Canonicalizer capabilities"
+                if selected.quotient_by_isomorphism
+                else "enumeration and evaluation capabilities"
+            )
+            raise ExperimentError(
+                "The enumeration plugin is unavailable or incomplete. Call "
+                "capability.describe, choose a reference domain with "
+                f"{capability_hint}, then retry."
+            ) from exc
 
         experiment_uri = f"experiment://{uuid.uuid4().hex}"
         now = _now()
@@ -322,7 +347,8 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
         if row is None:
-            raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
+            _LOGGER.warning("experiment not found: %s", experiment_uri)
+            raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
         try:
             return ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
@@ -345,7 +371,10 @@ class ExperimentService:
                 return snapshot
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError(f"experiment did not settle: {experiment_uri}")
+                raise TimeoutError(
+                    "The experiment is still running. Inspect it or wait again with "
+                    "a larger timeout."
+                )
             with self._thread_lock:
                 thread = self._threads.get(experiment_uri)
             if thread is not None:
@@ -367,7 +396,11 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
+                _LOGGER.warning(
+                    "experiment not found: %s",
+                    experiment_uri,
+                )
+                raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
             snapshot = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -767,6 +800,7 @@ class ExperimentService:
             ValidationError,
             ValueError,
         ) as exc:
+            detail = _enumeration_failure_detail(exc, experiment_uri)
             self._finish_if_possible(
                 experiment_uri,
                 started=started,
@@ -779,7 +813,7 @@ class ExperimentService:
                     evaluated_candidates=evaluated_candidates,
                     pages=pages,
                 ),
-                detail=str(exc),
+                detail=detail,
             )
         finally:
             with self._thread_lock:
@@ -891,6 +925,10 @@ class ExperimentService:
     ) -> None:
         """Fail closed when the terminal archive cannot be committed."""
 
+        _LOGGER.warning(
+            "enumeration terminal archive persistence failed",
+            exc_info=error,
+        )
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
@@ -902,7 +940,11 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
+                _LOGGER.warning(
+                    "experiment not found: %s",
+                    experiment_uri,
+                )
+                raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
             current = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -921,9 +963,9 @@ class ExperimentService:
                 archive_page_uris=tuple(page_uris),
                 accounting=accounting,
                 detail=(
-                    f"{detail}; terminal archive persistence failed: "
-                    f"{type(error).__name__}; "
-                    f"runtime_ms={int((time.monotonic() - started) * 1000)}"
+                    "Jacobian could not save the final experiment archive. "
+                    "The experiment remains unverified. Check state-directory space "
+                    "and permissions, then inspect the experiment."
                 ),
             )
             connection.execute(
@@ -961,7 +1003,8 @@ class ExperimentService:
                 (experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentNotFoundError(f"experiment not found: {experiment_uri}")
+                _LOGGER.warning("experiment not found: %s", experiment_uri)
+                raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
             snapshot = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -1022,9 +1065,11 @@ class ExperimentService:
                 (snapshot.experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentNotFoundError(
-                    f"experiment not found: {snapshot.experiment_uri}"
+                _LOGGER.warning(
+                    "experiment not found: %s",
+                    snapshot.experiment_uri,
                 )
+                raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
             current = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -1062,9 +1107,8 @@ class ExperimentService:
                 (snapshot.experiment_uri,),
             ).fetchone()
             if row is None:
-                raise ExperimentError(
-                    f"experiment not found: {snapshot.experiment_uri}"
-                )
+                _LOGGER.warning("experiment not found: %s", snapshot.experiment_uri)
+                raise ExperimentError(_EXPERIMENT_NOT_FOUND)
             current = ExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
             )
@@ -1095,6 +1139,33 @@ class ExperimentService:
                     terminal.experiment_uri,
                 ),
             )
+
+
+def _enumeration_failure_detail(exc: Exception, experiment_uri: str) -> str:
+    _LOGGER.warning(
+        "enumeration experiment failed for %s",
+        experiment_uri,
+        exc_info=exc,
+    )
+    if isinstance(exc, ExperimentError):
+        return str(exc)
+    if isinstance(exc, StoreError):
+        return (
+            "The enumeration stopped because required artifact or state data is "
+            "unavailable. Check the state directory and artifact URIs, then inspect "
+            "the experiment."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The enumeration stopped because a required plugin is unavailable. "
+            "Call capability.describe, reload the current plugin version, and start "
+            "a new experiment."
+        )
+    return (
+        "The enumeration stopped because an artifact or plugin response was "
+        "invalid. Check the reference contract and inspect the local Jacobian log "
+        "before starting a new experiment."
+    )
 
 
 def _now() -> datetime:

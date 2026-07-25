@@ -33,12 +33,14 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    error_code = "EXECUTION_FAILED"
     try:
         request = loads_strict_json(sys.stdin.buffer.read())
         if not isinstance(request, dict):
             raise TypeError("plugin request must be a JSON object")
         measured_before = package_source_digest(sys.argv[1])
         if measured_before != sys.argv[2]:
+            error_code = "SOURCE_CHANGED"
             raise ValueError("plugin source differs from its resolved digest")
         install_source_only_importer(sys.argv[1])
         with contextlib.redirect_stdout(sys.stderr):
@@ -48,6 +50,7 @@ def main() -> int:
             raise TypeError("plugin response must be a JSON object")
         measured_after = package_source_digest(sys.argv[1])
         if measured_after != measured_before:
+            error_code = "SOURCE_CHANGED"
             raise ValueError("plugin source changed during execution")
         sys.stdout.buffer.write(
             canonicalize_json(
@@ -60,7 +63,11 @@ def main() -> int:
         sys.stdout.buffer.write(b"\n")
         return 0
     except Exception as exc:  # untrusted failures are operational, never logical
-        error = {"error": type(exc).__name__, "detail": str(exc)}
+        error = {
+            "error": type(exc).__name__,
+            "error_code": error_code,
+            "detail": str(exc),
+        }
         sys.stdout.buffer.write(canonicalize_json(error))
         sys.stdout.buffer.write(b"\n")
         return 1

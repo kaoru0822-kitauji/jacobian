@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 
 from pydantic import ValidationError
@@ -34,6 +35,8 @@ from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class TransformationService:
@@ -87,13 +90,23 @@ class TransformationService:
         relation = TransformationRelation(requested_relation)
         try:
             if wall_seconds < 1:
-                raise ValueError("wall_seconds must be positive")
+                raise ValueError(
+                    "The transformation time budget must be at least 1 second. Set "
+                    "wall_seconds to 1 or more, then retry."
+                )
             source = self.store.get(source_uri)
             manifest = self.plugins.get(plugin_id)
             if source.manifest.schema_uri != manifest.candidate_schema_uri:
-                raise ValueError("source schema does not match plugin candidate schema")
+                raise ValueError(
+                    "The source artifact uses the wrong schema for this plugin. Use "
+                    "an artifact from the same reference domain, then retry."
+                )
             if source.manifest.semantics_uri != manifest.semantics_uri:
-                raise ValueError("source semantics do not match plugin semantics")
+                raise ValueError(
+                    "The source artifact and plugin use different semantics. Choose "
+                    "the plugin from the source artifact's reference domain, then "
+                    "retry."
+                )
             self.schemas.validate(source.manifest.schema_uri, source.payload)
             self.store.get_descriptor(target_schema_uri, expected_kind="schema")
             self.store.get_descriptor(
@@ -224,7 +237,11 @@ class TransformationService:
             ValidationError,
             ValueError,
         ) as exc:
-            return self._rejected(source_uri, started, str(exc))
+            return self._rejected(
+                source_uri,
+                started,
+                _transformation_failure_detail(exc),
+            )
 
     @staticmethod
     def _rejected(
@@ -278,3 +295,26 @@ class TransformationService:
                 ),
             ),
         )
+
+
+def _transformation_failure_detail(exc: Exception) -> str:
+    if isinstance(exc, ValueError) and not isinstance(
+        exc,
+        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+    ):
+        return str(exc)
+    _LOGGER.warning("representation transformation failed", exc_info=exc)
+    if isinstance(exc, StoreError):
+        return (
+            "A required source or target artifact is unavailable. Check the "
+            "artifact URIs, then retry."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The transformer plugin is unavailable. Call capability.describe, "
+            "choose an installed reference domain, and retry."
+        )
+    return (
+        "The source artifact or transformer response is invalid. Check the "
+        "reference contract and retry."
+    )

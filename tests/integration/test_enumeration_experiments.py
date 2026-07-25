@@ -21,7 +21,7 @@ from jacobian.contracts.results import (
     InputStatus,
     InputValidation,
 )
-from jacobian.experiments import ExperimentError
+from jacobian.experiments import ExperimentError, ExperimentNotFoundError
 from jacobian.kernel import JacobianKernel
 from jacobian.store import StoreError
 
@@ -119,6 +119,24 @@ def _matrix_claim_for_plugin(
     )
     assert validation.valid
     return claim.artifact_uri
+
+
+@pytest.mark.integration
+def test_unknown_experiment_error_explains_recovery(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    missing_uri = "experiment://missing"
+
+    with pytest.raises(
+        ExperimentNotFoundError,
+        match=r"Check the URI returned by search\.run or search\.enumerate",
+    ) as raised:
+        kernel.experiments.inspect(missing_uri)
+
+    assert missing_uri not in str(raised.value)
+    assert missing_uri in caplog.text
 
 
 @pytest.mark.integration
@@ -522,6 +540,12 @@ def test_enumerator_timeout_remains_a_bounded_nonconclusion(tmp_path: Path) -> N
         )
     )
 
+    with pytest.raises(
+        TimeoutError,
+        match="Inspect it or wait again with a larger timeout",
+    ):
+        kernel.experiments.wait(handle.experiment_uri, timeout_seconds=0)
+
     snapshot = kernel.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=15,
@@ -618,13 +642,16 @@ def test_rejected_evaluation_batch_fails_enumeration(
     assert snapshot.stop_reason == EnumerationStopReason.ERROR
     assert snapshot.accounting.evaluated_candidates == 0
     assert snapshot.archive_page_uris == ()
-    assert "simulated incomplete evaluation" in snapshot.detail
+    assert "artifact or plugin response was invalid" in snapshot.detail
+    assert "reference contract" in snapshot.detail
+    assert "simulated incomplete evaluation" not in snapshot.detail
 
 
 @pytest.mark.integration
 def test_terminal_archive_failure_marks_enumeration_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     claim_uri, plugin_id = _claim(
@@ -666,7 +693,12 @@ def test_terminal_archive_failure_marks_enumeration_error(
     assert snapshot.state == ExperimentState.ERROR
     assert snapshot.stop_reason == EnumerationStopReason.ERROR
     assert snapshot.archive_uri is None
-    assert "terminal archive persistence failed" in snapshot.detail
+    assert "could not save the final experiment archive" in snapshot.detail
+    assert "experiment remains unverified" in snapshot.detail
+    assert "StoreError" not in snapshot.detail
+    assert "runtime_ms" not in snapshot.detail
+    assert "fixture archive failure" not in snapshot.detail
+    assert "fixture archive failure" in caplog.text
 
 
 @pytest.mark.integration

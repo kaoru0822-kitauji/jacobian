@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import platform
 import subprocess
@@ -47,11 +48,49 @@ from jacobian.registry import (
     CheckerRegistryError,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.store import (
+    ArtifactIntegrityError,
+    ArtifactNotFoundError,
+    ArtifactStore,
+    StoredArtifact,
+    StoreError,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class CheckerExecutionError(RuntimeError):
     """An authorized checker failed operationally."""
+
+
+_CHECKER_OUTPUT_TOO_LARGE = (
+    "The checker returned too much data. Retry with a smaller input "
+    "and inspect the local checker log if the limit is reached again."
+)
+_CHECKER_DIAGNOSTICS_TOO_LARGE = (
+    "The checker produced too many diagnostics. Retry with a smaller input "
+    "and inspect the local checker log if the limit is reached again."
+)
+_CHECKER_UNREADABLE_RESPONSE = (
+    "The checker returned an unreadable response. Retry once; "
+    "if it happens again, inspect the local checker log."
+)
+_CHECKER_CHANGED = (
+    "The checker changed after authorization. Authorize the current checker version, "
+    "then retry."
+)
+_CHECKER_STOPPED = (
+    "The checker stopped before returning a decision. Retry once; "
+    "if it happens again, inspect the local checker log."
+)
+_CHECKER_INVALID_DECISION = (
+    "The checker returned an invalid decision. Inspect the local checker log "
+    "before retrying."
+)
+_CHECKER_TIMEOUT = (
+    "The checker did not finish within the allowed time. "
+    "Retry with a smaller input and inspect the local checker log if it times out again."
+)
 
 
 def _digest_bytes(data: bytes) -> str:
@@ -69,6 +108,39 @@ def _environment_digest(checker_digest: str) -> str:
                 "checker_digest": checker_digest,
             }
         )
+    )
+
+
+def _checker_failure_detail(response: Any) -> str:
+    if isinstance(response, dict) and response.get("error_code") == "SOURCE_CHANGED":
+        return _CHECKER_CHANGED
+    return _CHECKER_STOPPED
+
+
+def _verification_input_failure_detail(exc: Exception) -> str:
+    if isinstance(exc, CheckerRegistryError):
+        return str(exc)
+    if isinstance(exc, ValueError) and not isinstance(
+        exc,
+        (SchemaRegistryError, ValidationError),
+    ):
+        return str(exc)
+    _LOGGER.warning("verification input validation failed", exc_info=exc)
+    return (
+        "The evidence does not match its registered schema. Recreate it from the "
+        "reference contract and the exact claim and candidate, then retry."
+    )
+
+
+def _verification_storage_failure_detail(exc: StoreError) -> str:
+    if isinstance(exc, ArtifactIntegrityError):
+        return (
+            "Jacobian detected corrupted local verification data. Restore the "
+            "state directory from a trusted backup, then retry."
+        )
+    return (
+        "Jacobian could not read or save verification data. Check the state "
+        "directory and available disk space, then retry."
     )
 
 
@@ -158,32 +230,37 @@ class VerificationService:
                 timeout=effective_timeout,
             )
         if completed.stdout_exceeded:
-            raise CheckerExecutionError("checker output exceeds the configured limit")
+            raise CheckerExecutionError(_CHECKER_OUTPUT_TOO_LARGE)
         if completed.stderr_exceeded:
-            raise CheckerExecutionError(
-                "checker diagnostics exceed the configured limit"
-            )
+            raise CheckerExecutionError(_CHECKER_DIAGNOSTICS_TOO_LARGE)
         try:
             response = loads_strict_json(completed.stdout)
         except ValueError as exc:
-            raise CheckerExecutionError("checker returned invalid JSON") from exc
+            raise CheckerExecutionError(_CHECKER_UNREADABLE_RESPONSE) from exc
         if completed.returncode != 0:
-            detail = (
-                response.get("detail", "checker failed")
-                if isinstance(response, dict)
-                else "checker failed"
+            _LOGGER.warning(
+                "checker worker stopped: response=%r diagnostics=%r",
+                response,
+                completed.stderr,
             )
-            raise CheckerExecutionError(str(detail))
+            raise CheckerExecutionError(_checker_failure_detail(response))
         if not isinstance(response, dict):
-            raise CheckerExecutionError("checker worker returned a non-object")
+            raise CheckerExecutionError(_CHECKER_UNREADABLE_RESPONSE)
         if response.get("measured_checker_digest") != expected_digest:
-            raise CheckerExecutionError(
-                "checker worker did not measure the authorized source digest"
+            _LOGGER.warning(
+                "checker worker measured an unexpected implementation: %r",
+                response,
             )
+            raise CheckerExecutionError(_CHECKER_CHANGED)
         try:
             return CheckerDecision.model_validate(response.get("decision"))
         except ValidationError as exc:
-            raise CheckerExecutionError("checker returned an invalid decision") from exc
+            _LOGGER.warning(
+                "checker returned an invalid decision: %r",
+                response,
+                exc_info=exc,
+            )
+            raise CheckerExecutionError(_CHECKER_INVALID_DECISION) from exc
 
     def verify_witness(
         self,
@@ -206,7 +283,8 @@ class VerificationService:
             witness = WitnessEnvelope.model_validate(witness_artifact.payload)
             if witness.bindings.encoding_digest is not None:
                 raise ValueError(
-                    "direct witnesses do not support external encoding bindings"
+                    "This witness includes an unsupported encoding binding. "
+                    "Recreate it without encoding_digest, then retry."
                 )
             scope = None
             if witness.bindings.scope_digest is not None:
@@ -228,14 +306,16 @@ class VerificationService:
             }
             if witness.bindings.model_dump(mode="json") != expected_bindings:
                 raise ValueError(
-                    "witness bindings do not match the verification target"
+                    "The witness does not match the supplied claim and candidate. "
+                    "Recreate the witness from those exact artifacts, then retry."
                 )
             required_parents = {claim_uri, candidate_uri}
             if scope is not None:
                 required_parents.add(scope.artifact_uri)
             if not required_parents.issubset(witness_artifact.manifest.parents):
                 raise ValueError(
-                    "witness artifact parents do not bind its verification target"
+                    "The witness is missing required claim or candidate lineage. "
+                    "Recreate it from the supplied artifacts, then retry."
                 )
             if (
                 claim.manifest.semantics_uri != candidate.manifest.semantics_uri
@@ -247,7 +327,8 @@ class VerificationService:
                 )
             ):
                 raise ValueError(
-                    "claim, candidate, witness, and scope semantics differ"
+                    "The claim, candidate, witness, and scope use different "
+                    "semantics. Use artifacts from one reference contract, then retry."
                 )
 
             checker = self.checker_registry.require_compatible(
@@ -367,7 +448,7 @@ class VerificationService:
         except subprocess.TimeoutExpired:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
-                detail="checker timed out",
+                detail=_CHECKER_TIMEOUT,
                 started=started,
             )
         except CheckerExecutableChangedError as exc:
@@ -382,11 +463,21 @@ class VerificationService:
             ValueError,
             ValidationError,
         ) as exc:
-            return self._rejected_input(str(exc), started=started)
+            return self._rejected_input(
+                _verification_input_failure_detail(exc),
+                started=started,
+            )
+        except ArtifactNotFoundError:
+            return self._rejected_input(
+                "A required verification artifact is unavailable or invalid. "
+                "Check the artifact URIs and retry.",
+                started=started,
+            )
         except StoreError as exc:
+            _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
-                detail=str(exc),
+                detail=_verification_storage_failure_detail(exc),
                 started=started,
             )
         except CheckerExecutionError as exc:
@@ -414,7 +505,8 @@ class VerificationService:
             )
             if certificate.bindings.encoding_digest is not None:
                 raise ValueError(
-                    "v0.2 certificates do not support external encoding bindings"
+                    "This certificate includes an unsupported encoding binding. "
+                    "Recreate it without encoding_digest, then retry."
                 )
             claim = self._resolve_bound_parent(
                 certificate_artifact,
@@ -423,7 +515,8 @@ class VerificationService:
             )
             if certificate.bindings.candidate_digest is None:
                 raise ValueError(
-                    "v0.2 reference certificates require a candidate binding"
+                    "The certificate does not identify a candidate. Recreate it from "
+                    "the exact claim and candidate, then retry."
                 )
             candidate = self._resolve_bound_parent(
                 certificate_artifact,
@@ -443,7 +536,8 @@ class VerificationService:
             semantics_digest = self._semantics_digest(candidate)
             if certificate.bindings.semantics_digest != semantics_digest:
                 raise ValueError(
-                    "certificate semantics binding does not match the candidate"
+                    "The certificate and candidate use different semantics. Recreate "
+                    "the certificate from this candidate, then retry."
                 )
             if (
                 claim.manifest.semantics_uri != candidate.manifest.semantics_uri
@@ -455,7 +549,8 @@ class VerificationService:
                 )
             ):
                 raise ValueError(
-                    "claim, candidate, certificate, and scope semantics differ"
+                    "The claim, candidate, certificate, and scope use different "
+                    "semantics. Use artifacts from one reference contract, then retry."
                 )
 
             if checker_id is None:
@@ -570,7 +665,7 @@ class VerificationService:
         except subprocess.TimeoutExpired:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
-                detail="checker timed out",
+                detail=_CHECKER_TIMEOUT,
                 started=started,
             )
         except CheckerExecutableChangedError as exc:
@@ -585,11 +680,21 @@ class VerificationService:
             ValueError,
             ValidationError,
         ) as exc:
-            return self._rejected_input(str(exc), started=started)
+            return self._rejected_input(
+                _verification_input_failure_detail(exc),
+                started=started,
+            )
+        except ArtifactNotFoundError:
+            return self._rejected_input(
+                "A required verification artifact is unavailable or invalid. "
+                "Check the artifact URIs and retry.",
+                started=started,
+            )
         except StoreError as exc:
+            _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
-                detail=str(exc),
+                detail=_verification_storage_failure_detail(exc),
                 started=started,
             )
         except CheckerExecutionError as exc:
@@ -626,7 +731,8 @@ class VerificationService:
                 or parsed_claim.bindings != transformation.bindings
             ):
                 raise ValueError(
-                    "transformation claim does not match its evidence envelope"
+                    "The transformation record does not match its claim. Recreate the "
+                    "transformation from the supplied source and target, then retry."
                 )
             source_semantics_digest = self._semantics_digest(source)
             target_semantics_digest = self._semantics_digest(target)
@@ -640,7 +746,8 @@ class VerificationService:
             }
             if transformation.bindings.model_dump(mode="json") != expected_bindings:
                 raise ValueError(
-                    "transformation bindings do not match source and target"
+                    "The transformation does not match the supplied source and target. "
+                    "Recreate it from those exact artifacts, then retry."
                 )
             required_parents = {
                 claim.artifact_uri,
@@ -649,7 +756,8 @@ class VerificationService:
             }
             if not required_parents.issubset(transformation_artifact.manifest.parents):
                 raise ValueError(
-                    "transformation artifact parents do not bind its objects"
+                    "The transformation is missing required source or target lineage. "
+                    "Recreate it from the supplied artifacts, then retry."
                 )
             checker = self.checker_registry.select_compatible(
                 evidence_kind=EvidenceKind.TRANSFORMATION,
@@ -754,7 +862,7 @@ class VerificationService:
         except subprocess.TimeoutExpired:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
-                detail="transformation checker timed out",
+                detail=_CHECKER_TIMEOUT,
                 started=started,
             )
         except CheckerExecutableChangedError as exc:
@@ -769,11 +877,21 @@ class VerificationService:
             ValueError,
             ValidationError,
         ) as exc:
-            return self._rejected_input(str(exc), started=started)
+            return self._rejected_input(
+                _verification_input_failure_detail(exc),
+                started=started,
+            )
+        except ArtifactNotFoundError:
+            return self._rejected_input(
+                "A required verification artifact is unavailable or invalid. "
+                "Check the artifact URIs and retry.",
+                started=started,
+            )
         except StoreError as exc:
+            _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
-                detail=str(exc),
+                detail=_verification_storage_failure_detail(exc),
                 started=started,
             )
         except CheckerExecutionError as exc:
@@ -806,9 +924,15 @@ class VerificationService:
                 claim.manifest.semantics_uri != original.manifest.semantics_uri
                 or original.manifest.semantics_uri != reduced.manifest.semantics_uri
             ):
-                raise ValueError("claim, original, and reduced semantics differ")
+                raise ValueError(
+                    "The claim, original object, and reduced object use different "
+                    "semantics. Use artifacts from one reference contract, then retry."
+                )
             if original.manifest.schema_uri != reduced.manifest.schema_uri:
-                raise ValueError("original and reduced schemas differ")
+                raise ValueError(
+                    "The original and reduced objects use different schemas. "
+                    "Run a reducer that preserves the object schema, then retry."
+                )
             semantics_digest = self._semantics_digest(reduced)
             bindings = EvidenceBindings(
                 claim_digest=claim.manifest.object_digest,
@@ -927,7 +1051,7 @@ class VerificationService:
         except subprocess.TimeoutExpired:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
-                detail="checker timed out",
+                detail=_CHECKER_TIMEOUT,
                 started=started,
             )
         except CheckerExecutableChangedError as exc:
@@ -942,11 +1066,21 @@ class VerificationService:
             ValueError,
             ValidationError,
         ) as exc:
-            return self._rejected_input(str(exc), started=started)
+            return self._rejected_input(
+                _verification_input_failure_detail(exc),
+                started=started,
+            )
+        except ArtifactNotFoundError:
+            return self._rejected_input(
+                "A required verification artifact is unavailable or invalid. "
+                "Check the artifact URIs and retry.",
+                started=started,
+            )
         except StoreError as exc:
+            _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
-                detail=str(exc),
+                detail=_verification_storage_failure_detail(exc),
                 started=started,
             )
         except CheckerExecutionError as exc:
@@ -971,14 +1105,18 @@ class VerificationService:
         ]
         if not matches:
             raise ValueError(
-                f"certificate {label} binding is not present in artifact parents"
+                f"The certificate is missing its bound {label} artifact. Recreate "
+                "the certificate from the exact verification inputs, then retry."
             )
         return self.store.get(sorted(matches)[0])
 
     @staticmethod
     def _checker_artifact(artifact: StoredArtifact | None) -> dict[str, Any]:
         if artifact is None:
-            raise ValueError("checker artifact cannot be absent")
+            raise ValueError(
+                "Verification evidence is incomplete. Recreate it from the exact "
+                "claim and candidate, then retry."
+            )
         return {
             "artifact_uri": artifact.artifact_uri,
             "object_digest": artifact.manifest.object_digest,

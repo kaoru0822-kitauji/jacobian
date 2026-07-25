@@ -84,26 +84,63 @@ class CapabilityService:
         started = time.monotonic()
         try:
             adapter = self._adapters[request.capability_id]
-        except KeyError as exc:
-            raise CapabilityError(
-                f"unknown capability: {request.capability_id}"
-            ) from exc
+        except KeyError:
+            result = _resolution_failure(
+                request=request,
+                capability_version="not-installed",
+                diagnostic=CapabilityDiagnostic(
+                    code="UNKNOWN_CAPABILITY",
+                    stage="capability_resolution",
+                    message=(f"Capability {request.capability_id!r} is not installed."),
+                    hint=(
+                        "Call capability.describe without capability_id to list "
+                        "installed capabilities, then retry with one of those IDs."
+                    ),
+                ),
+                context={
+                    "available_capability_ids": sorted(self._adapters),
+                },
+            )
+            _log_invocation(result, started)
+            return result
         descriptor = adapter.descriptor
         if request.mode not in descriptor.modes:
-            raise CapabilityError(
-                f"{request.capability_id} does not support {request.mode.value}"
+            result = _resolution_failure(
+                request=request,
+                capability_version=descriptor.version,
+                diagnostic=CapabilityDiagnostic(
+                    code="UNSUPPORTED_MODE",
+                    stage="capability_resolution",
+                    message=(
+                        f"Capability {request.capability_id!r} does not support "
+                        f"{request.mode.value} mode."
+                    ),
+                    hint=(
+                        "Call capability.describe for this capability, then retry "
+                        "with one of its advertised modes."
+                    ),
+                ),
+                context={
+                    "available_modes": [mode.value for mode in descriptor.modes],
+                },
             )
+            _log_invocation(result, started)
+            return result
         try:
             normalized_input = _validate_payload(descriptor.input_schema, request.input)
         except CapabilityError as exc:
+            path = _error_path(exc)
             result = _failed_result(
                 descriptor=descriptor,
                 request=request,
                 diagnostic=CapabilityDiagnostic(
                     code="INVALID_REQUEST",
                     stage="capability_input_validation",
-                    message=str(exc),
-                    path=_error_path(exc),
+                    message=(
+                        "The capability input does not match its advertised schema"
+                        + (f" at {path}." if path else ".")
+                    ),
+                    path=path,
                     expected="input matching the capability descriptor JSON Schema",
                     actual_type="object",
                     hint="Call capability.describe and follow the advertised input schema.",
@@ -121,16 +158,21 @@ class CapabilityService:
                 diagnostic=exc.diagnostic,
             )
         except Exception as exc:
+            _LOGGER.warning(
+                "capability %s stopped during execution",
+                request.capability_id,
+                exc_info=exc,
+            )
             result = _failed_result(
                 descriptor=descriptor,
                 request=request,
                 diagnostic=CapabilityDiagnostic(
                     code="ADAPTER_EXECUTION_FAILED",
                     stage="adapter_execution",
-                    message=f"Capability adapter failed: {type(exc).__name__}",
+                    message="The capability stopped before returning a result.",
                     hint=(
-                        "Retry only if the service is healthy; this result carries "
-                        "no mathematical conclusion."
+                        "Retry once. If it fails again, inspect the local Jacobian "
+                        "log for this capability."
                     ),
                 ),
             )
@@ -282,6 +324,33 @@ def _failed_result(
         assurance=CapabilityAssurance(
             level=CapabilityAssuranceLevel.HEURISTIC,
             basis="execution or input failure; no mathematical conclusion",
+        ),
+    )
+
+
+def _resolution_failure(
+    *,
+    request: CapabilityRequest,
+    capability_version: str,
+    diagnostic: CapabilityDiagnostic,
+    context: dict[str, object],
+) -> CapabilityResult:
+    return CapabilityResult(
+        capability_id=request.capability_id,
+        capability_version=capability_version,
+        mode=request.mode,
+        execution=Execution(
+            status=ExecutionStatus.ERROR,
+            detail=diagnostic.message,
+        ),
+        output={
+            "error": diagnostic.model_dump(mode="json", exclude_none=True),
+            **context,
+        },
+        diagnostics=(diagnostic,),
+        assurance=CapabilityAssurance(
+            level=CapabilityAssuranceLevel.HEURISTIC,
+            basis="capability resolution failed; no mathematical conclusion",
         ),
     )
 

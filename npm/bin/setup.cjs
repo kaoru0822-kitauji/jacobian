@@ -210,14 +210,23 @@ function resolveJsonEdit(operation, def, launcher) {
   try {
     root = JSON.parse(source);
   } catch (error) {
-    throw new Error(`Invalid JSON in ${def.configPath}: ${error.message}`);
+    throw new Error(
+      `Invalid JSON in ${def.configPath}: ${error.message}. No changes were written. ` +
+        "Repair this file, then retry.",
+    );
   }
   if (typeof root !== "object" || root === null || Array.isArray(root)) {
-    throw new Error(`Top-level value in ${def.configPath} must be an object`);
+    throw new Error(
+      `Top-level value in ${def.configPath} must be an object. No changes were ` +
+        "written. Repair this file, then retry.",
+    );
   }
   const section = root[def.jsonSection] ?? {};
   if (typeof section !== "object" || section === null || Array.isArray(section)) {
-    throw new Error(`${def.jsonSection} in ${def.configPath} must be an object`);
+    throw new Error(
+      `${def.jsonSection} in ${def.configPath} must be an object. No changes were ` +
+        "written. Repair this file, then retry.",
+    );
   }
 
   if (operation === "setup") {

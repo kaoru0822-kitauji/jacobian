@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import platform
 import time
 from collections.abc import Sequence
@@ -35,6 +36,8 @@ from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class EvaluationService:
@@ -93,7 +96,10 @@ class EvaluationService:
                 plugin_id=plugin_id,
                 profile=selected_profile,
                 seed=seed,
-                error="wall_seconds must be positive",
+                error=(
+                    "The evaluation time budget must be at least 1 second. Set "
+                    "wall_seconds to 1 or more, then retry."
+                ),
             )
 
         validation = self.claims.validate(
@@ -124,7 +130,7 @@ class EvaluationService:
                 plugin_id=plugin_id,
                 profile=selected_profile,
                 seed=seed,
-                error=str(exc),
+                error=_evaluation_failure_detail(exc),
             )
 
         started = time.monotonic()
@@ -138,7 +144,11 @@ class EvaluationService:
                         result=ResultEnvelope(
                             execution=Execution(
                                 status=ExecutionStatus.TIMEOUT,
-                                detail="batch wall-clock budget exhausted",
+                                detail=(
+                                    "The evaluation batch reached its time budget. "
+                                    "Retry with fewer candidates or a larger "
+                                    "wall_seconds budget."
+                                ),
                             ),
                             input=InputValidation(status=InputStatus.ACCEPTED),
                             conclusion=Conclusion.UNKNOWN,
@@ -151,7 +161,10 @@ class EvaluationService:
                             claim_digest=claim.manifest.object_digest,
                             semantics_digest=semantics_digest,
                         ),
-                        detail="batch wall-clock budget exhausted",
+                        detail=(
+                            "The evaluation batch reached its time budget. Retry "
+                            "with fewer candidates or a larger wall_seconds budget."
+                        ),
                     )
                 )
                 continue
@@ -204,10 +217,14 @@ class EvaluationService:
             candidate = self.store.get(candidate_uri)
             if candidate.manifest.schema_uri != candidate_schema_uri:
                 raise ValueError(
-                    "candidate schema does not match the plugin candidate schema"
+                    "The candidate uses the wrong schema for this plugin. Use a "
+                    "candidate returned by the same reference domain, then retry."
                 )
             if candidate.manifest.semantics_uri != semantics_uri:
-                raise ValueError("candidate semantics do not match plugin semantics")
+                raise ValueError(
+                    "The candidate and plugin use different semantics. Choose the "
+                    "plugin from the candidate's reference domain, then retry."
+                )
             self.schemas.validate(candidate_schema_uri, candidate.payload)
             request = {
                 "request_version": "1",
@@ -282,13 +299,14 @@ class EvaluationService:
             ValidationError,
             ValueError,
         ) as exc:
+            detail = _evaluation_failure_detail(exc)
             return EvaluationItem(
                 candidate_uri=candidate_uri,
                 result=ResultEnvelope(
                     execution=Execution(status=ExecutionStatus.COMPLETED),
                     input=InputValidation(
                         status=InputStatus.REJECTED,
-                        errors=(str(exc),),
+                        errors=(detail,),
                     ),
                     conclusion=Conclusion.UNKNOWN,
                     assurance=Assurance(
@@ -298,7 +316,7 @@ class EvaluationService:
                         verification=Verification.UNVERIFIED,
                     ),
                 ),
-                detail=str(exc),
+                detail=detail,
             )
 
     @staticmethod
@@ -340,6 +358,29 @@ def require_complete_evaluation_batch(
             or "evaluation did not cover the selected candidates"
         )
         raise ValueError(detail)
+
+
+def _evaluation_failure_detail(exc: Exception) -> str:
+    if isinstance(exc, ValueError) and not isinstance(
+        exc,
+        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+    ):
+        return str(exc)
+    _LOGGER.warning("candidate evaluation failed", exc_info=exc)
+    if isinstance(exc, StoreError):
+        return (
+            "A required claim or candidate artifact is unavailable. Check the "
+            "artifact URIs, then retry."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The evaluator plugin is unavailable. Call capability.describe, choose "
+            "an installed reference domain, and retry."
+        )
+    return (
+        "The claim, candidate, or evaluator response is invalid. Check the reference "
+        "contract and retry with matching artifacts."
+    )
 
 
 def _evaluation_environment_digest(evaluator_digest: str) -> str:

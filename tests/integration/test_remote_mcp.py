@@ -38,6 +38,104 @@ def test_static_tokens_bind_distinct_authenticated_subjects() -> None:
 
 
 @pytest.mark.integration
+def test_remote_configuration_errors_name_the_rule_and_recovery(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=r"tenant_id must start with a letter or digit",
+    ):
+        StaticTokenGrant(tenant_id="bad subject", token="a" * 32)
+
+    router = TenantKernelRouter(tmp_path, install_references=False)
+    with pytest.raises(
+        PermissionError,
+        match="Authenticate with a configured bearer token and retry",
+    ):
+        router.kernel_for(None)
+    with pytest.raises(
+        PermissionError,
+        match="Check the server token configuration",
+    ):
+        router.kernel_for("bad subject")
+
+    missing = tmp_path / "missing-tokens.json"
+    with pytest.raises(
+        ValueError,
+        match="Check that the file exists, is readable, and contains valid JSON",
+    ):
+        load_static_token_file(missing)
+
+    token_file = tmp_path / "invalid-tokens.json"
+    token_file.write_bytes(b"\xff\xfe")
+    with pytest.raises(
+        ValueError,
+        match="Check that the file exists, is readable, and contains valid JSON",
+    ):
+        load_static_token_file(token_file)
+
+    token_file.write_text(
+        json.dumps(
+            {
+                "tokens": [
+                    {
+                        "tenant_id": "alpha",
+                        "token": "a" * 32,
+                        "unexpected": True,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        ValueError,
+        match="unsupported field 'unexpected' in token grant 1",
+    ):
+        load_static_token_file(token_file)
+
+    invalid_records = [
+        ("not-an-object", "token grant 1 must be a JSON object"),
+        (
+            {"tenant_id": 1, "token": "a" * 32},
+            "tenant_id in token grant 1 must be a string",
+        ),
+        (
+            {"tenant_id": "alpha", "token": 1},
+            "token in token grant 1 must be a string",
+        ),
+        (
+            {"tenant_id": "alpha", "token": "a" * 32, "scopes": [1]},
+            "scopes in token grant 1 must be an array of non-empty strings",
+        ),
+    ]
+    for record, expected in invalid_records:
+        token_file.write_text(
+            json.dumps({"tokens": [record]}),
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match=expected):
+            load_static_token_file(token_file)
+
+    token_file.write_text(
+        json.dumps(
+            {
+                "tokens": [
+                    {"tenant_id": "alpha", "token": "a" * 32},
+                    {"tenant_id": "beta", "token": "short"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        ValueError,
+        match="token grant 2: remote bearer tokens must contain at least 32 characters",
+    ):
+        load_static_token_file(token_file)
+
+
+@pytest.mark.integration
 def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
     router = TenantKernelRouter(tmp_path, install_references=False)
     alpha = router.kernel_for("alpha")
@@ -163,6 +261,7 @@ async def _remote_tenant_scenario(port: int) -> None:
             httpx2.AsyncClient(
                 headers={"Authorization": f"Bearer {token}"},
                 trust_env=False,
+                timeout=30,
             ) as http,
             Client(
                 streamable_http_client(url, http_client=http),

@@ -77,7 +77,7 @@ def test_search_budget_rejects_unimplemented_parallel_workers() -> None:
 def test_search_request_requires_complete_counterexample_verification_policy() -> None:
     with pytest.raises(
         ValidationError,
-        match="witness role and counterexample checker must be configured together",
+        match="Set both witness_role and counterexample_checker_id, or omit both",
     ):
         SearchRunRequest(
             idempotency_key="search-contract-002",
@@ -96,7 +96,7 @@ def test_search_request_requires_complete_counterexample_verification_policy() -
 def test_search_counterexample_policy_rejects_supporting_witness_roles() -> None:
     with pytest.raises(
         ValidationError,
-        match="requires a defeating or refuting witness",
+        match="requires witness_role DEFEATS_CANDIDATE or REFUTES_CLAIM",
     ):
         SearchRunRequest(
             idempotency_key="search-contract-003",

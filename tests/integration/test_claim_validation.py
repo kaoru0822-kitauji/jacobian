@@ -97,3 +97,4 @@ def test_claim_validation_rejects_missing_plugin_capability(tmp_path: Path) -> N
     assert not result.valid
     assert result.input.status.value == "REJECTED"
     assert "WitnessOracle" in result.missing_capabilities
+    assert "capability.describe" in result.input.errors[0]

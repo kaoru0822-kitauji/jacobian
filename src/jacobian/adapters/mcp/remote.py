@@ -18,6 +18,10 @@ from jacobian.kernel import JacobianKernel
 _TENANT_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
+class AuthenticationError(PermissionError):
+    """A remote request lacks a usable authenticated tenant subject."""
+
+
 @dataclass(frozen=True, slots=True)
 class StaticTokenGrant:
     tenant_id: str
@@ -26,7 +30,10 @@ class StaticTokenGrant:
 
     def __post_init__(self) -> None:
         if not _TENANT_PATTERN.fullmatch(self.tenant_id):
-            raise ValueError("tenant_id has an invalid format")
+            raise ValueError(
+                "tenant_id must start with a letter or digit, contain only letters, "
+                "digits, '.', '_', or '-', and be at most 128 characters"
+            )
         if len(self.token) < 32:
             raise ValueError("remote bearer tokens must contain at least 32 characters")
         if not self.scopes:
@@ -79,10 +86,16 @@ class TenantKernelRouter:
         tenant = subject
         if tenant is None:
             if not self.allow_anonymous:
-                raise PermissionError("authenticated tenant subject is required")
+                raise AuthenticationError(
+                    "Authentication is required for this server. "
+                    "Authenticate with a configured bearer token and retry."
+                )
             tenant = "anonymous"
         if not _TENANT_PATTERN.fullmatch(tenant):
-            raise PermissionError("authenticated tenant subject is invalid")
+            raise AuthenticationError(
+                "The authenticated subject cannot be used for tenant isolation. "
+                "Check the server token configuration, then authenticate again."
+            )
         tenant_key = hashlib.sha256(tenant.encode("utf-8")).hexdigest()
         with self._lock:
             kernel = self._kernels.get(tenant_key)
@@ -104,36 +117,52 @@ def load_static_token_file(path: str | Path) -> tuple[StaticTokenGrant, ...]:
     selected = Path(path)
     try:
         payload: Any = json.loads(selected.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError("cannot read the remote auth token file") from exc
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "Jacobian could not read the remote token file. Check that the file "
+            "exists, is readable, and contains valid JSON, then retry."
+        ) from exc
     if not isinstance(payload, dict) or set(payload) != {"tokens"}:
         raise ValueError("token file must contain only a tokens array")
     records = payload["tokens"]
     if not isinstance(records, list):
         raise ValueError("token file tokens must be an array")
     grants: list[StaticTokenGrant] = []
-    for record in records:
-        if not isinstance(record, dict) or not set(record) <= {
+    for index, record in enumerate(records, start=1):
+        if not isinstance(record, dict):
+            raise ValueError(f"token grant {index} must be a JSON object")
+        extra_fields = set(record) - {
             "tenant_id",
             "token",
             "scopes",
-        }:
-            raise ValueError("token grants contain unsupported fields")
+        }
+        if extra_fields:
+            fields = ", ".join(repr(field) for field in sorted(extra_fields))
+            raise ValueError(
+                f"unsupported field {fields} in token grant {index}; "
+                "use only tenant_id, token, and scopes"
+            )
         tenant_id = record.get("tenant_id")
         token = record.get("token")
         scopes = record.get("scopes", ["jacobian:use"])
-        if (
-            not isinstance(tenant_id, str)
-            or not isinstance(token, str)
-            or not isinstance(scopes, list)
-            or not all(isinstance(scope, str) and scope for scope in scopes)
+        if not isinstance(tenant_id, str):
+            raise ValueError(f"tenant_id in token grant {index} must be a string")
+        if not isinstance(token, str):
+            raise ValueError(f"token in token grant {index} must be a string")
+        if not isinstance(scopes, list) or not all(
+            isinstance(scope, str) and scope for scope in scopes
         ):
-            raise ValueError("token grant fields have invalid types")
-        grants.append(
-            StaticTokenGrant(
-                tenant_id=tenant_id,
-                token=token,
-                scopes=tuple(scopes),
+            raise ValueError(
+                f"scopes in token grant {index} must be an array of non-empty strings"
             )
-        )
+        try:
+            grants.append(
+                StaticTokenGrant(
+                    tenant_id=tenant_id,
+                    token=token,
+                    scopes=tuple(scopes),
+                )
+            )
+        except ValueError as exc:
+            raise ValueError(f"token grant {index}: {exc}") from exc
     return tuple(grants)

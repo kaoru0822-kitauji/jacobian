@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
+const npmRoot = dirname(fileURLToPath(import.meta.url));
 
 import {
   clientDefinitions,
@@ -15,6 +18,11 @@ import {
   resolveClientEdit,
   SERVER_NAME,
 } from "./bin/setup.cjs";
+import {
+  EXPECTED_TOOLS,
+  handshakeFailure,
+  timeoutMessage,
+} from "./bin/doctor.cjs";
 
 /**
  * Create a fake home directory with selected client markers.
@@ -80,6 +88,43 @@ test("buildLauncher returns a version-matching launcher with mcp subcommand", ()
   assert.ok(launcher.args.length > 0);
   // The last arg should be "mcp" (the subcommand).
   assert.equal(launcher.args[launcher.args.length - 1], "mcp");
+});
+
+test("doctor errors hide request ids and provide a recovery command", () => {
+  const timeout = timeoutMessage(10000);
+  assert.match(timeout, /Jacobian did not answer within 10000 ms/);
+  assert.match(timeout, /npx jacobian setup/);
+  assert.doesNotMatch(timeout, /response id=/);
+
+  const handshake = handshakeFailure("tool-catalog request");
+  assert.match(handshake, /MCP tool-catalog request/);
+  assert.match(handshake, /npx jacobian doctor/);
+});
+
+test("doctor validates the default capability-first MCP profile", () => {
+  assert.deepEqual(EXPECTED_TOOLS, [
+    "capability.describe",
+    "capability.invoke",
+  ]);
+});
+
+test("launcher explains how to recover when no runtime is on PATH", () => {
+  const script = [
+    "try {",
+    "  require('./bin/launcher.cjs').resolvePython();",
+    "} catch (error) {",
+    "  process.stdout.write(error.message);",
+    "}",
+  ].join("\n");
+  const result = spawnSync(process.execPath, ["-e", script], {
+    cwd: npmRoot,
+    encoding: "utf8",
+    env: { ...process.env, PATH: "" },
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /requires Python 3\.12 or uv on PATH/);
+  assert.match(result.stdout, /npx jacobian doctor/);
+  assert.doesNotMatch(result.stdout, /no Python runtime found/);
 });
 
 test("setup writes a JSON config for Claude Code", async () => {
@@ -189,5 +234,58 @@ test("setup updates an existing JSON config without losing other servers", async
     assert.equal(config.someOtherSetting, true);
   } finally {
     await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("invalid JSON explains that setup made no changes", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-invalid-json-"));
+  try {
+    const home = await fakeHome(base, ["claude"]);
+    const claude = clientDefinitions(home).find((d) => d.id === "claude");
+    const launcher = {
+      command: "/usr/bin/node",
+      args: ["/path/to/jacobian", "mcp"],
+      version: "0.2.0-alpha.0",
+      package: null,
+    };
+    await writeFile(claude.configPath, "{ invalid", "utf8");
+
+    assert.throws(
+      () => resolveClientEdit("setup", claude, launcher),
+      /No changes were written\. Repair this file, then retry/,
+    );
+    assert.equal(await readFile(claude.configPath, "utf8"), "{ invalid");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("top-level setup failure gives a retry action without a stack trace", async () => {
+  const home = await mkdtemp(join(tmpdir(), "jacobian-cli-invalid-json-"));
+  try {
+    const configPath = join(home, ".claude.json");
+    await writeFile(configPath, "{ invalid", "utf8");
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(npmRoot, "bin", "jacobian.cjs"),
+        "setup",
+        "--client",
+        "claude",
+        "--yes",
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, HOME: home },
+      },
+    );
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Jacobian setup did not finish/);
+    assert.match(result.stderr, /retry `npx jacobian setup`/);
+    assert.doesNotMatch(result.stderr, /\n\s+at /);
+    assert.equal(await readFile(configPath, "utf8"), "{ invalid");
+  } finally {
+    await rm(home, { recursive: true, force: true });
   }
 });

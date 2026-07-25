@@ -738,7 +738,7 @@ def reference_catalog(
                 else None
             ),
         }
-    if lean is not None:
+    if lean is not None and LeanEnvironment.CORE in lean:
         core = lean[LeanEnvironment.CORE]
         catalog["lean4"] = {
             "agent_contract_uri": "reference://domain/lean4",

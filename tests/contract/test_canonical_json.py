@@ -36,6 +36,30 @@ def test_ambiguous_or_inexact_json_is_rejected(value: object) -> None:
 
 
 @pytest.mark.contract
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ('{"value": NaN}', "non-finite JSON value is not allowed"),
+        (
+            '{"secret": 1, "secret": 2}',
+            "duplicate JSON object key: 'secret'. Remove or rename one occurrence.",
+        ),
+        ({"value": (1, 2)}, "unsupported JSON value type"),
+    ],
+)
+def test_canonical_errors_preserve_only_repair_relevant_context(
+    value: object,
+    message: str,
+) -> None:
+    with pytest.raises(CanonicalizationError) as raised:
+        canonicalize_json(value)
+
+    assert str(raised.value) == message
+    assert "NaN" not in str(raised.value)
+    assert "tuple" not in str(raised.value)
+
+
+@pytest.mark.contract
 def test_canonical_rational_wire_model_rejects_unreduced_input() -> None:
     with pytest.raises(ValidationError):
         CanonicalRational.model_validate({"num": "2", "den": "4"})

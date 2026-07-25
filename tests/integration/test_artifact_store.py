@@ -323,9 +323,10 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
 
 @pytest.mark.integration
 @pytest.mark.conformance
-def test_store_wraps_filesystem_failures(
+def test_store_keeps_filesystem_paths_local(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     store = ArtifactStore(tmp_path)
     schema = store.register_descriptor(
@@ -349,7 +350,7 @@ def test_store_wraps_filesystem_failures(
         exist_ok: bool = False,
     ) -> None:
         if store.blob_root in path.parents:
-            raise OSError("simulated filesystem failure")
+            raise OSError("simulated filesystem failure at /private/provider/blob/path")
         original_mkdir(
             path,
             mode=mode,
@@ -359,9 +360,17 @@ def test_store_wraps_filesystem_failures(
 
     monkeypatch.setattr(Path, "mkdir", fail_blob_directory)
 
-    with pytest.raises(StoreError, match="writing blob"):
+    with pytest.raises(
+        StoreError,
+        match=(
+            r"Jacobian could not write artifact data\. Check the state directory "
+            r"and available disk space, then retry\."
+        ),
+    ) as raised:
         store.put(
             schema_uri=schema,
             semantics_uri=semantics,
             payload={"unique": "filesystem-error"},
         )
+    assert "/private/provider" not in str(raised.value)
+    assert "/private/provider" in caplog.text

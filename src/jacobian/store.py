@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import sqlite3
 import tempfile
@@ -24,6 +25,7 @@ _CANONICALIZER_NAME: Final = b"jacobian.rfc8785+nfc+exact-rational.v1"
 CANONICALIZER_DIGEST: Final = (
     "sha256:" + hashlib.sha256(_CANONICALIZER_NAME).hexdigest()
 )
+_LOGGER = logging.getLogger(__name__)
 
 _BOOTSTRAP_SCHEMA_URI: Final = (
     "artifact://sha256/" + hashlib.sha256(b"jacobian.bootstrap.schema.v1").hexdigest()
@@ -237,7 +239,11 @@ class ArtifactStore:
         try:
             return self._write_blob_unchecked(data)
         except OSError as exc:
-            raise StoreError(f"filesystem error while writing blob: {exc}") from exc
+            _LOGGER.exception("filesystem error while writing artifact data")
+            raise StoreError(
+                "Jacobian could not write artifact data. Check the state directory "
+                "and available disk space, then retry."
+            ) from exc
 
     def _write_blob_unchecked(self, data: bytes) -> str:
         digest = _sha256(data)

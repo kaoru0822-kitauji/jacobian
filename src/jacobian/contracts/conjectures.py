@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Any, Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
+from pydantic_core import PydanticCustomError
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.common import (
@@ -118,8 +119,9 @@ class PluginHypothesisProposal(ContractModel):
             ParameterRegionEvidence.VERIFIED_SUFFICIENT,
             ParameterRegionEvidence.VERIFIED_NECESSARY,
         }:
-            raise ValueError(
-                "hypothesis plugins cannot promote parameter-region evidence"
+            raise PydanticCustomError(
+                "parameter_region_promotion",
+                "hypothesis plugins cannot promote parameter-region evidence",
             )
         if (
             self.parameter_region is not None
@@ -157,13 +159,17 @@ class FalsificationPlan(ContractModel):
         canonicalize_json(self.initial_state)
         if (self.witness_role is None) != (self.counterexample_checker_id is None):
             raise ValueError(
-                "witness role and counterexample checker must be configured together"
+                "Set both witness_role and counterexample_checker_id, or omit both. "
+                "Use the reference contract to choose the checker."
             )
         if self.witness_role is not None and self.witness_role not in {
             WitnessRole.DEFEATS_CANDIDATE,
             WitnessRole.REFUTES_CLAIM,
         }:
-            raise ValueError("falsification requires a defeating or refuting witness")
+            raise ValueError(
+                "Falsification requires witness_role DEFEATS_CANDIDATE "
+                "or REFUTES_CLAIM."
+            )
         return self
 
 

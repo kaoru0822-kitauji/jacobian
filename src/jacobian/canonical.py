@@ -31,15 +31,17 @@ def _reject_float(_value: str) -> NoReturn:
     raise CanonicalizationError("JSON floating-point numbers are not allowed")
 
 
-def _reject_constant(value: str) -> NoReturn:
-    raise CanonicalizationError(f"non-finite JSON value is not allowed: {value}")
+def _reject_constant(_value: str) -> NoReturn:
+    raise CanonicalizationError("non-finite JSON value is not allowed")
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise CanonicalizationError(f"duplicate JSON object key: {key!r}")
+            raise CanonicalizationError(
+                f"duplicate JSON object key: {key!r}. Remove or rename one occurrence."
+            )
         result[key] = value
     return result
 
@@ -137,7 +139,7 @@ def _normalize(value: Any, *, limits: CanonicalLimits, depth: int) -> Any:
                 depth=depth + 1,
             )
         return result
-    raise CanonicalizationError(f"unsupported JSON value type: {type(value).__name__}")
+    raise CanonicalizationError("unsupported JSON value type")
 
 
 def canonicalize_json(

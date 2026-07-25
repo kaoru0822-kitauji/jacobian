@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import platform
 import sqlite3
@@ -59,6 +60,8 @@ from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
+
+_LOGGER = logging.getLogger(__name__)
 
 _TERMINAL_STATES = {
     ExperimentState.COMPLETED,
@@ -309,7 +312,15 @@ class SearchService:
         else:
             raw_bytes = repr(raw).encode("utf-8")
         snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
-        detail = f"stored search snapshot is invalid: {type(error).__name__}"
+        detail = (
+            "Stored search state is invalid. Restore the Jacobian state directory "
+            "from a trusted backup or start a new search."
+        )
+        _LOGGER.warning(
+            "quarantining invalid search snapshot for %s",
+            experiment_uri,
+            exc_info=error,
+        )
         detected_at = _now()
         connection.execute(
             """
@@ -411,7 +422,12 @@ class SearchService:
                     CapabilityName.WITNESS_ORACLE,
                 )
         except PluginRegistryError as exc:
-            raise SearchError(str(exc)) from exc
+            _LOGGER.warning("search capability resolution failed", exc_info=exc)
+            raise SearchError(
+                "The search plugin is unavailable or incomplete. Call "
+                "capability.describe, choose a reference domain with proposer, "
+                "refiner, and evaluator capabilities, then retry."
+            ) from exc
 
         effective_budget = self._effective_budget(
             selected.budget,
@@ -524,7 +540,10 @@ class SearchService:
         if existing is None:
             return None
         if existing["request_digest"] != request_digest:
-            raise SearchError("idempotency key is already bound to a different request")
+            raise SearchError(
+                "This idempotency key is already bound to a different request. "
+                "Reuse the original request or choose a new idempotency key."
+            )
         existing_snapshot = self._read_snapshot(
             connection,
             existing["experiment_uri"],
@@ -565,7 +584,10 @@ class SearchService:
                 return snapshot
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise TimeoutError(f"search did not settle: {experiment_uri}")
+                raise TimeoutError(
+                    "The search is still running. Inspect the experiment or wait "
+                    "again with a larger timeout."
+                )
             with self._thread_lock:
                 thread = self._threads.get(experiment_uri)
             if thread is not None:
@@ -647,7 +669,11 @@ class SearchService:
                 ).fetchone()
                 is None
             ):
-                raise SearchError(f"search not found: {experiment_uri}")
+                _LOGGER.warning("search experiment not found: %s", experiment_uri)
+                raise SearchError(
+                    "The experiment was not found. Check the URI returned by "
+                    "search.run or search.enumerate, or start a new experiment."
+                )
             rows = connection.execute(
                 """
                 SELECT event_json
@@ -961,7 +987,10 @@ class SearchService:
                                 checker_id = request.counterexample_checker_id
                                 if checker_id is None:
                                     raise SearchError(
-                                        "counterexample checker policy is missing"
+                                        "A counterexample witness was found, but no "
+                                        "checker was supplied. Set "
+                                        "counterexample_checker_id from the reference "
+                                        "contract and retry."
                                     )
                                 checker_remaining = _require_remaining_seconds(
                                     budget,
@@ -1210,11 +1239,12 @@ class SearchService:
             ValidationError,
             ValueError,
         ) as exc:
+            detail = _search_failure_detail(exc, experiment_uri)
             self._finish_if_possible(
                 experiment_uri,
                 state=ExperimentState.ERROR,
                 stop_reason=SearchStopReason.ERROR,
-                detail=str(exc),
+                detail=detail,
                 wall_time_ms=_used_wall_ms(accounting, started),
                 accounting_override=partial_accounting,
             )
@@ -1634,13 +1664,19 @@ class SearchService:
     ) -> None:
         """Fail closed when the terminal archive cannot be committed."""
 
+        _LOGGER.warning(
+            "search terminal archive persistence failed",
+            exc_info=error,
+        )
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, experiment_uri)
             if current.state in _TERMINAL_STATES:
                 return
             terminal_detail = (
-                f"{detail}; terminal archive persistence failed: {type(error).__name__}"
+                "Jacobian could not save the final experiment archive. "
+                "The experiment remains unverified. Check state-directory space and "
+                "permissions, then inspect the experiment."
             )
             terminal = _updated_snapshot(
                 current,
@@ -1781,7 +1817,11 @@ class SearchService:
             (experiment_uri,),
         ).fetchone()
         if row is None:
-            raise SearchError(f"search not found: {experiment_uri}")
+            _LOGGER.warning("search experiment not found: %s", experiment_uri)
+            raise SearchError(
+                "The experiment was not found. Check the URI returned by search.run "
+                "or search.enumerate, or start a new experiment."
+            )
         try:
             return SearchExperimentSnapshot.model_validate(
                 loads_strict_json(row["snapshot_json"])
@@ -1853,6 +1893,33 @@ class SearchService:
                 event.event_digest,
             ),
         )
+
+
+def _search_failure_detail(exc: Exception, experiment_uri: str) -> str:
+    _LOGGER.warning(
+        "search experiment failed for %s",
+        experiment_uri,
+        exc_info=exc,
+    )
+    if isinstance(exc, SearchError):
+        return str(exc)
+    if isinstance(exc, StoreError):
+        return (
+            "The search stopped because required artifact or state data is "
+            "unavailable. Check the state directory and artifact URIs, then inspect "
+            "the experiment."
+        )
+    if isinstance(exc, PluginRegistryError):
+        return (
+            "The search stopped because a required plugin is unavailable. Call "
+            "capability.describe, reload the current plugin version, and start a "
+            "new search."
+        )
+    return (
+        "The search stopped because an artifact or plugin response was invalid. "
+        "Check the reference contract and inspect the local Jacobian log before "
+        "starting a new search."
+    )
 
 
 def _now() -> datetime:
