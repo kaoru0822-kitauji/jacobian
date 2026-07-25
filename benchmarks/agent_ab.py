@@ -226,6 +226,7 @@ def _score_partition_report(
     if not isinstance(universe, list) or not isinstance(cases, list):
         raise BenchmarkError("partition report is malformed")
     memberships: dict[str, str] = {}
+    case_ids: set[str] = set()
     for item in cases:
         if (
             not isinstance(item, Mapping)
@@ -233,10 +234,16 @@ def _score_partition_report(
             or not isinstance(item.get("members"), list)
         ):
             raise BenchmarkError("partition case is malformed")
+        case_id = item["case_id"]
+        if not case_id or case_id in case_ids:
+            raise BenchmarkError(
+                "partition case identifiers must be distinct and non-empty"
+            )
+        case_ids.add(case_id)
         for member in item["members"]:
             if not isinstance(member, str) or member in memberships:
                 raise BenchmarkError("partition cases overlap or are malformed")
-            memberships[member] = item["case_id"]
+            memberships[member] = case_id
     if set(memberships) != set(universe):
         raise BenchmarkError("partition does not cover the hidden finite oracle")
     reported_groups = {

@@ -7,6 +7,7 @@
   "expected": {
     "conclusion": "TRUE",
     "constraints": {
+      "order": 6,
       "connected": true,
       "tree": true,
       "maximum_degree": 2

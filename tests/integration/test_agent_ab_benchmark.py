@@ -279,6 +279,47 @@ def test_ab_graph_scorer_rejects_false_certification(tmp_path: Path) -> None:
         raise AssertionError("false certification was accepted")
 
 
+def test_ab_graph_scorer_enforces_exact_vertex_order(tmp_path: Path) -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = load_cases(["GRAPH-PATH-AB-001"])[0]
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "assurance": "SELF_CHECKED",
+        "final_verification": "UNVERIFIED",
+        "graph": {
+            "vertices": ["0", "1", "2"],
+            "edges": [["0", "1"], ["1", "2"]],
+        },
+        "properties": {
+            "order": 3,
+            "size": 2,
+            "connected": True,
+            "tree": True,
+            "maximum_degree": 2,
+            "bipartite": True,
+            "triangle_count": 0,
+            "independence_number": 2,
+        },
+        "graph_uri": None,
+        "property_artifact_uri": None,
+    }
+
+    try:
+        score_report(
+            case,
+            report,
+            condition="control",
+            state_dir=tmp_path,
+            mcp_calls=[],
+        )
+    except BENCHMARK["BenchmarkError"] as exc:
+        assert "order constraint" in str(exc)
+    else:
+        raise AssertionError("wrong-order graph was accepted")
+
+
 def test_ab_partition_scorer_requires_checker_backed_coverage(tmp_path: Path) -> None:
     load_cases = cast(Any, BENCHMARK["load_cases"])
     score_report = cast(Any, BENCHMARK["score_report"])
@@ -371,3 +412,38 @@ def test_ab_partition_scorer_requires_checker_backed_coverage(tmp_path: Path) ->
         assert "exact verified capability trace" in str(exc)
     else:
         raise AssertionError("unbound partition report was accepted")
+
+
+def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = load_cases(["FINITE-PARTITION-AB-001"])[0]
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "assurance": "SELF_CHECKED",
+        "final_verification": "UNVERIFIED",
+        "cases": [
+            {"case_id": "same", "members": ["0", "3", "6", "9"]},
+            {"case_id": "same", "members": ["1", "4", "7", "10"]},
+            {"case_id": "r2", "members": ["2", "5", "8", "11"]},
+        ],
+        "scope_uri": None,
+        "claim_uri": None,
+        "partition_uri": None,
+        "certificate_uri": None,
+        "verification_record_uri": None,
+    }
+
+    try:
+        score_report(
+            case,
+            report,
+            condition="control",
+            state_dir=tmp_path,
+            mcp_calls=[],
+        )
+    except BENCHMARK["BenchmarkError"] as exc:
+        assert "distinct and non-empty" in str(exc)
+    else:
+        raise AssertionError("duplicate partition case identifiers were accepted")
