@@ -17,6 +17,10 @@ repository root:
 uv sync --dev
 ```
 
+On macOS, see the
+[Z3 installation note](../../README.md#macos-and-z3) if environment setup
+falls back to a source build.
+
 ## Create the experiment
 
 Save the following as `first_verified_result.py`:

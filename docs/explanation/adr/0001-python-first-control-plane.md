@@ -76,6 +76,7 @@ Python kernel
 | Run metadata | SQLite in WAL mode |
 | Blob storage | Atomic digest-keyed filesystem |
 | Search-side graph handling | NetworkX |
+| Exact finite-polytope generation | Z3 |
 | CLI | Typer |
 | Tests | pytest, Hypothesis, and `jsonschema` |
 | Performance benchmarks | pyperf |
@@ -89,6 +90,12 @@ JSON floating-point values in exact mathematical objects.
 An independent graph-domain checker should use a small standard-library graph
 traversal instead of importing its search plugin's NetworkX routines.
 
+Z3 is a required v0.2 runtime dependency for exact rational finite-polytope
+membership and separation. It generates candidate weights and separating
+certificates, but it does not authorize their mathematical conclusions. The
+independent checker replays those artifacts with `fractions.Fraction` and does
+not import Z3.
+
 At the user's explicit request, v0.2 pins the current v2 beta exactly:
 
 ```toml
@@ -99,18 +106,21 @@ The exact prerelease pin prevents an unreviewed beta upgrade. The MCP package
 is isolated under `adapters/mcp` so SDK migration does not affect mathematical
 schemas or verification code.
 
-## Planned optional backends
+## Specialized backends
 
-### v0.2
+### Required in v0.2
+
+- Z3 for exact rational finite-polytope membership and separation
+
+### Planned optional backends
 
 - nauty/gtools for graph canonicalization and nonisomorphic generation
-- Z3 for bounded Boolean, integer, and rational synthesis
 - pycddlib through `cdd.gmp` for exact rational polyhedra
 - HiGHS for exploratory LP/MIP
 - SoPlex for exact rational LP
 - `gmpy2.mpq` if `Fraction` becomes a measured bottleneck
 
-### M3 and later
+Planned for M3 and later:
 
 - PySAT for SAT, MaxSAT, and MUS/MCS workflows
 - cvc5 for SMT and SyGuS

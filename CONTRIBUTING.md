@@ -26,6 +26,10 @@ uv run mypy
 uv build
 ```
 
+On macOS, read the
+[Z3 installation note](README.md#macos-and-z3) before troubleshooting a
+source-build failure from `uv sync --dev`.
+
 Use focused tests while implementing. Run the complete applicable validation
 before handing off the final tree, and report only checks that actually ran.
 

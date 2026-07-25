@@ -34,6 +34,32 @@ uv sync --dev
 uv run jacobian --state-dir .jacobian init
 ```
 
+### macOS and Z3
+
+The locked environment currently uses `z3-solver` 4.16.0.0. Its upstream
+macOS wheels are built for macOS 15 or newer on both Apple silicon and Intel.
+On an older macOS release, `uv` cannot use those wheels and falls back to
+building Z3 from its source distribution.
+
+That source build uses CMake, `make`, and a C++20 compiler. Install the Xcode
+Command Line Tools, which provide Apple Clang and `make`, and make sure CMake
+is available before retrying `uv sync --dev`. These commands identify the
+platform and missing build tools without changing the environment:
+
+```sh
+sw_vers -productVersion
+uname -m
+xcode-select -p
+clang++ --version
+cmake --version
+make --version
+```
+
+If `uv sync --dev` reports that it is building `z3-solver` and then fails,
+include that command output and the diagnostics above in a bug report. See the
+[`z3-solver` 4.16.0.0 files on PyPI](https://pypi.org/project/z3-solver/4.16.0.0/#files)
+for the upstream wheel compatibility tags.
+
 Then follow
 [Find and verify a counterexample](docs/tutorials/first-verified-result.md)
 for a complete first experiment. Run `uv run jacobian --help` to inspect the
