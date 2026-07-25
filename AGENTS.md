@@ -8,13 +8,16 @@ to search for counterexamples, construct and compare mathematical objects,
 compute invariants, decompose proof goals, retrieve premises, develop candidate
 proofs, and replay certificates.
 
-Each tool performs a bounded, observable operation and returns typed,
-inspectable artifacts with explicit relationships, scope, execution status,
-assurance, and provenance. Existing mathematical software and domain plugins
-supply mathematical operations; capability adapters expose them through a
-common contract. Jacobian provides the composition, artifact, execution, and
-assurance layer. Evidence that needs to become a trusted conclusion must be
-accepted by an operator-authorized independent checker.
+Each mathematical tool performs one observable construction, transformation,
+computation, retrieval, search, or verification operation over typed artifacts.
+It reports its explicit scope and completeness, execution status, assurance,
+and provenance. A capability that proposes, generates, or searches for evidence
+cannot promote its own result; verification requires an operator-authorized
+checker independent of the proposing or search implementation.
+
+Existing mathematical software and domain plugins supply mathematical
+operations; capability adapters expose them through a common contract. Jacobian
+provides the composition, artifact, execution, and assurance layer.
 
 Jacobian's long-term goal is to help agents and human researchers make genuine,
 trustworthy progress on open conjectures and other problems that benefit from
