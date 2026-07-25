@@ -22,7 +22,7 @@ import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.eval_graph_oracle import (
@@ -270,30 +270,58 @@ def _score_partition_report(
             or report.get("final_verification") != "VERIFIED"
         ):
             raise BenchmarkError("partition treatment was not independently verified")
-        record_uri = report.get("verification_record_uri")
-        if not isinstance(record_uri, str):
-            raise BenchmarkError("partition treatment omitted verification record")
+        reported_uris = {field: report.get(field) for field in uri_fields}
+        if not all(isinstance(uri, str) for uri in reported_uris.values()):
+            raise BenchmarkError("partition treatment omitted checked artifacts")
+        store = ArtifactStore(state_dir)
         try:
+            artifacts = {
+                field: store.get(cast(str, uri)) for field, uri in reported_uris.items()
+            }
             record = VerificationRecord.model_validate(
-                ArtifactStore(state_dir).get(record_uri).payload
+                artifacts["verification_record_uri"].payload
             )
         except (StoreError, ValueError) as exc:
             raise BenchmarkError(
-                "partition verification record is unavailable"
+                "partition verification artifacts are unavailable"
             ) from exc
         if (
             record.conclusion.value != "TRUE"
             or record.coverage.value != "EXHAUSTIVE"
             or record.relation_id != "case.relation.partitions"
+            or record.evidence_uri != reported_uris["certificate_uri"]
+            or record.obligation_uri != reported_uris["claim_uri"]
+            or record.bindings.claim_digest
+            != artifacts["claim_uri"].manifest.object_digest
+            or record.bindings.candidate_digest
+            != artifacts["partition_uri"].manifest.object_digest
+            or record.bindings.scope_digest
+            != artifacts["scope_uri"].manifest.object_digest
         ):
-            raise BenchmarkError("partition record differs from checked coverage")
+            raise BenchmarkError("partition record is not bound to reported artifacts")
         if not any(
             invocation.get("capability_id") == "case.partition.finite"
             and isinstance(invocation.get("assurance"), Mapping)
             and invocation["assurance"].get("level") == "VERIFIED"
+            and invocation.get("input")
+            == {
+                "universe": universe,
+                "cases": cases,
+                "require_disjoint": True,
+            }
+            and isinstance(invocation.get("output"), Mapping)
+            and all(
+                invocation["output"].get(field) == uri
+                for field, uri in reported_uris.items()
+            )
+            and isinstance(invocation.get("artifact_uris"), Sequence)
+            and not isinstance(invocation["artifact_uris"], (str, bytes))
+            and set(reported_uris.values()).issubset(invocation["artifact_uris"])
             for invocation in capability_invocations
         ):
-            raise BenchmarkError("partition treatment lacks verified capability trace")
+            raise BenchmarkError(
+                "partition treatment lacks an exact verified capability trace"
+            )
     else:
         raise BenchmarkError(f"unknown condition: {condition}")
     return {

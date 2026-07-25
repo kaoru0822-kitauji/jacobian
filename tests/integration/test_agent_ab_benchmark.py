@@ -328,9 +328,46 @@ def test_ab_partition_scorer_requires_checker_backed_coverage(tmp_path: Path) ->
         capability_invocations=[
             {
                 "capability_id": "case.partition.finite",
+                "input": {
+                    "universe": case["expected"]["universe"],
+                    "cases": cases,
+                    "require_disjoint": True,
+                },
+                "output": result.output,
+                "artifact_uris": result.artifact_uris,
                 "assurance": result.assurance.model_dump(mode="json"),
             }
         ],
     )
 
     assert score["passed"] is True
+
+    report["cases"] = [
+        {"case_id": f"spoofed-{item['case_id']}", "members": item["members"]}
+        for item in cases
+    ]
+    try:
+        score_report(
+            case,
+            report,
+            condition="treatment",
+            state_dir=state_dir,
+            mcp_calls=["capability.invoke"],
+            capability_invocations=[
+                {
+                    "capability_id": "case.partition.finite",
+                    "input": {
+                        "universe": case["expected"]["universe"],
+                        "cases": cases,
+                        "require_disjoint": True,
+                    },
+                    "output": result.output,
+                    "artifact_uris": result.artifact_uris,
+                    "assurance": result.assurance.model_dump(mode="json"),
+                }
+            ],
+        )
+    except BENCHMARK["BenchmarkError"] as exc:
+        assert "exact verified capability trace" in str(exc)
+    else:
+        raise AssertionError("unbound partition report was accepted")

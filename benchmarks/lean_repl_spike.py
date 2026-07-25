@@ -60,6 +60,21 @@ def _exchange(
     return response, time.monotonic() - started
 
 
+def _response_errors(response: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    message = response.get("message")
+    if isinstance(message, str):
+        errors.append(message)
+    messages = response.get("messages")
+    if isinstance(messages, list):
+        for item in messages:
+            if not isinstance(item, Mapping) or item.get("severity") != "error":
+                continue
+            data = item.get("data")
+            errors.append(data if isinstance(data, str) else repr(item))
+    return errors
+
+
 def run_tasks(repl: Path) -> dict[str, Any]:
     started = time.monotonic()
     process = subprocess.Popen(
@@ -77,6 +92,11 @@ def run_tasks(repl: Path) -> dict[str, Any]:
                 process,
                 {"cmd": task["command"]},
             )
+            command_errors = _response_errors(command_response)
+            if command_errors:
+                raise ReplSpikeError(
+                    f"{task['task_id']} command failed: {'; '.join(command_errors)}"
+                )
             sorries = command_response.get("sorries")
             if not isinstance(sorries, list) or len(sorries) != 1:
                 raise ReplSpikeError(
@@ -93,6 +113,12 @@ def run_tasks(repl: Path) -> dict[str, Any]:
                     process,
                     {"tactic": tactic, "proofState": proof_state},
                 )
+                response_errors = _response_errors(response)
+                if response_errors:
+                    raise ReplSpikeError(
+                        f"{task['task_id']} tactic failed: "
+                        + "; ".join(response_errors)
+                    )
                 next_state = response.get("proofState")
                 goals = response.get("goals")
                 if not isinstance(next_state, int) or not isinstance(goals, list):
@@ -104,6 +130,7 @@ def run_tasks(repl: Path) -> dict[str, Any]:
                         "tactic": tactic,
                         "elapsed_seconds": round(elapsed, 6),
                         "goal_count": len(goals),
+                        "error_count": len(response_errors),
                     }
                 )
                 proof_state = next_state
@@ -132,7 +159,9 @@ def run_tasks(repl: Path) -> dict[str, Any]:
         "task_count": len(task_results),
         "completed_count": sum(result["completed"] for result in task_results),
         "parameter_error_count": sum(
-            "message" in trace for result in task_results for trace in result["tactics"]
+            trace["error_count"]
+            for result in task_results
+            for trace in result["tactics"]
         ),
         "elapsed_seconds": round(time.monotonic() - started, 6),
         "return_code": return_code,
