@@ -5,7 +5,14 @@
   "title": "Complete path semantics",
   "prompt": "Using the bundled graph_paths reference domain, formalize and test the claim that the two listed intended paths are complete for this directed graph. Vertices: s, a, b, x, t1, t2. Arcs: s->a, a->x, s->b, b->x, x->t1, x->t2. Source: s. Terminals: t1 and t2. Intended paths: s-a-x-t1 and s-b-x-t2. Validate the claim, evaluate the candidate, search for a defeating witness, and independently verify any witness with the compatible authorized checker.",
   "required_tools": [
-    "verification.run"
+    "capability.invoke"
+  ],
+  "required_capability_ids": [
+    "artifact.put",
+    "claim.validate",
+    "evaluate.batch",
+    "witness.find",
+    "witness.verify"
   ],
   "expected": {
     "domain_id": "jacobian.graph-paths",

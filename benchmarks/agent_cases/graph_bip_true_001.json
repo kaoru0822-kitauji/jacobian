@@ -5,7 +5,14 @@
   "title": "Verified bipartite two-coloring",
   "prompt": "Using the bundled graph_paths reference domain, formalize and prove that the directed four-cycle with vertices a, b, c, d and arcs a->b, b->c, c->d, d->a is bipartite when interpreted through the underlying undirected graph. Validate and evaluate the candidate, search for a SUPPORTS_CLAIM witness, and independently verify the complete two-coloring with the compatible authorized checker.",
   "required_tools": [
-    "verification.run"
+    "capability.invoke"
+  ],
+  "required_capability_ids": [
+    "artifact.put",
+    "claim.validate",
+    "evaluate.batch",
+    "witness.find",
+    "witness.verify"
   ],
   "expected": {
     "domain_id": "jacobian.graph-paths",

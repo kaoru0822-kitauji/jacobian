@@ -5,7 +5,12 @@ import runpy
 from pathlib import Path
 from typing import Any, cast
 
-from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityCompletenessStatus,
+    CapabilityMode,
+    CapabilityRequest,
+)
 from jacobian.kernel import JacobianKernel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -94,25 +99,77 @@ def test_ab_scorer_accepts_control_and_durable_treatment(tmp_path: Path) -> None
 
     state_dir = tmp_path / "treatment"
     kernel = JacobianKernel(state_dir, install_references=True)
-    result = kernel.capabilities.invoke(
+    reference = kernel.references["erdos_straus"]
+    claim = kernel.capabilities.invoke(
         CapabilityRequest(
-            capability_id="reference.solve",
-            mode=CapabilityMode.VERIFY,
+            capability_id="artifact.put",
             input={
-                "reference_name": "erdos_straus",
-                "predicate": {
-                    "name": "erdos_straus_range",
-                    "parameters": {"lower_bound": 2, "upper_bound": 120},
+                "schema_uri": reference.claim_schema_uri,
+                "semantics_uri": reference.semantics_uri,
+                "payload": {
+                    "claim_schema_version": "1",
+                    "domain_id": reference.domain_id,
+                    "domain_version": reference.domain_version,
+                    "semantics_uri": reference.semantics_uri,
+                    "quantifiers": [],
+                    "predicate": {
+                        "name": "erdos_straus_range",
+                        "parameters": {"lower_bound": 2, "upper_bound": 120},
+                    },
+                    "bounds": {},
+                    "required_capabilities": ["Evaluator", "WitnessOracle"],
+                    "correspondence_status": "HUMAN_REVIEWED",
                 },
-                "candidate": {"lower_bound": 2, "upper_bound": 120},
-                "witness_role": "SUPPORTS_CLAIM",
-                "evaluation_wall_seconds": 30,
-                "witness_wall_seconds": 30,
             },
         )
     )
-    record_uri = result.assurance.verification_record_uri
+    claim_uri = claim.output["artifact_uri"]
+    candidate = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="artifact.put",
+            input={
+                "schema_uri": reference.candidate_schema_uri,
+                "semantics_uri": reference.semantics_uri,
+                "payload": {"lower_bound": 2, "upper_bound": 120},
+                "parents": [claim_uri],
+            },
+        )
+    )
+    candidate_uri = candidate.output["artifact_uri"]
+    found = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="witness.find",
+            input={
+                "claim_uri": claim_uri,
+                "candidate_uri": candidate_uri,
+                "plugin_id": reference.plugin_id,
+                "witness_role": "SUPPORTS_CLAIM",
+                "wall_seconds": 30,
+            },
+        )
+    )
+    witness_uri = found.output["witness_uri"]
+    assert witness_uri is not None
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="witness.verify",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "claim_uri": claim_uri,
+                "candidate_uri": candidate_uri,
+                "witness_uri": witness_uri,
+                "checker_id": reference.witness_checker_ids[
+                    "erdos_straus.decomposition_table"
+                ],
+            },
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
     assert record_uri is not None
+    assert verified.scope is not None
+    assert verified.scope.parameters["claim_uri"] == claim_uri
+    assert verified.completeness.status is CapabilityCompletenessStatus.COMPLETE
+    assert verified.completeness.assurance_level is CapabilityAssuranceLevel.COMPUTED
     treatment = score_report(
         case,
         _report(assurance="VERIFIED", verification_record_uri=record_uri),

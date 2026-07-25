@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from jacobian.artifacts import ArtifactService
+from jacobian.atomic_capabilities import install_atomic_capabilities
 from jacobian.builtin_capabilities import (
     KnowledgeSearchAdapter,
     LeanCheckAdapter,
-    ReferenceSolveAdapter,
 )
 from jacobian.capabilities import (
     CapabilityAdapter,
@@ -45,7 +45,6 @@ from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
-from jacobian.workflows import VerificationWorkflowService
 
 
 class JacobianKernel:
@@ -151,8 +150,9 @@ class JacobianKernel:
         self.polytope_checkers: PolytopeCheckerInstallation | None = None
         self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
         self.lean: LeanService | None = None
-        self.verification_workflows: VerificationWorkflowService | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
+        for atomic_adapter in install_atomic_capabilities(self):
+            self.capabilities.register(atomic_adapter)
         self.capabilities.register(KnowledgeSearchAdapter(self.memory))
         self.finite_partition: FinitePartitionInstallation
         finite_partition, self.finite_partition = install_finite_partition(
@@ -164,12 +164,12 @@ class JacobianKernel:
             authorize_checker=install_references,
         )
         self.capabilities.register(finite_partition)
-        for adapter in install_graph_capabilities(
+        for graph_adapter in install_graph_capabilities(
             self.store,
             self.schemas,
             self.artifacts,
         ):
-            self.capabilities.register(adapter)
+            self.capabilities.register(graph_adapter)
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(
@@ -183,18 +183,6 @@ class JacobianKernel:
                 self.artifacts,
                 self.verification,
                 self.lean_checkers,
-            )
-            self.verification_workflows = VerificationWorkflowService(
-                self.store,
-                self.artifacts,
-                self.claims,
-                self.evaluation,
-                self.witnesses,
-                self.verification,
-                self.references,
-            )
-            self.capabilities.register(
-                ReferenceSolveAdapter(self.verification_workflows)
             )
             self.capabilities.register(LeanCheckAdapter(self.lean))
         for entrypoint in capability_adapter_entrypoints:

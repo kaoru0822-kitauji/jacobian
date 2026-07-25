@@ -64,12 +64,13 @@ assurance as SELF_CHECKED and verification_record_uri as null.
 
 TREATMENT_INSTRUCTIONS = """\
 Use the jacobian_local MCP server for all mathematical computation. Do not use
-shell commands or create programs. Call capability.invoke directly with
-reference.solve in VERIFY mode. Its payload uses reference_name
-"erdos_straus", predicate {name: "erdos_straus_range", parameters:
-{lower_bound: 2, upper_bound: 120}}, candidate {lower_bound: 2, upper_bound:
-120}, and witness_role "SUPPORTS_CLAIM". Report VERIFIED only if the capability
-returns that assurance, and copy its exact verification_record_uri.
+shell commands or create programs. Inspect the capability and reference
+catalogs, then compose the available atomic operations to materialize the
+bounded Erdos-Straus claim and candidate for 2 <= n <= 120, validate the claim,
+evaluate the candidate, find a supporting witness, and independently verify
+that witness. Preserve the intermediate artifact URIs. Report VERIFIED only if
+the final checker-backed capability returns that assurance, and copy its exact
+verification_record_uri.
 """
 
 GRAPH_CONTROL_INSTRUCTIONS = """\
@@ -553,8 +554,6 @@ def _codex_command(
             "--project",
             str(PROJECT_ROOT),
             "jacobian-mcp",
-            "--tool-profile",
-            "capabilities",
             "--state-dir",
             str(state_dir),
         ]

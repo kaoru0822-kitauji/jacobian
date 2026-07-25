@@ -4,13 +4,14 @@
 
 ## Purpose
 
-Jacobian is a fail-closed verification system. Its tests must establish more
-than ordinary application correctness: they must demonstrate that malformed
-inputs, incomplete computations, stale caches, and substituted evidence cannot
-be promoted into verified mathematical conclusions.
+Jacobian is a mathematical capability toolbox with a fail-closed verification
+boundary. Its tests must establish more than ordinary application correctness:
+they must demonstrate that malformed inputs, incomplete computations, stale
+caches, and substituted evidence cannot be promoted into verified mathematical
+conclusions.
 
-This document defines the test architecture for v0.2 and the gates that later
-releases inherit. It complements the normative
+This document defines the test architecture for the current implementation. It
+complements the normative
 [v0.2 conformance specification](conformance-v0.2.md). The conformance
 specification states what an implementation must do; this document states how
 we build and maintain evidence that it does so.
@@ -89,12 +90,13 @@ failure to unblock a release. An intermittent C0 failure is a product defect.
 
 ### C1 — Correctness-critical
 
-C1 code can misreport experimental scope, lose evidence, or make a generic tool
+C1 code can misreport experimental scope, lose evidence, or make a capability
 behave incorrectly without directly authorizing a verified conclusion. It
 includes:
 
 - plugin manifests and capability dispatch;
-- evaluation and witness-search orchestration;
+- capability discovery, invocation, and domain adapters;
+- evaluation, construction, and witness-search capabilities;
 - shrinking;
 - budgets, cancellation, and partial batch handling;
 - CLI and MCP equivalence;
@@ -126,7 +128,7 @@ wire format.
 | Resource limits | Exhaustion changes truth or leaves a half-committed result | Fault injection, bounded parser/store tests, mixed-batch timeout/cancellation tests |
 | Shrinking | A smaller but invalid artifact replaces the verified target | Per-step checker replay, cycle/budget state machine, minimality-label attacks |
 | Representation changes | A relaxation or restriction is treated as equivalence | v0.2 direction tests, proof-obligation replay, proposer/checker separation |
-| Research corpus integration | Retrieved hypotheses silently gain verified status | M5 trust-label, provider-isolation, retention, and temporal-cutoff tests |
+| Research corpus integration | Retrieved hypotheses silently gain verified status | Trust-label, provider-isolation, retention, and temporal-cutoff tests |
 
 The first seven rows are the highest-risk v0.2 areas. They should be reviewed
 before optimizing throughput or expanding the public tool surface.
@@ -365,7 +367,7 @@ Required tests:
 Later certificate formats add format-specific mutation, differential, and
 known-answer suites before authorization is possible.
 
-### Evaluation and witness search
+### Evaluation, construction, and witness search
 
 Required tests:
 
@@ -385,53 +387,25 @@ Required tests:
   environment invalidates the corresponding cache entry;
 - evaluator and oracle bugs cannot write to the checker registry.
 
-### Durable strategy search
+### Capability composition
 
-Required tests:
+Multi-step mathematical strategies remain agent-owned. Tests therefore exercise
+the artifacts and contracts at capability boundaries rather than blessing one
+prescribed workflow:
 
-- concurrent submissions with one idempotency key and request digest select one
-  accepted experiment URI;
-- reusing an idempotency key with a different request fails before execution;
-- every lifecycle event binds its predecessor and update/delete attempts fail;
-- process recovery pauses active work at the last committed checkpoint and
-  preserves archive and retry lineage;
-- corrupt JSON, a row/snapshot identity mismatch, and an invalid indexed state
-  are quarantined independently without blocking a valid experiment;
-- restoration rejects changes to request, registry snapshot, proposer, refiner,
-  evaluator, environment, budget, archive, or accounting identity;
-- plugin work after an uncommitted checkpoint may repeat, but committed
-  archive pages and nominations are not duplicated;
-- checkpoint artifact persistence is included in measured wall time, and a
-  strategy cannot report completion after that measurement exceeds the wall
-  budget;
-- `workers > 1` fails validation instead of being silently clamped;
-- pause, cancellation, timeout, strategy completion, candidate limits, and
-  iteration limits remain distinct operational outcomes;
-- verified counterexample feedback cites an authorized verification record,
-  while heuristic feedback remains unverified;
-- workers and plugins cannot authorize a checker or widen any
-  Jacobian-represented budget or capability.
-
-### Claim-transformation workflows
-
-Required tests:
-
-- repair requires an exact authorized `REFUTES_CLAIM` record for the source
-  claim;
-- parameter generalization requires an exact verified construction source;
-- plugin proposals can produce only proposed or sampled parameter-region
-  evidence and cannot bind a region subject;
-- sampled regions cite only artifacts supplied as workflow evidence;
-- each committed hypothesis records its source, edit, plugin snapshot, and
-  implementation identity;
-- identical claim payloads deduplicate without losing transformation lineage;
-- falsification routes through `search.run` and cannot turn non-falsification
-  into verification;
-- promotion accepts sufficient and necessary labels only after authorized
-  certificate replay reproduces the exact verification-record URI;
-- promotion rejects a same-object/different-artifact subject carrier and a
-  record that omits the exact declared claim or subject parent;
-- CLI, MCP, and Python service paths preserve the same verification boundary.
+- every invocation records the exact descriptor, inputs, mode, budgets, backend
+  identity, outputs, and parent artifacts used;
+- outputs from one capability can be passed to another without losing type,
+  provenance, scope, completeness, or assurance;
+- intermediate failures, rejected candidates, and proof obligations remain
+  inspectable rather than disappearing inside a composite result;
+- repeated, reordered, or abandoned invocations cannot strengthen assurance;
+- search, generation, transformation, ranking, and retrieval outputs remain
+  unverified until an authorized independent checker accepts bound evidence;
+- a verified record from one claim, semantics, candidate, scope, or checker
+  version cannot be reused for another;
+- Python, CLI, and MCP invocation paths preserve the same capability contract
+  and verification boundary.
 
 ### Shrinking
 
@@ -445,21 +419,21 @@ Required examples and state sequences:
 - a malformed or nonterminating reducer is bounded;
 - repeated candidates and cycles do not cause nontermination;
 - budget exhaustion reports the strongest minimality actually established;
-- v0.2 rejects `ONE_STEP`, `BOUNDED_GLOBAL`, and `PROVED_GLOBAL`; later
-  releases cannot emit them without the corresponding checked completeness
-  evidence;
+- the current contract rejects `ONE_STEP`, `BOUNDED_GLOBAL`, and
+  `PROVED_GLOBAL`; no supported contract may emit them without the
+  corresponding checked completeness evidence;
 - the final output, accepted-step trace, rejected proposals, objectives, and
   checker identities can be replayed;
 - candidate and witness targets use typed reducers and cannot be confused;
-- certificate simplification remains a later, separate workflow.
+- certificate simplification requires a separate capability contract.
 
-### CLI and MCP adapter
+### CLI and MCP capability surface
 
 The CLI and MCP layer must be thin enough to test by equivalence:
 
-- the Python API, CLI, and MCP call return the same semantic result envelope
-  for the same artifact inputs;
-- tool input and output schemas match the checked-in contract;
+- the Python API, CLI, and `capability.invoke` return the same semantic result
+  envelope for the same descriptor version and artifact inputs;
+- `capability.describe`, `capability://catalog`, and invocation schemas agree;
 - malformed requests fail before kernel invocation;
 - large artifacts and traces are returned as resource URIs;
 - response-size limits are enforced;
@@ -554,13 +528,13 @@ explicit state-machine and integration scenarios first. Similarly,
 select a mutation-testing tool only after the C0 suite is stable enough that
 surviving mutants are actionable rather than noise.
 
-## Test work packages
+## Test areas
 
-Testing belongs to each implementation issue rather than to one cleanup issue
-at the end. Cross-cutting harness work can be tracked separately in these
-packages:
+Testing belongs to each implementation change rather than to one cleanup issue
+at the end. Cross-cutting harness work is organized into these concurrent
+areas:
 
-### T0 — Test foundation
+### Test foundation
 
 - configure pytest markers and bounded Hypothesis profiles;
 - add canonical fixture/artifact builders through public constructors;
@@ -568,7 +542,7 @@ packages:
 - add checked-in schema validation through `jsonschema`;
 - make random seeds and failure artifacts visible in CI output.
 
-### T1 — Result and artifact invariants
+### Result and artifact invariants
 
 - implement generated result-state cross-product tests;
 - implement rational and canonical-encoding properties;
@@ -577,7 +551,7 @@ packages:
 
 This work ships with the schema and artifact issues, not after them.
 
-### T2 — Trust-boundary conformance
+### Trust-boundary conformance
 
 - make the conformance IDs executable and traceable to tests;
 - implement checker-registry state machines;
@@ -585,38 +559,39 @@ This work ships with the schema and artifact issues, not after them.
 - enforce package/import and clean-process boundaries;
 - add direct-witness and finite-enumeration known-answer fixtures.
 
-### T3 — Orchestration and shrinking
+### Capabilities and shrinking
 
 - add mixed-batch and resource-failure scenarios;
 - add oracle outcome and `NONE_CERTIFIED` protocol tests;
 - add reduction state machines, cycle detection, and minimality-label tests;
-- compare Python API, CLI, and MCP results.
+- compare Python API, CLI, and `capability.invoke` results.
 
-### T4 — Cross-domain release fixtures
+### Cross-domain fixtures
 
 - freeze the two reference problem statements and hidden expected facts;
 - implement independent search and checker paths;
 - add adversarial variants and replayable bundles;
 - demonstrate that neither plugin changes core schemas.
 
-### T5 — Performance baseline
+### Performance baseline
 
 - freeze the benchmark corpus;
 - add pyperf commands and raw-result artifact collection;
 - establish same-host variance before proposing regression gates;
 - profile only after correctness and baseline results exist.
 
-### T6 — Model-evaluation harness
+### Portfolio-evaluation harness
 
 - isolate public fixtures from hidden oracles;
-- implement baseline and kernel conditions;
+- implement same-model, same-budget baseline and portfolio conditions;
 - record every run, seed, model/tool version, and hard failure;
-- pilot semantic-closure, timeout, binding, shrinking, and cross-domain cases.
+- include hidden independent oracles and held-out cross-domain cases;
+- record correctness, false certification, runtime, tokens, calls, and
+  parameter errors;
+- pilot semantic-closure, timeout, binding, shrinking, and composition cases.
 
-T0 should begin with implementation scaffolding. T1–T4 follow the dependency
-order of the existing foundational issues. T5 and T6 can be specified early,
-but they should not compete with the v0.2 trust boundary for implementation
-time.
+These areas are concurrent, not a release ladder. Trust-boundary
+coverage remains mandatory whenever a capability can affect verification.
 
 ## TDD implementation sequence
 
@@ -706,52 +681,30 @@ mathematical assurance level.
 - canonical keys bound to canonicalizer implementation identity;
 - transformation direction and proof-obligation tests;
 - exact projection and separator replay;
-- persistent experiment lifecycle and cancellation.
+- capability budget, cancellation, progress, and artifact-replay behavior.
 
 The normative attack matrix is
 [v0.2 conformance](conformance-v0.2.md). Complete search snapshots remain
 unverified; a theorem inferred from the absence of a candidate needs a
 domain-specific completeness certificate and checker.
 
-## Provisional and planned milestone coverage
+## Capability portfolio coverage
 
-### M3
+Capability availability is not a compatibility or verification claim. Every
+installed capability needs descriptor, schema, invocation, limit, cancellation,
+artifact, and provenance tests appropriate to its semantics. Experimental
+capabilities may change contracts, but they must still fail closed and must not
+obtain checker authority.
 
-The current provisional suite covers deterministic single-worker lineage,
-pause/resume, startup recovery, idempotent concurrent submission, corrupt-row
-quarantine, plugin timeouts, package identity, generic conformance, verified
-counterexample feedback, and candidate nomination through existing verification
-services.
+Portfolio evaluations complement contract tests. Run agents with the full
+portfolio and with controlled ablations using the same model, budget, seeds,
+task inputs, and hidden oracle. Include held-out tasks beyond the domains used
+to design the capabilities. Record correctness, false certification, runtime,
+tokens, calls, and parameter errors. Use transcripts to improve discovery,
+examples, routing, batching, and capability boundaries; do not treat prescribed
+tool use as evidence that the portfolio helps autonomous agents.
 
-Before an M3 release, add process-kill tests at each persistence boundary and,
-if multi-process or distributed scheduling is introduced, lease-expiry and
-duplicate-acceptance state machines. No strategy-specific score, exhaustion
-state, or failure may become a mathematical conclusion.
-
-### M4
-
-The current provisional suite covers all three hypothesis operations, exact
-source-record replay, duplicate claims, sampled-evidence lineage, optional M3
-falsification, unsupported promotion attempts, and sufficient/necessary region
-promotion through exact certificate replay.
-
-Before an M4 release, add broader cross-domain fixtures and clean-process
-replay for every authorized parameter-region certificate format. Corpus-free
-workflows must continue to report global novelty as unknown.
-
-### M5
-
-- M4 tools behave identically at the verification boundary with no provider;
-- trust-label preservation through indexing and retrieval;
-- provider compromise cannot mutate artifacts or checker authority;
-- retention, quota, deduplication, and promotion state machines;
-- temporal cutoff, provenance, and data-leakage tests;
-- retrieval-quality evaluations on held-out episodes.
-
-### v1.0
-
-- wire-format and artifact compatibility across released versions;
-- signed bundle and trust-root rotation tests;
-- independent installation and offline replay;
-- verified encoding-bridge and Lean kernel integration suites;
-- migration rollback and historical-record preservation.
+Provider-backed retrieval additionally requires trust-label preservation,
+provider isolation, retention and quota state machines, temporal cutoffs, and
+data-leakage tests. A compromised or unavailable provider cannot mutate
+artifacts, checker authority, or the verification boundary.

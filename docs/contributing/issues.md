@@ -27,22 +27,16 @@ normative behavior is defined by the
 
 ## Current implementation
 
-The v0.2 release contract implements the verification kernel together with:
+The repository implements the verification kernel together with:
 
 - bounded enumeration experiments and cancellation;
 - implementation-bound canonicalization;
 - transformation proposal and independent verification;
 - exact finite rational convex-hull membership and separation;
-- CLI and MCP `2.0.0b2` adapters;
+- CLI and MCP adapters;
 - graph/path and integer-matrix reference domains.
 
-The repository also contains provisional M3/M4 work: sealed plugin snapshots,
-durable strategy search with pause/resume and restart recovery, conjecture
-transformations, and verified parameter-region promotion. These features are
-documented by their milestone specifications and ADRs, but are not part of the
-v0.2 conformance contract.
-
-Do not open umbrella issues that merely repeat these release deliverables.
+Do not open umbrella issues that merely restate the product goals.
 
 ## Follow-up issue policy
 
@@ -57,6 +51,6 @@ specific unresolved behavior. Each issue should:
   evidence binding, or experiment integrity;
 - avoid prescribing a solver or backend unless the requirement depends on it.
 
-Later-roadmap work should become issues only when its dependencies and success
-criteria are concrete. The provisional direction remains in
-[the roadmap](../explanation/roadmap.md).
+Product goals should become issues only when the mathematical or operational
+problem and success criteria are concrete. The active direction remains in the
+[product goals](../explanation/goals.md).

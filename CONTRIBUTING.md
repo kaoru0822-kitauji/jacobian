@@ -1,12 +1,15 @@
 # Contributing to Jacobian
 
-Jacobian is pre-stable and verifier-centric. Contributions should preserve the
-boundary between heuristic search or evaluation and independently verified
-evidence.
+Jacobian is pre-stable. It exposes composable mathematical capabilities that
+AI agents use to investigate conjectures and other mathematically specified
+problems. Contributions should preserve mathematically atomic, agent-visible
+outcomes, agent-owned composition, and the boundary between heuristic search
+or evaluation and independently verified evidence.
 
 ## Before changing code
 
 Read the [documentation home](docs/index.md), the
+[product goals](docs/explanation/goals.md), the
 [v0.2 specification](docs/reference/specifications/v0.2.md), and the
 [v0.2 conformance specification](docs/reference/conformance-v0.2.md).
 Changes to checker authorization, plugin isolation, durable state, or evidence
@@ -59,7 +62,7 @@ Place documentation according to the reader's task:
 - `docs/explanation/` records architecture, rationale, and tradeoffs.
 
 Update `docs/index.md` and the root `README.md` when adding a public entry
-point. Keep v0.2 requirements separate from provisional milestone behavior.
+point. Keep rolling product goals separate from supported release behavior.
 For documentation-only changes, run:
 
 ```sh

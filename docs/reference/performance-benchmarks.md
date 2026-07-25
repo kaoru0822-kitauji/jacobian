@@ -77,7 +77,7 @@ witness representation, and cost profile.
 The exact public workloads are defined in the
 [Mathematical scenario catalog](math-scenarios.md).
 
-## v0.2 benchmark groups
+## Kernel and capability benchmark groups
 
 ### Canonical encoding and hashing
 
@@ -97,8 +97,8 @@ check.
 
 Measure:
 
-- cold `artifact.put`;
-- duplicate `artifact.put`;
+- cold artifact persistence;
+- duplicate artifact persistence;
 - manifest commit and lookup;
 - verified blob read;
 - store reopen;
@@ -136,7 +136,7 @@ Measure:
 Invalid evidence is included because adversarial inputs should be bounded.
 Rejection benchmarks do not replace parser limit tests.
 
-### Evaluation and witness orchestration
+### Evaluation and witness capabilities
 
 Measure:
 
@@ -146,8 +146,9 @@ Measure:
 - cold and warm evaluation-cache behavior;
 - proposed witness persistence by URI.
 
-Report orchestration overhead separately from plugin evaluation time. This
-shows when optimizing the kernel matters and when domain computation dominates.
+Report capability-adapter and kernel overhead separately from backend
+evaluation time. This shows when optimizing Jacobian matters and when domain
+computation dominates.
 
 ### Shrinking
 
@@ -162,13 +163,14 @@ Measure:
 Report the number of checker invocations and candidates considered alongside
 time. A faster result produced by skipping verification is invalid.
 
-### CLI and MCP adapter
+### CLI and MCP capability surface
 
 Measure:
 
 - installed CLI startup;
 - local MCP stdio startup;
-- one small structured request;
+- `capability.describe` for one installed descriptor;
+- one small `capability.invoke` request;
 - batch request encoding and decoding;
 - resource-handle response construction.
 
@@ -198,7 +200,7 @@ deduplicated artifact insertion, and verified artifact reads:
 uv run python benchmarks/benchmark_core.py
 ```
 
-The v0.2 harness adds bounded graph canonicalization and finite rational
+The capability harness adds bounded graph canonicalization and finite rational
 membership/separation:
 
 ```sh
@@ -223,30 +225,30 @@ Enumeration benchmarks always report the exact declared scope and number of
 unique canonical objects. Throughput without scope correctness is meaningless.
 
 The executable alpha harness measures canonicalization and exact finite
-polytope proposal costs. Experiment snapshot and archive benchmarks will be
-added when the local worker no longer launches one evaluator process per
-candidate.
+polytope proposal costs.
 
-## Planned-milestone benchmark groups
+## Portfolio and growth benchmarks
 
-### M3 — Scalable search
+These groups are independent measurement areas, not sequential release
+milestones. Add a benchmark when an implemented capability or infrastructure
+change creates a concrete performance question.
+
+### Search capabilities
 
 Measure:
 
-- candidates evaluated per worker-second;
-- queue and persistence overhead;
-- lifecycle-event, checkpoint, and lineage-query cost;
-- lineage storage amplification;
-- checkpoint, cancellation, crash recovery, and resume time;
-- duplicate work under worker failure;
-- local worker cold start, warm start, and process-limit overhead;
-- single-worker baseline cost and, only if a lease-based scheduler is added,
-  multi-process scaling efficiency.
+- candidates evaluated per backend-second;
+- capability invocation and artifact-persistence overhead;
+- bounded search progress and cancellation cost;
+- candidate, witness, and certificate storage amplification;
+- duplicate-elimination and canonicalization cost;
+- cold and warm backend startup;
+- batch scaling where repetitive transcript evidence justifies batching.
 
-Establish a correct sequential reference run before interpreting parallel
-speedups.
+Establish a correct single-invocation reference run before interpreting batch
+or backend-parallel speedups.
 
-### M4 — Claim-transformation primitives
+### Claim-transformation capabilities
 
 Measure:
 
@@ -256,13 +258,13 @@ Measure:
 - verified yield per compute budget.
 
 No count of generated conjectures is meaningful without falsification and
-trust labels. Corpus-wide novelty is not an M4 performance claim.
+trust labels. Corpus-wide novelty is not a performance claim.
 
-### M5 — Research corpus integration
+### Research corpus integration
 
 Measure:
 
-- ingestion throughput and storage per experiment;
+- ingestion throughput and storage per episode;
 - exact filter, structural, formula, and text retrieval latency;
 - index refresh and retention-policy cost;
 - deduplication and curated-promotion overhead;
@@ -272,15 +274,37 @@ Measure:
 Quality metrics must be computed separately by trust label, provider corpus,
 and temporal cutoff.
 
-### v1.0 — Reproducibility
+### Reproducibility
 
 Measure:
 
 - bundle export size and time;
 - offline integrity verification;
 - clean-install checker resolution;
-- full independent replay time;
-- compatibility migration cost.
+- full independent replay time.
+
+### Agent portfolio evaluations
+
+Tool overhead is only one part of system performance. Run paired agent
+evaluations with the same model, budget, seeds, and tasks:
+
+- baseline without the capability family and treatment with the full portfolio;
+- controlled ablations for discovery, retrieval, construction, search,
+  transformation, and verification capabilities;
+- held-out tasks and hidden independent oracles;
+- repeated trials that expose variance and tool-selection failures.
+
+Record task correctness and false certification alongside wall time, tokens,
+tool calls, parameter errors, backend calls, and artifact volume. Report
+prescribed-tool contract tests separately from autonomous portfolio tests. A
+faster agent that reaches a wrong or falsely certified conclusion is worse, not
+better.
+
+Use transcripts to identify repetitive calls, oversized results, confusing
+parameters, missing summaries, and poor capability boundaries. These
+measurements may justify examples, batching, discovery ranking, splitting, or
+consolidation. They do not justify hiding intermediate mathematical artifacts
+or weakening independent replay.
 
 ## Regression policy
 

@@ -3,19 +3,32 @@
 [Documentation home](../index.md)
 
 - Status: Active product evaluation plan; capability IDs remain provisional
-- Scope: Selecting the smallest useful mathematical capability set
-- Compatibility: The v0.2 verification contract remains normative
+- Scope: Shaping a broad portfolio of composable mathematical capabilities
+  through ablation evidence and portfolio guidance
 
 ## Decision
 
-Do not implement a broad vocabulary of mathematical verbs first. Stabilize the
-shared result contract, freeze realistic workflow tasks and independent
-oracles, record a no-new-capability baseline, and then add one vertical slice at
-a time. A capability ID is retained only when agent transcripts show that it
-improves correctness or resource use without increasing false certification.
+Build a broad portfolio of composable mathematical capabilities, each with one
+clear agent-visible outcome, and use held-out evaluations and real transcripts
+to improve discovery, examples, ranking, defaults, consolidation, and
+retirement. Experimental capabilities may be exposed and invoked before they
+are evaluated; evaluation results are evidence-based routing hints and
+portfolio guidance, not access restrictions or a prerequisite for availability.
 
-`CapabilityResult` version 2 therefore makes four composition concerns
-first-class before adding domain operations:
+Use the shared `CapabilityResult` contract, freeze realistic workflow tasks and
+independent oracles, and record baselines so every slice can be compared against
+a no-new-capability condition and against the rest of the portfolio. Agent
+transcripts show whether capability discovery, contracts, examples, or
+boundaries should change. Absence of evaluation does not block experimental
+availability.
+
+Prescribed-tool cases test contract usability and conformance, not portfolio
+value. Autonomous portfolio evaluations let agents choose tools and measure how
+well the portfolio supports composition. Evaluate complete portfolios and
+ablations as well as individual capabilities.
+
+The current `CapabilityResult` contract makes four composition concerns
+first-class:
 
 - exact scope, with domain-owned parameters or a scope artifact;
 - completeness as `NOT_APPLICABLE`, `UNKNOWN`, `PARTIAL`, or `COMPLETE`, with
@@ -72,8 +85,9 @@ separately. The negative fixtures include a missing boundary value, overlapping
 cases, a timeout after partial enumeration, and a partition whose prose
 description differs from its executable scope.
 
-This workflow tests whether first-class scope and completeness are useful
-before `case.partition` earns a stable capability contract.
+This workflow tests whether first-class scope and completeness let agents use
+`case.partition.finite` correctly and whether its contract, examples, or
+discovery metadata need adjustment.
 
 ### Decompose a Lean goal and apply retrieved premises
 
@@ -103,10 +117,12 @@ The workflows justify the following initial experiments:
   according to tool-call and parameter-error evidence.
 
 Generic `claim.derive`, `goal.decompose`, `premise.apply`, and
-`property.compute` names are design hypotheses, not an initial required API.
-Use the existing transformation and verification machinery for claim edits
-until a held-out workflow demonstrates that a smaller domain-specific
-capability cannot express the task.
+`property.compute` names are design hypotheses, not a required API. Prefer
+specific domain-owned capability IDs over generic verb wrappers; use the
+existing transformation and verification machinery for claim edits unless a
+held-out workflow shows that a smaller domain-specific capability expresses the
+task better. Evaluation informs whether to add, split, or consolidate such
+capabilities.
 
 ## Evaluation construction
 
@@ -140,7 +156,9 @@ Measure for each condition and case:
 
 Run a paired control without the new capability and a treatment with it under
 the same model and reasoning budget. Repeat enough times to expose variance.
-Freeze the tree and oracle before the comparison.
+Freeze the tree and oracle before the comparison. This ablation measures a
+capability's marginal contribution to the portfolio and informs retention,
+consolidation, and ranking.
 
 ## Development pilot evidence
 
@@ -194,10 +212,10 @@ The pinned Lean REPL spike used upstream tag `v4.31.0`, commit
 2.196 seconds with no parameter errors: `constructor` exposed two child goals
 and local-premise application closed its goal. The REPL currently cannot turn a
 completed tactic state back into the originating command or a replayable proof
-artifact. This is enough to retain the pinned spike, but not enough to add
-`goal.decompose` or premise-retrieval capabilities. A later paired agent
-evaluation must show outcome value; completed source must still go through
-`lean.check`.
+artifact. This is enough to keep the pinned spike available for experiments,
+but not enough to recommend `goal.decompose` or premise-retrieval capabilities
+by default. A paired agent evaluation should measure their outcome value;
+completed source must still go through `lean.check`.
 
 ## Source policy
 
@@ -208,7 +226,7 @@ Use the supplied research collection according to evidence strength:
 | Lean proofs, checker-ready certificates, explicit objects, and pinned code | Workflow mining, independent reproduction, and public regression |
 | Maintained proof assistants, CAS/solver libraries, and mathematical databases | Adapter candidates; pin and test their exact versions |
 | Curated problem databases and expert forums | Task discovery and premise retrieval; verify status against primary artifacts |
-| Public theorem-proving datasets and benchmarks | Baselines, compatibility, and regression after license and statement-alignment review |
+| Public theorem-proving datasets and benchmarks | Baselines, portability checks, and regression after license and statement-alignment review |
 | Blogs, news, social threads, and shared chats | Lead generation and workflow clues only |
 
 Machine checking proves the formal statement that was checked. It does not by
@@ -216,25 +234,26 @@ itself prove that the formal statement corresponds to the intended informal
 conjecture. Statement correspondence remains a separate relationship and
 review obligation.
 
-## Revised implementation order
+## Rolling evaluation loop
 
-1. Freeze these workflow cases, hidden oracle contracts, and baseline metrics.
-2. Stabilize first-class scope, completeness, relationships, and obligations.
-3. Implement the graph construction/property slice using maintained libraries.
-   The first slice uses NetworkX's Graph Atlas and exact graph algorithms;
-   solver-backed construction remains a later comparison for orders outside
-   the atlas.
-4. Run the paired evaluation and keep, split, or consolidate the graph
-   capabilities from transcripts.
-5. Implement finite partition coverage and rerun the evaluation.
-6. Spike the pinned Lean REPL integration, then add decomposition or retrieval
-   only where the measured workflow needs it.
-7. Decompose compatibility workflows only after the new slices preserve their
-   artifacts and assurance boundaries.
+1. Freeze workflow cases, hidden oracle contracts, and baseline metrics.
+2. Expose mathematically useful capabilities through
+   `capability.describe` and `capability.invoke`, preserving typed artifacts and
+   independent verification boundaries.
+3. Run autonomous portfolio evaluations and targeted ablations under matched
+   model, budget, and sampling conditions.
+4. Inspect transcripts for missing operations, discovery failures, redundant
+   calls, parameter errors, opaque intermediate state, and false certification.
+5. Improve capability contracts, examples, discovery, ranking, or boundaries
+   and rerun only the affected evaluations.
+6. Add new domains, maintained backends, and historical episodes as their
+   inputs and independent oracles become ready.
 
-This reorders the earlier proposal in one important way: evaluation design and
-baseline collection precede capability implementation, and evaluation runs
-after every vertical slice rather than at the end.
+The loop does not gate capability availability. Experimental capabilities may
+be installed before evaluation completes. Evidence guides agent-facing
+discovery, recommendations, defaults, consolidation, and retirement while
+verification authority remains independent of search, generation, and
+evaluation.
 
 [erdos-33]: https://github.com/google-deepmind/formal-conjectures/issues/1347
 [erdos-707]: https://github.com/google-deepmind/formal-conjectures/issues/1137

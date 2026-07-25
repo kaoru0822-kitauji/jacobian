@@ -2,7 +2,7 @@
 
 [mcp_servers.jacobian_local]
 command = "uv"
-args = ["run", "jacobian-mcp", "--tool-profile", "capabilities"]
+args = ["run", "jacobian-mcp"]
 cwd = "."
 enabled = true
 required = true

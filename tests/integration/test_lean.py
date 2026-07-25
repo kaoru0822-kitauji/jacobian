@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.adapters.mcp.server import ToolProfile, create_server
+from jacobian.adapters.mcp.server import create_server
 from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.results import (
@@ -102,31 +102,34 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     }
 
 
-def test_core_lean_tool_runs_through_compact_mcp_profile(tmp_path: Path) -> None:
+def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> None:
     async def scenario() -> None:
         from mcp import Client
 
         async with Client(
-            create_server(tmp_path, tool_profile=ToolProfile.VERIFICATION),
+            create_server(tmp_path),
             raise_exceptions=True,
         ) as client:
             response = await client.call_tool(
-                "lean.verify",
+                "capability.invoke",
                 {
-                    "statement": "∀ n : Nat, n + 0 = n",
-                    "proof": (
-                        "intro n\n"
-                        "induction n with\n"
-                        "| zero => rfl\n"
-                        "| succ n ih => exact congrArg Nat.succ ih"
-                    ),
+                    "capability_id": "lean.check",
+                    "mode": "VERIFY",
+                    "payload": {
+                        "statement": "∀ n : Nat, n + 0 = n",
+                        "proof": (
+                            "intro n\n"
+                            "induction n with\n"
+                            "| zero => rfl\n"
+                            "| succ n ih => exact congrArg Nat.succ ih"
+                        ),
+                    },
                 },
             )
             assert response.is_error is False
-            assert response.structured_content is None
             payload = json.loads(response.content[0].text)
-            assert payload["result"]["conclusion"] == "TRUE"
-            assert payload["result"]["assurance"]["verification"] == "VERIFIED"
+            assert payload["output"]["conclusion"] == "TRUE"
+            assert payload["assurance"]["level"] == "VERIFIED"
 
     asyncio.run(scenario())
 

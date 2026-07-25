@@ -5,6 +5,11 @@
 Use STDIO for a single local Codex process. Use Streamable HTTP when ChatGPT or
 another remote MCP client must reach Jacobian.
 
+The server exposes `capability.describe` and `capability.invoke`. Clients may
+read installed descriptors from `capability://catalog` and inspect exact
+contracts before invocation. Mathematical operations remain behind namespaced
+capability IDs.
+
 ## Create the auth secret
 
 Create a JSON file outside the repository:
@@ -30,7 +35,6 @@ or Jacobian artifacts.
 ```sh
 uv run jacobian-mcp \
   --transport streamable-http \
-  --tool-profile capabilities \
   --host 127.0.0.1 \
   --port 8000 \
   --path /mcp \
@@ -49,7 +53,6 @@ For a disposable local transport test only:
 ```sh
 uv run jacobian-mcp \
   --transport streamable-http \
-  --tool-profile capabilities \
   --allow-anonymous
 ```
 
@@ -84,7 +87,6 @@ docker run --rm -p 127.0.0.1:8000:8000 \
   -v "$PWD/tokens.json:/run/secrets/jacobian-tokens.json:ro" \
   jacobian:local \
   --transport streamable-http \
-  --tool-profile capabilities \
   --host 0.0.0.0 \
   --port 8000 \
   --state-dir /var/lib/jacobian \
@@ -103,5 +105,3 @@ subject to the same tenant-routing interface.
 - Apply CPU, memory, filesystem, and network policy outside Jacobian.
 - Do not interpret HTTP success, solver completion, or an MCP response as a
   verified mathematical result.
-- Use the `full` profile only for trusted advanced clients that need the
-  lower-level tool surface.

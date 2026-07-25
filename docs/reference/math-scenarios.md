@@ -2,7 +2,7 @@
 
 [Documentation home](../index.md)
 
-- Status: Active scenario catalog; individual release gates are defined by the
+- Status: Active scenario catalog; supported contracts are defined by the
   applicable specification and conformance document
 - Purpose: Exact public fixtures, reference-plugin workloads, and held-out
   model evaluations
@@ -43,13 +43,18 @@ Passing layer 1 is necessary but says nothing about model creativity. Passing
 layer 3 says something about tool-assisted behavior but cannot replace layer 1
 checker conformance.
 
+Capability IDs below name candidate agent-facing contracts for the scenario.
+They do not imply that a capability is installed; agents must discover
+availability through `capability://catalog` and inspect the exact contract with
+`capability.describe`.
+
 ## Scenario record
 
 Every scenario receives an immutable manifest containing:
 
 ```text
 scenario ID and version
-release and capability under test
+capability and contract version under test
 public claim and starting artifacts
 declared finite scope
 expected operational state
@@ -73,7 +78,7 @@ An imported dataset row is never its own oracle. A `proved`, `valid`, or
 `answer` field is provenance to investigate; Jacobian must replay the relevant
 checker under a pinned environment.
 
-## v0.2 public exact scenarios
+## Public exact micro-scenarios
 
 These scenarios are deliberately small enough to verify with standard-library
 Python and exact integers or rationals.
@@ -98,10 +103,10 @@ x = 2 -> y = 0
 
 **Capabilities**
 
-- `claim.validate` checks finite domains, bound variables, quantifier order,
-  and the modular-arithmetic semantics reference.
-- `evaluate.batch` may score a proposed witness table.
-- `certificate.verify` replays the complete three-row table.
+- `finite_logic.validate.quantified_claim` checks finite domains, bound
+  variables, quantifier order, and the modular-arithmetic semantics reference.
+- `finite_logic.evaluate.witness_table` may score a proposed witness table.
+- `finite_logic.verify.exhaustive_table` replays the complete three-row table.
 
 **Adversarial variants**
 
@@ -128,9 +133,11 @@ prime.
 
 **Capabilities**
 
-- `witness.find` returns a factor for 91.
-- `witness.verify` checks bounds, nontriviality, and exact multiplication.
-- `certificate.verify` checks the complete finite divisor table for 97.
+- `integer.search.factor` returns a factor for 91.
+- `integer.verify.factor` checks bounds, nontriviality, and exact
+  multiplication.
+- `integer.verify.primality_table` checks the complete finite divisor table for
+  97.
 
 **Adversarial variants**
 
@@ -157,9 +164,11 @@ domain.
 
 **Capabilities**
 
-- `witness.find` returns a counterassignment for the false claim.
-- `witness.verify` directly evaluates the formula under that assignment.
-- `certificate.verify` checks all four rows for the true claim.
+- `boolean.search.counterassignment` returns a counterassignment for the false
+  claim.
+- `boolean.verify.assignment` directly evaluates the formula under that
+  assignment.
+- `boolean.verify.truth_table` checks all four rows for the true claim.
 
 **Adversarial variants**
 
@@ -189,11 +198,12 @@ Removing either remaining clause makes the formula satisfiable.
 
 **Capabilities**
 
-- `evaluate.batch` reports an unverified unsatisfiable result or objective.
-- `shrink.run` proposes clause deletions.
+- `boolean.evaluate.cnf` reports an unverified unsatisfiable result or
+  objective.
+- `boolean.minimize.unsat_core` proposes clause deletions.
 - the preservation checker rejects any step that makes the formula satisfiable;
-- `certificate.verify` replays a complete table or a later registered SAT proof
-  format.
+- `boolean.verify.unsat_certificate` replays a complete table or a registered
+  SAT proof format.
 
 **Adversarial variants**
 
@@ -240,11 +250,10 @@ s -> b -> x -> t1
 
 **Capabilities**
 
-- the graph plugin's `family.materialize` capability enumerates the complete
-  bounded path family;
-- `witness.find` returns one omitted path;
-- `witness.verify` checks every arc and the source/terminal role;
-- `shrink.run` may minimize the responsible subgraph.
+- `graph.enumerate.simple_paths` enumerates the complete bounded path family;
+- `graph.search.omitted_path` returns one omitted path;
+- `graph.verify.path` checks every arc and the source/terminal role;
+- `graph.minimize.counterexample` may minimize the responsible subgraph.
 
 **Adversarial variants**
 
@@ -273,11 +282,11 @@ preserves non-bipartiteness; deleting any triangle edge does not.
 
 **Capabilities**
 
-- `witness.find` returns an odd cycle;
-- `witness.verify` checks adjacency, closure, odd length, and distinct interior
-  vertices;
-- `shrink.run` reduces the candidate to the triangle and reports a verified
-  local reduction. A one-step-minimality claim needs separate checked
+- `graph.search.odd_cycle` returns an odd cycle;
+- `graph.verify.odd_cycle` checks adjacency, closure, odd length, and distinct
+  interior vertices;
+- `graph.minimize.counterexample` reduces the candidate to the triangle and
+  reports a checked local reduction. A one-step-minimality claim needs separate
   neighborhood-completeness evidence.
 
 **Adversarial variants**
@@ -307,10 +316,11 @@ v=\begin{pmatrix}2\\-1\end{pmatrix}\neq0,\qquad Av=0.
 
 **Capabilities**
 
-- `witness.find` proposes a kernel vector;
-- `witness.verify` checks dimensions, nonzeroness, and exact multiplication;
-- a separate determinant evaluator may report \(\det A=0\), but it cannot
-  certify its own result.
+- `matrix.search.kernel_vector` proposes a kernel vector;
+- `matrix.verify.kernel_vector` checks dimensions, nonzeroness, and exact
+  multiplication;
+- `matrix.compute.determinant` may report \(\det A=0\), but it cannot certify
+  its own result.
 
 **Adversarial variants**
 
@@ -343,10 +353,12 @@ There are \(2^9=512\) labeled candidates. A complete labeled enumeration finds
 
 **Capabilities**
 
-- `evaluate.batch` computes exact determinant objectives;
+- `matrix.compute.determinant` computes exact determinant objectives;
 - a candidate matrix is a lower-bound witness;
-- `certificate.verify` checks all 512 determinant rows for the upper bound;
-- `shrink.run` may simplify a certificate but must not alter its scope.
+- `matrix.verify.exhaustive_determinant_table` checks all 512 determinant rows
+  for the upper bound;
+- `matrix.minimize.determinant_certificate` may simplify a certificate but must
+  not alter its scope.
 
 **Adversarial variants**
 
@@ -384,11 +396,10 @@ row using only the integer identity
 
 **Capabilities**
 
-- `evaluate.batch` performs unverified exact bounded search;
-- `witness.find` proposes a complete decomposition table;
-- `witness.verify` independently replays every row and the exact interval;
-- `verification.run` composes those stages without merging their assurance
-  labels.
+- `number_theory.search.erdos_straus_table` proposes a complete decomposition
+  table using exact bounded search;
+- `number_theory.verify.erdos_straus_table` independently replays every row and
+  the exact interval.
 
 **Adversarial variants**
 
@@ -425,8 +436,8 @@ The table is commutative. Associativity fails for \((0,0,1)\):
 
 - the candidate is a finite operation table;
 - the witness contains a model and a violating variable assignment;
-- `witness.verify` checks closure, every commutativity row, and the displayed
-  associativity failure;
+- `finite_magma.verify.countermodel` checks closure, every commutativity row,
+  and the displayed associativity failure;
 - a complete certificate may enumerate all eight triples.
 
 **Adversarial variants**
@@ -442,20 +453,16 @@ but the two-element table and checker are independently generated for Jacobian.
 
 ## Reference-plugin decision
 
-Use three levels of implementation:
+Maintain reference scenarios across structurally different domains. Finite
+logic exercises schemas and checker dispatch; directed graphs exercise semantic
+closure; integer matrices exercise exact arithmetic; finite magmas exercise a
+model-plus-assignment witness with a natural route to theorem-prover
+integration. These are portfolio coverage targets, not a mandatory
+implementation sequence.
 
-1. A tiny finite-logic fixture adapter exercises schemas and checker dispatch
-   early.
-2. The directed-graph/path plugin is the first semantic-closure reference.
-3. The integer-matrix plugin is the structurally different release reference.
-
-The finite-magma scenario is the preferred third domain when the capability API
-is stable. It has a different candidate representation, a model-plus-assignment
-witness, and a natural route to later theorem-prover integration.
-
-The full routing counterexample episode is not a v0.2 release blocker. It becomes
-a later end-to-end regression workload after the tiny path-language fixture has
-proved the semantic-closure boundary.
+The full routing counterexample episode is not a prerequisite for exposing the
+atomic path capabilities. It becomes an end-to-end regression workload after
+the tiny path-language fixture has established the semantic-closure boundary.
 
 ## Discovery and transformation scenarios
 
@@ -488,10 +495,12 @@ satisfies the incomplete CNF but violates the source predicate.
 
 **Capabilities**
 
-- `transform.apply` emits the encoding and variable map;
-- `transform.verify` checks the declared relation by complete enumeration;
+- `boolean.transform.at_most_one_cnf` emits the encoding and variable map;
+- `boolean.verify.encoding_relation` checks the declared relation by complete
+  enumeration;
 - a direct assignment refutes an incorrect equivalence claim;
-- `shrink.run` minimizes the omitted-clause explanation.
+- `boolean.minimize.encoding_counterexample` minimizes the omitted-clause
+  explanation.
 
 ### POLY-SEP-001 — Exact membership and separation
 
@@ -549,7 +558,7 @@ The two \(n=4\) row vectors by column are:
 
 **Capabilities**
 
-- `search.enumerate` declares the full row-vector scope;
+- `constraint.enumerate.n_queens` declares the full row-vector scope;
 - a solution is a direct witness;
 - zero counts require a complete certificate;
 - later symmetry reduction must distinguish labeled solutions from orbits.
@@ -617,14 +626,14 @@ This scenario checks candidate enumeration, operation-table canonical bytes,
 law evaluation, counterassignments, and honest distinction between labeled
 tables and isomorphism classes.
 
-## M3 search scenarios
+## Search and refinement scenarios
 
-M3 composes earlier exact scenarios rather than inventing new truth
-semantics:
+These scenarios compose earlier exact operations rather than inventing new
+truth semantics:
 
 | ID | Workflow | Exact promotion gate |
 | --- | --- | --- |
-| `REFINE-AMO-001` | Start from an incomplete at-most-one encoding; refine it with each verified defeating assignment | `transform.verify` proves equivalence over all eight assignments |
+| `REFINE-AMO-001` | Start from an incomplete at-most-one encoding; refine it with each verified defeating assignment | `boolean.verify.encoding_relation` proves equivalence over all eight assignments |
 | `SEARCH-DET3-001` | Explore \(\{-1,1\}\) matrices under a plugin-defined proposal strategy | Candidate determinant replay plus the existing 512-row optimum certificate |
 | `SEARCH-NQUEENS-001` | Explore partial queen placements under a plugin-defined search strategy | Direct solution checker or complete bounded search certificate |
 | `SEARCH-CAPSET-001` | Search for a constructor producing cap sets over small finite fields | Every materialized set receives forbidden-triple replay |
@@ -635,9 +644,9 @@ The scenario harness may use exact enumeration, refinement, tree search,
 evolutionary search, or another strategy without changing kernel records or
 trust semantics.
 
-## M4 claim-transformation scenarios
+## Claim-transformation and repair scenarios
 
-M4 scenarios exercise agent-facing claim-transformation operations without
+These scenarios exercise agent-facing claim-transformation operations without
 requiring a shared corpus:
 
 - mutate a true bounded theorem by dropping one necessary hypothesis, then
@@ -652,16 +661,16 @@ counterexample work generates false statements by removing necessary
 hypotheses from verified theorems, then asks for formal counterexamples. Jacobian
 can use the same idea on small pure-data domains before Lean integration.
 
-## M5 research-corpus scenarios
+## Knowledge-retrieval scenarios
 
-M5 adds optional corpus-assisted workflows:
+These scenarios exercise optional corpus-assisted workflows:
 
 - cluster omitted-path failures separately from malformed-path failures;
 - cluster magma countermodels by the smallest violating assignment;
 - retrieve a verified witness without upgrading neighboring unverified
   experiments;
 - enforce a publication-date cutoff during historical retrieval;
-- run an M4 repair task with the provider unavailable and report global
+- run a claim-repair task with the provider unavailable and report global
   novelty as unknown rather than failing or inventing a result.
 
 ## Held-out variants
@@ -681,6 +690,11 @@ The generator seed is recorded for reproducibility but hidden during a run. The
 oracle is generated by a separate exhaustive implementation, frozen, and then
 removed from the candidate workspace.
 
+Public exact fixtures can support prescribed-tool conformance cases. Held-out
+variants can support autonomous-portfolio evaluations that let agents discover
+and compose capabilities; the two case types measure different things and must
+not be aggregated together.
+
 Do not rely on random generation alone. Every family contains hand-designed
 boundary cases, and every generated instance is checked for:
 
@@ -698,11 +712,11 @@ boundary cases, and every generated instance is checked for:
 | --- | --- | --- |
 | [TPTP/TSTP](https://tptp.org/TPTP/) | Stable problem identifiers, explicit statuses, parameterized problem generators, standard solution records | Adopt its status/reproducibility discipline; import only pinned small cases later |
 | [CSPLib](https://github.com/csplib/csplib) | Structured finite constraint specifications, models, and known small result tables | Use formulations as inspiration; independently derive oracles; do not copy files until licensing is clear |
-| [Equational Theories](https://github.com/teorth/equational_theories) | Equation lists, finite magma tables, implication/countermodel workflows, Lean-verified outcomes | Strong v0.2 finite-algebra source; pin an Apache-2.0 release and replay models |
+| [Equational Theories](https://github.com/teorth/equational_theories) | Equation lists, finite magma tables, implication/countermodel workflows, Lean-verified outcomes | Strong finite-algebra source; pin an Apache-2.0 release and replay models |
 | [AlphaEvolve problem repository](https://github.com/google-deepmind/alphaevolve_repository_of_problems) | Prompts, verification code, initial programs, and evolved programs in notebooks | Later program-search regression corpus; answers are public, so not held out |
 | [SMT-LIB](https://smt-lib.org/) | Standard theory semantics, input/output formats, and solver benchmark instances | Later typed-backend compatibility and parser corpus, not public `solver.solve` semantics |
 
-### Use later for formal integration, not v0.2 oracles
+### Use later for formal integration, not public micro-scenario oracles
 
 | Source | Reason |
 | --- | --- |
@@ -718,7 +732,7 @@ The Dataset Viewer investigation on 2026-07-23 produced these decisions:
 | --- | --- | --- |
 | [`Tonic/MiniF2F`](https://huggingface.co/datasets/Tonic/MiniF2F) | 488 rows; names, declared split, informal statement, formal statement, goal, header; MIT-tagged snapshot | Good parser and later Lean compatibility corpus; never a hidden reasoning oracle |
 | [`internlm/Lean-Workbook`](https://huggingface.co/datasets/internlm/Lean-Workbook) | 25,214 Viewer rows; NL statement, answer, formal statement, tactic, proof states; Apache-2.0 | Useful proof-state and ingestion stress corpus; pin and replay against its declared Lean environment |
-| [`formalanon/semantic-lean-errors`](https://huggingface.co/datasets/formalanon/semantic-lean-errors) | 92 expert-annotated NL/formalization mismatch cases; 24 labeled primary specification errors | Excellent design source for `claim.validate` and transformation traps, but no license was declared; write independent analogues unless permission is obtained |
+| [`formalanon/semantic-lean-errors`](https://huggingface.co/datasets/formalanon/semantic-lean-errors) | 92 expert-annotated NL/formalization mismatch cases; 24 labeled primary specification errors | Excellent design source for domain-specific claim-validation and transformation traps, but no license was declared; write independent analogues unless permission is obtained |
 | [`AgenticCommons/formal-math-autoformalization`](https://huggingface.co/datasets/AgenticCommons/formal-math-autoformalization) | The dataset card declares NL/Lean/proof pairs with per-row provenance, toolchain, mathlib revision, axioms, and a CC0 license | Promising later statement/proof import source; the Dataset Viewer returned server errors during this review, so those fields still require row-level confirmation from a pinned commit |
 | [`charliemeyer2000/ai4math-lean`](https://huggingface.co/datasets/charliemeyer2000/ai4math-lean) | Aggregates millions of rows with source, proof, toolchain, and structured verification labels; Apache-2.0 | Useful v1 compatibility corpus; too large and answer-rich for initial or hidden fixtures |
 | [`AllenGrahamHart/formal-conjectures-gold`](https://huggingface.co/datasets/AllenGrahamHart/formal-conjectures-gold) | Pinned source/mathlib/toolchain fields, per-row licensing and redistribution status, bundled-oracle metadata | Use its manifest design as precedent; do not expose bundled gold solutions to evaluated agents |
@@ -755,7 +769,7 @@ known.
 
 ## Suggested repository layout
 
-The v0.2 schemas exist. Any future fixture layout may evolve, but public inputs
+Current schemas exist. Any future fixture layout may evolve, but public inputs
 and hidden oracles must remain separate:
 
 ```text
@@ -784,19 +798,21 @@ oracle/
 The private oracle directory must not be packaged into candidate workspaces,
 MCP resources, public container layers, or agent trace exports.
 
-## Implementation order
+## Portfolio development goals
 
-1. Implement `BOOL-MP-001` as the smallest full witness/certificate vertical
-   slice.
-2. Add `INT-FACTOR-001` to prove the result model is not Boolean-formula
-   specific.
-3. Implement `MAT-KERNEL-001` as the first exact nontrivial mathematical
-   witness.
-4. Implement `PATH-CLOSURE-001` to attack semantic incompleteness.
-5. Add `BOOL-MUS-001` for checker-preserving shrinking.
-6. Add `MAT-MAXDET3-001` for an exact finite optimization certificate.
-7. Add `MAGMA-IMPL-001` to test finite countermodels.
-8. Only then add v0.2 enumeration, transformation, and polyhedral scenarios.
+Develop scenarios across several domains and operation types in parallel.
+Prioritize gaps revealed by held-out evaluations, real transcripts, checker
+coverage, and backend availability rather than imposing a fixed sequence.
+Useful near-term coverage includes:
 
-This sequence produces useful, correct mathematical operations before any
-large search engine or famous-conjecture benchmark is required.
+- direct witnesses and exhaustive certificates in finite logic;
+- exact arithmetic and linear-algebra witnesses;
+- semantic closure and minimization in graph workloads;
+- finite optimization and model enumeration;
+- checked claim transformations and representation relations;
+- retrieval and formal-proof operations where measured tasks benefit.
+
+Experimental capabilities may be exposed before this catalog is complete.
+Scenario results guide discovery, examples, routing, consolidation, and
+retirement; they do not create verification authority or a universal tool
+taxonomy.
