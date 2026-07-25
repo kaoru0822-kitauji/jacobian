@@ -8,6 +8,8 @@ import pytest
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.registry import (
+    CheckerCompatibilityError,
+    CheckerNotFoundError,
     CheckerRegistry,
     CheckerRegistryError,
     CheckerRevokedError,
@@ -16,6 +18,43 @@ from jacobian.store import ArtifactStore
 
 CLAIM_SCHEMA_A = "artifact://sha256/" + "a" * 64
 CLAIM_SCHEMA_B = "artifact://sha256/" + "b" * 64
+
+
+@pytest.mark.integration
+def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
+    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+    selection = {
+        "evidence_kind": "WITNESS",
+        "format_id": "example.witness",
+        "format_version": "1",
+        "claim_schema_uri": CLAIM_SCHEMA_A,
+        "semantics_uri": CLAIM_SCHEMA_A,
+        "candidate_schema_uri": CLAIM_SCHEMA_A,
+    }
+
+    with pytest.raises(
+        CheckerNotFoundError,
+        match="authorize a compatible checker before retrying",
+    ):
+        registry.select_compatible(**selection)
+
+    for name in ("reject-all-v1", "reject-all-v2"):
+        registry.authorize(
+            name=name,
+            entrypoint="jacobian_checkers.reject:check",
+            evidence_kind="WITNESS",
+            format_id="example.witness",
+            format_version="1",
+            claim_schema_uris=(CLAIM_SCHEMA_A,),
+            semantics_uris=(CLAIM_SCHEMA_A,),
+            candidate_schema_uris=(CLAIM_SCHEMA_A,),
+        )
+
+    with pytest.raises(
+        CheckerCompatibilityError,
+        match="Configure checker policy to select exactly one",
+    ):
+        registry.select_compatible(**selection)
 
 
 @pytest.mark.integration
@@ -38,7 +77,10 @@ def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> No
 
     registry.revoke(checker.checker_id, reason="test revocation")
 
-    with pytest.raises(CheckerRevokedError):
+    with pytest.raises(
+        CheckerRevokedError,
+        match="Select an active checker from the reference contract",
+    ):
         registry.require_active(checker.checker_id)
     assert [event.action for event in registry.audit_log(checker.checker_id)] == [
         "AUTHORIZED",
@@ -88,7 +130,7 @@ def test_checker_registry_rejects_identity_metadata_corruption(
                 ("sha256:" + "0" * 64, checker.checker_id),
             )
 
-    with pytest.raises(CheckerRegistryError, match="stored checker metadata"):
+    with pytest.raises(CheckerRegistryError, match="Checker registry data"):
         registry.get(checker.checker_id)
 
 
@@ -119,7 +161,7 @@ def test_checker_authorization_requires_explicit_compatibility_scope(
 ) -> None:
     registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
 
-    with pytest.raises(CheckerRegistryError, match="explicit compatibility"):
+    with pytest.raises(CheckerRegistryError, match="Supply"):
         registry.authorize(
             name="reject-all-v1",
             entrypoint="jacobian_checkers.reject:check",

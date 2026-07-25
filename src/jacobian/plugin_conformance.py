@@ -218,7 +218,7 @@ def _check_declared_failure(
     )
     if snapshot.state is not ExperimentState.ERROR:
         raise AssertionError(f"declared failure ended as {snapshot.state.value}")
-    if "declared plugin failure" not in snapshot.detail:
+    if "stopped before returning a result" not in snapshot.detail:
         raise AssertionError(f"unexpected declared-failure detail: {snapshot.detail}")
 
 
@@ -233,7 +233,7 @@ def _check_malformed_output(
     )
     if snapshot.state is not ExperimentState.ERROR:
         raise AssertionError(f"malformed output ended as {snapshot.state.value}")
-    if "plugin response must be a JSON object" not in snapshot.detail:
+    if "stopped before returning a result" not in snapshot.detail:
         raise AssertionError(f"unexpected malformed-output detail: {snapshot.detail}")
 
 
@@ -275,7 +275,7 @@ def _check_symlink_attack(
                 target.plugin_id,
                 CapabilityName.PROPOSER,
             ),
-            match="regular file",
+            match="implementation is unavailable",
         )
     finally:
         if target.symlink_path.is_symlink():
@@ -300,7 +300,7 @@ def _check_evidence_promotion(
         or result.hypotheses
     ):
         raise AssertionError("unsupported promotion crossed the evidence boundary")
-    if "cannot promote parameter-region evidence" not in result.detail:
+    if "tried to promote parameter-region evidence" not in result.detail:
         raise AssertionError(f"unexpected promotion detail: {result.detail}")
 
 

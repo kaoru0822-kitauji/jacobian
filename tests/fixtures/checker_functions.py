@@ -2,7 +2,36 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
+
+
+def fail_with_internal_detail(_request: dict[str, Any]) -> dict[str, Any]:
+    raise RuntimeError("provider=fixture internal-checker-id=secret")
+
+
+def exit_without_response(_request: dict[str, Any]) -> dict[str, Any]:
+    os._exit(0)
+
+
+def return_invalid_decision(_request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "accepted": True,
+        "conclusion": "NOT_A_CONCLUSION",
+        "arithmetic": "EXACT_INTEGER",
+        "method": "DIRECT_WITNESS",
+        "coverage": "NOT_APPLICABLE",
+        "detail": "invalid fixture decision",
+    }
+
+
+def imitate_source_change(_request: dict[str, Any]) -> dict[str, Any]:
+    raise ValueError("checker source changed during execution")
+
+
+def emit_large_diagnostic(request: dict[str, Any]) -> dict[str, Any]:
+    print("x" * 4096)
+    return check_fixture_value(request)
 
 
 def check_fixture_value(request: dict[str, Any]) -> dict[str, Any]:

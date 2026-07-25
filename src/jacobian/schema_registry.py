@@ -19,6 +19,17 @@ class SchemaRegistryError(RuntimeError):
 class SchemaValidationError(SchemaRegistryError):
     """A payload does not satisfy its registered schema."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: str,
+        required_field: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.path = path
+        self.required_field = required_field
+
 
 def _reject_external_references(value: Any) -> None:
     if isinstance(value, dict):
@@ -102,5 +113,23 @@ class SchemaRegistry:
         if errors:
             first: ValidationError = errors[0]
             location = "/".join(str(part) for part in first.absolute_path) or "$"
-            raise SchemaValidationError(f"{location}: {first.message}")
+            required_field = None
+            if (
+                first.validator == "required"
+                and isinstance(first.validator_value, list)
+                and isinstance(first.instance, dict)
+            ):
+                required_field = next(
+                    (
+                        field
+                        for field in first.validator_value
+                        if isinstance(field, str) and field not in first.instance
+                    ),
+                    None,
+                )
+            raise SchemaValidationError(
+                f"{location}: {first.message}",
+                path=location,
+                required_field=required_field,
+            )
         return normalized

@@ -51,6 +51,41 @@ def _simplex(
 
 
 @pytest.mark.integration
+def test_backend_failure_keeps_provider_detail_local(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import z3
+
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    point_uri, generators_uri = _simplex(
+        kernel,
+        ((1, 4), (1, 4), (1, 4)),
+    )
+
+    def fail_backend(*_args: object, **_kwargs: object) -> None:
+        raise z3.Z3Exception("provider=solver internal-id=secret")
+
+    monkeypatch.setattr(kernel.polytope, "_convex_weights", fail_backend)
+    result = kernel.polytope.separate(
+        PolytopeSeparateRequest(
+            point_uri=point_uri,
+            generator_set_uri=generators_uri,
+        )
+    )
+
+    assert result.result.execution.status.value == "ERROR"
+    assert result.result.execution.detail == (
+        "The exact polytope check failed. Retry with a smaller input; "
+        "if it fails again, inspect the local Jacobian log."
+    )
+    assert "solver" not in result.result.execution.detail
+    assert "internal-id" not in result.result.execution.detail
+    assert "internal-id=secret" in caplog.text
+
+
+@pytest.mark.integration
 @pytest.mark.subprocess
 def test_exact_membership_witness_is_independently_replayed(
     tmp_path: Path,

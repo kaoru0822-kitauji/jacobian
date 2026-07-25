@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import sqlite3
 from collections.abc import Iterator
@@ -17,6 +18,8 @@ from jacobian.contracts.checkers import (
     EvidenceKind,
 )
 from jacobian.implementation import ImplementationError, package_source_digest
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class CheckerRegistryError(RuntimeError):
@@ -43,7 +46,15 @@ def compute_entrypoint_digest(entrypoint: str) -> str:
     try:
         return package_source_digest(entrypoint)
     except ImplementationError as exc:
-        raise CheckerRegistryError(str(exc)) from exc
+        _LOGGER.warning(
+            "could not read checker implementation %s",
+            entrypoint,
+            exc_info=exc,
+        )
+        raise CheckerRegistryError(
+            "The checker entrypoint could not be loaded. Check that the "
+            "module:function entrypoint is installed, then retry."
+        ) from exc
 
 
 class CheckerRegistry:
@@ -79,7 +90,8 @@ class CheckerRegistry:
             registration = self.require_active(checker_id)
             if registration.executable_digest != expected_digest:
                 raise CheckerExecutableChangedError(
-                    "checker digest changed before verification commit"
+                    "The checker changed before verification was saved. Authorize the "
+                    "current checker version, then run verification again."
                 )
             yield registration
 
@@ -199,11 +211,13 @@ class CheckerRegistry:
                 or existing["executable_digest"] != executable_digest
             ):
                 raise CheckerRegistryError(
-                    "checker identifier collides with another registration"
+                    "This checker conflicts with an existing registration. Register "
+                    "the changed implementation as a new checker version."
                 )
             elif not bool(existing["authorized"]):
                 raise CheckerRevokedError(
-                    "revoked checker identities cannot be reauthorized in place"
+                    "This checker version is revoked and cannot be reauthorized. "
+                    "Authorize the current implementation as a new checker version."
                 )
         return registration
 
@@ -220,19 +234,28 @@ class CheckerRegistry:
                 (checker_id,),
             ).fetchone()
         if row is None:
-            raise CheckerNotFoundError(f"checker is not registered: {checker_id}")
+            raise CheckerNotFoundError(
+                "The checker is not registered. Review the reference contract, choose "
+                "an authorized checker_id, and retry."
+            )
         try:
             data = loads_strict_json(bytes(row["registration_json"]))
             data["authorized"] = bool(row["authorized"])
             registration = CheckerRegistration.model_validate(data)
         except (TypeError, ValueError) as exc:
-            raise CheckerRegistryError("stored checker metadata is invalid") from exc
+            raise CheckerRegistryError(
+                "Checker registry data is invalid. Restore the Jacobian state "
+                "directory from a trusted copy before retrying."
+            ) from exc
         if (
             registration.checker_id != checker_id
             or _checker_identifier(registration) != checker_id
             or registration.executable_digest != row["executable_digest"]
         ):
-            raise CheckerRegistryError("stored checker metadata is inconsistent")
+            raise CheckerRegistryError(
+                "Checker registry data is inconsistent. Restore the Jacobian state "
+                "directory from a trusted copy before retrying."
+            )
         return registration
 
     def require_active(self, checker_id: str) -> CheckerRegistration:
@@ -240,11 +263,15 @@ class CheckerRegistry:
 
         registration = self.get(checker_id)
         if not registration.authorized:
-            raise CheckerRevokedError(f"checker is revoked: {checker_id}")
+            raise CheckerRevokedError(
+                "This checker is revoked. Select an active checker from the reference "
+                "contract, then retry."
+            )
         installed_digest = compute_entrypoint_digest(registration.entrypoint)
         if installed_digest != registration.executable_digest:
             raise CheckerExecutableChangedError(
-                "checker package bytes changed after authorization"
+                "The checker changed after authorization. Authorize the current "
+                "checker version, then retry."
             )
         return registration
 
@@ -276,12 +303,18 @@ class CheckerRegistry:
         if scope_error is not None:
             raise CheckerCompatibilityError(scope_error)
         if registration.evidence_kind is not expected_kind:
-            raise CheckerCompatibilityError("checker evidence kind is incompatible")
+            raise CheckerCompatibilityError(
+                "This checker does not support the supplied evidence type. Select a "
+                "checker from the same reference contract, then retry."
+            )
         if (
             registration.format_id != format_id
             or registration.format_version != format_version
         ):
-            raise CheckerCompatibilityError("checker evidence format is incompatible")
+            raise CheckerCompatibilityError(
+                "This checker does not support the supplied evidence format. Select "
+                "a compatible checker from the reference contract, then retry."
+            )
         compatibility_sets = (
             (registration.claim_schema_uris, claim_schema_uri, "claim schema"),
             (registration.semantics_uris, semantics_uri, "semantics"),
@@ -294,7 +327,8 @@ class CheckerRegistry:
         for supported, actual, label in compatibility_sets:
             if supported and actual not in supported:
                 raise CheckerCompatibilityError(
-                    f"checker does not support the requested {label}"
+                    f"This checker does not support the requested {label}. Select a "
+                    "compatible checker from the reference contract, then retry."
                 )
         target_compatibility = (
             (
@@ -313,7 +347,8 @@ class CheckerRegistry:
                 target_actual is None or target_actual not in target_supported
             ):
                 raise CheckerCompatibilityError(
-                    f"checker does not support the requested {target_label}"
+                    f"This checker does not support the requested {target_label}. "
+                    "Select a compatible transformation checker, then retry."
                 )
         return registration
 
@@ -355,11 +390,14 @@ class CheckerRegistry:
                 continue
         if not compatible:
             raise CheckerNotFoundError(
-                "no active checker supports this evidence format and semantics"
+                "No authorized checker matches this evidence and its semantics. "
+                "Review the reference contract and authorize a compatible checker "
+                "before retrying."
             )
         if len(compatible) > 1:
             raise CheckerCompatibilityError(
-                "checker selection is ambiguous; operator policy must choose one"
+                "Multiple authorized checkers match this evidence. Configure checker "
+                "policy to select exactly one, then retry."
             )
         return compatible[0]
 
@@ -372,9 +410,14 @@ class CheckerRegistry:
                 (checker_id,),
             ).fetchone()
             if row is None:
-                raise CheckerNotFoundError(f"checker is not registered: {checker_id}")
+                raise CheckerNotFoundError(
+                    "The checker is not registered. Review the reference contract, "
+                    "choose an authorized checker_id, and retry."
+                )
             if not bool(row["authorized"]):
-                raise CheckerRevokedError(f"checker is already revoked: {checker_id}")
+                raise CheckerRevokedError(
+                    "This checker is already revoked. No registry change is needed."
+                )
             connection.execute(
                 "UPDATE checkers SET authorized = 0 WHERE checker_id = ?",
                 (checker_id,),
@@ -423,16 +466,22 @@ def _compatibility_scope_error(
     target_semantics_uris: tuple[str, ...],
 ) -> str | None:
     if not claim_schema_uris or not semantics_uris or not candidate_schema_uris:
-        return "checker authorization requires explicit compatibility allowlists"
+        return (
+            "Checker authorization requires claim schema, semantics, and candidate "
+            "schema allowlists. Supply all three, then retry."
+        )
     if evidence_kind is EvidenceKind.TRANSFORMATION and (
         not target_schema_uris or not target_semantics_uris
     ):
         return (
-            "transformation checker authorization requires explicit compatibility "
-            "allowlists for target schemas and semantics"
+            "Transformation checker authorization requires target schema and target "
+            "semantics allowlists. Supply both, then retry."
         )
     if bool(target_schema_uris) != bool(target_semantics_uris):
-        return "checker target compatibility allowlists must be supplied together"
+        return (
+            "Target schema and target semantics allowlists must be supplied together. "
+            "Supply both or omit both, then retry."
+        )
     return None
 
 

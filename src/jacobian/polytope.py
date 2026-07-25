@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import time
 from fractions import Fraction
@@ -45,6 +46,8 @@ from jacobian.contracts.results import (
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 
+_LOGGER = logging.getLogger(__name__)
+
 
 def _wire_rational(value: Fraction) -> dict[str, str]:
     return {"num": str(value.numerator), "den": str(value.denominator)}
@@ -74,6 +77,19 @@ def _model_fraction(
     if not isinstance(value, z3.RatNumRef):
         raise ValueError("exact rational model value required")
     return Fraction(value.as_fraction())
+
+
+def _polytope_input_failure_detail(exc: Exception) -> str:
+    _LOGGER.warning("polytope input validation failed", exc_info=exc)
+    if isinstance(exc, (StoreError, SchemaRegistryError, ValidationError)):
+        return (
+            "The point or generator artifact is unavailable or invalid. Check the "
+            "artifact URIs and the polytope reference contract, then retry."
+        )
+    return (
+        "The point or generator input is invalid. Check that values are exact "
+        "rationals with matching dimensions and compatible semantics, then retry."
+    )
 
 
 class PolytopeService:
@@ -221,13 +237,19 @@ class PolytopeService:
             ValueError,
             ZeroDivisionError,
         ) as exc:
-            return self._rejected(request, started, str(exc))
-        except z3.Z3Exception as exc:
+            return self._rejected(
+                request,
+                started,
+                _polytope_input_failure_detail(exc),
+            )
+        except z3.Z3Exception:
+            _LOGGER.exception("exact polytope backend failed")
             return self._unknown(
                 request,
                 started,
                 ExecutionStatus.ERROR,
-                f"exact polytope backend failed: {exc}",
+                "The exact polytope check failed. Retry with a smaller input; "
+                "if it fails again, inspect the local Jacobian log.",
             )
 
     def _load_point(self, artifact: StoredArtifact) -> RationalPoint:

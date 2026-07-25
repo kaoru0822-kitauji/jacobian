@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import platform
 import sqlite3
 import sysconfig
@@ -23,6 +24,8 @@ from jacobian.implementation import (
 )
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore, StoreError
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class PluginRegistryError(RuntimeError):
@@ -110,7 +113,15 @@ class PluginRegistry:
         try:
             digest = module_source_digest(entrypoint)
         except ImplementationError as exc:
-            raise PluginRegistryError(str(exc)) from exc
+            _LOGGER.warning(
+                "could not register plugin implementation %s",
+                entrypoint,
+                exc_info=exc,
+            )
+            raise PluginRegistryError(
+                "The plugin entrypoint could not be loaded. Check that the "
+                "module:function entrypoint is installed, then retry."
+            ) from exc
         return self.store.register_descriptor(
             kind="implementation",
             name=entrypoint,
@@ -177,7 +188,12 @@ class PluginRegistry:
                     implementation_digest=expected_digest,
                 )
         except (StoreError, ValueError, ImplementationError) as exc:
-            raise PluginRegistryError(str(exc)) from exc
+            _LOGGER.warning("plugin installation failed", exc_info=exc)
+            raise PluginRegistryError(
+                "The plugin manifest or one of its dependencies is invalid or "
+                "unavailable. Check the reference contract and registered "
+                "descriptors, then retry."
+            ) from exc
 
         runtime_identity = _runtime_identity()
         build_identity_digest = _digest(
@@ -276,7 +292,11 @@ class PluginRegistry:
         try:
             return PluginManifest.model_validate(self.store.get(plugin_id).payload)
         except (StoreError, ValueError) as exc:
-            raise PluginRegistryError(str(exc)) from exc
+            _LOGGER.warning("installed plugin manifest is unreadable", exc_info=exc)
+            raise PluginRegistryError(
+                "The installed plugin manifest is invalid or unavailable. Reload "
+                "the plugin from its reference contract, then retry."
+            ) from exc
 
     def snapshot_uri(self, plugin_id: str) -> str:
         """Return the immutable installation snapshot URI without importing code."""
@@ -314,7 +334,11 @@ class PluginRegistry:
             snapshot = PluginRegistrySnapshot.model_validate(artifact.payload)
             manifest_artifact = self.store.get(plugin_id)
         except (StoreError, ValueError) as exc:
-            raise PluginRegistryError(str(exc)) from exc
+            _LOGGER.warning("installed plugin snapshot is unreadable", exc_info=exc)
+            raise PluginRegistryError(
+                "The installed plugin snapshot is invalid or unavailable. Reload "
+                "the plugin from its reference contract, then retry."
+            ) from exc
         if snapshot.plugin_id != plugin_id:
             raise PluginRegistryError("registry snapshot plugin binding mismatch")
         if snapshot.plugin_manifest_digest != manifest_artifact.manifest.object_digest:
@@ -380,7 +404,11 @@ class PluginRegistry:
                     "plugin implementation bytes changed after installation"
                 )
         except (StoreError, ImplementationError) as exc:
-            raise PluginRegistryError(str(exc)) from exc
+            _LOGGER.warning("plugin resolution failed", exc_info=exc)
+            raise PluginRegistryError(
+                "The plugin implementation is unavailable. Reload Jacobian to "
+                "register the current plugin version, then retry."
+            ) from exc
         return ResolvedCapability(
             plugin_id=plugin_id,
             name=capability,

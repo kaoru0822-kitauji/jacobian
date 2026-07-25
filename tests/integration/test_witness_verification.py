@@ -18,6 +18,7 @@ def _graph_case(
     tmp_path: Path,
     *,
     candidate_schema_definition: dict[str, object] | None = None,
+    checker_entrypoint: str = "jacobian_checkers.graph_paths:check_omitted_path",
 ) -> tuple[
     ArtifactStore,
     VerificationService,
@@ -101,7 +102,7 @@ def _graph_case(
     registry = CheckerRegistry(store.db_path)
     checker = registry.authorize(
         name="graph-omitted-path-v1",
-        entrypoint="jacobian_checkers.graph_paths:check_omitted_path",
+        entrypoint=checker_entrypoint,
         evidence_kind="WITNESS",
         format_id="graph.omitted_path",
         format_version="1",
@@ -118,6 +119,171 @@ def _graph_case(
         witness.artifact_uri,
         candidate_schema,
     )
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_checker_failure_does_not_expose_internal_exception_text(
+    tmp_path: Path,
+) -> None:
+    _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path,
+        checker_entrypoint=(
+            "tests.fixtures.checker_functions:fail_with_internal_detail"
+        ),
+    )
+
+    result = service.verify_witness(
+        claim_uri=claim_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.execution.detail == (
+        "The checker stopped before returning a decision. Retry once; "
+        "if it happens again, inspect the local checker log."
+    )
+    assert "fixture" not in result.execution.detail
+    assert "secret" not in result.execution.detail
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+@pytest.mark.parametrize(
+    ("checker_entrypoint", "expected_detail"),
+    [
+        (
+            "tests.fixtures.checker_functions:exit_without_response",
+            "The checker returned an unreadable response. Retry once; "
+            "if it happens again, inspect the local checker log.",
+        ),
+        (
+            "tests.fixtures.checker_functions:return_invalid_decision",
+            "The checker returned an invalid decision. Inspect the local checker "
+            "log before retrying.",
+        ),
+    ],
+)
+def test_invalid_checker_responses_explain_recovery(
+    tmp_path: Path,
+    checker_entrypoint: str,
+    expected_detail: str,
+) -> None:
+    _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path,
+        checker_entrypoint=checker_entrypoint,
+    )
+
+    result = service.verify_witness(
+        claim_uri=claim_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.execution.detail == expected_detail
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_checker_output_limit_explains_recovery(tmp_path: Path) -> None:
+    _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path
+    )
+    service.max_checker_output_bytes = 32
+
+    result = service.verify_witness(
+        claim_uri=claim_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.execution.detail == (
+        "The checker returned too much data. Retry with a smaller input "
+        "and inspect the local checker log if the limit is reached again."
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.subprocess
+def test_checker_diagnostic_limit_explains_recovery(tmp_path: Path) -> None:
+    _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path,
+        checker_entrypoint="tests.fixtures.checker_functions:emit_large_diagnostic",
+    )
+    service.max_checker_diagnostic_bytes = 32
+
+    result = service.verify_witness(
+        claim_uri=claim_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.execution.detail == (
+        "The checker produced too many diagnostics. Retry with a smaller input "
+        "and inspect the local checker log if the limit is reached again."
+    )
+
+
+@pytest.mark.integration
+def test_missing_verification_artifact_is_rejected_with_recovery(
+    tmp_path: Path,
+) -> None:
+    _, service, checker_id, _, candidate_uri, witness_uri, _ = _graph_case(tmp_path)
+    missing_uri = "artifact://sha256/" + "f" * 64
+
+    result = service.verify_witness(
+        claim_uri=missing_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status.value == "COMPLETED"
+    assert result.input.status.value == "REJECTED"
+    assert result.input.errors == (
+        "A required verification artifact is unavailable or invalid. "
+        "Check the artifact URIs and retry.",
+    )
+    assert missing_uri not in result.input.errors[0]
+    assert result.assurance.verification is Verification.UNVERIFIED
+
+
+@pytest.mark.integration
+def test_corrupt_verification_artifact_is_an_operational_failure(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    store, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path
+    )
+    claim = store.get(claim_uri)
+    claim_digest = claim.manifest.object_digest
+    store._blob_path(claim.manifest.payload_digest).write_bytes(b"corrupt")
+
+    result = service.verify_witness(
+        claim_uri=claim_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.input.status.value == "ACCEPTED"
+    assert result.execution.detail == (
+        "Jacobian detected corrupted local verification data. Restore the state "
+        "directory from a trusted backup, then retry."
+    )
+    assert claim_digest not in result.execution.detail
+    assert "ArtifactIntegrityError" not in result.execution.detail
+    assert "blob digest mismatch" in caplog.text
 
 
 @pytest.mark.integration
@@ -178,6 +344,10 @@ def test_valid_witness_rebound_to_another_candidate_is_rejected(
     assert result.conclusion is Conclusion.UNKNOWN
     assert result.assurance.verification is Verification.UNVERIFIED
     assert result.input.status.value == "REJECTED"
+    assert result.input.errors == (
+        "The witness does not match the supplied claim and candidate. "
+        "Recreate the witness from those exact artifacts, then retry.",
+    )
 
 
 @pytest.mark.integration

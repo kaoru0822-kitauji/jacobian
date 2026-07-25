@@ -34,7 +34,27 @@ def test_plugin_executor_rejects_changed_implementation_digest() -> None:
 
     assert result.status.value == "ERROR"
     assert result.output is None
-    assert "resolved digest" in (result.detail or "")
+    assert result.detail == (
+        "The plugin changed after it was registered. "
+        "Reload Jacobian to register the current plugin version, then retry."
+    )
+
+
+@pytest.mark.integration
+def test_plugin_executor_does_not_expose_untrusted_exception_text() -> None:
+    result = PluginExecutor().run(
+        entrypoint="tests.fixtures.plugin_functions:propose_declared_failure",
+        request={},
+        timeout_seconds=30,
+    )
+
+    assert result.status.value == "ERROR"
+    assert result.output is None
+    assert result.detail == (
+        "The plugin stopped before returning a result. Retry once; "
+        "if it happens again, inspect the local plugin log."
+    )
+    assert "fixture" not in result.detail
 
 
 @pytest.mark.integration
@@ -60,6 +80,26 @@ def test_plugin_timeout_has_no_mathematical_output() -> None:
 
     assert result.status.value == "TIMEOUT"
     assert result.output is None
+    assert result.detail == (
+        "The plugin did not finish within the allowed time. "
+        "Retry with a larger time budget or a smaller request."
+    )
+
+
+@pytest.mark.integration
+def test_plugin_unreadable_response_explains_recovery() -> None:
+    result = PluginExecutor().run(
+        entrypoint="tests.fixtures.plugin_functions:exit_without_response",
+        request={},
+        timeout_seconds=30,
+    )
+
+    assert result.status.value == "ERROR"
+    assert result.output is None
+    assert result.detail == (
+        "The plugin returned an unreadable response. Retry once; "
+        "if it happens again, inspect the local plugin log."
+    )
 
 
 @pytest.mark.integration
@@ -74,7 +114,10 @@ def test_plugin_diagnostic_limit_fails_closed() -> None:
     assert time.monotonic() - start < 10
     assert result.status.value == "ERROR"
     assert result.output is None
-    assert result.detail == "plugin diagnostics exceed the configured limit"
+    assert result.detail == (
+        "The plugin produced too many diagnostics. Retry with a smaller request "
+        "and inspect the local plugin log if the limit is reached again."
+    )
 
 
 @pytest.mark.integration
@@ -160,4 +203,7 @@ def test_plugin_worker_rejects_bytecode_modules(
     )
 
     assert result.status.value == "ERROR"
-    assert "not Python source" in result.detail
+    assert result.detail == (
+        "The plugin stopped before returning a result. Retry once; "
+        "if it happens again, inspect the local plugin log."
+    )
