@@ -23,6 +23,26 @@ instantiating premises; and replaying or cross-checking certificates. This list
 does not define a universal mathematical ontology. Domain plugins define the
 meaning of each operation for their objects and claims.
 
+These operation names are descriptive capability families, not a closed
+taxonomy, required interface, or shared mathematical ontology. Do not introduce
+a universal operation enum or generic mathematical object schema merely to
+match this list. Prefer specific capability IDs and domain-owned contracts,
+such as `graph.enumerate.nonisomorphic` or
+`polynomial.compute.groebner_basis`.
+
+Before implementing a mathematical algorithm or abstraction, check whether a
+maintained proof assistant, CAS, solver, optimization system, mathematical
+database, or domain library already provides it. Prefer a thin, version-pinned
+capability adapter over reimplementation. Examples include Lean/mathlib,
+SageMath, GAP, OSCAR, SymPy, SAT/SMT solvers, and specialized domain systems.
+
+Capability descriptors and results must make relevant semantic limits
+explicit, including exact versus approximate computation, bounded versus
+exhaustive scope, deterministic versus heuristic behavior, completion status,
+certificate availability, and the checker required for promotion. A successful
+computation, evaluator, or solver invocation remains unverified unless an
+authorized independent checker accepts appropriately bound evidence.
+
 Proof strategies and research agents compose primitives into workflows.
 External SAT, SMT, CAS, optimization, retrieval, and proof systems connect
 through capability adapters. Prefer a capability ID behind
