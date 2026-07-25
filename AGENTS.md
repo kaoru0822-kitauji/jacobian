@@ -25,16 +25,28 @@ executable search and checkable evidence.
 
 These operation names are descriptive capability families, not a closed
 taxonomy, required interface, or shared mathematical ontology. Do not introduce
-a universal operation enum or generic mathematical object schema merely to
-match this list. Prefer specific capability IDs and domain-owned contracts,
-such as `graph.enumerate.nonisomorphic` or
+a universal operation enum, generic mathematical object schema, one capability
+for every mathematical verb, or one-to-one wrappers for every backend API.
+Design a small set of distinct, namespaced agent-facing capabilities around
+realistic mathematical workflows. Prefer specific capability IDs and
+domain-owned contracts, such as `graph.enumerate.nonisomorphic` or
 `polynomial.compute.groebner_basis`.
+
+An agent-facing capability may coordinate multiple backend operations when
+they produce one coherent mathematical outcome. It must still preserve the
+intermediate artifacts, relationships, obligations, scope, assurance, and
+independent verification boundaries. Add, split, or consolidate capabilities
+using held-out agent evaluations rather than API completeness or taxonomic
+symmetry; measure correctness, false certification, tool errors, tool calls,
+latency, and context use.
 
 Before implementing a mathematical algorithm or abstraction, check whether a
 maintained proof assistant, CAS, solver, optimization system, mathematical
 database, or domain library already provides it. Prefer a thin, version-pinned
 capability adapter over reimplementation. Examples include Lean/mathlib,
 SageMath, GAP, OSCAR, SymPy, SAT/SMT solvers, and specialized domain systems.
+Thin means delegating mathematics while preserving clear contracts and trust
+boundaries, not mechanically exposing every backend function.
 
 Capability descriptors and results must make relevant semantic limits
 explicit, including exact versus approximate computation, bounded versus
