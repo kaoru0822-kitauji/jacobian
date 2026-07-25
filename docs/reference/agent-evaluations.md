@@ -94,7 +94,14 @@ Primary aggregate metrics are:
 - verified-witness utilization rate;
 - successful recovery rate after a defeating witness;
 - replayable-handoff rate;
-- tokens, tool calls, wall time, and compute conditional on correctness.
+- tokens, tool calls, wall time, and compute conditional on correctness;
+- tool execution errors and parameter/schema errors per run.
+
+The public MCP pilot records elapsed time, token usage, tool-call count, tool
+errors, parameter errors, correctness, and a conservative false-certification
+flag in each result. A claimed verified result that fails durable scoring is
+counted as false certification for triage, even when the immediate cause may
+later prove to be a reporting or binding error.
 
 The initial target for catastrophic false certification is zero. Other release
 thresholds are set only after baseline pilots show the scenario is
@@ -106,6 +113,14 @@ The public motifs and exact facts underlying these evaluations are listed in
 the [Mathematical scenario catalog](math-scenarios.md). Agent-facing cases use
 held-out relabelings, parameter changes, and distractors rather than exposing
 those public answers directly.
+
+The runnable public pilot also includes `GRAPH-ATLAS-PATH-001`, a smoke case
+for the first graph capability slice. It requires separate
+`graph.search.atlas` and `graph.compute.properties` calls, accepts any labeling
+of the five-vertex path, checks the durable graph-to-property relationship, and
+fails a run that promotes exact NetworkX computation to verified evidence.
+This public case validates the harness and tool composition; it is not a
+held-out research benchmark.
 
 ### EVAL-SEM-001 — Complete semantics
 

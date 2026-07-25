@@ -143,11 +143,15 @@ local artifact store, and records the episode. Projected record IDs and
 conclusions must agree with the checked record. `MCPServer` does not need a new
 tool when an Alloy, Lean, SAT/SMT, CAS, or domain adapter is registered.
 
-The current `CapabilityResult` exposes a generic output object and artifact
-URIs. Relationships and proof obligations are therefore still
-operation-specific data inside that output. Before the primitive contract is
-stabilized, they need versioned first-class fields so a workflow can compose
-them without understanding every domain payload.
+`CapabilityResult` version 2 exposes a generic operation-specific output plus
+first-class scope, completeness, relationships, proof obligations, and artifact
+URIs. The shared layer validates artifact bindings and checker-backed lifecycle
+states; domain adapters still define the mathematical meaning of relation IDs,
+scope parameters, and obligation artifacts.
+
+The [capability workflow evaluation plan](../reference/capability-workflow-evaluations.md)
+defines the first four held-out workflows and the evidence required before
+adding more capability IDs.
 
 Deploy an operator-approved adapter package with a repeatable
 `--capability-adapter package.module:factory` option. The factory receives the
@@ -157,6 +161,10 @@ mathematical trust.
 
 The initial bundled catalog contains:
 
+- `graph.search.atlas` for bounded exact-order construction from NetworkX's
+  maintained Graph Atlas;
+- `graph.compute.properties` for exact batched properties over Jacobian graph
+  artifacts;
 - `reference.solve` for bundled reference-domain exploration and verification;
 - `lean.check` for checker-backed Lean proof replay;
 - `knowledge.search` for trust-labeled local episode retrieval.
