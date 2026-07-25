@@ -196,11 +196,14 @@ access.
 
 ## Distribution
 
-Jacobian is a Python package with an installed CLI and MCP server entry point.
-The intended public distribution channel is PyPI once the alpha release is
-ready. MCP is language-neutral and does not require an npm package; a separate
-JavaScript package would be considered only if Jacobian later ships a
-TypeScript client or adapter.
+Jacobian ships through both PyPI and npm. The Python distribution provides the
+library, CLI, and MCP server. The npm package is the supported Node launcher
+and MCP client installer: it bootstraps the Python distribution, registers
+Jacobian with supported MCP clients, verifies the server handshake, and
+forwards commands to the Python CLI.
+
+The npm package does not duplicate the mathematical kernel or imply a separate
+JavaScript API. Both distributions expose the same Jacobian implementation.
 
 ## Initial non-goals
 
