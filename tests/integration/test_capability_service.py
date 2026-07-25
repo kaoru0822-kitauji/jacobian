@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -344,6 +345,10 @@ def test_unknown_reference_error_is_classified_and_not_remembered(
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    shutil.which("lean") is None,
+    reason="Lean is not installed",
+)
 def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
