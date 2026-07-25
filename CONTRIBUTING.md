@@ -72,6 +72,15 @@ git diff -- README.md CONTRIBUTING.md docs/
 
 Verify every relative Markdown link before submitting the change.
 
+## Releases
+
+The manifest-driven Release Please configuration keeps the Python and npm
+package versions synchronized. CI tests and packs the npm launcher
+independently, then publishes both distributions after a release is created.
+The `jacobian` package on npm must authorize `.github/workflows/ci.yml` as its
+trusted GitHub Actions publisher, using the `npm` environment; releases use
+OIDC rather than a long-lived npm token.
+
 ## Pull requests
 
 Keep each change focused on one outcome. Explain the problem, the resulting

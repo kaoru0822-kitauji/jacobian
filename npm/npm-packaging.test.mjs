@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const npmRoot = dirname(fileURLToPath(import.meta.url));
+const packageMetadata = require("./package.json");
 
 import {
   clientDefinitions,
@@ -82,12 +83,29 @@ test("isClientDetected recognizes installed client markers", async () => {
 
 test("buildLauncher returns a version-matching launcher with mcp subcommand", () => {
   const launcher = buildLauncher();
-  const pkg = require("./package.json");
-  assert.equal(launcher.version, pkg.version);
+  assert.equal(launcher.version, packageMetadata.version);
   assert.ok(launcher.command.length > 0);
   assert.ok(launcher.args.length > 0);
   // The last arg should be "mcp" (the subcommand).
   assert.equal(launcher.args[launcher.args.length - 1], "mcp");
+});
+
+test("npm and Python packages publish the same release version", async () => {
+  const pyproject = await readFile(join(npmRoot, "..", "pyproject.toml"), "utf8");
+  const match = pyproject.match(/^version = "([^"]+)"$/m);
+  assert.ok(match, "pyproject.toml must declare a project version");
+
+  const pythonVersion = match[1];
+  const pep440 = pythonVersion.match(
+    /^(\d+\.\d+\.\d+)(?:(a|b|rc)(\d+))?$/,
+  );
+  assert.ok(pep440, `unsupported Python release version: ${pythonVersion}`);
+  const prereleaseNames = { a: "alpha", b: "beta", rc: "rc" };
+  const expectedNpmVersion = pep440[2]
+    ? `${pep440[1]}-${prereleaseNames[pep440[2]]}.${pep440[3]}`
+    : pep440[1];
+
+  assert.equal(packageMetadata.version, expectedNpmVersion);
 });
 
 test("doctor errors hide request ids and provide a recovery command", () => {
@@ -133,7 +151,7 @@ test("setup writes a JSON config for Claude Code", async () => {
     const home = await fakeHome(base, ["claude"]);
     const defs = clientDefinitions(home);
     const claude = defs.find((d) => d.id === "claude");
-    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: "0.2.0-alpha.0", package: null };
+    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null };
 
     const edit = resolveClientEdit("setup", claude, launcher);
     assert.equal(edit.action, "create");
@@ -165,7 +183,7 @@ test("setup writes a TOML config for Codex", async () => {
     const home = await fakeHome(base, ["codex"]);
     const defs = clientDefinitions(home);
     const codex = defs.find((d) => d.id === "codex");
-    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: "0.2.0-alpha.0", package: null };
+    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null };
 
     const edit = resolveClientEdit("setup", codex, launcher);
     assert.equal(edit.action, "create");
@@ -195,7 +213,7 @@ test("remove on a non-configured client reports not_configured", async () => {
     const home = await fakeHome(base, ["claude"]);
     const defs = clientDefinitions(home);
     const claude = defs.find((d) => d.id === "claude");
-    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: "0.2.0-alpha.0", package: null };
+    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null };
 
     const edit = resolveClientEdit("remove", claude, launcher);
     assert.equal(edit.action, "not_configured");
@@ -222,7 +240,7 @@ test("setup updates an existing JSON config without losing other servers", async
     };
     writeFileSync(configPath, JSON.stringify(existing, null, 2) + "\n");
 
-    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: "0.2.0-alpha.0", package: null };
+    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null };
     const edit = resolveClientEdit("setup", claude, launcher);
     assert.equal(edit.action, "update");
 
@@ -245,7 +263,7 @@ test("invalid JSON explains that setup made no changes", async () => {
     const launcher = {
       command: "/usr/bin/node",
       args: ["/path/to/jacobian", "mcp"],
-      version: "0.2.0-alpha.0",
+      version: packageMetadata.version,
       package: null,
     };
     await writeFile(claude.configPath, "{ invalid", "utf8");
