@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
-from pydantic import TypeAdapter
-
+from jacobian.atomic_domain_capabilities import build_domain_adapters
+from jacobian.atomic_experiment_capabilities import build_experiment_adapters
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -26,16 +26,9 @@ from jacobian.contracts.capabilities import (
     CapabilityScope,
 )
 from jacobian.contracts.claims import ClaimValidationResult
-from jacobian.contracts.conjectures import ParameterRegion, ParameterRegionEvidence
-from jacobian.contracts.discovery import (
-    ExperimentCancelResult,
-    ExperimentHandle,
-    ExperimentSnapshot,
-    StructureCanonicalizationResult,
-)
+from jacobian.contracts.conjectures import ParameterRegionEvidence
 from jacobian.contracts.evaluation import EvaluationBatchResult, EvaluationProfile
 from jacobian.contracts.evidence import WitnessRole
-from jacobian.contracts.polytope import PolytopeSeparateRequest, PolytopeSeparateResult
 from jacobian.contracts.results import (
     Coverage,
     Execution,
@@ -43,14 +36,8 @@ from jacobian.contracts.results import (
     ResultEnvelope,
     Verification,
 )
-from jacobian.contracts.search import ExperimentControlResult, SearchExperimentSnapshot
 from jacobian.contracts.shrinking import ShrinkResult
-from jacobian.contracts.transformations import (
-    TransformationApplyResult,
-    TransformationRelation,
-)
 from jacobian.contracts.witness_search import WitnessFindResult
-from jacobian.experiments import ExperimentNotFoundError
 from jacobian.store import ArtifactStore, StoreError
 
 if TYPE_CHECKING:
@@ -393,199 +380,19 @@ def install_atomic_capabilities(
             unverified_basis="plugin-proposed reductions are not a verified minimality claim",
             tags=("shrink",),
         ),
-        _adapter(
-            capability_id="structure.canonicalize",
-            title="Canonicalize one structure",
-            description="Compute a plugin-defined canonical representative without self-certification.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {
-                    "structure_uri": _ARTIFACT_URI,
-                    "plugin_id": _ARTIFACT_URI,
-                    "wall_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
-                },
-                required=("structure_uri", "plugin_id", "wall_seconds"),
-            ),
-            output_schema=StructureCanonicalizationResult.model_json_schema(),
-            invoke=lambda p: kernel.structures.canonicalize(**p),
-            unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-            unverified_basis="plugin canonicalization is not independently verified",
-            tags=("structure", "canonicalization"),
+        *build_experiment_adapters(
+            kernel,
+            adapter=_adapter,
+            schema=_schema,
+            artifact_uri=_ARTIFACT_URI,
+            experiment_uri=_EXPERIMENT_URI,
+            enumeration_budget_schema=_enumeration_budget_schema,
         ),
-        _adapter(
-            capability_id="search.enumerate",
-            title="Start a bounded enumeration",
-            description="Start one durable candidate-enumeration experiment; it cannot self-certify.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {
-                    "claim_uri": _ARTIFACT_URI,
-                    "plugin_id": _ARTIFACT_URI,
-                    "bounds": {"type": "object"},
-                    "quotient_by_isomorphism": {"type": "boolean"},
-                    "profile": {"enum": ["FAST", "EXACT_CANDIDATE"]},
-                    "seed": {"type": "integer"},
-                    "budget": _enumeration_budget_schema(),
-                },
-                required=("claim_uri", "plugin_id", "bounds", "budget"),
-            ),
-            output_schema=ExperimentHandle.model_json_schema(),
-            invoke=lambda p: kernel.experiments.start_enumeration(p),
-            unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-            unverified_basis="enumeration lifecycle state cannot certify a mathematical conclusion",
-            tags=("search", "enumeration", "experiment"),
-        ),
-        _adapter(
-            capability_id="experiment.inspect",
-            title="Inspect one experiment",
-            description="Read the durable state and accounting of one enumeration or search experiment.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {"experiment_uri": _EXPERIMENT_URI}, required=("experiment_uri",)
-            ),
-            output_schema=TypeAdapter(
-                ExperimentSnapshot | SearchExperimentSnapshot
-            ).json_schema(),
-            invoke=lambda p: _inspect_experiment(kernel, p["experiment_uri"]),
-            read_only=True,
-            tags=("experiment",),
-        ),
-        _adapter(
-            capability_id="experiment.wait",
-            title="Wait for an experiment update",
-            description="Wait for a bounded interval and return the latest experiment snapshot.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {
-                    "experiment_uri": _EXPERIMENT_URI,
-                    "timeout_seconds": {
-                        "type": "number",
-                        "exclusiveMinimum": 0,
-                        "maximum": 86400,
-                    },
-                },
-                required=("experiment_uri",),
-            ),
-            output_schema=TypeAdapter(
-                ExperimentSnapshot | SearchExperimentSnapshot
-            ).json_schema(),
-            invoke=lambda p: _wait_experiment(
-                kernel, p["experiment_uri"], p.get("timeout_seconds", 30)
-            ),
-            read_only=True,
-            tags=("experiment",),
-        ),
-        _adapter(
-            capability_id="experiment.cancel",
-            title="Request experiment cancellation",
-            description="Request cancellation of one running enumeration or search experiment.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {"experiment_uri": _EXPERIMENT_URI}, required=("experiment_uri",)
-            ),
-            output_schema=TypeAdapter(
-                ExperimentCancelResult | ExperimentControlResult
-            ).json_schema(),
-            invoke=lambda p: _cancel_experiment(kernel, p["experiment_uri"]),
-            tags=("experiment", "control"),
-        ),
-        _adapter(
-            capability_id="transform.apply",
-            title="Apply one representation transformation",
-            description="Materialize a plugin-proposed transformation and its verification obligation.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {
-                    "source_uri": _ARTIFACT_URI,
-                    "plugin_id": _ARTIFACT_URI,
-                    "target_schema_uri": _ARTIFACT_URI,
-                    "target_semantics_uri": _ARTIFACT_URI,
-                    "requested_relation": {
-                        "enum": [
-                            "EQUIVALENT",
-                            "OVER_APPROXIMATION",
-                            "UNDER_APPROXIMATION",
-                            "HEURISTIC",
-                        ]
-                    },
-                    "wall_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
-                },
-                required=(
-                    "source_uri",
-                    "plugin_id",
-                    "target_schema_uri",
-                    "target_semantics_uri",
-                    "requested_relation",
-                    "wall_seconds",
-                ),
-            ),
-            output_schema=TransformationApplyResult.model_json_schema(),
-            invoke=lambda p: kernel.transformations.apply(
-                **{
-                    **p,
-                    "requested_relation": TransformationRelation(
-                        p["requested_relation"]
-                    ),
-                }
-            ),
-            unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-            unverified_basis="plugin transformation output remains an open verification obligation",
-            tags=("transform",),
-        ),
-        _adapter(
-            capability_id="transform.verify",
-            title="Verify one transformation",
-            description="Replay one transformation relation with its compatible authorized checker.",
-            modes=(CapabilityMode.VERIFY,),
-            input_schema=_schema(
-                {"transformation_uri": _ARTIFACT_URI}, required=("transformation_uri",)
-            ),
-            output_schema=ResultEnvelope.model_json_schema(),
-            invoke=lambda p: kernel.verification.verify_transformation(**p),
-            unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
-            unverified_basis="the checker did not accept the transformation relation",
-            tags=("transform", "verification"),
-        ),
-        _adapter(
-            capability_id="polytope.separate",
-            title="Separate a rational point from a convex hull",
-            description="Compute exact membership evidence or a separator; replay is separate.",
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=_schema(
-                {
-                    "point_uri": _ARTIFACT_URI,
-                    "generator_set_uri": _ARTIFACT_URI,
-                    "projection": {
-                        "type": "array",
-                        "items": {"type": "integer", "minimum": 0},
-                        "minItems": 1,
-                        "maxItems": 256,
-                        "uniqueItems": True,
-                    },
-                    "wall_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
-                },
-                required=("point_uri", "generator_set_uri"),
-            ),
-            output_schema=PolytopeSeparateResult.model_json_schema(),
-            invoke=lambda p: kernel.polytope.separate(PolytopeSeparateRequest(**p)),
-            tags=("polytope", "exact"),
-        ),
-        _adapter(
-            capability_id="parameter.region.promote",
-            title="Promote one verified parameter region",
-            description="Replay a record bound to an immutable region before marking it verified.",
-            modes=(CapabilityMode.VERIFY,),
-            input_schema=_schema(
-                {
-                    "subject_uri": _ARTIFACT_URI,
-                    "verification_record_uri": _ARTIFACT_URI,
-                },
-                required=("subject_uri", "verification_record_uri"),
-            ),
-            output_schema=ParameterRegion.model_json_schema(),
-            invoke=lambda p: kernel.conjectures.promote_parameter_region(**p),
-            read_only=True,
-            tags=("parameter", "verification"),
+        *build_domain_adapters(
+            kernel,
+            adapter=_adapter,
+            schema=_schema,
+            artifact_uri=_ARTIFACT_URI,
         ),
     )
     return adapters
@@ -781,28 +588,3 @@ def _verification_bindings(
     except StoreError:
         return None
     return tuple(sorted({*artifact_uris, record_uri, *record.manifest.parents}))
-
-
-def _inspect_experiment(kernel: JacobianKernel, experiment_uri: str) -> Any:
-    try:
-        return kernel.experiments.inspect(experiment_uri)
-    except ExperimentNotFoundError:
-        return kernel.search.inspect(experiment_uri)
-
-
-def _wait_experiment(
-    kernel: JacobianKernel,
-    experiment_uri: str,
-    timeout_seconds: float,
-) -> Any:
-    try:
-        return kernel.experiments.wait(experiment_uri, timeout_seconds=timeout_seconds)
-    except ExperimentNotFoundError:
-        return kernel.search.wait(experiment_uri, timeout_seconds=timeout_seconds)
-
-
-def _cancel_experiment(kernel: JacobianKernel, experiment_uri: str) -> Any:
-    try:
-        return kernel.experiments.cancel(experiment_uri)
-    except ExperimentNotFoundError:
-        return kernel.search.cancel(experiment_uri)
