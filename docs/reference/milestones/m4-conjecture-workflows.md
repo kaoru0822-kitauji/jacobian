@@ -1,23 +1,35 @@
-# Milestone 4 specification: conjecture workflows
+# Milestone 4 specification: claim-transformation primitives
 
 [Documentation home](../../index.md)
 
 - Status: Provisional implementation; outside v0.2 conformance
-- Theme: Give agents tools for developing conjectures
+- Theme: Give mathematician agents and researchers composable operations for
+  developing and challenging claims
 
 ## 1. Entry gate
 
 Scalable search must reliably preserve verified counterexamples,
 constructions, and transformation lineage.
 
-## 2. Shared plugin operation
+## 2. Current implementation and target decomposition
 
-The three hypothesis-producing M4 tools use one optional
-`HypothesisTransformer` plugin capability. The operation is typed as repair,
-generation, or parameter generalization, but the plugin owns its grammar,
-solver, enumerator, or heuristic. The kernel owns schema validation, exact
-source lineage, deduplication, budgets, and routing back into the M3
-falsification loop.
+The provisional implementation exposes three hypothesis-producing commands
+through one optional `HypothesisTransformer` plugin capability. This is the
+current compatibility surface, not the target primitive boundary.
+
+M4 should expose separately composable operations for:
+
+- deriving a claim from a source claim and a typed edit;
+- generating claims under a domain-owned grammar;
+- deduplicating claims within a declared reference set;
+- scoring or ranking hypotheses under a named heuristic;
+- requesting bounded falsification;
+- proposing and checking parameter conditions.
+
+The plugin owns the mathematical grammar, solver, enumerator, and heuristics.
+The kernel owns schema validation, exact source lineage, identity, budgets, and
+authorized-checker dispatch. Agent workflows choose how to compose the
+operations and whether to route a hypothesis into M3 falsification.
 
 ### `conjecture.repair`
 
@@ -37,9 +49,11 @@ operator-authorized checker, must bind the exact source claim, and must cite a
 
 ### `conjecture.generate`
 
-Generate candidate formal statements under a plugin-owned typed grammar,
-deduplicate them within the active experiment or supplied reference set,
-search for immediate counter-witnesses, and rank surviving hypotheses.
+The current command composes four stages: generate candidate formal statements
+under a plugin-owned typed grammar, deduplicate them within the active
+experiment or supplied reference set, request a search for immediate
+counter-witnesses, and rank surviving hypotheses. Each stage must remain
+inspectable and retain its own execution and assurance record.
 
 Interestingness, apparent novelty, and failure to find a counterexample are
 research heuristics, not assurance. Without an M5 corpus provider, global
@@ -92,7 +106,7 @@ object digests while carrying different lineage or summary metadata. Promotion
 returns the label implied by the subject's `SUFFICIENT` or `NECESSARY` kind only
 after all checks pass.
 
-## 3. Workflow
+## 3. Example workflow
 
 ```text
 verified result
@@ -106,13 +120,13 @@ verified result
 The workflow may consult an M5 corpus provider when one is configured, but its
 correctness and verification boundary do not depend on one.
 
-No workflow engine, synthesis framework, or evolutionary-search runtime is
-required. M4 composes immutable artifacts, the installed plugin boundary, and
-the M3 experiment service.
+No kernel-owned synthesis framework or evolutionary-search runtime is required.
+An agent workflow composes immutable artifacts, installed plugin operations,
+and the M3 experiment service.
 
 ## 4. Implemented scope and limits
 
-The provisional implementation provides all three hypothesis transformations,
+The provisional implementation provides the three compatibility commands,
 exact source-record replay, immutable edit and transformation records,
 request-local deduplication, optional M3 falsification, sampled-evidence
 lineage, and explicit parameter-region promotion through Python, CLI, and MCP
@@ -134,6 +148,8 @@ Milestone 4 is complete when:
 - every generated statement has a precise source and transformation record;
 - one synthetic plugin implements all three hypothesis operations without
   kernel or MCP changes;
+- claim derivation, deduplication, scoring, and falsification can be invoked
+  and inspected as distinct stages;
 - generated and repaired statements remain hypotheses;
 - immediate counterexamples are stored with verified witnesses;
 - parameter claims distinguish proved and sampled regions;

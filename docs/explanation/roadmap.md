@@ -17,20 +17,25 @@ M5 are capability milestones, not promised package versions or compatibility
 releases. Their scope and APIs may change. v1.0 remains a stability target
 rather than the next scheduled release.
 
-## Current product track — Capability workbench
+## Product direction — Composable mathematical primitives
 
 Status: initial implementation in the repository; pre-stable and outside the
-v0.2 conformance contract.
+v0.2 conformance contract. This is a parallel product track built on v0.2's
+artifact and verification model, not an earlier release milestone.
 
 ### Objective
 
-Make Jacobian useful before verification by giving agents one compact,
-extensible API for mathematical tools and local research memory, while keeping
-checker-backed assurance available when a result must be promoted.
+Give mathematician agents and human researchers a compact, extensible set of
+typed mathematical operations that they can inspect and compose. Keep
+checker-backed assurance separate and available when evidence must be promoted.
 
 ### Deliverables
 
 - Model-facing `capability.describe` and `capability.invoke` MCP tools
+- A versioned primitive contract covering typed inputs and outputs,
+  relationships, proof obligations, execution, assurance, and provenance
+- Explicit separation between primitive capabilities and composite workflows
+- Workflow traces that retain stage artifacts and assurance labels
 - Adapter registration without kernel or MCP edits
 - Explicit `EXPLORE` and `VERIFY` lanes
 - Heuristic, computed, and verified assurance labels
@@ -39,7 +44,11 @@ checker-backed assurance available when a result must be promoted.
 - Bearer-token authentication and subject-bound tenant state
 - Container and reverse-proxy deployment guidance
 - Paired control/treatment agent benchmark with transcript-level metrics
-- At least one external Alloy, SAT/SMT, or CAS adapter exercise
+- At least one external Alloy, SAT/SMT, CAS, optimization, retrieval, or proof
+  adapter exercise
+- Held-out agent tasks covering more than verification replay, including
+  object search, claim transformation, proof decomposition, or premise
+  retrieval
 
 ### Exit gate
 
@@ -48,7 +57,9 @@ improves correctness or resource use over the same model without Jacobian,
 without increasing false certification. A synthetic external adapter appears
 through MCP without editing the kernel or MCP server. Authenticated tenant
 tests demonstrate that tools and resources cannot read another tenant's
-artifacts or research episodes.
+artifacts or research episodes. At least one multi-step investigation is
+expressed as a composition of independently invocable primitives whose stage
+artifacts can be replayed.
 
 ## v0.2 — Bounded discovery
 
@@ -66,7 +77,9 @@ bounded candidate classes, and independently verify representation changes.
 - Digest-keyed local artifact store and SQLite registry metadata
 - Immutable verification-record artifacts
 - Operator-managed checker registry
-- Seven generic verification tools
+- The lower-level operations defined by the
+  [v0.2 specification](../reference/specifications/v0.2.md) and cataloged in
+  the [tool reference](../reference/tools.md)
 - A generic plugin capability API
 - At least two structurally different reference plugins and replay checkers
 - CLI and thin MCP adapter
@@ -113,10 +126,14 @@ exact-verification boundaries.
 
 - Typed proposer, evaluator, counterexample, refinement, and candidate
   nomination interfaces
+- Individually invocable proposer, evaluator, counterexample, refinement, and
+  nomination operations; `search.run` remains a durable reference workflow,
+  not the only way to use them
 - Strategy-neutral search state, checkpoints, lineage, and failure archives
 - Verified-counterexample feedback through the existing witness boundary
-- Candidate nomination that routes every mathematical promotion through the
-  existing verification boundary
+- Candidate nomination that can request authorized-checker dispatch; the
+  kernel enforces authorization, while agents and strategies choose which
+  verification operation to request
 - Exact budget, scope, and runtime identity, with measured wall time and
   durable operation accounting
 - Resumable, cancellable, and recoverable experiments
@@ -162,7 +179,7 @@ an invocation can be reconstructed without chat state and resumed without
 losing or duplicating lineage. Workers cannot widen execution policy or
 influence checker authorization.
 
-## M4 — Conjecture workflows
+## M4 — Claim-transformation primitives
 
 Implementation status: the provisional hypothesis-transformation and
 parameter-region promotion paths are in the repository. They remain pre-stable
@@ -175,27 +192,32 @@ their exact transformation lineage.
 
 ### Objective
 
-Give agents tools to turn verified counterexamples and constructions into
-nearby statements, parameter families, and new experiments through the same
-validation and falsification loop used by M3.
+Give mathematician agents and researchers composable operations for turning
+counterexamples, constructions, and partial arguments into nearby statements,
+parameter families, and new experiments.
 
 ### Deliverables
 
-- One typed hypothesis-transformation capability with repair, generation, and
-  parameter-generalization operations
+- Separately invocable claim derivation, generation, deduplication, scoring,
+  bounded falsification, and parameter-analysis operations
+- Compatibility workflows for repair, generation, and parameter
+  generalization that preserve those stage boundaries
 - Plugin-owned conjecture grammars and repair strategies rather than a
   kernel-level synthesis framework
 - Deduplication within the active experiment or supplied reference set
 - Exact proposed, sampled, sufficient, and necessary parameter-region labels;
   only independent checker records may use the verified labels
-- Falsification pipelines for generated statements
+- Agent-composable falsification paths for generated statements
 - Explicit source and transformation records for every proposal
 - Honest `UNKNOWN` novelty when no research-corpus provider is configured
 
 ### Exit gate
 
 Every generated or repaired claim is explicitly labeled as a hypothesis and
-can re-enter the ordinary validation, search, and verification pipeline.
+can re-enter the ordinary validation, search, and verification pipeline. Claim
+generation, deduplication, ranking, and falsification remain independently
+inspectable operations.
+
 Held-out evaluations confirm that failure to falsify a generated statement is
 never reported as verification. Parameter claims distinguish proved, sampled,
 and unknown regions. A synthetic plugin supports repair, generation, and
@@ -205,9 +227,9 @@ parameter generalization without core or MCP changes.
 
 ### Entry gate
 
-The search and conjecture tools have produced enough diverse verified and
-failed experiments for retrieval quality and useful query patterns to be
-measurable.
+The search and claim-transformation operations have produced enough diverse
+verified and failed experiments for retrieval quality and useful query patterns
+to be measurable.
 
 ### Objective
 
@@ -224,15 +246,16 @@ confusing retrieval with proof.
 - Retention quotas, canonical deduplication, and curated promotion
 - Provider-backed novelty checks with explicit corpus and cutoff scope
 - Episode comparison and abstraction suggestions as optional hypothesis tools
-- Certificate simplification as an independent checker-replay workflow
+- A certificate transformation primitive plus an independent checker-replay
+  simplification workflow
 
 ### Exit gate
 
-The conjecture tools operate correctly with no provider configured. When a
-provider is present, retrieval improves a held-out search or repair benchmark
-while preserving trust labels and temporal cutoffs. Retrieved records and
-suggested abstractions never gain verified status through ranking, clustering,
-or ingestion.
+The claim-transformation operations work correctly with no provider
+configured. When a provider is present, retrieval improves a held-out search or
+repair benchmark while preserving trust labels and temporal cutoffs. Retrieved
+records and suggested abstractions never gain verified status through ranking,
+clustering, or ingestion.
 
 ## Stability target — v1.0 research platform
 
@@ -268,6 +291,7 @@ their compatibility and migration suites.
 All releases preserve these invariants:
 
 - Search output is evidence, not proof.
+- Workflows preserve the identity and assurance of each primitive step.
 - A checker cannot be registered by the untrusted plugin it verifies.
 - Artifact identity binds schema and semantics.
 - Operational failure never silently changes a mathematical conclusion.

@@ -6,6 +6,10 @@ Run the conformance kit before treating a sealed plugin as compatible with the
 provisional M3 runtime. The target must be disposable: several checks mutate
 the package or create attack paths intentionally.
 
+The kit enforces the plugin ownership boundary: a plugin may define
+mathematical operations and required checker roles, but it cannot authorize
+itself or widen the operator's execution and trust policy.
+
 ## Prepare the target
 
 Install the plugin into a fresh `JacobianKernel`, create a minimal claim it can

@@ -31,9 +31,10 @@ through capability adapters. Prefer a capability ID behind
 The kernel owns artifact identity, execution status, assurance, checker
 authorization, budgets, and provenance. Capability adapters own external
 integrations. Domain plugins own mathematical schemas, transformations,
-invariants, witness meanings, and checkers. Agent workflows and skills own
-multi-step exploration policies. Worked cases belong in reference scenarios
-and benchmarks.
+invariants, witness meanings, and required checker roles. Independent checker
+packages implement replay; operators authorize them. Agent workflows and
+skills own multi-step exploration policies. Worked cases belong in reference
+scenarios and benchmarks.
 
 ## Fail-Closed Verification Rules
 

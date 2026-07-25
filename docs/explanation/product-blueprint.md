@@ -1,22 +1,26 @@
-# Capability-first product blueprint
+# Product model: composable mathematical primitives
 
 [Documentation home](../index.md)
 
 - Status: Active product direction
-- Scope: Agent-facing MCP, local and remote execution, research memory, and
-  optional mathematical assurance
+- Scope: Mathematical primitives, agent workflows, capability adapters,
+  research memory, and optional mathematical assurance
 - Compatibility: v0.2 verification records remain valid; this document changes
   the product entry point, not the meaning of `VERIFIED`
 
 ## Product definition
 
-Jacobian is an agent-facing mathematical capability and research-memory layer.
-It supplies reusable computation, search, solver, formal-proof, retrieval, and
-experiment tools so a model can spend more of its context and reasoning budget
-on strategy rather than rebuilding infrastructure.
+Jacobian is a verifier-centric workbench of composable mathematical primitives
+for mathematician agents and human researchers. It supports research-level
+problems and conjectures through bounded, executable operations whose artifacts
+can be inspected, composed, and replayed.
 
-Verification is an available assurance service. It is not a mandatory prelude
-to exploration and it is not the only reason to use Jacobian.
+The workbench is not one conjecture-solving algorithm. Models and researchers
+choose a strategy and compose operations for transforming claims, constructing
+or searching objects, computing invariants, decomposing goals, retrieving
+premises, and checking evidence. External mathematical systems supply many of
+those operations; Jacobian supplies the common artifact, execution, assurance,
+budget, and provenance model.
 
 The product succeeds when an agent solves held-out tasks more reliably or
 efficiently with Jacobian than the same agent solves them with prompts and a
@@ -24,21 +28,47 @@ general-purpose shell alone. Starting an MCP server, calling a tool, or
 producing a verification record is necessary infrastructure evidence, not
 proof of that product outcome.
 
-## Decision rules
+## Primitive contract
 
-Use these rules when adding a feature:
+The target mathematical primitive contract is a versioned capability with one
+observable operation. It consumes typed artifacts and returns:
 
-1. Expose a mathematical action, not an internal lifecycle step.
-2. Keep large schemas and payloads behind catalogs and resource handles.
-3. Let exploration return useful candidates without requiring a `ClaimSpec`.
-4. Label every result as heuristic, computed, or verified.
-5. Require an authorized local verification record before an adapter may use
-   the verified label.
-6. Record reusable episodes with provenance and their original assurance.
-7. Never turn retrieval rank, solver status, search exhaustion, timeout, or an
-   adapter's self-assessment into proof.
-8. Add a provider through the capability registry without editing the MCP
-   adapter.
+- typed output artifacts;
+- explicit relationships to its inputs;
+- any proof obligations created by the operation;
+- execution status and resource accounting;
+- assurance and the evidence supporting it;
+- enough provenance to replay or compare the step.
+
+Search, generation, transformation, retrieval, and evaluation primitives may
+return useful unverified results. They cannot promote their own output to
+verified evidence. Promotion requires an independently authorized checker bound
+to the exact claim, semantics, candidate, scope, certificate format, and
+checker identity.
+
+Broad actions such as “investigate this conjecture” are workflows, not
+primitives. A workflow may coordinate many primitive calls, but it must expose
+the stage artifacts and preserve their separate assurance labels. Composite
+compatibility tools in the current implementation are convenience façades over
+this model, not templates for adding more monolithic tools.
+
+## Ownership model
+
+The boundaries are intentionally narrow:
+
+- The kernel owns artifact identity, execution status, assurance, checker
+  authorization, budgets, and provenance.
+- Capability adapters connect external SAT, SMT, CAS, optimization, retrieval,
+  and proof systems to the primitive contract.
+- Domain plugins own mathematical schemas, transformations, invariants,
+  witness meanings, and required checker roles.
+- Independent checker packages implement replay; operators authorize them.
+- Agent workflows and skills own multi-step exploration and proof strategies.
+- Reference scenarios and benchmarks own worked examples.
+
+This separation lets a new mathematical operation or external engine appear
+behind a capability ID without changing the MCP server or expanding checker
+authority.
 
 ## System shape
 
@@ -49,7 +79,7 @@ Codex CLI              ChatGPT / remote agent
                    ▼
           MCP capability projection
           capability://catalog
-          capability.invoke
+          capability.describe / capability.invoke
                    │
                    ▼
              CapabilityService
@@ -68,9 +98,10 @@ Codex CLI              ChatGPT / remote agent
           immutable verification record
 ```
 
-The generic capability layer understands an operation ID, JSON schemas,
-supported modes, execution status, assurance, scope, artifacts, and an episode
-handle. Mathematical semantics remain in adapters and domain plugins.
+The generic capability layer must understand an operation ID, JSON schemas,
+supported modes, execution status, assurance, scope, artifact relationships,
+proof obligations, and an episode handle. Mathematical semantics remain in
+adapters and domain plugins.
 
 ## Capability contract
 
@@ -98,6 +129,12 @@ mode, checks any verified record and its complete parent binding against the
 local artifact store, and records the episode. Projected record IDs and
 conclusions must agree with the checked record. `MCPServer` does not need a new
 tool when an Alloy, Lean, SAT/SMT, CAS, or domain adapter is registered.
+
+The current `CapabilityResult` exposes a generic output object and artifact
+URIs. Relationships and proof obligations are therefore still
+operation-specific data inside that output. Before the primitive contract is
+stabilized, they need versioned first-class fields so a workflow can compose
+them without understanding every domain payload.
 
 Deploy an operator-approved adapter package with a repeatable
 `--capability-adapter package.module:factory` option. The factory receives the
@@ -170,54 +207,26 @@ The local Codex profile uses STDIO and the `capabilities` tool profile. It
 advertises one read-only discovery tool and one extensible invocation tool
 rather than every backend operation.
 
-Remote hosts use Streamable HTTP by default. A remote deployment:
+Remote hosts use Streamable HTTP and subject-bound tenant state. Authentication,
+tenant isolation, persistence, and TLS are deployment responsibilities, not
+mathematical primitives. See
+[Deploy the remote MCP server](../how-to/deploy-remote-mcp.md) and the
+[threat model](threat-model.md) for their concrete requirements.
 
-- requires an operator-provisioned bearer-token file unless anonymous
-  development mode is explicitly selected;
-- binds each token to a tenant subject and required scope;
-- routes every tool and resource request to a tenant-specific state root;
-- hashes tenant IDs before constructing filesystem paths;
-- keeps artifact, memory, experiment, plugin, and checker metadata isolated;
-- terminates TLS at a trusted reverse proxy or platform ingress;
-- mounts the state root and token file as separate persistent volume and
-  secret.
+## Product evidence
 
-Static opaque tokens are an initial deployment mechanism, not a complete
-identity platform. Hosted deployments should replace the verifier with their
-OAuth/OIDC policy while preserving the tenant subject contract.
+The immediate product work is to stabilize the primitive contract, make stage
+composition visible, and exercise external adapters without kernel or MCP
+edits. Authenticated hosting, local research memory, and compact tool
+projection support that work; they are not substitutes for useful mathematical
+operations.
 
-## Evaluation
-
-Two benchmark families answer different questions:
-
-- The known-answer MCP pilot checks integration and durable verification.
-- The A/B agent benchmark compares the same model on the same task under a
-  control condition and a Jacobian capability condition.
-
-The A/B runner must:
-
-- ignore user MCP configuration and construct each condition explicitly;
-- fix model, reasoning effort, repository commit, prompt, and budgets;
-- randomize or alternate condition order across repetitions;
-- retain every transcript and report;
-- score mathematical answers with an independent known-answer oracle;
-- measure pass rate, false claims, input/output tokens, wall time, tool calls,
-  shell calls, and generated files;
-- report paired deltas rather than selecting the best run.
-
-One successful MCP transcript does not establish an improvement. A product
-claim requires repeated held-out cases with a better correctness/efficiency
-frontier and no increase in false certification.
-
-## Delivery order
-
-1. Stabilize capability contracts, local memory, and the two lanes.
-2. Keep the compact MCP catalog below the tool-description budget.
-3. Exercise at least one external adapter without a kernel or MCP edit.
-4. Deploy authenticated Streamable HTTP with tenant-isolation tests.
-5. Run paired A/B pilots and use agent feedback to prioritize adapters.
-6. Add cross-project corpus providers only after local episode queries are
-   empirically useful.
+Agent evaluations should measure held-out mathematical tasks, including
+counterexample search, claim transformation, proof decomposition, premise
+retrieval, and independent replay. Cross-project corpus providers should follow
+only after local episode queries are empirically useful. The
+[agent evaluation protocol](../reference/agent-evaluations.md) defines the
+controls, retained evidence, and scoring required for a product claim.
 
 ## Non-goals
 

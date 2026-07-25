@@ -5,6 +5,15 @@ Start with a tutorial when learning the system, use a how-to guide for a
 specific task, consult reference material for exact contracts, and read the
 explanations for design rationale.
 
+Jacobian is a workbench of composable mathematical primitives for
+mathematician agents and human researchers. A primitive performs one bounded,
+observable operation and returns typed artifacts, their relationships and
+obligations, and the execution, assurance, and provenance needed to inspect or
+replay it. Agent workflows compose those operations; only independently
+authorized checkers may promote evidence to a verified result. The
+[product model](explanation/product-blueprint.md) defines these terms and
+ownership boundaries.
+
 The only current release contract is v0.2 alpha. Documents for M3, M4, M5, and
 v1.0 describe provisional or planned work unless they explicitly say
 otherwise.
@@ -16,13 +25,13 @@ still pre-stable:
 
 | Question | Document | Status |
 | --- | --- | --- |
-| What product is Jacobian building? | [Capability-first product blueprint](explanation/product-blueprint.md) | Active product direction |
+| What product is Jacobian building? | [Product model](explanation/product-blueprint.md) | Active product direction |
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current v0.2 design plus labeled provisional M3/M4 sections |
 | What is implemented, provisional, or planned? | [Roadmap](explanation/roadmap.md) | Active milestone plan; gates are not promised release dates |
 | Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
 | Which properties and trust boundaries must hold? | [Threat model](explanation/threat-model.md) | Current for v0.2 and provisional M3/M4 code |
 | What is the supported release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative for `0.2.0a0` |
-| Which later contracts are being exercised? | [M3](reference/milestones/m3-scalable-search.md) and [M4](reference/milestones/m4-conjecture-workflows.md) | Provisional; outside v0.2 conformance |
+| Which later contracts are being exercised? | [M3](reference/milestones/m3-scalable-search.md), [M4](reference/milestones/m4-conjecture-workflows.md), and [M5](reference/milestones/m5-research-corpus.md) | Provisional; outside v0.2 conformance |
 
 ## Tutorials
 
@@ -60,7 +69,7 @@ expectations.
 Later-release contracts are provisional:
 
 - [M3 scalable search](reference/milestones/m3-scalable-search.md)
-- [M4 conjecture workflows](reference/milestones/m4-conjecture-workflows.md)
+- [M4 claim-transformation primitives](reference/milestones/m4-conjecture-workflows.md)
 - [M5 federated research corpus](reference/milestones/m5-research-corpus.md)
 - [v1.0 stability target](reference/specifications/v1.0.md)
 
@@ -70,7 +79,7 @@ Explanation documents describe why Jacobian has its current boundaries and
 how its major parts fit together.
 
 - [Architecture](explanation/architecture.md)
-- [Capability-first product blueprint](explanation/product-blueprint.md)
+- [Product model](explanation/product-blueprint.md)
 - [Threat model](explanation/threat-model.md)
 - [Roadmap](explanation/roadmap.md)
 - [Durable search runtime](explanation/search-runtime.md)

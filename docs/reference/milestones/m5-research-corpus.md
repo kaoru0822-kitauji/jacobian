@@ -14,7 +14,7 @@ unverified runs to evaluate cross-project retrieval quality.
 ## 2. Integration boundary
 
 Jacobian owns immutable artifacts, verification records, checker authority,
-the local research-memory index, and the experiment ledger required for
+the local research memory index, and the experiment ledger required for
 replay. A federated corpus provider is optional and may run in another process,
 package, or service.
 
@@ -30,7 +30,7 @@ Provider results carry their corpus identity, query, cutoff, source,
 availability, review, retraction, and verification labels. Jacobian validates
 referenced local artifacts independently.
 
-## 3. New tools
+## 3. New primitives and workflows
 
 ### `knowledge.search`
 
@@ -57,9 +57,15 @@ hypothesis artifact with supporting examples and provider provenance.
 
 ### `certificate.simplify`
 
-Minimize a certificate according to format-specific objectives while replaying
-the authorized checker after every accepted change. This tool uses the corpus
-only for discovery; checker replay remains local and authoritative.
+This is a workflow over a format-specific certificate transformation primitive
+and repeated `certificate.verify` calls. It minimizes a certificate while
+replaying the authorized checker after every accepted change. The corpus is
+used only for discovery; checker replay remains local and authoritative.
+
+Outputs from `episode.compare` and `abstraction.extract` are unverified
+hypothesis artifacts. They may feed claim-transformation or falsification
+workflows, but retrieval, comparison, and abstraction do not close a proof
+obligation.
 
 ## 4. Record lifecycle
 

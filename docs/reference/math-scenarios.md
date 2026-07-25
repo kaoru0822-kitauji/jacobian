@@ -2,7 +2,8 @@
 
 [Documentation home](../index.md)
 
-- Status: Draft
+- Status: Active scenario catalog; individual release gates are defined by the
+  applicable specification and conformance document
 - Purpose: Exact public fixtures, reference-plugin workloads, and held-out
   model evaluations
 
@@ -634,10 +635,10 @@ The scenario harness may use exact enumeration, refinement, tree search,
 evolutionary search, or another strategy without changing kernel records or
 trust semantics.
 
-## M4 conjecture-workflow scenarios
+## M4 claim-transformation scenarios
 
-M4 scenarios exercise agent-facing conjecture tools without requiring a
-shared corpus:
+M4 scenarios exercise agent-facing claim-transformation operations without
+requiring a shared corpus:
 
 - mutate a true bounded theorem by dropping one necessary hypothesis, then
   generate and verify a counterexample;
@@ -754,8 +755,8 @@ known.
 
 ## Suggested repository layout
 
-Do not freeze this layout until the v0.2 schemas exist, but keep public inputs
-and hidden oracles separate:
+The v0.2 schemas exist. Any future fixture layout may evolve, but public inputs
+and hidden oracles must remain separate:
 
 ```text
 scenarios/
