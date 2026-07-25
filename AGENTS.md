@@ -2,26 +2,23 @@
 
 ## Product Model
 
-Jacobian is a verifier-centric workbench for investigating mathematical
-problems, including research-level conjectures, through bounded, executable
-steps. Mathematician agents and human researchers compose small capabilities to
-transform claims, construct and explore mathematical objects, search for
-counterexamples, build candidate proofs, and submit evidence to independent
-checkers.
+Jacobian provides composable mathematical tools for AI agents investigating
+conjectures and other mathematically specified problems. Agents use these tools
+to search for counterexamples, construct and compare mathematical objects,
+compute invariants, decompose proof goals, retrieve premises, develop candidate
+proofs, and replay certificates.
 
-A mathematical primitive is a versioned capability that performs one
-observable operation. It consumes typed artifacts and returns typed artifacts,
-their explicit relationships, any new proof obligations, and the execution,
-assurance, and provenance needed to inspect or replay the step. A primitive may
-search, generate, transform, retrieve, or evaluate; it cannot promote its own
-output to verified evidence.
+Each tool performs a bounded, observable operation and returns typed,
+inspectable artifacts with explicit relationships, scope, execution status,
+assurance, and provenance. Existing mathematical software and domain plugins
+supply mathematical operations; capability adapters expose them through a
+common contract. Jacobian provides the composition, artifact, execution, and
+assurance layer. Evidence that needs to become a trusted conclusion must be
+accepted by an operator-authorized independent checker.
 
-Primitive operations include deriving related claims; constructing,
-enumerating, mutating, or searching mathematical objects; computing properties
-and invariants; partitioning cases; decomposing goals; retrieving and
-instantiating premises; and replaying or cross-checking certificates. This list
-does not define a universal mathematical ontology. Domain plugins define the
-meaning of each operation for their objects and claims.
+Jacobian's long-term goal is to help agents and human researchers make genuine,
+trustworthy progress on open conjectures and other problems that benefit from
+executable search and checkable evidence.
 
 These operation names are descriptive capability families, not a closed
 taxonomy, required interface, or shared mathematical ontology. Do not introduce
@@ -43,7 +40,7 @@ certificate availability, and the checker required for promotion. A successful
 computation, evaluator, or solver invocation remains unverified unless an
 authorized independent checker accepts appropriately bound evidence.
 
-Proof strategies and research agents compose primitives into workflows.
+Proof strategies and research agents compose tools into workflows.
 External SAT, SMT, CAS, optimization, retrieval, and proof systems connect
 through capability adapters. Prefer a capability ID behind
 `capability.describe` and `capability.invoke` over a new top-level MCP tool.

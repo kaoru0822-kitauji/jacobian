@@ -3,7 +3,7 @@
 [Documentation home](../../index.md)
 
 - Status: Provisional implementation; outside v0.2 conformance
-- Theme: Give mathematician agents and researchers composable operations for
+- Theme: Give AI agents and human researchers composable operations for
   developing and challenging claims
 
 ## 1. Entry gate

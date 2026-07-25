@@ -17,7 +17,7 @@ M5 are capability milestones, not promised package versions or compatibility
 releases. Their scope and APIs may change. v1.0 remains a stability target
 rather than the next scheduled release.
 
-## Product direction — Composable mathematical primitives
+## Product direction — Mathematical tools for AI agents
 
 Status: initial implementation in the repository; pre-stable and outside the
 v0.2 conformance contract. This is a parallel product track built on v0.2's
@@ -25,8 +25,9 @@ artifact and verification model, not an earlier release milestone.
 
 ### Objective
 
-Give mathematician agents and human researchers a compact, extensible set of
-typed mathematical operations that they can inspect and compose. Keep
+Give AI agents a compact, extensible set of mathematical tools for investigating
+conjectures and other mathematically specified problems. Human researchers can
+direct investigations and inspect or replay their artifacts. Keep
 checker-backed assurance separate and available when evidence must be promoted.
 
 ### Deliverables
@@ -192,7 +193,7 @@ their exact transformation lineage.
 
 ### Objective
 
-Give mathematician agents and researchers composable operations for turning
+Give AI agents and human researchers composable operations for turning
 counterexamples, constructions, and partial arguments into nearby statements,
 parameter families, and new experiments.
 

@@ -1,27 +1,29 @@
 # Jacobian
 
-Jacobian is a verifier-centric workbench of composable mathematical primitives
-for mathematician agents and human researchers. It supports research-level
-problems and conjectures by turning an investigation into bounded, executable
-steps that produce inspectable artifacts.
+Jacobian provides composable mathematical tools for AI agents investigating
+conjectures and other mathematically specified problems. Agents use these tools
+to search for counterexamples, construct and compare mathematical objects,
+compute invariants, decompose proof goals, retrieve premises, develop candidate
+proofs, and replay certificates.
 
-A primitive performs one observable operation: transform a claim, construct or
-search mathematical objects, compute an invariant, decompose a goal, retrieve
-a premise, or replay a certificate. Proof strategies compose these operations
-into larger investigations. Jacobian preserves the inputs, outputs,
-relationships, obligations, execution status, assurance, and provenance of
-each step instead of presenting the workflow as one opaque solver call.
+Each tool performs a bounded, observable operation and returns typed,
+inspectable artifacts with explicit relationships, scope, execution status,
+assurance, and provenance. Existing mathematical software and domain plugins
+supply mathematical operations; capability adapters expose them through a
+common contract. Jacobian provides the composition, artifact, execution, and
+assurance layer.
+
+Jacobian's long-term goal is to help agents and human researchers make genuine,
+trustworthy progress on open conjectures and other problems that benefit from
+executable search and checkable evidence.
 
 The public kernel is domain-agnostic. Graphs, matrices, finite algebra,
 optimization problems, numerical claims, and formal proof goals acquire their
-mathematical meaning through plugins. Generality here means that those plugins
-share the same artifact, evaluation, witness, shrinking, provenance, and
-verification substrate—not that an informal conjecture requires no
-formalization or domain implementation.
-
+mathematical meaning through plugins. Those plugins share the same artifact,
+evaluation, witness, shrinking, provenance, and verification substrate.
 Exploration may use models, heuristics, solvers, and external mathematical
-systems through capability adapters. Verification is a separate assurance lane
-for evidence that should become a durable mathematical result:
+systems. Evidence that needs to become a trusted conclusion must enter a
+separate assurance lane:
 
 > Search and evaluation may be wrong. A result becomes verified only when an
 > operator-authorized checker accepts evidence bound to the exact claim,
@@ -73,16 +75,16 @@ CLI or `uv run jacobian-mcp` to start the MCP adapter.
 | Milestone | Theme | Primary outcome |
 | --- | --- | --- |
 | Current release | Verification and bounded discovery | v0.2 alpha stores, evaluates, attacks, shrinks, independently verifies, enumerates structures, verifies representation changes, and computes exact separators |
-| Current product track | Composable mathematical primitives | One extensible model-facing API exposes typed operations for exploration, composition, replay, and optional verification |
+| Current product track | Mathematical tools for AI agents | One extensible model-facing API exposes typed operations for exploration, composition, replay, and optional verification |
 | M3 | Scalable search | Provisional implementation runs typed search strategies through one resumable experiment loop |
 | M4 | Claim transformation | Decompose broad claim-development workflows into typed generation, repair, ranking, falsification, and parameter-analysis operations |
 | M5 | Federated research corpus | Extend the implemented local episode database with optional cross-project providers, review, retraction, and temporal retrieval |
 | Stability target | Stable research platform | Publish a v1.0 API with formal-checking and collaboration support |
 
-The roadmap is primitive-first and artifact-first. Agent workflows may compose
-primitives, and completed capability episodes are recorded and searchable
-without a shared service. Corpus-scale retrieval is optional and cannot
-promote evidence or authorize checkers.
+The roadmap is tool-first and artifact-first. Agent workflows may compose
+versioned capabilities, and completed capability episodes are recorded and
+searchable without a shared service. Corpus-scale retrieval is optional and
+cannot promote evidence or authorize checkers.
 
 The only public release contract is v0.2 alpha (`0.2.0a0`). It includes the
 verification kernel and bounded discovery. The repository also contains

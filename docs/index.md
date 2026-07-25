@@ -5,13 +5,17 @@ Start with a tutorial when learning the system, use a how-to guide for a
 specific task, consult reference material for exact contracts, and read the
 explanations for design rationale.
 
-Jacobian is a workbench of composable mathematical primitives for
-mathematician agents and human researchers. A primitive performs one bounded,
-observable operation and returns typed artifacts, their relationships and
-obligations, and the execution, assurance, and provenance needed to inspect or
-replay it. Agent workflows compose those operations; only independently
-authorized checkers may promote evidence to a verified result. The
-[product model](explanation/product-blueprint.md) defines these terms and
+Jacobian provides composable mathematical tools for AI agents investigating
+conjectures and other mathematically specified problems. Each tool performs one
+bounded, observable operation and returns typed artifacts, their relationships
+and obligations, and the execution, assurance, and provenance needed to inspect
+or replay it.
+
+Agent workflows compose those tools into investigations. Existing mathematical
+software and domain plugins supply operations; capability adapters expose them
+through a common contract. Only operator-authorized independent checkers may
+promote evidence to a verified result. The
+[product model](explanation/product-blueprint.md) defines the tool contract and
 ownership boundaries.
 
 The only current release contract is v0.2 alpha. Documents for M3, M4, M5, and

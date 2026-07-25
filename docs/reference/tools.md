@@ -6,7 +6,7 @@
 - Normative sources: [v0.2 specification](specifications/v0.2.md) and
   [conformance gate](conformance-v0.2.md)
 
-Jacobian is a workbench of composable mathematical primitives. The generic
+Jacobian provides composable mathematical tools for AI agents. The generic
 kernel understands artifacts, claims, candidates, predicates, witnesses,
 certificates, reductions, budgets, and provenance. Mathematical meaning is
 supplied by versioned domain plugins.
@@ -14,13 +14,14 @@ supplied by versioned domain plugins.
 The model-facing surface is layered so adapters are easy to add and a
 heuristic operation cannot masquerade as a verifier.
 
-## Primitives, workflows, and adapters
+## Tools, primitives, workflows, and adapters
 
-The target primitive contract is a versioned capability with one observable
-operation. It consumes typed artifacts and returns typed artifacts, explicit
-relationships, new proof obligations when applicable, execution status,
-assurance, and provenance. Agents and proof strategies compose primitives into
-workflows without merging the assurance of their stages.
+At the product level, capabilities are agent tools. Internally, the target
+primitive contract is a versioned capability with one observable operation. It
+consumes typed artifacts and returns typed artifacts, explicit relationships,
+new proof obligations when applicable, execution status, assurance, and
+provenance. Agents and proof strategies compose tools into workflows without
+merging the assurance of their stages.
 
 The current `CapabilityResult` has a typed operation-specific output and
 artifact URIs but no generic first-class relationship or proof-obligation

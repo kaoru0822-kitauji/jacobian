@@ -1,26 +1,38 @@
-# Product model: composable mathematical primitives
+# Product model: mathematical tools for AI agents
 
 [Documentation home](../index.md)
 
 - Status: Active product direction
-- Scope: Mathematical primitives, agent workflows, capability adapters,
-  research memory, and optional mathematical assurance
+- Scope: Mathematical tools, agent workflows, capability adapters, research
+  memory, and optional mathematical assurance
 - Compatibility: v0.2 verification records remain valid; this document changes
   the product entry point, not the meaning of `VERIFIED`
 
 ## Product definition
 
-Jacobian is a verifier-centric workbench of composable mathematical primitives
-for mathematician agents and human researchers. It supports research-level
-problems and conjectures through bounded, executable operations whose artifacts
-can be inspected, composed, and replayed.
+Jacobian provides composable mathematical tools for AI agents investigating
+conjectures and other mathematically specified problems. Agents use these tools
+to search for counterexamples, construct and compare mathematical objects,
+compute invariants, decompose proof goals, retrieve premises, develop candidate
+proofs, and replay certificates.
 
-The workbench is not one conjecture-solving algorithm. Models and researchers
-choose a strategy and compose operations for transforming claims, constructing
-or searching objects, computing invariants, decomposing goals, retrieving
-premises, and checking evidence. External mathematical systems supply many of
-those operations; Jacobian supplies the common artifact, execution, assurance,
-budget, and provenance model.
+Each tool performs a bounded, observable operation and returns typed,
+inspectable artifacts with explicit relationships, scope, execution status,
+assurance, and provenance. Existing mathematical software and domain plugins
+supply mathematical operations; capability adapters expose them through a
+common contract. Jacobian provides the composition, artifact, execution, and
+assurance layer. Evidence that needs to become a trusted conclusion must be
+accepted by an operator-authorized independent checker.
+
+Jacobian's long-term goal is to help agents and human researchers make genuine,
+trustworthy progress on open conjectures and other problems that benefit from
+executable search and checkable evidence.
+
+The product is the mathematical toolset and its shared capability runtime:
+versioned contracts, artifact and provenance storage, execution and budget
+control, adapter and plugin boundaries, and optional checker-backed assurance.
+MCP is the primary agent-facing interface; the CLI and Python API support local
+use and integration without changing the mathematical contracts.
 
 The product succeeds when an agent solves held-out tasks more reliably or
 efficiently with Jacobian than the same agent solves them with prompts and a
@@ -28,10 +40,11 @@ general-purpose shell alone. Starting an MCP server, calling a tool, or
 producing a verification record is necessary infrastructure evidence, not
 proof of that product outcome.
 
-## Primitive contract
+## Tool and primitive contract
 
-The target mathematical primitive contract is a versioned capability with one
-observable operation. It consumes typed artifacts and returns:
+At the product level these capabilities are tools. Internally, the target
+mathematical primitive contract is a versioned capability with one observable
+operation. It consumes typed artifacts and returns:
 
 - typed output artifacts;
 - explicit relationships to its inputs;
