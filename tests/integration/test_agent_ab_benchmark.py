@@ -70,6 +70,11 @@ def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> N
         "mcp_calls": ["capability.invoke"],
         "shell_calls": ["python solve.py"],
         "usage": {"input_tokens": 12, "output_tokens": 3},
+        "tool_error_count": 0,
+        "parameter_error_count": 0,
+        "successful_tool_calls": ["capability.invoke"],
+        "capability_ids": [],
+        "capability_invocations": [],
     }
 
 
@@ -148,3 +153,184 @@ def test_ab_summary_reports_paired_deltas() -> None:
     assert summary["pair_count"] == 1
     assert summary["pairs"][0]["input_token_delta"] == -40
     assert summary["pairs"][0]["elapsed_delta_seconds"] == -4
+    assert summary["conditions"]["treatment"]["median_tool_calls"] == 1
+
+
+def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
+    tmp_path: Path,
+) -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = load_cases(["GRAPH-COUNTEREXAMPLE-AB-001"])[0]
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir)
+    searched = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.search.atlas",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "order": 6,
+                "constraints": {
+                    "connected": True,
+                    "triangle_free": True,
+                    "minimum_degree": 2,
+                    "bipartite": False,
+                },
+                "limit": 1,
+            },
+        )
+    )
+    candidate = cast(dict[str, Any], searched.output["candidates"][0])
+    graph_uri = cast(str, candidate["graph_uri"])
+    requested = cast(list[str], case["expected"]["properties"])
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.compute.properties",
+            mode=CapabilityMode.EXPLORE,
+            input={"graph_uri": graph_uri, "properties": requested},
+        )
+    )
+    property_uri = cast(str, computed.output["property_artifact_uri"])
+    graph = kernel.store.get(graph_uri).payload
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "FALSE",
+        "assurance": "COMPUTED",
+        "final_verification": "UNVERIFIED",
+        "graph": graph,
+        "properties": computed.output["properties"],
+        "graph_uri": graph_uri,
+        "property_artifact_uri": property_uri,
+        "limitations": ["bounded witness"],
+        "feedback": {
+            "reasoning_focus": [],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+    invocations = [
+        {
+            "capability_id": "graph.search.atlas",
+            "input": {
+                "order": 6,
+                "constraints": case["expected"]["constraints"],
+                "limit": 1,
+            },
+            "artifact_uris": list(searched.artifact_uris),
+        },
+        {
+            "capability_id": "graph.compute.properties",
+            "input": {"graph_uri": graph_uri, "properties": requested},
+            "artifact_uris": list(computed.artifact_uris),
+        },
+    ]
+
+    score = score_report(
+        case,
+        report,
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke", "capability.invoke"],
+        capability_invocations=invocations,
+    )
+
+    assert score["passed"] is True
+    assert score["false_certification"] is False
+
+
+def test_ab_graph_scorer_rejects_false_certification(tmp_path: Path) -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = load_cases(["GRAPH-PATH-AB-001"])[0]
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "assurance": "VERIFIED",
+        "final_verification": "VERIFIED",
+        "graph": {
+            "vertices": ["0", "1", "2", "3", "4", "5"],
+            "edges": [["0", "1"], ["1", "2"], ["2", "3"], ["3", "4"], ["4", "5"]],
+        },
+        "properties": {
+            "order": 6,
+            "size": 5,
+            "connected": True,
+            "tree": True,
+            "maximum_degree": 2,
+            "bipartite": True,
+            "triangle_count": 0,
+            "independence_number": 3,
+        },
+        "graph_uri": None,
+        "property_artifact_uri": None,
+    }
+
+    try:
+        score_report(
+            case,
+            report,
+            condition="control",
+            state_dir=tmp_path,
+            mcp_calls=[],
+        )
+    except BENCHMARK["BenchmarkError"] as exc:
+        assert "falsely certified" in str(exc)
+    else:
+        raise AssertionError("false certification was accepted")
+
+
+def test_ab_partition_scorer_requires_checker_backed_coverage(tmp_path: Path) -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = load_cases(["FINITE-PARTITION-AB-001"])[0]
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    cases = [
+        {"case_id": "r0", "members": ["0", "3", "6", "9"]},
+        {"case_id": "r1", "members": ["1", "4", "7", "10"]},
+        {"case_id": "r2", "members": ["2", "5", "8", "11"]},
+    ]
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="case.partition.finite",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "universe": case["expected"]["universe"],
+                "cases": cases,
+                "require_disjoint": True,
+            },
+        )
+    )
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "assurance": "VERIFIED",
+        "final_verification": "VERIFIED",
+        "cases": cases,
+        **{
+            field: result.output[field]
+            for field in (
+                "scope_uri",
+                "claim_uri",
+                "partition_uri",
+                "certificate_uri",
+                "verification_record_uri",
+            )
+        },
+    }
+
+    score = score_report(
+        case,
+        report,
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[
+            {
+                "capability_id": "case.partition.finite",
+                "assurance": result.assurance.model_dump(mode="json"),
+            }
+        ],
+    )
+
+    assert score["passed"] is True

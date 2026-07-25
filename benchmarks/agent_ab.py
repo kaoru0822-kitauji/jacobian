@@ -25,11 +25,22 @@ from pathlib import Path
 from typing import Any
 
 from jacobian.contracts.verification import VerificationRecord
+from jacobian.eval_graph_oracle import (
+    GraphOracleError,
+    check_constraints,
+    check_reported_properties,
+    compute_properties,
+    normalize_graph,
+)
+from jacobian.eval_telemetry import parse_agent_transcript as parse_transcript
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASES_ROOT = Path(__file__).with_name("ab_cases")
 REPORT_SCHEMA = CASES_ROOT / "report.schema.json"
+GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
+PARTITION_REPORT_SCHEMA = CASES_ROOT / "partition-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
 CONDITIONS = ("control", "treatment")
 
@@ -61,6 +72,35 @@ reference.solve in VERIFY mode. Its payload uses reference_name
 returns that assurance, and copy its exact verification_record_uri.
 """
 
+GRAPH_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. You may write and run local code
+in the empty workspace. Return one explicit simple undirected graph satisfying
+the constraints. Report SELF_CHECKED, UNVERIFIED, and null artifact URIs.
+Set graph-property fields not requested by the case to null.
+"""
+
+GRAPH_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical computation. Do not use shell commands
+or create programs. Describe and invoke graph.search.atlas, then invoke
+graph.compute.properties on one returned graph. Return that graph and its exact
+properties. Copy the exact inline graph payload returned by graph.search.atlas;
+do not substitute an isomorphic relabeling. Report COMPUTED, UNVERIFIED, and the
+durable graph/property URIs.
+Set graph-property fields not requested by the case to null.
+"""
+
+PARTITION_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. Construct the requested cases
+directly. Report SELF_CHECKED, UNVERIFIED, and null artifact URIs.
+"""
+
+PARTITION_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Describe and invoke
+case.partition.finite in VERIFY mode with the exact universe and cases. Do not
+use shell commands or create programs. Copy the returned durable URIs. Report
+VERIFIED only when the capability returns VERIFIED assurance.
+"""
+
 
 class BenchmarkError(RuntimeError):
     """The A/B runner, report, or known-answer evidence is invalid."""
@@ -77,7 +117,7 @@ def load_cases(selected: Sequence[str]) -> list[dict[str, Any]]:
     cases = [
         _load_json_object(path)
         for path in sorted(CASES_ROOT.glob("*.json"))
-        if path.name != REPORT_SCHEMA.name
+        if not path.name.endswith(".schema.json")
     ]
     indexed = {str(case.get("case_id")): case for case in cases}
     if len(indexed) != len(cases):
@@ -90,43 +130,6 @@ def load_cases(selected: Sequence[str]) -> list[dict[str, Any]]:
     return [indexed[case_id] for case_id in selected]
 
 
-def parse_transcript(path: Path) -> dict[str, Any]:
-    mcp_calls: list[str] = []
-    shell_calls: list[str] = []
-    usage: dict[str, Any] | None = None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(event, dict):
-            continue
-        item = event.get("item")
-        if (
-            event.get("type") == "item.completed"
-            and isinstance(item, dict)
-            and item.get("type") == "mcp_tool_call"
-            and isinstance(item.get("tool"), str)
-        ):
-            mcp_calls.append(item["tool"])
-        if (
-            event.get("type") == "item.completed"
-            and isinstance(item, dict)
-            and item.get("type") == "command_execution"
-        ):
-            command = item.get("command")
-            shell_calls.append(command if isinstance(command, str) else "")
-        if event.get("type") == "turn.completed" and isinstance(
-            event.get("usage"), dict
-        ):
-            usage = event["usage"]
-    return {
-        "mcp_calls": mcp_calls,
-        "shell_calls": shell_calls,
-        "usage": usage,
-    }
-
-
 def score_report(
     case: Mapping[str, Any],
     report: Mapping[str, Any],
@@ -134,7 +137,26 @@ def score_report(
     condition: str,
     state_dir: Path,
     mcp_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "graph":
+        return _score_graph_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            capability_invocations=capability_invocations,
+        )
+    if case.get("task_type") == "finite_partition":
+        return _score_partition_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            capability_invocations=capability_invocations,
+        )
     expected_value = case.get("expected")
     if not isinstance(expected_value, dict):
         raise BenchmarkError("case expected must be an object")
@@ -180,6 +202,231 @@ def score_report(
     else:
         raise BenchmarkError(f"unknown condition: {condition}")
     return {"passed": True, "checks": checks}
+
+
+def _score_partition_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    expected = case.get("expected")
+    if not isinstance(expected, Mapping):
+        raise BenchmarkError("partition expected must be an object")
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("conclusion") != "TRUE"
+    ):
+        raise BenchmarkError("partition report has the wrong case or conclusion")
+    universe = expected.get("universe")
+    cases = report.get("cases")
+    if not isinstance(universe, list) or not isinstance(cases, list):
+        raise BenchmarkError("partition report is malformed")
+    memberships: dict[str, str] = {}
+    for item in cases:
+        if (
+            not isinstance(item, Mapping)
+            or not isinstance(item.get("case_id"), str)
+            or not isinstance(item.get("members"), list)
+        ):
+            raise BenchmarkError("partition case is malformed")
+        for member in item["members"]:
+            if not isinstance(member, str) or member in memberships:
+                raise BenchmarkError("partition cases overlap or are malformed")
+            memberships[member] = item["case_id"]
+    if set(memberships) != set(universe):
+        raise BenchmarkError("partition does not cover the hidden finite oracle")
+    reported_groups = {
+        frozenset(str(member) for member in item["members"]) for item in cases
+    }
+    expected_groups = {
+        frozenset(value for value in universe if int(value) % 3 == residue)
+        for residue in range(3)
+    }
+    if reported_groups != expected_groups:
+        raise BenchmarkError("partition cases do not match residue classes")
+    if report.get("false_certification") is True:
+        raise BenchmarkError("partition report declared false certification")
+    uri_fields = (
+        "scope_uri",
+        "claim_uri",
+        "partition_uri",
+        "certificate_uri",
+        "verification_record_uri",
+    )
+    if condition == "control":
+        if mcp_calls or report.get("assurance") != "SELF_CHECKED":
+            raise BenchmarkError("partition control isolation failed")
+        if report.get("final_verification") != "UNVERIFIED" or any(
+            report.get(field) is not None for field in uri_fields
+        ):
+            raise BenchmarkError("partition control falsely projected verification")
+    elif condition == "treatment":
+        if (
+            report.get("assurance") != "VERIFIED"
+            or report.get("final_verification") != "VERIFIED"
+        ):
+            raise BenchmarkError("partition treatment was not independently verified")
+        record_uri = report.get("verification_record_uri")
+        if not isinstance(record_uri, str):
+            raise BenchmarkError("partition treatment omitted verification record")
+        try:
+            record = VerificationRecord.model_validate(
+                ArtifactStore(state_dir).get(record_uri).payload
+            )
+        except (StoreError, ValueError) as exc:
+            raise BenchmarkError("partition verification record is unavailable") from exc
+        if (
+            record.conclusion.value != "TRUE"
+            or record.coverage.value != "EXHAUSTIVE"
+            or record.relation_id != "case.relation.partitions"
+        ):
+            raise BenchmarkError("partition record differs from checked coverage")
+        if not any(
+            invocation.get("capability_id") == "case.partition.finite"
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            for invocation in capability_invocations
+        ):
+            raise BenchmarkError("partition treatment lacks verified capability trace")
+    else:
+        raise BenchmarkError(f"unknown condition: {condition}")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "checks": [
+            "hidden exact finite oracle",
+            "coverage and disjointness",
+            "checker-backed treatment" if condition == "treatment" else "control isolation",
+        ],
+    }
+
+
+def _score_graph_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    expected = case.get("expected")
+    if not isinstance(expected, Mapping):
+        raise BenchmarkError("graph case expected must be an object")
+    if report.get("case_id") != case.get("case_id"):
+        raise BenchmarkError("report case_id differs from graph case")
+    if report.get("conclusion") != expected.get("conclusion"):
+        raise BenchmarkError("graph conclusion differs from hidden oracle")
+    if report.get("final_verification") != "UNVERIFIED":
+        raise BenchmarkError("computed graph result was falsely certified")
+    graph = report.get("graph")
+    try:
+        properties = compute_properties(graph)
+        check_constraints(properties, expected.get("constraints"))
+        check_reported_properties(
+            properties,
+            report.get("properties"),
+            expected.get("properties"),
+        )
+    except GraphOracleError as exc:
+        raise BenchmarkError(str(exc)) from exc
+
+    graph_uri = report.get("graph_uri")
+    property_uri = report.get("property_artifact_uri")
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("control condition used an MCP tool")
+        if report.get("assurance") != "SELF_CHECKED":
+            raise BenchmarkError("graph control assurance must be SELF_CHECKED")
+        if graph_uri is not None or property_uri is not None:
+            raise BenchmarkError("graph control reported Jacobian artifacts")
+    elif condition == "treatment":
+        if report.get("assurance") != "COMPUTED":
+            raise BenchmarkError("graph treatment assurance must be COMPUTED")
+        if "capability.invoke" not in mcp_calls:
+            raise BenchmarkError("graph treatment did not invoke capabilities")
+        if not isinstance(graph_uri, str) or not isinstance(property_uri, str):
+            raise BenchmarkError("graph treatment omitted durable artifacts")
+        _score_graph_artifacts(
+            state_dir=state_dir,
+            graph=graph,
+            graph_uri=graph_uri,
+            property_uri=property_uri,
+            requested=expected.get("properties"),
+            capability_invocations=capability_invocations,
+        )
+    else:
+        raise BenchmarkError(f"unknown condition: {condition}")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "checks": [
+            "independent graph witness oracle",
+            "exact property vector",
+            "fail-closed assurance",
+            "durable treatment dataflow" if condition == "treatment" else "control isolation",
+        ],
+    }
+
+
+def _score_graph_artifacts(
+    *,
+    state_dir: Path,
+    graph: object,
+    graph_uri: str,
+    property_uri: str,
+    requested: object,
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> None:
+    store = ArtifactStore(state_dir)
+    try:
+        graph_artifact = store.get(graph_uri)
+        property_artifact = store.get(property_uri)
+        schemas = SchemaRegistry(store)
+        schemas.validate(graph_artifact.manifest.schema_uri, graph_artifact.payload)
+        schemas.validate(property_artifact.manifest.schema_uri, property_artifact.payload)
+    except (SchemaRegistryError, StoreError) as exc:
+        raise BenchmarkError("graph treatment artifacts fail validation") from exc
+    try:
+        durable_graph = normalize_graph(graph_artifact.payload)
+        reported_graph = normalize_graph(graph)
+    except GraphOracleError as exc:
+        raise BenchmarkError(str(exc)) from exc
+    if durable_graph != reported_graph:
+        raise BenchmarkError("reported graph differs from durable graph artifact")
+    if graph_uri not in property_artifact.manifest.parents:
+        raise BenchmarkError("property artifact is not bound to graph artifact")
+    property_payload = property_artifact.payload
+    if not isinstance(property_payload, Mapping):
+        raise BenchmarkError("property artifact is malformed")
+    computed = compute_properties(graph)
+    try:
+        check_reported_properties(computed, property_payload.get("properties"), requested)
+    except GraphOracleError as exc:
+        raise BenchmarkError(str(exc)) from exc
+    found_search = False
+    found_compute = False
+    for invocation in capability_invocations:
+        if (
+            invocation.get("capability_id") == "graph.search.atlas"
+            and graph_uri in (invocation.get("artifact_uris") or [])
+        ):
+            found_search = True
+        if (
+            found_search
+            and invocation.get("capability_id") == "graph.compute.properties"
+            and isinstance(invocation.get("input"), Mapping)
+            and invocation["input"].get("graph_uri") == graph_uri
+            and property_uri in (invocation.get("artifact_uris") or [])
+        ):
+            found_compute = True
+            break
+    if not found_compute:
+        raise BenchmarkError("treatment lacks ordered search-to-property dataflow")
 
 
 def _score_erdos_record(
@@ -231,6 +478,7 @@ def _codex_command(
     state_dir: Path,
     model: str | None,
     reasoning_effort: str,
+    report_schema: Path = REPORT_SCHEMA,
 ) -> list[str]:
     command = [
         codex_command,
@@ -246,7 +494,7 @@ def _codex_command(
         "never",
         "--json",
         "--output-schema",
-        str(REPORT_SCHEMA),
+        str(report_schema),
         "--output-last-message",
         str(report_path),
         "-c",
@@ -310,9 +558,24 @@ def _run_condition(
     condition_root.mkdir(parents=True)
     workspace.mkdir()
     state_dir.mkdir()
-    condition_instructions = (
-        CONTROL_INSTRUCTIONS if condition == "control" else TREATMENT_INSTRUCTIONS
-    )
+    is_graph = case.get("task_type") == "graph"
+    is_partition = case.get("task_type") == "finite_partition"
+    if is_graph:
+        condition_instructions = (
+            GRAPH_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else GRAPH_TREATMENT_INSTRUCTIONS
+        )
+    elif is_partition:
+        condition_instructions = (
+            PARTITION_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else PARTITION_TREATMENT_INSTRUCTIONS
+        )
+    else:
+        condition_instructions = (
+            CONTROL_INSTRUCTIONS if condition == "control" else TREATMENT_INSTRUCTIONS
+        )
     prompt = condition_instructions + "\n" + COMMON_PROMPT.format(**case)
     command = _codex_command(
         codex_command=codex_command,
@@ -322,6 +585,13 @@ def _run_condition(
         state_dir=state_dir,
         model=model,
         reasoning_effort=reasoning_effort,
+        report_schema=(
+            GRAPH_REPORT_SCHEMA
+            if is_graph
+            else PARTITION_REPORT_SCHEMA
+            if is_partition
+            else REPORT_SCHEMA
+        ),
     )
     started = time.monotonic()
     started_at = _timestamp()
@@ -363,6 +633,7 @@ def _run_condition(
                 condition=condition,
                 state_dir=state_dir,
                 mcp_calls=telemetry["mcp_calls"],
+                capability_invocations=telemetry["capability_invocations"],
             )
         except (BenchmarkError, OSError, json.JSONDecodeError) as exc:
             score = {"passed": False, "error": str(exc)}
@@ -378,12 +649,30 @@ def _run_condition(
         "usage": telemetry["usage"],
         "mcp_calls": telemetry["mcp_calls"],
         "mcp_call_count": len(telemetry["mcp_calls"]),
+        "tool_error_count": telemetry["tool_error_count"],
+        "parameter_error_count": telemetry["parameter_error_count"],
         "shell_calls": telemetry["shell_calls"],
         "shell_call_count": len(telemetry["shell_calls"]),
         "workspace_file_count": sum(
             1 for path in workspace.rglob("*") if path.is_file()
         ),
         "agent_report": report,
+        "false_certification": bool(
+            (
+                is_graph
+                and isinstance(report, dict)
+                and (
+                    report.get("assurance") == "VERIFIED"
+                    or report.get("final_verification") == "VERIFIED"
+                )
+            )
+            or (
+                is_partition
+                and isinstance(report, dict)
+                and report.get("final_verification") == "VERIFIED"
+                and report.get("verification_record_uri") is None
+            )
+        ),
         "score": score,
     }
     (condition_root / "result.json").write_text(
@@ -423,6 +712,10 @@ def summarize_pairs(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 - int(control["shell_call_count"]),
                 "mcp_call_delta": int(treatment["mcp_call_count"])
                 - int(control["mcp_call_count"]),
+                "tool_error_delta": int(treatment.get("tool_error_count", 0))
+                - int(control.get("tool_error_count", 0)),
+                "parameter_error_delta": int(treatment.get("parameter_error_count", 0))
+                - int(control.get("parameter_error_count", 0)),
             }
         )
     condition_summary = {
@@ -453,6 +746,18 @@ def _condition_summary(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         ),
         "median_output_tokens": statistics.median(
             _usage_value(result, "output_tokens") for result in results
+        ),
+        "median_tool_calls": statistics.median(
+            int(result.get("mcp_call_count", 0))
+            + int(result.get("shell_call_count", 0))
+            for result in results
+        ),
+        "tool_error_count": sum(int(result.get("tool_error_count", 0)) for result in results),
+        "parameter_error_count": sum(
+            int(result.get("parameter_error_count", 0)) for result in results
+        ),
+        "false_certification_count": sum(
+            bool(result.get("false_certification")) for result in results
         ),
     }
 

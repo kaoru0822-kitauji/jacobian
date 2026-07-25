@@ -1,0 +1,148 @@
+"""Codex JSONL telemetry parsing shared by executable evaluations."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+_PARAMETER_ERROR_CODES = frozenset(
+    {
+        -32602,
+        "INVALID_ARGUMENT",
+        "INVALID_CONSTRAINT_RANGE",
+        "INVALID_PARAMS",
+        "INVALID_REQUEST",
+        "SCHEMA_VALIDATION",
+        "invalid_params",
+    }
+)
+
+
+def _contains_value(value: object, *, field: str, accepted: set[object]) -> bool:
+    if isinstance(value, Mapping):
+        if value.get(field) in accepted:
+            return True
+        return any(
+            _contains_value(item, field=field, accepted=accepted)
+            for item in value.values()
+        )
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return any(
+            _contains_value(item, field=field, accepted=accepted) for item in value
+        )
+    return False
+
+
+def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
+    result = item.get("result")
+    content = result.get("content") if isinstance(result, Mapping) else None
+    if not isinstance(content, list):
+        return None
+    for block in content:
+        if not isinstance(block, Mapping) or not isinstance(block.get("text"), str):
+            continue
+        try:
+            payload = json.loads(block["text"])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def parse_agent_transcript(path: Path) -> dict[str, Any]:
+    """Return calls, usage, failures, and successful capability dataflow."""
+
+    mcp_calls: list[str] = []
+    successful_calls: list[str] = []
+    capability_ids: list[str] = []
+    capability_invocations: list[dict[str, Any]] = []
+    shell_calls: list[str] = []
+    usage: dict[str, Any] | None = None
+    tool_error_count = 0
+    parameter_error_count = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        item = event.get("item")
+        if (
+            event.get("type") == "item.completed"
+            and isinstance(item, dict)
+            and item.get("type") == "command_execution"
+        ):
+            command = item.get("command")
+            shell_calls.append(command if isinstance(command, str) else "")
+        if (
+            event.get("type") == "item.completed"
+            and isinstance(item, dict)
+            and item.get("type") == "mcp_tool_call"
+            and isinstance(item.get("tool"), str)
+        ):
+            tool = item["tool"]
+            mcp_calls.append(tool)
+            result = item.get("result")
+            failed = bool(
+                item.get("status") in {"error", "failed"}
+                or item.get("error")
+                or (isinstance(result, Mapping) and result.get("isError") is True)
+                or _contains_value(
+                    item,
+                    field="status",
+                    accepted={"CANCELLED", "ERROR", "TIMEOUT"},
+                )
+            )
+            if failed:
+                tool_error_count += 1
+            else:
+                successful_calls.append(tool)
+                arguments = item.get("arguments")
+                response = _mcp_text_payload(item)
+                execution = (
+                    response.get("execution") if isinstance(response, Mapping) else None
+                )
+                if (
+                    tool == "capability.invoke"
+                    and isinstance(arguments, Mapping)
+                    and isinstance(arguments.get("capability_id"), str)
+                    and isinstance(response, Mapping)
+                    and response.get("capability_id") == arguments["capability_id"]
+                    and isinstance(execution, Mapping)
+                    and execution.get("status") == "COMPLETED"
+                ):
+                    capability_ids.append(arguments["capability_id"])
+                    capability_invocations.append(
+                        {
+                            "capability_id": arguments["capability_id"],
+                            "input": arguments.get("payload"),
+                            "output": response.get("output"),
+                            "artifact_uris": response.get("artifact_uris"),
+                            "assurance": response.get("assurance"),
+                            "completeness": response.get("completeness"),
+                        }
+                    )
+            if _contains_value(
+                item,
+                field="code",
+                accepted=set(_PARAMETER_ERROR_CODES),
+            ):
+                parameter_error_count += 1
+        if event.get("type") == "turn.completed" and isinstance(
+            event.get("usage"), dict
+        ):
+            usage = event["usage"]
+    return {
+        "mcp_calls": mcp_calls,
+        "shell_calls": shell_calls,
+        "usage": usage,
+        "tool_error_count": tool_error_count,
+        "parameter_error_count": parameter_error_count,
+        "successful_tool_calls": successful_calls,
+        "capability_ids": capability_ids,
+        "capability_invocations": capability_invocations,
+    }
