@@ -217,8 +217,6 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
             "jacobian.adapters.mcp.server",
             "--transport",
             "streamable-http",
-            "--tool-profile",
-            "capabilities",
             "--host",
             "127.0.0.1",
             "--port",

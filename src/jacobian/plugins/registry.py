@@ -20,7 +20,7 @@ from jacobian.contracts.plugins import (
 )
 from jacobian.implementation import (
     ImplementationError,
-    module_source_digest,
+    package_source_digest,
 )
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore, StoreError
@@ -111,7 +111,7 @@ class PluginRegistry:
         """Record an operator-installed entrypoint and its current source digest."""
 
         try:
-            digest = module_source_digest(entrypoint)
+            digest = package_source_digest(entrypoint)
         except ImplementationError as exc:
             _LOGGER.warning(
                 "could not register plugin implementation %s",
@@ -179,7 +179,7 @@ class PluginRegistry:
                         "capability entrypoint differs from implementation binding"
                     )
                 expected_digest = definition.get("module_digest")
-                if expected_digest != module_source_digest(descriptor.entrypoint):
+                if expected_digest != package_source_digest(descriptor.entrypoint):
                     raise PluginRegistryError(
                         "plugin implementation bytes differ from its binding"
                     )
@@ -391,7 +391,7 @@ class PluginRegistry:
                     "implementation descriptor has no object definition"
                 )
             expected_digest = definition.get("module_digest")
-            actual_digest = module_source_digest(descriptor.entrypoint)
+            actual_digest = package_source_digest(descriptor.entrypoint)
             if definition.get("entrypoint") != descriptor.entrypoint:
                 raise PluginRegistryError(
                     "capability entrypoint differs from implementation binding"

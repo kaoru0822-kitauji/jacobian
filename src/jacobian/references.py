@@ -702,7 +702,6 @@ def reference_catalog(
 
     catalog: dict[str, Any] = {
         name: {
-            "agent_contract_uri": f"reference://domain/{name}",
             "domain_id": reference.domain_id,
             "domain_version": reference.domain_version,
             "available_capabilities": reference.available_capabilities,
@@ -741,7 +740,6 @@ def reference_catalog(
     if lean is not None and LeanEnvironment.CORE in lean:
         core = lean[LeanEnvironment.CORE]
         catalog["lean4"] = {
-            "agent_contract_uri": "reference://domain/lean4",
             "domain_id": "jacobian.lean4",
             "domain_version": "1",
             "lean_version": core.lean_version,

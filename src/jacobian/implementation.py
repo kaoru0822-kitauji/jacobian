@@ -179,9 +179,3 @@ def package_source_digest(entrypoint: str) -> str:
         digest.update(len(content).to_bytes(8, "big"))
         digest.update(content)
     return "sha256:" + digest.hexdigest()
-
-
-def module_source_digest(entrypoint: str) -> str:
-    """Compatibility alias for the v0.2 implementation descriptor."""
-
-    return package_source_digest(entrypoint)

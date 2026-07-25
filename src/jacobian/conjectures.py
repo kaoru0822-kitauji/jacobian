@@ -56,7 +56,7 @@ class ConjectureError(RuntimeError):
 
 
 class ConjectureService:
-    """Create unverified hypotheses and optionally route them through M3.
+    """Create unverified hypotheses and optionally route them through search.
 
     Hypothesis plugins own domain grammar and heuristics. This service owns
     exact source/evidence replay, immutable edit lineage, schema validation,
@@ -739,7 +739,7 @@ class ConjectureService:
         ).hexdigest()
         handle = self.search.start(
             SearchRunRequest(
-                idempotency_key=f"m4:{idempotency_digest}",
+                idempotency_key=f"hypothesis:{idempotency_digest}",
                 claim_uri=record.claim_uri,
                 plugin_id=selected.plugin_id,
                 initial_state=plan.initial_state,

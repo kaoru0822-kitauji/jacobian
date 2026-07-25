@@ -22,12 +22,7 @@ def test_project_codex_profile_starts_the_local_stdio_server() -> None:
     profile = config["mcp_servers"]["jacobian_local"]
     assert profile == {
         "command": "uv",
-        "args": [
-            "run",
-            "jacobian-mcp",
-            "--tool-profile",
-            "capabilities",
-        ],
+        "args": ["run", "jacobian-mcp"],
         "cwd": ".",
         "enabled": True,
         "required": True,

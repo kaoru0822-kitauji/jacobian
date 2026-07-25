@@ -61,7 +61,7 @@ class CapabilityCompletenessStatus(StrEnum):
 
 
 class CapabilityDescriptor(ContractModel):
-    """One stable operation advertised by an operator-installed adapter."""
+    """One installed operation advertised by an operator-installed adapter."""
 
     descriptor_version: Literal["1"] = "1"
     capability_id: CapabilityId
