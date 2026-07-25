@@ -137,6 +137,31 @@ parameter-region proof format, or domain-independent meaning for sufficient and
 necessary conditions. Authorized domain checkers own that mathematics. M5
 corpus integration remains optional and unimplemented.
 
+## 4.1 Staged compatibility decomposition
+
+Do not replace the three compatibility commands with speculative generic
+verbs. Preserve their public behavior while proven primitives absorb
+individual internal stages:
+
+| Compatibility workflow | Candidate primitive stages | Migration gate |
+| --- | --- | --- |
+| `conjecture.repair` | typed claim transformation, claim validation, bounded falsification | equivalent edit lineage and no increase in false certification on held-out repair cases |
+| `conjecture.generate` | domain construction/search, property computation, deduplication, ranking, bounded falsification | separate stage artifacts and matched or improved paired correctness and parameter-error rates |
+| `parameter.generalize` | domain region construction, exact or approximate evaluation, certificate replay, `parameter.region.promote` | distinct sampled and proved regions, with the same bound verification record on replay |
+
+The graph pilot proves only the construction/search-to-property dataflow; it
+does not prove a general claim-derivation, ranking, or parameter-region
+primitive. The finite-partition checker proves exact coverage for explicit
+finite scopes, not arbitrary proof by cases. The Lean REPL spike is exploratory
+and does not yet justify a stable decomposition or retrieval interface.
+
+Instrument compatibility-command transcripts first. Redirect one internal
+stage at a time, keep the compatibility output as a projection of the new
+artifacts, and run the frozen paired cases after each redirect. Deprecation is a
+later public-contract decision, only after artifact lineage, assurance,
+runtime, tokens, call count, and parameter errors meet the existing workflow's
+baseline.
+
 See
 [ADR 0004](../../explanation/adr/0004-verified-parameter-regions.md)
 for the immutable subject and exact-carrier decision.
