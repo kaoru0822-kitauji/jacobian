@@ -40,6 +40,29 @@ _PROPERTY_NAMES = (
     "tree",
     "triangle_count",
 )
+_GRAPH_PAYLOAD_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "graph_schema_version": {"const": "1"},
+        "vertices": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": True,
+        },
+        "edges": {
+            "type": "array",
+            "items": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 2,
+                "maxItems": 2,
+            },
+            "uniqueItems": True,
+        },
+    },
+    "required": ["graph_schema_version", "vertices", "edges"],
+    "additionalProperties": False,
+}
 _CONSTRAINT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -91,29 +114,7 @@ def install_graph_capabilities(
     graph_schema_uri = schemas.register(
         name="jacobian.simple-undirected-graph",
         version="1",
-        schema={
-            "type": "object",
-            "properties": {
-                "graph_schema_version": {"const": "1"},
-                "vertices": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "uniqueItems": True,
-                },
-                "edges": {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "minItems": 2,
-                        "maxItems": 2,
-                    },
-                    "uniqueItems": True,
-                },
-            },
-            "required": ["graph_schema_version", "vertices", "edges"],
-            "additionalProperties": False,
-        },
+        schema=_GRAPH_PAYLOAD_SCHEMA,
     )
     scope_schema_uri = schemas.register(
         name="jacobian.graph-atlas-scope",
@@ -208,9 +209,10 @@ class GraphAtlasSearchAdapter:
                                     "type": "string",
                                     "pattern": _ARTIFACT_URI_PATTERN,
                                 },
+                                "graph": _GRAPH_PAYLOAD_SCHEMA,
                                 "properties": {"type": "object"},
                             },
-                            "required": ["graph_uri", "properties"],
+                            "required": ["graph_uri", "graph", "properties"],
                             "additionalProperties": False,
                         },
                     },
@@ -271,10 +273,11 @@ class GraphAtlasSearchAdapter:
         candidates: list[dict[str, Any]] = []
         graph_uris: list[str] = []
         for graph, properties in matches[:limit]:
+            graph_payload = _graph_payload(graph)
             graph_artifact = self.resources.artifacts.put(
                 schema_uri=self.resources.graph_schema_uri,
                 semantics_uri=self.resources.semantics_uri,
-                payload=_graph_payload(graph),
+                payload=graph_payload,
                 parents=(scope.artifact_uri,),
                 summary=f"Graph Atlas candidate of order {order}",
             )
@@ -282,6 +285,7 @@ class GraphAtlasSearchAdapter:
             candidates.append(
                 {
                     "graph_uri": graph_artifact.artifact_uri,
+                    "graph": graph_payload,
                     "properties": properties,
                 }
             )

@@ -50,6 +50,7 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
     for candidate in result.output["candidates"]:
         graph_uri = candidate["graph_uri"]
         graph = kernel.store.get(graph_uri)
+        assert candidate["graph"] == graph.payload
         assert graph.payload["graph_schema_version"] == "1"
         assert len(graph.payload["vertices"]) == 5
         assert candidate["properties"]["connected"] is True

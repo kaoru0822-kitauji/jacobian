@@ -20,6 +20,10 @@ from jacobian.conjectures import ConjectureService
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.evaluation import EvaluationService
 from jacobian.experiments import ExperimentService
+from jacobian.finite_partition import (
+    FinitePartitionInstallation,
+    install_finite_partition,
+)
 from jacobian.graph_capabilities import install_graph_capabilities
 from jacobian.lean import LeanService
 from jacobian.memory import ResearchMemory
@@ -150,6 +154,16 @@ class JacobianKernel:
         self.verification_workflows: VerificationWorkflowService | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         self.capabilities.register(KnowledgeSearchAdapter(self.memory))
+        self.finite_partition: FinitePartitionInstallation
+        finite_partition, self.finite_partition = install_finite_partition(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        self.capabilities.register(finite_partition)
         for adapter in install_graph_capabilities(
             self.store,
             self.schemas,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from jacobian.contracts.capabilities import CapabilityId
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.evidence import EvidenceBindings
@@ -29,3 +30,5 @@ class VerificationRecord(ContractModel):
     coverage: Coverage
     request_digest: Sha256Digest
     environment_digest: Sha256Digest
+    relation_id: CapabilityId | None = None
+    obligation_uri: ArtifactUri | None = None

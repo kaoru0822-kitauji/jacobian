@@ -634,6 +634,8 @@ class VerificationService:
                 coverage=decision.coverage,
                 request_digest=request_digest,
                 environment_digest=_environment_digest(checker.executable_digest),
+                relation_id=decision.relation_id,
+                obligation_uri=decision.obligation_uri,
             )
             parent_uris = [claim.artifact_uri, candidate.artifact_uri, certificate_uri]
             if scope is not None:

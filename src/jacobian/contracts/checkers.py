@@ -7,6 +7,7 @@ from typing import Literal, Self
 
 from pydantic import model_validator
 
+from jacobian.contracts.capabilities import CapabilityId
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.evidence import FormatIdentifier
 from jacobian.contracts.plugins import Entrypoint
@@ -58,6 +59,8 @@ class CheckerDecision(ContractModel):
     method: Method
     coverage: Coverage
     detail: str = ""
+    relation_id: CapabilityId | None = None
+    obligation_uri: ArtifactUri | None = None
 
     @model_validator(mode="after")
     def rejected_evidence_has_no_mathematical_conclusion(self) -> Self:
@@ -66,6 +69,10 @@ class CheckerDecision(ContractModel):
             Conclusion.NOT_APPLICABLE,
         }:
             raise ValueError("a rejected checker input cannot decide the claim")
+        if not self.accepted and (
+            self.relation_id is not None or self.obligation_uri is not None
+        ):
+            raise ValueError("rejected evidence cannot certify relationship metadata")
         if self.accepted:
             if self.conclusion not in {Conclusion.TRUE, Conclusion.FALSE}:
                 raise ValueError(
