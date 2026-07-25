@@ -12,7 +12,9 @@ class GraphOracleError(ValueError):
     """A reported graph or property vector is invalid."""
 
 
-def normalize_graph(value: object) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+def normalize_graph(
+    value: object,
+) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
     if not isinstance(value, Mapping):
         raise GraphOracleError("graph must be an object")
     vertices_value = value.get("vertices")
@@ -114,7 +116,9 @@ def check_reported_properties(
         raise GraphOracleError("reported graph properties are malformed")
     expected_names = {str(name) for name in requested}
     unexpected_values = {
-        name for name, value in reported.items() if name not in expected_names and value is not None
+        name
+        for name, value in reported.items()
+        if name not in expected_names and value is not None
     }
     if not expected_names.issubset(reported) or unexpected_values:
         raise GraphOracleError("reported graph properties differ from requested set")
@@ -172,6 +176,9 @@ def _independence_number(
 ) -> int:
     for size in range(len(vertices), -1, -1):
         for candidate in combinations(vertices, size):
-            if all(second not in adjacency[first] for first, second in combinations(candidate, 2)):
+            if all(
+                second not in adjacency[first]
+                for first, second in combinations(candidate, 2)
+            ):
                 return size
     return 0

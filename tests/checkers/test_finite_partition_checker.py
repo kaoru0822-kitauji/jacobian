@@ -20,7 +20,7 @@ def _request(*, cases: list[dict[str, object]]) -> dict[str, Any]:
             "payload": {
                 "predicate": "finite_partition",
                 "require_disjoint": True,
-            }
+            },
         },
         "candidate": {"payload": {"cases": cases}},
         "scope": {"payload": {"elements": ["a", "b", "c", "d"]}},

@@ -42,9 +42,7 @@ def test_graph_oracle_computes_path_properties_without_networkx() -> None:
 
 
 def test_graph_oracle_rejects_wrong_exact_property() -> None:
-    properties = compute_properties(
-        {"vertices": ["a", "b"], "edges": [["a", "b"]]}
-    )
+    properties = compute_properties({"vertices": ["a", "b"], "edges": [["a", "b"]]})
 
     with pytest.raises(GraphOracleError, match="differs from hidden oracle"):
         check_reported_properties(

@@ -79,10 +79,14 @@ def run_tasks(repl: Path) -> dict[str, Any]:
             )
             sorries = command_response.get("sorries")
             if not isinstance(sorries, list) or len(sorries) != 1:
-                raise ReplSpikeError(f"{task['task_id']} did not expose one proof state")
+                raise ReplSpikeError(
+                    f"{task['task_id']} did not expose one proof state"
+                )
             proof_state = sorries[0].get("proofState")
             if not isinstance(proof_state, int):
-                raise ReplSpikeError(f"{task['task_id']} returned an invalid proof state")
+                raise ReplSpikeError(
+                    f"{task['task_id']} returned an invalid proof state"
+                )
             traces: list[dict[str, Any]] = []
             for tactic in task["tactics"]:
                 response, elapsed = _exchange(
@@ -128,9 +132,7 @@ def run_tasks(repl: Path) -> dict[str, Any]:
         "task_count": len(task_results),
         "completed_count": sum(result["completed"] for result in task_results),
         "parameter_error_count": sum(
-            "message" in trace
-            for result in task_results
-            for trace in result["tactics"]
+            "message" in trace for result in task_results for trace in result["tactics"]
         ),
         "elapsed_seconds": round(time.monotonic() - started, 6),
         "return_code": return_code,

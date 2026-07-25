@@ -278,7 +278,9 @@ def _score_partition_report(
                 ArtifactStore(state_dir).get(record_uri).payload
             )
         except (StoreError, ValueError) as exc:
-            raise BenchmarkError("partition verification record is unavailable") from exc
+            raise BenchmarkError(
+                "partition verification record is unavailable"
+            ) from exc
         if (
             record.conclusion.value != "TRUE"
             or record.coverage.value != "EXHAUSTIVE"
@@ -300,7 +302,9 @@ def _score_partition_report(
         "checks": [
             "hidden exact finite oracle",
             "coverage and disjointness",
-            "checker-backed treatment" if condition == "treatment" else "control isolation",
+            "checker-backed treatment"
+            if condition == "treatment"
+            else "control isolation",
         ],
     }
 
@@ -368,7 +372,9 @@ def _score_graph_report(
             "independent graph witness oracle",
             "exact property vector",
             "fail-closed assurance",
-            "durable treatment dataflow" if condition == "treatment" else "control isolation",
+            "durable treatment dataflow"
+            if condition == "treatment"
+            else "control isolation",
         ],
     }
 
@@ -388,7 +394,9 @@ def _score_graph_artifacts(
         property_artifact = store.get(property_uri)
         schemas = SchemaRegistry(store)
         schemas.validate(graph_artifact.manifest.schema_uri, graph_artifact.payload)
-        schemas.validate(property_artifact.manifest.schema_uri, property_artifact.payload)
+        schemas.validate(
+            property_artifact.manifest.schema_uri, property_artifact.payload
+        )
     except (SchemaRegistryError, StoreError) as exc:
         raise BenchmarkError("graph treatment artifacts fail validation") from exc
     try:
@@ -405,15 +413,16 @@ def _score_graph_artifacts(
         raise BenchmarkError("property artifact is malformed")
     computed = compute_properties(graph)
     try:
-        check_reported_properties(computed, property_payload.get("properties"), requested)
+        check_reported_properties(
+            computed, property_payload.get("properties"), requested
+        )
     except GraphOracleError as exc:
         raise BenchmarkError(str(exc)) from exc
     found_search = False
     found_compute = False
     for invocation in capability_invocations:
-        if (
-            invocation.get("capability_id") == "graph.search.atlas"
-            and graph_uri in (invocation.get("artifact_uris") or [])
+        if invocation.get("capability_id") == "graph.search.atlas" and graph_uri in (
+            invocation.get("artifact_uris") or []
         ):
             found_search = True
         if (
@@ -752,7 +761,9 @@ def _condition_summary(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             + int(result.get("shell_call_count", 0))
             for result in results
         ),
-        "tool_error_count": sum(int(result.get("tool_error_count", 0)) for result in results),
+        "tool_error_count": sum(
+            int(result.get("tool_error_count", 0)) for result in results
+        ),
         "parameter_error_count": sum(
             int(result.get("parameter_error_count", 0)) for result in results
         ),
