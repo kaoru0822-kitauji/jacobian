@@ -12,7 +12,7 @@ from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.results import ContractModel
 
@@ -24,8 +24,9 @@ from jacobian.contracts.results import ContractModel
 class LeanStatementProposalRequest(ContractModel):
     """Type-check one proposed Lean statement against an informal claim."""
 
+    operation: Literal["PROPOSE", "ELABORATE_PROPOSITION"] = "PROPOSE"
     environment: LeanEnvironment = LeanEnvironment.CORE
-    informal_claim: str = Field(min_length=1, max_length=4_000)
+    informal_claim: str | None = Field(default=None, min_length=1, max_length=4_000)
     proposed_statement: str = Field(min_length=1, max_length=2_000)
     source_locator: str | None = Field(default=None, max_length=512)
 
@@ -35,32 +36,75 @@ class LeanStatementProposalRequest(ContractModel):
             raise ValueError("proposed_statement must be one Lean expression")
         if ":=" in self.proposed_statement:
             raise ValueError("proposed_statement must not contain ':='")
+        if self.operation == "PROPOSE" and self.informal_claim is None:
+            raise ValueError("informal_claim is required for PROPOSE")
+        if (
+            self.operation == "ELABORATE_PROPOSITION"
+            and self.informal_claim is not None
+        ):
+            raise ValueError("informal_claim must be omitted for ELABORATE_PROPOSITION")
         return self
+
+
+class LeanElaborationDiagnostic(ContractModel):
+    severity: Literal["ERROR", "WARNING", "INFO"]
+    message: str = Field(min_length=1, max_length=20_000)
+
+
+class LeanElaborationOption(ContractModel):
+    name: str = Field(min_length=1, max_length=128)
+    value: str = Field(min_length=1, max_length=128)
 
 
 class LeanStatementProposalArtifact(ContractModel):
     """One type-checked Lean statement proposal with elaboration status."""
 
-    proposal_schema_version: Literal["1"] = "1"
+    proposal_schema_version: Literal["2"] = "2"
+    operation: Literal["PROPOSE", "ELABORATE_PROPOSITION"] = "PROPOSE"
     environment: LeanEnvironment
-    informal_claim: str
+    environment_digest: Sha256Digest
+    informal_claim: str | None = None
     proposed_statement: str
     elaborates: bool
+    elaborated_expression: str | None = Field(default=None, max_length=20_000)
     sorry_count: int = Field(ge=0)
     goals: tuple[str, ...]
     messages: tuple[str, ...]
+    diagnostics: tuple[LeanElaborationDiagnostic, ...] = ()
+    used_imports: tuple[str, ...] = ()
+    used_declarations: tuple[str, ...] = ()
+    options: tuple[LeanElaborationOption, ...] = ()
     lean_version: str
     lean_commit: str
     mathlib_commit: str | None = None
     source_locator: str | None = None
+    semantic_scope: Literal["ELABORATION_ONLY"] = "ELABORATION_ONLY"
+    truth_status: Literal["NOT_ASSESSED"] = "NOT_ASSESSED"
 
     @model_validator(mode="after")
-    def require_nonnegative_sorry_when_elaborates(self) -> Self:
-        if self.elaborates and self.sorry_count < 1:
+    def require_operation_specific_shape(self) -> Self:
+        if self.operation == "PROPOSE" and self.informal_claim is None:
+            raise ValueError("a proposal artifact requires an informal claim")
+        if self.operation == "PROPOSE" and self.elaborates and self.sorry_count < 1:
             raise ValueError(
                 "an elaborating proposal must report at least one sorry "
                 "because the type-check proof uses sorry"
             )
+        if self.operation == "ELABORATE_PROPOSITION":
+            if self.informal_claim is not None:
+                raise ValueError("direct elaboration cannot bind an informal claim")
+            if self.sorry_count != 0:
+                raise ValueError("direct proposition elaboration does not use sorry")
+            if self.elaborates != (self.elaborated_expression is not None):
+                raise ValueError(
+                    "direct elaboration must return an expression exactly on success"
+                )
+        if len(set(self.used_imports)) != len(self.used_imports):
+            raise ValueError("used imports must be unique")
+        if len(set(self.used_declarations)) != len(self.used_declarations):
+            raise ValueError("used declarations must be unique")
+        if len({option.name for option in self.options}) != len(self.options):
+            raise ValueError("elaboration option names must be unique")
         return self
 
 
