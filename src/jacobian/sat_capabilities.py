@@ -9,6 +9,7 @@ from typing import Literal
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -27,7 +28,6 @@ from jacobian.contracts.evidence import (
     CertificateEnvelope,
     EvidenceBindings,
     WitnessEnvelope,
-    WitnessRole,
 )
 from jacobian.contracts.results import (
     Conclusion,
@@ -228,29 +228,17 @@ class SatAssignmentVerificationAdapter:
 
         checker_id = self.installation.checker_id
         assert checker_id is not None
-        bindings = EvidenceBindings(
-            claim_digest=resolved.cnf_artifact.manifest.object_digest,
-            semantics_digest=semantics.manifest.object_digest,
-            candidate_digest=resolved.artifact.manifest.object_digest,
-        )
-        witness = WitnessEnvelope(
+        witness_artifact = put_witness_envelope(
+            self.artifacts,
+            witness_schema_uri=self.installation.witness_schema_uri,
             witness_format="sat.assignment",
-            format_version="1",
-            role=WitnessRole.SUPPORTS_CLAIM,
-            bindings=bindings,
+            claim_artifact=resolved.cnf_artifact,
+            semantics_artifact=semantics,
+            candidate_artifact=resolved.artifact,
             payload={
                 "cnf_uri": resolved.cnf_artifact.artifact_uri,
                 "assignment_uri": resolved.artifact.artifact_uri,
             },
-        )
-        witness_artifact = self.artifacts.put(
-            schema_uri=self.installation.witness_schema_uri,
-            semantics_uri=self.sat.installation.semantics_uri,
-            payload=witness.model_dump(mode="json"),
-            parents=(
-                resolved.cnf_artifact.artifact_uri,
-                resolved.artifact.artifact_uri,
-            ),
             summary="SAT assignment verification witness",
         )
         checked = self.verification.verify_witness(

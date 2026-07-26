@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -21,11 +22,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
-from jacobian.contracts.evidence import (
-    EvidenceBindings,
-    WitnessEnvelope,
-    WitnessRole,
-)
+from jacobian.contracts.evidence import WitnessEnvelope
 from jacobian.contracts.matrices import (
     ExactRationalMatrix,
     MatrixDeterminantArtifact,
@@ -197,29 +194,17 @@ class MatrixDeterminantVerificationAdapter:
 
         checker_id = self.installation.checker_id
         assert checker_id is not None
-        bindings = EvidenceBindings(
-            claim_digest=resolved.matrix_artifact.manifest.object_digest,
-            semantics_digest=semantics.manifest.object_digest,
-            candidate_digest=resolved.artifact.manifest.object_digest,
-        )
-        witness = WitnessEnvelope(
+        witness_artifact = put_witness_envelope(
+            self.artifacts,
+            witness_schema_uri=self.installation.witness_schema_uri,
             witness_format="matrix.rational_determinant",
-            format_version="1",
-            role=WitnessRole.SUPPORTS_CLAIM,
-            bindings=bindings,
+            claim_artifact=resolved.matrix_artifact,
+            semantics_artifact=semantics,
+            candidate_artifact=resolved.artifact,
             payload={
                 "matrix_uri": resolved.matrix_artifact.artifact_uri,
                 "determinant_uri": resolved.artifact.artifact_uri,
             },
-        )
-        witness_artifact = self.artifacts.put(
-            schema_uri=self.installation.witness_schema_uri,
-            semantics_uri=self.matrices.semantics_uri,
-            payload=witness.model_dump(mode="json"),
-            parents=(
-                resolved.matrix_artifact.artifact_uri,
-                resolved.artifact.artifact_uri,
-            ),
             summary="exact rational determinant verification witness",
         )
         checked = self.verification.verify_witness(
