@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+declare -A plan=()
+expected_keys=(
+  classification
+  run-python
+  run-lean
+  run-npm
+  run-static
+  run-build
+  run-security
+  run-duplicate
+)
+
+while IFS='=' read -r key value; do
+  case "$key" in
+    classification|run-python|run-lean|run-npm|run-static|run-build|run-security|run-duplicate)
+      ;;
+    *)
+      echo "invalid CI plan key: $key" >&2
+      exit 1
+      ;;
+  esac
+  if [[ -v "plan[$key]" ]]; then
+    echo "duplicate CI plan key: $key" >&2
+    exit 1
+  fi
+  plan["$key"]=$value
+done
+
+for key in "${expected_keys[@]}"; do
+  if [[ ! -v "plan[$key]" ]]; then
+    echo "missing CI plan key: $key" >&2
+    exit 1
+  fi
+done
+
+for key in "${expected_keys[@]:1}"; do
+  case "${plan[$key]}" in
+    true|false) ;;
+    *)
+      echo "invalid CI plan value for $key: ${plan[$key]}" >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "${plan[classification]}" in
+  docs)
+    expected_npm=false
+    ;;
+  npm)
+    expected_npm=true
+    ;;
+  full)
+    for key in "${expected_keys[@]:1}"; do
+      if [[ "${plan[$key]}" != true ]]; then
+        echo "full CI plan must enable $key" >&2
+        exit 1
+      fi
+    done
+    exit 0
+    ;;
+  *)
+    echo "invalid CI classification: ${plan[classification]}" >&2
+    exit 1
+    ;;
+esac
+
+for key in run-python run-static run-build run-security run-duplicate; do
+  if [[ "${plan[$key]}" != false ]]; then
+    echo "${plan[classification]} CI plan must disable $key" >&2
+    exit 1
+  fi
+done
+if [[ "${plan[run-npm]}" != "$expected_npm" ]]; then
+  echo "${plan[classification]} CI plan has an invalid run-npm value" >&2
+  exit 1
+fi

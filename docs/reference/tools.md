@@ -107,95 +107,28 @@ computation or artifact writes. JSON Schema remains the discovery contract;
 Pydantic enforces cross-field conditions such as polynomial-map dimensions,
 finite operation-table closure, and bounded exact encodings.
 
-## Installed bundled capabilities
+## Installed capability discovery
 
-The base installation currently includes these kernel capability IDs:
+The installed catalog is the canonical capability inventory. Its membership
+depends on the available provider runtimes, operator-authorized checkers,
+enabled bundled references, configured exclusions, and operator-installed
+adapters. A static list in this document would therefore describe only one
+installation snapshot.
 
-| Capability ID | Outcome |
-| --- | --- |
-| `artifact.put` | Materialize one immutable, content-addressed artifact. |
-| `claim.validate` | Validate one formal claim against installed schemas and domain semantics without asserting its truth. |
-| `evaluate.batch` | Evaluate a batch of candidates and return computed evidence without self-certification. |
-| `witness.find` | Search for one claim-bound witness or return an explicitly bounded non-conclusion. |
-| `witness.verify` | Independently replay the claimed logical effect of one witness. |
-| `certificate.verify` | Independently replay one registered certificate format. |
-| `shrink.run` | Reduce one candidate or witness while preserving a checker-backed property. |
-| `structure.canonicalize` | Produce one implementation-bound canonical representation of a supported structure. |
-| `search.enumerate` | Start one bounded enumeration with explicit scope and accounting. |
-| `experiment.inspect` | Read one experiment snapshot. |
-| `experiment.wait` | Wait for one experiment to settle within the declared bound. |
-| `experiment.cancel` | Request cancellation of one experiment. |
-| `transform.apply` | Produce one proposed representation or claim transformation and its obligations. |
-| `transform.verify` | Independently check one proposed transformation relationship. |
-| `polytope.separate` | Compute one exact finite rational convex-hull witness or separator. |
-| `parameter.region.promote` | Check one immutable parameter-region subject with an authorized certificate. |
-| `case.partition.finite` | Partition an explicit finite domain and report exact coverage. |
-| `graph.search.atlas` | Search the bounded Graph Atlas and return matching graph candidates with explicit coverage limits. |
-| `graph.realize.degree_sequence` | Construct a simple graph with an exact degree sequence, or return a replayable Erdős–Gallai/basic obstruction. |
-| `graph.compute.properties` | Compute supported exact invariants of an explicit graph. |
-| `graph.compute.neighborhood_independence` | Compute every open-neighborhood independence optimum, witness, sum, and exact rational average. |
-| `graph.isomorphism.verify` | Independently verify one explicit vertex bijection between two existing graph artifacts by exhaustive adjacency and nonadjacency replay. |
-| `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
-| `polynomial.map.compute_jacobian` | Compute an exact Jacobian matrix and determinant for one sparse rational polynomial map. |
-| `polynomial.map.collision_witness` | Compare two exact point-evaluation artifacts and materialize a candidate collision witness. |
-| `polynomial.map.collision.verify` | Independently reevaluate two distinct exact rational points and verify their claimed common polynomial-map image. |
-| `polynomial.identity.verify` | Independently verify equality or inequality of two sparse polynomials over one declared rational polynomial ring. |
-| `polynomial.map.collision.search` | Search one fully declared finite rational grid for the first exact collision with reconciled point accounting. |
-| `polynomial.factor.compute` | Factor one univariate polynomial over QQ and materialize its exact reconstructed product without self-certifying irreducibility. |
-| `matrix.determinant.compute` | Compute the exact determinant of one square rational matrix and materialize the result. |
-| `matrix.rank.compute` | Compute the exact rank and pivot columns of one rectangular rational matrix. |
-| `polynomial.system.solution.verify` | Independently check one exact rational assignment against every equation and inequation in a finite polynomial system. |
-| `universal_algebra.evaluate_laws` | Exhaust finite magma laws or return the first canonical failing valuation. |
-| `universal_algebra.search.countermodel` | Search all operation tables of one bounded carrier order for a source-law model falsifying a target law. |
-| `knowledge.search` | Retrieve locally indexed capability episodes without changing their assurance. |
+Read `capability://catalog`, or call `capability.describe` without a capability
+ID, for the exact installed IDs and compact descriptors. Call
+`capability.describe` with one ID before invocation to inspect its complete
+input and output schemas, supported modes, provider identity, availability,
+and checker requirements. Do not infer installation or payload fields from
+examples in documentation.
 
-`polynomial.map.evaluate` is the sole bundled operation that computes a point
-image. `polynomial.map.collision_witness` accepts two evaluation artifact URIs
-for the same map, compares their declared canonical rational values, and
-exposes any resulting candidate witness for independent replay. It does not
-recompute or certify either evaluation. This keeps evaluation and witness
-construction separate while making their composition explicit to the agent.
+Domain reference documents define constraints that remain useful independent
+of catalog membership:
 
-`matrix.determinant.compute` and `matrix.rank.compute` use deterministic exact
-rational arithmetic and return `COMPUTED` assurance. Their result artifacts
-remain unverified: a future independently implemented and operator-authorized
-checker must replay a determinant or rank claim before Jacobian may report
-`VERIFIED`.
-
-Optional exact runtimes add narrowly scoped operations only when their pinned
-provider identity is available:
-
-| Capability ID | Availability and outcome |
-| --- | --- |
-| `sat.model.find` | With CaDiCaL 3.0.1, preserve one total assignment candidate without certifying SAT. |
-| `sat.unsat_proof.find` | With CaDiCaL 3.0.1, preserve raw DRAT evidence without certifying UNSAT. |
-| `smt.unsat_proof.find` | With the `smt` extra and cvc5 1.3.4, preserve raw Alethe for one pinned-profile QF query, expose holes, and retain `UNKNOWN`. |
-
-See the [SAT artifact contracts](sat-artifacts.md) and
-[SMT Alethe artifact contracts](smt-artifacts.md) for exact input profiles,
-resource bounds, artifact bindings, and independent verification boundaries.
-
-When the operator enables bundled references, the catalog also includes:
-
-| Capability ID | Outcome |
-| --- | --- |
-| `lean.declaration.search` | Search public declarations by a bounded name and/or elaborated-type constant pattern; retrieval remains computed evidence. |
-| `lean.declaration.inspect` | Resolve one exact declaration with type, kind, docs, source metadata, and pinned environment digest. |
-| `lean.check` | Check a Lean proof in an operator-pinned environment and return its replay evidence. |
-| `lean.proof_state.apply_tactic` | Apply one tactic through the pinned Lean REPL and materialize the resulting goals and replay source. |
-| `lean.retrieve.premises` | Ask pinned Mathlib `exact?` for bounded candidate tactics and declaration references for one proof state. |
-
-The two exploratory Lean capabilities use the maintained
-`leanprover-community/repl` JSON protocol pinned in the Lake manifest. Their
-computed transitions and suggestions are not proof certificates. A completed
-source still requires `lean.check`, whose independent checker binds the exact
-statement, proof, environment, allowed axioms, and runtime revisions.
-
-Operator-installed adapters appear in the same catalog. Agents should call
-`capability.describe` before invoking an unfamiliar capability instead of
-guessing payload fields. The
-[Lean declaration discovery contract](lean-declaration-discovery.md) defines
-its matching, coverage, environment identity, and assurance semantics.
+- [SAT artifact contracts](sat-artifacts.md);
+- [SMT Alethe artifact contracts](smt-artifacts.md);
+- [exact rational solution artifacts](linear-rational-solutions.md); and
+- [Lean declaration discovery contract](lean-declaration-discovery.md).
 
 ## Mathematical operation portfolio
 
