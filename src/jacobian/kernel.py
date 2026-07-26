@@ -35,6 +35,10 @@ from jacobian.lean_declarations import (
     LeanDeclarationService,
     installed_lean_declaration_service,
 )
+from jacobian.lean_exploration import (
+    LeanExplorationInstallation,
+    install_lean_exploration_capabilities,
+)
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
@@ -178,6 +182,7 @@ class JacobianKernel:
         self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
         self.lean: LeanService | None = None
         self.lean_declarations: LeanDeclarationService | None = None
+        self.lean_exploration: LeanExplorationInstallation | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         for atomic_adapter in install_atomic_capabilities(self):
             self.register_capability(atomic_adapter)
@@ -283,6 +288,17 @@ class JacobianKernel:
                     self.lean_checkers,
                 )
                 self.register_capability(LeanCheckAdapter(self.lean, runtime))
+                lean_exploration_adapters, self.lean_exploration = (
+                    install_lean_exploration_capabilities(
+                        self.store,
+                        self.schemas,
+                        self.artifacts,
+                        self.lean_checkers,
+                        runtime,
+                    )
+                )
+                for lean_exploration_adapter in lean_exploration_adapters:
+                    self.register_capability(lean_exploration_adapter)
             else:
                 _LOGGER.warning(
                     "lean.check is not installed: %s",
