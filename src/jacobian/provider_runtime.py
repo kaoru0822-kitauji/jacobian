@@ -24,6 +24,9 @@ from jacobian.contracts.capabilities import (
 from jacobian.implementation import ImplementationError, package_source_digest
 
 CADICAL_VERSION = "3.0.1"
+CARCARA_SOURCE_COMMIT = "394edbb15ba95c47893f1d821fddde7e016af178"
+CARCARA_SOURCE_REPOSITORY = "https://github.com/ufmg-smite/carcara"
+CARCARA_VERSION = "1.1.0"
 CVC5_VERSION = "1.3.4"
 DRAT_TRIM_RELEASE_TAG = "v05.22.2023"
 DRAT_TRIM_SOURCE_COMMIT = "2e5e29cb0019d5cfd547d4208dca1b3ec290349f"
@@ -453,6 +456,141 @@ def drat_trim_provider_runtime(
             "provenance_file": str(manifest_path),
             "source_repository": DRAT_TRIM_SOURCE_REPOSITORY,
             "source_commit": DRAT_TRIM_SOURCE_COMMIT,
+        },
+    )
+
+
+def carcara_provider_runtime(
+    executable: str | Path = "carcara",
+    *,
+    provenance_file: str | Path | None = None,
+) -> CapabilityProviderRuntime:
+    """Inspect the exact operator-provenanced Carcara Alethe checker runtime."""
+
+    resolved_name = shutil.which(os.fspath(executable))
+    if resolved_name is None:
+        return _unavailable_runtime(
+            provider="carcara",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="Apache-2.0",
+            diagnostic=(
+                f"The pinned Carcara {CARCARA_VERSION} runtime is unavailable."
+            ),
+        )
+    try:
+        resolved = Path(resolved_name).resolve(strict=True)
+        manifest_path = (
+            Path(provenance_file).resolve(strict=True)
+            if provenance_file is not None
+            else resolved.with_name(resolved.name + ".jacobian-runtime.json").resolve(
+                strict=True
+            )
+        )
+        manifest = loads_strict_json(manifest_path.read_bytes())
+        expected_manifest = {
+            "runtime_manifest_version": "1",
+            "provider": "carcara",
+            "version": CARCARA_VERSION,
+            "source_repository": CARCARA_SOURCE_REPOSITORY,
+            "source_commit": CARCARA_SOURCE_COMMIT,
+            "compatible_cvc5_version": CVC5_VERSION,
+        }
+        if (
+            not isinstance(manifest, dict)
+            or set(manifest) != {*expected_manifest, "executable_sha256"}
+            or any(
+                manifest.get(key) != value for key, value in expected_manifest.items()
+            )
+            or not isinstance(manifest.get("executable_sha256"), str)
+        ):
+            raise ProviderRuntimeError("Carcara provenance is invalid")
+        digest = _sha256_file(resolved)
+        if manifest["executable_sha256"] != digest:
+            raise ProviderRuntimeError("Carcara executable digest changed")
+        environment = {
+            "LANG": "C",
+            "LC_ALL": "C",
+            "TZ": "UTC",
+        }
+        version = run_bounded_process(
+            [str(resolved), "--version"],
+            input_bytes=b"",
+            timeout_seconds=5,
+            environment=environment,
+            stdout_limit=16_000,
+            stderr_limit=16_000,
+        )
+        help_result = run_bounded_process(
+            [str(resolved), "check", "--help"],
+            input_bytes=b"",
+            timeout_seconds=5,
+            environment=environment,
+            stdout_limit=64_000,
+            stderr_limit=16_000,
+        )
+        expected_version = (
+            f"carcara {CARCARA_VERSION} [git master {CARCARA_SOURCE_COMMIT[:7]}]\n"
+        ).encode("ascii")
+        required_help = (
+            b"--strict-parsing",
+            b"--parse-hole-args",
+            b"--allow-int-real-subtyping",
+            b"--expand-let-bindings",
+        )
+        if (
+            version.timed_out
+            or version.stdout_exceeded
+            or version.stderr_exceeded
+            or version.returncode != 0
+            or version.stdout != expected_version
+            or version.stderr
+            or help_result.timed_out
+            or help_result.stdout_exceeded
+            or help_result.stderr_exceeded
+            or help_result.returncode != 0
+            or help_result.stderr
+            or any(flag not in help_result.stdout for flag in required_help)
+        ):
+            raise ProviderRuntimeError("Carcara health probe failed")
+    except (OSError, ProviderRuntimeError, ValueError):
+        return _unavailable_runtime(
+            provider="carcara",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="Apache-2.0",
+            diagnostic=(
+                f"The pinned Carcara {CARCARA_VERSION} runtime and operator "
+                "provenance are unavailable."
+            ),
+        )
+    return CapabilityProviderRuntime(
+        provider="carcara",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version=CARCARA_VERSION,
+        digest=digest,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform=_platform_tag(),
+        install_tier=CapabilityInstallTier.T2,
+        license_id="Apache-2.0",
+        features=(
+            "alethe-proof-replay",
+            "strict-parsing",
+            "reject-holes",
+        ),
+        configuration={
+            "executable": str(resolved),
+            "provenance_file": str(manifest_path),
+            "source_repository": CARCARA_SOURCE_REPOSITORY,
+            "source_commit": CARCARA_SOURCE_COMMIT,
+            "compatible_cvc5_version": CVC5_VERSION,
+            "problem_profile": "jacobian.smtlib2.qf-unsat/v1",
+            "accepted_logic": "QF_UF",
+            "proof_format": "cvc5.alethe/1.3.4",
+            "command_flags": [
+                "--strict-parsing",
+                "--parse-hole-args",
+                "--allow-int-real-subtyping",
+                "--expand-let-bindings",
+            ],
         },
     )
 

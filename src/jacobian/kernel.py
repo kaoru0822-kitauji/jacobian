@@ -54,6 +54,7 @@ from jacobian.polynomial_capabilities import (
 from jacobian.polytope import PolytopeService
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
+    carcara_provider_runtime,
     cvc5_provider_runtime,
     drat_trim_provider_runtime,
     lean_provider_runtime,
@@ -76,6 +77,10 @@ from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
 from jacobian.smt import SmtArtifactService, install_smt_artifacts
+from jacobian.smt_capabilities import (
+    SmtUnsatProofCheckerInstallation,
+    install_smt_unsat_proof_checker,
+)
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
@@ -240,6 +245,22 @@ class JacobianKernel:
         )
         if proof_adapter is not None:
             self.register_capability(proof_adapter)
+        self.carcara_runtime: CapabilityProviderRuntime = carcara_provider_runtime()
+        self.smt_unsat_proof_checker: SmtUnsatProofCheckerInstallation
+        smt_proof_adapter, self.smt_unsat_proof_checker = (
+            install_smt_unsat_proof_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.smt,
+                self.verification,
+                self.checkers,
+                self.carcara_runtime,
+                authorize_checker=install_references,
+            )
+        )
+        if smt_proof_adapter is not None:
+            self.register_capability(smt_proof_adapter)
         self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
         if (
             self.cadical_runtime.availability
