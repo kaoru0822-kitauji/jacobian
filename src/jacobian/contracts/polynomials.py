@@ -11,7 +11,7 @@ from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.contracts.common import ArtifactUri, CheckerUri
 from jacobian.contracts.exact import CanonicalRational
-from jacobian.contracts.results import ContractModel
+from jacobian.contracts.results import ContractModel, InputValidation
 
 PolynomialVariable = Annotated[
     str,
@@ -343,6 +343,7 @@ class PolynomialCollisionOutput(ContractModel):
 class PolynomialCollisionVerifyOutput(ContractModel):
     collision_verified: bool
     conclusion: Literal["FALSE", "UNKNOWN"]
+    verification_input: InputValidation
     map_uri: ArtifactUri
     claim_uri: ArtifactUri
     witness_uri: ArtifactUri

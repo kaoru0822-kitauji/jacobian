@@ -10,7 +10,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRelationshipStatus,
     CapabilityRequest,
 )
-from jacobian.contracts.results import ExecutionStatus
+from jacobian.contracts.results import ExecutionStatus, InputStatus
 from jacobian.kernel import JacobianKernel
 
 
@@ -53,6 +53,11 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
 
     assert result.output["collision_verified"] is True
     assert result.output["conclusion"] == "FALSE"
+    assert result.output["verification_input"] == {
+        "status": InputStatus.ACCEPTED.value,
+        "errors": [],
+        "warnings": [],
+    }
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     record_uri = result.output["verification_record_uri"]
     assert record_uri in result.artifact_uris
@@ -74,6 +79,11 @@ def test_direct_collision_verifier_fails_closed_for_wrong_image(
 
     assert result.output["collision_verified"] is False
     assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["verification_input"] == {
+        "status": InputStatus.REJECTED.value,
+        "errors": ["declared collision does not replay exactly"],
+        "warnings": [],
+    }
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.output["verification_record_uri"] is None
     assert result.execution.status is ExecutionStatus.COMPLETED

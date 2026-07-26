@@ -746,6 +746,7 @@ class PolynomialCollisionVerifyAdapter:
         output = PolynomialCollisionVerifyOutput(
             collision_verified=verified,
             conclusion="FALSE" if verified else "UNKNOWN",
+            verification_input=checked.input,
             map_uri=map_uri,
             claim_uri=claim_artifact.artifact_uri,
             witness_uri=witness_artifact.artifact_uri,
