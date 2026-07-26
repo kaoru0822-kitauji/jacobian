@@ -39,6 +39,12 @@ from jacobian.contracts.graph_degree_sequence import (
     GraphDegreeSequenceResultArtifact,
 )
 from jacobian.contracts.graph_invariants import (
+    GraphInvariantBatchArtifact,
+    GraphInvariantBatchOutput,
+    GraphInvariantBatchRequest,
+    GraphInvariantBinding,
+    GraphInvariantResult,
+    GraphInvariantResultArtifact,
     GraphNeighborhoodIndependenceArtifact,
     GraphNeighborhoodIndependenceClaim,
     GraphNeighborhoodIndependenceOutput,
@@ -54,6 +60,7 @@ from jacobian.store import ArtifactStore, StoreError
 
 _ARTIFACT_URI_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
 _PROPERTY_NAMES = (
+    "average_eccentricity",
     "bipartite",
     "connected",
     "degree_sequence",
@@ -72,7 +79,6 @@ _PROPERTY_NAMES = (
     "tree",
     "triangle_count",
     "triangle_frequencies",
-    "average_eccentricity",
 )
 _GRAPH_PAYLOAD_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -122,6 +128,7 @@ class GraphCapabilityResources:
     graph_schema_uri: str
     scope_schema_uri: str
     property_schema_uri: str
+    invariant_result_schema_uri: str
     degree_sequence_claim_schema_uri: str
     degree_sequence_result_schema_uri: str
     neighborhood_schema_uri: str
@@ -137,6 +144,7 @@ class GraphInstallation:
     graph_schema_uri: str
     scope_schema_uri: str
     property_schema_uri: str
+    invariant_result_schema_uri: str
     degree_sequence_claim_schema_uri: str
     degree_sequence_result_schema_uri: str
     neighborhood_schema_uri: str
@@ -207,26 +215,13 @@ def install_graph_capabilities(
     )
     property_schema_uri = schemas.register(
         name="jacobian.graph-property-batch",
+        version="2",
+        schema=model_schema(GraphInvariantBatchArtifact),
+    )
+    invariant_result_schema_uri = schemas.register(
+        name="jacobian.graph-invariant-result",
         version="1",
-        schema={
-            "type": "object",
-            "properties": {
-                "property_schema_version": {"const": "1"},
-                "graph_uri": {
-                    "type": "string",
-                    "pattern": _ARTIFACT_URI_PATTERN,
-                },
-                "backend_version": {"type": "string"},
-                "properties": {"type": "object"},
-            },
-            "required": [
-                "property_schema_version",
-                "graph_uri",
-                "backend_version",
-                "properties",
-            ],
-            "additionalProperties": False,
-        },
+        schema=model_schema(GraphInvariantResultArtifact),
     )
     degree_sequence_claim_schema_uri = schemas.register(
         name="jacobian.graph-degree-sequence-claim",
@@ -287,6 +282,7 @@ def install_graph_capabilities(
         graph_schema_uri=graph_schema_uri,
         scope_schema_uri=scope_schema_uri,
         property_schema_uri=property_schema_uri,
+        invariant_result_schema_uri=invariant_result_schema_uri,
         degree_sequence_claim_schema_uri=degree_sequence_claim_schema_uri,
         degree_sequence_result_schema_uri=degree_sequence_result_schema_uri,
         neighborhood_schema_uri=neighborhood_schema_uri,
@@ -302,6 +298,7 @@ def install_graph_capabilities(
         graph_schema_uri=graph_schema_uri,
         scope_schema_uri=scope_schema_uri,
         property_schema_uri=property_schema_uri,
+        invariant_result_schema_uri=invariant_result_schema_uri,
         degree_sequence_claim_schema_uri=degree_sequence_claim_schema_uri,
         degree_sequence_result_schema_uri=degree_sequence_result_schema_uri,
         neighborhood_schema_uri=neighborhood_schema_uri,
@@ -504,13 +501,15 @@ class GraphPropertyAdapter:
 
     def __init__(self, resources: GraphCapabilityResources) -> None:
         self.resources = resources
+        input_schema = model_schema(GraphInvariantBatchRequest)
+        input_schema["x-supported-invariants"] = list(_PROPERTY_NAMES)
         self._descriptor = CapabilityDescriptor(
             capability_id="graph.compute.properties",
-            version="1",
+            version="2",
             title="Compute exact graph properties",
             description=(
-                "Compute a requested batch of exact NetworkX properties for one "
-                "Jacobian simple-undirected-graph artifact."
+                "Classify and compute a requested batch against the fixed exact "
+                "graph-invariant registry, preserving every per-invariant outcome."
             ),
             provider="jacobian.networkx",
             provider_runtime=known_provider_runtime(
@@ -518,45 +517,8 @@ class GraphPropertyAdapter:
                 features=("graph-properties", "simple-undirected-graphs"),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "graph_uri": {
-                        "type": "string",
-                        "pattern": _ARTIFACT_URI_PATTERN,
-                    },
-                    "properties": {
-                        "type": "array",
-                        "items": {"enum": list(_PROPERTY_NAMES)},
-                        "minItems": 1,
-                        "uniqueItems": True,
-                    },
-                },
-                "required": ["graph_uri", "properties"],
-                "additionalProperties": False,
-            },
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "graph_uri": {
-                        "type": "string",
-                        "pattern": _ARTIFACT_URI_PATTERN,
-                    },
-                    "property_artifact_uri": {
-                        "type": "string",
-                        "pattern": _ARTIFACT_URI_PATTERN,
-                    },
-                    "properties": {"type": "object"},
-                    "backend_version": {"type": "string"},
-                },
-                "required": [
-                    "graph_uri",
-                    "property_artifact_uri",
-                    "properties",
-                    "backend_version",
-                ],
-                "additionalProperties": False,
-            },
+            input_schema=input_schema,
+            output_schema=model_schema(GraphInvariantBatchOutput),
             tags=("graph", "properties", "exact-computation"),
         )
 
@@ -566,37 +528,72 @@ class GraphPropertyAdapter:
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         started = time.monotonic()
-        graph_uri = str(request.input["graph_uri"])
-        graph = _load_graph(self.resources, graph_uri)
-        names = sorted(str(item) for item in request.input["properties"])
         try:
-            selected = {
-                name: _property_result(name, _compute_property(graph, name))
-                for name in names
-            }
-        except nx.NetworkXError as exc:
+            validated = GraphInvariantBatchRequest.model_validate(request.input)
+        except ValidationError as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
-                    code="GRAPH_PROPERTY_NOT_APPLICABLE",
-                    stage="graph_property_computation",
-                    message=str(exc),
+                    code="INVALID_GRAPH_INVARIANT_BATCH_REQUEST",
+                    stage="request_validation",
+                    message=(
+                        "The complete graph-invariant batch request is invalid: "
+                        f"{exc.errors()[0].get('msg', 'validation failed')}"
+                    ),
                     hint=(
-                        "Distance-based properties require a nonempty connected "
-                        "graph; request structural properties separately."
+                        "Supply one compatible graph artifact URI and 1 to 32 "
+                        "unique lowercase invariant names."
                     ),
                 )
             ) from exc
+        graph_uri = validated.graph_uri
+        graph = _load_graph(self.resources, graph_uri)
+        names = tuple(sorted(validated.properties))
+        bindings: list[GraphInvariantBinding] = []
+        selected: dict[str, Any] = {}
+        for name in names:
+            result = _compute_invariant_result(graph, name)
+            if result.status == "COMPUTED":
+                selected[name] = {
+                    "value": result.value,
+                    "exactness": result.exactness,
+                    "backend": result.backend,
+                }
+            result_artifact = self.resources.artifacts.put(
+                schema_uri=self.resources.invariant_result_schema_uri,
+                semantics_uri=self.resources.semantics_uri,
+                payload=GraphInvariantResultArtifact(
+                    graph_uri=graph_uri,
+                    backend_version=nx.__version__,
+                    result=result,
+                ).model_dump(mode="json"),
+                parents=(graph_uri,),
+                summary=f"{result.status.lower()} graph invariant: {name}",
+            )
+            bindings.append(
+                GraphInvariantBinding(
+                    invariant=name,
+                    artifact_uri=result_artifact.artifact_uri,
+                    result=result,
+                )
+            )
+        batch = GraphInvariantBatchArtifact(
+            graph_uri=graph_uri,
+            supported_invariants=tuple(sorted(_PROPERTY_NAMES)),
+            requested_invariants=names,
+            backend_version=nx.__version__,
+            results=tuple(bindings),
+            properties=selected,
+        )
         property_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.property_schema_uri,
             semantics_uri=self.resources.semantics_uri,
-            payload={
-                "property_schema_version": "1",
-                "graph_uri": graph_uri,
-                "backend_version": nx.__version__,
-                "properties": selected,
-            },
-            parents=(graph_uri,),
-            summary="exact NetworkX graph-property batch",
+            payload=batch.model_dump(mode="json"),
+            parents=(graph_uri, *(binding.artifact_uri for binding in bindings)),
+            summary="fixed-registry graph-invariant batch",
+        )
+        output = GraphInvariantBatchOutput(
+            **batch.model_dump(mode="python"),
+            property_artifact_uri=property_artifact.artifact_uri,
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
@@ -606,27 +603,21 @@ class GraphPropertyAdapter:
                 status=ExecutionStatus.COMPLETED,
                 runtime_ms=_runtime_ms(started),
             ),
-            output={
-                "graph_uri": graph_uri,
-                "property_artifact_uri": property_artifact.artifact_uri,
-                "properties": selected,
-                "backend_version": nx.__version__,
-            },
+            output=output.model_dump(mode="json"),
             scope=CapabilityScope(
                 description="the requested property batch for one exact graph artifact",
                 parameters={
                     "graph_uri": graph_uri,
-                    "properties": sorted(
-                        str(item) for item in request.input["properties"]
-                    ),
+                    "registry_version": "1",
+                    "properties": list(names),
                 },
                 artifact_uri=graph_uri,
             ),
             completeness=CapabilityCompleteness(
                 status=CapabilityCompletenessStatus.COMPLETE,
                 basis=(
-                    "every requested property was computed; no mathematical "
-                    "conclusion or independent verification is claimed"
+                    "every requested invariant received a terminal COMPUTED, "
+                    "NOT_APPLICABLE, or UNSUPPORTED result under registry version 1"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
@@ -634,7 +625,10 @@ class GraphPropertyAdapter:
                 CapabilityRelationship(
                     relation_id="graph.relation.properties-of",
                     source_artifact_uris=(graph_uri,),
-                    target_artifact_uris=(property_artifact.artifact_uri,),
+                    target_artifact_uris=(
+                        property_artifact.artifact_uri,
+                        *(binding.artifact_uri for binding in bindings),
+                    ),
                 ),
             ),
             assurance=CapabilityAssurance(
@@ -644,7 +638,11 @@ class GraphPropertyAdapter:
                     "checker was invoked"
                 ),
             ),
-            artifact_uris=(graph_uri, property_artifact.artifact_uri),
+            artifact_uris=(
+                graph_uri,
+                property_artifact.artifact_uri,
+                *(binding.artifact_uri for binding in bindings),
+            ),
         )
 
 
@@ -1402,17 +1400,46 @@ def _matches_constraints(
     )
 
 
-def _property_result(name: str, value: Any) -> dict[str, Any]:
+def _property_backend(name: str) -> str:
     backend = (
         "networkx.max_weight_clique(complement)"
         if name == "independence_number"
         else "networkx"
     )
-    return {
-        "value": value,
-        "exactness": "EXACT",
-        "backend": backend,
-    }
+    return backend
+
+
+def _compute_invariant_result(
+    graph: nx.Graph[Any],
+    name: str,
+) -> GraphInvariantResult:
+    if name not in _PROPERTY_NAMES:
+        return GraphInvariantResult(
+            invariant=name,
+            status="UNSUPPORTED",
+            exactness="NOT_APPLICABLE",
+            detail=(
+                "the invariant is not present in graph.compute.properties "
+                "registry version 1"
+            ),
+        )
+    try:
+        value = _compute_property(graph, name)
+    except nx.NetworkXError as exc:
+        return GraphInvariantResult(
+            invariant=name,
+            status="NOT_APPLICABLE",
+            exactness="NOT_APPLICABLE",
+            backend=_property_backend(name),
+            detail=str(exc),
+        )
+    return GraphInvariantResult(
+        invariant=name,
+        status="COMPUTED",
+        value=value,
+        exactness="EXACT",
+        backend=_property_backend(name),
+    )
 
 
 def _runtime_ms(started: float) -> int:
