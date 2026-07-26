@@ -324,6 +324,22 @@ See [Lean declaration-discovery pilot](../reference/capability-workflow-evaluati
 for scorer invariants, per-run measurements, and the excluded operationally
 invalid pair.
 
+The indexed follow-up is implemented. It derives a compact catalog from the
+pinned environment's imported module metadata, binds it to the exact
+environment digest, rechecks its byte identity before and after reuse, and
+keeps final candidate and type matching inside Lean. A fresh held-out
+`List.revzip` search completed in 28.886 seconds instead of timing out; catalog
+reuse completed in 9.568 seconds and direct exact inspection in 9.146 seconds.
+Fresh and reused outputs agreed on declarations, stop reason, and exact scan
+count.
+
+The frozen autonomous rerun passed in both conditions with no tool errors, but
+neither treatment selected discovery. That run therefore does not measure
+intervention lift. Search and inspection remain experimental and
+non-recommended. Before changing recommendation status or exposing interactive
+goal tools, add harder held-out statements where direct automation does not
+already solve the proposition.
+
 ## Wave 2: SAT certificate vertical slice
 
 Use four outcomes rather than one ambiguous solver call:

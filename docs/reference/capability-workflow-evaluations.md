@@ -275,6 +275,45 @@ environment identity, and make catalog discovery compact. Then rerun these
 same held-out cases and add cases where direct automation does not already
 solve the proposition.
 
+#### Indexed follow-up
+
+The follow-up implementation uses Mathlib's imported module metadata to build
+an atomically materialized, environment-bound catalog. Catalog candidates keep
+their exact deterministic scan positions; Lean resolves them again and checks
+the elaborated type. Exact inspection uses direct environment lookup. The
+backend checks the catalog byte digest before and after reuse and rejects
+identity changes, partial writes, response-ID mismatches, and tampering.
+
+On the same host, a fresh `List.revzip` search that previously exhausted the
+75-second budget completed in 28.886 seconds. Reusing the catalog for the same
+three-result query completed in 9.568 seconds, and exact inspection completed
+in 9.146 seconds. Fresh and reused searches returned the same three
+declarations, `RESULT_LIMIT`, and `scanned_declarations = 145293`. These are
+development measurements, not latency guarantees.
+
+One frozen pair per case was then rerun with the same model, effort, oracle,
+condition isolation, and 600-second condition budget:
+
+| Case | Condition | Correct | Discovery used | Seconds | Input tokens | Calls | Tool errors | Rejected proofs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `List.revzip` | control | yes | no | 166.788 | 252,870 | 6 | 0 | 3 |
+| `List.revzip` | treatment | yes | no | 170.406 | 299,191 | 6 | 0 | 3 |
+| set image/preimage | control | yes | no | 57.268 | 140,354 | 3 | 0 | 0 |
+| set image/preimage | treatment | yes | no | 64.866 | 131,915 | 3 | 0 | 0 |
+
+All four runs produced checker-bound exact results with no false
+certification, parameter error, tool error, shell use, or operational failure.
+The treatment agents did not invoke declaration discovery, so the elapsed and
+token deltas are not intervention effects. This rerun shows that merely making
+the experimental capabilities available did not add calls or failures; it does
+not establish autonomous outcome lift.
+
+The performance revision is accepted at the capability layer. Recommendation
+status remains experimental: keep search and inspection separate, do not add
+goal-stepping tools, and evaluate harder held-out statements where direct
+automation does not already solve the proposition before recommending
+discovery by default.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:
