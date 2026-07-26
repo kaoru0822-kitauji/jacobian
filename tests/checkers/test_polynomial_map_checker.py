@@ -49,6 +49,7 @@ def _request() -> dict[str, Any]:
             },
         },
         "witness": {
+            "artifact_uri": "artifact://sha256/" + "6" * 64,
             "payload": {
                 "evidence_schema_version": "1",
                 "witness_format": "polynomial.map_collision",
@@ -60,7 +61,7 @@ def _request() -> dict[str, Any]:
                     "second_point": [{"num": "1", "den": "1"}],
                     "image": [{"num": "1", "den": "1"}],
                 },
-            }
+            },
         },
         "expected_bindings": deepcopy(bindings),
     }
@@ -76,6 +77,9 @@ def test_collision_checker_accepts_exact_distinct_preimages() -> None:
         "method": "DIRECT_WITNESS",
         "coverage": "NOT_APPLICABLE",
         "detail": "distinct rational points have the same exact polynomial-map image",
+        "relation_id": "polynomial.relation.collision-refutes-injectivity",
+        "relationship_source_artifact_uris": ["artifact://sha256/" + "6" * 64],
+        "relationship_target_artifact_uris": ["artifact://sha256/" + "4" * 64],
     }
 
 
