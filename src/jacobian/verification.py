@@ -664,6 +664,23 @@ class VerificationService:
                     candidate_digest=candidate.manifest.object_digest,
                     evidence_uris=(certificate_uri,),
                 )
+            request_artifact_uris = {
+                claim.artifact_uri,
+                candidate.artifact_uri,
+                certificate_artifact.artifact_uri,
+                *(artifact.artifact_uri for artifact in supporting_artifacts),
+            }
+            if scope is not None:
+                request_artifact_uris.add(scope.artifact_uri)
+            decision_endpoints = {
+                *decision.relationship_source_artifact_uris,
+                *decision.relationship_target_artifact_uris,
+            }
+            if not decision_endpoints.issubset(request_artifact_uris):
+                raise ValueError(
+                    "The checker certified a relationship endpoint outside its "
+                    "verification request."
+                )
 
             verified_assurance = Assurance(
                 arithmetic=decision.arithmetic,
@@ -690,6 +707,12 @@ class VerificationService:
                     checker.provider_runtime,
                 ),
                 relation_id=decision.relation_id,
+                relationship_source_artifact_uris=(
+                    decision.relationship_source_artifact_uris
+                ),
+                relationship_target_artifact_uris=(
+                    decision.relationship_target_artifact_uris
+                ),
                 obligation_uri=decision.obligation_uri,
             )
             parent_uris = [claim.artifact_uri, candidate.artifact_uri, certificate_uri]

@@ -86,6 +86,8 @@ class CheckerDecision(ContractModel):
     coverage: Coverage
     detail: str = ""
     relation_id: CapabilityId | None = None
+    relationship_source_artifact_uris: tuple[ArtifactUri, ...] = ()
+    relationship_target_artifact_uris: tuple[ArtifactUri, ...] = ()
     obligation_uri: ArtifactUri | None = None
 
     @model_validator(mode="after")
@@ -96,9 +98,28 @@ class CheckerDecision(ContractModel):
         }:
             raise ValueError("a rejected checker input cannot decide the claim")
         if not self.accepted and (
-            self.relation_id is not None or self.obligation_uri is not None
+            self.relation_id is not None
+            or self.relationship_source_artifact_uris
+            or self.relationship_target_artifact_uris
+            or self.obligation_uri is not None
         ):
             raise ValueError("rejected evidence cannot certify relationship metadata")
+        if self.relation_id is None and (
+            self.relationship_source_artifact_uris
+            or self.relationship_target_artifact_uris
+        ):
+            raise ValueError("relationship endpoints require a relation ID")
+        if self.relation_id is not None and (
+            not self.relationship_source_artifact_uris
+            or not self.relationship_target_artifact_uris
+        ):
+            raise ValueError("a certified relationship requires exact endpoints")
+        if len(set(self.relationship_source_artifact_uris)) != len(
+            self.relationship_source_artifact_uris
+        ) or len(set(self.relationship_target_artifact_uris)) != len(
+            self.relationship_target_artifact_uris
+        ):
+            raise ValueError("certified relationship endpoints must be unique")
         if self.accepted:
             if self.conclusion not in {Conclusion.TRUE, Conclusion.FALSE}:
                 raise ValueError(
