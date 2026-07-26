@@ -36,6 +36,19 @@ DRAT_TRIM_SOURCE_COMMIT = "2e5e29cb0019d5cfd547d4208dca1b3ec290349f"
 DRAT_TRIM_SOURCE_REPOSITORY = "https://github.com/marijnheule/drat-trim"
 PYTHON_FLINT_VERSION = "0.9.0"
 PYTHON_FLINT_HNF_FLINT_VERSION = "3.6.0"
+PYTHON_FLINT_LLL_CONFIGURATION = {
+    "domain": "ZZ",
+    "operation": "fmpz_mat.lll(transform=True)",
+    "flint_library_version": PYTHON_FLINT_HNF_FLINT_VERSION,
+    "maximum_rows": 32,
+    "maximum_columns": 32,
+    "maximum_decimal_digits_per_entry": 256,
+    "representation": "zbasis",
+    "gram": "exact",
+    "delta_double": "0.99",
+    "eta_double": "0.51",
+    "relation": "L=T*A",
+}
 SYMPY_VERSION = "1.14.0"
 
 
@@ -812,6 +825,66 @@ def python_flint_hnf_provider_runtime(
                     "Python-FLINT is installed but its linked FLINT library does "
                     "not match the pinned "
                     f"{PYTHON_FLINT_HNF_FLINT_VERSION} HNF profile."
+                ),
+            )
+    return runtime
+
+
+def python_flint_lll_provider_runtime(
+    *,
+    refresh: bool = False,
+) -> CapabilityProviderRuntime:
+    """Identify the pinned Python-FLINT exact-gram LLL profile."""
+
+    runtime = python_distribution_provider_runtime(
+        "python-flint",
+        distribution_name="python-flint",
+        import_name="flint",
+        required_attributes=("fmpz", "fmpz_mat"),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT AND LGPL-3.0-or-later",
+        features=(
+            "exact-integer",
+            "dense-matrix",
+            "lll-reduction",
+            "left-transformation",
+        ),
+        configuration=PYTHON_FLINT_LLL_CONFIGURATION,
+        refresh=refresh,
+    )
+    if (
+        runtime.availability is CapabilityProviderAvailability.AVAILABLE
+        and runtime.version != PYTHON_FLINT_VERSION
+    ):
+        return _unavailable_runtime(
+            provider="python-flint",
+            install_tier=CapabilityInstallTier.T1,
+            license_id="MIT AND LGPL-3.0-or-later",
+            diagnostic=(
+                "Python-FLINT is installed but does not match the pinned "
+                f"{PYTHON_FLINT_VERSION} LLL profile."
+            ),
+        )
+    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+        try:
+            flint = importlib.import_module("flint")
+        except (ImportError, OSError):
+            return _unavailable_runtime(
+                provider="python-flint",
+                install_tier=CapabilityInstallTier.T1,
+                license_id="MIT AND LGPL-3.0-or-later",
+                diagnostic="The pinned Python-FLINT LLL runtime cannot be imported.",
+            )
+        if getattr(flint, "__FLINT_VERSION__", None) != (
+            PYTHON_FLINT_HNF_FLINT_VERSION
+        ):
+            return _unavailable_runtime(
+                provider="python-flint",
+                install_tier=CapabilityInstallTier.T1,
+                license_id="MIT AND LGPL-3.0-or-later",
+                diagnostic=(
+                    "Python-FLINT is installed but its linked FLINT library does "
+                    "not match the pinned LLL profile."
                 ),
             )
     return runtime

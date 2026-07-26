@@ -1,0 +1,160 @@
+"""Bounded exact lattice-basis reduction."""
+
+from __future__ import annotations
+
+import sys
+
+from pydantic import ValidationError
+
+from jacobian.bounded_process import run_bounded_process
+from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.contracts.capabilities import (
+    CapabilityDiagnostic,
+    CapabilityProviderAvailability,
+)
+from jacobian.contracts.matrix_operations import (
+    IntegerMatrix,
+    LatticeReductionRequest,
+    LatticeReductionResult,
+)
+from jacobian.contracts.results import ExecutionStatus
+from jacobian.operations import (
+    ComputedOperation,
+    ComputedOutcome,
+    ComputedSuccess,
+    OperationExecutionFailure,
+)
+from jacobian.provider_runtime import python_flint_lll_provider_runtime
+
+from .lll_worker import PROTOCOL
+
+STDOUT_LIMIT = 1_000_000
+STDERR_LIMIT = 64_000
+LATTICE_RUNTIME = python_flint_lll_provider_runtime()
+
+
+def _failure(
+    status: ExecutionStatus,
+    code: str,
+    message: str,
+) -> OperationExecutionFailure:
+    return OperationExecutionFailure(
+        status=status,
+        diagnostic=CapabilityDiagnostic(
+            code=code,
+            stage="lattice_reduction",
+            message=message,
+            hint=(
+                "Install the pinned Python-FLINT LLL provider or reduce the "
+                "matrix size, scalar size, or requested wall budget."
+            ),
+        ),
+    )
+
+
+def reduce_lattice_basis(
+    request: LatticeReductionRequest,
+) -> ComputedOutcome[LatticeReductionResult]:
+    if (
+        LATTICE_RUNTIME.availability is not CapabilityProviderAvailability.AVAILABLE
+        or python_flint_lll_provider_runtime(refresh=True) != LATTICE_RUNTIME
+    ):
+        return _failure(
+            ExecutionStatus.ERROR,
+            "FLINT_LLL_PROVIDER_UNAVAILABLE",
+            "The pinned Python-FLINT exact-gram LLL provider is unavailable.",
+        )
+    try:
+        completed = run_bounded_process(
+            [
+                sys.executable,
+                "-I",
+                "-m",
+                "jacobian.domains.matrix_lattice.lll_worker",
+            ],
+            input_bytes=canonicalize_json(
+                {
+                    "protocol": PROTOCOL,
+                    "basis": request.basis.model_dump(mode="json"),
+                }
+            ),
+            timeout_seconds=float(request.resource_budget.wall_seconds),
+            environment={
+                "LANG": "C",
+                "LC_ALL": "C",
+                "TZ": "UTC",
+                "PYTHONHASHSEED": "0",
+            },
+            stdout_limit=STDOUT_LIMIT,
+            stderr_limit=STDERR_LIMIT,
+        )
+    except OSError:
+        return _failure(
+            ExecutionStatus.ERROR,
+            "FLINT_LLL_WORKER_START_FAILED",
+            "The isolated Python-FLINT LLL worker could not be started.",
+        )
+    if completed.timed_out:
+        return _failure(
+            ExecutionStatus.TIMEOUT,
+            "FLINT_LLL_TIMEOUT",
+            "The LLL wall-clock budget expired; no reduced basis was retained.",
+        )
+    if completed.stdout_exceeded or completed.stderr_exceeded:
+        return _failure(
+            ExecutionStatus.ERROR,
+            "FLINT_LLL_OUTPUT_LIMIT_EXCEEDED",
+            "The isolated LLL worker exceeded its bounded output protocol.",
+        )
+    if completed.returncode != 0:
+        return _failure(
+            ExecutionStatus.ERROR,
+            "FLINT_LLL_WORKER_FAILED",
+            "The isolated Python-FLINT LLL worker did not complete successfully.",
+        )
+    try:
+        output = loads_strict_json(completed.stdout)
+        if not isinstance(output, dict) or set(output) != {
+            "protocol",
+            "rank",
+            "reduced_basis",
+            "transformation",
+        }:
+            raise ValueError("LLL worker response has unexpected fields")
+        if output["protocol"] != PROTOCOL:
+            raise ValueError("LLL worker protocol does not match")
+        result = LatticeReductionResult(
+            reduced_basis=IntegerMatrix(entries=output["reduced_basis"]),
+            transformation=IntegerMatrix(entries=output["transformation"]),
+            rank=output["rank"],
+        )
+    except (TypeError, ValueError, ValidationError):
+        return _failure(
+            ExecutionStatus.ERROR,
+            "FLINT_LLL_PROTOCOL_INVALID",
+            "The LLL worker returned a result outside the bounded exact contract.",
+        )
+    if python_flint_lll_provider_runtime(refresh=True) != LATTICE_RUNTIME:
+        return _failure(
+            ExecutionStatus.ERROR,
+            "FLINT_LLL_PROVIDER_CHANGED",
+            "The Python-FLINT runtime changed during LLL execution.",
+        )
+    return ComputedSuccess(result)
+
+
+LATTICE_CAPABILITIES = (
+    ComputedOperation(
+        capability_id="lattice.basis.reduce",
+        title="Reduce an exact integer lattice basis",
+        description=(
+            "Run bounded Python-FLINT exact-gram LLL and return the reduced row "
+            "basis with its exact left transformation."
+        ),
+        request_model=LatticeReductionRequest,
+        result_model=LatticeReductionResult,
+        implementation=reduce_lattice_basis,
+        relation_id="lattice.relation.reduced-basis-of",
+        tags=("lattice", "lll", "exact-integer", "bounded", "python-flint"),
+    ),
+)

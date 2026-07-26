@@ -11,6 +11,9 @@ from jacobian.domains.graph_optimization.chromatic_number import (
 from jacobian.domains.graph_optimization.finite_optimization import (
     FINITE_GRAPH_OPTIMIZATION_CAPABILITIES,
 )
+from jacobian.domains.graph_optimization.invariants import (
+    BOUNDED_GRAPH_INVARIANT_CAPABILITIES,
+)
 from jacobian.operations import (
     DomainBundle,
     DomainDiagnostics,
@@ -44,6 +47,8 @@ GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
                     "nonempty connected acyclic; empty source has optimum zero"
                 ),
                 "induced_bipartite": "empty induced graph allowed",
+                "clique_number": "maximum complete vertex subset",
+                "independence_number": "maximum edge-free vertex subset",
             },
             "timeout_or_cancellation": (
                 "UNKNOWN partial result with preserved bounds and tested obligations"
@@ -63,6 +68,7 @@ GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
     capabilities=(
         CHROMATIC_NUMBER_CAPABILITY,
         *FINITE_GRAPH_OPTIMIZATION_CAPABILITIES,
+        *BOUNDED_GRAPH_INVARIANT_CAPABILITIES,
     ),
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(

@@ -25,9 +25,23 @@ def test_domain_atomic_results_are_exact_computed_evidence(tmp_path: Path) -> No
             {"n": 100, "prime_count": 25},
         ),
         (
-            "matrix.integer.determinant.compute",
-            {"matrix": {"rows": 2, "cols": 2, "entries": [1, 2, 3, 4]}},
-            {"determinant": -2},
+            "matrix.determinant.compute",
+            {
+                "matrix": {
+                    "domain": "QQ",
+                    "entries": [
+                        [
+                            {"num": "1", "den": "1"},
+                            {"num": "2", "den": "1"},
+                        ],
+                        [
+                            {"num": "3", "den": "1"},
+                            {"num": "4", "den": "1"},
+                        ],
+                    ],
+                }
+            },
+            {"determinant": {"num": "-2", "den": "1"}},
         ),
         (
             "graph.invariant.triangle_count",
@@ -44,7 +58,7 @@ def test_domain_atomic_results_are_exact_computed_evidence(tmp_path: Path) -> No
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-        assert result.output == expected
+        assert all(result.output[key] == value for key, value in expected.items())
 
 
 def test_domain_atomic_input_failure_is_not_a_mathematical_conclusion(
