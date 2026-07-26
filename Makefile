@@ -26,6 +26,9 @@ lint: ## Check lint, formatting, and dependency declarations.
 	$(UV_RUN) deptry .
 	$(UV_RUN) vulture src tests --min-confidence=80
 
+security-audit: ## Audit dependencies for known vulnerabilities.
+	$(UV_RUN) pip-audit
+
 typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
 

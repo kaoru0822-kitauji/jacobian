@@ -32,6 +32,7 @@ dev = [
     "deptry>=0.21,<1",
     "hypothesis>=6.130,<7",
     "mypy>=1.15,<3",
+    "pip-audit>=2.9,<3",
     "pre-commit>=4.4,<5",
     "pyperf>=2.9,<3",
     "pytest>=8.3,<10",
