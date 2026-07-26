@@ -25,17 +25,19 @@ make test-fast
 
 `make test-fast` is the short non-integration feedback loop. Run `make check`
 before pushing; it performs lint, formatting, dependency, type, fast tests,
-and package-build checks. CI owns the full Python matrix, integration,
-end-to-end, coverage, and real-Lean validation. `make validate` remains
-available for exhaustive local validation. Run `make help` for focused
-commands. The measured costs and reasoning behind these lanes are recorded in
-the [test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
+and package-build checks. Push after that check and let CI own the full Python
+matrix, integration, end-to-end, coverage, and real-Lean validation.
+`make validate-full` is only for reproducing exhaustive CI validation locally
+when CI is unavailable or an environment-specific failure requires it. Run
+`make help` for focused commands. The measured costs and reasoning behind
+these lanes are recorded in the
+[test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
 Tests can be narrowed without learning another wrapper:
 
 ```sh
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
-make test-lean
+make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
 make refresh-test-durations
 make refresh-lean-test-durations
 ```
@@ -51,7 +53,8 @@ source-build failure from `uv sync --dev`.
 Use focused tests while implementing. Run `make check` before pushing and wait
 for green CI checks before merge. Run complete local validation only
 when changing CI itself, debugging an environment-specific failure, or when CI
-is unavailable. Report only checks that actually ran.
+is unavailable; use `make validate-full` for that exceptional path. Report only
+checks that actually ran.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 
@@ -66,7 +69,9 @@ of the normal xdist pool because Mathlib processes can retain several
 gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
 dedicated pair of serial lanes on separate runners.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
-and `make check` before pushing. Use
+and `make check` before pushing. Use `make test-lean TESTS=path/to/test.py` for
+a deliberately focused local Lean reproduction, or dispatch the remote Lean
+debug workflow from GitHub Actions when local Lean is impractical. Use
 `make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
 Do not use unfiltered `uv run pytest` as the normal complete-suite command
 because it mixes Lean into the general xdist pool.

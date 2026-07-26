@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_lean=false
+classification=isolated
+
+if (( $# == 0 )); then
+  run_lean=true
+  classification=full
+else
+  for path in "$@"; do
+    case "$path" in
+      docs/*|*.md|.github/ISSUE_TEMPLATE/*|.github/CODEOWNERS|npm/*)
+        ;;
+      *)
+        run_lean=true
+        classification=full
+        break
+        ;;
+    esac
+  done
+fi
+
+printf 'run-lean=%s\nclassification=%s\n' "$run_lean" "$classification"

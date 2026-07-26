@@ -9,12 +9,13 @@
 
 ```sh
 make setup
-make validate
+make check
 ```
 
 ## Trust & Compatibility Impact
 <!-- Does this change affect the verification kernel, checker registry, artifact format, or public API? -->
 
 ## Checklist
-- [ ] Python validation passes locally (`make validate`)
+- [ ] Routine local validation passes (`make check`)
+- [ ] Relevant focused tests are listed above
 - [ ] Relevant documentation updated

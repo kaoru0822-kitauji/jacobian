@@ -11,6 +11,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  plan:
+    name: Plan CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run-lean: ${{ steps.classify.outputs.run-lean }}
+      classification: ${{ steps.classify.outputs.classification }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: classify
+        name: Classify changed paths
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            mapfile -d '' changed_paths < <(
+              git diff --name-only -z "$BASE_SHA" "$HEAD_SHA"
+            )
+            plan_output=$(
+              .github/scripts/classify-ci-paths "${changed_paths[@]}"
+            )
+          else
+            plan_output=$'run-lean=true\nclassification=full'
+          fi
+
+          printf '%s\n' "$plan_output" >> "$GITHUB_OUTPUT"
+          run_lean=$(sed -n 's/^run-lean=//p' <<< "$plan_output")
+          classification=$(sed -n 's/^classification=//p' <<< "$plan_output")
+          {
+            echo "## CI plan"
+            echo ""
+            echo "- Classification: \`$classification\`"
+            echo "- Run real Lean validation: \`$run_lean\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
@@ -130,6 +170,8 @@ jobs:
 
   lean-test-shards:
     name: Lean Tests (${{ matrix.lane }})
+    needs: plan
+    if: needs.plan.outputs.run-lean == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -138,25 +180,17 @@ jobs:
         lane: [1, 2]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1
-        with:
-          lake-package-directory: lean
-          use-mathlib-cache: true
-          test: false
-          lint: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            pyproject.toml
-            uv.lock
-      - run: uv sync --frozen --dev
-      - run: lake build repl
-        working-directory: lean
-      - run: make test-lean
+      - name: Prepare Lean test environment
+        uses: ./.github/actions/setup-lean
+      - name: Run Lean tests
+        run: |
+          started=$SECONDS
+          set +e
+          make test-lean
+          status=$?
+          set -e
+          echo "| Selected Lean tests | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
         env:
           PYTEST_ARGS: >-
             --splits 2 --group ${{ matrix.lane }}
@@ -167,14 +201,20 @@ jobs:
   lean-test:
     name: Lean Tests
     if: always()
-    needs: lean-test-shards
+    needs: [plan, lean-test-shards]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require every Lean shard
+      - name: Require planned Lean validation
         env:
+          RUN_LEAN: ${{ needs.plan.outputs.run-lean }}
           SHARD_RESULT: ${{ needs.lean-test-shards.result }}
-        run: test "$SHARD_RESULT" = "success"
+        run: |
+          if [ "$RUN_LEAN" = "true" ]; then
+            test "$SHARD_RESULT" = "success"
+          else
+            test "$SHARD_RESULT" = "skipped"
+          fi
 
   coverage:
     name: Coverage
@@ -297,27 +337,3 @@ jobs:
         with:
           name: build-timing
           path: build-timing.log
-
-  release-please:
-    name: Release Please
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: write
-      contents: write
-      issues: write
-      pull-requests: write
-    if: github.ref == 'refs/heads/main'
-    needs: [lint, validate-agents-md, security-audit, test, lean-test, coverage, duplicate-code, npm-package, build]
-    steps:
-      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
-        id: release
-      - name: Dispatch release publishing
-        if: steps.release.outputs.release_created == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        run: >-
-          gh workflow run release.yml
-          --ref "$RELEASE_TAG"
-          --field tag="$RELEASE_TAG"

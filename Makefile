@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed test-durations refresh-test-durations refresh-lean-test-durations build check validate agent-eval
+.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed test-durations refresh-test-durations refresh-lean-test-durations build check validate-full agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -39,8 +39,8 @@ test-fast: ## Run the sequential non-integration feedback loop.
 	$(UV_RUN) pytest -n 0 -m "not integration and not end_to_end and not lean_runtime" \
 		tests/unit tests/contract tests/checkers tests/reference $(PYTEST_ARGS)
 
-test-lean: ## Run pinned Lean integration tests serially.
-	$(UV_RUN) pytest -n 0 -m lean_runtime $(PYTEST_ARGS)
+test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_ARGS=....
+	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_ARGS)
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
@@ -74,7 +74,7 @@ build: ## Build Python source and wheel distributions.
 
 check: lint typecheck test-fast build ## Run the routine local pre-push checks.
 
-validate: lint typecheck test test-lean build ## Run complete local validation.
+validate-full: lint typecheck test test-lean build ## Reproduce exhaustive CI validation locally (slow and exceptional).
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

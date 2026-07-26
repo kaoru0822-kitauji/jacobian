@@ -59,15 +59,26 @@ make test-fast
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test
 make test-lean
-make validate
+make validate-full
 ```
 
 `make test-fast` is the normal edit loop. Use focused integration tests while
 changing stores, adapters, plugins, subprocesses, or checker execution.
 `make test` runs the complete non-Lean suite, and `make test-lean` keeps the
-memory-heavy backend serial. `make validate` is the final local gate. Do not
-use unfiltered `uv run pytest` as the default handoff command because it mixes
-Lean into the general parallel pool.
+memory-heavy backend serial. Neither is a routine pre-push requirement:
+`make check` is the local handoff gate, and CI owns exhaustive validation.
+`make validate-full` exists only to reproduce that exhaustive validation when
+CI is unavailable or an environment-specific failure requires it. Do not use
+unfiltered `uv run pytest` as the default handoff command because it mixes Lean
+into the general parallel pool.
+
+Recent CI phase timing supports retaining two independent Lean shards. On both
+lanes, Lean toolchain and Mathlib cache setup took about 83 to 85 seconds,
+`lake build repl` took 11 to 12 seconds, and selected tests took 66 to 71
+seconds. Sharing Jacobian's build output would serialize both shards behind a
+new preparation job to avoid only the small build phase, so CI keeps the build
+local to each parallel lane. The workflow records these phases for future
+decisions.
 
 Refresh CI timings after a material suite expansion or when shard runtimes
 diverge:

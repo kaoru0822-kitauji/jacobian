@@ -193,7 +193,7 @@ uv run python benchmarks/agent_mcp.py
 Raw transcripts, isolated Jacobian state, reports, structured agent feedback,
 and scores are written to the ignored `benchmarks/results/` directory.
 Model-in-the-loop evaluations are local, optional, and never part of
-`make test-fast`, `make test`, `make validate`, or CI. Preview a selected
+`make test-fast`, `make test`, `make validate-full`, or CI. Preview a selected
 paired evaluation without executing a model:
 
 ```sh
