@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import queue
@@ -21,6 +22,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -41,14 +43,17 @@ from jacobian.contracts.lean_exploration import (
     LeanPremiseRetrievalArtifact,
     LeanPremiseRetrievalOutput,
     LeanPremiseRetrievalRequest,
+    LeanProofStateArtifact,
     LeanProofStateOutput,
     LeanProofStateRequest,
     LeanProofStateTransitionArtifact,
+    LeanProofSuccessorState,
+    LeanTacticDiagnostic,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.references import LeanCheckerInstallation
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.store import ArtifactStore, StoreError
 
 _FORBIDDEN = re.compile(
     r"\b(?:admit|axiom|elab|import|macro|native_decide|opaque|run_tac|"
@@ -122,6 +127,33 @@ class PersistentLeanRepl:
             )
             self._requests += 1
             return command_response, tactic_response
+
+    def execute_validated(
+        self,
+        *,
+        command: str,
+        tactic: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        """Reconstruct, inspect, then advance one state in this process."""
+
+        with self._lock:
+            self._ensure_process()
+            command_request: dict[str, Any] = {"cmd": command}
+            if self._base_env is not None:
+                command_request["env"] = self._base_env
+            command_response = self._exchange(command_request)
+            proof_state = _single_proof_state(command_response)
+            validation_response = self._exchange(
+                {"tactic": "skip", "proofState": proof_state}
+            )
+            validated_state = validation_response.get("proofState")
+            if not isinstance(validated_state, int):
+                raise RuntimeError("Lean REPL did not return the validated proof state")
+            tactic_response = self._exchange(
+                {"tactic": tactic, "proofState": validated_state}
+            )
+            self._requests += 1
+            return command_response, validation_response, tactic_response
 
     def close(self) -> None:
         """Stop the process and discard all retained snapshots."""
@@ -322,6 +354,21 @@ class LeanExplorationReplRuntime:
                 self._sessions[environment] = session
             return session.execute(command=command, tactic=tactic)
 
+    def execute_clean(
+        self,
+        *,
+        command: str,
+        tactic: str,
+        environment: LeanEnvironment,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        """Replay and apply in a new process that is always discarded."""
+
+        session = self._create_session(environment)
+        try:
+            return session.execute_validated(command=command, tactic=tactic)
+        finally:
+            session.close()
+
     def close(self) -> None:
         """Stop every exploration process without affecting independent checkers."""
 
@@ -376,6 +423,7 @@ def _close_repls(
 @dataclass(frozen=True, slots=True)
 class LeanExplorationInstallation:
     semantics_uri: str
+    state_schema_uri: str
     transition_schema_uri: str
     retrieval_schema_uri: str
 
@@ -385,6 +433,7 @@ class _Resources:
     store: ArtifactStore
     artifacts: ArtifactService
     semantics_uri: str
+    state_schema_uri: str
     transition_schema_uri: str
     retrieval_schema_uri: str
     installations: Mapping[LeanEnvironment, LeanCheckerInstallation]
@@ -413,17 +462,24 @@ def install_lean_exploration_capabilities(
         version="1",
         definition={
             "description": (
-                "exploratory Lean proof-state transitions and premise suggestions"
+                "immutable replayable Lean proof states, one-step tactic "
+                "transitions, and premise suggestions"
             ),
             "lean_version": core.lean_version,
             "lean_commit": core.lean_commit,
             "mathlib_commit": mathlib.mathlib_commit,
+            "state_expiry": "immutable artifacts do not expire",
             "verification": "none; completed source must pass lean.check",
         },
     )
+    state_schema_uri = schemas.register(
+        name="jacobian.lean4-proof-state",
+        version="1",
+        schema=LeanProofStateArtifact.model_json_schema(),
+    )
     transition_schema_uri = schemas.register(
         name="jacobian.lean4-proof-state-transition",
-        version="1",
+        version="2",
         schema=LeanProofStateTransitionArtifact.model_json_schema(),
     )
     retrieval_schema_uri = schemas.register(
@@ -437,6 +493,7 @@ def install_lean_exploration_capabilities(
         store=store,
         artifacts=artifacts,
         semantics_uri=semantics_uri,
+        state_schema_uri=state_schema_uri,
         transition_schema_uri=transition_schema_uri,
         retrieval_schema_uri=retrieval_schema_uri,
         installations=installations,
@@ -451,6 +508,7 @@ def install_lean_exploration_capabilities(
         ),
         LeanExplorationInstallation(
             semantics_uri=semantics_uri,
+            state_schema_uri=state_schema_uri,
             transition_schema_uri=transition_schema_uri,
             retrieval_schema_uri=retrieval_schema_uri,
         ),
@@ -462,11 +520,12 @@ class LeanProofStateAdapter:
         self.resources = resources
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.proof_state.apply_tactic",
-            version="1",
-            title="Apply one Lean tactic",
+            version="2",
+            title="Apply one Lean tactic to a replayable proof state",
             description=(
-                "Replay an explicit proof prefix, apply one tactic, and expose the "
-                "resulting Lean goals or a structured rejection."
+                "Reconstruct and validate an immutable proof state in a clean "
+                "Lean process, apply one tactic, and return every durable "
+                "successor state or structured rejection diagnostics."
             ),
             provider="jacobian.lean4",
             provider_runtime=resources.provider_runtime,
@@ -483,10 +542,13 @@ class LeanProofStateAdapter:
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         try:
             validated = LeanProofStateRequest.model_validate(request.input)
-            _validate_source_parts(
-                validated.statement,
-                (*validated.proof_prefix, validated.tactic),
-            )
+            if validated.statement is not None:
+                _validate_source_parts(
+                    validated.statement,
+                    (*validated.proof_prefix, validated.tactic),
+                )
+            else:
+                _validate_source_parts("True", (validated.tactic,))
         except (ValidationError, ValueError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
@@ -501,55 +563,178 @@ class LeanProofStateAdapter:
             ) from exc
         started = time.monotonic()
         installation = self.resources.installations[validated.environment]
-        command = _proof_state_command(
-            statement=validated.statement,
-            proof_prefix=validated.proof_prefix,
+        environment_digest = _environment_digest(
+            validated.environment,
+            installation,
         )
-        responses = _run_repl(
-            self.resources,
+        if validated.state_uri is None:
+            assert validated.statement is not None
+            statement = validated.statement
+            proof_prefix = validated.proof_prefix
+            bound_state = None
+        else:
+            bound_state = self._load_bound_state(
+                validated.state_uri,
+                expected_environment=validated.environment,
+                expected_environment_digest=environment_digest,
+            )
+            if bound_state.completed:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="LEAN_PROOF_STATE_COMPLETED",
+                        stage="state_validation",
+                        message="The supplied proof state has no remaining goals.",
+                        hint=(
+                            "Send the complete statement and proof to lean.check; "
+                            "no further tactic transition is applicable."
+                        ),
+                    )
+                )
+            if len(bound_state.tactic_prefix) >= 64:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="LEAN_PROOF_STATE_PREFIX_LIMIT",
+                        stage="state_validation",
+                        message="The replayable proof state reached the 64-tactic limit.",
+                        hint=(
+                            "Submit a complete proof to lean.check or begin a new "
+                            "bounded exploration."
+                        ),
+                    )
+                )
+            statement = bound_state.statement
+            proof_prefix = bound_state.tactic_prefix
+            _validate_source_parts(statement, (*proof_prefix, validated.tactic))
+        command = _proof_state_command(
+            statement=statement,
+            proof_prefix=proof_prefix,
+        )
+        responses = self.resources.repl.execute_clean(
             command=command,
             tactic=validated.tactic,
             environment=validated.environment,
         )
-        command_response, tactic_response = responses
-        errors = (
+        command_response, validation_response, tactic_response = responses
+        reconstruction_errors = (
             *_response_errors(command_response),
-            *_response_errors(tactic_response),
+            *_response_errors(validation_response),
         )
-        if errors:
+        if reconstruction_errors:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
-                    code="LEAN_TACTIC_REJECTED",
-                    stage="tactic_application",
-                    message=f"Lean rejected the tactic transition: {errors[0][:500]}",
+                    code="LEAN_STATE_RECONSTRUCTION_FAILED",
+                    stage="state_reconstruction",
+                    message=(
+                        "Lean could not reconstruct the bound proof state: "
+                        f"{reconstruction_errors[0][:500]}"
+                    ),
                     hint=(
-                        "Inspect the current goals, revise the tactic or prefix, "
-                        "and retry. A rejection is not a mathematical conclusion."
+                        "Recreate the state from the current pinned environment; "
+                        "a reconstruction failure is not a proof conclusion."
                     ),
                 )
             )
-        goals_value = tactic_response.get("goals", [])
-        if not isinstance(goals_value, list) or any(
-            not isinstance(goal, str) for goal in goals_value
-        ):
-            raise RuntimeError("Lean REPL returned malformed goals")
-        goals = tuple(goals_value)
-        replay_source = "\n  ".join((*validated.proof_prefix, validated.tactic))
-        messages = tuple(
-            message
-            for response in responses
-            for message in _response_messages(response)
+        replayed_goals = _normalized_response_goals(validation_response)
+        if bound_state is not None and replayed_goals != bound_state.normalized_goals:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="STALE_LEAN_PROOF_STATE",
+                    stage="state_validation",
+                    message=(
+                        "The clean replay produced goals different from the "
+                        "state artifact."
+                    ),
+                    hint=(
+                        "Recreate the state under the current source and "
+                        "environment before applying another tactic."
+                    ),
+                )
+            )
+        if bound_state is None:
+            input_state_payload = _state_payload(
+                environment=validated.environment,
+                environment_digest=environment_digest,
+                statement=statement,
+                tactic_prefix=proof_prefix,
+                normalized_goals=replayed_goals,
+                installation=installation,
+            )
+            input_state_artifact = self.resources.artifacts.put(
+                schema_uri=self.resources.state_schema_uri,
+                semantics_uri=self.resources.semantics_uri,
+                payload=input_state_payload.model_dump(mode="json"),
+                summary="replayable immutable Lean proof state",
+            )
+            input_state_uri = input_state_artifact.artifact_uri
+            input_state = input_state_payload
+        else:
+            assert validated.state_uri is not None
+            input_state_uri = validated.state_uri
+            input_state = bound_state
+
+        tactic_errors = _response_errors(tactic_response)
+        accepted = not tactic_errors
+        diagnostics = _tactic_diagnostics(responses)
+        successor_states: tuple[LeanProofSuccessorState, ...] = ()
+        successor_artifact_uris: tuple[str, ...] = ()
+        goals: tuple[str, ...] = ()
+        completed = False
+        if accepted:
+            goals = _normalized_response_goals(tactic_response)
+            proof_status = tactic_response.get("proofStatus")
+            if (proof_status == "Completed") != (len(goals) == 0):
+                raise RuntimeError(
+                    "Lean REPL returned inconsistent completion and goals"
+                )
+            successor_payload = _state_payload(
+                environment=validated.environment,
+                environment_digest=environment_digest,
+                statement=statement,
+                tactic_prefix=(*proof_prefix, validated.tactic),
+                normalized_goals=goals,
+                installation=installation,
+            )
+            successor_artifact = self.resources.artifacts.put(
+                schema_uri=self.resources.state_schema_uri,
+                semantics_uri=self.resources.semantics_uri,
+                payload=successor_payload.model_dump(mode="json"),
+                parents=(input_state_uri,),
+                summary="successor immutable Lean proof state",
+            )
+            completed = successor_payload.completed
+            successor_states = (
+                LeanProofSuccessorState(
+                    state_uri=successor_artifact.artifact_uri,
+                    state_digest=successor_payload.state_digest,
+                    normalized_goals=goals,
+                    completed=completed,
+                ),
+            )
+            successor_artifact_uris = (successor_artifact.artifact_uri,)
+
+        replay_source = "\n  ".join((*proof_prefix, validated.tactic))
+        transition_source_digest = _source_digest(
+            statement,
+            (*proof_prefix, validated.tactic),
         )
+        messages = tuple(diagnostic.message for diagnostic in diagnostics)
         artifact_payload = LeanProofStateTransitionArtifact(
             environment=validated.environment,
-            statement=validated.statement,
-            proof_prefix=validated.proof_prefix,
+            environment_digest=environment_digest,
+            source_digest=transition_source_digest,
+            statement=statement,
+            proof_prefix=proof_prefix,
             tactic=validated.tactic,
+            input_state_uri=input_state_uri,
+            input_state_digest=input_state.state_digest,
             replay_source=replay_source,
             goals=goals,
             goal_count=len(goals),
-            completed=(tactic_response.get("proofStatus") == "Completed" and not goals),
+            successor_states=successor_states,
+            accepted=accepted,
+            completed=completed,
             messages=messages,
+            diagnostics=diagnostics,
             lean_version=installation.lean_version,
             lean_commit=installation.lean_commit,
             mathlib_commit=installation.mathlib_commit,
@@ -558,11 +743,21 @@ class LeanProofStateAdapter:
             schema_uri=self.resources.transition_schema_uri,
             semantics_uri=self.resources.semantics_uri,
             payload=artifact_payload.model_dump(mode="json"),
-            summary="replayable exploratory Lean proof-state transition",
+            parents=(input_state_uri, *successor_artifact_uris),
+            summary=(
+                "accepted replayable Lean tactic transition"
+                if accepted
+                else "rejected replayable Lean tactic transition"
+            ),
         )
         output = LeanProofStateOutput(
             **artifact_payload.model_dump(mode="python"),
             transition_uri=artifact.artifact_uri,
+        )
+        artifact_uris = (
+            input_state_uri,
+            *successor_artifact_uris,
+            artifact.artifact_uri,
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
@@ -571,30 +766,87 @@ class LeanProofStateAdapter:
             execution=Execution(
                 status=ExecutionStatus.COMPLETED,
                 runtime_ms=_runtime_ms(started),
+                detail=(
+                    None
+                    if accepted
+                    else "Lean rejected the tactic; no successor state was created"
+                ),
             ),
             output=output.model_dump(mode="json"),
             scope=CapabilityScope(
-                description="one tactic applied after one explicit Lean proof prefix",
+                description=(
+                    "one tactic applied after clean replay and state validation"
+                ),
                 parameters={
                     "environment": validated.environment.value,
-                    "statement": validated.statement,
+                    "statement": statement,
+                    "input_state_digest": input_state.state_digest,
+                    "environment_digest": environment_digest,
                 },
                 artifact_uri=artifact.artifact_uri,
             ),
             completeness=CapabilityCompleteness(
                 status=CapabilityCompletenessStatus.COMPLETE,
-                basis="Lean returned the complete successor-goal list for this step",
+                basis=(
+                    "Lean returned the complete successor-state list for this "
+                    "single tactic application"
+                ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
-                    "pinned Lean elaboration of one replayable tactic transition; "
-                    "this does not verify the theorem"
+                    "a clean pinned Lean process reconstructed the bound state "
+                    "and computed one transition; only lean.check can verify a "
+                    "completed theorem"
                 ),
             ),
-            artifact_uris=(artifact.artifact_uri,),
+            artifact_uris=artifact_uris,
         )
+
+    def _load_bound_state(
+        self,
+        state_uri: str,
+        *,
+        expected_environment: LeanEnvironment,
+        expected_environment_digest: str,
+    ) -> LeanProofStateArtifact:
+        try:
+            stored = self.resources.store.get(state_uri)
+            if (
+                stored.manifest.schema_uri != self.resources.state_schema_uri
+                or stored.manifest.semantics_uri != self.resources.semantics_uri
+            ):
+                raise ValueError("artifact is not a Lean proof state")
+            state = LeanProofStateArtifact.model_validate(stored.payload)
+        except (StoreError, ValidationError, ValueError) as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_LEAN_PROOF_STATE",
+                    stage="state_loading",
+                    message="The supplied state artifact is unavailable or invalid.",
+                    hint="Use a state URI returned by this capability.",
+                )
+            ) from exc
+        if (
+            state.environment is not expected_environment
+            or state.environment_digest != expected_environment_digest
+            or state.source_digest
+            != _source_digest(state.statement, state.tactic_prefix)
+            or state.state_digest != _state_digest_payload(state)
+        ):
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="STALE_LEAN_PROOF_STATE",
+                    stage="state_validation",
+                    message=(
+                        "The proof state no longer matches its source or the "
+                        "current pinned Lean environment."
+                    ),
+                    hint="Recreate the proof state under the current environment.",
+                )
+            )
+        return state
 
 
 class LeanPremiseRetrievalAdapter:
@@ -750,6 +1002,165 @@ def _validate_source_parts(statement: str, tactics: tuple[str, ...]) -> None:
 def _proof_state_command(*, statement: str, proof_prefix: tuple[str, ...]) -> str:
     proof = "\n".join(f"  {line}" for line in (*proof_prefix, "sorry"))
     return f"example : {statement} := by\n{proof}"
+
+
+def _digest(value: Any) -> str:
+    return "sha256:" + hashlib.sha256(canonicalize_json(value)).hexdigest()
+
+
+def _environment_imports(environment: LeanEnvironment) -> tuple[str, ...]:
+    return ("Mathlib",) if environment is LeanEnvironment.MATHLIB else ("Init",)
+
+
+def _environment_digest(
+    environment: LeanEnvironment,
+    installation: LeanCheckerInstallation,
+) -> str:
+    return _digest(
+        {
+            "environment": environment.value,
+            "imports": list(_environment_imports(environment)),
+            "lean_version": installation.lean_version,
+            "lean_commit": installation.lean_commit,
+            "mathlib_commit": installation.mathlib_commit,
+        }
+    )
+
+
+def _source_digest(statement: str, tactic_prefix: tuple[str, ...]) -> str:
+    return _digest(
+        {
+            "statement": statement,
+            "tactic_prefix": list(tactic_prefix),
+            "replay_command": _proof_state_command(
+                statement=statement,
+                proof_prefix=tactic_prefix,
+            ),
+        }
+    )
+
+
+def _state_digest_data(
+    *,
+    environment: LeanEnvironment,
+    environment_digest: str,
+    source_digest: str,
+    statement: str,
+    tactic_prefix: tuple[str, ...],
+    normalized_goals: tuple[str, ...],
+    completed: bool,
+    imports: tuple[str, ...],
+    lean_version: str,
+    lean_commit: str,
+    mathlib_commit: str | None,
+) -> dict[str, Any]:
+    return {
+        "environment": environment.value,
+        "environment_digest": environment_digest,
+        "source_digest": source_digest,
+        "statement": statement,
+        "tactic_prefix": list(tactic_prefix),
+        "normalized_goals": list(normalized_goals),
+        "completed": completed,
+        "imports": list(imports),
+        "lean_version": lean_version,
+        "lean_commit": lean_commit,
+        "mathlib_commit": mathlib_commit,
+    }
+
+
+def _state_payload(
+    *,
+    environment: LeanEnvironment,
+    environment_digest: str,
+    statement: str,
+    tactic_prefix: tuple[str, ...],
+    normalized_goals: tuple[str, ...],
+    installation: LeanCheckerInstallation,
+) -> LeanProofStateArtifact:
+    source_digest = _source_digest(statement, tactic_prefix)
+    imports = _environment_imports(environment)
+    completed = len(normalized_goals) == 0
+    digest_data = _state_digest_data(
+        environment=environment,
+        environment_digest=environment_digest,
+        source_digest=source_digest,
+        statement=statement,
+        tactic_prefix=tactic_prefix,
+        normalized_goals=normalized_goals,
+        completed=completed,
+        imports=imports,
+        lean_version=installation.lean_version,
+        lean_commit=installation.lean_commit,
+        mathlib_commit=installation.mathlib_commit,
+    )
+    return LeanProofStateArtifact(
+        **digest_data,
+        state_digest=_digest(digest_data),
+    )
+
+
+def _state_digest_payload(state: LeanProofStateArtifact) -> str:
+    return _digest(
+        _state_digest_data(
+            environment=state.environment,
+            environment_digest=state.environment_digest,
+            source_digest=state.source_digest,
+            statement=state.statement,
+            tactic_prefix=state.tactic_prefix,
+            normalized_goals=state.normalized_goals,
+            completed=state.completed,
+            imports=state.imports,
+            lean_version=state.lean_version,
+            lean_commit=state.lean_commit,
+            mathlib_commit=state.mathlib_commit,
+        )
+    )
+
+
+def _normalized_response_goals(response: Mapping[str, Any]) -> tuple[str, ...]:
+    goals_value = response.get("goals", [])
+    if not isinstance(goals_value, list) or any(
+        not isinstance(goal, str) for goal in goals_value
+    ):
+        raise RuntimeError("Lean REPL returned malformed goals")
+    return tuple(_normalize_goal(goal) for goal in goals_value)
+
+
+def _normalize_goal(goal: str) -> str:
+    lines = goal.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+    return "\n".join(line.rstrip() for line in lines).strip()
+
+
+def _tactic_diagnostics(
+    responses: tuple[dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> tuple[LeanTacticDiagnostic, ...]:
+    diagnostics: list[LeanTacticDiagnostic] = []
+    for response in responses:
+        message = response.get("message")
+        if isinstance(message, str):
+            diagnostics.append(LeanTacticDiagnostic(severity="ERROR", message=message))
+        structured = response.get("messages")
+        if not isinstance(structured, list):
+            continue
+        for item in structured:
+            if not isinstance(item, Mapping):
+                continue
+            data = item.get("data")
+            if not isinstance(data, str):
+                continue
+            raw_severity = item.get("severity")
+            severity = (
+                "ERROR"
+                if raw_severity == "error"
+                else ("WARNING" if raw_severity == "warning" else "INFO")
+            )
+            diagnostics.append(
+                LeanTacticDiagnostic.model_validate(
+                    {"severity": severity, "message": data}
+                )
+            )
+    return tuple(diagnostics)
 
 
 def _run_repl(
