@@ -46,6 +46,7 @@ from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
+from jacobian.workspaces import WorkspaceService
 
 
 class JacobianKernel:
@@ -62,6 +63,7 @@ class JacobianKernel:
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
         self.memory = ResearchMemory(self.store, self.schemas)
+        self.workspaces = WorkspaceService(self.store, self.schemas)
         self.plugins = PluginRegistry(self.store)
         self.checkers = CheckerRegistry(self.store.db_path)
         self.claims = ClaimValidationService(

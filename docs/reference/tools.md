@@ -6,13 +6,17 @@
 - Normative sources: [v0.2 specification](specifications/v0.2.md) and
   [conformance gate](conformance-v0.2.md)
 
-Jacobian exposes mathematical operations as namespaced capabilities. The
-model-facing MCP surface is deliberately small:
+Jacobian exposes mathematical operations as namespaced capabilities and
+operational working state through three direct workspace tools. The
+model-facing MCP surface contains five tools:
 
 | MCP tool | Purpose |
 | --- | --- |
 | `capability.describe` | Read an installed capability's descriptor and exact input and output schemas. |
 | `capability.invoke` | Invoke an installed capability in `EXPLORE` or `VERIFY` mode. |
+| `workspace.open` | Create one durable agent workspace, canonical problem card, pinned `main` branch, and immutable initial revision. |
+| `workspace.write` | Append scratch, findings, attempts, lifecycle marks, and focus against an exact base revision. |
+| `workspace.query` | Read a deterministic `RESUME`, `FRONTIER`, `ATTEMPTS`, `CONTEXT`, or `STALE` view. |
 
 Read `capability://catalog` to discover installed capability IDs, provider
 versions, supported modes, compact schemas, and tags. Catalog membership means
@@ -22,7 +26,49 @@ support, recommendation, conformance coverage, or authority to return
 
 There are no alternate MCP tool profiles and no public top-level MCP commands
 for individual mathematical operations. Adding a capability does not add a
-new MCP tool.
+new MCP tool. Workspace tools are an explicit operational-state exception:
+successful persistence has no mathematical assurance level.
+
+## Epistemic workspace
+
+`workspace.open` creates exactly one canonical problem card. Only
+`workspace.open` may create that card. Every later mutation carries an
+idempotency key; `workspace.write` advances the branch only when
+`base_revision` is still its current head. Full accepted batches are available
+through the returned immutable `revision_artifact_uri`.
+
+Within a write, entries use unique `client_ref` values. Findings record a
+`kind`, `title`, `body`, and optional explicit dependency or assumption
+references. Attempts record a target, method, operational outcome, and summary.
+`OPEN_GOAL` normalizes to `GOAL`; `SUCCEEDED` normalizes to `COMPLETED`.
+Completion never means `VERIFIED` and never closes a goal automatically.
+
+Append-only margin marks record paper-like lifecycle state:
+
+- `ACTIVE` explicitly reopens or restores a card;
+- `CLOSED` closes a `GOAL` or `OPEN_QUESTION` as workflow state;
+- `RETRACTED` withdraws a card and invalidates explicit dependents;
+- `SUPERSEDED` names a replacement and invalidates old dependents;
+- `ARCHIVED` files a card without invalidating dependents.
+
+Every mark requires `reason`; the unambiguous `summary` input alias normalizes
+to it. A `RETRACTED` or `SUPERSEDED` card must be explicitly restored with
+`ACTIVE` before `CLOSED` or `ARCHIVED` can clear its invalidating state.
+Supersession does not prove equivalence or reconnect dependents.
+
+Workspace drafts cannot set `verification`, `assertion`, or derived `stale`.
+Findings, attempts, marks, focus, and retrieval remain `AGENT_RECORDED` and
+`UNVERIFIED`. Stale warnings follow only current `RETRACTED` or `SUPERSEDED`
+roots through explicit dependency and assumption links; absence of a warning
+says nothing about truth or semantic completeness.
+
+`workspace.query` optionally accepts an exact expected `revision_id`.
+`CONTEXT` additionally requires `target_card_id` and returns a bounded,
+dependency-first closure plus recent target attempts. It reports
+`total_dependency_count` and `truncated`; it does not infer relevance or
+missing premises. Active stale goals remain visible until an explicit
+`CLOSED`, `ARCHIVED`, `RETRACTED`, or `SUPERSEDED` mark changes their workflow
+state.
 
 ## Capability contract
 
