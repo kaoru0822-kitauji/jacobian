@@ -40,8 +40,9 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(tmp_path: Path) -> N
 
     assert result.output["accepted"] is True
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.assurance.verification_record_uri == (
-        result.output["verification_record_uri"]
+    assert (
+        result.assurance.verification_record_uri
+        == (result.output["verification_record_uri"])
     )
     assert result.output["proof_edit_uri"] in result.artifact_uris
     edit = kernel.store.get(result.output["proof_edit_uri"])

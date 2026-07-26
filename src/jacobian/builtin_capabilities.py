@@ -384,8 +384,7 @@ class LeanDependencyGraphAdapter:
             semantics_uri=self.semantics_uri,
             payload=graph.model_dump(mode="json"),
             summary=(
-                "bounded Lean dependency subgraph rooted at "
-                f"{query.root_declaration}"
+                f"bounded Lean dependency subgraph rooted at {query.root_declaration}"
             ),
         )
         output = LeanDependencyGraphOutput(

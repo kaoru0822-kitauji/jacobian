@@ -224,9 +224,7 @@ class LeanDependencyGraphArtifact(ContractModel):
             raise ValueError("dependency frontier names must be unique")
         if any(name not in depths for name in self.frontier):
             raise ValueError("dependency frontier must refer to returned nodes")
-        if self.closure_complete and (
-            self.node_budget_exhausted or self.frontier
-        ):
+        if self.closure_complete and (self.node_budget_exhausted or self.frontier):
             raise ValueError("a complete dependency closure cannot have a frontier")
         return self
 

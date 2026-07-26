@@ -77,15 +77,16 @@ def install_geometry_checker(
 
     missing = set(_OPERATION_MODELS) - geometry.result_schema_uris.keys()
     if missing:
-        raise ValueError(f"geometry bundle lacks verifiable operations: {sorted(missing)}")
+        raise ValueError(
+            f"geometry bundle lacks verifiable operations: {sorted(missing)}"
+        )
     witness_schema_uri = schemas.register_model(
         name="jacobian.witness-envelope",
         version="1",
         model=WitnessEnvelope,
     )
     result_schema_uris = tuple(
-        geometry.result_schema_uris[operation_id]
-        for operation_id in _OPERATION_MODELS
+        geometry.result_schema_uris[operation_id] for operation_id in _OPERATION_MODELS
     )
     claim_schema_uris = tuple(
         dict.fromkeys(
@@ -229,9 +230,7 @@ class GeometryResultVerificationAdapter:
             and checked.assurance.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
-        status: Literal[
-            "VERIFIED_RESULT", "REJECTED", "TIMEOUT", "CANCELLED", "ERROR"
-        ]
+        status: Literal["VERIFIED_RESULT", "REJECTED", "TIMEOUT", "CANCELLED", "ERROR"]
         if verified:
             status = "VERIFIED_RESULT"
         elif checked.execution.status is ExecutionStatus.COMPLETED:

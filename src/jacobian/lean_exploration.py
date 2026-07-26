@@ -129,7 +129,9 @@ class PersistentLeanRepl:
             if pickle_path is not None and not _response_errors(tactic_response):
                 successor = tactic_response.get("proofState")
                 if not isinstance(successor, int):
-                    raise RuntimeError("Lean REPL did not return a successor proof state")
+                    raise RuntimeError(
+                        "Lean REPL did not return a successor proof state"
+                    )
                 pickled = self._exchange(
                     {"proofState": successor, "pickleTo": str(pickle_path)}
                 )
@@ -711,8 +713,7 @@ class LeanPremiseRetrievalAdapter:
                 tactic=suggestion,
                 declaration_names=tuple(sorted(set(_DECLARATION.findall(suggestion)))),
                 tactic_replayed=(
-                    index == 1
-                    and tactic_response.get("proofStatus") == "Completed"
+                    index == 1 and tactic_response.get("proofStatus") == "Completed"
                 ),
             )
             for index, suggestion in enumerate(suggestions, start=1)
@@ -836,13 +837,7 @@ def _extract_typed_goals(
     )
     environment = dict(os.environ)
     environment["JACOBIAN_LEAN_PROOF_STATE_QUERY"] = str(query_path)
-    helper = (
-        resources.runtime
-        / ".lake"
-        / "build"
-        / "bin"
-        / "jacobian_lean_proof_state"
-    )
+    helper = resources.runtime / ".lake" / "build" / "bin" / "jacobian_lean_proof_state"
     if not helper.is_file():
         raise RuntimeError(
             "the pinned typed proof-state helper is unavailable; "
@@ -890,7 +885,9 @@ def _extract_typed_goals(
             LeanTypedGoal.model_validate(goal) for goal in payload["typed_goals"]
         )
     except (KeyError, TypeError, ValidationError) as exc:
-        raise RuntimeError("Lean typed proof-state extraction returned invalid goals") from exc
+        raise RuntimeError(
+            "Lean typed proof-state extraction returned invalid goals"
+        ) from exc
 
 
 def _response_messages(response: Mapping[str, Any]) -> tuple[str, ...]:
