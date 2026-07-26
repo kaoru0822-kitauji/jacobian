@@ -66,7 +66,9 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
     relationship = result.relationships[0]
     assert relationship.status is CapabilityRelationshipStatus.VERIFIED
     assert relationship.verification_record_uri == record_uri
-    assert kernel.store.get(record_uri).payload["relation_id"] == relationship.relation_id
+    assert (
+        kernel.store.get(record_uri).payload["relation_id"] == relationship.relation_id
+    )
 
 
 @pytest.mark.integration
