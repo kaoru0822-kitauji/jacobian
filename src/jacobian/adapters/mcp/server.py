@@ -11,18 +11,38 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
 from mcp_types import ToolAnnotations
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, Field, StrictInt
 
 from jacobian import __version__
 from jacobian.contracts.capabilities import (
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
+)
+from jacobian.contracts.workspaces import (
+    WorkspaceAttemptDraft,
+    WorkspaceBranchId,
+    WorkspaceCardId,
+    WorkspaceFindingDraft,
+    WorkspaceFocusDraft,
+    WorkspaceId,
+    WorkspaceIdempotencyKey,
+    WorkspaceMarkDraft,
+    WorkspaceOpenRequest,
+    WorkspaceOpenResult,
+    WorkspaceQueryRequest,
+    WorkspaceQueryResult,
+    WorkspaceQueryView,
+    WorkspaceRevisionId,
+    WorkspaceScratchDraft,
+    WorkspaceTag,
+    WorkspaceWriteRequest,
+    WorkspaceWriteResult,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,13 +57,21 @@ if TYPE_CHECKING:
 
 SERVER_INSTRUCTIONS = (
     "Call capability.describe before the first invocation of an unfamiliar "
-    "capability; do not guess payload fields. Use EXPLORE for low-friction search "
-    "and VERIFY only when a durable checked conclusion is needed. Retrieved memory, "
-    "search, evaluation, and generated evidence are not proof. Only assurance level "
-    "VERIFIED with a local verification record is verified. Operational completion, "
+    "capability passed to capability.invoke; do not guess payload fields. Direct "
+    "workspace.* tools publish their input shape and enforce documented cross-field "
+    "invariants without capability discovery. Use EXPLORE for low-friction search and "
+    "VERIFY only when a durable checked conclusion is needed. Retrieved memory, "
+    "search, evaluation, generated evidence, workspace entries, and lifecycle marks "
+    "are not proof. Only assurance level VERIFIED with a local verification record is "
+    "verified. Writing, retrieving, closing, retracting, superseding, or pinning a "
+    "workspace entry never promotes mathematical assurance. Operational completion, "
     "failure to find a witness, and exhausted or bounded search are not mathematical "
     "conclusions. Follow returned artifact:// and experiment:// resources instead of "
     "requesting large payloads inline."
+)
+
+WORKSPACE_TOOL_NAMES = frozenset(
+    {"workspace.open", "workspace.write", "workspace.query"}
 )
 
 
@@ -63,6 +91,57 @@ def _tool_annotations(
         idempotent_hint=idempotent,
         open_world_hint=False,
     )
+
+
+def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
+    """Close SDK-generated argument models that otherwise ignore unknown fields."""
+
+    # MCP 2.0.0b2 creates flat function argument models with Pydantic's default
+    # ``extra="ignore"``. Workspace writes must reject the entire request instead of
+    # silently committing a partial batch when a caller misspells a top-level field.
+    manager = server._tool_manager
+    for tool_name in tool_names:
+        tool = manager.get_tool(tool_name)
+        if tool is None:  # pragma: no cover - registration invariant
+            raise RuntimeError(f"workspace tool was not registered: {tool_name}")
+        argument_model = tool.fn_metadata.arg_model
+        argument_model.model_config["extra"] = "forbid"
+        argument_model.model_rebuild(force=True)
+        tool.parameters = argument_model.model_json_schema(by_alias=True)
+
+
+def _publish_workspace_normalization_aliases(server: Any) -> None:
+    """Advertise exactly the input aliases normalized by workspace contracts."""
+
+    tool = server._tool_manager.get_tool("workspace.write")
+    if tool is None:  # pragma: no cover - registration invariant
+        raise RuntimeError("workspace tool was not registered: workspace.write")
+    schema = tool.parameters
+    definitions = schema["$defs"]
+    definitions["WorkspaceFindingKind"]["enum"].remove("PROBLEM")
+    definitions["WorkspaceFindingKind"]["enum"].append("OPEN_GOAL")
+    definitions["WorkspaceAttemptOutcome"]["enum"].append("SUCCEEDED")
+
+    mark_schema = definitions["WorkspaceMarkDraft"]
+    reason_schema = mark_schema["properties"]["reason"]
+    mark_schema["properties"]["summary"] = {
+        **reason_schema,
+        "title": "Summary",
+        "description": (
+            "Input alias for reason. Supplying both summary and reason is rejected."
+        ),
+    }
+    mark_schema["required"].remove("reason")
+    mark_schema["oneOf"] = [
+        {
+            "required": ["reason"],
+            "not": {"required": ["summary"]},
+        },
+        {
+            "required": ["summary"],
+            "not": {"required": ["reason"]},
+        },
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,15 +261,21 @@ def create_server(
         try:
             descriptor = descriptors[capability_id]
         except KeyError:
+            hint = (
+                "workspace.* names are direct MCP tools, not capability IDs; call the "
+                "workspace tool directly using its published input schema."
+                if capability_id.startswith("workspace.")
+                else (
+                    "Call capability.describe without a capability_id to list installed "
+                    "capabilities."
+                )
+            )
             return {
                 "error": {
                     "code": "UNKNOWN_CAPABILITY",
                     "stage": "capability_resolution",
                     "message": f"Unknown capability: {capability_id}",
-                    "hint": (
-                        "Call capability.describe without a capability_id to list "
-                        "installed capabilities."
-                    ),
+                    "hint": hint,
                     "available_capability_ids": sorted(descriptors),
                 }
             }
@@ -229,6 +314,228 @@ def create_server(
                 input=payload,
             ),
         )
+
+    @server.tool(
+        name="workspace.open",
+        description=(
+            "Direct tool; do not call capability.describe. Create a durable epistemic "
+            "workspace with one canonical problem, a main branch, and an immutable "
+            "initial revision. Workspace content is agent-authored and UNVERIFIED."
+        ),
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=False,
+    )
+    async def workspace_open(
+        idempotency_key: WorkspaceIdempotencyKey,
+        name: Annotated[str, Field(min_length=1, max_length=128)],
+        problem: Annotated[str, Field(min_length=1, max_length=16_384)],
+        tags: Annotated[
+            list[WorkspaceTag] | None,
+            Field(max_length=16),
+        ] = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> WorkspaceOpenResult:
+        active_kernel = _kernel(ctx)
+        return await asyncio.to_thread(
+            active_kernel.workspaces.open,
+            WorkspaceOpenRequest(
+                idempotency_key=idempotency_key,
+                name=name,
+                problem=problem,
+                tags=tuple(tags or ()),
+            ),
+        )
+
+    @server.tool(
+        name="workspace.write",
+        description=(
+            "Direct tool. Do not call capability.describe. Arguments are flat: send "
+            "base_revision (never revision_id) and top-level findings, attempts, marks, "
+            "scratch, or focus (never a batch wrapper). Every draft uses client_ref, "
+            "never ref. Append at an exact base revision. Finding fields are client_ref, "
+            "kind, title, body; optional links are dependency_refs and assumption_refs "
+            "(never depends_on_refs). Attempt fields are client_ref, target_ref, method, "
+            "outcome, summary. Margin marks append an explicit ACTIVE, CLOSED, "
+            "RETRACTED, SUPERSEDED, or ARCHIVED state; only SUPERSEDED carries "
+            "superseded_by_ref, and summary is accepted as an alias for reason. "
+            "References may use a client_ref from the same batch. OPEN_GOAL normalizes "
+            "to GOAL and SUCCEEDED normalizes to COMPLETED. PROBLEM is reserved for "
+            "workspace.open. A RETRACTED or SUPERSEDED card must receive an ACTIVE mark "
+            "before CLOSED or ARCHIVED. Set focus with active_ref/pinned_refs, clear it "
+            "with clear=true, or omit it; focus references finding cards, never "
+            "attempts, marks, or scratch. Never send verification/assertion/stale "
+            "fields: all workspace assertions remain AGENT_RECORDED and UNVERIFIED. "
+            "Canonical batch example: "
+            'findings=[{"client_ref":"C1","kind":"CLAIM","title":"...","body":"..."}], '
+            'attempts=[{"client_ref":"T1","target_ref":"C1","method":"...",'
+            '"outcome":"COMPLETED","summary":"..."}], '
+            'focus={"active_ref":"C1","pinned_refs":["C1"]}.'
+        ),
+        annotations=_tool_annotations(idempotent=True),
+        structured_output=False,
+    )
+    async def workspace_write(
+        workspace_id: Annotated[
+            WorkspaceId,
+            Field(description="workspace:// handle returned by workspace.open"),
+        ],
+        branch_id: Annotated[
+            WorkspaceBranchId,
+            Field(description="branch:// handle returned by workspace.open"),
+        ],
+        base_revision: Annotated[
+            WorkspaceRevisionId,
+            Field(
+                description=(
+                    "Exact current revision:// head returned by workspace.open, "
+                    "workspace.write, or workspace.query."
+                )
+            ),
+        ],
+        idempotency_key: Annotated[
+            WorkspaceIdempotencyKey,
+            Field(
+                description=(
+                    "Caller-chosen key unique to this exact write payload; reuse only "
+                    "to retry the identical request."
+                )
+            ),
+        ],
+        scratch: Annotated[
+            list[WorkspaceScratchDraft] | None,
+            Field(
+                max_length=64,
+                description="Optional unverified scratch entries to append.",
+            ),
+        ] = None,
+        findings: Annotated[
+            list[WorkspaceFindingDraft] | None,
+            Field(
+                max_length=64,
+                description="Optional typed, unverified cards to append.",
+                examples=[
+                    [
+                        {
+                            "client_ref": "C1",
+                            "kind": "CLAIM",
+                            "title": "Candidate conclusion",
+                            "body": "Agent-authored reasoning; still unverified.",
+                        }
+                    ]
+                ],
+            ),
+        ] = None,
+        attempts: Annotated[
+            list[WorkspaceAttemptDraft] | None,
+            Field(
+                max_length=64,
+                description="Optional unverified operational attempts to append.",
+                examples=[
+                    [
+                        {
+                            "client_ref": "T1",
+                            "target_ref": "C1",
+                            "method": "direct",
+                            "outcome": "COMPLETED",
+                            "summary": "The operational attempt finished.",
+                        }
+                    ]
+                ],
+            ),
+        ] = None,
+        marks: Annotated[
+            list[WorkspaceMarkDraft] | None,
+            Field(
+                max_length=64,
+                description=(
+                    "Optional append-only lifecycle marks. CLOSED is workflow state, "
+                    "not proof; RETRACTED and SUPERSEDED deterministically make explicit "
+                    "dependents stale."
+                ),
+                examples=[
+                    [
+                        {
+                            "client_ref": "M1",
+                            "target_ref": "C1",
+                            "state": "RETRACTED",
+                            "reason": "The recorded premise was withdrawn.",
+                        }
+                    ]
+                ],
+            ),
+        ] = None,
+        focus: Annotated[
+            WorkspaceFocusDraft | None,
+            Field(
+                description=(
+                    "Optional explicit focus update: set active_ref/pinned_refs, use "
+                    "clear=true to clear, or omit to preserve current focus."
+                ),
+                examples=[{"active_ref": "C1", "pinned_refs": ["C1"]}],
+            ),
+        ] = None,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> WorkspaceWriteResult:
+        active_kernel = _kernel(ctx)
+        return await asyncio.to_thread(
+            active_kernel.workspaces.write,
+            WorkspaceWriteRequest(
+                idempotency_key=idempotency_key,
+                workspace_id=workspace_id,
+                branch_id=branch_id,
+                base_revision=base_revision,
+                scratch=tuple(scratch or ()),
+                findings=tuple(findings or ()),
+                attempts=tuple(attempts or ()),
+                marks=tuple(marks or ()),
+                focus=focus,
+            ),
+        )
+
+    @server.tool(
+        name="workspace.query",
+        description=(
+            "Direct tool; do not call capability.describe. Read a compact deterministic "
+            "RESUME, FRONTIER, ATTEMPTS, CONTEXT, or STALE view from agent-authored "
+            "workspace state. CONTEXT requires target_card_id and follows only explicit "
+            "dependency/assumption links. Derived staleness is a paper-like warning, "
+            "not a mathematical conclusion. Retrieval preserves UNVERIFIED status."
+        ),
+        annotations=_tool_annotations(read_only=True, idempotent=True),
+        structured_output=False,
+    )
+    async def workspace_query(
+        workspace_id: WorkspaceId,
+        branch_id: WorkspaceBranchId,
+        revision_id: Annotated[
+            WorkspaceRevisionId | None,
+            Field(
+                description=(
+                    "Optional expected branch head revision:// handle. The query "
+                    "fails if the current head differs; omit to read the latest."
+                )
+            ),
+        ] = None,
+        view: WorkspaceQueryView = WorkspaceQueryView.RESUME,
+        target_card_id: WorkspaceCardId | None = None,
+        limit: Annotated[StrictInt, Field(ge=1, le=50)] = 10,
+        ctx: Context[AppState, Any] | None = None,
+    ) -> WorkspaceQueryResult:
+        active_kernel = _kernel(ctx)
+        return await asyncio.to_thread(
+            active_kernel.workspaces.query,
+            WorkspaceQueryRequest(
+                workspace_id=workspace_id,
+                branch_id=branch_id,
+                revision_id=revision_id,
+                view=view,
+                target_card_id=target_card_id,
+                limit=limit,
+            ),
+        )
+
+    _forbid_extra_tool_arguments(server, *WORKSPACE_TOOL_NAMES)
+    _publish_workspace_normalization_aliases(server)
 
     @server.resource(
         "artifact://sha256/{digest}",
@@ -473,6 +780,12 @@ def _public_tool_error(tool_name: str, exc: Exception) -> str:
     from jacobian.experiments import ExperimentNotFoundError
     from jacobian.registry import CheckerNotFoundError
     from jacobian.store import ArtifactNotFoundError
+    from jacobian.workspaces import (
+        WorkspaceConflictError,
+        WorkspaceIdempotencyError,
+        WorkspaceNotFoundError,
+        WorkspaceReferenceError,
+    )
 
     tool_error = exc.__cause__ if isinstance(exc, ToolError) else exc
     if not isinstance(tool_error, Exception):
@@ -495,7 +808,12 @@ def _public_tool_error(tool_name: str, exc: Exception) -> str:
         hint = "Check the state-directory permissions, then retry."
     elif isinstance(
         tool_error,
-        (ArtifactNotFoundError, CheckerNotFoundError, ExperimentNotFoundError),
+        (
+            ArtifactNotFoundError,
+            CheckerNotFoundError,
+            ExperimentNotFoundError,
+            WorkspaceNotFoundError,
+        ),
     ):
         code = "RESOURCE_NOT_FOUND"
         message = "A required Jacobian resource was not found."
@@ -503,10 +821,25 @@ def _public_tool_error(tool_name: str, exc: Exception) -> str:
             "Check the artifact or experiment URI returned by the earlier tool call, "
             "then retry."
         )
+    elif isinstance(tool_error, WorkspaceConflictError):
+        code = "WORKSPACE_CONFLICT"
+        message = str(tool_error)
+        hint = "Query the latest workspace revision, then retry from that exact head."
+    elif isinstance(
+        tool_error,
+        (WorkspaceIdempotencyError, WorkspaceReferenceError),
+    ):
+        code = "INVALID_INPUT"
+        message = str(tool_error)
+        hint = "Check the published workspace tool schema and returned handles."
     elif isinstance(tool_error, ValueError):
         code = "INVALID_INPUT"
         message = "The tool input is not valid for this operation."
-        hint = "Check the tool input schema or call capability.describe, then retry."
+        hint = (
+            "Check the published workspace tool schema, then retry."
+            if tool_name.startswith("workspace.")
+            else "Check the tool input schema or call capability.describe, then retry."
+        )
     else:
         code = "OPERATION_FAILED"
         message = "Jacobian could not complete the operation."
