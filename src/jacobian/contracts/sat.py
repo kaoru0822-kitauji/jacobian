@@ -259,14 +259,23 @@ class SatModelFindOutput(ContractModel):
     conclusion: Literal["UNKNOWN"] = "UNKNOWN"
     cnf_uri: ArtifactUri
     assignment_uri: ArtifactUri | None = None
+    assignment: dict[SatVariableName, StrictBool] | None = None
     detail: str = Field(min_length=1, max_length=1024)
 
     @model_validator(mode="after")
     def bind_assignment_to_status(self) -> Self:
         produced = self.status == "ASSIGNMENT_PRODUCED"
-        if produced != (self.assignment_uri is not None):
+        if produced != (
+            self.assignment_uri is not None and self.assignment is not None
+        ):
             raise ValueError(
-                "only an assignment-produced result may carry an assignment URI"
+                "an assignment-produced result requires both its URI and named values"
+            )
+        if not produced and (
+            self.assignment_uri is not None or self.assignment is not None
+        ):
+            raise ValueError(
+                "a no-assignment result cannot carry an assignment URI or named values"
             )
         if produced and self.solver_status != "SATISFIABLE":
             raise ValueError("an assignment requires a SATISFIABLE solver report")

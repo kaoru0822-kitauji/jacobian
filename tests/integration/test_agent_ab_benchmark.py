@@ -114,11 +114,12 @@ def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     assert "assignment_uri from sat.model.find" in description
     assert "proof_uri from sat.unsat_proof.find" in description
     assert "never the verifier's witness_uri or certificate_uri" in description
-    assert "Do not substitute the verifier's witness_uri" in BENCHMARK[
-        "SAT_TREATMENT_INSTRUCTIONS"
-    ]
-    assert "read_mcp_resource" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
-    assert "artifact.read capability" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    assert (
+        "Do not substitute the verifier's witness_uri"
+        in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    )
+    assert "named assignment map returned" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    assert "pre-canonical variable order" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
 
 
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:

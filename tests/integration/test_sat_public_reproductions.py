@@ -73,6 +73,8 @@ def test_sat_public_reproductions_reach_checker_bound_results(
         assert found.output["conclusion"] == "UNKNOWN"
         evidence_uri = found.output[evidence_field]
         assert evidence_uri is not None
+        if case["expected_status"] == "SATISFIABLE":
+            assert found.output["assignment"] is not None
 
         verified = kernel.capabilities.invoke(
             CapabilityRequest(
