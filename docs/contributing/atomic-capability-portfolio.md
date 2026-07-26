@@ -303,8 +303,26 @@ host with warm filesystem caches, direct helper measurements were:
 
 The first two operations return `COMPUTED` retrieval evidence and bind the
 exact pinned environment-manifest digest. The last operation alone returned
-`VERIFIED`. These measurements establish a workable spike, not portfolio lift;
-the held-out paired evaluation remains the next separate queue item.
+`VERIFIED`. These measurements established a workable spike, not portfolio
+lift.
+
+The held-out paired pilot completed on 2026-07-26. Both `List.revzip`
+treatments used discovery and reached independently verified proofs, but the
+controls also passed. Discovery added 226--288 seconds, 208k--365k input
+tokens, and three to six additional tool execution errors in those pairs. A
+second statement family was solved without selecting discovery. The decision
+is to revise rather than stabilize, consolidate, or retire:
+
+- retain search and exact inspection as separate experimental atomic outcomes;
+- do not recommend them or add goal-stepping capabilities yet;
+- replace repeated Mathlib startup and full scans with a reusable pinned index
+  or persistent query service instead of merely raising the timeout;
+- compact catalog discovery; and
+- rerun the frozen held-out evaluation before changing recommendation status.
+
+See [Lean declaration-discovery pilot](../reference/capability-workflow-evaluations.md#lean-declaration-discovery-pilot)
+for scorer invariants, per-run measurements, and the excluded operationally
+invalid pair.
 
 ## Wave 2: SAT certificate vertical slice
 

@@ -159,8 +159,12 @@ def create_server(
     token_verifier: Any | None = None,
     auth: Any | None = None,
     capability_adapter_entrypoints: tuple[str, ...] = (),
+    capability_exclusions: frozenset[str] = frozenset(),
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over the Jacobian kernel."""
+
+    if tenant_isolation and capability_exclusions:
+        raise ValueError("capability exclusions are supported only by local evaluation")
 
     # Keep ``--help`` and ``--version`` independent of the MCP runtime's
     # heavier imports and shutdown hooks.
@@ -205,6 +209,7 @@ def create_server(
             configured_root,
             install_references=install_references,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
+            capability_exclusions=capability_exclusions,
         )
     )
     tenant_router = (

@@ -22,7 +22,10 @@ _PARAMETER_ERROR_CODES = frozenset(
 
 def _contains_value(value: object, *, field: str, accepted: set[object]) -> bool:
     if isinstance(value, Mapping):
-        if value.get(field) in accepted:
+        candidate = value.get(field)
+        if isinstance(candidate, str | int | float | bool | type(None)) and (
+            candidate in accepted
+        ):
             return True
         return any(
             _contains_value(item, field=field, accepted=accepted)
@@ -57,12 +60,14 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
 
     mcp_calls: list[str] = []
     successful_calls: list[str] = []
+    capability_attempt_ids: list[str] = []
     capability_ids: list[str] = []
     capability_invocations: list[dict[str, Any]] = []
     shell_calls: list[str] = []
     usage: dict[str, Any] | None = None
     tool_error_count = 0
     parameter_error_count = 0
+    capability_rejection_count = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             event = json.loads(line)
@@ -86,11 +91,23 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         ):
             tool = item["tool"]
             mcp_calls.append(tool)
+            arguments = item.get("arguments")
+            if (
+                tool == "capability.invoke"
+                and isinstance(arguments, Mapping)
+                and isinstance(arguments.get("capability_id"), str)
+            ):
+                capability_attempt_ids.append(arguments["capability_id"])
             result = item.get("result")
+            response = _mcp_text_payload(item)
             failed = bool(
                 item.get("status") in {"error", "failed"}
                 or item.get("error")
                 or (isinstance(result, Mapping) and result.get("isError") is True)
+                or (
+                    isinstance(response, Mapping)
+                    and isinstance(response.get("error"), Mapping)
+                )
                 or _contains_value(
                     item,
                     field="status",
@@ -101,8 +118,16 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
                 tool_error_count += 1
             else:
                 successful_calls.append(tool)
-                arguments = item.get("arguments")
-                response = _mcp_text_payload(item)
+                if (
+                    tool == "capability.invoke"
+                    and isinstance(response, Mapping)
+                    and _contains_value(
+                        response.get("output"),
+                        field="status",
+                        accepted={"REJECTED"},
+                    )
+                ):
+                    capability_rejection_count += 1
                 execution = (
                     response.get("execution") if isinstance(response, Mapping) else None
                 )
@@ -142,7 +167,9 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         "usage": usage,
         "tool_error_count": tool_error_count,
         "parameter_error_count": parameter_error_count,
+        "capability_rejection_count": capability_rejection_count,
         "successful_tool_calls": successful_calls,
+        "capability_attempt_ids": capability_attempt_ids,
         "capability_ids": capability_ids,
         "capability_invocations": capability_invocations,
     }
