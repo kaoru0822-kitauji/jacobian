@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import runpy
 from pathlib import Path
 from typing import Any, cast
@@ -18,6 +20,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.sat import SatResourceBudget
+from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
@@ -77,6 +80,59 @@ def _sat_producer() -> CapabilityProviderRuntime:
     )
 
 
+def _smt_producer() -> CapabilityProviderRuntime:
+    return CapabilityProviderRuntime(
+        provider="cvc5",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version="1.3.4",
+        digest="sha256:" + "d" * 64,
+        digest_kind=CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD,
+        platform="linux-x86_64",
+        install_tier=CapabilityInstallTier.T1,
+        license_id="BSD-3-Clause",
+        features=("alethe-proof-production",),
+        configuration={
+            "profile": "jacobian.smtlib2.qf-unsat/v1",
+            "proof_format": "cvc5.alethe/1.3.4",
+        },
+    )
+
+
+def _install_fake_carcara(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    executable = tmp_path / "carcara"
+    executable.write_text(
+        (
+            "#!/usr/bin/python3\n"
+            "import sys\n"
+            "if '--version' in sys.argv:\n"
+            "    print('carcara 1.1.0 [git master 394edbb]')\n"
+            "elif sys.argv[1:] == ['check', '--help']:\n"
+            "    print('--strict-parsing --parse-hole-args '\n"
+            "          '--allow-int-real-subtyping --expand-let-bindings')\n"
+            "else:\n"
+            "    print('valid')\n"
+        ),
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    digest = "sha256:" + hashlib.sha256(executable.read_bytes()).hexdigest()
+    executable.with_name("carcara.jacobian-runtime.json").write_text(
+        json.dumps(
+            {
+                "runtime_manifest_version": "1",
+                "provider": "carcara",
+                "version": "1.1.0",
+                "source_repository": "https://github.com/ufmg-smite/carcara",
+                "source_commit": "394edbb15ba95c47893f1d821fddde7e016af178",
+                "compatible_cvc5_version": "1.3.4",
+                "executable_sha256": digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ['PATH']}")
+
+
 def _sat_report(
     *,
     case_id: str,
@@ -120,6 +176,111 @@ def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     )
     assert "named assignment map returned" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
     assert "pre-canonical variable order" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+
+
+def test_ab_smt_task_selects_its_own_control_and_treatment_instructions() -> None:
+    select = cast(Any, BENCHMARK["_condition_instructions"])
+
+    control = select("smt_unsat_proof", "control")
+    treatment = select("smt_unsat_proof", "treatment")
+
+    assert "SMT-LIB query directly" in control
+    assert "smt.unsat_proof.find" in treatment
+    assert "smt.unsat_proof.verify" in treatment
+    assert "Erdos" not in control
+    assert "Erdos" not in treatment
+
+
+def test_ab_smt_scorer_preserves_rejected_holey_proof(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_carcara(tmp_path, monkeypatch)
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    text = (
+        "(set-logic QF_UF)\n"
+        "(declare-sort U 0)\n"
+        "(declare-fun a () U)\n"
+        "(assert (not (= a a)))\n"
+        "(check-sat)\n"
+    )
+    problem = kernel.smt.put_problem(logic="QF_UF", smtlib_text=text)
+    proof = kernel.smt.put_proof(
+        problem_uri=problem.artifact_uri,
+        proof=b'(\n(step t0 (cl) :rule hole :args ("unsupported"))\n)\n',
+        producer=_smt_producer(),
+        resource_budget=SmtResourceBudget(wall_seconds=5),
+    )
+    rejected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="smt.unsat_proof.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"proof_uri": proof.artifact_uri},
+        )
+    )
+    assert rejected.output["status"] == "REJECTED"
+    case = {
+        "case_id": "SMT-PRIVATE-TEST-001",
+        "task_type": "smt_unsat_proof",
+        "logic": "QF_UF",
+        "smtlib_text": text,
+        "expected": {
+            "status": "UNSATISFIABLE",
+            "verification_status": "REJECTED",
+        },
+    }
+    report = {
+        "case_id": case["case_id"],
+        "status": "UNSATISFIABLE",
+        "assurance": "COMPUTED",
+        "final_verification": "UNVERIFIED",
+        "problem_uri": problem.artifact_uri,
+        "proof_uri": proof.artifact_uri,
+        "verification_record_uri": None,
+        "detail": "the exact proof was rejected because it contains a hole",
+        "feedback": {
+            "reasoning_focus": ["preserve the verification boundary"],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+    invocations = [
+        {
+            "capability_id": "smt.unsat_proof.find",
+            "input": {
+                "logic": "QF_UF",
+                "smtlib_text": text,
+                "resource_budget": {"wall_seconds": 5},
+            },
+            "output": {
+                "solver_status": "UNSATISFIABLE",
+                "problem_uri": problem.artifact_uri,
+                "proof_uri": proof.artifact_uri,
+            },
+            "artifact_uris": [problem.artifact_uri, proof.artifact_uri],
+        },
+        {
+            "capability_id": "smt.unsat_proof.verify",
+            "input": {"proof_uri": proof.artifact_uri},
+            "output": rejected.output,
+            "artifact_uris": list(rejected.artifact_uris),
+        },
+    ]
+    score_report = cast(Any, BENCHMARK["score_report"])
+
+    score = score_report(
+        case,
+        report,
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke", "capability.invoke"],
+        shell_calls=[],
+        capability_invocations=invocations,
+    )
+
+    assert score["passed"] is True
+    assert score["false_certification"] is False
 
 
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:
