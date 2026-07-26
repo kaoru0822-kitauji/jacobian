@@ -87,6 +87,10 @@ def check_partition(request: dict[str, Any]) -> dict[str, Any]:
                 f"replayed {len(cases)} cases over {len(universe)} exact elements"
             ),
             "relation_id": "case.relation.partitions",
+            "relationship_source_artifact_uris": ([request["scope"]["artifact_uri"]]),
+            "relationship_target_artifact_uris": (
+                [request["candidate"]["artifact_uri"]]
+            ),
             "obligation_uri": claim_uri,
         }
     except (KeyError, TypeError, ValueError):

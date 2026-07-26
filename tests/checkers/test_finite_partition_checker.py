@@ -22,8 +22,14 @@ def _request(*, cases: list[dict[str, object]]) -> dict[str, Any]:
                 "require_disjoint": True,
             },
         },
-        "candidate": {"payload": {"cases": cases}},
-        "scope": {"payload": {"elements": ["a", "b", "c", "d"]}},
+        "candidate": {
+            "artifact_uri": "artifact://sha256/" + "6" * 64,
+            "payload": {"cases": cases},
+        },
+        "scope": {
+            "artifact_uri": "artifact://sha256/" + "7" * 64,
+            "payload": {"elements": ["a", "b", "c", "d"]},
+        },
         "certificate": {
             "payload": {
                 "certificate_type": "finite.partition",
@@ -52,6 +58,12 @@ def test_finite_partition_checker_accepts_exact_partition() -> None:
     assert decision["accepted"] is True
     assert decision["coverage"] == "EXHAUSTIVE"
     assert decision["method"] == "EXHAUSTIVE_FINITE"
+    assert decision["relationship_source_artifact_uris"] == [
+        "artifact://sha256/" + "7" * 64
+    ]
+    assert decision["relationship_target_artifact_uris"] == [
+        "artifact://sha256/" + "6" * 64
+    ]
 
 
 def test_finite_partition_checker_rejects_gap_and_overlap() -> None:
