@@ -6,7 +6,7 @@ import hashlib
 import time
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import networkx as nx
 from pydantic import ValidationError
@@ -29,6 +29,14 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.graph_degree_sequence import (
+    GraphDegreeSequenceClaim,
+    GraphDegreeSequenceObstruction,
+    GraphDegreeSequenceOutput,
+    GraphDegreeSequenceReplayPayload,
+    GraphDegreeSequenceRequest,
+    GraphDegreeSequenceResultArtifact,
+)
 from jacobian.contracts.graph_invariants import (
     GraphNeighborhoodIndependenceArtifact,
     GraphNeighborhoodIndependenceClaim,
@@ -104,9 +112,12 @@ class GraphCapabilityResources:
     graph_schema_uri: str
     scope_schema_uri: str
     property_schema_uri: str
+    degree_sequence_claim_schema_uri: str
+    degree_sequence_result_schema_uri: str
     neighborhood_schema_uri: str
     neighborhood_claim_schema_uri: str
     certificate_schema_uri: str
+    degree_sequence_checker_id: str | None
     neighborhood_checker_id: str | None
 
 
@@ -116,9 +127,12 @@ class GraphInstallation:
     graph_schema_uri: str
     scope_schema_uri: str
     property_schema_uri: str
+    degree_sequence_claim_schema_uri: str
+    degree_sequence_result_schema_uri: str
     neighborhood_schema_uri: str
     neighborhood_claim_schema_uri: str
     certificate_schema_uri: str
+    degree_sequence_checker_id: str | None
     neighborhood_checker_id: str | None
 
 
@@ -133,6 +147,7 @@ def install_graph_capabilities(
     tuple[
         GraphAtlasSearchAdapter,
         GraphPropertyAdapter,
+        GraphDegreeSequenceAdapter,
         GraphNeighborhoodIndependenceAdapter,
     ],
     GraphInstallation,
@@ -203,6 +218,16 @@ def install_graph_capabilities(
             "additionalProperties": False,
         },
     )
+    degree_sequence_claim_schema_uri = schemas.register(
+        name="jacobian.graph-degree-sequence-claim",
+        version="1",
+        schema=GraphDegreeSequenceClaim.model_json_schema(),
+    )
+    degree_sequence_result_schema_uri = schemas.register(
+        name="jacobian.graph-degree-sequence-result",
+        version="1",
+        schema=GraphDegreeSequenceResultArtifact.model_json_schema(),
+    )
     neighborhood_schema_uri = schemas.register(
         name="jacobian.graph-neighborhood-independence",
         version="1",
@@ -218,8 +243,22 @@ def install_graph_capabilities(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
+    degree_sequence_checker_id = None
     neighborhood_checker_id = None
     if authorize_checker:
+        degree_sequence_checker_id = checkers.authorize(
+            name="exact simple-graph degree-sequence replay checker",
+            entrypoint=(
+                "jacobian_checkers.graph_degree_sequence:check_degree_sequence"
+            ),
+            evidence_kind="CERTIFICATE",
+            format_id="graph.degree_sequence",
+            format_version="1",
+            claim_schema_uris=(degree_sequence_claim_schema_uri,),
+            semantics_uris=(semantics_uri,),
+            candidate_schema_uris=(degree_sequence_result_schema_uri,),
+            reason="bundled independent degree-sequence checker",
+        ).checker_id
         neighborhood_checker_id = checkers.authorize(
             name="exact graph neighborhood-independence replay checker",
             entrypoint=(
@@ -238,9 +277,12 @@ def install_graph_capabilities(
         graph_schema_uri=graph_schema_uri,
         scope_schema_uri=scope_schema_uri,
         property_schema_uri=property_schema_uri,
+        degree_sequence_claim_schema_uri=degree_sequence_claim_schema_uri,
+        degree_sequence_result_schema_uri=degree_sequence_result_schema_uri,
         neighborhood_schema_uri=neighborhood_schema_uri,
         neighborhood_claim_schema_uri=neighborhood_claim_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
+        degree_sequence_checker_id=degree_sequence_checker_id,
         neighborhood_checker_id=neighborhood_checker_id,
     )
     resources = GraphCapabilityResources(
@@ -250,15 +292,19 @@ def install_graph_capabilities(
         graph_schema_uri=graph_schema_uri,
         scope_schema_uri=scope_schema_uri,
         property_schema_uri=property_schema_uri,
+        degree_sequence_claim_schema_uri=degree_sequence_claim_schema_uri,
+        degree_sequence_result_schema_uri=degree_sequence_result_schema_uri,
         neighborhood_schema_uri=neighborhood_schema_uri,
         neighborhood_claim_schema_uri=neighborhood_claim_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
+        degree_sequence_checker_id=degree_sequence_checker_id,
         neighborhood_checker_id=neighborhood_checker_id,
     )
     return (
         (
             GraphAtlasSearchAdapter(resources),
             GraphPropertyAdapter(resources),
+            GraphDegreeSequenceAdapter(resources),
             GraphNeighborhoodIndependenceAdapter(resources),
         ),
         installation,
@@ -579,6 +625,218 @@ class GraphPropertyAdapter:
         )
 
 
+class GraphDegreeSequenceAdapter:
+    """Realize a simple-graph degree sequence or expose an exact obstruction."""
+
+    def __init__(self, resources: GraphCapabilityResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="graph.realize.degree_sequence",
+            version="1",
+            title="Realize a simple-graph degree sequence",
+            description=(
+                "Construct a simple graph with the requested degree multiset, or "
+                "return an odd-sum, maximum-degree, or Erdos-Gallai obstruction."
+            ),
+            provider="jacobian.networkx",
+            provider_runtime=known_provider_runtime(
+                "jacobian.networkx",
+                features=("degree-sequence", "simple-undirected-graphs"),
+                checker_ids=(
+                    (resources.degree_sequence_checker_id,)
+                    if resources.degree_sequence_checker_id is not None
+                    else ()
+                ),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=GraphDegreeSequenceRequest.model_json_schema(),
+            output_schema=GraphDegreeSequenceOutput.model_json_schema(),
+            tags=(
+                "graph",
+                "degree-sequence",
+                "construction",
+                "counterexample",
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = GraphDegreeSequenceRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_DEGREE_SEQUENCE_REQUEST",
+                    stage="request_validation",
+                    message="The complete degree-sequence request is invalid.",
+                    hint=("Provide between 1 and 512 nonnegative integer degrees."),
+                )
+            ) from exc
+        started = time.monotonic()
+        sequence = tuple(validated.degree_sequence)
+        obstruction = _degree_sequence_obstruction(sequence)
+        graph_payload: dict[str, Any] | None = None
+        graph_uri: str | None = None
+        graph_artifact = None
+        conclusion: Literal["GRAPHICAL", "NON_GRAPHICAL"]
+        method: Literal[
+            "EXACT_DEGREE_REPLAY",
+            "ODD_SUM_OBSTRUCTION",
+            "MAX_DEGREE_OBSTRUCTION",
+            "ERDOS_GALLAI_OBSTRUCTION",
+        ]
+        if obstruction is None:
+            graph = nx.havel_hakimi_graph(sequence)
+            graph_payload = _graph_payload(graph)
+            graph_artifact = self.resources.artifacts.put(
+                schema_uri=self.resources.graph_schema_uri,
+                semantics_uri=self.resources.semantics_uri,
+                payload=graph_payload,
+                summary="simple graph realizing the requested degree sequence",
+            )
+            graph_uri = graph_artifact.artifact_uri
+            conclusion = "GRAPHICAL"
+            method = "EXACT_DEGREE_REPLAY"
+        else:
+            conclusion = "NON_GRAPHICAL"
+            method = cast(
+                Literal[
+                    "ODD_SUM_OBSTRUCTION",
+                    "MAX_DEGREE_OBSTRUCTION",
+                    "ERDOS_GALLAI_OBSTRUCTION",
+                ],
+                {
+                    "ODD_SUM": "ODD_SUM_OBSTRUCTION",
+                    "MAX_DEGREE": "MAX_DEGREE_OBSTRUCTION",
+                    "ERDOS_GALLAI": "ERDOS_GALLAI_OBSTRUCTION",
+                }[obstruction.kind],
+            )
+        claim = GraphDegreeSequenceClaim(degree_sequence=sequence)
+        claim_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.degree_sequence_claim_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=claim.model_dump(mode="json"),
+            summary="simple-graph degree-sequence realizability claim",
+        )
+        result_artifact_payload = GraphDegreeSequenceResultArtifact(
+            degree_sequence=sequence,
+            conclusion=conclusion,
+            graph_uri=graph_uri,
+            graph=graph_payload,
+            obstruction=obstruction,
+        )
+        result_parents = (
+            (claim_artifact.artifact_uri, graph_uri)
+            if graph_uri is not None
+            else (claim_artifact.artifact_uri,)
+        )
+        result_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.degree_sequence_result_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=result_artifact_payload.model_dump(
+                mode="json",
+                exclude_none=True,
+            ),
+            parents=result_parents,
+            summary=f"exact degree-sequence result: {conclusion.lower()}",
+        )
+        semantics = self.resources.store.get(self.resources.semantics_uri)
+        certificate_payload = GraphDegreeSequenceReplayPayload(
+            method=method,
+            degree_sequence=sequence,
+            conclusion=conclusion,
+            graph_uri=graph_uri,
+            obstruction=obstruction,
+        ).model_dump(mode="json", exclude_none=True)
+        certificate = CertificateEnvelope(
+            certificate_type="graph.degree_sequence",
+            format_version="1",
+            bindings=EvidenceBindings(
+                claim_digest=claim_artifact.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=result_artifact.object_digest,
+            ),
+            payload_digest=(
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(certificate_payload)).hexdigest()
+            ),
+            payload=certificate_payload,
+        )
+        certificate_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.certificate_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(
+                claim_artifact.artifact_uri,
+                result_artifact.artifact_uri,
+            ),
+            summary="unverified exact degree-sequence replay certificate",
+        )
+        output = GraphDegreeSequenceOutput(
+            degree_sequence=sequence,
+            conclusion=conclusion,
+            graph_uri=graph_uri,
+            graph=graph_payload,
+            obstruction=obstruction,
+            result_uri=result_artifact.artifact_uri,
+            claim_uri=claim_artifact.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=self.resources.degree_sequence_checker_id,
+            backend_version=nx.__version__,
+        )
+        artifact_uris = [
+            claim_artifact.artifact_uri,
+            result_artifact.artifact_uri,
+            certificate_artifact.artifact_uri,
+        ]
+        if graph_artifact is not None:
+            artifact_uris.insert(0, graph_artifact.artifact_uri)
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=_runtime_ms(started),
+            ),
+            output=output.model_dump(mode="json", exclude_none=True),
+            scope=CapabilityScope(
+                description="one finite nonnegative integer degree sequence",
+                parameters={
+                    "degree_sequence": list(sequence),
+                    "graph_model": "finite simple undirected graph",
+                },
+                artifact_uri=claim_artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.COMPLETE,
+                basis=(
+                    "the result carries either a full graph realization or one "
+                    "necessary-condition obstruction; verification remains separate"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="graph.relation.degree-sequence-result",
+                    source_artifact_uris=(claim_artifact.artifact_uri,),
+                    target_artifact_uris=(result_artifact.artifact_uri,),
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "deterministic NetworkX construction or exact integer "
+                    "obstruction; the bundled certificate was not invoked"
+                ),
+            ),
+            artifact_uris=tuple(artifact_uris),
+        )
+
+
 class GraphNeighborhoodIndependenceAdapter:
     """Compute every exact neighborhood independence number for one graph."""
 
@@ -817,6 +1075,42 @@ def _validate_constraint_ranges(constraints: dict[str, Any]) -> None:
                     hint="Swap the bounds or remove one of them, then retry.",
                 )
             )
+
+
+def _degree_sequence_obstruction(
+    sequence: tuple[int, ...],
+) -> GraphDegreeSequenceObstruction | None:
+    order = len(sequence)
+    for index, degree in enumerate(sequence):
+        if degree >= order:
+            return GraphDegreeSequenceObstruction(
+                kind="MAX_DEGREE",
+                index=index,
+                degree=degree,
+                order=order,
+            )
+    degree_sum = sum(sequence)
+    if degree_sum % 2:
+        return GraphDegreeSequenceObstruction(
+            kind="ODD_SUM",
+            degree_sum=degree_sum,
+        )
+    ordered = sorted(sequence, reverse=True)
+    for k in range(1, order + 1):
+        lhs = sum(ordered[:k])
+        rhs = k * (k - 1) + sum(min(degree, k) for degree in ordered[k:])
+        if lhs > rhs:
+            return GraphDegreeSequenceObstruction(
+                kind="ERDOS_GALLAI",
+                k=k,
+                lhs=lhs,
+                rhs=rhs,
+            )
+    if not nx.is_graphical(sequence, method="eg"):
+        raise RuntimeError(
+            "NetworkX rejected a degree sequence without a replayable obstruction"
+        )
+    return None
 
 
 def _graph_payload(graph: nx.Graph[Any]) -> dict[str, Any]:
