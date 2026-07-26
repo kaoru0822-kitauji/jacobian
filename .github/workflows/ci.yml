@@ -16,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -40,8 +40,8 @@ jobs:
         python-version: ["3.12", "3.13"]
         shard: [1, 2]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -51,12 +51,18 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
+      - run: >-
+          uv run --frozen python -c
+          "import json, pathlib;
+          data = json.loads(pathlib.Path('.test_durations').read_text());
+          assert data, '.test_durations must contain measured test timings'"
       - if: matrix.python-version == '3.12'
         run: >-
           uv run --frozen pytest
           -m "not lean_runtime"
           --splits 2 --group ${{ matrix.shard }}
           --splitting-algorithm least_duration
+          --durations-path .test_durations
           --cov --cov-report= --cov-fail-under=0
           --durations=10
       - if: matrix.python-version != '3.12'
@@ -65,10 +71,11 @@ jobs:
           -m "not lean_runtime"
           --splits 2 --group ${{ matrix.shard }}
           --splitting-algorithm least_duration
+          --durations-path .test_durations
           --durations=10
       - if: matrix.python-version == '3.12'
         run: mv .coverage .coverage.shard-${{ matrix.shard }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ always() && matrix.python-version == '3.12' }}
         with:
           name: coverage-data-${{ matrix.shard }}
@@ -76,18 +83,29 @@ jobs:
           include-hidden-files: true
 
   lean-test:
-    name: Lean Tests
+    name: Lean Tests (${{ matrix.lane }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: checker
+            tests: tests/integration/test_lean.py
+          - lane: capabilities
+            tests: >-
+              tests/integration/test_agent_ab_benchmark.py
+              tests/integration/test_capability_service.py
+              tests/integration/test_lean_exploration_capabilities.py
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1
         with:
           lake-package-directory: lean
           use-mathlib-cache: true
           test: false
           lint: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -99,7 +117,9 @@ jobs:
       - run: uv sync --frozen --dev
       - run: lake build repl
         working-directory: lean
-      - run: make test-lean PYTEST_ARGS="--durations=10"
+      - run: make test-lean
+        env:
+          PYTEST_ARGS: --durations=10 ${{ matrix.tests }}
 
   coverage:
     name: Coverage
@@ -107,8 +127,8 @@ jobs:
     timeout-minutes: 10
     needs: test
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -118,7 +138,7 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           pattern: coverage-data-*
           path: coverage-data
@@ -126,7 +146,7 @@ jobs:
       - run: uv run --frozen coverage combine coverage-data
       - run: uv run --frozen coverage report
       - run: uv run --frozen coverage xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-3.12
           path: coverage.xml
@@ -136,8 +156,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
       - run: npx --yes jscpd@5.0.12 --config .jscpd.json .
@@ -147,8 +167,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
           package-manager-cache: false
@@ -162,8 +182,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -176,11 +196,11 @@ jobs:
           echo "::group::Build timing"
           /usr/bin/time -v make build 2>&1 | tee build-timing.log
           echo "::endgroup::"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
           path: dist/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: build-timing
@@ -196,11 +216,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
 
   publish-npm:
     name: Publish to npm
@@ -213,8 +233,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -222,16 +242,22 @@ jobs:
       - run: npm test
         working-directory: npm
       - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: npm
 
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     if: github.ref == 'refs/heads/main'
     needs: [lint, test, lean-test, coverage, duplicate-code, npm-package, build]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release

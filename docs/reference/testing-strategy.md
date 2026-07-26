@@ -37,11 +37,18 @@ make test-failed
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-lean
+make refresh-test-durations
+make check
 make validate
 ```
 
-`make test-fast` is the short marker-filtered loop, while `make validate`
-includes the full suite. The full suite uses `pytest-xdist` work stealing and
+`make test-fast` collects only unit, contract, checker, and reference
+directories, then excludes integration-marked cases. Avoiding collection of
+integration and end-to-end modules keeps the loop short without dropping
+independent checker tests. `make check` is the routine local pre-push gate;
+CI owns exhaustive validation. `make validate` remains the local full-suite
+escape hatch. The full
+suite uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
 wait on isolated subprocesses. `make test-failed` is the failure-recovery
 shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
@@ -50,18 +57,34 @@ execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
 and is disabled automatically by pytest-timeout while debugging. Parallel
 workers retain separate `tmp_path` roots; tests that add shared external state
 must coordinate it explicitly.
+Workflow tests that repeatedly construct the kernel may opt into
+`initialized_kernel_store`. Each xdist worker builds the core descriptor store
+once, then the fixture physically copies that snapshot into the test's own
+`tmp_path` before construction. SQLite metadata and blobs remain isolated per
+test; no kernel service, process, or mutable database is shared. Tests whose
+subject is fresh-store bootstrap, quota accounting, migration, or descriptor
+installation must not use this fixture.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
 CI splits each supported Python run into two disjoint groups and retains xdist
-parallelism inside each group. Tests marked `lean_runtime` are excluded from
-those shards and run serially in a dedicated job with pinned Lean and Mathlib
-caches. This avoids concurrent multi-gigabyte Mathlib processes while
-preserving real-backend coverage. Python 3.12 shards write raw coverage data; a
-dependent job combines both files before enforcing the repository threshold
-and producing the XML report. Python 3.13 runs the same two groups without
-duplicate instrumentation. Coverage.py's subprocess patch includes plugin and
-checker workers so clean-process execution is not misreported as uncovered.
+parallelism inside each group. The committed `.test_durations` gives
+`pytest-split` measured input for `least_duration`; refresh it with
+`make refresh-test-durations` on Linux with Python 3.12 after a major suite
+change, or when the slower shard exceeds the faster shard by more than 10% in
+two representative CI runs. Routine test edits do not require refreshes. The
+target enforces its platform, replaces timings only after a successful run,
+and leaves the previous file intact on interruption or failure. Tests marked
+`lean_runtime` are excluded from those shards and divided by file between two
+dedicated runners with pinned Lean and Mathlib caches. Each runner executes its
+lane serially, avoiding concurrent multi-gigabyte Mathlib processes on one
+machine while shortening the CI critical path and preserving real-backend
+coverage.
+Python 3.12 shards write raw coverage data; a dependent job combines both
+files before enforcing the repository threshold and producing the XML report.
+Python 3.13 runs the same two groups without duplicate instrumentation.
+Coverage.py's subprocess patch includes plugin and checker workers so
+clean-process execution is not misreported as uncovered.
 
 Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
 their loaders, scorers, replay paths, telemetry parsing, and dispatch guards

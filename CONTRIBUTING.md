@@ -23,9 +23,12 @@ make setup
 make test-fast
 ```
 
-`make test-fast` is the short non-integration feedback loop. Before handoff,
-run `make validate`, which performs lint, formatting, dependency, type, full
-test-suite, and package-build checks. Run `make help` for focused commands.
+`make test-fast` is the short non-integration feedback loop. Run `make check`
+before pushing; it performs lint, formatting, dependency, type, fast tests,
+and package-build checks. CI owns the full Python matrix, integration,
+end-to-end, coverage, and real-Lean validation. `make validate` remains
+available for exhaustive local validation. Run `make help` for focused
+commands.
 Tests can be narrowed without learning another wrapper:
 
 ```sh
@@ -43,8 +46,10 @@ On macOS, read the
 [Z3 installation note](README.md#macos-and-z3) before troubleshooting a
 source-build failure from `uv sync --dev`.
 
-Use focused tests while implementing. Run the complete applicable validation
-before handing off the final tree, and report only checks that actually ran.
+Use focused tests while implementing. Run `make check` before pushing and wait
+for green CI checks before merge. Run complete local validation only
+when changing CI itself, debugging an environment-specific failure, or when CI
+is unavailable. Report only checks that actually ran.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 
@@ -59,7 +64,7 @@ of the normal xdist pool because Mathlib processes can retain several
 gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
 dedicated pair of serial lanes on separate runners.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
-and `make validate` before handoff. Use
+and `make check` before pushing. Use
 `make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
 Refresh `.test_durations` after major suite changes; the target replaces the
 committed timings only after a successful non-Lean run on Linux with Python
