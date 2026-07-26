@@ -218,6 +218,111 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
         return _reject("malformed polynomial-map collision request")
 
 
+def check_identity(request: dict[str, Any]) -> dict[str, Any]:
+    """Independently compare two canonical sparse polynomials over QQ."""
+
+    try:
+        if request.get("request_version") != "1":
+            return _reject("unsupported request version")
+        claim = request["claim"]["payload"]
+        candidate = request["candidate"]
+        scope = request["scope"]
+        certificate = request["certificate"]["payload"]
+        supporting_artifacts = request.get("supporting_artifacts", [])
+        if (
+            not isinstance(claim, dict)
+            or claim.get("claim_schema_version") != "1"
+            or claim.get("predicate") != "POLYNOMIAL_IDENTITY"
+            or claim.get("domain") != "QQ"
+            or not isinstance(candidate, dict)
+            or not isinstance(scope, dict)
+            or supporting_artifacts != []
+            or claim.get("left_uri") != scope.get("artifact_uri")
+            or claim.get("right_uri") != candidate.get("artifact_uri")
+        ):
+            return _reject("unexpected polynomial identity claim or artifact binding")
+        variables = claim.get("variables")
+        if (
+            not isinstance(variables, list)
+            or not 1 <= len(variables) <= _MAX_DIMENSION
+            or any(
+                not isinstance(variable, str) or _VARIABLE.fullmatch(variable) is None
+                for variable in variables
+            )
+            or len(set(variables)) != len(variables)
+        ):
+            return _reject("invalid polynomial ring variables")
+        if (
+            not isinstance(certificate, dict)
+            or certificate.get("certificate_type") != "polynomial.identity_replay"
+            or certificate.get("format_version") != "1"
+            or certificate.get("bindings") != request.get("expected_bindings")
+            or certificate.get("payload")
+            != {
+                "method": "DIRECT_SPARSE_REPLAY",
+                "variables": variables,
+                "left_uri": scope["artifact_uri"],
+                "right_uri": candidate["artifact_uri"],
+            }
+        ):
+            return _reject("unexpected identity certificate or bindings")
+        left_artifact = scope["payload"]
+        right_artifact = candidate["payload"]
+        if (
+            not isinstance(left_artifact, dict)
+            or not isinstance(right_artifact, dict)
+            or left_artifact.get("polynomial_schema_version") != "1"
+            or right_artifact.get("polynomial_schema_version") != "1"
+            or left_artifact.get("domain") != "QQ"
+            or right_artifact.get("domain") != "QQ"
+            or left_artifact.get("variables") != variables
+            or right_artifact.get("variables") != variables
+        ):
+            return _reject("polynomial artifacts do not match the declared ring")
+        left = _as_polynomial(
+            _parse_polynomial(
+                left_artifact.get("polynomial"),
+                len(variables),
+                maximum_exponent=_MAX_DERIVED_EXPONENT,
+            )
+        )
+        right = _as_polynomial(
+            _parse_polynomial(
+                right_artifact.get("polynomial"),
+                len(variables),
+                maximum_exponent=_MAX_DERIVED_EXPONENT,
+            )
+        )
+        equal = left == right
+        return {
+            "accepted": True,
+            "conclusion": "TRUE" if equal else "FALSE",
+            "arithmetic": "EXACT_RATIONAL",
+            "method": "CHECKED_CERTIFICATE",
+            "coverage": "EXHAUSTIVE",
+            "detail": (
+                "polynomials have identical exact coefficients in the declared ring"
+                if equal
+                else "polynomials differ in at least one exact coefficient"
+            ),
+            **({"relation_id": "polynomial.relation.identity"} if equal else {}),
+            **(
+                {
+                    "relationship_source_artifact_uris": [
+                        scope["artifact_uri"],
+                    ],
+                    "relationship_target_artifact_uris": [
+                        candidate["artifact_uri"],
+                    ],
+                }
+                if equal
+                else {}
+            ),
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return _reject("malformed polynomial identity request")
+
+
 def check_jacobian(request: dict[str, Any]) -> dict[str, Any]:
     """Replay a sparse polynomial Jacobian without importing SymPy."""
 
