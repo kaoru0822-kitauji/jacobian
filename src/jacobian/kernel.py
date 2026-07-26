@@ -44,6 +44,10 @@ from jacobian.lean_exploration import (
     LeanExplorationInstallation,
     install_lean_exploration_capabilities,
 )
+from jacobian.matrix_capabilities import (
+    MatrixInstallation,
+    install_matrix_capabilities,
+)
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
@@ -309,6 +313,14 @@ class JacobianKernel:
         )
         for polynomial_adapter in polynomial_adapters:
             self.register_capability(polynomial_adapter)
+        self.matrix: MatrixInstallation
+        matrix_adapters, self.matrix = install_matrix_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
+        for matrix_adapter in matrix_adapters:
+            self.register_capability(matrix_adapter)
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
