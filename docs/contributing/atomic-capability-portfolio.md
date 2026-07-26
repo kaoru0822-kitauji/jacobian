@@ -493,10 +493,15 @@ Implement one vertical slice at a time:
 3. `matrix.normal_form.hermite` is implemented with the binding's complete
    left transformation. Independent replay checks `H = U A`, unimodularity,
    and every FLINT row-HNF condition.
-4. Add `polynomial.factor` with a product relation. Checking that the factors
+4. `matrix.determinant.verify` is implemented as a small shared exact
+   primitive. It checks the existing SymPy determinant artifact by
+   standard-library rational Gaussian elimination in an independent clean
+   process; see the
+   [exact rational determinant contract](../reference/matrix-rational-determinant.md).
+5. Add `polynomial.factor` with a product relation. Checking that the factors
    multiply to the input does not by itself certify irreducibility or
    completeness; keep those as open obligations until separately checked.
-5. Add rigorous Arb enclosures as computed evidence. The provider's rigorous
+6. Add rigorous Arb enclosures as computed evidence. The provider's rigorous
    error tracking is valuable, but it is not Jacobian `VERIFIED` until an
    authorized independent implementation checks the exact enclosure claim.
 
@@ -594,7 +599,10 @@ backlog.
 14. Python-FLINT rational inconsistency-certificate find and verify slice.
     Implemented; see the
     [exact rational linear-system evidence contract](../reference/linear-rational-solutions.md#inconsistency-certificate).
-15. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
+15. Independent exact rational matrix-determinant verification. Implemented;
+    see the
+    [exact rational determinant contract](../reference/matrix-rational-determinant.md).
+16. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
     and HiGHS from accumulated workflow evidence.
 
 Stop after each paired evaluation long enough to decide whether the next
