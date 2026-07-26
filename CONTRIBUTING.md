@@ -24,9 +24,11 @@ make test-fast
 ```
 
 `make test-fast` is the short non-integration feedback loop. Run `make check`
-before pushing; it performs lint, formatting, dependency, type, fast tests,
-and package-build checks. Push after that check and let CI own the full Python
-matrix, integration, end-to-end, coverage, and real-Lean validation.
+before pushing; it performs fast Ruff and non-integration test checks. Push
+after that check and let CI own dependency and dead-code analysis, strict
+typing, package builds, the full Python matrix, integration, end-to-end,
+coverage, and real-Lean validation. `make check-static` reproduces the
+CI-owned static and package checks when a focused change needs them.
 `make validate-full` is only for reproducing exhaustive CI validation locally
 when CI is unavailable or an environment-specific failure requires it. Run
 `make help` for focused commands. The measured costs and reasoning behind
@@ -37,6 +39,10 @@ Tests can be narrowed without learning another wrapper:
 ```sh
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-contracts
+make test-checkers
+make test-mcp PYTEST_ARGS="-k authentication"
+make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
 make refresh-test-durations
 make refresh-lean-test-durations
@@ -54,7 +60,18 @@ Use focused tests while implementing. Run `make check` before pushing and wait
 for green CI checks before merge. Run complete local validation only
 when changing CI itself, debugging an environment-specific failure, or when CI
 is unavailable; use `make validate-full` for that exceptional path. Report only
-checks that actually ran.
+checks that actually ran. The manually dispatched Python Debug and Lean Debug
+workflows reproduce one pytest file or node in a prepared remote environment
+when the relevant local runtime is impractical.
+
+CI classifies pull requests conservatively. Documentation-only changes skip
+Python, npm, Lean, static, package, security, and duplicate-code lanes.
+Documentation plus npm or npm-only changes run npm packaging without the
+Python and Lean lanes. Source, dependency, workflow, mixed, empty, and unknown
+change sets run complete validation, as does every push to `main`.
+Maintainers can add the `ci:full` label to force every lane or `ci:lean` to
+add real-Lean validation to an otherwise isolated plan. These overrides only
+add work; labels cannot reduce the fail-closed path classification.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 

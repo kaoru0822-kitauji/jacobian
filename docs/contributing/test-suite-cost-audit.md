@@ -64,9 +64,12 @@ make validate-full
 
 `make test-fast` is the normal edit loop. Use focused integration tests while
 changing stores, adapters, plugins, subprocesses, or checker execution.
+`make check` combines fast Ruff checks with that loop. Dependency and
+dead-code analysis, strict typing, and package builds remain available through
+`make check-static` but are CI-owned rather than routine local handoff work.
 `make test` runs the complete non-Lean suite, and `make test-lean` keeps the
-memory-heavy backend serial. Neither is a routine pre-push requirement:
-`make check` is the local handoff gate, and CI owns exhaustive validation.
+memory-heavy backend serial. Neither is a routine pre-push requirement; CI
+owns exhaustive validation.
 `make validate-full` exists only to reproduce that exhaustive validation when
 CI is unavailable or an environment-specific failure requires it. Do not use
 unfiltered `uv run pytest` as the default handoff command because it mixes Lean

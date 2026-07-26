@@ -16,8 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      run-lean: ${{ steps.classify.outputs.run-lean }}
       classification: ${{ steps.classify.outputs.classification }}
+      run-python: ${{ steps.classify.outputs.run-python }}
+      run-lean: ${{ steps.classify.outputs.run-lean }}
+      run-npm: ${{ steps.classify.outputs.run-npm }}
+      run-static: ${{ steps.classify.outputs.run-static }}
+      run-build: ${{ steps.classify.outputs.run-build }}
+      run-security: ${{ steps.classify.outputs.run-security }}
+      run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,30 +35,43 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+          FORCE_LEAN: ${{ contains(github.event.pull_request.labels.*.name, 'ci:lean') }}
         run: |
           if [ "$EVENT_NAME" = "pull_request" ]; then
             mapfile -d '' changed_paths < <(
               git diff --name-only -z "$BASE_SHA" "$HEAD_SHA"
             )
+            planner_args=(--)
+            if [ "$FORCE_FULL" = "true" ]; then
+              planner_args=(--force-full --)
+            elif [ "$FORCE_LEAN" = "true" ]; then
+              planner_args=(--force-lean --)
+            fi
             plan_output=$(
-              .github/scripts/classify-ci-paths "${changed_paths[@]}"
+              .github/scripts/classify-ci-paths \
+                "${planner_args[@]}" "${changed_paths[@]}"
             )
           else
-            plan_output=$'run-lean=true\nclassification=full'
+            plan_output=$(.github/scripts/classify-ci-paths --force-full)
           fi
 
           printf '%s\n' "$plan_output" >> "$GITHUB_OUTPUT"
-          run_lean=$(sed -n 's/^run-lean=//p' <<< "$plan_output")
           classification=$(sed -n 's/^classification=//p' <<< "$plan_output")
           {
             echo "## CI plan"
             echo ""
             echo "- Classification: \`$classification\`"
-            echo "- Run real Lean validation: \`$run_lean\`"
+            echo ""
+            echo '```text'
+            echo "$plan_output"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
   lint:
     name: Lint & Format
+    needs: plan
+    if: needs.plan.outputs.run-static == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -67,7 +86,7 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
-      - run: make lint
+      - run: make lint-full
       - run: make typecheck
       - name: Check TODO comments reference issues
         run: |
@@ -80,6 +99,8 @@ jobs:
 
   security-audit:
     name: Security Audit
+    needs: plan
+    if: needs.plan.outputs.run-security == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -98,6 +119,8 @@ jobs:
 
   validate-agents-md:
     name: Validate AGENTS.md
+    needs: plan
+    if: needs.plan.outputs.run-build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -118,6 +141,8 @@ jobs:
 
   test:
     name: Tests (Python ${{ matrix.python-version }}, shard ${{ matrix.shard }}/2)
+    needs: plan
+    if: needs.plan.outputs.run-python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -168,6 +193,26 @@ jobs:
           path: .coverage.shard-${{ matrix.shard }}
           include-hidden-files: true
 
+  python-test:
+    name: Python Tests
+    if: always()
+    needs: [plan, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require planned Python validation
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          if [ "$RUN_PYTHON" = "true" ]; then
+            test "$TEST_RESULT" = "success"
+          else
+            test "$TEST_RESULT" = "skipped"
+          fi
+
   lean-test-shards:
     name: Lean Tests (${{ matrix.lane }})
     needs: plan
@@ -207,9 +252,11 @@ jobs:
     steps:
       - name: Require planned Lean validation
         env:
+          PLAN_RESULT: ${{ needs.plan.result }}
           RUN_LEAN: ${{ needs.plan.outputs.run-lean }}
           SHARD_RESULT: ${{ needs.lean-test-shards.result }}
         run: |
+          test "$PLAN_RESULT" = "success"
           if [ "$RUN_LEAN" = "true" ]; then
             test "$SHARD_RESULT" = "success"
           else
@@ -218,9 +265,10 @@ jobs:
 
   coverage:
     name: Coverage
+    if: always() && needs.plan.outputs.run-python == 'true' && needs.test.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: test
+    needs: [plan, test]
     permissions:
       contents: read
       pull-requests: write
@@ -246,10 +294,15 @@ jobs:
         shell: bash -o pipefail {0}
       - run: uv run --frozen coverage xml
       - name: Post coverage summary to PR
-        if: github.event_name == 'pull_request'
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.type != 'Bot' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          pct="$(grep -oP 'TOTAL\s+\d+\s+\d+\s+\K\d+(?=%)' coverage-report.txt || echo 'N/A')"
+          pct="$(awk '$1 == "TOTAL" { value = $NF; sub(/%$/, "", value); print value }' coverage-report.txt)"
+          test -n "$pct"
           {
+            echo "<!-- jacobian-coverage-report -->"
             echo "## Coverage Report"
             echo ""
             echo '```'
@@ -261,9 +314,27 @@ jobs:
             echo "Branch coverage enabled. Complexity tracked via Ruff C90 (max 28)."
             echo "Duplicate code detection via jscpd (threshold 10)."
           } > coverage-summary.md
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file coverage-summary.md || true
+          jq -n --rawfile body coverage-summary.md '{body: $body}' > coverage-comment.json
+          mapfile -t comment_ids < <(
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | select((.body | contains("<!-- jacobian-coverage-report -->")) or (.body | startswith("## Coverage Report"))) | .id'
+          )
+          if [ "${#comment_ids[@]}" -eq 0 ]; then
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input coverage-comment.json
+          else
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/${comment_ids[0]}" \
+              --input coverage-comment.json
+            for duplicate_id in "${comment_ids[@]:1}"; do
+              gh api --method DELETE \
+                "repos/$GITHUB_REPOSITORY/issues/comments/$duplicate_id"
+            done
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-3.12
@@ -271,6 +342,8 @@ jobs:
 
   duplicate-code:
     name: Duplicate Code Detection
+    needs: plan
+    if: needs.plan.outputs.run-duplicate == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -282,6 +355,8 @@ jobs:
 
   npm-package:
     name: npm Package
+    needs: plan
+    if: needs.plan.outputs.run-npm == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -297,6 +372,8 @@ jobs:
 
   build:
     name: Build
+    needs: plan
+    if: needs.plan.outputs.run-build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
