@@ -51,7 +51,11 @@ from jacobian.polynomial_capabilities import (
     install_polynomial_capabilities,
 )
 from jacobian.polytope import PolytopeService
-from jacobian.provider_runtime import cadical_provider_runtime, lean_provider_runtime
+from jacobian.provider_runtime import (
+    cadical_provider_runtime,
+    drat_trim_provider_runtime,
+    lean_provider_runtime,
+)
 from jacobian.references import (
     LeanCheckerInstallation,
     PolytopeCheckerInstallation,
@@ -62,7 +66,9 @@ from jacobian.registry import CheckerRegistry
 from jacobian.sat import SatArtifactService, install_sat_artifacts
 from jacobian.sat_capabilities import (
     SatAssignmentCheckerInstallation,
+    SatUnsatProofCheckerInstallation,
     install_sat_assignment_checker,
+    install_sat_unsat_proof_checker,
 )
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
@@ -212,6 +218,20 @@ class JacobianKernel:
         )
         if sat_assignment_adapter is not None:
             self.register_capability(sat_assignment_adapter)
+        self.drat_trim_runtime: CapabilityProviderRuntime = drat_trim_provider_runtime()
+        self.sat_unsat_proof_checker: SatUnsatProofCheckerInstallation
+        proof_adapter, self.sat_unsat_proof_checker = install_sat_unsat_proof_checker(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.sat,
+            self.verification,
+            self.checkers,
+            self.drat_trim_runtime,
+            authorize_checker=install_references,
+        )
+        if proof_adapter is not None:
+            self.register_capability(proof_adapter)
         self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
         if (
             self.cadical_runtime.availability
