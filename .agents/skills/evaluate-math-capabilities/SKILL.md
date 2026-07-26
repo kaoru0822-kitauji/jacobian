@@ -9,6 +9,9 @@ Determine whether a concrete Jacobian capability or portfolio change helps
 agents on new mathematical work. Keep the strategy agent-owned and score
 outcomes and evidence, not a preferred sequence of calls.
 
+Use the [shared handoff format](../../../docs/reference/capability-development-handoffs.md)
+for inputs, returns, and portfolio decisions.
+
 ## Confirm evaluation readiness
 
 Start from a concrete intervention:
@@ -180,10 +183,10 @@ tool failure, or insufficient prompt as its own failure class.
 Use the repository runner and keep generated results under its ignored results
 directory. Record:
 
-- repository tree and capability/provider versions;
-- model and reasoning settings;
+- the reproducibility fingerprint: git tree, visible case-bundle digest,
+  catalog-availability digest, provider/runtime identity, model/settings,
+  prompt, oracle, and scorer identities;
 - order and fixture seeds;
-- prompts and capability availability;
 - raw transcripts and structured reports;
 - oracle and scorer outcomes; and
 - validation actually run.
@@ -227,18 +230,11 @@ descriptor, or evaluation-design failure by manufacturing another operation.
 
 ## Report
 
-Return:
-
-- the discovery candidate and supporting evidence lineage;
-- the frozen question and intervention;
-- case and oracle provenance;
-- baseline and treatment definitions;
-- correctness and false-certification results;
-- cost and tool-use metrics for correct runs;
-- transcript-derived failure classes;
-- contamination and proof gaps;
-- the justified portfolio action; and
-- exact reproduction commands.
+Return a `stage=evaluation,status=complete` handoff using the shared format.
+Include the frozen question and intervention, case/oracle provenance, baseline
+and treatment definitions, correctness and false-certification results,
+transcript-derived failure classes, contamination and proof gaps, the justified
+portfolio action, and exact reproduction commands.
 
 State whether the result is a harness validation, public regression, pilot, or
 comparative performance claim. Do not promote a single pair to a statistically

@@ -131,17 +131,19 @@ import checker authorization into the producer or plugin.
 
 ## Add proportionate proof
 
-At minimum add:
+Required core checks are:
 
 - descriptor, schema, and catalog uniqueness/installation coverage;
 - one representative completing reproduction;
 - exact inline output and persisted artifact assertions;
 - artifact parent and relationship assertions;
-- one boundary-value case;
 - one invalid or mathematically inapplicable case proving fail-closed behavior
-  and absence of success artifacts; and
-- timeout, cancellation, unavailable-runtime, incomplete-search, or malformed
-  backend cases when the capability can reach them.
+  and absence of success artifacts.
+
+Add a meaningful boundary-value case when the domain has one. Add timeout,
+cancellation, unavailable-runtime, incomplete-search, or malformed-backend
+cases only when the capability can reach those states; keep each applicable
+case tied to its observable failure contract.
 
 For a family, invoke every ID through the public registry but test semantics by
 meaningful equivalence classes rather than mirroring every implementation
@@ -173,17 +175,10 @@ Run focused tests while implementing, then the repository-prescribed check for
 the exact final tree. Report only validation that ran and any unavailable
 runtime or proof gap.
 
-Produce an implementation handoff containing:
-
-- capability IDs and versions;
-- source candidate and outcome;
-- contracts, semantics, artifacts, and relationships;
-- provider identity and resource bounds;
-- every failure/non-conclusion state;
-- attainable assurance and open checker obligations;
-- public reproductions and validation evidence;
-- compatibility status; and
-- the exact control/treatment delta for `evaluate-math-capabilities`.
+Use the [shared handoff format](../../../docs/reference/capability-development-handoffs.md)
+with `stage=implementation,status=complete`. Include the exact capability
+availability delta, validation actually run, compatibility status, and any
+remaining checker or proof obligations.
 
 Use `implement-math-capability-checker` only for a separately justified
 verification path. Use `evaluate-math-capabilities` to decide whether the

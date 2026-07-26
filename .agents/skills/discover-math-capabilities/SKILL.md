@@ -157,7 +157,10 @@ Agent-visible mathematical atomicity matters; backend-call atomicity does not.
 
 ## Apply the candidate gate
 
-Create a candidate record before implementation:
+Create a candidate record before implementation using the
+[shared handoff format](../../../docs/reference/capability-development-handoffs.md).
+Set `stage=discovery` and record the gate status, evidence references, open
+obligations, and next action.
 
 | Gate | Required evidence |
 | --- | --- |
@@ -195,17 +198,12 @@ it replays the examples that inspired it.
 ## Hand off implementation-ready candidates
 
 Hand an accepted candidate to `implement-math-capability` only when the
-candidate gate is complete enough to freeze an experimental contract. Supply:
-
-- the single mathematical outcome and proposed domain-owned ID;
-- supporting move episodes and any fundamental-primitive exception;
-- current catalog overlap and the smallest justified portfolio change;
-- typed input, output, artifacts, relationships, and normalization;
-- resource bounds and every failure or non-conclusion state;
-- provider identity, version, deployment, and license constraints;
-- attainable assurance and independent-checker obligations;
-- public reproduction and adversarial cases; and
-- the evaluation hypothesis and proposed control ablation.
+candidate gate is complete enough to freeze an experimental contract. Use the
+[shared handoff format](../../../docs/reference/capability-development-handoffs.md)
+with `stage=discovery,status=accepted`; the stage-specific record must cover
+the outcome and ID, move episodes, portfolio delta, contract and failure
+semantics, runtime snapshot, assurance obligations, reproductions, and
+evaluation hypothesis.
 
 Discovery does not authorize implementation to broaden the scope, add nearby
 backend functions, or promote the result to `VERIFIED`. If the candidate needs
@@ -215,19 +213,11 @@ an independent verification path after its producer contract is stable, use
 ## Hand off comparative questions
 
 When the proposal is concrete enough to ask whether it improves autonomous
-performance, hand it to `evaluate-math-capabilities`. Supply:
-
-- the complete candidate record and supporting move episodes;
-- the capability hypothesis and counterfactual benefit;
-- public reproduction cases;
-- plausible wrong paths and false-certification risks;
-- current portfolio overlap and the proposed control ablation;
-- candidate backends and checker boundaries;
-- applicable datasets and contamination notes; and
-- the metrics that could distinguish success from a persuasive replay.
-
-Do not construct hidden oracles during open workflow mining unless the user also
-asks for an evaluation.
+performance, hand it to `evaluate-math-capabilities` using the same record.
+Include the counterfactual benefit, public and adversarial cases, proposed
+control ablation, checker boundary, contamination notes, and discriminating
+metrics. Do not construct hidden oracles during open workflow mining unless the
+user also asks for an evaluation.
 
 ## Report
 

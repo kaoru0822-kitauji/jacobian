@@ -8,6 +8,9 @@ description: Design and implement an operator-authorized independent checker for
 Build a verification path whose authority, implementation, and evidence are
 independent of the producer, search, or evaluator it checks.
 
+Use the [shared handoff format](../../../docs/reference/capability-development-handoffs.md)
+for the checker record and its return to evaluation.
+
 ## Confirm checker-worthiness
 
 Start from a stable candidate artifact and exact relation. Require:
@@ -182,19 +185,12 @@ oracle or test merely to make the checker pass.
 
 ## Hand off to evaluation
 
-Return:
-
-- the exact verifiable claim;
-- obligation ledger and discharged obligations;
-- certificate/witness format and artifact bindings;
-- producer and checker dependency comparison;
-- registry authorization and compatibility scope;
-- all non-verifying outcomes;
-- attack-test evidence;
-- runtime and operational limits;
-- residual proof gaps; and
-- a treatment definition that adds verification without changing the producer
-  outcome.
+Return a `stage=checker,status=complete` handoff using the shared format. It
+must identify the exact verifiable claim, discharged and open obligations,
+certificate bindings, producer/checker dependency comparison (including the
+allowed passive shared types or codecs), authorization scope, attack evidence,
+non-verifying outcomes, runtime limits, and the treatment definition that adds
+verification without changing the producer outcome.
 
 Use `evaluate-math-capabilities` to measure false certification, false
 rejection, downstream use of verified evidence, discovery cost, calls, tokens,
