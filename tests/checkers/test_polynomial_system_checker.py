@@ -89,6 +89,14 @@ def test_solution_checker_accepts_a_valid_assignment() -> None:
 
     assert decision["accepted"] is True
     assert decision["conclusion"] == "TRUE"
+    assert decision["relation_id"] == "polynomial.relation.satisfies-system"
+    assert decision["relationship_source_artifact_uris"] == [
+        "artifact://sha256/" + "6" * 64
+    ]
+    assert decision["relationship_target_artifact_uris"] == [
+        "artifact://sha256/" + "5" * 64
+    ]
+    assert "obligation_uri" not in decision
 
 
 def test_solution_checker_verifies_a_violating_assignment_as_false() -> None:
@@ -105,6 +113,10 @@ def test_solution_checker_verifies_a_violating_assignment_as_false() -> None:
 
     assert decision["accepted"] is True
     assert decision["conclusion"] == "FALSE"
+    assert "relation_id" not in decision
+    assert "relationship_source_artifact_uris" not in decision
+    assert "relationship_target_artifact_uris" not in decision
+    assert "obligation_uri" not in decision
 
 
 def test_solution_checker_rejects_assignment_substitution() -> None:

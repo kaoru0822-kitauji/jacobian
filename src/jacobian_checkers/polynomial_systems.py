@@ -203,11 +203,23 @@ def check_solution(request: dict[str, Any]) -> dict[str, Any]:
             "arithmetic": "EXACT_RATIONAL",
             "method": "CHECKED_CERTIFICATE",
             "coverage": "EXHAUSTIVE",
-            "relation_id": "polynomial.relation.satisfies-system",
             "detail": (
                 "every equation vanishes and every inequation is nonzero"
                 if satisfies
                 else "the assignment violates at least one declared constraint"
+            ),
+            **(
+                {
+                    "relation_id": "polynomial.relation.satisfies-system",
+                    "relationship_source_artifact_uris": [
+                        assignment_artifact["artifact_uri"]
+                    ],
+                    "relationship_target_artifact_uris": [
+                        system_artifact["artifact_uri"]
+                    ],
+                }
+                if satisfies
+                else {}
             ),
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):

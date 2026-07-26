@@ -69,6 +69,13 @@ def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
     )
     record = kernel.store.get(result.output["verification_record_uri"])
     assert result.output["certificate_uri"] in record.manifest.parents
+    assert record.payload["relationship_source_artifact_uris"] == [
+        result.output["assignment_uri"]
+    ]
+    assert record.payload["relationship_target_artifact_uris"] == [
+        result.output["system_uri"]
+    ]
+    assert record.payload["obligation_uri"] is None
 
 
 @pytest.mark.integration
@@ -88,6 +95,11 @@ def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None
     assert result.output["residuals_assurance"] == "VERIFIED"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.relationships == ()
+    record = kernel.store.get(result.output["verification_record_uri"])
+    assert record.payload["relation_id"] is None
+    assert record.payload["relationship_source_artifact_uris"] == []
+    assert record.payload["relationship_target_artifact_uris"] == []
+    assert record.payload["obligation_uri"] is None
 
 
 @pytest.mark.integration
