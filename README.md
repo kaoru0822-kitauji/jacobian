@@ -34,25 +34,15 @@ Jacobian exposes those as typed, inspectable artifacts: the witness, the
 certificate, the rejected candidate, the stale attempt. A human reviewer or a
 downstream agent can see what was tried, what passed, and what did not.
 
-Capabilities have mathematically atomic, agent-visible outcomes: retrieve
-premises, construct an object, compute an invariant, transform a claim, search
-for a witness, or check a certificate. Agents compose these operations into
-research strategies. Optional workflows preserve their intermediate artifacts,
-and independent checkers verify exact claims and evidence.
-
-Each operation returns typed, inspectable results with explicit relationships,
-scope, execution status, assurance, and provenance. Existing mathematical
-software and domain plugins supply the mathematics; capability adapters expose
-it through a common contract. Jacobian supplies operations, artifacts,
-execution policy, and trust boundaries—not a prescribed research strategy.
-
-The public kernel is domain-agnostic. Graphs, matrices, finite algebra,
-optimization problems, numerical claims, and formal proof goals acquire their
-mathematical meaning through plugins. Those plugins share the same artifact,
-evaluation, witness, shrinking, provenance, and verification substrate.
-Exploration may use models, heuristics, solvers, and external mathematical
-systems. Evidence that needs to become a trusted conclusion must enter a
-separate assurance lane:
+Each capability has one mathematically atomic, agent-visible outcome and
+returns typed results with explicit scope, execution status, assurance, and
+provenance. Existing mathematical software supplies the mathematics; capability
+adapters expose it through a common contract. Jacobian supplies operations,
+artifacts, execution policy, and trust boundaries, not a prescribed research
+strategy. The public kernel is domain-agnostic: graphs, matrices, finite
+algebra, optimization problems, and formal proof goals acquire their meaning
+through plugins that share the same artifact, evaluation, witness, and
+verification substrate.
 
 > Search and evaluation may be wrong. A result becomes verified only when an
 > operator-authorized checker accepts evidence bound to the exact claim,
@@ -231,48 +221,32 @@ documentation placement, and pull-request expectations.
 Jacobian is implemented as a Python package, CLI, and local or remote MCP
 adapter. The agent-facing MCP surface uses `capability.describe` for exact
 contracts and `capability.invoke` for execution, backed by an extensible
-adapter registry and trust-labeled artifacts. Bundled capabilities cover graph
-construction and properties, exact rational polynomial maps, finite magma law
-evaluation and countermodel search, reference-domain exploration and
-verification, Lean checking, and local research-memory search.
+adapter registry and trust-labeled artifacts. See the
+[Bundled capabilities](#bundled-capabilities) section above for the operation
+portfolio, and the [tool reference](docs/reference/tools.md) for per-capability
+contracts.
 
-The optional `flint` extra pins Python-FLINT 0.9.0 and adds
-`linear.rational_solution.find` for one exact finite rational `A x = b`
-candidate. A returned vector remains `COMPUTED`; a not-found outcome makes no
-consistency claim. With bundled references enabled,
-`linear.rational_solution.verify` independently replays every equation using
-standard-library exact rational arithmetic and alone may create a bound
-verification record. See the
-[exact rational solution contract](docs/reference/linear-rational-solutions.md).
+Some capabilities depend on optional backends that are not installed by
+default: CaDiCaL for SAT model and UNSAT proof finding, cvc5 for SMT UNSAT
+proof finding, and the `flint` extra for exact rational linear solutions.
+Solver output always remains unverified until a separate, independent checker
+accepts the bound witness or certificate. See the
+[SAT artifact contracts](docs/reference/sat-artifacts.md),
+[SMT artifact contracts](docs/reference/smt-artifacts.md), and
+[exact rational solution contract](docs/reference/linear-rational-solutions.md)
+for the verification boundaries.
 
-The base kernel also registers canonical CNF, total assignment, and raw DRAT
-proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
-`sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound
-model or text-DRAT evidence. Solver status and produced bytes remain
-unverified; assignment and proof checking are separate capability boundaries.
-With bundled references and an operator-provenanced pinned DRAT-trim runtime,
-`sat.unsat_proof.verify` can independently replay the exact CNF-bound proof and
-create a verification record. Runtime failure or proof rejection remains
-`UNKNOWN`.
-
-Three direct operational tools—`workspace.open`, `workspace.write`, and
-`workspace.query`—provide durable, revisioned paper-like working state outside
+Three direct operational tools, `workspace.open`, `workspace.write`, and
+`workspace.query`, provide durable, revisioned paper-like working state outside
 the mathematical capability and assurance model. Scratch entries, findings,
 attempts, focus, and append-only lifecycle marks remain agent-authored and
 `UNVERIFIED`. Explicit dependency links support bounded context retrieval and
 derived stale warnings without promoting a claim.
 
 All public capability contracts and artifact formats remain pre-stable unless
-a release specification explicitly says otherwise.
-
-Development commands and test-selection guidance live in
-[CONTRIBUTING.md](CONTRIBUTING.md) and the
+a release specification explicitly says otherwise. Development commands and
+test-selection guidance live in [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [testing strategy](docs/reference/testing-strategy.md).
-
-The MCP adapter remains isolated from the mathematical kernel. Exact
-finite-polytope generation uses Z3 rational constraints, but Z3 output remains
-unverified until the separate `Fraction`-based checker accepts the bound
-witness or certificate.
 
 ### MCP clients
 
