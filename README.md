@@ -105,8 +105,6 @@ goals are part of the working project record. Start with:
   cross-cutting decisions and their release scope.
 - [Epistemic workspace ADR](docs/explanation/adr/0005-direct-epistemic-workspaces.md)
   for the separation between durable working state and mathematical assurance.
-- [Threat model](docs/explanation/threat-model.md) for protected properties,
-  trust assumptions, and explicit exclusions.
 - [Durable search runtime](docs/explanation/search-runtime.md) for ownership,
   persistence, and recovery decisions.
 

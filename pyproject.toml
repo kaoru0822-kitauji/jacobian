@@ -32,16 +32,19 @@ dev = [
     "deptry>=0.21,<1",
     "hypothesis>=6.130,<7",
     "mypy>=1.15,<3",
+    "pip-audit>=2.9,<3",
     "pre-commit>=4.4,<5",
     "pyperf>=2.9,<3",
     "pytest>=8.3,<10",
     "pytest-cov>=6,<8",
+    "pytest-rerunfailures>=14,<16",
     "pytest-split>=0.11,<1",
     "pytest-timeout>=2.4,<3",
     "pytest-xdist>=3.6,<4",
     "ruff>=0.11,<1",
     "types-jsonschema>=4.23,<5",
     "types-networkx>=3.4,<4",
+    "vulture>=2.14,<3",
 ]
 
 [tool.hatch.build.targets.wheel]

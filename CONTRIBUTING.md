@@ -12,9 +12,6 @@ Read the [documentation home](docs/index.md), the
 [product goals](docs/explanation/goals.md), the
 [v0.2 specification](docs/reference/specifications/v0.2.md), and the
 [v0.2 conformance specification](docs/reference/conformance-v0.2.md).
-Changes to checker authorization, plugin isolation, durable state, or evidence
-promotion also require reviewing the
-[threat model](docs/explanation/threat-model.md).
 
 ## Development environment
 
@@ -26,17 +23,21 @@ make setup
 make test-fast
 ```
 
-`make test-fast` is the short non-integration feedback loop. Before handoff,
-run `make validate`, which performs lint, formatting, dependency, type, full
-test-suite, and package-build checks. Run `make help` for focused commands.
-Tests can be narrowed without learning another wrapper. The measured costs and
-reasoning behind these lanes are recorded in the
-[test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
+`make test-fast` is the short non-integration feedback loop. Run `make check`
+before pushing; it performs lint, formatting, dependency, type, fast tests,
+and package-build checks. CI owns the full Python matrix, integration,
+end-to-end, coverage, and real-Lean validation. `make validate` remains
+available for exhaustive local validation. Run `make help` for focused
+commands. The measured costs and reasoning behind these lanes are recorded in
+the [test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
+Tests can be narrowed without learning another wrapper:
 
 ```sh
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-lean
+make refresh-test-durations
+make refresh-lean-test-durations
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,
@@ -47,8 +48,10 @@ On macOS, read the
 [Z3 installation note](README.md#macos-and-z3) before troubleshooting a
 source-build failure from `uv sync --dev`.
 
-Use focused tests while implementing. Run the complete applicable validation
-before handing off the final tree, and report only checks that actually ran.
+Use focused tests while implementing. Run `make check` before pushing and wait
+for green CI checks before merge. Run complete local validation only
+when changing CI itself, debugging an environment-specific failure, or when CI
+is unavailable. Report only checks that actually ran.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 
@@ -61,12 +64,19 @@ integration tests join the right loop without repeated file-level boilerplate.
 Tests marked `lean_runtime` run serially through `make test-lean`; keep them out
 of the normal xdist pool because Mathlib processes can retain several
 gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
-dedicated job.
+dedicated pair of serial lanes on separate runners.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
-and `make validate` before handoff. Do not use unfiltered `uv run pytest` as the
-normal complete-suite command because it mixes Lean into the general xdist
-pool. After a material suite expansion or observed CI shard imbalance, run
-`make test-durations` and commit the updated `.test_durations` file.
+and `make check` before pushing. Use
+`make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
+Do not use unfiltered `uv run pytest` as the normal complete-suite command
+because it mixes Lean into the general xdist pool.
+Refresh `.test_durations` after major suite changes; the target replaces the
+committed timings only after a successful non-Lean run on Linux with Python
+3.12. Also refresh when the slower CI shard exceeds the faster shard by more
+than 10% in two representative runs. Do not refresh for routine test edits.
+Refresh `.lean_test_durations` after adding or materially changing
+`lean_runtime` tests; its target runs all Lean tests serially before replacing
+the committed file.
 
 ## Verification rules
 
@@ -107,31 +117,11 @@ Verify every relative Markdown link before submitting the change.
 ## Releases
 
 The manifest-driven Release Please configuration keeps the Python and npm
-package versions synchronized. After the generated release pull request is
-merged, CI validates the exact tree and creates the GitHub release. It then
-dispatches the separate `Release` workflow at that immutable tag. The release
-workflow builds both distributions before its independent PyPI and npm publish
-jobs start.
-
-Both registries use OIDC rather than long-lived tokens. Configure their trusted
-GitHub Actions publishers for repository `morluto/jacobian`, workflow
-`release.yml`, and their matching `pypi` or `npm` environment. Restrict those
-environments to protected release tags and add required reviewers when manual
-approval is desired. Enable GitHub release immutability before the first
-release; publishing fails closed unless GitHub reports that the release tag is
-locked.
-
-The `Release` workflow is normally dispatched automatically. Its manual
-dispatch is a recovery path for an existing GitHub release tag and must run
-from the same tag, for example:
-
-```sh
-gh workflow run release.yml --ref v0.2.0 --field tag=v0.2.0
-```
-
-It does not create or version a release. If one registry publish fails, rerun
-only that failed job so the successful immutable upload is not attempted
-twice.
+package versions synchronized. CI tests and packs the npm launcher
+independently, then publishes both distributions after a release is created.
+The `jacobian` package on npm must authorize `.github/workflows/ci.yml` as its
+trusted GitHub Actions publisher, using the `npm` environment; releases use
+OIDC rather than a long-lived npm token.
 
 ## Pull requests
 
