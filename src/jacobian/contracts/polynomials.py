@@ -11,7 +11,7 @@ from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.contracts.common import ArtifactUri, CheckerUri
 from jacobian.contracts.exact import CanonicalRational
-from jacobian.contracts.results import ContractModel
+from jacobian.contracts.results import Conclusion, ContractModel
 
 PolynomialVariable = Annotated[
     str,
@@ -56,6 +56,25 @@ class SparseRationalPolynomial(ContractModel):
             raise ValueError("polynomial exponent tuples must be unique")
         if exponents != tuple(sorted(exponents, reverse=True)):
             raise ValueError("polynomial terms must use descending lexicographic order")
+        return self
+
+
+class RationalPolynomial(ContractModel):
+    """One sparse polynomial together with its exact coefficient ring."""
+
+    polynomial_schema_version: Literal["1"] = "1"
+    domain: Literal["QQ"] = "QQ"
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    polynomial: SparseRationalPolynomial
+
+    @model_validator(mode="after")
+    def require_matching_ring(self) -> Self:
+        if len(set(self.variables)) != len(self.variables):
+            raise ValueError("polynomial variables must be unique")
+        if any(
+            len(term.exponents) != len(self.variables) for term in self.polynomial.terms
+        ):
+            raise ValueError("every monomial must match the declared variable order")
         return self
 
 
@@ -186,6 +205,25 @@ class PolynomialCollisionRequest(ContractModel):
         return self
 
 
+class PolynomialIdentityRequest(ContractModel):
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    left: SparseRationalPolynomial
+    right: SparseRationalPolynomial
+
+    @model_validator(mode="after")
+    def require_matching_ring(self) -> Self:
+        if len(set(self.variables)) != len(self.variables):
+            raise ValueError("polynomial variables must be unique")
+        dimension = len(self.variables)
+        if any(
+            len(term.exponents) != dimension
+            for polynomial in (self.left, self.right)
+            for term in polynomial.terms
+        ):
+            raise ValueError("every monomial must match the declared variable order")
+        return self
+
+
 class PolynomialCollisionSearchRequest(ContractModel):
     map: RationalPolynomialMap
     max_abs_numerator: int = Field(ge=0, le=8)
@@ -262,6 +300,22 @@ class PolynomialJacobianClaim(ContractModel):
     claim_schema_version: Literal["1"] = "1"
     predicate: Literal["EXACT_POLYNOMIAL_JACOBIAN"] = "EXACT_POLYNOMIAL_JACOBIAN"
     source_map_uri: ArtifactUri
+
+
+class PolynomialIdentityClaim(ContractModel):
+    claim_schema_version: Literal["1"] = "1"
+    predicate: Literal["POLYNOMIAL_IDENTITY"] = "POLYNOMIAL_IDENTITY"
+    domain: Literal["QQ"] = "QQ"
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    left_uri: ArtifactUri
+    right_uri: ArtifactUri
+
+
+class PolynomialIdentityReplayPayload(ContractModel):
+    method: Literal["DIRECT_SPARSE_REPLAY"] = "DIRECT_SPARSE_REPLAY"
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    left_uri: ArtifactUri
+    right_uri: ArtifactUri
 
 
 class PolynomialJacobianReplayPayload(ContractModel):
@@ -375,6 +429,34 @@ class PolynomialCollisionOutput(ContractModel):
             self.witness_uri is not None and self.checker_id is not None
         ):
             raise ValueError("certificate availability requires witness and checker")
+        return self
+
+
+class PolynomialIdentityOutput(ContractModel):
+    identical: bool | None
+    conclusion: Conclusion
+    left_uri: ArtifactUri
+    right_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri | None = None
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+    determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
+
+    @model_validator(mode="after")
+    def identity_matches_conclusion(self) -> Self:
+        expected = {
+            Conclusion.TRUE: True,
+            Conclusion.FALSE: False,
+            Conclusion.UNKNOWN: None,
+        }
+        if self.conclusion not in expected:
+            raise ValueError(
+                "polynomial identity conclusion must be TRUE, FALSE, or UNKNOWN"
+            )
+        if self.identical is not expected[self.conclusion]:
+            raise ValueError("identical must preserve an unknown checker conclusion")
         return self
 
 

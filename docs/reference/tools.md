@@ -138,6 +138,7 @@ The base installation currently includes these kernel capability IDs:
 | `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
 | `polynomial.map.compute_jacobian` | Compute an exact Jacobian matrix and determinant for one sparse rational polynomial map. |
 | `polynomial.map.collision_witness` | Compare two exact point-evaluation artifacts and materialize a candidate collision witness. |
+| `polynomial.identity.verify` | Independently verify equality or inequality of two sparse polynomials over one declared rational polynomial ring. |
 | `polynomial.map.collision.search` | Search one fully declared finite rational grid for the first exact collision with reconciled point accounting. |
 | `polynomial.factor.compute` | Factor one univariate polynomial over QQ and materialize its exact reconstructed product without self-certifying irreducibility. |
 | `matrix.determinant.compute` | Compute the exact determinant of one square rational matrix and materialize the result. |
