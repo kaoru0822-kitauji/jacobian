@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import time
 from dataclasses import dataclass
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 import sympy
 from pydantic import ValidationError
@@ -53,12 +53,18 @@ from jacobian.contracts.polynomials import (
     PolynomialJacobianReplayPayload,
     PolynomialJacobianRequest,
     PolynomialMapEvaluation,
+    RationalPolynomial,
     RationalPolynomialMap,
     RationalPolynomialPoint,
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
-from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
+from jacobian.contracts.results import (
+    Conclusion,
+    ContractModel,
+    Execution,
+    ExecutionStatus,
+)
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -69,12 +75,13 @@ from jacobian.verification import VerificationService
 @dataclass(frozen=True, slots=True)
 class PolynomialInstallation:
     semantics_uri: str
+    polynomial_semantics_uri: str
     map_schema_uri: str
     evaluation_schema_uri: str
     jacobian_schema_uri: str
     claim_schema_uri: str
     jacobian_claim_schema_uri: str
-    polynomial_schema_uri: str
+    right_polynomial_schema_uri: str
     left_polynomial_schema_uri: str
     identity_claim_schema_uri: str
     witness_schema_uri: str
@@ -129,6 +136,23 @@ def install_polynomial_capabilities(
             "maximum_jacobian_product_term_estimate": 1024,
         },
     )
+    polynomial_semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.sparse-rational-polynomial-ring",
+        version="1",
+        definition={
+            "description": (
+                "canonical sparse polynomials over QQ in an explicit ordered "
+                "tuple of variables"
+            ),
+            "coefficient_field": "QQ",
+            "maximum_dimension": 4,
+            "maximum_terms": 1024,
+            "maximum_exponent": 127,
+            "monomial_order": "descending lexicographic",
+            "zero_terms": "omitted",
+        },
+    )
     map_schema_uri = schemas.register(
         name="jacobian.rational-polynomial-map",
         version="1",
@@ -154,15 +178,15 @@ def install_polynomial_capabilities(
         version="1",
         schema=model_schema(PolynomialJacobianClaim),
     )
-    polynomial_schema_uri = schemas.register(
+    right_polynomial_schema_uri = schemas.register(
         name="jacobian.sparse-rational-polynomial-right",
         version="1",
-        schema=model_schema(SparseRationalPolynomial),
+        schema=model_schema(RationalPolynomial),
     )
     left_polynomial_schema_uri = schemas.register(
         name="jacobian.sparse-rational-polynomial-left",
         version="1",
-        schema=model_schema(SparseRationalPolynomial),
+        schema=model_schema(RationalPolynomial),
     )
     identity_claim_schema_uri = schemas.register(
         name="jacobian.polynomial-identity-claim",
@@ -212,18 +236,19 @@ def install_polynomial_capabilities(
             format_id="polynomial.identity_replay",
             format_version="1",
             claim_schema_uris=(identity_claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(polynomial_schema_uri,),
+            semantics_uris=(polynomial_semantics_uri,),
+            candidate_schema_uris=(right_polynomial_schema_uri,),
             reason="bundled independent sparse-polynomial identity checker",
         ).checker_id
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
+        polynomial_semantics_uri=polynomial_semantics_uri,
         map_schema_uri=map_schema_uri,
         evaluation_schema_uri=evaluation_schema_uri,
         jacobian_schema_uri=jacobian_schema_uri,
         claim_schema_uri=claim_schema_uri,
         jacobian_claim_schema_uri=jacobian_claim_schema_uri,
-        polynomial_schema_uri=polynomial_schema_uri,
+        right_polynomial_schema_uri=right_polynomial_schema_uri,
         left_polynomial_schema_uri=left_polynomial_schema_uri,
         identity_claim_schema_uri=identity_claim_schema_uri,
         witness_schema_uri=witness_schema_uri,
@@ -860,19 +885,25 @@ class PolynomialIdentityAdapter:
             )
         left = self.resources.artifacts.put(
             schema_uri=self.resources.installation.left_polynomial_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
-            payload=validated.left.model_dump(mode="json"),
+            semantics_uri=self.resources.installation.polynomial_semantics_uri,
+            payload=RationalPolynomial(
+                variables=validated.variables,
+                polynomial=validated.left,
+            ).model_dump(mode="json"),
             summary="left exact rational polynomial",
         )
         right = self.resources.artifacts.put(
-            schema_uri=self.resources.installation.polynomial_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
-            payload=validated.right.model_dump(mode="json"),
+            schema_uri=self.resources.installation.right_polynomial_schema_uri,
+            semantics_uri=self.resources.installation.polynomial_semantics_uri,
+            payload=RationalPolynomial(
+                variables=validated.variables,
+                polynomial=validated.right,
+            ).model_dump(mode="json"),
             summary="right exact rational polynomial",
         )
         claim = self.resources.artifacts.put(
             schema_uri=self.resources.installation.identity_claim_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            semantics_uri=self.resources.installation.polynomial_semantics_uri,
             payload=PolynomialIdentityClaim(
                 variables=validated.variables,
                 left_uri=left.artifact_uri,
@@ -881,7 +912,9 @@ class PolynomialIdentityAdapter:
             parents=(left.artifact_uri, right.artifact_uri),
             summary="exact polynomial identity claim",
         )
-        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        semantics = self.resources.store.get(
+            self.resources.installation.polynomial_semantics_uri
+        )
         certificate_payload = PolynomialIdentityReplayPayload(
             variables=validated.variables,
             left_uri=left.artifact_uri,
@@ -904,7 +937,7 @@ class PolynomialIdentityAdapter:
         )
         certificate_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.installation.certificate_schema_uri,
-            semantics_uri=self.resources.installation.semantics_uri,
+            semantics_uri=self.resources.installation.polynomial_semantics_uri,
             payload=certificate.model_dump(mode="json"),
             parents=(claim.artifact_uri, right.artifact_uri, left.artifact_uri),
             summary="exact sparse polynomial identity replay certificate",
@@ -914,12 +947,14 @@ class PolynomialIdentityAdapter:
             checker_id=checker_id,
         )
         verified = checked.verification_record_uri is not None
-        conclusion = cast(
-            Literal["TRUE", "FALSE", "UNKNOWN"],
-            checked.conclusion.value,
-        )
+        conclusion = checked.conclusion
+        identical = {
+            Conclusion.TRUE: True,
+            Conclusion.FALSE: False,
+            Conclusion.UNKNOWN: None,
+        }[conclusion]
         output = PolynomialIdentityOutput(
-            identical=conclusion == "TRUE",
+            identical=identical,
             conclusion=conclusion,
             left_uri=left.artifact_uri,
             right_uri=right.artifact_uri,
@@ -939,29 +974,32 @@ class PolynomialIdentityAdapter:
                 parameters={"variables": list(validated.variables)},
                 artifact_uri=left.artifact_uri,
             ),
-            completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="every canonical sparse coefficient was replayed independently",
-                assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                verification_record_uri=checked.verification_record_uri,
+            completeness=(
+                CapabilityCompleteness(
+                    status=CapabilityCompletenessStatus.COMPLETE,
+                    basis=(
+                        "every canonical sparse coefficient was replayed independently"
+                    ),
+                    assurance_level=CapabilityAssuranceLevel.VERIFIED,
+                    verification_record_uri=checked.verification_record_uri,
+                )
+                if verified
+                else CapabilityCompleteness(
+                    status=CapabilityCompletenessStatus.UNKNOWN,
+                    basis="the independent checker did not accept the replay",
+                )
             ),
             relationships=(
                 CapabilityRelationship(
                     relation_id="polynomial.relation.identity",
                     source_artifact_uris=(left.artifact_uri,),
                     target_artifact_uris=(right.artifact_uri,),
-                    status=(
-                        CapabilityRelationshipStatus.VERIFIED
-                        if verified
-                        else CapabilityRelationshipStatus.PROPOSED
-                    ),
+                    status=CapabilityRelationshipStatus.VERIFIED,
                     verification_record_uri=checked.verification_record_uri,
                 ),
-            ),
+            )
+            if conclusion is Conclusion.TRUE and verified
+            else (),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED

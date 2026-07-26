@@ -167,8 +167,24 @@ def _identity_request() -> dict[str, Any]:
                 "right_uri": right_uri,
             }
         },
-        "scope": {"artifact_uri": left_uri, "payload": deepcopy(polynomial)},
-        "candidate": {"artifact_uri": right_uri, "payload": deepcopy(polynomial)},
+        "scope": {
+            "artifact_uri": left_uri,
+            "payload": {
+                "polynomial_schema_version": "1",
+                "domain": "QQ",
+                "variables": ["x", "y"],
+                "polynomial": deepcopy(polynomial),
+            },
+        },
+        "candidate": {
+            "artifact_uri": right_uri,
+            "payload": {
+                "polynomial_schema_version": "1",
+                "domain": "QQ",
+                "variables": ["x", "y"],
+                "polynomial": deepcopy(polynomial),
+            },
+        },
         "certificate": {
             "payload": {
                 "evidence_schema_version": "1",
@@ -197,7 +213,7 @@ def test_identity_checker_accepts_equal_exact_polynomials() -> None:
 
 def test_identity_checker_verifies_a_nonidentity_as_false() -> None:
     request = _identity_request()
-    request["candidate"]["payload"]["terms"][0]["coefficient"] = {
+    request["candidate"]["payload"]["polynomial"]["terms"][0]["coefficient"] = {
         "num": "5",
         "den": "7",
     }
@@ -206,11 +222,22 @@ def test_identity_checker_verifies_a_nonidentity_as_false() -> None:
 
     assert decision["accepted"] is True
     assert decision["conclusion"] == "FALSE"
+    assert "relation_id" not in decision
 
 
 def test_identity_checker_rejects_candidate_substitution() -> None:
     request = _identity_request()
     request["candidate"]["artifact_uri"] = "artifact://sha256/" + "8" * 64
+
+    decision = check_identity(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_identity_checker_rejects_polynomial_ring_substitution() -> None:
+    request = _identity_request()
+    request["candidate"]["payload"]["variables"] = ["y", "x"]
 
     decision = check_identity(request)
 

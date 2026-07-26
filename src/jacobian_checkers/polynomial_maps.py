@@ -264,16 +264,29 @@ def check_identity(request: dict[str, Any]) -> dict[str, Any]:
             }
         ):
             return _reject("unexpected identity certificate or bindings")
+        left_artifact = scope["payload"]
+        right_artifact = candidate["payload"]
+        if (
+            not isinstance(left_artifact, dict)
+            or not isinstance(right_artifact, dict)
+            or left_artifact.get("polynomial_schema_version") != "1"
+            or right_artifact.get("polynomial_schema_version") != "1"
+            or left_artifact.get("domain") != "QQ"
+            or right_artifact.get("domain") != "QQ"
+            or left_artifact.get("variables") != variables
+            or right_artifact.get("variables") != variables
+        ):
+            return _reject("polynomial artifacts do not match the declared ring")
         left = _as_polynomial(
             _parse_polynomial(
-                scope["payload"],
+                left_artifact.get("polynomial"),
                 len(variables),
                 maximum_exponent=_MAX_DERIVED_EXPONENT,
             )
         )
         right = _as_polynomial(
             _parse_polynomial(
-                candidate["payload"],
+                right_artifact.get("polynomial"),
                 len(variables),
                 maximum_exponent=_MAX_DERIVED_EXPONENT,
             )
@@ -285,12 +298,12 @@ def check_identity(request: dict[str, Any]) -> dict[str, Any]:
             "arithmetic": "EXACT_RATIONAL",
             "method": "CHECKED_CERTIFICATE",
             "coverage": "EXHAUSTIVE",
-            "relation_id": "polynomial.relation.identity",
             "detail": (
                 "polynomials have identical exact coefficients in the declared ring"
                 if equal
                 else "polynomials differ in at least one exact coefficient"
             ),
+            **({"relation_id": "polynomial.relation.identity"} if equal else {}),
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return _reject("malformed polynomial identity request")
