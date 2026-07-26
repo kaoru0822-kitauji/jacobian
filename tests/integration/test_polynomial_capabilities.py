@@ -12,13 +12,10 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
     CapabilityMode,
+    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
-from jacobian.contracts.evidence import (
-    EvidenceBindings,
-    WitnessEnvelope,
-    WitnessRole,
-)
+from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, WitnessRole
 from jacobian.contracts.results import Conclusion, InputStatus, Verification
 from jacobian.kernel import JacobianKernel
 
@@ -62,6 +59,138 @@ def _jacobian_counterexample_map() -> dict[str, Any]:
 
 def _point(*values: Fraction | int) -> list[dict[str, str]]:
     return [_wire_fraction(value) for value in values]
+
+
+def _identity_input(
+    *,
+    right_coefficient: Fraction | int = 2,
+) -> dict[str, Any]:
+    return {
+        "variables": ["x", "y"],
+        "left": {
+            "terms": [
+                {
+                    "coefficient": _wire_fraction(2),
+                    "exponents": [2, 0],
+                },
+                {
+                    "coefficient": _wire_fraction(-1),
+                    "exponents": [0, 1],
+                },
+            ]
+        },
+        "right": {
+            "terms": [
+                {
+                    "coefficient": _wire_fraction(right_coefficient),
+                    "exponents": [2, 0],
+                },
+                {
+                    "coefficient": _wire_fraction(-1),
+                    "exponents": [0, 1],
+                },
+            ]
+        },
+    }
+
+
+@pytest.mark.integration
+def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.identity.verify",
+            mode=CapabilityMode.VERIFY,
+            input=_identity_input(),
+        )
+    )
+
+    assert result.output["identical"] is True
+    assert result.output["conclusion"] == "TRUE"
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.assurance.verification_record_uri is not None
+    assert len(result.relationships) == 1
+    assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
+    assert result.output["left_uri"] != result.output["right_uri"]
+
+    semantics_uri = kernel.polynomial.identity_semantics_uri
+    assert semantics_uri != kernel.polynomial.semantics_uri
+    semantics = kernel.store.get(semantics_uri)
+    assert semantics.payload["name"] == "jacobian.sparse-rational-polynomial-ring"
+    for output_key in ("left_uri", "right_uri", "claim_uri", "certificate_uri"):
+        artifact = kernel.store.get(result.output[output_key])
+        assert artifact.manifest.semantics_uri == semantics_uri
+    record = kernel.store.get(result.output["verification_record_uri"])
+    assert (
+        record.payload["bindings"]["semantics_digest"]
+        == semantics.manifest.object_digest
+    )
+    assert record.payload["relationship_source_artifact_uris"] == [
+        result.output["left_uri"]
+    ]
+    assert record.payload["relationship_target_artifact_uris"] == [
+        result.output["right_uri"]
+    ]
+    assert record.payload["obligation_uri"] is None
+    checker = kernel.checkers.get(result.output["checker_id"])
+    assert checker.semantics_uris == (semantics_uri,)
+
+    rejected = kernel.verification.verify_certificate(
+        certificate_uri=result.output["certificate_uri"],
+        checker_id=result.output["checker_id"],
+        supporting_artifact_uris=(result.output["claim_uri"],),
+    )
+    assert rejected.input.status is InputStatus.REJECTED
+    assert rejected.conclusion is Conclusion.UNKNOWN
+    assert rejected.verification_record_uri is None
+
+
+@pytest.mark.integration
+def test_polynomial_identity_verifies_a_difference(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.identity.verify",
+            mode=CapabilityMode.VERIFY,
+            input=_identity_input(right_coefficient=3),
+        )
+    )
+
+    assert result.output["identical"] is False
+    assert result.output["conclusion"] == "FALSE"
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.assurance.verification_record_uri is not None
+    assert result.relationships == ()
+    record = kernel.store.get(result.output["verification_record_uri"])
+    assert record.payload["conclusion"] == Conclusion.FALSE.value
+    assert record.payload["relation_id"] is None
+
+
+@pytest.mark.integration
+def test_polynomial_identity_preserves_checker_rejection_as_unknown(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    checker_id = kernel.polynomial.identity_checker_id
+    assert checker_id is not None
+    kernel.checkers.revoke(checker_id, reason="exercise fail-closed projection")
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.identity.verify",
+            mode=CapabilityMode.VERIFY,
+            input=_identity_input(),
+        )
+    )
+
+    assert result.output["identical"] is None
+    assert result.output["conclusion"] == Conclusion.UNKNOWN.value
+    assert result.output["verification_record_uri"] is None
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
+    assert result.relationships == ()
 
 
 @pytest.mark.integration
