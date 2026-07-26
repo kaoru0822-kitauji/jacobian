@@ -44,8 +44,10 @@ Jacobian protects:
   plugin, runtime, checkpoint, or experiment;
 - parameter-region promotion bound to the exact subject and claim artifacts,
   not merely an equal payload.
-- remote tenant separation for artifacts, episodes, experiments, plugins, and
-  checker metadata.
+- durable workspace lineage that cannot be silently rebound to another
+  workspace, branch, base revision, or idempotency request;
+- remote tenant separation for artifacts, episodes, workspaces, experiments,
+  plugins, and checker metadata.
 
 Availability is important but secondary to integrity: resource exhaustion may
 produce timeout or error, never a false mathematical conclusion.
@@ -83,6 +85,38 @@ Controls:
 The deliberate crash, malformed-output, and timeout behaviors used by the
 generic conformance kit exist only in a disposable synthetic package and
 isolated state. They are not a required production-plugin interface.
+
+### Agent-authored workspace state
+
+A model or remote caller may record a false claim, report an unsuccessful
+attempt as complete, cite a missing dependency, create a reference cycle, reuse
+an idempotency key for different content, write from a stale branch head, forge
+a lifecycle label, or create a cyclic supersession chain.
+
+Controls:
+
+- workspace drafts expose no caller-controlled verified or derived-stale field;
+- stored findings, attempts, and lifecycle marks are explicitly agent-authored
+  and unverified;
+- explicit finding references must exist in the same workspace branch;
+- only `workspace.open` may create the branch's singular canonical problem
+  card;
+- new dependency cycles, supersession cycles, self-supersession, and
+  assumption-kind mismatches are rejected;
+- an invalidating `RETRACTED` or `SUPERSEDED` mark cannot be silently cleared
+  by `CLOSED` or `ARCHIVED`; an explicit `ACTIVE` restoration is required;
+- `COMPLETED` attempts do not close goals; only an explicit `CLOSED` mark changes
+  workflow state, and this never assigns a mathematical conclusion;
+- stale warnings derive only from current `RETRACTED` or `SUPERSEDED` roots and
+  explicit dependency or assumption links; absence of a warning says nothing
+  about semantic completeness or truth;
+- every mutation binds an exact request digest to an idempotency key;
+- branch-head comparison and indexed writes commit in one SQLite transaction;
+- each query uses one SQLite read snapshot, and accepted row order rather than
+  caller-controlled timestamps selects current marks and recent entries;
+- immutable revision artifacts bind the accepted parent lineage;
+- workspace retrieval, context packs, focus, marks, and attempt outcomes never
+  authorize a checker or promote assurance.
 
 ### Malformed or ambiguous artifact
 
@@ -169,6 +203,8 @@ Controls:
 - idempotency keys select one durable capability invocation, append-only event
   chains preserve retries and runtime identity, and interrupted invocations
   recover from immutable checkpoints;
+- workspace idempotency keys select one accepted mutation, and optimistic
+  revision conflicts leave indexed workspace state unchanged;
 - recovery validates a snapshot against its database key and indexed state;
   malformed rows are quarantined as `ERROR` without stopping unrelated
   recovery;
@@ -242,6 +278,8 @@ Controls:
 - capability adapters cannot return verified assurance without a valid
   verification record, complete bound parent set, and matching conclusion in
   that tenant's store;
+- workspace tools use the same subject-routed kernel and tenant-local state
+  database as capability and artifact operations;
 - TLS, rate limits, host isolation, and network policy are supplied by the
   deployment platform.
 

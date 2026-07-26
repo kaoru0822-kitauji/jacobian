@@ -100,6 +100,8 @@ goals are part of the working project record. Start with:
   planning model.
 - [Architecture decision log](docs/explanation/adr/index.md) for accepted
   cross-cutting decisions and their release scope.
+- [Epistemic workspace ADR](docs/explanation/adr/0005-direct-epistemic-workspaces.md)
+  for the separation between durable working state and mathematical assurance.
 - [Threat model](docs/explanation/threat-model.md) for protected properties,
   trust assumptions, and explicit exclusions.
 - [Durable search runtime](docs/explanation/search-runtime.md) for ownership,
@@ -130,6 +132,13 @@ adapter registry and trust-labeled artifacts. Bundled capabilities cover graph
 construction and properties, reference-domain exploration and verification,
 Lean checking, and local research-memory search.
 
+Three direct operational tools—`workspace.open`, `workspace.write`, and
+`workspace.query`—provide durable, revisioned paper-like working state outside
+the mathematical capability and assurance model. Scratch entries, findings,
+attempts, focus, and append-only lifecycle marks remain agent-authored and
+`UNVERIFIED`. Explicit dependency links support bounded context retrieval and
+derived stale warnings without promoting a claim.
+
 All public capability contracts and artifact formats remain pre-stable unless
 a release specification explicitly says otherwise.
 
@@ -147,12 +156,12 @@ witness or certificate.
 The repository includes a trusted-project Codex profile at
 `.codex/config.toml`. Run Codex from the repository root and inspect
 `jacobian_local` with `/mcp`; the profile starts `uv run jacobian-mcp` over
-STDIO with the compact two-tool capability surface and stores durable local state
-under the ignored `.jacobian/` directory. The profile advertises
-`capability.describe` and `capability.invoke`. Describe an unfamiliar
-capability before invoking it; reference domains include exact predicate and
-candidate schemas plus executable examples. `capability://catalog` remains a
-resource-level catalog for clients that support MCP resources.
+STDIO with a compact five-tool surface and stores durable local state under the
+ignored `.jacobian/` directory. It advertises `capability.describe`,
+`capability.invoke`, and the three direct `workspace.*` tools. Describe an
+unfamiliar mathematical capability before invoking it; direct workspace tools
+publish their own schemas. `capability://catalog` remains a resource-level
+catalog for clients that support MCP resources.
 
 For ChatGPT and other remote clients, the server supports Streamable HTTP and
 SSE, bearer-token authentication, and subject-bound tenant state. Follow

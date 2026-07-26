@@ -375,6 +375,30 @@ artifacts, not reference contracts. Store them under the ignored
 `benchmarks/results/` directory and summarize them only from a clean,
 identified tree when making a benchmark claim.
 
+### Workspace context-loss development run
+
+An exploratory two-session run on 2026-07-26 used Codex CLI `0.144.1`,
+`gpt-5.6-terra`, and high reasoning effort. After the mark `summary` alias was
+published, the first session completed `open`, seed `write`, retraction
+`write`, and `CONTEXT` in four calls with no retry. A fresh session completed
+`CONTEXT`, `STALE`, resolution `write`, and `RESUME` in four calls with no
+retry. The target goal stayed visible while active-but-stale and left
+`open_goals` only after an explicit `CLOSED` mark.
+
+The fresh session's initial `CONTEXT` and `STALE` responses totaled 4,899
+characters. An earlier development run's initial `RESUME` and `FRONTIER`
+responses totaled 8,453 characters. The prompts and stored states were not
+identical, so the 42.0% payload difference is interface feedback, not a causal
+efficiency claim. A final alias-heavy smoke completed `open`, `write`, and
+`CONTEXT` in three calls with no retry and retained `UNVERIFIED` assurance.
+
+On the rebased five-tool server, compact sorted JSON over instructions and the
+`tools/list` payload is 24,745 characters. Workspace output schemas are omitted
+from initial tool discovery while complete JSON results remain available from
+calls; this keeps the first-stage descriptor below the 25 KB development
+target. These are dirty-worktree development measurements, not held-out product
+evidence.
+
 Run the kernel condition with:
 
 ```sh

@@ -16,7 +16,13 @@ from jacobian.adapters.mcp.remote import (
     TenantKernelRouter,
     load_static_token_file,
 )
+from jacobian.contracts.workspaces import (
+    WorkspaceOpenRequest,
+    WorkspaceQueryRequest,
+    WorkspaceQueryView,
+)
 from jacobian.store import ArtifactNotFoundError
+from jacobian.workspaces import WorkspaceNotFoundError
 
 
 @pytest.mark.integration
@@ -150,6 +156,29 @@ def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
     assert alpha.store.root != beta.store.root
     with pytest.raises(ArtifactNotFoundError):
         beta.store.get(stored)
+
+
+@pytest.mark.integration
+def test_tenant_router_isolates_epistemic_workspaces(tmp_path: Path) -> None:
+    router = TenantKernelRouter(tmp_path, install_references=False)
+    alpha = router.kernel_for("alpha")
+    beta = router.kernel_for("beta")
+    opened = alpha.workspaces.open(
+        WorkspaceOpenRequest(
+            idempotency_key="tenant-workspace-open-001",
+            name="alpha workspace",
+            problem="This working state belongs only to alpha.",
+        )
+    )
+
+    with pytest.raises(WorkspaceNotFoundError):
+        beta.workspaces.query(
+            WorkspaceQueryRequest(
+                workspace_id=opened.workspace_id,
+                branch_id=opened.branch_id,
+                view=WorkspaceQueryView.RESUME,
+            )
+        )
 
 
 @pytest.mark.integration

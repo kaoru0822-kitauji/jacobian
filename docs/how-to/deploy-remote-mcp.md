@@ -5,10 +5,11 @@
 Use STDIO for a single local Codex process. Use Streamable HTTP when ChatGPT or
 another remote MCP client must reach Jacobian.
 
-The server exposes `capability.describe` and `capability.invoke`. Clients may
-read installed descriptors from `capability://catalog` and inspect exact
-contracts before invocation. Mathematical operations remain behind namespaced
-capability IDs.
+The server exposes `capability.describe`, `capability.invoke`, and the three
+direct `workspace.*` tools. Clients may read installed descriptors from
+`capability://catalog` and inspect exact contracts before invoking mathematical
+operations, which remain behind namespaced capability IDs. Workspace state is
+subject-bound operational data and never becomes mathematical assurance.
 
 ## Create the auth secret
 
@@ -100,7 +101,8 @@ subject to the same tenant-routing interface.
 
 ## Operational boundaries
 
-- Back up the state volume; artifacts and research episodes live there.
+- Back up the state volume; artifacts, workspaces, and research episodes live
+  there.
 - Run one Jacobian process per state root until a lease model is implemented.
 - Apply CPU, memory, filesystem, and network policy outside Jacobian.
 - Do not interpret HTTP success, solver completion, or an MCP response as a

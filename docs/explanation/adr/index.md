@@ -13,6 +13,7 @@ stable public contract.
 | [0002](0002-sealed-plugin-packages.md) | Seal plugin packages and registry snapshots | Accepted, pre-stable |
 | [0003](0003-durable-search-invocations.md) | Use SQLite acceptance with immutable search checkpoints | Accepted, pre-stable |
 | [0004](0004-verified-parameter-regions.md) | Verify parameter regions through immutable subjects | Accepted, pre-stable |
+| [0005](0005-direct-epistemic-workspaces.md) | Keep epistemic workspaces separate from capability assurance | Accepted, pre-stable |
 
 Add an ADR when a decision changes a trust boundary, durable data model,
 cross-component contract, dependency strategy, or other choice that would be
