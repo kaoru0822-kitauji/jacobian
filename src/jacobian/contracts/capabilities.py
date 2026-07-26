@@ -51,6 +51,7 @@ class CapabilityProviderDigestKind(StrEnum):
     SOURCE_TREE = "SOURCE_TREE"
     PYTHON_DISTRIBUTION_RECORD = "PYTHON_DISTRIBUTION_RECORD"
     EXECUTABLE = "EXECUTABLE"
+    COMPOSITE = "COMPOSITE"
 
 
 class CapabilityProviderRuntime(ContractModel):

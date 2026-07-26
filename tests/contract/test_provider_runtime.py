@@ -15,6 +15,12 @@ from jacobian.contracts.provider_measurements import (
     ProviderMeasurementSample,
     ProviderMeasurementStatus,
 )
+from jacobian.provider_runtime import (
+    ProviderRuntimeError,
+    composite_provider_runtime,
+    exact_domain_checker_provider_runtime,
+    require_provider_runtime_unchanged,
+)
 
 
 def _runtime(**updates: object) -> CapabilityProviderRuntime:
@@ -77,6 +83,76 @@ def test_descriptor_provider_must_match_runtime_identity() -> None:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
+
+
+def test_composite_provider_binds_all_component_identities() -> None:
+    first = _runtime(provider="tests.first", version="1")
+    second = _runtime(
+        provider="tests.second",
+        version="2",
+        digest="sha256:" + "c" * 64,
+    )
+
+    runtime = composite_provider_runtime(
+        "tests.composite",
+        components=(first, second),
+        features=("two-backends",),
+    )
+
+    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    assert runtime.digest_kind is CapabilityProviderDigestKind.COMPOSITE
+    assert runtime.digest is not None
+    assert tuple(
+        component["provider"] for component in runtime.configuration["components"]
+    ) == ("tests.first", "tests.second")
+    changed = composite_provider_runtime(
+        "tests.composite",
+        components=(first, second.model_copy(update={"version": "3"})),
+        features=("two-backends",),
+    )
+    assert changed.digest != runtime.digest
+
+
+def test_composite_provider_fails_closed_when_one_component_is_unavailable() -> None:
+    unavailable = _runtime(
+        provider="tests.missing",
+        availability=CapabilityProviderAvailability.UNAVAILABLE,
+        version=None,
+        digest=None,
+        digest_kind=None,
+        diagnostic="Missing fixture runtime.",
+    )
+
+    runtime = composite_provider_runtime(
+        "tests.composite",
+        components=(_runtime(provider="tests.present"), unavailable),
+    )
+
+    assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
+    assert runtime.digest is None
+    assert runtime.diagnostic is not None
+    assert "tests.missing" in runtime.diagnostic
+
+
+def test_exact_checker_composite_runtime_is_remeasured_recursively() -> None:
+    runtime = exact_domain_checker_provider_runtime(refresh=True)
+    require_provider_runtime_unchanged(runtime)
+
+    components = list(runtime.configuration["components"])
+    flint = dict(components[1])
+    flint["digest"] = "sha256:" + "0" * 64
+    components[1] = flint
+    changed = runtime.model_copy(
+        update={
+            "configuration": {
+                **runtime.configuration,
+                "components": components,
+            }
+        }
+    )
+
+    with pytest.raises(ProviderRuntimeError, match="identity changed"):
+        require_provider_runtime_unchanged(changed)
 
 
 def test_measurement_status_cannot_hide_missing_elapsed_time() -> None:

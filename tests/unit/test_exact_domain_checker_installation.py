@@ -33,8 +33,7 @@ def _installed(
         adapters=(),
         semantics_uri=_uri(character),
         input_schema_uris={
-            model: _uri(str(index + 1))
-            for index, model in enumerate(request_models)
+            model: _uri(str(index + 1)) for index, model in enumerate(request_models)
         },
         result_schema_uris={
             capability_id: _uri(chr(ord("a") + index))

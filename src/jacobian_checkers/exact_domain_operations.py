@@ -118,7 +118,10 @@ def _bound_request(
     claim = _artifact(request["claim"])
     candidate = _artifact(request["candidate"])
     witness = _artifact(request["witness"])
-    if len(candidate["parents"]) != 1 or candidate["parents"][0] != claim["artifact_uri"]:
+    if (
+        len(candidate["parents"]) != 1
+        or candidate["parents"][0] != claim["artifact_uri"]
+    ):
         raise ValueError("candidate is not bound to the input artifact")
     if (
         claim["semantics_uri"] != candidate["semantics_uri"]
@@ -161,8 +164,7 @@ def _bound_request(
             "result_uri": candidate["artifact_uri"],
         }
         or len(witness["parents"]) != 2
-        or set(witness["parents"])
-        != {claim["artifact_uri"], candidate["artifact_uri"]}
+        or set(witness["parents"]) != {claim["artifact_uri"], candidate["artifact_uri"]}
     ):
         raise ValueError("witness is not exactly bound to the operation artifacts")
     return claim["payload"], candidate["payload"]
@@ -252,7 +254,9 @@ def _rational_matrix(value: object) -> fmpq_mat:
         or not entries
         or not isinstance(entries[0], list)
         or not entries[0]
-        or any(not isinstance(row, list) or len(row) != len(entries[0]) for row in entries)
+        or any(
+            not isinstance(row, list) or len(row) != len(entries[0]) for row in entries
+        )
     ):
         raise ValueError("rational matrix shape is malformed")
     return fmpq_mat([[_q(item) for item in row] for row in entries])
@@ -269,7 +273,9 @@ def _integer_matrix(value: object) -> fmpz_mat:
         or not entries
         or not isinstance(entries[0], list)
         or not entries[0]
-        or any(not isinstance(row, list) or len(row) != len(entries[0]) for row in entries)
+        or any(
+            not isinstance(row, list) or len(row) != len(entries[0]) for row in entries
+        )
     ):
         raise ValueError("integer matrix shape is malformed")
     return fmpz_mat([[_integer(item) for item in row] for row in entries])
@@ -435,13 +441,17 @@ def _matrix_source(source: dict[str, Any], *, integer: bool = False) -> Any:
 
 
 def _rref(source: dict[str, Any], result: dict[str, Any]) -> bool:
-    if set(result) != {
-        "reduced_matrix",
-        "rank",
-        "pivot_columns",
-        "free_columns",
-        "convention",
-    } or result["convention"] != "UNIQUE_RREF_OVER_QQ":
+    if (
+        set(result)
+        != {
+            "reduced_matrix",
+            "rank",
+            "pivot_columns",
+            "free_columns",
+            "convention",
+        }
+        or result["convention"] != "UNIQUE_RREF_OVER_QQ"
+    ):
         return False
     expected, rank = _matrix_source(source).rref()
     declared = _rational_matrix(result["reduced_matrix"])
@@ -468,13 +478,17 @@ def check_matrix_rref(request: dict[str, Any]) -> dict[str, Any]:
 
 
 def _nullspace(source: dict[str, Any], result: dict[str, Any]) -> bool:
-    if set(result) != {
-        "ambient_dimension",
-        "nullity",
-        "basis_vectors",
-        "free_columns",
-        "convention",
-    } or result["convention"] != "RREF_FUNDAMENTAL_BASIS":
+    if (
+        set(result)
+        != {
+            "ambient_dimension",
+            "nullity",
+            "basis_vectors",
+            "free_columns",
+            "convention",
+        }
+        or result["convention"] != "RREF_FUNDAMENTAL_BASIS"
+    ):
         return False
     matrix = _matrix_source(source)
     reduced, rank = matrix.rref()
@@ -508,9 +522,7 @@ def check_matrix_nullspace(request: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _characteristic_polynomial(
-    source: dict[str, Any], result: dict[str, Any]
-) -> bool:
+def _characteristic_polynomial(source: dict[str, Any], result: dict[str, Any]) -> bool:
     if set(result) != {
         "variable",
         "degree",

@@ -19,6 +19,10 @@ from jacobian.contracts.checkers import (
     EvidenceKind,
 )
 from jacobian.implementation import ImplementationError, package_source_digest
+from jacobian.provider_runtime import (
+    ProviderRuntimeError,
+    require_provider_runtime_unchanged,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,27 +65,12 @@ def compute_entrypoint_digest(entrypoint: str) -> str:
 def _require_runtime_unchanged(runtime: CapabilityProviderRuntime | None) -> None:
     if runtime is None:
         return
-    executable = runtime.configuration.get("executable")
-    if not isinstance(executable, str) or runtime.digest is None:
-        raise CheckerExecutableChangedError(
-            "The authorized checker runtime identity is incomplete."
-        )
     try:
-        resolved = Path(executable).resolve(strict=True)
-        digest = hashlib.sha256()
-        with resolved.open("rb") as stream:
-            for block in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(block)
-    except OSError as exc:
+        require_provider_runtime_unchanged(runtime)
+    except (OSError, ProviderRuntimeError, ValueError) as exc:
         raise CheckerExecutableChangedError(
-            "The authorized checker runtime is unavailable."
+            "The authorized checker runtime changed or is unavailable."
         ) from exc
-    measured = "sha256:" + digest.hexdigest()
-    if measured != runtime.digest:
-        raise CheckerExecutableChangedError(
-            "The checker runtime changed after authorization. Authorize the "
-            "current runtime, then retry."
-        )
 
 
 class CheckerRegistry:

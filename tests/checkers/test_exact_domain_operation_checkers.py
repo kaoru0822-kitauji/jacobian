@@ -26,15 +26,18 @@ def _uri(character: str) -> str:
 
 
 def _digest(value: object) -> str:
-    return "sha256:" + hashlib.sha256(
-        json.dumps(
-            value,
-            allow_nan=False,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode()
-    ).hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(
+                value,
+                allow_nan=False,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+    )
 
 
 def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
@@ -259,6 +262,22 @@ _CASES: tuple[
 )
 
 
+def _mutate_numeric_leaf(value: object) -> bool:
+    if isinstance(value, dict):
+        if set(value) == {"num", "den"}:
+            value["num"] = str(int(value["num"]) + 1)
+            return True
+        return any(_mutate_numeric_leaf(item) for item in value.values())
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            if _mutate_numeric_leaf(item):
+                return True
+            if isinstance(item, str) and item.lstrip("-").isdigit():
+                value[index] = str(int(item) + 1)
+                return True
+    return False
+
+
 @pytest.mark.parametrize(("checker", "checker_request"), _CASES)
 def test_exact_domain_checker_accepts_independent_replay(
     checker: Callable[[dict[str, Any]], dict[str, Any]],
@@ -273,7 +292,7 @@ def test_exact_domain_checker_rejects_candidate_mutation(
     checker_request: dict[str, Any],
 ) -> None:
     mutated = copy.deepcopy(checker_request)
-    mutated["candidate"]["payload"]["unexpected"] = True
+    assert _mutate_numeric_leaf(mutated["candidate"]["payload"])
     mutated["candidate"]["payload_digest"] = _digest(mutated["candidate"]["payload"])
 
     decision = checker(mutated)
@@ -282,7 +301,7 @@ def test_exact_domain_checker_rejects_candidate_mutation(
     assert decision["conclusion"] == "UNKNOWN"
 
 
-@pytest.mark.parametrize(("checker", "checker_request"), _CASES[:1])
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES)
 def test_exact_domain_checker_rejects_semantics_substitution(
     checker: Callable[[dict[str, Any]], dict[str, Any]],
     checker_request: dict[str, Any],
@@ -293,14 +312,13 @@ def test_exact_domain_checker_rejects_semantics_substitution(
     assert checker(mutated)["accepted"] is False
 
 
-@pytest.mark.parametrize(("checker", "checker_request"), _CASES[:1])
-def test_exact_domain_checker_rejects_source_substitution(
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES)
+def test_exact_domain_checker_rejects_claim_binding_substitution(
     checker: Callable[[dict[str, Any]], dict[str, Any]],
     checker_request: dict[str, Any],
 ) -> None:
     mutated = copy.deepcopy(checker_request)
-    mutated["claim"]["payload"]["left"] = _poly(1, 1)
-    mutated["claim"]["payload_digest"] = _digest(mutated["claim"]["payload"])
+    mutated["claim"]["object_digest"] = "sha256:" + "9" * 64
 
     assert checker(mutated)["accepted"] is False
 

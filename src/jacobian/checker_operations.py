@@ -6,6 +6,28 @@ from dataclasses import dataclass
 
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.checkers import EvidenceKind
+from jacobian.contracts.results import ContractModel
+
+
+@dataclass(frozen=True, slots=True)
+class ExactReplayCheckerDeclaration:
+    """Domain-owned declaration of an independently replayable exact result."""
+
+    capability_id: str
+    request_model: type[ContractModel]
+    function: str
+    format_id: str
+
+    def __post_init__(self) -> None:
+        for field, value in {
+            "capability_id": self.capability_id,
+            "function": self.function,
+            "format_id": self.format_id,
+        }.items():
+            if not value.strip():
+                raise ValueError(
+                    f"exact replay checker declaration {field} must not be empty"
+                )
 
 
 @dataclass(frozen=True, slots=True)

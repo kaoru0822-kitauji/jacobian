@@ -14,12 +14,19 @@ class ExactDomainResultVerificationRequest(ContractModel):
 
 
 class ExactDomainResultVerificationOutput(ContractModel):
-    status: Literal["VERIFIED", "REJECTED", "TIMEOUT", "CANCELLED", "ERROR"]
+    status: Literal[
+        "VERIFIED",
+        "REJECTED",
+        "UNSUPPORTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
     conclusion: Literal["TRUE", "UNKNOWN"]
     operation_id: CapabilityId
     input_uri: ArtifactUri
     result_uri: ArtifactUri
-    witness_uri: ArtifactUri
+    witness_uri: ArtifactUri | None = None
     checker_id: CheckerUri
     verification_record_uri: ArtifactUri | None = None
     detail: str

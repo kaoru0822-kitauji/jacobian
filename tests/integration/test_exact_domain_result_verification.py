@@ -31,6 +31,21 @@ def _poly(*coefficients_ascending: int) -> dict[str, object]:
     }
 
 
+def _poly_xy(*terms: tuple[tuple[int, int], int]) -> dict[str, object]:
+    return {
+        "variables": ["x", "y"],
+        "polynomial": {
+            "terms": [
+                {
+                    "coefficient": _q(coefficient),
+                    "exponents": list(exponents),
+                }
+                for exponents, coefficient in terms
+            ]
+        },
+    }
+
+
 def _install_verification(
     kernel: JacobianKernel, *, authorize: bool
 ) -> tuple[object, ...]:
@@ -41,7 +56,7 @@ def _install_verification(
         kernel.verification,
         kernel.checkers,
         polynomial=kernel.domain_bundles["polynomial"],
-        matrix=kernel.domain_bundles["matrix_lattice"],
+        matrix=kernel.domain_bundles["matrix"],
         authorize=authorize,
     )
     for adapter in adapters:
@@ -63,7 +78,12 @@ def _computed_gcd(kernel: JacobianKernel):
 
 def test_public_seam_verifies_exact_producer_result(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
-    _install_verification(kernel, authorize=True)
+    adapters = _install_verification(kernel, authorize=True)
+    runtime = adapters[0].descriptor.provider_runtime
+    assert runtime is not None
+    assert {
+        component["provider"] for component in runtime.configuration["components"]
+    } == {"jacobian.exact-domain-checker-source", "python-flint"}
     computed = _computed_gcd(kernel)
 
     verified = kernel.capabilities.invoke(
@@ -119,6 +139,38 @@ def test_public_seam_rejects_validly_shaped_false_result(tmp_path: Path) -> None
     assert rejected.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
+def test_public_seam_reports_valid_multivariate_result_as_unsupported(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    _install_verification(kernel, authorize=True)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.compute.resultant",
+            input={
+                "left": _poly_xy(((1, 0), 1), ((0, 1), 1)),
+                "right": _poly_xy(((1, 0), 1), ((0, 0), 1)),
+                "elimination_variable": "x",
+            },
+        )
+    )
+
+    checked = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.result.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+
+    assert checked.execution.status is ExecutionStatus.COMPLETED
+    assert checked.output["status"] == "UNSUPPORTED"
+    assert checked.output["conclusion"] == "UNKNOWN"
+    assert checked.output["witness_uri"] is None
+    assert checked.output["verification_record_uri"] is None
+    assert checked.assurance.level is CapabilityAssuranceLevel.COMPUTED
+
+
 def test_operator_can_leave_exact_result_verification_unavailable(
     tmp_path: Path,
 ) -> None:
@@ -127,7 +179,9 @@ def test_operator_can_leave_exact_result_verification_unavailable(
     adapters = _install_verification(kernel, authorize=False)
 
     assert adapters == ()
-    assert {"polynomial.result.verify", "matrix.result.verify"}.isdisjoint({
-        descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
-    })
+    assert {"polynomial.result.verify", "matrix.result.verify"}.isdisjoint(
+        {
+            descriptor.capability_id
+            for descriptor in kernel.capabilities.catalog().capabilities
+        }
+    )

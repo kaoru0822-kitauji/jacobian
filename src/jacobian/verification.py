@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.bounded_process import run_bounded_process
+from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
@@ -234,6 +234,10 @@ class VerificationService:
             environment=environment,
             stdout_limit=self.max_checker_output_bytes,
             stderr_limit=self.max_checker_diagnostic_bytes,
+            resource_limits=ProcessResourceLimits(
+                cpu_seconds=max(1, int(effective_timeout) + 1),
+                address_space_bytes=1024 * 1024 * 1024,
+            ),
         )
         if completed.timed_out:
             raise subprocess.TimeoutExpired(

@@ -11,7 +11,7 @@ from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
-from jacobian.checker_operations import CheckerOperation
+from jacobian.checker_operations import CheckerOperation, ExactReplayCheckerDeclaration
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -20,6 +20,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityMode,
+    CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -30,25 +31,16 @@ from jacobian.contracts.exact_domain_verification import (
     ExactDomainResultVerificationOutput,
     ExactDomainResultVerificationRequest,
 )
-from jacobian.contracts.matrix_operations import (
-    IntegerMatrixRequest,
-    RationalMatrixRequest,
-    SquareRationalMatrixRequest,
-)
-from jacobian.contracts.polynomial_operations import (
-    PolynomialDiscriminantRequest,
-    PolynomialGcdRequest,
-    PolynomialResultantRequest,
-    PolynomialSquareFreeRequest,
-)
 from jacobian.contracts.results import (
     Conclusion,
-    ContractModel,
+    Execution,
     ExecutionStatus,
     Verification,
 )
+from jacobian.domains.matrix_lattice.checkers import MATRIX_EXACT_REPLAY_CHECKERS
+from jacobian.domains.polynomial.checkers import POLYNOMIAL_EXACT_REPLAY_CHECKERS
 from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import exact_domain_checker_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
@@ -60,79 +52,17 @@ class ExactDomainCheckerInstallation:
     """Authorized checker identities keyed by producer capability ID."""
 
     checker_ids: dict[str, str | None]
+    provider_runtime: CapabilityProviderRuntime
     witness_schema_uri: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class _Declaration:
-    capability_id: str
-    request_model: type[ContractModel]
-    function: str
-    format_id: str
-
-
-@dataclass(frozen=True, slots=True)
 class _InstalledDeclaration:
-    declaration: _Declaration
+    declaration: ExactReplayCheckerDeclaration
     input_schema_uri: str
     result_schema_uri: str
     semantics_uri: str
     checker_id: str
-
-
-_POLYNOMIAL_DECLARATIONS = (
-    _Declaration(
-        "polynomial.compute.gcd",
-        PolynomialGcdRequest,
-        "check_polynomial_gcd",
-        "polynomial.gcd.flint-replay",
-    ),
-    _Declaration(
-        "polynomial.compute.resultant",
-        PolynomialResultantRequest,
-        "check_polynomial_resultant",
-        "polynomial.resultant.flint-replay",
-    ),
-    _Declaration(
-        "polynomial.compute.discriminant",
-        PolynomialDiscriminantRequest,
-        "check_polynomial_discriminant",
-        "polynomial.discriminant.flint-replay",
-    ),
-    _Declaration(
-        "polynomial.compute.square_free_decomposition",
-        PolynomialSquareFreeRequest,
-        "check_polynomial_square_free",
-        "polynomial.square-free.flint-replay",
-    ),
-)
-
-_MATRIX_DECLARATIONS = (
-    _Declaration(
-        "matrix.normal_form.rref.compute",
-        RationalMatrixRequest,
-        "check_matrix_rref",
-        "matrix.rref.flint-replay",
-    ),
-    _Declaration(
-        "matrix.nullspace.compute",
-        RationalMatrixRequest,
-        "check_matrix_nullspace",
-        "matrix.nullspace.flint-replay",
-    ),
-    _Declaration(
-        "matrix.characteristic_polynomial.compute",
-        SquareRationalMatrixRequest,
-        "check_matrix_characteristic_polynomial",
-        "matrix.characteristic-polynomial.flint-replay",
-    ),
-    _Declaration(
-        "matrix.normal_form.smith.compute",
-        IntegerMatrixRequest,
-        "check_matrix_smith_normal_form",
-        "matrix.smith-normal-form.flint-replay",
-    ),
-)
 
 
 def install_exact_domain_checkers(
@@ -145,23 +75,21 @@ def install_exact_domain_checkers(
     """Install independent FLINT replay against dynamically registered schemas."""
 
     installer = CheckerInstaller(checkers)
+    provider_runtime = exact_domain_checker_provider_runtime()
     checker_ids: dict[str, str | None] = {}
     for installed, declaration in (
-        *((polynomial, item) for item in _POLYNOMIAL_DECLARATIONS),
-        *((matrix, item) for item in _MATRIX_DECLARATIONS),
+        *((polynomial, item) for item in POLYNOMIAL_EXACT_REPLAY_CHECKERS),
+        *((matrix, item) for item in MATRIX_EXACT_REPLAY_CHECKERS),
     ):
         operation = CheckerOperation(
             name=f"{declaration.capability_id} independent FLINT replay",
             entrypoint=(
-                "jacobian_checkers.exact_domain_operations:"
-                f"{declaration.function}"
+                f"jacobian_checkers.exact_domain_operations:{declaration.function}"
             ),
             evidence_kind=EvidenceKind.WITNESS,
             format_id=declaration.format_id,
             format_version="1",
-            claim_schema_uris=(
-                installed.input_schema_uris[declaration.request_model],
-            ),
+            claim_schema_uris=(installed.input_schema_uris[declaration.request_model],),
             semantics_uris=(installed.semantics_uri,),
             candidate_schema_uris=(
                 installed.result_schema_uris[declaration.capability_id],
@@ -170,12 +98,21 @@ def install_exact_domain_checkers(
                 "operator-authorized Python-FLINT exact replay independent "
                 "of the SymPy producer"
             ),
+            provider_runtime=provider_runtime,
         )
         checker_ids[declaration.capability_id] = installer.install(
             operation,
             authorize=authorize,
         ).checker_id
-    return ExactDomainCheckerInstallation(checker_ids=checker_ids)
+    authorized_ids = tuple(
+        checker_id for checker_id in checker_ids.values() if checker_id is not None
+    )
+    return ExactDomainCheckerInstallation(
+        checker_ids=checker_ids,
+        provider_runtime=exact_domain_checker_provider_runtime(
+            checker_ids=authorized_ids
+        ),
+    )
 
 
 def install_exact_domain_verification(
@@ -205,16 +142,17 @@ def install_exact_domain_verification(
     installation = ExactDomainCheckerInstallation(
         checker_ids=installed.checker_ids,
         witness_schema_uri=witness_schema_uri,
+        provider_runtime=installed.provider_runtime,
     )
     if not authorize:
         return (), installation
     polynomial_declarations = tuple(
         _installed_declaration(polynomial, declaration, installation)
-        for declaration in _POLYNOMIAL_DECLARATIONS
+        for declaration in POLYNOMIAL_EXACT_REPLAY_CHECKERS
     )
     matrix_declarations = tuple(
         _installed_declaration(matrix, declaration, installation)
-        for declaration in _MATRIX_DECLARATIONS
+        for declaration in MATRIX_EXACT_REPLAY_CHECKERS
     )
     return (
         (
@@ -232,6 +170,7 @@ def install_exact_domain_verification(
                 verification=verification,
                 declarations=polynomial_declarations,
                 witness_schema_uri=witness_schema_uri,
+                provider_runtime=installation.provider_runtime,
             ),
             ExactDomainResultVerificationAdapter(
                 capability_id="matrix.result.verify",
@@ -247,6 +186,7 @@ def install_exact_domain_verification(
                 verification=verification,
                 declarations=matrix_declarations,
                 witness_schema_uri=witness_schema_uri,
+                provider_runtime=installation.provider_runtime,
             ),
         ),
         installation,
@@ -255,7 +195,7 @@ def install_exact_domain_verification(
 
 def _installed_declaration(
     bundle: InstalledDomainBundle,
-    declaration: _Declaration,
+    declaration: ExactReplayCheckerDeclaration,
     installation: ExactDomainCheckerInstallation,
 ) -> _InstalledDeclaration:
     checker_id = installation.checker_ids[declaration.capability_id]
@@ -290,18 +230,15 @@ class ExactDomainResultVerificationAdapter:
         verification: VerificationService,
         declarations: tuple[_InstalledDeclaration, ...],
         witness_schema_uri: str,
+        provider_runtime: CapabilityProviderRuntime,
     ) -> None:
         self.store = store
         self.schemas = schemas
         self.artifacts = artifacts
         self.verification = verification
         self.declarations_by_schema = {
-            declaration.result_schema_uri: declaration
-            for declaration in declarations
+            declaration.result_schema_uri: declaration for declaration in declarations
         }
-        checker_ids = tuple(
-            declaration.checker_id for declaration in declarations
-        )
         self.witness_schema_uri = witness_schema_uri
         self._descriptor = CapabilityDescriptor(
             capability_id=capability_id,
@@ -309,11 +246,7 @@ class ExactDomainResultVerificationAdapter:
             title=title,
             description=description,
             provider="jacobian.exact-domain-checkers",
-            provider_runtime=known_provider_runtime(
-                "jacobian.exact-domain-checkers",
-                features=("clean-process-replay", "python-flint"),
-                checker_ids=checker_ids,
-            ),
+            provider_runtime=provider_runtime,
             modes=(CapabilityMode.VERIFY,),
             input_schema=model_schema(ExactDomainResultVerificationRequest),
             output_schema=model_schema(ExactDomainResultVerificationOutput),
@@ -343,6 +276,54 @@ class ExactDomainResultVerificationAdapter:
                     ),
                 )
             ) from exc
+
+        if not _checker_supports(
+            declaration.declaration.capability_id,
+            input_artifact.payload,
+        ):
+            output = ExactDomainResultVerificationOutput(
+                status="UNSUPPORTED",
+                conclusion="UNKNOWN",
+                operation_id=declaration.declaration.capability_id,
+                input_uri=input_artifact.artifact_uri,
+                result_uri=result_artifact.artifact_uri,
+                checker_id=declaration.checker_id,
+                detail=(
+                    "The authorized FLINT replay currently supports only "
+                    "univariate polynomial artifacts for this operation."
+                ),
+            )
+            return CapabilityResult(
+                capability_id=self.descriptor.capability_id,
+                capability_version=self.descriptor.version,
+                mode=request.mode,
+                execution=Execution(status=ExecutionStatus.COMPLETED),
+                output=output.model_dump(mode="json"),
+                scope=CapabilityScope(
+                    description="the supported univariate checker scope",
+                    parameters={
+                        "operation_id": declaration.declaration.capability_id,
+                        "polynomial_variables": 1,
+                    },
+                    artifact_uri=input_artifact.artifact_uri,
+                ),
+                completeness=CapabilityCompleteness(
+                    status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                    basis="the result lies outside this checker's declared scope",
+                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
+                ),
+                assurance=CapabilityAssurance(
+                    level=CapabilityAssuranceLevel.COMPUTED,
+                    basis=(
+                        "checker scope was evaluated without making a "
+                        "mathematical conclusion"
+                    ),
+                ),
+                artifact_uris=(
+                    input_artifact.artifact_uri,
+                    result_artifact.artifact_uri,
+                ),
+            )
 
         witness = put_witness_envelope(
             self.artifacts,
@@ -507,6 +488,25 @@ class ExactDomainResultVerificationAdapter:
             ) from exc
         semantics = self.store.get(declaration.semantics_uri)
         return declaration, input_artifact, result, semantics
+
+
+def _checker_supports(operation_id: str, payload: object) -> bool:
+    if not operation_id.startswith("polynomial."):
+        return True
+    if not isinstance(payload, dict):
+        return False
+    polynomial_fields = {
+        "polynomial.compute.gcd": ("left", "right"),
+        "polynomial.compute.resultant": ("left", "right"),
+        "polynomial.compute.discriminant": ("polynomial",),
+        "polynomial.compute.square_free_decomposition": ("polynomial",),
+    }[operation_id]
+    return all(
+        isinstance(payload.get(field), dict)
+        and payload[field].get("variables")
+        and len(payload[field]["variables"]) == 1
+        for field in polynomial_fields
+    )
 
 
 __all__ = [
