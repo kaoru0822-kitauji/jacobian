@@ -144,7 +144,8 @@ output.
 plus `s SATISFIABLE` and a unique, range-checked, zero-terminated literal for
 every declared variable. It then stores the Boolean vector through
 `SatArtifactService.put_assignment`. The result reports the durable
-`assignment_uri`, an inline name-to-Boolean map in canonical variable order,
+`assignment_uri`, an inline name-to-Boolean map keyed by canonical variable
+names,
 `ASSIGNMENT_PRODUCED`, `solver_status: SATISFIABLE`, and
 `conclusion: UNKNOWN`. The inline map makes the constructed object immediately
 inspectable; it does not add assurance. The candidate becomes mathematically
