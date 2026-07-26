@@ -43,6 +43,7 @@ from jacobian.contracts.polynomials import (
     PolynomialCollisionRequest,
     PolynomialCollisionSearchOutput,
     PolynomialCollisionSearchRequest,
+    PolynomialCollisionSearchStopReason,
     PolynomialEvaluationOutput,
     PolynomialEvaluationRequest,
     PolynomialInjectivityClaim,
@@ -703,7 +704,7 @@ class PolynomialCollisionSearchAdapter:
                 }
             )
         )
-        points = tuple(product(scalar_values, repeat=len(polynomial_map.variables)))
+        grid_point_count = len(scalar_values) ** len(polynomial_map.variables)
         seen: dict[
             tuple[tuple[str, str], ...],
             tuple[tuple[CanonicalRational, ...], str],
@@ -718,8 +719,12 @@ class PolynomialCollisionSearchAdapter:
             ]
             | None
         ) = None
+        evaluation_uris: list[str] = []
         examined = 0
-        for point_values in points:
+        for point_values in product(
+            scalar_values,
+            repeat=len(polynomial_map.variables),
+        ):
             examined += 1
             point = RationalPolynomialPoint(values=point_values)
             image = _evaluate(polynomial_map, point)
@@ -729,6 +734,7 @@ class PolynomialCollisionSearchAdapter:
                 point=point,
                 image=image,
             )
+            evaluation_uris.append(evaluation_uri)
             key = tuple((value.num, value.den) for value in image)
             previous = seen.get(key)
             if previous is not None and previous[0] != point_values:
@@ -804,7 +810,7 @@ class PolynomialCollisionSearchAdapter:
             found=found is not None,
             map_uri=map_uri,
             examined_point_count=examined,
-            grid_point_count=len(points),
+            grid_point_count=grid_point_count,
             first_point=first_point_result,
             second_point=second_point_result,
             common_image=image_result,
@@ -813,8 +819,20 @@ class PolynomialCollisionSearchAdapter:
             claim_uri=claim_uri,
             witness_uri=witness_uri,
             checker_id=self.resources.installation.collision_checker_id,
+            stop_reason=(
+                PolynomialCollisionSearchStopReason.FIRST_COLLISION
+                if found is not None
+                else PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
+            ),
         )
-        artifacts = [map_uri, *[uri for _, uri in seen.values()]]
+        artifacts = [map_uri, *evaluation_uris]
+        relationships = [
+            CapabilityRelationship(
+                relation_id="polynomial.relation.evaluation-of",
+                source_artifact_uris=(map_uri,),
+                target_artifact_uris=tuple(evaluation_uris),
+            )
+        ]
         if found is not None:
             assert second_evaluation_result is not None
             assert claim_uri is not None
@@ -826,28 +844,58 @@ class PolynomialCollisionSearchAdapter:
                     witness_uri,
                 ]
             )
+            relationships.extend(
+                (
+                    CapabilityRelationship(
+                        relation_id="polynomial.relation.injectivity-claim-of",
+                        source_artifact_uris=(map_uri,),
+                        target_artifact_uris=(claim_uri,),
+                    ),
+                    CapabilityRelationship(
+                        relation_id="polynomial.relation.collision-derived-from",
+                        source_artifact_uris=(
+                            first_evaluation_result,
+                            second_evaluation_result,
+                        ),
+                        target_artifact_uris=(witness_uri,),
+                    ),
+                    CapabilityRelationship(
+                        relation_id=(
+                            "polynomial.relation.collision-refutes-injectivity"
+                        ),
+                        source_artifact_uris=(witness_uri,),
+                        target_artifact_uris=(claim_uri,),
+                    ),
+                )
+            )
+        exhausted_grid = examined == grid_point_count
         return _computed_result(
             descriptor=self.descriptor,
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
             scope=CapabilityScope(
-                description="complete declared finite rational grid",
+                description="declared finite rational grid",
                 parameters={
                     "max_abs_numerator": validated.max_abs_numerator,
                     "max_denominator": validated.max_denominator,
-                    "grid_point_count": len(points),
+                    "grid_point_count": grid_point_count,
                 },
                 artifact_uri=map_uri,
             ),
-            relationships=(),
+            relationships=tuple(relationships),
             artifact_uris=tuple(
                 dict.fromkeys(uri for uri in artifacts if uri is not None)
             ),
             completeness_basis=(
                 "the deterministic grid was fully enumerated"
-                if found is None
+                if exhausted_grid
                 else "the canonical prefix through the first collision was enumerated"
+            ),
+            completeness_status=(
+                CapabilityCompletenessStatus.COMPLETE
+                if exhausted_grid
+                else CapabilityCompletenessStatus.PARTIAL
             ),
             assurance_basis=(
                 "deterministic exact SymPy search; any returned witness remains "
@@ -1100,6 +1148,9 @@ def _computed_result(
     relationships: tuple[CapabilityRelationship, ...],
     artifact_uris: tuple[str, ...],
     completeness_basis: str,
+    completeness_status: CapabilityCompletenessStatus = (
+        CapabilityCompletenessStatus.COMPLETE
+    ),
     assurance_basis: str = (
         "deterministic exact SymPy arithmetic over QQ; the computation did not "
         "authorize or invoke an independent checker"
@@ -1116,7 +1167,7 @@ def _computed_result(
         output=output,
         scope=scope,
         completeness=CapabilityCompleteness(
-            status=CapabilityCompletenessStatus.COMPLETE,
+            status=completeness_status,
             basis=(
                 f"{completeness_basis}; no mathematical conclusion or independent "
                 "verification is claimed"

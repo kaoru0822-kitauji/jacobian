@@ -158,6 +158,11 @@ class PolynomialCollisionSearchRequest(ContractModel):
         return self
 
 
+class PolynomialCollisionSearchStopReason(StrEnum):
+    FIRST_COLLISION = "FIRST_COLLISION"
+    GRID_EXHAUSTED = "GRID_EXHAUSTED"
+
+
 class PolynomialMapEvaluation(ContractModel):
     evaluation_schema_version: Literal["1"] = "1"
     map_uri: ArtifactUri
@@ -345,7 +350,7 @@ class PolynomialCollisionSearchOutput(ContractModel):
     claim_uri: ArtifactUri | None = None
     witness_uri: ArtifactUri | None = None
     checker_id: CheckerUri | None = None
-    coverage: Literal["COMPLETE_SEARCH_OBJECTIVE"] = "COMPLETE_SEARCH_OBJECTIVE"
+    stop_reason: PolynomialCollisionSearchStopReason
     verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
 
     @model_validator(mode="after")
@@ -359,8 +364,19 @@ class PolynomialCollisionSearchOutput(ContractModel):
             self.claim_uri,
             self.witness_uri,
         )
-        if self.found != all(value is not None for value in candidate_fields):
+        if self.found and not all(value is not None for value in candidate_fields):
             raise ValueError("found status must match the complete collision bundle")
+        if not self.found and any(value is not None for value in candidate_fields):
+            raise ValueError("not-found results cannot carry a collision bundle")
         if self.examined_point_count > self.grid_point_count:
             raise ValueError("examined point count cannot exceed grid size")
+        if self.found and (
+            self.stop_reason is not PolynomialCollisionSearchStopReason.FIRST_COLLISION
+        ):
+            raise ValueError("found results must stop at the first collision")
+        if not self.found and (
+            self.stop_reason is not PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
+            or self.examined_point_count != self.grid_point_count
+        ):
+            raise ValueError("not-found results require an exhausted grid")
         return self
