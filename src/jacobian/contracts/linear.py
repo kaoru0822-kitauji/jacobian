@@ -220,3 +220,127 @@ class LinearRationalSolutionVerificationOutput(ContractModel):
                 "non-verified solution output cannot carry a conclusion or record"
             )
         return self
+
+
+class LinearRationalInconsistencyArtifact(ContractModel):
+    """One normalized left-nullspace witness that proves ``A x = b`` inconsistent."""
+
+    certificate_schema_version: Literal["1"] = "1"
+    system: LinearSystemBinding
+    declared_scope: Literal["FULL_SYSTEM"] = "FULL_SYSTEM"
+    left_witness: tuple[CanonicalRational, ...] = Field(
+        min_length=1,
+        max_length=MAX_LINEAR_DIMENSION,
+    )
+    rhs_pairing: CanonicalRational
+    producer: CapabilityProviderRuntime
+    resource_budget: LinearRationalResourceBudget
+    method: Literal["DUAL_RREF_PAIRING_ONE"] = "DUAL_RREF_PAIRING_ONE"
+
+    @model_validator(mode="after")
+    def require_normalized_bound_certificate(self) -> Self:
+        if len(self.left_witness) != self.system.row_count:
+            raise ValueError(
+                "inconsistency witness must contain one value per system row"
+            )
+        if self.rhs_pairing.as_fraction() != 1:
+            raise ValueError("inconsistency witness must be normalized to y^T b = 1")
+        _require_bounded_rationals((*self.left_witness, self.rhs_pairing))
+        if (
+            self.producer.provider != "python-flint"
+            or self.producer.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+            or self.producer.version != "0.9.0"
+        ):
+            raise ValueError(
+                "inconsistency producer must be the available pinned "
+                "Python-FLINT 0.9.0 runtime"
+            )
+        return self
+
+
+class LinearRationalInconsistencyFindRequest(ContractModel):
+    """Ask the pinned provider for one normalized inconsistency witness."""
+
+    system: LinearRationalSystem
+    resource_budget: LinearRationalResourceBudget = Field(
+        default_factory=LinearRationalResourceBudget
+    )
+
+
+class LinearRationalInconsistencyFindOutput(ContractModel):
+    """Unverified outcome of one bounded inconsistency-certificate attempt."""
+
+    status: Literal["CERTIFICATE_PRODUCED", "NO_CERTIFICATE_PRODUCED"]
+    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
+    system_uri: ArtifactUri
+    certificate_uri: ArtifactUri | None = None
+    left_witness: tuple[CanonicalRational, ...] | None = None
+    rhs_pairing: CanonicalRational | None = None
+    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
+    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
+    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+    verification_candidate_available: bool
+    method: Literal["DUAL_RREF_PAIRING_ONE"] = "DUAL_RREF_PAIRING_ONE"
+    backend: Literal["python-flint"] = "python-flint"
+    backend_version: Literal["0.9.0"] = "0.9.0"
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_candidate_projection(self) -> Self:
+        produced = self.status == "CERTIFICATE_PRODUCED"
+        if produced != (
+            self.certificate_uri is not None
+            and self.left_witness is not None
+            and self.rhs_pairing is not None
+            and self.verification_candidate_available
+        ):
+            raise ValueError(
+                "produced output requires one durable normalized inconsistency witness"
+            )
+        if not produced and (
+            self.certificate_uri is not None
+            or self.left_witness is not None
+            or self.rhs_pairing is not None
+            or self.verification_candidate_available
+        ):
+            raise ValueError("not-found output cannot carry inconsistency evidence")
+        return self
+
+
+class LinearRationalInconsistencyVerificationRequest(ContractModel):
+    """Verify one stored normalized left-nullspace witness."""
+
+    certificate_uri: ArtifactUri
+
+
+class LinearRationalInconsistencyVerificationOutput(ContractModel):
+    """Model-facing projection of independent inconsistency replay."""
+
+    status: Literal[
+        "VERIFIED_INCONSISTENT",
+        "REJECTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    system_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_projection(self) -> Self:
+        if self.status == "VERIFIED_INCONSISTENT":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified inconsistency requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError(
+                "non-verified inconsistency cannot carry a conclusion or record"
+            )
+        return self
