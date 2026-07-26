@@ -53,6 +53,11 @@ starts, `lean.check` is absent from `capability://catalog`, and no invocation is
 attempted. Explicit operator-installed adapters fail registration instead of
 silently falling back to another provider.
 
+The optional cvc5 Alethe producer follows the same rule. The exact 1.3.4 wheel
+must expose the required SMT-LIB parser and proof APIs and have a hashed RECORD
+manifest. Otherwise `smt.unsat_proof.find` is absent while the base kernel and
+SMT artifact schemas remain available.
+
 Source-backed adapters can construct metadata without importing their
 implementation:
 

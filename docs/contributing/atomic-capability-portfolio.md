@@ -458,6 +458,17 @@ the first slice.
 Keep Z3 as an existing exploration and differential provider. Its broad tactic
 surface has uneven proof support, so a Z3 result must not verify itself.
 
+The cvc5 producer checkpoint was implemented on 2026-07-26. The optional
+`cvc5==1.3.4` wheel now exposes `smt.unsat_proof.find` for exact single-query
+`QF_UF`, `QF_LIA`, and `QF_LRA` inputs. It runs in a bounded isolated worker,
+materializes the exact SMT-LIB source and bound raw Alethe bytes, reports
+lexical holes, and always returns `conclusion: UNKNOWN`. Public reproductions
+found a zero-hole equality contradiction in `QF_UF` and explicit holes in
+small linear integer and rational contradictions. This is useful producer
+evidence and a concrete compatibility target for item 10, not a broad
+proof-support claim. See
+[SMT Alethe artifact contracts](../reference/smt-artifacts.md).
+
 ## Wave 4: shared exact mathematics
 
 ### Python-FLINT first
@@ -546,7 +557,8 @@ backlog.
 8. SAT public reproductions and held-out portfolio ablation. Implemented; see
    [SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
 9. cvc5 Alethe proof-production spike for quantifier-free EUF and linear
-   arithmetic.
+   arithmetic. Implemented; see
+   [SMT Alethe artifact contracts](../reference/smt-artifacts.md).
 10. Carcara compatibility matrix, checker adapter, mutations, and paired
     evaluation.
 11. Python-FLINT rational-solution find and verify slice.

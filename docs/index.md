@@ -59,6 +59,7 @@ expectations.
 - [Provider runtime contract](reference/provider-runtime.md)
 - [Lean declaration discovery](reference/lean-declaration-discovery.md)
 - [SAT artifact contracts](reference/sat-artifacts.md)
+- [SMT Alethe artifact contracts](reference/smt-artifacts.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
 - [v0.2 conformance specification](reference/conformance-v0.2.md)
 - [Plugin conformance contract](reference/plugin-conformance.md)

@@ -24,6 +24,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.implementation import ImplementationError, package_source_digest
 
 CADICAL_VERSION = "3.0.1"
+CVC5_VERSION = "1.3.4"
 DRAT_TRIM_RELEASE_TAG = "v05.22.2023"
 DRAT_TRIM_SOURCE_COMMIT = "2e5e29cb0019d5cfd547d4208dca1b3ec290349f"
 DRAT_TRIM_SOURCE_REPOSITORY = "https://github.com/marijnheule/drat-trim"
@@ -322,6 +323,42 @@ def cadical_provider_runtime(
             "proof_format": "drat-text/v1",
         },
     )
+
+
+def cvc5_provider_runtime() -> CapabilityProviderRuntime:
+    """Inspect the exact optional cvc5 Python distribution used for Alethe."""
+
+    runtime = python_distribution_provider_runtime(
+        "cvc5",
+        distribution_name="cvc5",
+        import_name="cvc5",
+        required_attributes=(
+            "InputParser",
+            "ProofComponent",
+            "ProofFormat",
+            "Solver",
+        ),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="BSD-3-Clause",
+        features=("smt-lib-2.6", "alethe-proof-production"),
+        configuration={
+            "profile": "jacobian.smtlib2.qf-unsat/v1",
+            "proof_format": "cvc5.alethe/1.3.4",
+        },
+    )
+    if (
+        runtime.availability is not CapabilityProviderAvailability.AVAILABLE
+        or runtime.version != CVC5_VERSION
+    ):
+        return _unavailable_runtime(
+            provider="cvc5",
+            install_tier=CapabilityInstallTier.T1,
+            license_id="BSD-3-Clause",
+            diagnostic=(
+                f"The pinned cvc5 {CVC5_VERSION} Python distribution is unavailable."
+            ),
+        )
+    return runtime
 
 
 def drat_trim_provider_runtime(
