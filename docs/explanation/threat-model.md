@@ -278,6 +278,22 @@ Controls:
   equality and inequality;
 - changed coefficients, margins, bindings, or scopes are rejected.
 
+### Degree-sequence realization
+
+The NetworkX construction backend may return a malformed graph, mishandle a
+sequence, or propose an invalid non-graphical obstruction.
+
+Controls:
+
+- construction and obstruction discovery never self-promote;
+- the certificate binds the exact sorted sequence and either the explicit
+  graph or one basic/Erdős–Gallai obstruction;
+- the authorized checker uses only the Python standard library and does not
+  import NetworkX or the proposing adapter;
+- the checker recomputes simplicity, vertex degrees, parity, maximum-degree
+  bounds, and the claimed Erdős–Gallai inequality;
+- changed edges, degrees, inequality parameters, or bindings are rejected.
+
 ### Remote client or tenant
 
 A remote caller may omit authentication, present an invalid token, choose a

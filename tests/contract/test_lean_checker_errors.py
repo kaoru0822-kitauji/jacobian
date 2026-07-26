@@ -134,3 +134,25 @@ def test_missing_pinned_toolchain_names_the_install_command(
         "The pinned Lean 4.31.0 toolchain is unavailable. Install it with "
         "`elan toolchain install leanprover/lean4:v4.31.0`, then retry."
     )
+
+
+def test_toolchain_probe_allows_cold_start_latency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    timeouts: list[int] = []
+    outputs = iter(("4.31.0", "68218e876d2a38b1985b8590fff244a83c321783"))
+
+    def completed(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        timeouts.append(int(kwargs["timeout"]))
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout=next(outputs),
+            stderr="",
+        )
+
+    monkeypatch.setattr("jacobian_checkers.lean4.subprocess.run", completed)
+
+    _validate_lean(("/opt/elan/bin/elan", "run", LEAN_TOOLCHAIN, "lean"))
+
+    assert timeouts == [15, 15]

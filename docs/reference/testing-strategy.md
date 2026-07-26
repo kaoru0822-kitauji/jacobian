@@ -29,38 +29,46 @@ exhaustive, and a checked SAT proof or proof-assistant term may certify a claim
 through another assurance route. In every case, only an operator-authorized
 checker may originate `verification = VERIFIED`.
 
-The current local validation commands are:
+The current local development entry points are:
 
 ```sh
-uv run pytest
-uv run pytest --lf
-uv run pytest --sw
-uv run pytest -m "not integration and not end_to_end"
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv run deptry .
-uv build
+make test-fast
+make test-failed
+make test TESTS=tests/integration/test_mcp_adapter.py
+make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-lean
+make validate
 ```
 
-The first command is the full suite. It uses `pytest-xdist` work stealing and
+`make test-fast` is the short marker-filtered loop, while `make validate`
+includes the full suite. The full suite uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
-wait on isolated subprocesses. The `--lf` and `--sw` commands are failure
-recovery shortcuts; the marker-filtered command is the fast local loop. Use
-`-n 0` for debugger-friendly, single-process execution and `--durations=25`
-when investigating regressions. A 120-second per-test backstop prevents local
-deadlocks from hanging indefinitely and is disabled automatically by
-`pytest-timeout` while debugging. Parallel workers retain separate `tmp_path`
-roots; tests that add shared external state must coordinate it explicitly.
+wait on isolated subprocesses. `make test-failed` is the failure-recovery
+shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
+execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
+120-second per-test backstop prevents local deadlocks from hanging indefinitely
+and is disabled automatically by pytest-timeout while debugging. Parallel
+workers retain separate `tmp_path` roots; tests that add shared external state
+must coordinate it explicitly.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
 CI splits each supported Python run into two disjoint groups and retains xdist
-parallelism inside each group. Python 3.12 shards write raw coverage data; a
+parallelism inside each group. Tests marked `lean_runtime` are excluded from
+those shards and run serially in a dedicated job with pinned Lean and Mathlib
+caches. This avoids concurrent multi-gigabyte Mathlib processes while
+preserving real-backend coverage. Python 3.12 shards write raw coverage data; a
 dependent job combines both files before enforcing the repository threshold
 and producing the XML report. Python 3.13 runs the same two groups without
 duplicate instrumentation. Coverage.py's subprocess patch includes plugin and
 checker workers so clean-process execution is not misreported as uncovered.
+
+Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
+their loaders, scorers, replay paths, telemetry parsing, and dispatch guards
+with deterministic fixtures, but never start an evaluated model. A human must
+use the separate `make agent-eval` entry point, select cases explicitly, review
+the plan, and opt into execution with a bounded model-run count. See
+[Agent evaluations](agent-evaluations.md#local-execution-boundary).
 
 ## Criticality classes
 

@@ -18,16 +18,28 @@ promotion also require reviewing the
 
 ## Development environment
 
-Jacobian uses Python 3.12 and `uv`:
+Jacobian uses Python 3.12, `uv`, and a small `Makefile` that keeps local
+commands aligned:
 
 ```sh
-uv sync --dev
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv build
+make setup
+make test-fast
 ```
+
+`make test-fast` is the short non-integration feedback loop. Before handoff,
+run `make validate`, which performs lint, formatting, dependency, type, full
+test-suite, and package-build checks. Run `make help` for focused commands.
+Tests can be narrowed without learning another wrapper:
+
+```sh
+make test TESTS=tests/integration/test_mcp_adapter.py
+make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-lean
+```
+
+Run `make hooks` once to install the repository's formatting, syntax, secret,
+and large-file checks. `make fix` applies Ruff's safe lint fixes followed by
+formatting.
 
 On macOS, read the
 [Z3 installation note](README.md#macos-and-z3) before troubleshooting a
@@ -44,6 +56,10 @@ uv run pytest -m "not integration and not end_to_end"
 
 Pytest assigns these layer markers from the test directories, so new
 integration tests join the right loop without repeated file-level boilerplate.
+Tests marked `lean_runtime` run serially through `make test-lean`; keep them out
+of the normal xdist pool because Mathlib processes can retain several
+gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
+dedicated job.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
 and unfiltered `uv run pytest` before handoff.
 
