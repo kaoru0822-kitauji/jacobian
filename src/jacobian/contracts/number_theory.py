@@ -11,7 +11,7 @@ integer nth root).
 
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, StringConstraints, model_validator
 
@@ -120,6 +120,42 @@ class ChineseRemainderRequest(ContractModel):
         return self
 
 
+class JacobiSymbolRequest(ContractModel):
+    """Arguments for the Jacobi symbol (a / n), with odd positive n."""
+
+    a: BoundedInteger
+    n: StrictInt = Field(ge=3, le=_MAX_MODULUS)
+
+    @model_validator(mode="after")
+    def require_odd_denominator(self) -> Self:
+        if self.n % 2 == 0:
+            raise ValueError("Jacobi symbol denominator must be odd")
+        return self
+
+
+class DiscreteLogarithmBudget(ContractModel):
+    """Total wall-clock budget for one isolated SymPy computation."""
+
+    wall_seconds: StrictInt = Field(default=5, ge=1, le=30)
+
+
+class DiscreteLogarithmRequest(ContractModel):
+    """A bounded modular discrete-logarithm problem."""
+
+    base: StrictInt = Field(ge=0, le=_MAX_MODULUS)
+    target: StrictInt = Field(ge=0, le=_MAX_MODULUS)
+    modulus: StrictInt = Field(ge=2, le=_MAX_MODULUS)
+    resource_budget: DiscreteLogarithmBudget = Field(
+        default_factory=DiscreteLogarithmBudget
+    )
+
+    @model_validator(mode="after")
+    def require_canonical_residues(self) -> Self:
+        if self.base >= self.modulus or self.target >= self.modulus:
+            raise ValueError("base and target must be less than the modulus")
+        return self
+
+
 # ---------------------------------------------------------------------------
 # Result models
 # ---------------------------------------------------------------------------
@@ -207,3 +243,76 @@ class ChineseRemainderResult(ContractModel):
 
     residue: BoundedInteger
     modulus: BoundedInteger
+
+
+class JacobiSymbolResult(ContractModel):
+    """The exact Jacobi symbol, bound to its normalized arguments."""
+
+    a: BoundedInteger
+    n: StrictInt = Field(ge=3, le=_MAX_MODULUS)
+    jacobi: Literal[-1, 0, 1]
+
+    @model_validator(mode="after")
+    def require_odd_denominator(self) -> Self:
+        if self.n % 2 == 0:
+            raise ValueError("Jacobi symbol denominator must be odd")
+        return self
+
+
+class DiscreteLogarithmResult(ContractModel):
+    """A completed discrete-log result; interruption has a separate envelope."""
+
+    status: Literal["SOLVED", "UNSOLVABLE"]
+    base: StrictInt = Field(ge=0, le=_MAX_MODULUS)
+    target: StrictInt = Field(ge=0, le=_MAX_MODULUS)
+    modulus: StrictInt = Field(ge=2, le=_MAX_MODULUS)
+    discrete_log: StrictInt | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def bind_conclusion(self) -> Self:
+        if self.base >= self.modulus or self.target >= self.modulus:
+            raise ValueError("base and target must be less than the modulus")
+        if self.status == "SOLVED":
+            if self.discrete_log is None:
+                raise ValueError("solved discrete logarithm requires an exponent")
+            if pow(self.base, self.discrete_log, self.modulus) != self.target:
+                raise ValueError("discrete logarithm does not reproduce the target")
+        elif self.discrete_log is not None:
+            raise ValueError("unsolvable discrete logarithm cannot carry an exponent")
+        return self
+
+
+class DiscreteLogarithmObligation(ContractModel):
+    """Independent checks still open for a completed producer result."""
+
+    obligation_schema_version: Literal["1"] = "1"
+    predicate: Literal["MODULAR_DISCRETE_LOGARITHM"] = (
+        "MODULAR_DISCRETE_LOGARITHM"
+    )
+    base: StrictInt = Field(ge=0, le=_MAX_MODULUS)
+    target: StrictInt = Field(ge=0, le=_MAX_MODULUS)
+    modulus: StrictInt = Field(ge=2, le=_MAX_MODULUS)
+    status: Literal["SOLVED", "UNSOLVABLE"]
+    discrete_log: StrictInt | None = Field(default=None, ge=0)
+    required_checks: tuple[
+        Literal[
+            "DISCRETE_LOG_WITNESS_REPLAY",
+            "DISCRETE_LOG_NONSOLVABILITY",
+        ],
+        ...,
+    ]
+
+    @model_validator(mode="after")
+    def require_status_specific_check(self) -> Self:
+        if self.base >= self.modulus or self.target >= self.modulus:
+            raise ValueError("base and target must be less than the modulus")
+        expected = (
+            ("DISCRETE_LOG_WITNESS_REPLAY",)
+            if self.status == "SOLVED"
+            else ("DISCRETE_LOG_NONSOLVABILITY",)
+        )
+        if self.required_checks != expected:
+            raise ValueError("required checks must match the discrete-log status")
+        if (self.discrete_log is None) != (self.status == "UNSOLVABLE"):
+            raise ValueError("candidate exponent must match the discrete-log status")
+        return self

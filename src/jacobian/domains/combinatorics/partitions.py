@@ -1,6 +1,8 @@
 """Partition-owned exact combinatorics capabilities."""
 
 from jacobian.contracts.combinatorics import (
+    IntegerPartitionEnumerationRequest,
+    IntegerPartitionEnumerationResult,
     IntegerResult,
     NonnegativeIntegerRequest,
     NonnegativePairRequest,
@@ -10,6 +12,7 @@ from jacobian.domains.combinatorics._support import (
 )
 from jacobian.domains.combinatorics.operations import (
     bell,
+    enumerate_integer_partitions,
     partition_number,
     stirling_first,
     stirling_second,
@@ -55,5 +58,19 @@ PARTITION_CAPABILITIES = (
         partition_number,
         "combinatorics",
         "partition",
+    ),
+    combinatorics_operation(
+        "combinatorics.enumerate.integer_partitions",
+        "Enumerate integer partitions",
+        (
+            "Enumerate every partition of bounded n containing at most "
+            "max_parts summands, in canonical descending order."
+        ),
+        IntegerPartitionEnumerationRequest,
+        IntegerPartitionEnumerationResult,
+        enumerate_integer_partitions,
+        "combinatorics",
+        "partition",
+        "enumeration",
     ),
 )

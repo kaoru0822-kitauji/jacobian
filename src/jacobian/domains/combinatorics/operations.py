@@ -8,6 +8,8 @@ from typing import cast
 
 from jacobian.contracts.combinatorics import (
     IntegerListRequest,
+    IntegerPartitionEnumerationRequest,
+    IntegerPartitionEnumerationResult,
     IntegerResult,
     NonnegativeIntegerRequest,
     NonnegativePairRequest,
@@ -102,6 +104,27 @@ def partition_number(request: ContractModel) -> ContractModel:
 
     n = cast(NonnegativeIntegerRequest, request).n
     return _integer_result(sympy.partition(n))
+
+
+def enumerate_integer_partitions(request: ContractModel) -> ContractModel:
+    """Enumerate all bounded partitions using ``sympy.utilities.partitions``."""
+    from sympy.utilities.iterables import partitions
+
+    value = cast(IntegerPartitionEnumerationRequest, request)
+    expanded_partitions: list[tuple[int, ...]] = []
+    for multiplicities in partitions(value.n, m=value.max_parts):
+        expanded_partitions.append(
+            tuple(
+                part
+                for part in sorted(multiplicities, reverse=True)
+                for _ in range(int(multiplicities[part]))
+            )
+        )
+    return IntegerPartitionEnumerationResult(
+        n=value.n,
+        max_parts=value.max_parts,
+        partitions=tuple(expanded_partitions),
+    )
 
 
 def fibonacci(request: ContractModel) -> ContractModel:

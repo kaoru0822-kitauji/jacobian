@@ -15,7 +15,7 @@ library provides a maintained implementation (``math.gcd``, ``math.lcm``,
 from __future__ import annotations
 
 import math
-from typing import cast
+from typing import Literal, cast
 
 from jacobian.contracts.number_theory import (
     BooleanResult,
@@ -27,6 +27,8 @@ from jacobian.contracts.number_theory import (
     IntegerPairRequest,
     IntegerValueRequest,
     IntegerValueResult,
+    JacobiSymbolRequest,
+    JacobiSymbolResult,
     ModularValueRequest,
     ModulusRequest,
     NonnegativeIntegerRequest,
@@ -49,6 +51,19 @@ def compute_lcm(request: ContractModel) -> ContractModel:
     """Compute lcm(a, b) using ``math.lcm``."""
     pair = cast(IntegerPairRequest, request)
     return IntegerValueResult(value=str(math.lcm(int(pair.left), int(pair.right))))
+
+
+def compute_jacobi_symbol(request: ContractModel) -> ContractModel:
+    """Compute the Jacobi symbol using ``sympy.jacobi_symbol``."""
+    from sympy import jacobi_symbol
+
+    value = cast(JacobiSymbolRequest, request)
+    symbol = cast(Literal[-1, 0, 1], int(jacobi_symbol(int(value.a), value.n)))
+    return JacobiSymbolResult(
+        a=value.a,
+        n=value.n,
+        jacobi=symbol,
+    )
 
 
 def compute_extended_gcd(request: ContractModel) -> ContractModel:

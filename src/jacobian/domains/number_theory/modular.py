@@ -4,6 +4,8 @@ from jacobian.contracts.number_theory import (
     ChineseRemainderRequest,
     ChineseRemainderResult,
     IntegerValueResult,
+    JacobiSymbolRequest,
+    JacobiSymbolResult,
     ModularValueRequest,
     ModulusRequest,
     QuadraticResiduesResult,
@@ -11,7 +13,11 @@ from jacobian.contracts.number_theory import (
 from jacobian.domains.number_theory._support import (
     number_theory_operation,
 )
+from jacobian.domains.number_theory.discrete_logarithm import (
+    DISCRETE_LOGARITHM_CAPABILITY,
+)
 from jacobian.domains.number_theory.operations import (
+    compute_jacobi_symbol,
     compute_modular_inverse,
     compute_multiplicative_order,
     enumerate_quadratic_residues,
@@ -19,6 +25,17 @@ from jacobian.domains.number_theory.operations import (
 )
 
 MODULAR_CAPABILITIES = (
+    number_theory_operation(
+        "number_theory.compute.jacobi_symbol",
+        "Compute Jacobi symbol",
+        "Compute the Jacobi symbol (a / n) for an odd positive denominator.",
+        JacobiSymbolRequest,
+        JacobiSymbolResult,
+        compute_jacobi_symbol,
+        "number-theory",
+        "modular",
+        "jacobi-symbol",
+    ),
     number_theory_operation(
         "modular.compute.inverse",
         "Compute modular inverse",
@@ -60,4 +77,5 @@ MODULAR_CAPABILITIES = (
         "number-theory",
         "modular",
     ),
+    DISCRETE_LOGARITHM_CAPABILITY,
 )
