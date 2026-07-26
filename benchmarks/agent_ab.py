@@ -163,8 +163,9 @@ copy its exact verification-record URI. Set evidence_uri to the producer output
 passed into that verifier: assignment_uri from sat.model.find or proof_uri from
 sat.unsat_proof.find. Do not substitute the verifier's witness_uri or
 certificate_uri. For a SAT assignment, read the assignment artifact through its
-artifact:// resource to copy the variable values; artifact.get is not a
-capability.
+artifact:// resource to copy the variable values. Use the client's MCP resource
+reader (`read_mcp_resource` in Codex); do not guess an artifact.get or
+artifact.read capability.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\

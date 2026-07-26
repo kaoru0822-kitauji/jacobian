@@ -117,7 +117,8 @@ def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     assert "Do not substitute the verifier's witness_uri" in BENCHMARK[
         "SAT_TREATMENT_INSTRUCTIONS"
     ]
-    assert "artifact.get is not a" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    assert "read_mcp_resource" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    assert "artifact.read capability" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
 
 
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:
