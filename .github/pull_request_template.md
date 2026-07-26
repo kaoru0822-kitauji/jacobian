@@ -18,4 +18,3 @@ make check
 ## Checklist
 - [ ] Routine local validation passes (`make check`)
 - [ ] Relevant focused tests are listed above
-- [ ] Relevant documentation updated

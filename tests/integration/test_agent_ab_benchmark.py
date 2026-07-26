@@ -1496,8 +1496,11 @@ def test_ab_lean_control_ablation_removes_only_declaration_discovery(
 
     assert lean_ids == {
         "lean.check",
+        "lean.proof.repair_once",
         "lean.proof_state.apply_tactic",
         "lean.retrieve.premises",
+        "lean.statement.compare",
+        "lean.statement.propose",
     }
     excluded = kernel.capabilities.invoke(
         CapabilityRequest(

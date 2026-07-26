@@ -27,6 +27,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.cvc5 import install_cvc5_capability
+from jacobian.domain_atomic_extras import install_domain_atomic_extras
 from jacobian.evaluation import EvaluationService
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
@@ -41,6 +42,14 @@ from jacobian.flint_linear import (
 )
 from jacobian.geometry_capabilities import install_geometry_capabilities
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
+from jacobian.graph_coloring_capabilities import (
+    GraphColoringInstallation,
+    install_graph_coloring_capabilities,
+)
+from jacobian.graph_composition_capabilities import (
+    GraphCompositionInstallation,
+    install_graph_composition_capabilities,
+)
 from jacobian.graph_isomorphism import (
     GraphIsomorphismInstallation,
     install_graph_isomorphism,
@@ -53,6 +62,10 @@ from jacobian.lean_declarations import (
 from jacobian.lean_exploration import (
     LeanExplorationInstallation,
     install_lean_exploration_capabilities,
+)
+from jacobian.lean_statement_capabilities import (
+    LeanStatementInstallation,
+    install_lean_statement_capabilities,
 )
 from jacobian.linear import LinearArtifactService, install_linear_artifacts
 from jacobian.linear_capabilities import (
@@ -92,11 +105,20 @@ from jacobian.polynomial_expressions import (
     PolynomialExpressionArtifactService,
     install_polynomial_expression_artifacts,
 )
+from jacobian.polynomial_interval_capabilities import (
+    PolynomialIntervalInstallation,
+    install_polynomial_interval_capabilities,
+)
+from jacobian.polynomial_positivity_capabilities import (
+    PolynomialPositivityInstallation,
+    install_polynomial_positivity_capabilities,
+)
 from jacobian.polynomial_system_capabilities import (
     PolynomialSystemInstallation,
     install_polynomial_system_capabilities,
 )
 from jacobian.polytope import PolytopeService
+from jacobian.primitive_adapters import factory as install_primitive_adapters
 from jacobian.primitive_math_capabilities import install_primitive_math_capabilities
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
@@ -425,6 +447,7 @@ class JacobianKernel:
         )
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
+        self._install_graph_coloring_capabilities(install_references)
         self._install_geometry_capabilities()
         self.graph_isomorphism: GraphIsomorphismInstallation
         graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
@@ -497,6 +520,7 @@ class JacobianKernel:
         )
         for universal_algebra_adapter in universal_algebra_adapters:
             self.register_capability(universal_algebra_adapter)
+        self._install_resource_capabilities(install_references)
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(
@@ -574,6 +598,77 @@ class JacobianKernel:
                 )
         for entrypoint in capability_adapter_entrypoints:
             self.register_capability(load_capability_adapter(entrypoint, self))
+
+    def _install_resource_capabilities(self, install_references: bool) -> None:
+        """Install resource-mined domain atomics after core services exist."""
+        self.graph_composition: GraphCompositionInstallation
+        graph_adapters, self.graph_composition = install_graph_composition_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            semantics_uri=self.graph.semantics_uri,
+            graph_schema_uri=self.graph.graph_schema_uri,
+        )
+        for adapter in graph_adapters:
+            self.register_capability(adapter)
+
+        self.polynomial_interval: PolynomialIntervalInstallation
+        interval_adapters, self.polynomial_interval = (
+            install_polynomial_interval_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        for interval_adapter in interval_adapters:
+            if interval_adapter is not None:
+                self.register_capability(interval_adapter)
+
+        self.polynomial_positivity: PolynomialPositivityInstallation
+        positivity_adapters, self.polynomial_positivity = (
+            install_polynomial_positivity_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        for positivity_adapter in positivity_adapters:
+            if positivity_adapter is not None:
+                self.register_capability(positivity_adapter)
+
+        self.lean_statement: LeanStatementInstallation
+        lean_adapters, self.lean_statement = install_lean_statement_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
+        for lean_statement_adapter in lean_adapters:
+            self.register_capability(lean_statement_adapter)
+        for primitive_adapter in install_primitive_adapters(self):
+            self.register_capability(primitive_adapter)
+        for domain_atomic_adapter in install_domain_atomic_extras(self):
+            self.register_capability(domain_atomic_adapter)
+
+    def _install_graph_coloring_capabilities(self, authorize_checker: bool) -> None:
+        self.graph_coloring: GraphColoringInstallation
+        graph_coloring_adapters, self.graph_coloring = (
+            install_graph_coloring_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.sat,
+                self.checkers,
+                authorize_checker=authorize_checker,
+            )
+        )
+        for graph_coloring_adapter in graph_coloring_adapters:
+            self.register_capability(graph_coloring_adapter)
 
     def _install_matrix_normal_form_capabilities(
         self,
