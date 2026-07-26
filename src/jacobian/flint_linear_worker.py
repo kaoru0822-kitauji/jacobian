@@ -1,4 +1,4 @@
-"""Isolated Python-FLINT worker for one exact rational solution candidate."""
+"""Isolated Python-FLINT worker for exact rational linear-system candidates."""
 
 from __future__ import annotations
 
@@ -10,6 +10,9 @@ from fractions import Fraction
 from typing import Any
 
 FLINT_LINEAR_WORKER_PROTOCOL = "jacobian.flint-linear-worker/v1"
+FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL = (
+    "jacobian.flint-linear-inconsistency-worker/v1"
+)
 FLINT_LINEAR_INPUT_LIMIT = 1_000_000
 MAX_LINEAR_DIMENSION = 32
 MAX_RATIONAL_DIGITS = 256
@@ -25,10 +28,14 @@ class FlintLinearWorkerError(RuntimeError):
         self.code = code
 
 
-def _emit(payload: dict[str, object]) -> None:
+def _emit(
+    payload: dict[str, object],
+    *,
+    protocol: str = FLINT_LINEAR_WORKER_PROTOCOL,
+) -> None:
     sys.stdout.write(
         json.dumps(
-            {"protocol": FLINT_LINEAR_WORKER_PROTOCOL, **payload},
+            {"protocol": protocol, **payload},
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -84,11 +91,10 @@ def _rational(value: Any) -> Fraction:
 
 def _validate_system(
     request: dict[str, Any],
+    *,
+    protocol: str,
 ) -> tuple[list[list[Fraction]], list[Fraction]]:
-    if (
-        set(request) != {"protocol", "system"}
-        or request.get("protocol") != FLINT_LINEAR_WORKER_PROTOCOL
-    ):
+    if set(request) != {"protocol", "system"} or request.get("protocol") != protocol:
         raise FlintLinearWorkerError("FLINT_LINEAR_INPUT_INVALID")
     system = request["system"]
     if not isinstance(system, dict) or set(system) != {
@@ -144,23 +150,19 @@ def _validate_system(
     )
 
 
-def _run(request: dict[str, Any]) -> dict[str, object]:
-    coefficients, rhs = _validate_system(request)
-    try:
-        flint: Any = importlib.import_module("flint")
-        if getattr(flint, "__version__", None) != "0.9.0":
-            raise FlintLinearWorkerError("FLINT_LINEAR_VERSION_MISMATCH")
-        augmented = flint.fmpq_mat(
-            [
-                [flint.fmpq(value.numerator, value.denominator) for value in row]
-                + [flint.fmpq(bound.numerator, bound.denominator)]
-                for row, bound in zip(coefficients, rhs, strict=True)
-            ]
-        )
-        reduced, _ = augmented.rref()
-    except (AttributeError, ImportError, OSError, RuntimeError, TypeError) as exc:
-        raise FlintLinearWorkerError("FLINT_LINEAR_EXECUTION_FAILED") from exc
-
+def _solve(
+    coefficients: list[list[Fraction]],
+    rhs: list[Fraction],
+    flint: Any,
+) -> list[Any] | None:
+    augmented = flint.fmpq_mat(
+        [
+            [flint.fmpq(value.numerator, value.denominator) for value in row]
+            + [flint.fmpq(bound.numerator, bound.denominator)]
+            for row, bound in zip(coefficients, rhs, strict=True)
+        ]
+    )
+    reduced, _ = augmented.rref()
     column_count = len(coefficients[0])
     values = [flint.fmpq(0) for _ in range(column_count)]
     for row_index in range(reduced.nrows()):
@@ -174,13 +176,58 @@ def _run(request: dict[str, Any]) -> dict[str, object]:
         )
         if pivot is None:
             if reduced[row_index, column_count] != 0:
-                return {
-                    "status": "NO_SOLUTION_PRODUCED",
-                    "backend_version": "0.9.0",
-                }
+                return None
             continue
         values[pivot] = reduced[row_index, column_count]
+    return values
 
+
+def _run(request: dict[str, Any]) -> dict[str, object]:
+    protocol = request.get("protocol")
+    if protocol not in {
+        FLINT_LINEAR_WORKER_PROTOCOL,
+        FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL,
+    }:
+        raise FlintLinearWorkerError("FLINT_LINEAR_INPUT_INVALID")
+    assert isinstance(protocol, str)
+    coefficients, rhs = _validate_system(request, protocol=protocol)
+    try:
+        flint: Any = importlib.import_module("flint")
+        if getattr(flint, "__version__", None) != "0.9.0":
+            raise FlintLinearWorkerError("FLINT_LINEAR_VERSION_MISMATCH")
+        if protocol == FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL:
+            row_count = len(coefficients)
+            column_count = len(coefficients[0])
+            dual_coefficients = [
+                [coefficients[row][column] for row in range(row_count)]
+                for column in range(column_count)
+            ]
+            dual_coefficients.append(rhs)
+            dual_rhs = [Fraction(0) for _ in range(column_count)] + [Fraction(1)]
+            values = _solve(dual_coefficients, dual_rhs, flint)
+        else:
+            values = _solve(coefficients, rhs, flint)
+    except (AttributeError, ImportError, OSError, RuntimeError, TypeError) as exc:
+        raise FlintLinearWorkerError("FLINT_LINEAR_EXECUTION_FAILED") from exc
+    if values is None:
+        return {
+            "status": (
+                "NO_CERTIFICATE_PRODUCED"
+                if protocol == FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL
+                else "NO_SOLUTION_PRODUCED"
+            ),
+            "backend_version": "0.9.0",
+        }
+    if protocol == FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL:
+        return {
+            "status": "CERTIFICATE_PRODUCED",
+            "backend_version": "0.9.0",
+            "left_witness": [
+                {"num": str(value.numerator), "den": str(value.denominator)}
+                for value in values
+            ],
+            "rhs_pairing": {"num": "1", "den": "1"},
+        }
     return {
         "status": "SOLUTION_PRODUCED",
         "backend_version": "0.9.0",
@@ -192,12 +239,16 @@ def _run(request: dict[str, Any]) -> dict[str, object]:
 
 
 def main() -> int:
+    protocol = FLINT_LINEAR_WORKER_PROTOCOL
     try:
-        result = _run(_read_request())
+        request = _read_request()
+        if request.get("protocol") == FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL:
+            protocol = FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL
+        result = _run(request)
     except FlintLinearWorkerError as exc:
-        _emit({"error_code": exc.code})
+        _emit({"error_code": exc.code}, protocol=protocol)
         return 2
-    _emit(result)
+    _emit(result, protocol=protocol)
     return 0
 
 

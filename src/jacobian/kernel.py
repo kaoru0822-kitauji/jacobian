@@ -36,7 +36,11 @@ from jacobian.finite_partition import (
     install_finite_partition,
 )
 from jacobian.flint_hnf import install_python_flint_hnf_capability
-from jacobian.flint_linear import install_python_flint_linear_capability
+from jacobian.flint_linear import (
+    install_python_flint_inconsistency_capability,
+    install_python_flint_linear_capability,
+)
+from jacobian.geometry_capabilities import install_geometry_capabilities
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.graph_coloring_capabilities import (
     GraphColoringInstallation,
@@ -65,12 +69,18 @@ from jacobian.lean_statement_capabilities import (
 )
 from jacobian.linear import LinearArtifactService, install_linear_artifacts
 from jacobian.linear_capabilities import (
+    LinearRationalInconsistencyCheckerInstallation,
     LinearRationalSolutionCheckerInstallation,
+    install_linear_rational_inconsistency_checker,
     install_linear_rational_solution_checker,
 )
 from jacobian.matrix_capabilities import (
     MatrixInstallation,
     install_matrix_capabilities,
+)
+from jacobian.matrix_determinant_capabilities import (
+    MatrixDeterminantCheckerInstallation,
+    install_matrix_determinant_checker,
 )
 from jacobian.matrix_normal_form_capabilities import (
     MatrixNormalFormCheckerInstallation,
@@ -109,6 +119,7 @@ from jacobian.polynomial_system_capabilities import (
 )
 from jacobian.polytope import PolytopeService
 from jacobian.primitive_adapters import factory as install_primitive_adapters
+from jacobian.primitive_math_capabilities import install_primitive_math_capabilities
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
     carcara_provider_runtime,
@@ -357,25 +368,24 @@ class JacobianKernel:
         )
         if linear_verification_adapter is not None:
             self.register_capability(linear_verification_adapter)
-        self.python_flint_runtime: CapabilityProviderRuntime = (
-            python_flint_provider_runtime()
+        self.linear_inconsistency_checker: (
+            LinearRationalInconsistencyCheckerInstallation
         )
-        if (
-            self.python_flint_runtime.availability
-            is CapabilityProviderAvailability.AVAILABLE
-        ):
-            try:
-                linear_find_adapter = install_python_flint_linear_capability(
-                    self.linear,
-                    self.python_flint_runtime,
-                )
-            except (OSError, ValueError) as exc:
-                _LOGGER.warning(
-                    "Python-FLINT rational solution exploration is not installed: %s",
-                    exc,
-                )
-            else:
-                self.register_capability(linear_find_adapter)
+        (
+            linear_inconsistency_verification_adapter,
+            self.linear_inconsistency_checker,
+        ) = install_linear_rational_inconsistency_checker(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.linear,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if linear_inconsistency_verification_adapter is not None:
+            self.register_capability(linear_inconsistency_verification_adapter)
+        self._install_python_flint_capabilities()
         self._install_matrix_normal_form_capabilities(
             authorize_checker=install_references
         )
@@ -438,6 +448,7 @@ class JacobianKernel:
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
         self._install_graph_coloring_capabilities(install_references)
+        self._install_geometry_capabilities()
         self.graph_isomorphism: GraphIsomorphismInstallation
         graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
             self.store,
@@ -469,6 +480,21 @@ class JacobianKernel:
         )
         for matrix_adapter in matrix_adapters:
             self.register_capability(matrix_adapter)
+        self.matrix_determinant_checker: MatrixDeterminantCheckerInstallation
+        determinant_verification, self.matrix_determinant_checker = (
+            install_matrix_determinant_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.matrix,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        if determinant_verification is not None:
+            self.register_capability(determinant_verification)
+        self._install_primitive_math_capabilities()
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
@@ -684,6 +710,56 @@ class JacobianKernel:
             )
         else:
             self.register_capability(adapter)
+
+    def _install_primitive_math_capabilities(self) -> None:
+        for adapter in install_primitive_math_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        ):
+            self.register_capability(adapter)
+
+    def _install_geometry_capabilities(self) -> None:
+        for adapter in install_geometry_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        ):
+            self.register_capability(adapter)
+
+    def _install_python_flint_capabilities(self) -> None:
+        """Install exact rational linear producers when the pin is available."""
+
+        self.python_flint_runtime = python_flint_provider_runtime()
+        if (
+            self.python_flint_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            return
+        try:
+            solution_adapter = install_python_flint_linear_capability(
+                self.linear,
+                self.python_flint_runtime,
+            )
+        except (OSError, ValueError) as exc:
+            _LOGGER.warning(
+                "Python-FLINT rational solution exploration is not installed: %s",
+                exc,
+            )
+        else:
+            self.register_capability(solution_adapter)
+        try:
+            inconsistency_adapter = install_python_flint_inconsistency_capability(
+                self.linear,
+                self.python_flint_runtime,
+            )
+        except (OSError, ValueError) as exc:
+            _LOGGER.warning(
+                "Python-FLINT rational inconsistency exploration is not installed: %s",
+                exc,
+            )
+        else:
+            self.register_capability(inconsistency_adapter)
 
     def _install_polynomial_expression_capabilities(
         self,

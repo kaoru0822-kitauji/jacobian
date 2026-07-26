@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from fractions import Fraction
 from itertools import permutations
 from pathlib import Path
@@ -11,10 +12,15 @@ import sympy
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
+    CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityRequest,
 )
+from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
+from jacobian.matrix_determinant_capabilities import (
+    install_matrix_determinant_checker,
+)
 
 
 def _rational(value: int | Fraction) -> dict[str, str]:
@@ -43,6 +49,22 @@ def _reference_determinant(rows: list[list[Fraction]]) -> Fraction:
             term *= rows[row][column]
         total += term
     return total
+
+
+def _kernel_with_determinant_checker(root: Path) -> JacobianKernel:
+    kernel = JacobianKernel(root)
+    adapter, _installation = install_matrix_determinant_checker(
+        kernel.store,
+        kernel.schemas,
+        kernel.artifacts,
+        kernel.matrix,
+        kernel.verification,
+        kernel.checkers,
+        authorize_checker=True,
+    )
+    assert adapter is not None
+    kernel.register_capability(adapter)
+    return kernel
 
 
 @pytest.mark.integration
@@ -82,6 +104,112 @@ def test_matrix_determinant_compute_is_exact_and_unverified(
     determinant_artifact = kernel.store.get(result.output["determinant_uri"])
     assert determinant_artifact.payload["backend"] == "sympy"
     assert determinant_artifact.payload["backend_version"] == sympy.__version__
+
+
+@pytest.mark.integration
+def test_matrix_determinant_verify_independently_recomputes_exact_value(
+    tmp_path: Path,
+) -> None:
+    kernel = _kernel_with_determinant_checker(tmp_path)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.compute",
+            input={
+                "matrix": _matrix(
+                    [
+                        [1, 0, 1],
+                        [2, -1, 3],
+                        [4, 3, 2],
+                    ]
+                )
+            },
+        )
+    )
+
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"determinant_uri": computed.output["determinant_uri"]},
+        )
+    )
+
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED_DETERMINANT"
+    assert verified.output["conclusion"] == "TRUE"
+    assert verified.output["verification_record_uri"].startswith("artifact://sha256/")
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+
+@pytest.mark.integration
+def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> None:
+    kernel = _kernel_with_determinant_checker(tmp_path)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.compute",
+            input={"matrix": _matrix([[1, 2], [3, 4]])},
+        )
+    )
+    source_uri = computed.output["matrix_uri"]
+    wrong = kernel.artifacts.put(
+        schema_uri=kernel.matrix.determinant_schema_uri,
+        semantics_uri=kernel.matrix.semantics_uri,
+        payload={
+            **kernel.store.get(computed.output["determinant_uri"]).payload,
+            "determinant": _rational(2),
+        },
+        parents=(source_uri,),
+        summary="deliberately incorrect determinant candidate",
+    )
+
+    rejected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"determinant_uri": wrong.artifact_uri},
+        )
+    )
+
+    assert rejected.execution.status is ExecutionStatus.COMPLETED
+    assert rejected.output["status"] == "REJECTED"
+    assert rejected.output["conclusion"] == "UNKNOWN"
+    assert rejected.output["verification_record_uri"] is None
+    assert rejected.assurance.level is not CapabilityAssuranceLevel.VERIFIED
+
+
+@pytest.mark.integration
+def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = _kernel_with_determinant_checker(tmp_path)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.compute",
+            input={"matrix": _matrix([[1]])},
+        )
+    )
+    monkeypatch.setattr(
+        kernel.verification,
+        "_run_checker",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired("determinant-checker", 1)
+        ),
+    )
+
+    timed_out = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.determinant.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"determinant_uri": computed.output["determinant_uri"]},
+        )
+    )
+
+    assert timed_out.execution.status is ExecutionStatus.TIMEOUT
+    assert timed_out.output["status"] == "TIMEOUT"
+    assert timed_out.output["conclusion"] == "UNKNOWN"
+    assert timed_out.output["verification_record_uri"] is None
+    assert timed_out.assurance.level is not CapabilityAssuranceLevel.VERIFIED
 
 
 @pytest.mark.integration

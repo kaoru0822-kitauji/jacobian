@@ -273,6 +273,80 @@ def _validate_solution(
     return [_rational(value) for value in values]
 
 
+def _validate_inconsistency(
+    payload: object,
+    *,
+    claim: dict[str, Any],
+    candidate: dict[str, Any],
+    rows: int,
+    columns: int,
+    variables: list[str],
+) -> tuple[list[Fraction], Fraction]:
+    if not isinstance(payload, dict) or set(payload) != {
+        "certificate_schema_version",
+        "system",
+        "declared_scope",
+        "left_witness",
+        "rhs_pairing",
+        "producer",
+        "resource_budget",
+        "method",
+    }:
+        raise ValueError("rational inconsistency certificate has an invalid shape")
+    if (
+        payload["certificate_schema_version"] != "1"
+        or payload["declared_scope"] != "FULL_SYSTEM"
+        or payload["method"] != "DUAL_RREF_PAIRING_ONE"
+    ):
+        raise ValueError("rational inconsistency uses unsupported semantics")
+    binding = payload["system"]
+    if not isinstance(binding, dict) or set(binding) != _SYSTEM_BINDING_KEYS:
+        raise ValueError("rational inconsistency system binding is malformed")
+    expected_variable_digest = _sha256(_canonical_json({"variables": variables}))
+    if binding != {
+        "binding_version": "1",
+        "system_artifact_uri": claim["artifact_uri"],
+        "system_object_digest": claim["object_digest"],
+        "system_payload_digest": claim["payload_digest"],
+        "variable_order_digest": expected_variable_digest,
+        "row_count": rows,
+        "column_count": columns,
+    }:
+        raise ValueError("rational inconsistency is not exactly bound to the system")
+    if claim["artifact_uri"] not in candidate["parents"]:
+        raise ValueError("rational inconsistency is missing system lineage")
+    values = payload["left_witness"]
+    if not isinstance(values, list) or len(values) != rows:
+        raise ValueError("left witness must contain one exact value per system row")
+    provider = payload["producer"]
+    if (
+        not isinstance(provider, dict)
+        or set(provider) != _PROVIDER_KEYS
+        or provider["runtime_version"] != "1"
+        or provider["provider"] != "python-flint"
+        or provider["availability"] != "AVAILABLE"
+        or provider["version"] != "0.9.0"
+        or not isinstance(provider["digest"], str)
+        or _DIGEST.fullmatch(provider["digest"]) is None
+        or provider["digest_kind"] != "PYTHON_DISTRIBUTION_RECORD"
+        or provider["install_tier"] != "T1"
+    ):
+        raise ValueError("rational inconsistency producer identity is malformed")
+    budget = payload["resource_budget"]
+    if (
+        not isinstance(budget, dict)
+        or set(budget) != {"budget_version", "wall_seconds"}
+        or budget["budget_version"] != "1"
+        or type(budget["wall_seconds"]) is not int
+        or not 1 <= budget["wall_seconds"] <= 60
+    ):
+        raise ValueError("rational inconsistency resource budget is malformed")
+    pairing = _rational(payload["rhs_pairing"])
+    if pairing != 1:
+        raise ValueError("rational inconsistency witness is not normalized")
+    return [_rational(value) for value in values], pairing
+
+
 def check_rational_solution(request: dict[str, Any]) -> dict[str, Any]:
     """Accept only a total exact vector satisfying every bound equation."""
 
@@ -379,3 +453,120 @@ def check_rational_solution(request: dict[str, Any]) -> dict[str, Any]:
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError, OverflowError):
         return _reject("malformed checker request")
+
+
+def check_rational_inconsistency(request: dict[str, Any]) -> dict[str, Any]:
+    """Accept only a left witness proving the exact bound system inconsistent."""
+
+    try:
+        if not isinstance(request, dict) or set(request) != {
+            "request_version",
+            "claim",
+            "candidate",
+            "scope",
+            "witness",
+            "expected_bindings",
+        }:
+            return _reject("malformed checker request")
+        if request["request_version"] != "1" or request["scope"] is not None:
+            return _reject("unsupported checker request")
+        claim = request["claim"]
+        candidate = request["candidate"]
+        witness = request["witness"]
+        if not all(_valid_artifact(item) for item in (claim, candidate, witness)):
+            return _reject("checker artifact metadata is malformed")
+        expected_bindings = request["expected_bindings"]
+        if not _valid_bindings(expected_bindings):
+            return _reject("expected evidence bindings are malformed")
+        if (
+            claim["semantics_uri"] != candidate["semantics_uri"]
+            or claim["semantics_uri"] != witness["semantics_uri"]
+        ):
+            return _reject("checker artifacts use different semantics")
+        for artifact, label in (
+            (claim, "linear-system"),
+            (candidate, "inconsistency"),
+            (witness, "linear witness"),
+        ):
+            if artifact["payload_digest"] != _sha256(
+                _canonical_json(artifact["payload"])
+            ):
+                return _reject(f"{label} payload digest does not match")
+
+        coefficients, rhs, variables = _validate_system(claim["payload"])
+        values, declared_pairing = _validate_inconsistency(
+            candidate["payload"],
+            claim=claim,
+            candidate=candidate,
+            rows=len(coefficients),
+            columns=len(variables),
+            variables=variables,
+        )
+        if (
+            expected_bindings["claim_digest"] != claim["object_digest"]
+            or expected_bindings["candidate_digest"] != candidate["object_digest"]
+        ):
+            return _reject("expected evidence bindings do not match artifacts")
+        envelope = witness["payload"]
+        if not isinstance(envelope, dict) or set(envelope) != {
+            "evidence_schema_version",
+            "witness_format",
+            "format_version",
+            "role",
+            "bindings",
+            "payload",
+        }:
+            return _reject("linear witness envelope is malformed")
+        if (
+            envelope["evidence_schema_version"] != "1"
+            or envelope["witness_format"] != "linear.rational_inconsistency"
+            or envelope["format_version"] != "1"
+            or envelope["role"] != "SUPPORTS_CLAIM"
+            or envelope["bindings"] != expected_bindings
+        ):
+            return _reject("linear witness envelope is not exactly bound")
+        if envelope["payload"] != {
+            "system_uri": claim["artifact_uri"],
+            "certificate_uri": candidate["artifact_uri"],
+        }:
+            return _reject("linear witness points at different artifacts")
+        if not {
+            claim["artifact_uri"],
+            candidate["artifact_uri"],
+        }.issubset(set(witness["parents"])):
+            return _reject("linear witness is missing required lineage")
+
+        for column in range(len(variables)):
+            if (
+                sum(
+                    (
+                        values[row] * coefficients[row][column]
+                        for row in range(len(coefficients))
+                    ),
+                    Fraction(0),
+                )
+                != 0
+            ):
+                return _reject("left witness does not annihilate every column")
+        actual_pairing = sum(
+            (value * bound for value, bound in zip(values, rhs, strict=True)),
+            Fraction(0),
+        )
+        if actual_pairing != declared_pairing or actual_pairing == 0:
+            return _reject("left witness has no nonzero right-hand-side pairing")
+        return {
+            "accepted": True,
+            "conclusion": "TRUE",
+            "arithmetic": "EXACT_RATIONAL",
+            "method": "DIRECT_WITNESS",
+            "coverage": "NOT_APPLICABLE",
+            "relation_id": "linear.relation.inconsistency-certificate-of",
+            "relationship_source_artifact_uris": [candidate["artifact_uri"]],
+            "relationship_target_artifact_uris": [claim["artifact_uri"]],
+            "detail": (
+                f"replayed a {len(values)}-entry left witness over "
+                f"{len(variables)} exact rational columns"
+            ),
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return _reject("malformed rational inconsistency request")

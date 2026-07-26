@@ -473,8 +473,9 @@ proof-support claim. See
 
 ### Python-FLINT first
 
-The rational-solution and integer row-HNF slices are implemented; see the
-[exact rational solution contract](../reference/linear-rational-solutions.md)
+The rational solution, rational inconsistency-certificate, and integer row-HNF
+slices are implemented; see the
+[exact rational linear-system evidence contract](../reference/linear-rational-solutions.md)
 and [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md).
 The rational-solution usability evidence is recorded in the
 [Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
@@ -485,15 +486,22 @@ Implement one vertical slice at a time:
 1. `linear.rational_solution.find` returns one exact vector for a declared
    rational system. `linear.rational_solution.verify` independently checks
    `A x = b`. Failure to find a vector says nothing about consistency.
-2. Add an inconsistent-system outcome only with a separately checkable
-   left-nullspace or equivalent certificate.
+2. `linear.rational_inconsistency.find` is implemented with a normalized
+   left-nullspace witness `y^T A = 0`, `y^T b = 1`;
+   `linear.rational_inconsistency.verify` independently replays the exact
+   certificate. Failure to produce or accept a witness remains `UNKNOWN`.
 3. `matrix.normal_form.hermite` is implemented with the binding's complete
    left transformation. Independent replay checks `H = U A`, unimodularity,
    and every FLINT row-HNF condition.
-4. Add `polynomial.factor` with a product relation. Checking that the factors
+4. `matrix.determinant.verify` is implemented as a small shared exact
+   primitive. It checks the existing SymPy determinant artifact by
+   standard-library rational Gaussian elimination in an independent clean
+   process; see the
+   [exact rational determinant contract](../reference/matrix-rational-determinant.md).
+5. Add `polynomial.factor` with a product relation. Checking that the factors
    multiply to the input does not by itself certify irreducibility or
    completeness; keep those as open obligations until separately checked.
-5. Add rigorous Arb enclosures as computed evidence. The provider's rigorous
+6. Add rigorous Arb enclosures as computed evidence. The provider's rigorous
    error tracking is valuable, but it is not Jacobian `VERIFIED` until an
    authorized independent implementation checks the exact enclosure claim.
 
@@ -588,7 +596,13 @@ backlog.
     [typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
     and the
     [SymPy normalization pilot](../reference/capability-workflow-evaluations.md#sympy-typed-polynomial-normalization-pilot).
-14. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
+14. Python-FLINT rational inconsistency-certificate find and verify slice.
+    Implemented; see the
+    [exact rational linear-system evidence contract](../reference/linear-rational-solutions.md#inconsistency-certificate).
+15. Independent exact rational matrix-determinant verification. Implemented;
+    see the
+    [exact rational determinant contract](../reference/matrix-rational-determinant.md).
+16. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
     and HiGHS from accumulated workflow evidence.
 
 Stop after each paired evaluation long enough to decide whether the next

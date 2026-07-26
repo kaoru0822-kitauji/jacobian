@@ -1,6 +1,6 @@
 ---
 name: evaluate-math-capabilities
-description: Consume evidence-backed capability candidates and design, implement, run, and interpret Jacobian-specific model-in-the-loop evaluations that measure whether a mathematical operation or portfolio change improves autonomous agent outcomes. Use when asked to benchmark a Jacobian capability, compare baseline and treatment portfolios, create held-out mathematical cases or independent oracles, detect workflow leakage, measure correctness or false certification, evaluate retrieval or tool composition, or decide whether to keep, expand, split, consolidate, rank, or retire a capability. Use discover-math-capabilities first when the question is what to build rather than whether a concrete proposal helps.
+description: Consume evidence-backed capability candidates or implemented capability deltas and design, implement, run, and interpret Jacobian-specific model-in-the-loop evaluations that measure whether a mathematical operation, checker, or portfolio change improves autonomous agent outcomes. Use when asked to benchmark a Jacobian capability, compare baseline and treatment portfolios, create held-out mathematical cases or independent oracles, detect workflow leakage, measure correctness or false certification, evaluate retrieval or tool composition, or decide whether to keep, expand, split, consolidate, rank, stabilize, or retire a capability. Use discover-math-capabilities first when the question is what to build, implement-math-capability for producer construction, and implement-math-capability-checker for verification construction.
 ---
 
 # Evaluate Math Capabilities
@@ -15,6 +15,9 @@ Start from a concrete intervention:
 
 - a capability or portfolio delta;
 - a discovery candidate record with supporting move episodes;
+- an implementation handoff identifying exact contracts, artifacts, provider,
+  failure semantics, validation, and capability-availability delta;
+- a checker handoff and obligation ledger when verification is the treatment;
 - one expected counterfactual benefit;
 - a runnable baseline and treatment;
 - public reproduction evidence or a stable contract;
@@ -24,6 +27,13 @@ Start from a concrete intervention:
 If the operation, contract, backend, or intended mathematical outcome is still
 unclear, return the question to `discover-math-capabilities`. Evaluation should
 not invent the product hypothesis it is meant to test.
+
+If the intervention is not runnable or its artifacts and failures do not match
+the accepted candidate, return it to `implement-math-capability`. If a
+verification treatment lacks an independent checker, exact evidence bindings,
+or fail-closed outcomes, return it to
+`implement-math-capability-checker`. Evaluation must not repair product or
+trust-boundary defects inside the benchmark.
 
 ## Audit the discovery handoff
 
@@ -37,6 +47,11 @@ Confirm that the handoff identifies:
 - candidate backend, contract, failure semantics, and checker boundary;
 - contamination risks and plausible falsely persuasive paths; and
 - the predicted autonomous behavior that should change under treatment.
+
+For an implemented intervention, also confirm that the runnable catalog
+snapshot matches the candidate; public reproductions pass; invalid,
+inapplicable, timeout, and incomplete states remain non-conclusions; and no
+producer or checker artifact leaks into the held-out visible bundle.
 
 Use missing handoff evidence as a reason to return the candidate to discovery,
 not as an invitation to fill the gap with evaluation fixtures.

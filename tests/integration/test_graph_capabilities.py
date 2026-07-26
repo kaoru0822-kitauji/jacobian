@@ -214,3 +214,87 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     )
     property_artifact = kernel.store.get(result.output["property_artifact_uri"])
     assert property_artifact.manifest.parents == (graph_uri,)
+
+
+@pytest.mark.integration
+def test_graph_counterexample_invariant_batch_reproduces_path_five(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    searched = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.search.atlas",
+            input={
+                "order": 5,
+                "constraints": {"tree": True, "maximum_degree": 2},
+                "limit": 1,
+            },
+        )
+    )
+    graph_uri = searched.output["candidates"][0]["graph_uri"]
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.compute.properties",
+            input={
+                "graph_uri": graph_uri,
+                "properties": [
+                    "average_eccentricity",
+                    "diameter",
+                    "eccentricities",
+                    "girth",
+                    "harmonic_index",
+                    "havel_hakimi_trace",
+                    "radius",
+                    "residue",
+                    "triangle_frequencies",
+                ],
+            },
+        )
+    )
+
+    properties = result.output["properties"]
+    assert properties["average_eccentricity"]["value"] == {"num": "16", "den": "5"}
+    assert properties["diameter"]["value"] == 4
+    assert sorted(properties["eccentricities"]["value"].values()) == [2, 3, 3, 4, 4]
+    assert properties["girth"]["value"] is None
+    assert properties["harmonic_index"]["value"] == {"num": "7", "den": "3"}
+    assert properties["havel_hakimi_trace"]["value"] == [
+        [2, 2, 2, 1, 1],
+        [1, 1, 1, 1],
+        [1, 1, 0],
+        [0, 0],
+    ]
+    assert properties["radius"]["value"] == 2
+    assert properties["residue"]["value"] == 2
+    assert set(properties["triangle_frequencies"]["value"].values()) == {0}
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+
+
+@pytest.mark.integration
+def test_distance_property_on_disconnected_graph_fails_closed(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    searched = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.search.atlas",
+            input={
+                "order": 4,
+                "constraints": {"connected": False},
+                "limit": 1,
+            },
+        )
+    )
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.compute.properties",
+            input={
+                "graph_uri": searched.output["candidates"][0]["graph_uri"],
+                "properties": ["diameter"],
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "GRAPH_PROPERTY_NOT_APPLICABLE"
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC

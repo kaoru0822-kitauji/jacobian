@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import time
 from dataclasses import dataclass
 from fractions import Fraction
@@ -56,13 +57,22 @@ _PROPERTY_NAMES = (
     "bipartite",
     "connected",
     "degree_sequence",
+    "diameter",
+    "eccentricities",
+    "girth",
+    "harmonic_index",
+    "havel_hakimi_trace",
     "independence_number",
     "maximum_degree",
     "minimum_degree",
     "order",
+    "radius",
+    "residue",
     "size",
     "tree",
     "triangle_count",
+    "triangle_frequencies",
+    "average_eccentricity",
 )
 _GRAPH_PAYLOAD_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -558,11 +568,24 @@ class GraphPropertyAdapter:
         started = time.monotonic()
         graph_uri = str(request.input["graph_uri"])
         graph = _load_graph(self.resources, graph_uri)
-        all_properties = _compute_all_properties(graph)
-        selected = {
-            name: _property_result(name, all_properties[name])
-            for name in sorted(str(item) for item in request.input["properties"])
-        }
+        names = sorted(str(item) for item in request.input["properties"])
+        try:
+            selected = {
+                name: _property_result(name, _compute_property(graph, name))
+                for name in names
+            }
+        except nx.NetworkXError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="GRAPH_PROPERTY_NOT_APPLICABLE",
+                    stage="graph_property_computation",
+                    message=str(exc),
+                    hint=(
+                        "Distance-based properties require a nonempty connected "
+                        "graph; request structural properties separately."
+                    ),
+                )
+            ) from exc
         property_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.property_schema_uri,
             semantics_uri=self.resources.semantics_uri,
@@ -1240,6 +1263,97 @@ def _compute_all_properties(graph: nx.Graph[Any]) -> dict[str, Any]:
         ),
         "independence_number": independence_number,
     }
+
+
+def _compute_property(graph: nx.Graph[Any], name: str) -> Any:
+    """Compute only the requested outcome instead of the full property portfolio."""
+
+    if name == "order":
+        return graph.number_of_nodes()
+    if name == "size":
+        return graph.number_of_edges()
+    if name == "connected":
+        return nx.is_connected(graph) if graph else False
+    if name == "bipartite":
+        return nx.is_bipartite(graph)
+    if name == "tree":
+        return nx.is_tree(graph) if graph else False
+    if name in {"degree_sequence", "minimum_degree", "maximum_degree"}:
+        degrees = sorted((degree for _, degree in graph.degree), reverse=True)
+        if name == "degree_sequence":
+            return degrees
+        if name == "minimum_degree":
+            return min(degrees) if degrees else None
+        return max(degrees) if degrees else None
+    if name == "triangle_count":
+        return sum(cast(dict[Any, int], nx.triangles(graph)).values()) // 3
+    if name == "independence_number":
+        if not graph:
+            return 0
+        independent_set, independence_number = nx.max_weight_clique(
+            nx.complement(graph),
+            weight=None,
+        )
+        assert len(independent_set) == independence_number
+        return independence_number
+    if name == "girth":
+        value = nx.girth(graph)
+        return None if math.isinf(value) else int(value)
+    if name in {"eccentricities", "diameter", "radius", "average_eccentricity"}:
+        if not graph:
+            raise nx.NetworkXPointlessConcept(
+                "distance properties are undefined for the null graph"
+            )
+        eccentricities = cast(dict[Any, int], nx.eccentricity(graph))
+        ordered = {
+            str(vertex): eccentricities[vertex]
+            for vertex in sorted(eccentricities, key=str)
+        }
+        if name == "eccentricities":
+            return ordered
+        if name == "diameter":
+            return max(eccentricities.values(), default=0)
+        if name == "radius":
+            return min(eccentricities.values(), default=0)
+        total = sum(eccentricities.values())
+        return _rational_payload(Fraction(total, len(eccentricities)))
+    if name == "triangle_frequencies":
+        frequencies = cast(dict[Any, int], nx.triangles(graph))
+        return {
+            str(vertex): frequencies[vertex] for vertex in sorted(frequencies, key=str)
+        }
+    if name == "harmonic_index":
+        harmonic_value = Fraction(0)
+        for source, target in graph.edges:
+            harmonic_value += Fraction(
+                2,
+                graph.degree[source] + graph.degree[target],
+            )
+        return _rational_payload(harmonic_value)
+    if name in {"havel_hakimi_trace", "residue"}:
+        trace = _havel_hakimi_trace(graph)
+        return trace if name == "havel_hakimi_trace" else len(trace[-1])
+    raise AssertionError(f"unsupported graph property: {name}")
+
+
+def _havel_hakimi_trace(graph: nx.Graph[Any]) -> list[list[int]]:
+    sequence = sorted((degree for _, degree in graph.degree), reverse=True)
+    trace = [sequence.copy()]
+    while sequence and sequence[0] > 0:
+        degree = sequence.pop(0)
+        if degree > len(sequence):
+            raise nx.NetworkXError("degree sequence became non-graphical")
+        for index in range(degree):
+            sequence[index] -= 1
+            if sequence[index] < 0:
+                raise nx.NetworkXError("degree sequence became non-graphical")
+        sequence.sort(reverse=True)
+        trace.append(sequence.copy())
+    return trace
+
+
+def _rational_payload(value: Fraction) -> dict[str, str]:
+    return {"num": str(value.numerator), "den": str(value.denominator)}
 
 
 def _matches_constraints(
