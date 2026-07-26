@@ -1,0 +1,52 @@
+# Lean statement proposal and direct elaboration
+
+[Documentation home](../index.md) · [Capability surface](tools.md)
+
+`lean.statement.propose` has two operations over one canonical statement
+artifact:
+
+- `PROPOSE` checks a formal statement supplied alongside an informal claim;
+- `ELABORATE_PROPOSITION` directly elaborates one proposition and requires the
+  informal claim to be omitted.
+
+The direct operation resolves the `lean.statement.elaborate` inventory
+contract without adding an alias. Both operations remain available through
+`lean.statement.propose` because they use the same statement input, Lean
+execution boundary, artifact ownership, and non-verification semantics.
+
+## Direct proposition contract
+
+`ELABORATE_PROPOSITION` accepts one bounded, single-expression Lean
+proposition. It rejects declarations, imports, option commands, `sorry`,
+`admit`, metaprogramming commands, and other structural input. Version 1
+supports the `CORE` environment; `MATHLIB` remains unavailable through this
+capability.
+
+Lean elaborates the expression against expected type `Prop` with fixed
+pretty-printing options. A completed result records:
+
+- the pretty-printed elaborated core expression, when elaboration succeeds;
+- structured compiler diagnostics;
+- the fixed imports used to establish the environment;
+- declaration names occurring in the emitted elaborated expression;
+- every fixed elaboration/printing option;
+- Lean version and commit identifiers; and
+- an environment digest binding those identifiers, imports, and options.
+
+The artifact is durable and content-addressed. Failed elaboration is also a
+completed inspection result, but has no elaborated expression. Backend
+absence, timeout, invalid input, and unsupported environments are execution
+errors rather than mathematical conclusions.
+
+## Assurance boundary
+
+Successful elaboration means only that Lean produced a well-typed expression
+of type `Prop` in the bound environment. The artifact therefore always reports:
+
+- `semantic_scope = ELABORATION_ONLY`;
+- `truth_status = NOT_ASSESSED`; and
+- `verification = UNVERIFIED`.
+
+It does not show that the proposition is true, provable, equivalent to an
+informal claim, or appropriate for a proof task. No proof-state or session
+identity is created by this capability.
