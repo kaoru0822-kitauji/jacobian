@@ -7,8 +7,10 @@ import pytest
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
+    CapabilityRelationshipStatus,
     CapabilityRequest,
 )
+from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
 
@@ -52,7 +54,14 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
     assert result.output["collision_verified"] is True
     assert result.output["conclusion"] == "FALSE"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    assert result.output["verification_record_uri"] in result.artifact_uris
+    record_uri = result.output["verification_record_uri"]
+    assert record_uri in result.artifact_uris
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert len(result.relationships) == 1
+    relationship = result.relationships[0]
+    assert relationship.status is CapabilityRelationshipStatus.VERIFIED
+    assert relationship.verification_record_uri == record_uri
+    assert kernel.store.get(record_uri).payload["relation_id"] == relationship.relation_id
 
 
 @pytest.mark.integration
@@ -67,6 +76,11 @@ def test_direct_collision_verifier_fails_closed_for_wrong_image(
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.output["verification_record_uri"] is None
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert len(result.relationships) == 1
+    relationship = result.relationships[0]
+    assert relationship.status is CapabilityRelationshipStatus.PROPOSED
+    assert relationship.verification_record_uri is None
 
 
 def test_direct_collision_verifier_requires_authorized_reference_checker(

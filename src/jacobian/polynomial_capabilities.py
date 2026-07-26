@@ -783,7 +783,14 @@ class PolynomialCollisionVerifyAdapter:
                     relation_id="polynomial.relation.collision-refutes-injectivity",
                     source_artifact_uris=(witness_artifact.artifact_uri,),
                     target_artifact_uris=(claim_artifact.artifact_uri,),
-                    status=CapabilityRelationshipStatus.PROPOSED,
+                    status=(
+                        CapabilityRelationshipStatus.VERIFIED
+                        if verified
+                        else CapabilityRelationshipStatus.PROPOSED
+                    ),
+                    verification_record_uri=(
+                        checked.verification_record_uri if verified else None
+                    ),
                 ),
             ),
             assurance=CapabilityAssurance(

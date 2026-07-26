@@ -213,6 +213,7 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
             "detail": (
                 "distinct rational points have the same exact polynomial-map image"
             ),
+            "relation_id": "polynomial.relation.collision-refutes-injectivity",
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return _reject("malformed polynomial-map collision request")

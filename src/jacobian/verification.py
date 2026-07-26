@@ -440,6 +440,8 @@ class VerificationService:
                     checker.executable_digest,
                     checker.provider_runtime,
                 ),
+                relation_id=decision.relation_id,
+                obligation_uri=decision.obligation_uri,
             )
             parent_uris = [claim_uri, candidate_uri, witness_uri]
             if scope is not None:

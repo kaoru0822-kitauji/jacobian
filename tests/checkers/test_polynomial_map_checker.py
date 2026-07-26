@@ -72,6 +72,7 @@ def test_collision_checker_accepts_exact_distinct_preimages() -> None:
         "method": "DIRECT_WITNESS",
         "coverage": "NOT_APPLICABLE",
         "detail": "distinct rational points have the same exact polynomial-map image",
+        "relation_id": "polynomial.relation.collision-refutes-injectivity",
     }
 
 
