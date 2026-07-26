@@ -31,8 +31,8 @@ def _graph(value: object) -> tuple[tuple[str, ...], set[tuple[str, str]]]:
         value["graph_schema_version"] != "1"
         or not isinstance(vertices, list)
         or len(vertices) > _MAX_ORDER
-        or vertices != sorted(set(vertices))
-        or any(not isinstance(vertex, str) or not vertex for vertex in vertices)
+        or len(set(vertices)) != len(vertices)
+        or any(not isinstance(vertex, str) for vertex in vertices)
         or not isinstance(edges, list)
     ):
         raise ValueError("malformed graph vertices")
@@ -48,8 +48,8 @@ def _graph(value: object) -> tuple[tuple[str, ...], set[tuple[str, str]]]:
         ):
             raise ValueError("malformed graph edge")
         parsed_edges.append((edge[0], edge[1]))
-    if parsed_edges != sorted(set(parsed_edges)):
-        raise ValueError("graph edges are not canonical")
+    if len(set(parsed_edges)) != len(parsed_edges):
+        raise ValueError("graph edges are duplicated")
     return tuple(vertices), set(parsed_edges)
 
 
@@ -73,14 +73,37 @@ def check_isomorphism(request: dict[str, Any]) -> dict[str, Any]:
             return _reject("unexpected graph-isomorphism claim or binding")
         pair = pair_artifact["payload"]
         mapping_payload = mapping_artifact["payload"]
+        supporting_artifacts = request.get("supporting_artifacts")
         if (
             not isinstance(pair, dict)
             or pair.get("pair_schema_version") != "1"
             or not isinstance(mapping_payload, dict)
             or mapping_payload.get("mapping_schema_version") != "1"
             or not isinstance(mapping_payload.get("mapping"), dict)
+            or not isinstance(supporting_artifacts, list)
         ):
             return _reject("malformed graph-pair or mapping artifact")
+        supporting_by_uri = {
+            artifact.get("artifact_uri"): artifact
+            for artifact in supporting_artifacts
+            if isinstance(artifact, dict)
+        }
+        left_source = supporting_by_uri.get(pair.get("left_graph_uri"))
+        right_source = supporting_by_uri.get(pair.get("right_graph_uri"))
+        if (
+            len(supporting_by_uri) != len(supporting_artifacts)
+            or not isinstance(left_source, dict)
+            or not isinstance(right_source, dict)
+            or left_source.get("object_digest") != pair.get("left_graph_digest")
+            or right_source.get("object_digest") != pair.get("right_graph_digest")
+            or left_source.get("schema_uri") != pair.get("graph_schema_uri")
+            or right_source.get("schema_uri") != pair.get("graph_schema_uri")
+            or left_source.get("semantics_uri") != pair.get("graph_semantics_uri")
+            or right_source.get("semantics_uri") != pair.get("graph_semantics_uri")
+            or left_source.get("payload") != pair.get("left")
+            or right_source.get("payload") != pair.get("right")
+        ):
+            return _reject("source graph artifacts do not match the checked pair")
         if (
             not isinstance(certificate, dict)
             or certificate.get("certificate_type") != "graph.isomorphism_replay"
@@ -91,6 +114,12 @@ def check_isomorphism(request: dict[str, Any]) -> dict[str, Any]:
                 "method": "DIRECT_ADJACENCY_REPLAY",
                 "graph_pair_uri": pair_artifact["artifact_uri"],
                 "mapping_uri": mapping_artifact["artifact_uri"],
+                "left_graph_uri": pair.get("left_graph_uri"),
+                "right_graph_uri": pair.get("right_graph_uri"),
+                "left_graph_digest": pair.get("left_graph_digest"),
+                "right_graph_digest": pair.get("right_graph_digest"),
+                "graph_schema_uri": pair.get("graph_schema_uri"),
+                "graph_semantics_uri": pair.get("graph_semantics_uri"),
             }
         ):
             return _reject("unexpected isomorphism certificate or bindings")
@@ -118,12 +147,12 @@ def check_isomorphism(request: dict[str, Any]) -> dict[str, Any]:
             "arithmetic": "EXACT_INTEGER",
             "method": "CHECKED_CERTIFICATE",
             "coverage": "EXHAUSTIVE",
-            "relation_id": "graph.relation.isomorphic-via",
             "detail": (
                 "the bijection preserves every edge and nonedge"
                 if isomorphic
                 else "the proposed mapping is not an adjacency-preserving bijection"
             ),
+            **({"relation_id": "graph.relation.isomorphic-via"} if isomorphic else {}),
         }
     except (KeyError, TypeError, ValueError):
         return _reject("malformed graph-isomorphism verification request")

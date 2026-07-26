@@ -306,6 +306,7 @@ class JacobianKernel:
             self.artifacts,
             self.verification,
             self.checkers,
+            self.graph,
             authorize_checker=install_references,
         )
         if graph_isomorphism is not None:

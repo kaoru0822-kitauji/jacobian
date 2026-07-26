@@ -517,6 +517,7 @@ class VerificationService:
         checker_id: str | None = None,
         timeout_seconds: float | None = None,
         include_artifact_metadata: bool = False,
+        supporting_artifact_uris: tuple[str, ...] = (),
     ) -> ResultEnvelope:
         """Run a specified compatible checker or uniquely select one."""
 
@@ -576,6 +577,11 @@ class VerificationService:
                     "The claim, candidate, certificate, and scope use different "
                     "semantics. Use artifacts from one reference contract, then retry."
                 )
+            supporting_artifacts = tuple(
+                self.store.get(uri) for uri in dict.fromkeys(supporting_artifact_uris)
+            )
+            for artifact in supporting_artifacts:
+                self._validate_artifact(artifact)
 
             if checker_id is None:
                 checker = self.checker_registry.select_compatible(
@@ -596,7 +602,7 @@ class VerificationService:
                     semantics_uri=candidate.manifest.semantics_uri,
                     candidate_schema_uri=candidate.manifest.schema_uri,
                 )
-            request = {
+            request: dict[str, Any] = {
                 "request_version": "1",
                 "claim": self._checker_artifact(
                     claim,
@@ -623,6 +629,11 @@ class VerificationService:
                 },
                 "expected_bindings": certificate.bindings.model_dump(mode="json"),
             }
+            if supporting_artifacts:
+                request["supporting_artifacts"] = [
+                    self._checker_artifact(artifact)
+                    for artifact in supporting_artifacts
+                ]
             request_digest = _digest_bytes(canonicalize_json(request))
             decision = self._run_checker(
                 entrypoint=checker.entrypoint,
@@ -684,13 +695,16 @@ class VerificationService:
             parent_uris = [claim.artifact_uri, candidate.artifact_uri, certificate_uri]
             if scope is not None:
                 parent_uris.append(scope.artifact_uri)
+            parent_uris.extend(
+                artifact.artifact_uri for artifact in supporting_artifacts
+            )
             record_artifact = self._commit_verification_record(
                 checker_id=checker.checker_id,
                 checker_digest=checker.executable_digest,
                 schema_uri=self.record_schema_uri,
                 semantics_uri=self.record_semantics_uri,
                 payload=record.model_dump(mode="json"),
-                parents=tuple(parent_uris),
+                parents=tuple(dict.fromkeys(parent_uris)),
                 summary="authorized certificate verification",
             )
             return ResultEnvelope(
