@@ -14,7 +14,7 @@ from jacobian.contracts.geometry import (
     PolygonRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.geometry_capabilities import SPECS
+from jacobian.domains.geometry import GEOMETRY_BUNDLE
 from jacobian.kernel import JacobianKernel
 
 ZERO = {"num": "0", "den": "1"}
@@ -46,19 +46,19 @@ def test_geometry_capabilities_are_distinct_and_every_contract_completes(
         PolygonRequest: {"points": [P0, PX, PY]},
         PointSetRequest: {"points": [P0, PX, PY, PXY]},
     }
-    ids = [spec.capability_id for spec in SPECS]
+    ids = [operation.capability_id for operation in GEOMETRY_BUNDLE.capabilities]
 
     assert len(ids) == 13
     assert len(ids) == len(set(ids))
-    for spec in SPECS:
+    for operation in GEOMETRY_BUNDLE.capabilities:
         result = kernel.capabilities.invoke(
             CapabilityRequest(
-                capability_id=spec.capability_id,
-                input=payloads[spec.request_model],
+                capability_id=operation.capability_id,
+                input=payloads[operation.request_model],
             )
         )
         assert result.execution.status is ExecutionStatus.COMPLETED, (
-            spec.capability_id,
+            operation.capability_id,
             result.diagnostics,
         )
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED

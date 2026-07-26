@@ -54,6 +54,10 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
         "UNSATISFIABLE",
         "SATISFIABLE",
     ]
+    assert len(result.artifact_uris) == 2
+    input_uri, output_uri = result.artifact_uris
+    assert kernel.store.get(output_uri).manifest.parents == (input_uri,)
+    assert kernel.store.get(output_uri).payload == result.output
 
     coloring = result.output["coloring"]
     assert set(coloring) == {"a", "b", "c"}
@@ -95,6 +99,8 @@ def test_chromatic_number_timeout_is_unknown_and_preserves_bounds(
     assert result.output["chromatic_number"] is None
     assert result.output["lower_bound"] <= result.output["upper_bound"]
     assert result.output["tested"][-1]["status"] == "UNKNOWN"
+    assert len(result.artifact_uris) == 2
+    assert kernel.store.get(result.artifact_uris[1]).payload["status"] == "UNKNOWN"
 
 
 def test_chromatic_number_rejects_repeated_undirected_edges(
@@ -112,3 +118,4 @@ def test_chromatic_number_rejects_repeated_undirected_edges(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
     assert result.diagnostics[0].code == "INVALID_CHROMATIC_NUMBER_REQUEST"
+    assert result.artifact_uris == ()

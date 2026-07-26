@@ -28,6 +28,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.cvc5 import install_cvc5_capability
 from jacobian.domain_atomic_extras import install_domain_atomic_extras
+from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLES
 from jacobian.evaluation import EvaluationService
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
@@ -40,7 +41,6 @@ from jacobian.flint_linear import (
     install_python_flint_inconsistency_capability,
     install_python_flint_linear_capability,
 )
-from jacobian.geometry_capabilities import install_geometry_capabilities
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.graph_coloring_capabilities import (
     GraphColoringInstallation,
@@ -91,6 +91,11 @@ from jacobian.matrix_normal_forms import (
     install_matrix_normal_form_artifacts,
 )
 from jacobian.memory import ResearchMemory
+from jacobian.operation_installation import (
+    InstalledDomainBundle,
+    OperationInstaller,
+)
+from jacobian.operations import DomainBundle
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.polynomial_capabilities import (
@@ -119,7 +124,6 @@ from jacobian.polynomial_system_capabilities import (
 )
 from jacobian.polytope import PolytopeService
 from jacobian.primitive_adapters import factory as install_primitive_adapters
-from jacobian.primitive_math_capabilities import install_primitive_math_capabilities
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
     carcara_provider_runtime,
@@ -186,6 +190,12 @@ class JacobianKernel:
         self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
+        self.operation_installer = OperationInstaller(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
+        self.domain_bundles: dict[str, InstalledDomainBundle] = {}
         self.sat: SatArtifactService = install_sat_artifacts(
             self.store,
             self.schemas,
@@ -448,7 +458,7 @@ class JacobianKernel:
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
         self._install_graph_coloring_capabilities(install_references)
-        self._install_geometry_capabilities()
+        self._install_builtin_domain_bundles()
         self.graph_isomorphism: GraphIsomorphismInstallation
         graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
             self.store,
@@ -494,7 +504,6 @@ class JacobianKernel:
         )
         if determinant_verification is not None:
             self.register_capability(determinant_verification)
-        self._install_primitive_math_capabilities()
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
@@ -711,20 +720,16 @@ class JacobianKernel:
         else:
             self.register_capability(adapter)
 
-    def _install_primitive_math_capabilities(self) -> None:
-        for adapter in install_primitive_math_capabilities(
-            self.store,
-            self.schemas,
-            self.artifacts,
-        ):
-            self.register_capability(adapter)
+    def _install_builtin_domain_bundles(self) -> None:
+        for bundle in BUILTIN_DOMAIN_BUNDLES:
+            self._install_capability_bundle(bundle)
 
-    def _install_geometry_capabilities(self) -> None:
-        for adapter in install_geometry_capabilities(
-            self.store,
-            self.schemas,
-            self.artifacts,
-        ):
+    def _install_capability_bundle(self, bundle: DomainBundle) -> None:
+        installation = self.operation_installer.install(bundle)
+        if bundle.domain_id in self.domain_bundles:
+            raise ValueError(f"duplicate capability bundle: {bundle.domain_id}")
+        self.domain_bundles[bundle.domain_id] = installation
+        for adapter in installation.adapters:
             self.register_capability(adapter)
 
     def _install_python_flint_capabilities(self) -> None:

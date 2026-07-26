@@ -210,6 +210,34 @@ agent, not by the kernel. A capability may coordinate several backend calls
 when they implement that one operation, but material intermediate artifacts
 and verification obligations remain visible.
 
+### Domain operation library
+
+Built-in mathematical producers live in explicit domain packages. A package
+exports one `DomainBundle`; subject modules export named collections such as
+`POINT_CAPABILITIES` or `DIVISIBILITY_CAPABILITIES`, and `bundle.py` combines
+them without import-time registration or recursive discovery.
+
+`ComputedOperation` declares a deterministic typed producer.
+`BoundedSearchOperation` additionally distinguishes a complete witness from an
+incomplete result and carries a typed scope projection plus the basis for
+unknown completeness. Both use Pydantic request and result models.
+`OperationInstaller` projects either operation into the existing
+`CapabilityAdapter` protocol, registers schemas and semantics, materializes
+input and result artifacts with lineage, and caps producer assurance at
+`COMPUTED`. Domain functions therefore depend on mathematical libraries and
+contracts, not stores, protocol envelopes, or checker authorization.
+
+The kernel installs a fixed tuple of built-in bundles. Registration still
+passes through `JacobianKernel.register_capability`, so portfolio exclusions
+apply uniformly. There is no global operation registry, recursive package
+scan, compatibility adapter, or registration side effect.
+
+`AtomicServiceAdapter` has a narrower role: it projects existing stateful
+services that already return rich result envelopes. Domain-owned mathematical
+functions use domain operations instead. Checker-backed verification remains
+specialized because authorization, evidence binding, and replay are trust
+boundaries rather than producer metadata.
+
 ### Epistemic workspace
 
 `WorkspaceService` owns durable agent working state independently of
