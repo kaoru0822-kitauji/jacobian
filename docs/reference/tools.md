@@ -144,6 +144,7 @@ The base installation currently includes these kernel capability IDs:
 | `polynomial.factor.compute` | Factor one univariate polynomial over QQ and materialize its exact reconstructed product without self-certifying irreducibility. |
 | `matrix.determinant.compute` | Compute the exact determinant of one square rational matrix and materialize the result. |
 | `matrix.rank.compute` | Compute the exact rank and pivot columns of one rectangular rational matrix. |
+| `polynomial.system.solution.verify` | Independently check one exact rational assignment against every equation and inequation in a finite polynomial system. |
 | `universal_algebra.evaluate_laws` | Exhaust finite magma laws or return the first canonical failing valuation. |
 | `universal_algebra.search.countermodel` | Search all operation tables of one bounded carrier order for a source-law model falsifying a target law. |
 | `knowledge.search` | Retrieve locally indexed capability episodes without changing their assurance. |
