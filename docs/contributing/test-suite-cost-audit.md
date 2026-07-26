@@ -103,3 +103,41 @@ caused it. Ordinary test edits do not need a refresh.
   blanket `slow` marker or weakening required coverage.
 - Move backend combinations to a slower lane only when the pull-request lane
   still exercises every affected trust boundary.
+
+## Follow-up audit
+
+The expanded 537-test non-Lean suite has a median recorded case duration of
+0.08 seconds, but its slowest five percent take at least 6.62 seconds. Those
+cases are not interchangeable repetitions: they cover remote tenant isolation,
+MCP and CLI process boundaries, interrupted-search recovery, clean-process
+checker replay, SAT proof interoperability, and complete end-to-end workflows.
+The two supported Python versions exercise runtime compatibility, while the
+Lean lane exercises a separate pinned toolchain and checker boundary. Retain
+those lanes.
+
+An exploratory eight-worker run on an eight-logical-CPU, 32 GB Linux host
+completed all 537 tests in 137.81 seconds, compared with about 170 seconds under
+the four-worker default. This single-host result is not sufficient to raise the
+default: the suite is subprocess-heavy, wall time changed substantially under
+unrelated host load, and exhaustive local validation is deliberately not the
+routine loop. Keep the stable four-worker cap and revisit it only with
+controlled repeated measurements on local and CI runners.
+
+The actionable redundancy was procedural. The routine `make check` lane now
+contains only fast Ruff and non-integration tests; named contract, checker, MCP,
+and storage targets expose common focused checks. CI skips heavy Python and
+Lean lanes for documentation-only and npm-only changes, while all other paths
+fail closed to full validation. Focused Python and Lean debug workflows provide
+remote reproduction without rerunning unrelated matrices. On the measured
+host, the resulting `make check` completed 256 selected tests in 8.36 seconds.
+
+Do not run the complete non-Lean and Lean suites repeatedly during
+implementation and then immediately repeat them in pull-request CI. Use
+`make check` plus the affected focused target, and let CI provide one exhaustive
+pass on the final tree. Run `make validate-full` locally only when CI is
+unavailable or an environment-specific failure needs reproduction.
+
+Some short CI jobs still overlap in setup or packaging work, but they run in
+parallel and were not on the measured critical path. Consolidating them would
+increase workflow coupling without materially shortening feedback, so this
+audit leaves them unchanged.
