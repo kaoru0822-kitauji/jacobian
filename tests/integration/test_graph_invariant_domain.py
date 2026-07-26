@@ -127,9 +127,9 @@ def test_np_hard_invariants_are_budgeted_and_carry_obligations(
             )
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
-        assert result.output["result"]["status"] == "EXACT"
-        assert result.output["result"]["optimum_value"] == optimum
-        assert len(result.output["result"]["witness_vertices"]) == optimum
+        assert result.output["status"] == "EXACT"
+        assert result.output["optimum_value"] == optimum
+        assert len(result.output["witness_vertices"]) == optimum
         assert len(result.artifact_uris) == 3
-        obligation = kernel.store.get(result.open_obligations[0].artifact_uri)
+        obligation = kernel.store.get(result.obligations[0].obligation_uri)
         assert obligation.payload["claimed_value"] == optimum

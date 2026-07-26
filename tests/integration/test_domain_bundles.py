@@ -21,10 +21,11 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.combinatorics import (
-    IntegerListRequest as CombIntegerListRequest,
+    FibonacciPairRequest,
+    IntegerPartitionEnumerationRequest,
 )
 from jacobian.contracts.combinatorics import (
-    IntegerPartitionEnumerationRequest,
+    IntegerListRequest as CombIntegerListRequest,
 )
 from jacobian.contracts.combinatorics import (
     NonnegativeIntegerRequest as CombNonnegIntRequest,
@@ -37,7 +38,11 @@ from jacobian.contracts.number_theory import (
     ChineseRemainderRequest,
     DiscreteLogarithmRequest,
     DivisibilityRequest,
+    FactorialValuationRequest,
+    FactorizationRequest,
+    FloorSquareRootRequest,
     JacobiSymbolRequest,
+    LegendreSymbolRequest,
     ModularValueRequest,
     ModulusRequest,
     PositiveIntegerRequest,
@@ -78,6 +83,7 @@ EXPECTED_IDS: frozenset[str] = frozenset(
         "combinatorics.compute.double_factorial",
         "combinatorics.compute.factorial",
         "combinatorics.compute.fibonacci",
+        "combinatorics.compute.fibonacci_pair",
         "combinatorics.compute.lucas",
         "combinatorics.compute.motzkin",
         "combinatorics.compute.multinomial",
@@ -105,6 +111,7 @@ EXPECTED_IDS: frozenset[str] = frozenset(
         "integer.compute.divisors",
         "integer.compute.euler_totient",
         "integer.compute.extended_gcd",
+        "integer.compute.floor_square_root",
         "integer.compute.gcd",
         "integer.compute.lcm",
         "integer.compute.mobius",
@@ -136,6 +143,8 @@ EXPECTED_IDS: frozenset[str] = frozenset(
         "modular.enumerate.quadratic_residues",
         "modular.solve.chinese_remainder",
         "number_theory.compute.jacobi_symbol",
+        "number_theory.compute.factorial_valuation",
+        "number_theory.compute.legendre_symbol",
         "rational.compute.absolute_value",
         "rational.compute.ceiling",
         "rational.compute.continued_fraction",
@@ -195,6 +204,7 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (IntegerBaseDigitsRequest, {"value": "12", "base": 2}),
     (IntegerNthRootRequest, {"value": 8, "degree": 3}),
     (CombNonnegIntRequest, {"n": 5}),
+    (FibonacciPairRequest, {"n": 5}),
     (CombNonnegPairRequest, {"n": 5, "k": 2}),
     (CombIntegerListRequest, {"values": ["2", "1", "1"]}),
     (IntegerPartitionEnumerationRequest, {"n": 5, "max_parts": 3}),
@@ -205,6 +215,10 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (NTIntegerValueRequest, {"value": "12"}),
     (NTIntegerPairRequest, {"left": "12", "right": "8"}),
     (DivisibilityRequest, {"divisor": "3", "dividend": "12"}),
+    (
+        FactorizationRequest,
+        {"value": "12", "resource_budget": {"wall_seconds": 5}},
+    ),
     (ValuationRequest, {"value": "12", "prime": "2"}),
     (NTNonnegIntRequest, {"n": 10}),
     (PositiveIntegerRequest, {"n": 10}),
@@ -212,6 +226,9 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (ModulusRequest, {"modulus": 7}),
     (ChineseRemainderRequest, {"residues": [2, 3], "moduli": [3, 5]}),
     (JacobiSymbolRequest, {"a": "10", "n": 21}),
+    (FloorSquareRootRequest, {"n": 12}),
+    (LegendreSymbolRequest, {"a": 2, "prime": 7}),
+    (FactorialValuationRequest, {"n": 10, "base": 2}),
     (
         DiscreteLogarithmRequest,
         {"base": 7, "target": 15, "modulus": 41},

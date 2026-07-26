@@ -236,7 +236,10 @@ class VerificationService:
             stderr_limit=self.max_checker_diagnostic_bytes,
             resource_limits=ProcessResourceLimits(
                 cpu_seconds=max(1, int(effective_timeout) + 1),
-                address_space_bytes=1024 * 1024 * 1024,
+                # Lean/Mathlib reserves a large virtual heap even for small
+                # proofs; keep it bounded without applying the much smaller
+                # arithmetic-worker profile.
+                address_space_bytes=16 * 1024 * 1024 * 1024,
             ),
         )
         if completed.timed_out:

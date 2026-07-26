@@ -351,7 +351,6 @@ def python_distribution_provider_runtime(
         checker_ids=checker_ids,
         configuration={
             "distribution": distribution_name,
-            "import_name": import_name,
             **dict(configuration or {}),
         },
     )
@@ -950,6 +949,7 @@ def python_flint_exact_checker_provider_runtime(
         install_tier=CapabilityInstallTier.T1,
         license_id="MIT AND LGPL-3.0-or-later",
         features=("exact-domain-independent-replay",),
+        configuration={"import_name": "flint"},
         refresh=refresh,
     )
     if (

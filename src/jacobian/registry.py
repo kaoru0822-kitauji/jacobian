@@ -69,7 +69,8 @@ def _require_runtime_unchanged(runtime: CapabilityProviderRuntime | None) -> Non
         require_provider_runtime_unchanged(runtime)
     except (OSError, ProviderRuntimeError, ValueError) as exc:
         raise CheckerExecutableChangedError(
-            "The authorized checker runtime changed or is unavailable."
+            "The checker runtime changed after authorization or is unavailable. "
+            "Authorize the current runtime, then retry."
         ) from exc
 
 
