@@ -77,7 +77,11 @@ class JacobianKernel:
         *,
         install_references: bool = False,
         capability_adapter_entrypoints: tuple[str, ...] = (),
+        capability_exclusions: frozenset[str] = frozenset(),
     ) -> None:
+        # Construction-time exclusions support controlled portfolio ablations.
+        # They are not a runtime authorization or access-control mechanism.
+        self._capability_exclusions = capability_exclusions
         self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
@@ -176,8 +180,8 @@ class JacobianKernel:
         self.lean_declarations: LeanDeclarationService | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         for atomic_adapter in install_atomic_capabilities(self):
-            self.capabilities.register(atomic_adapter)
-        self.capabilities.register(KnowledgeSearchAdapter(self.memory))
+            self.register_capability(atomic_adapter)
+        self.register_capability(KnowledgeSearchAdapter(self.memory))
         self.finite_partition: FinitePartitionInstallation
         finite_partition, self.finite_partition = install_finite_partition(
             self.store,
@@ -187,7 +191,7 @@ class JacobianKernel:
             self.checkers,
             authorize_checker=install_references,
         )
-        self.capabilities.register(finite_partition)
+        self.register_capability(finite_partition)
         self.graph: GraphInstallation
         graph_adapters, self.graph = install_graph_capabilities(
             self.store,
@@ -197,7 +201,7 @@ class JacobianKernel:
             authorize_checker=install_references,
         )
         for graph_adapter in graph_adapters:
-            self.capabilities.register(graph_adapter)
+            self.register_capability(graph_adapter)
         self.polynomial: PolynomialInstallation
         polynomial_adapters, self.polynomial = install_polynomial_capabilities(
             self.store,
@@ -207,7 +211,7 @@ class JacobianKernel:
             authorize_checker=install_references,
         )
         for polynomial_adapter in polynomial_adapters:
-            self.capabilities.register(polynomial_adapter)
+            self.register_capability(polynomial_adapter)
         self.universal_algebra: UniversalAlgebraInstallation
         universal_algebra_adapters, self.universal_algebra = (
             install_universal_algebra_capabilities(
@@ -219,7 +223,7 @@ class JacobianKernel:
             )
         )
         for universal_algebra_adapter in universal_algebra_adapters:
-            self.capabilities.register(universal_algebra_adapter)
+            self.register_capability(universal_algebra_adapter)
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(
@@ -260,13 +264,13 @@ class JacobianKernel:
                         exc,
                     )
                 if self.lean_declarations is not None:
-                    self.capabilities.register(
+                    self.register_capability(
                         LeanDeclarationSearchAdapter(
                             self.lean_declarations,
                             runtime,
                         )
                     )
-                    self.capabilities.register(
+                    self.register_capability(
                         LeanDeclarationInspectAdapter(
                             self.lean_declarations,
                             runtime,
@@ -278,16 +282,18 @@ class JacobianKernel:
                     self.verification,
                     self.lean_checkers,
                 )
-                self.capabilities.register(LeanCheckAdapter(self.lean, runtime))
+                self.register_capability(LeanCheckAdapter(self.lean, runtime))
             else:
                 _LOGGER.warning(
                     "lean.check is not installed: %s",
                     runtime.diagnostic,
                 )
         for entrypoint in capability_adapter_entrypoints:
-            self.capabilities.register(load_capability_adapter(entrypoint, self))
+            self.register_capability(load_capability_adapter(entrypoint, self))
 
     def register_capability(self, adapter: CapabilityAdapter) -> None:
         """Install an operator-owned adapter without changing the kernel or MCP."""
 
+        if adapter.descriptor.capability_id in self._capability_exclusions:
+            return
         self.capabilities.register(adapter)

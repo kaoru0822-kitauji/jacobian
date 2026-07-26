@@ -226,6 +226,55 @@ but not enough to recommend `goal.decompose` or premise-retrieval capabilities
 by default. A paired agent evaluation should measure their outcome value;
 completed source must still go through `lean.check`.
 
+### Lean declaration-discovery pilot
+
+The 2026-07-26 pilot compared the same Jacobian portfolio under both
+conditions. The control server omitted only `lean.declaration.search` and
+`lean.declaration.inspect`; both conditions retained `lean.check`. Prompts,
+`gpt-5.6-sol`, high reasoning effort, per-condition timeout, output schema, and
+hidden checker oracle were matched. The two held-out statements used
+`List.revzip` and `Set.image`/`Set.preimage`, not the public square-root
+tutorial. The scorer required the report, successful invocation trace,
+candidate, claim, certificate, and authorized verification record to bind the
+exact statement and proof.
+
+Three valid pairs and one operationally invalid pair were inspected. This is a
+small development pilot, not a powered performance comparison:
+
+| Case/run | Condition | Correct | Discovery used | Seconds | Input tokens | Calls | Tool errors | Rejected proofs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `List.revzip` A | control | yes | no | 88.292 | 278,161 | 7 | 1 | 1 |
+| `List.revzip` A | treatment | yes | yes | 376.399 | 486,143 | 12 | 4 | 1 |
+| `List.revzip` B | control | yes | no | 214.873 | 250,982 | 6 | 0 | 3 |
+| `List.revzip` B | treatment | yes | yes | 440.582 | 615,722 | 15 | 6 | 1 |
+| set image/preimage | control | yes | no | 88.583 | 140,217 | 3 | 0 | 0 |
+| set image/preimage | treatment | yes | no | 59.424 | 139,035 | 3 | 0 | 0 |
+
+No valid run falsely certified a result, used the shell, or made a parameter
+error. In both `List.revzip` pairs, treatment eventually used successful exact
+inspection or search results and produced a checker-accepted proof. It did not
+improve completion: control also passed. Treatment added 288.107 and 225.709
+seconds, 207,982 and 364,740 input tokens, five and nine MCP calls, and three
+and six additional tool execution errors. Most errors were Mathlib searches
+exhausting the 75-second subprocess budget. The set case did not exercise
+discovery in either treatment run, so its elapsed difference is sampling and
+runtime variance, not intervention lift.
+
+One additional set pair is excluded from comparative interpretation. Its first
+condition passed; the second condition's `lean.check` reported the pinned
+toolchain unavailable after registration and returned `UNKNOWN`. The agent
+correctly reported heuristic assurance with no record. This is an operational
+runtime flake and neither a mathematical failure nor evidence for treatment.
+
+The decision is **revise**. Keep search and exact inspection available as
+separate experimental atomic outcomes, but do not recommend them or expand to
+goal stepping and premise application yet. A longer timeout would only hide
+the dominant cost. First replace repeated full Mathlib process startup and
+scans with a reusable pinned index or persistent query service, keep exact
+environment identity, and make catalog discovery compact. Then rerun these
+same held-out cases and add cases where direct automation does not already
+solve the proposition.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:
