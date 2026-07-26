@@ -1,6 +1,6 @@
 ---
 name: evaluate-math-capabilities
-description: Design, implement, run, and interpret Jacobian-specific model-in-the-loop evaluations that measure whether a mathematical capability or portfolio change improves autonomous agent outcomes. Use when asked to benchmark a Jacobian capability, compare baseline and treatment portfolios, create held-out mathematical cases or independent oracles, measure correctness or false certification, evaluate retrieval or tool composition, or decide whether to keep, expand, split, consolidate, rank, or retire a capability. Use discover-math-capabilities first when the question is what to build rather than whether a concrete proposal helps.
+description: Consume evidence-backed capability candidates and design, implement, run, and interpret Jacobian-specific model-in-the-loop evaluations that measure whether a mathematical operation or portfolio change improves autonomous agent outcomes. Use when asked to benchmark a Jacobian capability, compare baseline and treatment portfolios, create held-out mathematical cases or independent oracles, detect workflow leakage, measure correctness or false certification, evaluate retrieval or tool composition, or decide whether to keep, expand, split, consolidate, rank, or retire a capability. Use discover-math-capabilities first when the question is what to build rather than whether a concrete proposal helps.
 ---
 
 # Evaluate Math Capabilities
@@ -14,6 +14,7 @@ outcomes and evidence, not a preferred sequence of calls.
 Start from a concrete intervention:
 
 - a capability or portfolio delta;
+- a discovery candidate record with supporting move episodes;
 - one expected counterfactual benefit;
 - a runnable baseline and treatment;
 - public reproduction evidence or a stable contract;
@@ -23,6 +24,22 @@ Start from a concrete intervention:
 If the operation, contract, backend, or intended mathematical outcome is still
 unclear, return the question to `discover-math-capabilities`. Evaluation should
 not invent the product hypothesis it is meant to test.
+
+## Audit the discovery handoff
+
+Confirm that the handoff identifies:
+
+- exact source rows, traces, proofs, or counterexamples that motivated the move;
+- the before-state, operation, output artifact, downstream use, and verification
+  boundary for each supporting episode;
+- current portfolio overlap and why composition does not already close the gap;
+- public reproduction cases separated from held-out scored cases;
+- candidate backend, contract, failure semantics, and checker boundary;
+- contamination risks and plausible falsely persuasive paths; and
+- the predicted autonomous behavior that should change under treatment.
+
+Use missing handoff evidence as a reason to return the candidate to discovery,
+not as an invitation to fill the gap with evaluation fixtures.
 
 ## Inspect the repository harness
 
@@ -52,7 +69,12 @@ Freeze the evaluation question before running either condition. Define:
 
 Prescribed-tool cases measure contract usability and conformance. Autonomous
 portfolio cases let the agent choose operations and measure portfolio value.
-Do not confuse the two.
+Do not confuse the two. If the agent is told the successful sequence mined from
+the source cases, report contract replay rather than autonomous portfolio value.
+
+Change one intervention dimension at a time. Evaluate a capability delta,
+descriptor change, example, ranking policy, or reusable strategy skill as
+separate treatments when the question is which one caused the improvement.
 
 ## Build the held-out case
 
@@ -77,6 +99,10 @@ For every case, freeze:
 
 Prefer generated or transformed variants for scored claims. Public solved
 problems are valuable regressions but weak evidence of generalization.
+Prefer held-out source families when practical. If a scored case descends from
+the discovery corpus, record the lineage and transform it enough that success
+requires using the mathematical operation rather than recalling the mined
+answer or workflow.
 
 ## Keep the oracle independent
 
@@ -158,6 +184,7 @@ Separate:
 - capability value;
 - discovery or descriptor quality;
 - parameterization and contract usability;
+- workflow or answer leakage;
 - backend reliability;
 - verification and provenance behavior; and
 - mathematical reasoning limits.
@@ -177,10 +204,17 @@ Experimental availability need not wait for evaluation. Use results to guide
 recommendations, defaults, consolidation, and retirement rather than turning
 evaluation into an access gate.
 
+Feed failures back to discovery with the failed candidate gate. A capability
+that is unused because its outcome has no leverage is different from one that
+is valuable but undiscoverable, difficult to parameterize, unavailable in the
+environment, or missing an independent checker. Do not respond to a strategy,
+descriptor, or evaluation-design failure by manufacturing another operation.
+
 ## Report
 
 Return:
 
+- the discovery candidate and supporting evidence lineage;
 - the frozen question and intervention;
 - case and oracle provenance;
 - baseline and treatment definitions;
