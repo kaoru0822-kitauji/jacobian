@@ -42,6 +42,10 @@ from jacobian.polynomial_capabilities import (
     PolynomialInstallation,
     install_polynomial_capabilities,
 )
+from jacobian.polynomial_system_capabilities import (
+    PolynomialSystemInstallation,
+    install_polynomial_system_capabilities,
+)
 from jacobian.polytope import PolytopeService
 from jacobian.provider_runtime import lean_provider_runtime
 from jacobian.references import (
@@ -212,6 +216,19 @@ class JacobianKernel:
         )
         for polynomial_adapter in polynomial_adapters:
             self.register_capability(polynomial_adapter)
+        self.polynomial_system: PolynomialSystemInstallation
+        polynomial_system_adapter, self.polynomial_system = (
+            install_polynomial_system_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        if polynomial_system_adapter is not None:
+            self.register_capability(polynomial_system_adapter)
         self.universal_algebra: UniversalAlgebraInstallation
         universal_algebra_adapters, self.universal_algebra = (
             install_universal_algebra_capabilities(
