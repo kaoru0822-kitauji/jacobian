@@ -64,6 +64,10 @@ from jacobian.matrix_capabilities import (
     MatrixInstallation,
     install_matrix_capabilities,
 )
+from jacobian.matrix_determinant_capabilities import (
+    MatrixDeterminantCheckerInstallation,
+    install_matrix_determinant_checker,
+)
 from jacobian.matrix_normal_form_capabilities import (
     MatrixNormalFormCheckerInstallation,
     install_matrix_normal_form_checker,
@@ -450,6 +454,20 @@ class JacobianKernel:
         )
         for matrix_adapter in matrix_adapters:
             self.register_capability(matrix_adapter)
+        self.matrix_determinant_checker: MatrixDeterminantCheckerInstallation
+        determinant_verification, self.matrix_determinant_checker = (
+            install_matrix_determinant_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.matrix,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        if determinant_verification is not None:
+            self.register_capability(determinant_verification)
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(

@@ -61,6 +61,7 @@ expectations.
 - [SAT artifact contracts](reference/sat-artifacts.md)
 - [SMT Alethe artifact contracts](reference/smt-artifacts.md)
 - [Exact rational linear-system evidence](reference/linear-rational-solutions.md)
+- [Exact rational matrix determinants](reference/matrix-rational-determinant.md)
 - [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
 - [Typed polynomial expression normalization](reference/polynomial-expression-normalization.md)
 - [v0.2 specification](reference/specifications/v0.2.md)

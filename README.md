@@ -161,6 +161,7 @@ Specialized contracts cover
 [SAT artifacts](docs/reference/sat-artifacts.md),
 [SMT/Alethe artifacts](docs/reference/smt-artifacts.md),
 [exact rational linear-system evidence](docs/reference/linear-rational-solutions.md),
+[exact rational matrix determinants](docs/reference/matrix-rational-determinant.md),
 [integer matrix HNF](docs/reference/matrix-hermite-normal-form.md), and
 [Lean declaration discovery](docs/reference/lean-declaration-discovery.md).
 Architecture decisions are recorded in the
