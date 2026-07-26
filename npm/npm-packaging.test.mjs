@@ -12,6 +12,38 @@ const require = createRequire(import.meta.url);
 const npmRoot = dirname(fileURLToPath(import.meta.url));
 const packageMetadata = require("./package.json");
 
+const pythonPrereleaseNames = {
+  a: "alpha",
+  alpha: "alpha",
+  b: "beta",
+  beta: "beta",
+  c: "rc",
+  pre: "rc",
+  preview: "rc",
+  rc: "rc",
+};
+
+/**
+ * Convert the Python release spellings used by the project to npm semver.
+ *
+ * Python's version normalizer accepts aliases and separators such as
+ * `0.3.0-alpha.0`, while npm uses `0.3.0-alpha.0` for the same release.
+ *
+ * @param {string} pythonVersion
+ * @returns {string}
+ */
+function npmVersionFromPythonVersion(pythonVersion) {
+  const match = pythonVersion.match(
+    /^(\d+\.\d+\.\d+)(?:(?:[-_.]?)(alpha|a|beta|b|rc|c|pre|preview)(?:[-_.]?)(\d+))?$/,
+  );
+  assert.ok(match, `unsupported Python release version: ${pythonVersion}`);
+
+  const prerelease = match[2];
+  return prerelease
+    ? `${match[1]}-${pythonPrereleaseNames[prerelease]}.${match[3]}`
+    : match[1];
+}
+
 import {
   clientDefinitions,
   isClientDetected,
@@ -90,20 +122,21 @@ test("buildLauncher returns a version-matching launcher with mcp subcommand", ()
   assert.equal(launcher.args[launcher.args.length - 1], "mcp");
 });
 
+test("normalizes release-please Python prerelease versions for npm", () => {
+  assert.equal(npmVersionFromPythonVersion("0.2.0a0"), "0.2.0-alpha.0");
+  assert.equal(
+    npmVersionFromPythonVersion("0.3.0-alpha.0"),
+    "0.3.0-alpha.0",
+  );
+});
+
 test("npm and Python packages publish the same release version", async () => {
   const pyproject = await readFile(join(npmRoot, "..", "pyproject.toml"), "utf8");
   const match = pyproject.match(/^version = "([^"]+)"$/m);
   assert.ok(match, "pyproject.toml must declare a project version");
 
   const pythonVersion = match[1];
-  const pep440 = pythonVersion.match(
-    /^(\d+\.\d+\.\d+)(?:(a|b|rc)(\d+))?$/,
-  );
-  assert.ok(pep440, `unsupported Python release version: ${pythonVersion}`);
-  const prereleaseNames = { a: "alpha", b: "beta", rc: "rc" };
-  const expectedNpmVersion = pep440[2]
-    ? `${pep440[1]}-${prereleaseNames[pep440[2]]}.${pep440[3]}`
-    : pep440[1];
+  const expectedNpmVersion = npmVersionFromPythonVersion(pythonVersion);
 
   assert.equal(packageMetadata.version, expectedNpmVersion);
 });
