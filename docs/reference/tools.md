@@ -166,8 +166,9 @@ of catalog membership:
 - [bounded finite exactly-once coverage](finite-coverage-verification.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
 - [Lean declaration discovery contract](lean-declaration-discovery.md);
-- [Lean formal intermediates](lean-formal-intermediates.md); and
-- [Lean statement proposal and direct elaboration](lean-statement-elaboration.md).
+- [Lean formal intermediates](lean-formal-intermediates.md);
+- [Lean statement proposal and direct elaboration](lean-statement-elaboration.md); and
+- [replayable Lean proof-state transitions](lean-replayable-proof-states.md).
 
 ## Mathematical operation portfolio
 
