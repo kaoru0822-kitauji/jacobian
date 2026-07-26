@@ -148,6 +148,19 @@ exposes any resulting candidate witness for independent replay. It does not
 recompute or certify either evaluation. This keeps evaluation and witness
 construction separate while making their composition explicit to the agent.
 
+Optional exact runtimes add narrowly scoped operations only when their pinned
+provider identity is available:
+
+| Capability ID | Availability and outcome |
+| --- | --- |
+| `sat.model.find` | With CaDiCaL 3.0.1, preserve one total assignment candidate without certifying SAT. |
+| `sat.unsat_proof.find` | With CaDiCaL 3.0.1, preserve raw DRAT evidence without certifying UNSAT. |
+| `smt.unsat_proof.find` | With the `smt` extra and cvc5 1.3.4, preserve raw Alethe for one pinned-profile QF query, expose holes, and retain `UNKNOWN`. |
+
+See the [SAT artifact contracts](sat-artifacts.md) and
+[SMT Alethe artifact contracts](smt-artifacts.md) for exact input profiles,
+resource bounds, artifact bindings, and independent verification boundaries.
+
 When the operator enables bundled references, the catalog also includes:
 
 | Capability ID | Outcome |
