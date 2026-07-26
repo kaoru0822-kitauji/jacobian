@@ -27,7 +27,11 @@ from jacobian.contracts.results import ExecutionStatus, Verification
 from jacobian.contracts.search import SearchBudget
 from jacobian.kernel import JacobianKernel
 
-pytestmark = [pytest.mark.integration, pytest.mark.conformance]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.conformance,
+    pytest.mark.usefixtures("initialized_kernel_store"),
+]
 
 
 def _install_hypothesis_plugin(

@@ -24,7 +24,10 @@ from jacobian.plugin_conformance import (
 )
 from jacobian.plugins.registry import PluginRegistryError
 
-pytestmark = pytest.mark.conformance
+pytestmark = [
+    pytest.mark.conformance,
+    pytest.mark.usefixtures("initialized_kernel_store"),
+]
 
 
 def _install_external_plugin(
