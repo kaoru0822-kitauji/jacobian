@@ -43,6 +43,8 @@ def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
 
 def _poly(*coefficients_ascending: int) -> dict[str, Any]:
     return {
+        "polynomial_schema_version": "1",
+        "domain": "QQ",
         "variables": ["x"],
         "polynomial": {
             "terms": [

@@ -196,7 +196,18 @@ def _q(value: object) -> fmpq:
 
 
 def _polynomial(value: object) -> fmpq_poly:
-    if not isinstance(value, dict) or set(value) != {"variables", "polynomial"}:
+    if (
+        not isinstance(value, dict)
+        or set(value)
+        != {
+            "polynomial_schema_version",
+            "domain",
+            "variables",
+            "polynomial",
+        }
+        or value["polynomial_schema_version"] != "1"
+        or value["domain"] != "QQ"
+    ):
         raise ValueError("polynomial is malformed")
     variables = value["variables"]
     if not isinstance(variables, list) or len(variables) != 1:
