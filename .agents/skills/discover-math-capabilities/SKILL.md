@@ -1,6 +1,6 @@
 ---
 name: discover-math-capabilities
-description: Mine mathematical datasets, known solutions, formal artifacts, research cases, agent traces, and maintained backends to identify evidence-backed additions or changes to Jacobian's capability portfolio. Use when asked what mathematical tools Jacobian should add, expand, split, consolidate, improve, or retire; when auditing proof or disproof processes for recurring mathematical operations; or when turning public cases and workflow traces into capability proposals and reproduction cases. This skill performs open workflow mining with answers visible; use evaluate-math-capabilities for held-out comparative evaluation.
+description: Mine row-level mathematical datasets, known solutions, formal artifacts, research cases, agent traces, and maintained backends for recurring mathematical moves that justify additions or changes to Jacobian's capability portfolio. Use when asked what mathematical tools Jacobian should add, expand, split, consolidate, improve, or retire; when extracting tool ideas from proofs, counterexamples, transcripts, datasets, or failed attempts; or when turning public cases into typed capability proposals and reproduction cases. This skill performs open workflow mining with answers visible; use evaluate-math-capabilities for held-out comparative evaluation.
 ---
 
 # Discover Math Capabilities
@@ -31,6 +31,31 @@ Record dataset revision, license, redistribution constraints, and contamination
 risk when material. Do not copy a large dataset into the repository merely to
 mine it.
 
+## Inspect rows and primary artifacts
+
+Use landing pages, indexes, social posts, and dataset cards to map the source
+bundle, not as substitutes for its mathematical contents. Inspect enough
+primary examples to see variation across:
+
+- successful proofs, counterexamples, constructions, and formal checks;
+- failed attempts, false premises, rejected proofs, and reviewer corrections;
+- easy and hard cases, domains, labels, and source families; and
+- natural-language, executable, and machine-checkable artifacts.
+
+For datasets, inspect the schema and identifiable rows at a pinned revision.
+For repositories and pull requests, inspect the exact statement, decisive
+object or proof, computation, checker, and review corrections. For transcripts,
+extract tool-visible actions, artifacts, failures, and user corrections; do not
+treat hidden reasoning or persuasive narration as mathematical evidence. Follow
+papers, forums, blogs, and social claims to their primary objects before
+crediting a method.
+
+Keep downloaded corpora, source-bundle inventories, scratch ledgers, and dated
+investigations in temporary or ignored storage unless a durable research record
+is explicitly requested. Commit generalized process guidance, stable
+reproduction fixtures, benchmark cases, contracts, and implementation—not a
+one-off URL inventory.
+
 ## Inspect Jacobian first
 
 Read `AGENTS.md`, then consult these files as needed:
@@ -58,10 +83,24 @@ or friction event.
 
 For each representative case, inspect the statement, successful resolution,
 failed routes, intermediate artifacts, and verification method. Build a compact
-workflow ledger:
+move ledger:
 
-| Task | Successful moves | Failed moves | External systems | Useful artifacts | Verification | Capability implication |
+| Case or row | Inputs before move | Mathematical operation | Output or artifact | Downstream use | Failure or alternative | Verification |
 | --- | --- | --- | --- | --- | --- | --- |
+
+Treat each consequential transition as a move episode:
+
+```text
+available mathematical state
+→ operation performed
+→ inspectable mathematical output
+→ changed downstream decision
+→ independent check, open obligation, or failure
+```
+
+Do not summarize a whole proof or transcript as one move. Split exact
+evaluation, transformation, construction, search, comparison, reduction, and
+replay when their outputs remain independently useful to an agent.
 
 Identify the smallest agent-visible mathematical outcome that would have
 changed a consequential step. Examples include retrieving a premise,
@@ -71,17 +110,27 @@ checking a certificate. These are prompts, not a closed taxonomy.
 
 For each proposed outcome, state:
 
+- the exact supporting episodes and source locators;
 - the input available at that point;
 - the typed output and inline summary;
 - durable intermediate artifacts and relationships;
 - exactness, scope, completeness, and determinism;
 - the provider and version requirements;
 - the independent verification boundary; and
+- the counterfactual reason the outcome would help an agent; and
 - what the operation still cannot establish.
 
 Cluster repeated moves by mathematical outcome, not by dataset name or backend
 API call. Prefer domain-owned IDs such as `graph.enumerate.nonisomorphic` or
 `polynomial.compute.groebner_basis` over universal object or solver schemas.
+Normally require the move to recur in at least two independent cases or source
+families. Admit a single-source exception only for a fundamental primitive with
+clear reuse, a maintained backend, and a strong verification boundary.
+
+Distinguish a missing operation from a strategy gap. If current capabilities
+already expose the necessary intermediate outcomes, improve discovery,
+descriptors, examples, or a reusable agent skill instead of adding another
+capability.
 
 ## Research existing systems
 
@@ -106,6 +155,28 @@ Preserve useful intermediate objects, failures, transformations, and
 obligations. Do not replace them with an opaque `solve_conjecture` workflow.
 Agent-visible mathematical atomicity matters; backend-call atomicity does not.
 
+## Apply the candidate gate
+
+Create a candidate record before implementation:
+
+| Gate | Required evidence |
+| --- | --- |
+| Recurrence | Independent move episodes or a justified fundamental-primitive exception |
+| Leverage | The output changes a consequential downstream mathematical decision |
+| Atomicity | One coherent agent-visible outcome with useful intermediate artifacts |
+| Portfolio fit | A real gap, split, consolidation, or improvement rather than a duplicate |
+| Backend readiness | Maintained implementation, versioning, deployment, and license understood |
+| Contract honesty | Typed input/output with explicit exactness, scope, completeness, and determinism |
+| Trust boundary | Independent replay path or an explicit unverified obligation |
+| Reproduction | At least one primary public case can exercise the proposed contract |
+| Evaluation hypothesis | A held-out comparison could distinguish value from persuasive replay |
+
+Reject or defer candidates that are dataset-specific wrappers, opaque
+multi-stage workflows, mechanical backend-function mirrors, answer generators,
+self-verifying searches, or operations whose failure state could be mistaken
+for a theorem. Record the failed gate and evidence; a rejection ledger prevents
+the same weak idea from being repeatedly rediscovered.
+
 ## Reproduce known cases
 
 Use a small selection of public cases to test whether a proposed contract can
@@ -126,9 +197,11 @@ it replays the examples that inspired it.
 When the proposal is concrete enough to ask whether it improves autonomous
 performance, hand it to `evaluate-math-capabilities`. Supply:
 
+- the complete candidate record and supporting move episodes;
 - the capability hypothesis and counterfactual benefit;
 - public reproduction cases;
 - plausible wrong paths and false-certification risks;
+- current portfolio overlap and the proposed control ablation;
 - candidate backends and checker boundaries;
 - applicable datasets and contamination notes; and
 - the metrics that could distinguish success from a persuasive replay.
@@ -149,5 +222,12 @@ Separate:
 - capabilities already covering apparent gaps;
 - additions, expansions, splits, consolidation, or retirement;
 - research-only hypotheses;
+- rejected candidates and the gates they failed;
 - limitations and unresolved proof gaps; and
 - proposals ready for comparative evaluation.
+
+Continue until the remaining ideas lack repeated workflow evidence, meaningful
+leverage, agent-visible atomicity, backend readiness, an honest contract,
+trustworthy verification boundaries, portfolio distinctness, or a testable
+value hypothesis. “No more good candidates” is a supported portfolio decision,
+not a requirement to manufacture another capability.

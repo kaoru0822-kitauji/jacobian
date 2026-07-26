@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -10,25 +9,6 @@ from typer.testing import CliRunner
 from jacobian.cli import _public_error, app
 from jacobian.kernel import JacobianKernel
 from jacobian.store import StoreLimitError
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-
-def test_project_codex_profile_starts_the_local_stdio_server() -> None:
-    config = tomllib.loads(
-        (PROJECT_ROOT / ".codex" / "config.toml").read_text(encoding="utf-8")
-    )
-
-    profile = config["mcp_servers"]["jacobian_local"]
-    assert profile == {
-        "command": "uv",
-        "args": ["run", "jacobian-mcp"],
-        "cwd": ".",
-        "enabled": True,
-        "required": True,
-        "startup_timeout_sec": 30,
-        "tool_timeout_sec": 360,
-    }
 
 
 @pytest.mark.integration
@@ -47,7 +27,10 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
         "graph_paths",
         "matrices",
         "finite_polytopes",
+        "finite_magmas",
         "lean4",
+        "rational_polynomial_maps",
+        "simple_undirected_graphs",
     }
     assert catalog["erdos_straus"]["witness_checker_ids"][
         "erdos_straus.decomposition_table"

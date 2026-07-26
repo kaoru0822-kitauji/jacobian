@@ -265,8 +265,11 @@ def initialize(context: typer.Context) -> None:
     _emit(
         reference_catalog(
             state.kernel.references,
+            graph=state.kernel.graph,
             polytope=state.kernel.polytope,
             polytope_checkers=state.kernel.polytope_checkers,
+            polynomial=state.kernel.polynomial,
+            universal_algebra=state.kernel.universal_algebra,
             lean=state.kernel.lean_checkers,
         )
     )

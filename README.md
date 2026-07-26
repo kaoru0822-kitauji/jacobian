@@ -129,8 +129,9 @@ Jacobian is implemented as a Python package, CLI, and local or remote MCP
 adapter. The agent-facing MCP surface uses `capability.describe` for exact
 contracts and `capability.invoke` for execution, backed by an extensible
 adapter registry and trust-labeled artifacts. Bundled capabilities cover graph
-construction and properties, reference-domain exploration and verification,
-Lean checking, and local research-memory search.
+construction and properties, exact rational polynomial maps, finite magma law
+evaluation and countermodel search, reference-domain exploration and
+verification, Lean checking, and local research-memory search.
 
 Three direct operational tools—`workspace.open`, `workspace.write`, and
 `workspace.query`—provide durable, revisioned paper-like working state outside
@@ -151,17 +152,14 @@ finite-polytope generation uses Z3 rational constraints, but Z3 output remains
 unverified until the separate `Fraction`-based checker accepts the bound
 witness or certificate.
 
-### Local Codex
+### MCP clients
 
-The repository includes a trusted-project Codex profile at
-`.codex/config.toml`. Run Codex from the repository root and inspect
-`jacobian_local` with `/mcp`; the profile starts `uv run jacobian-mcp` over
-STDIO with a compact five-tool surface and stores durable local state under the
-ignored `.jacobian/` directory. It advertises `capability.describe`,
-`capability.invoke`, and the three direct `workspace.*` tools. Describe an
-unfamiliar mathematical capability before invoking it; direct workspace tools
-publish their own schemas. `capability://catalog` remains a resource-level
-catalog for clients that support MCP resources.
+Configure a client against `jacobian-mcp` or the remote endpoint described
+below. The server advertises `capability.describe`, `capability.invoke`, and
+the three direct `workspace.*` tools. Describe an unfamiliar mathematical
+capability before invoking it; direct workspace tools publish their own
+schemas. `capability://catalog` remains a resource-level catalog for clients
+that support MCP resources.
 
 For ChatGPT and other remote clients, the server supports Streamable HTTP and
 SSE, bearer-token authentication, and subject-bound tenant state. Follow
@@ -169,9 +167,9 @@ SSE, bearer-token authentication, and subject-bound tenant state. Follow
 are an initial controlled-deployment mechanism, not a full hosted identity
 platform.
 
-The public known-answer agent pilot launches a real Codex CLI against this
-profile and validates the resulting durable verification records rather than
-trusting the model's summary:
+The public known-answer agent pilot validates durable verification records
+rather than trusting the model's summary. It requires an operator-configured
+Jacobian MCP connector:
 
 ```sh
 uv run python benchmarks/agent_mcp.py

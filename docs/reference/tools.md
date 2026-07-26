@@ -96,6 +96,10 @@ cannot certify their own conclusions.
 
 Invalid requests, adapter failures, timeouts, and cancellations return
 stage-aware diagnostics. They do not become mathematical conclusions.
+Domain adapters validate their complete Pydantic request model before
+computation or artifact writes. JSON Schema remains the discovery contract;
+Pydantic enforces cross-field conditions such as polynomial-map dimensions,
+finite operation-table closure, and bounded exact encodings.
 
 ## Installed bundled capabilities
 
@@ -122,7 +126,20 @@ The base installation currently includes these kernel capability IDs:
 | `case.partition.finite` | Partition an explicit finite domain and report exact coverage. |
 | `graph.search.atlas` | Search the bounded Graph Atlas and return matching graph candidates with explicit coverage limits. |
 | `graph.compute.properties` | Compute supported exact invariants of an explicit graph. |
+| `graph.compute.neighborhood_independence` | Compute every open-neighborhood independence optimum, witness, sum, and exact rational average. |
+| `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
+| `polynomial.map.compute_jacobian` | Compute an exact Jacobian matrix and determinant for one sparse rational polynomial map. |
+| `polynomial.map.collision_witness` | Compare two exact point-evaluation artifacts and materialize a candidate collision witness. |
+| `universal_algebra.evaluate_laws` | Exhaust finite magma laws or return the first canonical failing valuation. |
+| `universal_algebra.search.countermodel` | Search all operation tables of one bounded carrier order for a source-law model falsifying a target law. |
 | `knowledge.search` | Retrieve locally indexed capability episodes without changing their assurance. |
+
+`polynomial.map.evaluate` is the sole bundled operation that computes a point
+image. `polynomial.map.collision_witness` accepts two evaluation artifact URIs
+for the same map, compares their declared canonical rational values, and
+exposes any resulting candidate witness for independent replay. It does not
+recompute or certify either evaluation. This keeps evaluation and witness
+construction separate while making their composition explicit to the agent.
 
 When the operator enables bundled references, the catalog also includes:
 

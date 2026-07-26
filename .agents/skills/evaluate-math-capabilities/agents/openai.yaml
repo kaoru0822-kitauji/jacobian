@@ -1,4 +1,4 @@
 interface:
   display_name: "Evaluate Math Capabilities"
-  short_description: "Measure Jacobian capability value with paired evals"
-  default_prompt: "Use $evaluate-math-capabilities to design a paired Jacobian capability evaluation."
+  short_description: "Test candidate operations with leakage-resistant evals"
+  default_prompt: "Use $evaluate-math-capabilities to turn this discovery candidate into a held-out Jacobian portfolio evaluation."

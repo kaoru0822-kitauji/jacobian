@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Any, cast
 
 import networkx as nx
+from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -23,7 +27,18 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
+from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.graph_invariants import (
+    GraphNeighborhoodIndependenceArtifact,
+    GraphNeighborhoodIndependenceClaim,
+    GraphNeighborhoodIndependenceOutput,
+    GraphNeighborhoodIndependenceRecord,
+    GraphNeighborhoodIndependenceReplayPayload,
+    GraphNeighborhoodIndependenceRequest,
+)
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore, StoreError
 
@@ -88,13 +103,39 @@ class GraphCapabilityResources:
     graph_schema_uri: str
     scope_schema_uri: str
     property_schema_uri: str
+    neighborhood_schema_uri: str
+    neighborhood_claim_schema_uri: str
+    certificate_schema_uri: str
+    neighborhood_checker_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class GraphInstallation:
+    semantics_uri: str
+    graph_schema_uri: str
+    scope_schema_uri: str
+    property_schema_uri: str
+    neighborhood_schema_uri: str
+    neighborhood_claim_schema_uri: str
+    certificate_schema_uri: str
+    neighborhood_checker_id: str | None
 
 
 def install_graph_capabilities(
     store: ArtifactStore,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
-) -> tuple[GraphAtlasSearchAdapter, GraphPropertyAdapter]:
+    checkers: CheckerRegistry,
+    *,
+    authorize_checker: bool,
+) -> tuple[
+    tuple[
+        GraphAtlasSearchAdapter,
+        GraphPropertyAdapter,
+        GraphNeighborhoodIndependenceAdapter,
+    ],
+    GraphInstallation,
+]:
     """Register graph artifact contracts and return the bundled adapters."""
 
     semantics_uri = store.register_descriptor(
@@ -161,6 +202,46 @@ def install_graph_capabilities(
             "additionalProperties": False,
         },
     )
+    neighborhood_schema_uri = schemas.register(
+        name="jacobian.graph-neighborhood-independence",
+        version="1",
+        schema=GraphNeighborhoodIndependenceArtifact.model_json_schema(),
+    )
+    neighborhood_claim_schema_uri = schemas.register(
+        name="jacobian.graph-neighborhood-independence-claim",
+        version="1",
+        schema=GraphNeighborhoodIndependenceClaim.model_json_schema(),
+    )
+    certificate_schema_uri = schemas.register(
+        name="jacobian.certificate-envelope",
+        version="1",
+        schema=CertificateEnvelope.model_json_schema(),
+    )
+    neighborhood_checker_id = None
+    if authorize_checker:
+        neighborhood_checker_id = checkers.authorize(
+            name="exact graph neighborhood-independence replay checker",
+            entrypoint=(
+                "jacobian_checkers.graph_invariants:check_neighborhood_independence"
+            ),
+            evidence_kind="CERTIFICATE",
+            format_id="graph.neighborhood_independence",
+            format_version="1",
+            claim_schema_uris=(neighborhood_claim_schema_uri,),
+            semantics_uris=(semantics_uri,),
+            candidate_schema_uris=(neighborhood_schema_uri,),
+            reason="bundled independent finite-graph invariant checker",
+        ).checker_id
+    installation = GraphInstallation(
+        semantics_uri=semantics_uri,
+        graph_schema_uri=graph_schema_uri,
+        scope_schema_uri=scope_schema_uri,
+        property_schema_uri=property_schema_uri,
+        neighborhood_schema_uri=neighborhood_schema_uri,
+        neighborhood_claim_schema_uri=neighborhood_claim_schema_uri,
+        certificate_schema_uri=certificate_schema_uri,
+        neighborhood_checker_id=neighborhood_checker_id,
+    )
     resources = GraphCapabilityResources(
         store=store,
         artifacts=artifacts,
@@ -168,8 +249,19 @@ def install_graph_capabilities(
         graph_schema_uri=graph_schema_uri,
         scope_schema_uri=scope_schema_uri,
         property_schema_uri=property_schema_uri,
+        neighborhood_schema_uri=neighborhood_schema_uri,
+        neighborhood_claim_schema_uri=neighborhood_claim_schema_uri,
+        certificate_schema_uri=certificate_schema_uri,
+        neighborhood_checker_id=neighborhood_checker_id,
     )
-    return GraphAtlasSearchAdapter(resources), GraphPropertyAdapter(resources)
+    return (
+        (
+            GraphAtlasSearchAdapter(resources),
+            GraphPropertyAdapter(resources),
+            GraphNeighborhoodIndependenceAdapter(resources),
+        ),
+        installation,
+    )
 
 
 class GraphAtlasSearchAdapter:
@@ -475,6 +567,216 @@ class GraphPropertyAdapter:
                 ),
             ),
             artifact_uris=(graph_uri, property_artifact.artifact_uri),
+        )
+
+
+class GraphNeighborhoodIndependenceAdapter:
+    """Compute every exact neighborhood independence number for one graph."""
+
+    def __init__(self, resources: GraphCapabilityResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="graph.compute.neighborhood_independence",
+            version="1",
+            title="Compute neighborhood independence",
+            description=(
+                "Compute an exact maximum independent set in every open "
+                "neighborhood, their sum, and their rational average. "
+                "Neighborhoods are limited to 24 vertices."
+            ),
+            provider="jacobian.networkx",
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=GraphNeighborhoodIndependenceRequest.model_json_schema(),
+            output_schema=GraphNeighborhoodIndependenceOutput.model_json_schema(),
+            tags=(
+                "graph",
+                "neighborhood",
+                "independence-number",
+                "exact-computation",
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = GraphNeighborhoodIndependenceRequest.model_validate(
+                request.input
+            )
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_NEIGHBORHOOD_INDEPENDENCE_REQUEST",
+                    stage="request_validation",
+                    message=(
+                        "The complete neighborhood-independence request is invalid."
+                    ),
+                )
+            ) from exc
+        started = time.monotonic()
+        graph = _load_graph(self.resources, validated.graph_uri)
+        if graph.number_of_nodes() > 256:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="GRAPH_ORDER_LIMIT_EXCEEDED",
+                    stage="invariant_computation",
+                    message=("The graph exceeds the exact 256-vertex profile limit."),
+                )
+            )
+        records: list[GraphNeighborhoodIndependenceRecord] = []
+        for vertex in sorted(graph):
+            neighborhood = tuple(sorted(graph.neighbors(vertex)))
+            if len(neighborhood) > 24:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="NEIGHBORHOOD_ORDER_LIMIT_EXCEEDED",
+                        stage="invariant_computation",
+                        message=(
+                            "At least one open neighborhood exceeds the exact "
+                            "24-vertex operation limit."
+                        ),
+                        hint=(
+                            "Use a structurally certified bound or a separately "
+                            "budgeted solver-backed capability."
+                        ),
+                    )
+                )
+            neighborhood_graph: nx.Graph[str] = nx.Graph()
+            neighborhood_graph.add_nodes_from(neighborhood)
+            neighborhood_graph.add_edges_from(graph.subgraph(neighborhood).edges())
+            independent_set, independence_number = nx.max_weight_clique(
+                nx.complement(neighborhood_graph),
+                weight=None,
+            )
+            records.append(
+                GraphNeighborhoodIndependenceRecord(
+                    vertex=vertex,
+                    neighborhood=neighborhood,
+                    independent_set=tuple(sorted(independent_set)),
+                    independence_number=independence_number,
+                )
+            )
+        total = sum(record.independence_number for record in records)
+        average = Fraction(total, len(records)) if records else Fraction(0)
+        average_wire = CanonicalRational(
+            num=str(average.numerator),
+            den=str(average.denominator),
+        )
+        invariant = GraphNeighborhoodIndependenceArtifact(
+            graph_uri=validated.graph_uri,
+            records=tuple(records),
+            total=total,
+            average=average_wire,
+            backend_version=nx.__version__,
+        )
+        invariant_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.neighborhood_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=invariant.model_dump(mode="json"),
+            parents=(validated.graph_uri,),
+            summary="exact graph neighborhood-independence profile",
+        )
+        claim = GraphNeighborhoodIndependenceClaim(source_graph_uri=validated.graph_uri)
+        claim_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.neighborhood_claim_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=claim.model_dump(mode="json"),
+            parents=(validated.graph_uri, invariant_artifact.artifact_uri),
+            summary="exact neighborhood-independence profile claim",
+        )
+        semantics = self.resources.store.get(self.resources.semantics_uri)
+        source_graph = self.resources.store.get(validated.graph_uri)
+        certificate_payload = GraphNeighborhoodIndependenceReplayPayload(
+            source_graph_uri=validated.graph_uri,
+            invariant_uri=invariant_artifact.artifact_uri,
+        ).model_dump(mode="json")
+        certificate = CertificateEnvelope(
+            certificate_type="graph.neighborhood_independence",
+            format_version="1",
+            bindings=EvidenceBindings(
+                claim_digest=claim_artifact.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=invariant_artifact.object_digest,
+                scope_digest=source_graph.manifest.object_digest,
+            ),
+            payload_digest=(
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(certificate_payload)).hexdigest()
+            ),
+            payload=certificate_payload,
+        )
+        certificate_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.certificate_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(
+                claim_artifact.artifact_uri,
+                invariant_artifact.artifact_uri,
+                validated.graph_uri,
+            ),
+            summary="unverified graph neighborhood-independence certificate",
+        )
+        output = GraphNeighborhoodIndependenceOutput(
+            graph_uri=validated.graph_uri,
+            invariant_uri=invariant_artifact.artifact_uri,
+            claim_uri=claim_artifact.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=self.resources.neighborhood_checker_id,
+            records=tuple(records),
+            total=total,
+            average=average_wire,
+            backend_version=nx.__version__,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=_runtime_ms(started),
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description=(
+                    "all open neighborhoods of one finite simple undirected graph"
+                ),
+                parameters={
+                    "graph_uri": validated.graph_uri,
+                    "graph_order": graph.number_of_nodes(),
+                    "maximum_neighborhood_order": 24,
+                },
+                artifact_uri=validated.graph_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.COMPLETE,
+                basis=(
+                    "every open neighborhood was solved exactly within the "
+                    "advertised 24-vertex limit; verification remains separate"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id=("graph.relation.neighborhood-independence-profile-of"),
+                    source_artifact_uris=(validated.graph_uri,),
+                    target_artifact_uris=(invariant_artifact.artifact_uri,),
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "NetworkX exact maximum-clique computations on complement "
+                    "neighborhoods; the bundled certificate was not invoked"
+                ),
+            ),
+            artifact_uris=(
+                validated.graph_uri,
+                invariant_artifact.artifact_uri,
+                claim_artifact.artifact_uri,
+                certificate_artifact.artifact_uri,
+            ),
         )
 
 

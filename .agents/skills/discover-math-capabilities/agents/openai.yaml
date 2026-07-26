@@ -1,4 +1,4 @@
 interface:
   display_name: "Discover Math Capabilities"
-  short_description: "Mine mathematical work for capability proposals"
-  default_prompt: "Use $discover-math-capabilities to mine these mathematical cases for reusable Jacobian capabilities."
+  short_description: "Mine recurring mathematical moves into tool proposals"
+  default_prompt: "Use $discover-math-capabilities to mine these source rows and artifacts for recurring mathematical moves that justify Jacobian capability changes."
