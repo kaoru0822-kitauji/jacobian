@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import time
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import sympy
 from pydantic import ValidationError
@@ -24,6 +24,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityMode,
     CapabilityRelationship,
+    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -41,6 +42,10 @@ from jacobian.contracts.polynomials import (
     PolynomialCollisionRequest,
     PolynomialEvaluationOutput,
     PolynomialEvaluationRequest,
+    PolynomialIdentityClaim,
+    PolynomialIdentityOutput,
+    PolynomialIdentityReplayPayload,
+    PolynomialIdentityRequest,
     PolynomialInjectivityClaim,
     PolynomialJacobian,
     PolynomialJacobianClaim,
@@ -58,6 +63,7 @@ from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.verification import VerificationService
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,16 +74,21 @@ class PolynomialInstallation:
     jacobian_schema_uri: str
     claim_schema_uri: str
     jacobian_claim_schema_uri: str
+    polynomial_schema_uri: str
+    left_polynomial_schema_uri: str
+    identity_claim_schema_uri: str
     witness_schema_uri: str
     certificate_schema_uri: str
     collision_checker_id: str | None
     jacobian_checker_id: str | None
+    identity_checker_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
 class PolynomialResources:
     store: ArtifactStore
     artifacts: ArtifactService
+    verification: VerificationService
     installation: PolynomialInstallation
 
 
@@ -85,6 +96,7 @@ def install_polynomial_capabilities(
     store: ArtifactStore,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
+    verification: VerificationService,
     checkers: CheckerRegistry,
     *,
     authorize_checker: bool,
@@ -93,6 +105,7 @@ def install_polynomial_capabilities(
         PolynomialMapEvaluationAdapter,
         PolynomialJacobianAdapter,
         PolynomialCollisionAdapter,
+        PolynomialIdentityAdapter,
     ],
     PolynomialInstallation,
 ]:
@@ -141,6 +154,21 @@ def install_polynomial_capabilities(
         version="1",
         schema=model_schema(PolynomialJacobianClaim),
     )
+    polynomial_schema_uri = schemas.register(
+        name="jacobian.sparse-rational-polynomial-right",
+        version="1",
+        schema=model_schema(SparseRationalPolynomial),
+    )
+    left_polynomial_schema_uri = schemas.register(
+        name="jacobian.sparse-rational-polynomial-left",
+        version="1",
+        schema=model_schema(SparseRationalPolynomial),
+    )
+    identity_claim_schema_uri = schemas.register(
+        name="jacobian.polynomial-identity-claim",
+        version="1",
+        schema=model_schema(PolynomialIdentityClaim),
+    )
     witness_schema_uri = schemas.register(
         name="jacobian.witness-envelope",
         version="1",
@@ -153,6 +181,7 @@ def install_polynomial_capabilities(
     )
     collision_checker_id = None
     jacobian_checker_id = None
+    identity_checker_id = None
     if authorize_checker:
         collision_checker_id = checkers.authorize(
             name="exact rational polynomial-map collision checker",
@@ -176,6 +205,17 @@ def install_polynomial_capabilities(
             candidate_schema_uris=(jacobian_schema_uri,),
             reason="bundled independent sparse-polynomial Jacobian checker",
         ).checker_id
+        identity_checker_id = checkers.authorize(
+            name="exact sparse rational polynomial identity checker",
+            entrypoint="jacobian_checkers.polynomial_maps:check_identity",
+            evidence_kind="CERTIFICATE",
+            format_id="polynomial.identity_replay",
+            format_version="1",
+            claim_schema_uris=(identity_claim_schema_uri,),
+            semantics_uris=(semantics_uri,),
+            candidate_schema_uris=(polynomial_schema_uri,),
+            reason="bundled independent sparse-polynomial identity checker",
+        ).checker_id
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
         map_schema_uri=map_schema_uri,
@@ -183,14 +223,19 @@ def install_polynomial_capabilities(
         jacobian_schema_uri=jacobian_schema_uri,
         claim_schema_uri=claim_schema_uri,
         jacobian_claim_schema_uri=jacobian_claim_schema_uri,
+        polynomial_schema_uri=polynomial_schema_uri,
+        left_polynomial_schema_uri=left_polynomial_schema_uri,
+        identity_claim_schema_uri=identity_claim_schema_uri,
         witness_schema_uri=witness_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
         collision_checker_id=collision_checker_id,
         jacobian_checker_id=jacobian_checker_id,
+        identity_checker_id=identity_checker_id,
     )
     resources = PolynomialResources(
         store=store,
         artifacts=artifacts,
+        verification=verification,
         installation=installation,
     )
     return (
@@ -198,6 +243,7 @@ def install_polynomial_capabilities(
             PolynomialMapEvaluationAdapter(resources),
             PolynomialJacobianAdapter(resources),
             PolynomialCollisionAdapter(resources),
+            PolynomialIdentityAdapter(resources),
         ),
         installation,
     )
@@ -762,6 +808,185 @@ def _load_polynomial_map(
             )
         ) from exc
     return polynomial_map, artifact
+
+
+class PolynomialIdentityAdapter:
+    """Verify equality in one exact sparse polynomial ring."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        checker_ids = (
+            (resources.installation.identity_checker_id,)
+            if resources.installation.identity_checker_id is not None
+            else ()
+        )
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.identity.verify",
+            version="1",
+            title="Verify an exact polynomial identity",
+            description=(
+                "Independently compare every exact coefficient of two sparse "
+                "polynomials in one declared QQ polynomial ring."
+            ),
+            provider="jacobian.sparse-polynomial-checker",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sparse-polynomial-checker",
+                features=("polynomial-identity", "exact-rational"),
+                checker_ids=checker_ids,
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=model_schema(PolynomialIdentityRequest),
+            output_schema=model_schema(PolynomialIdentityOutput),
+            tags=("polynomial", "identity", "verification", "exact-rational"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialIdentityRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_IDENTITY_REQUEST",
+            operation="identity verification",
+        )
+        checker_id = self.resources.installation.identity_checker_id
+        if checker_id is None:
+            raise _polynomial_error(
+                "POLYNOMIAL_IDENTITY_CHECKER_UNAVAILABLE",
+                "identity_verification",
+                "No authorized polynomial identity checker is installed.",
+            )
+        left = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.left_polynomial_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=validated.left.model_dump(mode="json"),
+            summary="left exact rational polynomial",
+        )
+        right = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.polynomial_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=validated.right.model_dump(mode="json"),
+            summary="right exact rational polynomial",
+        )
+        claim = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.identity_claim_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=PolynomialIdentityClaim(
+                variables=validated.variables,
+                left_uri=left.artifact_uri,
+                right_uri=right.artifact_uri,
+            ).model_dump(mode="json"),
+            parents=(left.artifact_uri, right.artifact_uri),
+            summary="exact polynomial identity claim",
+        )
+        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        certificate_payload = PolynomialIdentityReplayPayload(
+            variables=validated.variables,
+            left_uri=left.artifact_uri,
+            right_uri=right.artifact_uri,
+        ).model_dump(mode="json")
+        certificate = CertificateEnvelope(
+            certificate_type="polynomial.identity_replay",
+            format_version="1",
+            bindings=EvidenceBindings(
+                claim_digest=claim.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=right.object_digest,
+                scope_digest=left.object_digest,
+            ),
+            payload_digest=(
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(certificate_payload)).hexdigest()
+            ),
+            payload=certificate_payload,
+        )
+        certificate_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.certificate_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(claim.artifact_uri, right.artifact_uri, left.artifact_uri),
+            summary="exact sparse polynomial identity replay certificate",
+        )
+        checked = self.resources.verification.verify_certificate(
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=checker_id,
+        )
+        verified = checked.verification_record_uri is not None
+        conclusion = cast(
+            Literal["TRUE", "FALSE", "UNKNOWN"],
+            checked.conclusion.value,
+        )
+        output = PolynomialIdentityOutput(
+            identical=conclusion == "TRUE",
+            conclusion=conclusion,
+            left_uri=left.artifact_uri,
+            right_uri=right.artifact_uri,
+            claim_uri=claim.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            verification_record_uri=checked.verification_record_uri,
+            checker_id=checker_id,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="global coefficient equality in one declared QQ ring",
+                parameters={"variables": list(validated.variables)},
+                artifact_uri=left.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.COMPLETE,
+                basis="every canonical sparse coefficient was replayed independently",
+                assurance_level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+                verification_record_uri=checked.verification_record_uri,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="polynomial.relation.identity",
+                    source_artifact_uris=(left.artifact_uri,),
+                    target_artifact_uris=(right.artifact_uri,),
+                    status=(
+                        CapabilityRelationshipStatus.VERIFIED
+                        if verified
+                        else CapabilityRelationshipStatus.PROPOSED
+                    ),
+                    verification_record_uri=checked.verification_record_uri,
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+                basis=(
+                    "accepted by the authorized independent sparse-polynomial checker"
+                    if verified
+                    else "the independent checker did not accept the identity request"
+                ),
+                verification_record_uri=checked.verification_record_uri,
+            ),
+            artifact_uris=(
+                left.artifact_uri,
+                right.artifact_uri,
+                claim.artifact_uri,
+                certificate_artifact.artifact_uri,
+                *(
+                    (checked.verification_record_uri,)
+                    if checked.verification_record_uri is not None
+                    else ()
+                ),
+            ),
+        )
 
 
 def _validate_request[RequestModel: ContractModel](
