@@ -109,6 +109,13 @@ def test_checker_accepts_an_explicit_isomorphism() -> None:
     assert decision["accepted"] is True
     assert decision["conclusion"] == "TRUE"
     assert decision["coverage"] == "EXHAUSTIVE"
+    assert decision["relationship_source_artifact_uris"] == [
+        "artifact://sha256/" + "3" * 64,
+        "artifact://sha256/" + "4" * 64,
+    ]
+    assert decision["relationship_target_artifact_uris"] == [
+        "artifact://sha256/" + "2" * 64
+    ]
 
 
 def test_checker_certifies_that_a_bad_mapping_is_not_an_isomorphism() -> None:
@@ -123,6 +130,8 @@ def test_checker_certifies_that_a_bad_mapping_is_not_an_isomorphism() -> None:
 
     assert decision["accepted"] is True
     assert decision["conclusion"] == "FALSE"
+    assert "relationship_source_artifact_uris" not in decision
+    assert "relationship_target_artifact_uris" not in decision
 
 
 def test_checker_rejects_mapping_or_scope_substitution() -> None:
@@ -152,6 +161,19 @@ def test_checker_rejects_source_graph_substitution() -> None:
 def test_checker_rejects_embedded_graph_substitution() -> None:
     request = _request()
     request["scope"]["payload"]["left"]["edges"] = []
+
+    decision = check_isomorphism(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_checker_rejects_unrelated_supporting_artifact() -> None:
+    request = _request()
+    unrelated = deepcopy(request["supporting_artifacts"][0])
+    unrelated["artifact_uri"] = "artifact://sha256/" + "9" * 64
+    unrelated["object_digest"] = "sha256:" + "9" * 64
+    request["supporting_artifacts"].append(unrelated)
 
     decision = check_isomorphism(request)
 

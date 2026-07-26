@@ -88,10 +88,15 @@ def check_isomorphism(request: dict[str, Any]) -> dict[str, Any]:
             for artifact in supporting_artifacts
             if isinstance(artifact, dict)
         }
+        expected_source_uris = list(
+            dict.fromkeys((pair.get("left_graph_uri"), pair.get("right_graph_uri")))
+        )
         left_source = supporting_by_uri.get(pair.get("left_graph_uri"))
         right_source = supporting_by_uri.get(pair.get("right_graph_uri"))
         if (
-            len(supporting_by_uri) != len(supporting_artifacts)
+            [artifact.get("artifact_uri") for artifact in supporting_artifacts]
+            != expected_source_uris
+            or len(supporting_by_uri) != len(supporting_artifacts)
             or not isinstance(left_source, dict)
             or not isinstance(right_source, dict)
             or left_source.get("object_digest") != pair.get("left_graph_digest")
@@ -152,7 +157,17 @@ def check_isomorphism(request: dict[str, Any]) -> dict[str, Any]:
                 if isomorphic
                 else "the proposed mapping is not an adjacency-preserving bijection"
             ),
-            **({"relation_id": "graph.relation.isomorphic-via"} if isomorphic else {}),
+            **(
+                {
+                    "relation_id": "graph.relation.isomorphic-via",
+                    "relationship_source_artifact_uris": expected_source_uris,
+                    "relationship_target_artifact_uris": [
+                        mapping_artifact["artifact_uri"]
+                    ],
+                }
+                if isomorphic
+                else {}
+            ),
         }
     except (KeyError, TypeError, ValueError):
         return _reject("malformed graph-isomorphism verification request")
