@@ -422,6 +422,18 @@ Use `BOOL-MUS-001`, a small satisfiable instance, and a pigeonhole UNSAT
 instance as public reproductions. Core extraction and shrinking are later
 operations; first prove that the model/proof artifact boundary is sound.
 
+The public-reproduction and held-out-evaluation checkpoint was implemented on
+2026-07-26. The real CaDiCaL-to-checker reproductions pass for all three public
+cases and remain explicitly unscored. After interface tuning was frozen, a
+private four-pair pilot passed 4/4 under both direct control reasoning and the
+SAT portfolio. All treatment runs preserved exact producer-to-verifier traces
+and independently replayed, with zero false certification or tool error.
+Treatment cost was materially higher, and the small sample demonstrates
+assurance value rather than completion or efficiency lift. Retain the four
+atomic outcomes while prioritizing compact catalog discovery over another SAT
+operation. See
+[SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
+
 ## Wave 3: theory-bounded SMT proof slice
 
 Begin with:
@@ -531,7 +543,8 @@ backlog.
 7. DRAT-trim clean-process checker, authorization fixture, and attack tests.
    Implemented; see
    [UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
-8. SAT public reproductions and held-out portfolio ablation.
+8. SAT public reproductions and held-out portfolio ablation. Implemented; see
+   [SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
 9. cvc5 Alethe proof-production spike for quantifier-free EUF and linear
    arithmetic.
 10. Carcara compatibility matrix, checker adapter, mutations, and paired

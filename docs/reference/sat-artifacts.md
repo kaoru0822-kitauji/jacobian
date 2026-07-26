@@ -143,10 +143,12 @@ output.
 `sat.model.find` accepts only the documented competition protocol: exit 10
 plus `s SATISFIABLE` and a unique, range-checked, zero-terminated literal for
 every declared variable. It then stores the Boolean vector through
-`SatArtifactService.put_assignment`. The result reports
+`SatArtifactService.put_assignment`. The result reports the durable
+`assignment_uri`, an inline name-to-Boolean map in canonical variable order,
 `ASSIGNMENT_PRODUCED`, `solver_status: SATISFIABLE`, and
-`conclusion: UNKNOWN`. The candidate becomes mathematically assured only if a
-later `sat.model.verify` invocation independently accepts it.
+`conclusion: UNKNOWN`. The inline map makes the constructed object immediately
+inspectable; it does not add assurance. The candidate becomes mathematically
+assured only if a later `sat.model.verify` invocation independently accepts it.
 
 `sat.unsat_proof.find` invokes CaDiCaL with `--no-binary` and an explicit proof
 path. Exit 20 plus `s UNSATISFIABLE` permits the adapter to read at most
@@ -243,20 +245,47 @@ The standard-library-only checker adapter independently validates the closed
 CNF, proof, certificate, evidence bindings, payload digests, and lineage. It
 reconstructs canonical DIMACS and admits a bounded ASCII `drat-text/v1`
 profile. Malformed clauses, duplicate or complementary literals, integer
-overflow, deletion of the empty clause, or proof steps after the empty clause
-are rejected before external dispatch. A fixed benign comment is prepended to
-force DRAT-trim's text parser; it does not alter the stored proof bytes.
+overflow, deletion of the empty clause, or non-deletion steps after the empty
+clause are rejected before external dispatch. Cleanup deletions after the
+empty clause are admitted because CaDiCaL may emit them; they cannot alter the
+already-derived contradiction. A fixed benign comment is prepended to force
+DRAT-trim's text parser; it does not alter the stored proof bytes.
 
-DRAT-trim runs against temporary CNF and proof files with `-W`, fixed locale,
-bounded time and output, and the exact authorized executable. Acceptance
-requires exit zero, empty stderr, protocol-only output, and exactly one
-`s VERIFIED` line. Any other status, warning, malformed output, excessive
-output, mutation, cross-CNF replay, runtime replacement, timeout,
-cancellation, or crash yields no mathematical conclusion.
+DRAT-trim runs its official forward UNSAT check against temporary CNF and proof
+files with `-f -W`, fixed locale, bounded time and output, and the exact
+authorized executable. Acceptance requires exit zero, empty stderr,
+protocol-only output, and exactly one `s VERIFIED` line. Any other status,
+warning, malformed output, excessive output, mutation, cross-CNF replay,
+runtime replacement, timeout, cancellation, or crash yields no mathematical
+conclusion.
 
 Acceptance creates the ordinary kernel `VerificationRecord`, bound to the
 certificate and all three artifacts, and permits `VERIFIED_UNSAT` with
 conclusion `TRUE`. Rejection reports `UNKNOWN`; it does not establish SAT.
+
+## Public reproductions
+
+The unscored manifest
+[`sat_public_reproductions.json`](../../benchmarks/reproduction_cases/sat_public_reproductions.json)
+replays three public cases through the real installed backends:
+
+- the complete `BOOL-MUS-001` formula, without treating later shrinking as
+  part of this capability slice;
+- one small satisfiable CNF; and
+- the three-pigeons/two-holes UNSAT instance.
+
+The manifest records `scored: false`; these cases exercise compatibility and
+regression behavior and are never hidden evaluation. Run the actual
+CaDiCaL-to-checker path with:
+
+```sh
+uv run pytest -n 0 tests/integration/test_sat_public_reproductions.py
+```
+
+The `BOOL-MUS-001` replay exposed CaDiCaL cleanup deletions after its empty
+clause. Preserving the raw proof and using DRAT-trim's forward check accepted
+that valid producer output without weakening rejection of concatenated
+post-contradiction additions.
 
 ## Trust boundary
 
