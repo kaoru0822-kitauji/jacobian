@@ -25,7 +25,7 @@ repos:
         exclude: uv.lock
 
   - repo: https://github.com/jendrikseipp/vulture
-    rev: v2.14
+    rev: v2.16
     hooks:
       - id: vulture
         args: ["src", "tests", "--min-confidence=80"]
