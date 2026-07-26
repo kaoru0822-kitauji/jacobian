@@ -1,4 +1,4 @@
-"""Contract tests for Lean statement proposal, repair, and comparison."""
+"""Contract tests for Lean statement proposal and comparison."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.contracts.lean_statement import (
-    LeanProofRepairArtifact,
-    LeanProofRepairRequest,
     LeanStatementComparisonArtifact,
     LeanStatementComparisonRequest,
     LeanStatementProposalArtifact,
@@ -87,93 +85,6 @@ def test_proposal_artifact_accepts_non_elaborating_with_zero_sorry() -> None:
     )
     assert artifact.elaborates is False
     assert artifact.sorry_count == 0
-
-
-# ---------------------------------------------------------------------------
-# LeanProofRepairRequest
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.contract
-def test_repair_request_rejects_multiline_statement() -> None:
-    with pytest.raises(ValidationError, match="one Lean expression"):
-        LeanProofRepairRequest(
-            statement="True\n",
-            failing_proof="trivial",
-        )
-
-
-@pytest.mark.contract
-def test_repair_request_accepts_multiline_proof() -> None:
-    req = LeanProofRepairRequest(
-        statement="True",
-        failing_proof="intro\n  trivial",
-        compiler_errors=("unsolved goals",),
-    )
-    assert "\n" in req.failing_proof
-    assert len(req.compiler_errors) == 1
-
-
-# ---------------------------------------------------------------------------
-# LeanProofRepairArtifact
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.contract
-def test_repair_artifact_requires_proof_change_for_non_none_strategy() -> None:
-    with pytest.raises(ValidationError, match="must change the proof"):
-        LeanProofRepairArtifact(
-            environment="CORE",
-            statement="True",
-            failing_proof="trivial",
-            repaired_proof="trivial",
-            diff="",
-            repair_strategy="append_sorry",
-            compiles=False,
-            compile_checked=False,
-            sorry_count=0,
-            messages=(),
-            lean_version="4.0.0",
-            lean_commit="abc",
-        )
-
-
-@pytest.mark.contract
-def test_repair_artifact_rejects_proof_change_for_none_strategy() -> None:
-    with pytest.raises(ValidationError, match="must not change the proof"):
-        LeanProofRepairArtifact(
-            environment="CORE",
-            statement="True",
-            failing_proof="trivial",
-            repaired_proof="sorry",
-            diff="diff",
-            repair_strategy="none",
-            compiles=False,
-            compile_checked=False,
-            sorry_count=0,
-            messages=(),
-            lean_version="4.0.0",
-            lean_commit="abc",
-        )
-
-
-@pytest.mark.contract
-def test_repair_artifact_accepts_none_strategy_with_unchanged_proof() -> None:
-    artifact = LeanProofRepairArtifact(
-        environment="CORE",
-        statement="True",
-        failing_proof="trivial",
-        repaired_proof="trivial",
-        diff="",
-        repair_strategy="none",
-        compiles=False,
-        compile_checked=False,
-        sorry_count=0,
-        messages=(),
-        lean_version="4.0.0",
-        lean_commit="abc",
-    )
-    assert artifact.repair_strategy == "none"
 
 
 # ---------------------------------------------------------------------------

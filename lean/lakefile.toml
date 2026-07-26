@@ -1,9 +1,14 @@
 name = "jacobianLeanRuntime"
 version = "0.1.0"
-defaultTargets = ["JacobianLeanRuntime"]
+defaultTargets = ["JacobianLeanRuntime", "jacobian_lean_proof_state"]
 
 [[lean_lib]]
 name = "JacobianLeanRuntime"
+
+[[lean_exe]]
+name = "jacobian_lean_proof_state"
+root = "JacobianLeanProofState"
+supportInterpreter = true
 
 [[require]]
 name = "mathlib"

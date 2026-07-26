@@ -1,9 +1,8 @@
-"""Contracts for atomic Lean statement proposal, repair, and comparison.
+"""Contracts for atomic Lean statement proposal and comparison.
 
 Each contract exposes exactly one inspectable artifact. None of these
 capabilities certify that a formal statement matches an informal claim,
-that a repaired proof proves a theorem, or that two statements are
-semantically equivalent. The ``verification`` field is always
+or that two statements are semantically equivalent. The ``verification`` field is always
 ``UNVERIFIED`` to enforce the fail-closed boundary.
 """
 
@@ -69,61 +68,6 @@ class LeanStatementProposalOutput(LeanStatementProposalArtifact):
     """Proposal output with artifact URI and explicit UNVERIFIED label."""
 
     proposal_uri: ArtifactUri
-    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
-
-
-# ---------------------------------------------------------------------------
-# lean.proof.repair_once
-# ---------------------------------------------------------------------------
-
-
-class LeanProofRepairRequest(ContractModel):
-    """Attempt one deterministic repair on a failing Lean proof."""
-
-    environment: LeanEnvironment = LeanEnvironment.CORE
-    statement: str = Field(min_length=1, max_length=2_000)
-    failing_proof: str = Field(min_length=1, max_length=20_000)
-    compiler_errors: tuple[str, ...] = Field(default=(), max_length=20)
-
-    @model_validator(mode="after")
-    def require_single_line_statement(self) -> Self:
-        if "\n" in self.statement or "\r" in self.statement:
-            raise ValueError("statement must be one Lean expression")
-        if ":=" in self.statement:
-            raise ValueError("statement must not contain ':='")
-        return self
-
-
-class LeanProofRepairArtifact(ContractModel):
-    """One repair attempt with diff and compile status."""
-
-    repair_schema_version: Literal["1"] = "1"
-    environment: LeanEnvironment
-    statement: str
-    failing_proof: str
-    repaired_proof: str
-    diff: str
-    repair_strategy: str = Field(min_length=1, max_length=64)
-    compiles: bool
-    compile_checked: bool
-    sorry_count: int = Field(ge=0)
-    messages: tuple[str, ...]
-    lean_version: str
-    lean_commit: str
-
-    @model_validator(mode="after")
-    def require_diff_when_strategy_applied(self) -> Self:
-        if self.repair_strategy != "none" and self.repaired_proof == self.failing_proof:
-            raise ValueError("a non-'none' repair strategy must change the proof")
-        if self.repair_strategy == "none" and self.repaired_proof != self.failing_proof:
-            raise ValueError("the 'none' strategy must not change the proof")
-        return self
-
-
-class LeanProofRepairOutput(LeanProofRepairArtifact):
-    """Repair output with artifact URI and explicit UNVERIFIED label."""
-
-    repair_uri: ArtifactUri
     verification: Literal["UNVERIFIED"] = "UNVERIFIED"
 
 

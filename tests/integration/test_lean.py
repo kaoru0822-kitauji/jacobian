@@ -103,6 +103,36 @@ def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
         fresh_backend.close()
 
 
+def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.declaration.dependencies",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "environment": "CORE",
+                "root_declaration": "Nat.add_comm",
+                "max_depth": 1,
+                "max_nodes": 40,
+            },
+        )
+    )
+
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert result.assurance.verification_record_uri is None
+    assert result.output["nodes"][0] == {
+        "name": "Nat.add_comm",
+        "kind": "THEOREM",
+        "depth": 0,
+    }
+    assert len(result.output["nodes"]) <= 40
+    assert result.output["dependency_graph_uri"] in result.artifact_uris
+    artifact = kernel.store.get(result.output["dependency_graph_uri"])
+    assert artifact.payload["nodes"][0]["name"] == "Nat.add_comm"
+    assert artifact.payload["query"]["max_depth"] == 1
+
+
 @pytest.mark.skipif(
     not MATHLIB_OLEAN.is_file(),
     reason="the pinned mathlib runtime has not been built",

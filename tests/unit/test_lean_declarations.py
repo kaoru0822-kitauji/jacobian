@@ -10,9 +10,11 @@ from typing import Any
 
 import pytest
 
+from jacobian.artifacts import ArtifactService
 from jacobian.builtin_capabilities import (
     LeanDeclarationInspectAdapter,
     LeanDeclarationSearchAdapter,
+    LeanDependencyGraphAdapter,
 )
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
@@ -25,7 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
     CapabilityRequest,
 )
-from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean import LeanDependencyGraphArtifact, LeanEnvironment
 from jacobian.lean_declarations import (
     LeanDeclarationBackend,
     LeanDeclarationBackendError,
@@ -33,6 +35,8 @@ from jacobian.lean_declarations import (
     LeanSubprocessDeclarationBackend,
     _parse_session_response,
 )
+from jacobian.schema_registry import SchemaRegistry
+from jacobian.store import ArtifactStore
 
 _DIGEST = "sha256:" + "a" * 64
 _RUNTIME = CapabilityProviderRuntime(
@@ -224,6 +228,8 @@ def test_search_adapter_exposes_bounded_computed_retrieval() -> None:
         "target_module_prefixes": [],
         "kinds": [],
         "limit": 1,
+        "max_depth": 0,
+        "max_nodes": 1,
     }
 
 
@@ -292,6 +298,71 @@ def test_inspect_adapter_returns_docs_without_promoting_the_theorem() -> None:
     assert result.assurance.verification_record_uri is None
     assert result.output["declaration"]["docstring"].startswith("Addition")
     assert result.output["environment_digest"] == _DIGEST
+
+
+def test_dependency_adapter_exposes_partial_typed_subgraph(tmp_path: Path) -> None:
+    backend = FakeBackend(
+        {
+            "operation": "dependencies",
+            "nodes": [
+                {"name": "Nat.add_assoc", "kind": "THEOREM", "depth": 0},
+                {"name": "Nat.add", "kind": "DEFINITION", "depth": 1},
+            ],
+            "edges": [
+                {
+                    "source": "Nat.add_assoc",
+                    "target": "Nat.add",
+                    "kinds": ["TYPE", "VALUE"],
+                }
+            ],
+            "frontier": ["Nat.add"],
+            "node_budget_exhausted": False,
+            "closure_complete": False,
+        }
+    )
+    store = ArtifactStore(tmp_path)
+    schemas = SchemaRegistry(store)
+    artifacts = ArtifactService(store, schemas)
+    semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="test.lean-dependencies",
+        version="1",
+        definition={"dependency_api": "Lean.Expr.getUsedConstantsAsSet"},
+    )
+    schema_uri = schemas.register(
+        name="test.lean-dependency-graph",
+        version="1",
+        schema=LeanDependencyGraphArtifact.model_json_schema(),
+    )
+    adapter = LeanDependencyGraphAdapter(
+        LeanDeclarationService(backend),
+        _RUNTIME,
+        artifacts,
+        semantics_uri=semantics_uri,
+        dependency_graph_schema_uri=schema_uri,
+    )
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="lean.declaration.dependencies",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "environment": "CORE",
+                "root_declaration": "Nat.add_assoc",
+                "max_depth": 1,
+                "max_nodes": 20,
+            },
+        )
+    )
+
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
+    assert result.output["edges"][0]["kinds"] == ["TYPE", "VALUE"]
+    assert result.output["closure_complete"] is False
+    assert result.output["dependency_graph_uri"] in result.artifact_uris
+    assert backend.calls[0][1]["operation"] == "dependencies"
+    assert backend.calls[0][1]["max_depth"] == 1
+    assert backend.calls[0][1]["max_nodes"] == 20
 
 
 def test_missing_declaration_is_an_explicit_failed_operation() -> None:

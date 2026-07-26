@@ -8,6 +8,8 @@ from jacobian.contracts.lean import (
     LeanDeclarationKind,
     LeanDeclarationSearchRequest,
     LeanDeclarationTypePattern,
+    LeanDependencyGraphArtifact,
+    LeanDependencyGraphRequest,
     LeanEnvironment,
 )
 
@@ -59,4 +61,37 @@ def test_declaration_inspect_requires_one_bounded_exact_name() -> None:
         LeanDeclarationInspectRequest(
             environment=LeanEnvironment.CORE,
             declaration_name="",
+        )
+
+
+def test_dependency_graph_contract_rejects_inconsistent_completeness() -> None:
+    query = LeanDependencyGraphRequest(
+        root_declaration="Nat.add",
+        max_depth=1,
+        max_nodes=4,
+    )
+
+    with pytest.raises(ValidationError, match=r"complete.*frontier"):
+        LeanDependencyGraphArtifact(
+            environment="CORE",
+            environment_digest="sha256:" + "a" * 64,
+            query=query,
+            nodes=({"name": "Nat.add", "kind": "DEFINITION", "depth": 0},),
+            edges=(),
+            frontier=("Nat.add",),
+            node_budget_exhausted=False,
+            closure_complete=True,
+        )
+
+
+def test_dependency_graph_request_has_hard_traversal_budgets() -> None:
+    with pytest.raises(ValidationError):
+        LeanDependencyGraphRequest(
+            root_declaration="Nat.add",
+            max_depth=9,
+        )
+    with pytest.raises(ValidationError):
+        LeanDependencyGraphRequest(
+            root_declaration="Nat.add",
+            max_nodes=501,
         )
