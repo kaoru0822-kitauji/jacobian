@@ -11,6 +11,8 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -25,6 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.graph_isomorphism import (
     GraphIsomorphismClaim,
@@ -106,17 +109,24 @@ def install_graph_isomorphism(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact finite simple-graph isomorphism checker",
-            entrypoint="jacobian_checkers.graph_isomorphism:check_isomorphism",
-            evidence_kind="CERTIFICATE",
-            format_id="graph.isomorphism_replay",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(mapping_schema_uri,),
-            reason="bundled independent adjacency-preservation checker",
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact finite simple-graph isomorphism checker",
+                    entrypoint="jacobian_checkers.graph_isomorphism:check_isomorphism",
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="graph.isomorphism_replay",
+                    format_version="1",
+                    claim_schema_uris=(claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(mapping_schema_uri,),
+                    reason="bundled independent adjacency-preservation checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = GraphIsomorphismInstallation(
         semantics_uri=semantics_uri,
         source_graph_semantics_uri=graph.semantics_uri,

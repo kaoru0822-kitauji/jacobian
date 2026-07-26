@@ -35,6 +35,8 @@ from sympy.polys.polyerrors import PolynomialError
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -49,6 +51,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.polynomial_intervals import (
@@ -174,17 +177,24 @@ def install_polynomial_positivity_capabilities(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact rational polynomial interval strict positivity checker",
-            entrypoint="jacobian_checkers.polynomial_positivity:check_positivity",
-            evidence_kind="CERTIFICATE",
-            format_id="polynomial.interval_sturm_positivity_replay",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(decision_schema_uri,),
-            reason="bundled independent Sturm-sequence positivity checker",
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact rational polynomial interval strict positivity checker",
+                    entrypoint="jacobian_checkers.polynomial_positivity:check_positivity",
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="polynomial.interval_sturm_positivity_replay",
+                    format_version="1",
+                    claim_schema_uris=(claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(decision_schema_uri,),
+                    reason="bundled independent Sturm-sequence positivity checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = PolynomialPositivityInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,

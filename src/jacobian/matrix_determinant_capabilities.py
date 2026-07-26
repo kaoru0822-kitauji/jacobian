@@ -10,6 +10,8 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -22,6 +24,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import WitnessEnvelope
 from jacobian.contracts.matrices import (
     ExactRationalMatrix,
@@ -77,24 +80,29 @@ def install_matrix_determinant_checker(
         version="1",
         model=WitnessEnvelope,
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact rational determinant recomputation checker",
-            entrypoint=(
-                "jacobian_checkers.rational_determinants:check_rational_determinant"
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational determinant recomputation checker",
+                entrypoint=(
+                    "jacobian_checkers.rational_determinants:check_rational_determinant"
+                ),
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="matrix.rational_determinant",
+                format_version="1",
+                claim_schema_uris=(matrices.matrix_schema_uri,),
+                semantics_uris=(matrices.semantics_uri,),
+                candidate_schema_uris=(matrices.determinant_schema_uri,),
+                reason=(
+                    "bundled independent standard-library exact rational "
+                    "determinant recomputation"
+                ),
             ),
-            evidence_kind="WITNESS",
-            format_id="matrix.rational_determinant",
-            format_version="1",
-            claim_schema_uris=(matrices.matrix_schema_uri,),
-            semantics_uris=(matrices.semantics_uri,),
-            candidate_schema_uris=(matrices.determinant_schema_uri,),
-            reason=(
-                "bundled independent standard-library exact rational "
-                "determinant recomputation"
-            ),
-        ).checker_id
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = MatrixDeterminantCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,

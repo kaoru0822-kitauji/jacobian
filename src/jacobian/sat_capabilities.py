@@ -10,6 +10,8 @@ from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -24,6 +26,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
     EvidenceBindings,
@@ -77,19 +80,24 @@ def install_sat_assignment_checker(
         version="1",
         model=WitnessEnvelope,
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact total SAT assignment replay checker",
-            entrypoint="jacobian_checkers.sat:check_assignment",
-            evidence_kind="WITNESS",
-            format_id="sat.assignment",
-            format_version="1",
-            claim_schema_uris=(sat.installation.cnf_schema_uri,),
-            semantics_uris=(sat.installation.semantics_uri,),
-            candidate_schema_uris=(sat.installation.assignment_schema_uri,),
-            reason="bundled independent SAT assignment checker",
-        ).checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact total SAT assignment replay checker",
+                entrypoint="jacobian_checkers.sat:check_assignment",
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="sat.assignment",
+                format_version="1",
+                claim_schema_uris=(sat.installation.cnf_schema_uri,),
+                semantics_uris=(sat.installation.semantics_uri,),
+                candidate_schema_uris=(sat.installation.assignment_schema_uri,),
+                reason="bundled independent SAT assignment checker",
+            ),
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = SatAssignmentCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,
@@ -124,23 +132,28 @@ def install_sat_unsat_proof_checker(
         version="1",
         model=CertificateEnvelope,
     )
-    checker_id = None
-    if (
-        authorize_checker
-        and runtime.availability is CapabilityProviderAvailability.AVAILABLE
-    ):
-        checker_id = checkers.authorize(
-            name="pinned DRAT-trim exact SAT UNSAT proof checker",
-            entrypoint="jacobian_checkers.sat:check_unsat_proof",
-            evidence_kind="CERTIFICATE",
-            format_id="sat.unsat-proof",
-            format_version="1",
-            claim_schema_uris=(sat.installation.cnf_schema_uri,),
-            semantics_uris=(sat.installation.semantics_uri,),
-            candidate_schema_uris=(sat.installation.proof_schema_uri,),
-            provider_runtime=runtime,
-            reason="operator-authorized pinned DRAT-trim proof replay",
-        ).checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="pinned DRAT-trim exact SAT UNSAT proof checker",
+                entrypoint="jacobian_checkers.sat:check_unsat_proof",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="sat.unsat-proof",
+                format_version="1",
+                claim_schema_uris=(sat.installation.cnf_schema_uri,),
+                semantics_uris=(sat.installation.semantics_uri,),
+                candidate_schema_uris=(sat.installation.proof_schema_uri,),
+                provider_runtime=runtime,
+                reason="operator-authorized pinned DRAT-trim proof replay",
+            ),
+            authorize=(
+                authorize_checker
+                and runtime.availability is CapabilityProviderAvailability.AVAILABLE
+            ),
+        )
+        .checker_id
+    )
     installation = SatUnsatProofCheckerInstallation(
         certificate_schema_uri=certificate_schema_uri,
         checker_id=checker_id,

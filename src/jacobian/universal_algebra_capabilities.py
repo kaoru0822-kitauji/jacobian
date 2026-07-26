@@ -14,6 +14,8 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -27,6 +29,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.contracts.universal_algebra import (
@@ -134,17 +137,26 @@ def install_universal_algebra_capabilities(
     )
     evaluation_checker_id = None
     if authorize_checker:
-        evaluation_checker_id = checkers.authorize(
-            name="exact finite magma law evaluation replay checker",
-            entrypoint=("jacobian_checkers.universal_algebra:check_law_evaluation"),
-            evidence_kind="CERTIFICATE",
-            format_id="universal_algebra.law_evaluation",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(evaluation_schema_uri,),
-            reason="bundled independent finite table evaluator",
-        ).checker_id
+        evaluation_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact finite magma law evaluation replay checker",
+                    entrypoint=(
+                        "jacobian_checkers.universal_algebra:check_law_evaluation"
+                    ),
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="universal_algebra.law_evaluation",
+                    format_version="1",
+                    claim_schema_uris=(claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(evaluation_schema_uri,),
+                    reason="bundled independent finite table evaluator",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = UniversalAlgebraInstallation(
         semantics_uri=semantics_uri,
         problem_schema_uri=problem_schema_uri,

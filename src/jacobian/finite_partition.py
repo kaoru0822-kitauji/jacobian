@@ -9,6 +9,8 @@ from typing import Any
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -140,16 +142,19 @@ def install_finite_partition(
     )
     checker_id = None
     if authorize_checker:
-        registration = checkers.authorize(
-            name="finite partition coverage checker",
-            entrypoint="jacobian_checkers.finite_partition:check_partition",
-            evidence_kind=EvidenceKind.CERTIFICATE,
-            format_id="finite.partition",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(partition_schema_uri,),
-            reason="operator requested bundled reference checker installation",
+        registration = CheckerInstaller(checkers).install(
+            CheckerOperation(
+                name="finite partition coverage checker",
+                entrypoint="jacobian_checkers.finite_partition:check_partition",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="finite.partition",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(partition_schema_uri,),
+                reason="operator requested bundled reference checker installation",
+            ),
+            authorize=True,
         )
         checker_id = registration.checker_id
     installation = FinitePartitionInstallation(
