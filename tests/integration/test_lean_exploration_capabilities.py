@@ -69,8 +69,7 @@ def test_apply_tactic_returns_structured_failure_without_conclusion(
     assert result.output["accepted"] is False
     assert result.output["successor_states"] == []
     assert any(
-        diagnostic["severity"] == "ERROR"
-        for diagnostic in result.output["diagnostics"]
+        diagnostic["severity"] == "ERROR" for diagnostic in result.output["diagnostics"]
     )
 
 
