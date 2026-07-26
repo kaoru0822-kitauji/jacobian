@@ -1276,6 +1276,7 @@ def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
     )
     assert treatment["passed"] is True
     assert treatment["false_certification"] is False
+    assert treatment["replay_success"] is True
 
 
 def test_ab_sat_scorer_rejects_unbound_verified_claim(tmp_path: Path) -> None:

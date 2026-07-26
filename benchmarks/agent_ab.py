@@ -504,6 +504,7 @@ def _score_sat_report(
     return {
         "passed": True,
         "false_certification": False,
+        "replay_success": True,
         "checks": [
             "hidden exact SAT oracle",
             "durable CNF and evidence binding",
