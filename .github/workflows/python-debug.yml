@@ -1,0 +1,59 @@
+name: Python Debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      pytest-selector:
+        description: One pytest file or node ID to run
+        required: true
+        default: tests/integration/test_mcp_adapter.py
+        type: string
+      keyword:
+        description: Optional pytest -k expression
+        required: false
+        type: string
+      python-version:
+        description: Supported Python version
+        required: true
+        default: "3.12"
+        type: choice
+        options:
+          - "3.12"
+          - "3.13"
+
+concurrency:
+  group: python-debug-${{ github.ref }}-${{ inputs.pytest-selector }}-${{ inputs.python-version }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python-debug:
+    name: Focused Python reproduction
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ inputs.python-version }}
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv sync --frozen --dev
+      - name: Run focused Python test
+        env:
+          TEST_SELECTOR: ${{ inputs.pytest-selector }}
+          TEST_KEYWORD: ${{ inputs.keyword }}
+        run: |
+          args=(-n 0 "$TEST_SELECTOR" --durations=10)
+          if [ -n "$TEST_KEYWORD" ]; then
+            args+=(-k "$TEST_KEYWORD")
+          fi
+          uv run --frozen pytest "${args[@]}"

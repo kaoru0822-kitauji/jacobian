@@ -197,9 +197,7 @@ async def main() -> None:
                     "claim_uri": claim_uri,
                     "candidate_uri": candidate_uri,
                     "witness_uri": witness_uri,
-                    "checker_id": graph["witness_checker_ids"][
-                        "graph.omitted_path"
-                    ],
+                    "checker_id": graph["witness_checker_ids"]["graph.omitted_path"],
                 },
             },
         )

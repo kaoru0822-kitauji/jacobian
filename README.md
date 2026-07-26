@@ -105,8 +105,6 @@ goals are part of the working project record. Start with:
   cross-cutting decisions and their release scope.
 - [Epistemic workspace ADR](docs/explanation/adr/0005-direct-epistemic-workspaces.md)
   for the separation between durable working state and mathematical assurance.
-- [Threat model](docs/explanation/threat-model.md) for protected properties,
-  trust assumptions, and explicit exclusions.
 - [Durable search runtime](docs/explanation/search-runtime.md) for ownership,
   persistence, and recovery decisions.
 
@@ -116,8 +114,9 @@ Release contracts and engineering evidence are:
 - [Provider runtime contract](docs/reference/provider-runtime.md) for
   availability, exact backend identity, install tiers, and local measurement.
 - [SAT artifact contracts](docs/reference/sat-artifacts.md) for canonical CNF,
-  total assignment, and raw proof identity before solver or checker
-  installation.
+  raw model and proof identity, and independently checked total assignments.
+- [SMT Alethe artifact contracts](docs/reference/smt-artifacts.md) for the
+  pinned quantifier-free cvc5 producer and its unverified proof boundary.
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
 - [Testing strategy](docs/reference/testing-strategy.md),
@@ -142,8 +141,14 @@ evaluation and countermodel search, reference-domain exploration and
 verification, Lean checking, and local research-memory search.
 
 The base kernel also registers canonical CNF, total assignment, and raw DRAT
-proof artifact contracts. They do not add SAT capabilities or mathematical
-assurance; solver and independent-checker slices remain separate.
+proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
+`sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound
+model or text-DRAT evidence. Solver status and produced bytes remain
+unverified; assignment and proof checking are separate capability boundaries.
+With bundled references and an operator-provenanced pinned DRAT-trim runtime,
+`sat.unsat_proof.verify` can independently replay the exact CNF-bound proof and
+create a verification record. Runtime failure or proof rejection remains
+`UNKNOWN`.
 
 Three direct operational tools—`workspace.open`, `workspace.write`, and
 `workspace.query`—provide durable, revisioned paper-like working state outside
@@ -190,7 +195,7 @@ uv run python benchmarks/agent_mcp.py
 Raw transcripts, isolated Jacobian state, reports, structured agent feedback,
 and scores are written to the ignored `benchmarks/results/` directory.
 Model-in-the-loop evaluations are local, optional, and never part of
-`make test-fast`, `make test`, `make validate`, or CI. Preview a selected
+`make test-fast`, `make test`, `make validate-full`, or CI. Preview a selected
 paired evaluation without executing a model:
 
 ```sh

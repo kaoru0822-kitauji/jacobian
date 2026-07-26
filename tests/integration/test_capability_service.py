@@ -27,6 +27,8 @@ from jacobian.contracts.results import (
 )
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 TEST_RUNTIME = CapabilityProviderRuntime(
     provider="tests",
     availability=CapabilityProviderAvailability.AVAILABLE,

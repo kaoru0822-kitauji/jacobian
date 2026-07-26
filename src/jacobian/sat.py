@@ -19,7 +19,7 @@ from jacobian.contracts.sat import (
     canonicalize_cnf,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 
 
 class SatArtifactError(ValueError):
@@ -32,6 +32,27 @@ class SatArtifactInstallation:
     cnf_schema_uri: str
     assignment_schema_uri: str
     proof_schema_uri: str
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSatCnf:
+    artifact: StoredArtifact
+    cnf: CanonicalCnf
+    binding: SatCnfBinding
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSatAssignment:
+    artifact: StoredArtifact
+    assignment: SatAssignmentArtifact
+    cnf_artifact: StoredArtifact
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedSatProof:
+    artifact: StoredArtifact
+    proof: SatProofArtifact
+    cnf_artifact: StoredArtifact
 
 
 class SatArtifactService:
@@ -68,8 +89,8 @@ class SatArtifactService:
             ),
         )
 
-    def bind_cnf(self, cnf_uri: str) -> SatCnfBinding:
-        """Resolve one canonical CNF and bind its exact stored identity."""
+    def resolve_cnf(self, cnf_uri: str) -> ResolvedSatCnf:
+        """Resolve one valid canonical CNF and its exact stored identity."""
 
         try:
             artifact = self.store.get(cnf_uri)
@@ -92,7 +113,7 @@ class SatArtifactService:
             raise SatArtifactError(
                 "source is not a valid canonical CNF artifact"
             ) from exc
-        return SatCnfBinding(
+        binding = SatCnfBinding(
             cnf_artifact_uri=artifact.artifact_uri,
             cnf_object_digest=artifact.manifest.object_digest,
             cnf_payload_digest=artifact.manifest.payload_digest,
@@ -103,6 +124,16 @@ class SatArtifactService:
             variable_count=len(cnf.variables),
             clause_count=len(cnf.clauses),
         )
+        return ResolvedSatCnf(
+            artifact=artifact,
+            cnf=cnf,
+            binding=binding,
+        )
+
+    def bind_cnf(self, cnf_uri: str) -> SatCnfBinding:
+        """Resolve one canonical CNF and bind its exact stored identity."""
+
+        return self.resolve_cnf(cnf_uri).binding
 
     def put_assignment(
         self,
@@ -128,6 +159,43 @@ class SatArtifactService:
             summary="unverified SAT assignment candidate",
         )
 
+    def resolve_assignment(self, assignment_uri: str) -> ResolvedSatAssignment:
+        """Resolve an assignment whose payload and lineage bind one exact CNF."""
+
+        try:
+            artifact = self.store.get(assignment_uri)
+        except StoreError as exc:
+            raise SatArtifactError(
+                "source is not an available SAT assignment artifact"
+            ) from exc
+        if (
+            artifact.manifest.schema_uri != self.installation.assignment_schema_uri
+            or artifact.manifest.semantics_uri != self.installation.semantics_uri
+        ):
+            raise SatArtifactError("source is not a SAT assignment artifact")
+        try:
+            normalized = self.schemas.validate(
+                self.installation.assignment_schema_uri,
+                artifact.payload,
+            )
+            assignment = SatAssignmentArtifact.model_validate(normalized)
+        except (SchemaRegistryError, ValueError, ValidationError) as exc:
+            raise SatArtifactError(
+                "source is not a valid SAT assignment artifact"
+            ) from exc
+        binding = self.bind_cnf(assignment.cnf.cnf_artifact_uri)
+        if assignment.cnf != binding:
+            raise SatArtifactError(
+                "SAT assignment binding does not match its exact canonical CNF"
+            )
+        if binding.cnf_artifact_uri not in artifact.manifest.parents:
+            raise SatArtifactError("SAT assignment is missing its canonical CNF parent")
+        return ResolvedSatAssignment(
+            artifact=artifact,
+            assignment=assignment,
+            cnf_artifact=self.store.get(binding.cnf_artifact_uri),
+        )
+
     def put_proof(
         self,
         *,
@@ -150,6 +218,41 @@ class SatArtifactService:
             payload=proof_artifact.model_dump(mode="json"),
             parents=(cnf_uri,),
             summary="unverified raw DRAT proof",
+        )
+
+    def resolve_proof(self, proof_uri: str) -> ResolvedSatProof:
+        """Resolve raw proof bytes whose payload and lineage bind one exact CNF."""
+
+        try:
+            artifact = self.store.get(proof_uri)
+        except StoreError as exc:
+            raise SatArtifactError(
+                "source is not an available SAT proof artifact"
+            ) from exc
+        if (
+            artifact.manifest.schema_uri != self.installation.proof_schema_uri
+            or artifact.manifest.semantics_uri != self.installation.semantics_uri
+        ):
+            raise SatArtifactError("source is not a SAT proof artifact")
+        try:
+            normalized = self.schemas.validate(
+                self.installation.proof_schema_uri,
+                artifact.payload,
+            )
+            proof = SatProofArtifact.model_validate(normalized)
+        except (SchemaRegistryError, ValueError, ValidationError) as exc:
+            raise SatArtifactError("source is not a valid SAT proof artifact") from exc
+        binding = self.bind_cnf(proof.cnf.cnf_artifact_uri)
+        if proof.cnf != binding:
+            raise SatArtifactError(
+                "SAT proof binding does not match its exact canonical CNF"
+            )
+        if binding.cnf_artifact_uri not in artifact.manifest.parents:
+            raise SatArtifactError("SAT proof is missing its canonical CNF parent")
+        return ResolvedSatProof(
+            artifact=artifact,
+            proof=proof,
+            cnf_artifact=self.store.get(binding.cnf_artifact_uri),
         )
 
 

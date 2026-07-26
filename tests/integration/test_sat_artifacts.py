@@ -20,6 +20,8 @@ from jacobian.contracts.sat import (
 from jacobian.kernel import JacobianKernel
 from jacobian.sat import SatArtifactError
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _producer() -> CapabilityProviderRuntime:
     return CapabilityProviderRuntime(

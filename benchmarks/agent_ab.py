@@ -28,10 +28,18 @@ import subprocess
 import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from itertools import product
 from pathlib import Path
 from typing import Any, cast
 
+from jacobian.artifacts import ArtifactService
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
+from jacobian.contracts.sat import (
+    CanonicalCnf,
+    SatAssignmentArtifact,
+    SatProofArtifact,
+    canonicalize_cnf,
+)
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.eval_graph_oracle import (
     GraphOracleError,
@@ -42,6 +50,7 @@ from jacobian.eval_graph_oracle import (
 )
 from jacobian.eval_telemetry import parse_agent_transcript as parse_transcript
 from jacobian.kernel import JacobianKernel
+from jacobian.sat import install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 
@@ -50,6 +59,7 @@ CASES_ROOT = Path(__file__).with_name("ab_cases")
 REPORT_SCHEMA = CASES_ROOT / "report.schema.json"
 GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
 PARTITION_REPORT_SCHEMA = CASES_ROOT / "partition-report.schema.json"
+SAT_REPORT_SCHEMA = CASES_ROOT / "sat-report.schema.json"
 LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
@@ -58,6 +68,14 @@ LEAN_DISCOVERY_IDS = frozenset(
     {
         "lean.declaration.search",
         "lean.declaration.inspect",
+    }
+)
+SAT_CAPABILITY_IDS = frozenset(
+    {
+        "sat.model.find",
+        "sat.model.verify",
+        "sat.unsat_proof.find",
+        "sat.unsat_proof.verify",
     }
 )
 LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
@@ -126,6 +144,29 @@ use shell commands or create programs. Copy the returned durable URIs. Report
 VERIFIED only when the capability returns VERIFIED assurance.
 """
 
+SAT_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. You may write and run local code
+in the empty workspace. Decide the exact supplied CNF directly. A satisfying
+assignment is acceptable evidence for SAT; do not invent an UNSAT certificate.
+Report SELF_CHECKED and UNVERIFIED, with null durable evidence and verification
+record URIs.
+"""
+
+SAT_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create programs. The exact canonical CNF has already been materialized at the
+URI supplied below. Inspect the installed catalog, then compose the appropriate
+SAT evidence producer and its independent verifier. A solver status, failed
+search, assignment artifact, or proof artifact alone is not verification.
+Report VERIFIED only when the matching verify capability returns VERIFIED and
+copy its exact verification-record URI. Set evidence_uri to the producer output
+passed into that verifier: assignment_uri from sat.model.find or proof_uri from
+sat.unsat_proof.find. Do not substitute the verifier's witness_uri or
+certificate_uri. For a SAT result, copy the named assignment map returned
+inline by sat.model.find; do not reinterpret the durable artifact's positional
+values against the prompt's pre-canonical variable order.
+"""
+
 LEAN_DECLARATION_INSTRUCTIONS = """\
 Use only the jacobian_local MCP server for mathematical work. Do not use shell
 commands or create programs. Inspect the installed capability catalog, construct
@@ -192,6 +233,287 @@ def load_cases(
     return [indexed[case_id] for case_id in requested]
 
 
+def _sat_case_cnf(case: Mapping[str, Any]) -> CanonicalCnf:
+    variable_names = case.get("variable_names")
+    clauses = case.get("clauses")
+    if (
+        not isinstance(variable_names, list)
+        or not all(isinstance(name, str) for name in variable_names)
+        or not isinstance(clauses, list)
+        or not all(isinstance(clause, list) for clause in clauses)
+    ):
+        raise BenchmarkError("SAT case must contain variable_names and clauses")
+    try:
+        return canonicalize_cnf(variable_names=variable_names, clauses=clauses)
+    except ValueError as exc:
+        raise BenchmarkError("SAT case contains an invalid CNF") from exc
+
+
+def _seed_sat_case(case: Mapping[str, Any], state_dir: Path) -> str:
+    cnf = _sat_case_cnf(case)
+    store = ArtifactStore(state_dir)
+    schemas = SchemaRegistry(store)
+    artifacts = ArtifactService(store, schemas)
+    sat = install_sat_artifacts(store, schemas, artifacts)
+    stored = sat.put_cnf(
+        variable_names=tuple(variable.name for variable in cnf.variables),
+        clauses=tuple(clause.literals for clause in cnf.clauses),
+    )
+    return stored.artifact_uri
+
+
+def _sat_assignment_satisfies(
+    cnf: CanonicalCnf,
+    assignment: Mapping[str, bool],
+) -> bool:
+    names = {variable.id: variable.name for variable in cnf.variables}
+    return all(
+        any(
+            assignment[names[abs(literal)]]
+            if literal > 0
+            else not assignment[names[abs(literal)]]
+            for literal in clause.literals
+        )
+        for clause in cnf.clauses
+    )
+
+
+def _sat_hidden_status(cnf: CanonicalCnf) -> str:
+    if len(cnf.variables) > 20:
+        raise BenchmarkError("held-out SAT oracle is limited to 20 variables")
+    names = tuple(variable.name for variable in cnf.variables)
+    for values in product((False, True), repeat=len(names)):
+        assignment = dict(zip(names, values, strict=True))
+        if _sat_assignment_satisfies(cnf, assignment):
+            return "SATISFIABLE"
+    return "UNSATISFIABLE"
+
+
+def _reported_sat_assignment(
+    report: Mapping[str, Any],
+    *,
+    cnf: CanonicalCnf,
+    hidden_status: str,
+) -> dict[str, bool] | None:
+    assignment_value = report.get("assignment")
+    if hidden_status != "SATISFIABLE":
+        if assignment_value is not None:
+            raise BenchmarkError("UNSAT report must not contain an assignment")
+        return None
+    if not isinstance(assignment_value, Mapping) or not all(
+        isinstance(name, str) and isinstance(value, bool)
+        for name, value in assignment_value.items()
+    ):
+        raise BenchmarkError("SAT report omitted a Boolean assignment")
+    assignment = dict(assignment_value)
+    if set(assignment) != {
+        variable.name for variable in cnf.variables
+    } or not _sat_assignment_satisfies(cnf, assignment):
+        raise BenchmarkError("SAT report assignment does not satisfy the exact CNF")
+    if report.get("evidence_kind") != "ASSIGNMENT":
+        raise BenchmarkError("SAT report mislabeled its assignment evidence")
+    return assignment
+
+
+def _score_sat_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    expected = case.get("expected")
+    if not isinstance(expected, Mapping):
+        raise BenchmarkError("SAT expected must be an object")
+    expected_cnf = _sat_case_cnf(case)
+    hidden_status = _sat_hidden_status(expected_cnf)
+    if expected.get("status") != hidden_status:
+        raise BenchmarkError("SAT case expectation differs from the hidden oracle")
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("status") != hidden_status
+        or report.get("conclusion") != "TRUE"
+    ):
+        raise BenchmarkError("SAT report has the wrong case, status, or conclusion")
+    _validate_feedback(report.get("feedback"))
+
+    cnf_uri = report.get("cnf_uri")
+    if not isinstance(cnf_uri, str):
+        raise BenchmarkError("SAT report omitted its canonical CNF URI")
+    store = ArtifactStore(state_dir)
+    try:
+        cnf_artifact = store.get(cnf_uri)
+        schemas = SchemaRegistry(store)
+        schemas.validate(cnf_artifact.manifest.schema_uri, cnf_artifact.payload)
+        durable_cnf = CanonicalCnf.model_validate(cnf_artifact.payload)
+    except (SchemaRegistryError, StoreError, ValueError) as exc:
+        raise BenchmarkError("SAT canonical CNF artifact is unavailable") from exc
+    if durable_cnf != expected_cnf:
+        raise BenchmarkError("SAT durable CNF differs from the held-out case")
+
+    reported_assignment = _reported_sat_assignment(
+        report,
+        cnf=durable_cnf,
+        hidden_status=hidden_status,
+    )
+
+    evidence_uri = report.get("evidence_uri")
+    record_uri = report.get("verification_record_uri")
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("SAT control condition used an MCP tool")
+        if (
+            report.get("assurance") != "SELF_CHECKED"
+            or report.get("final_verification") != "UNVERIFIED"
+            or evidence_uri is not None
+            or record_uri is not None
+        ):
+            raise BenchmarkError("SAT control condition falsely projected verification")
+        expected_kind = "ASSIGNMENT" if hidden_status == "SATISFIABLE" else "NONE"
+        if report.get("evidence_kind") != expected_kind:
+            raise BenchmarkError("SAT control report has the wrong evidence kind")
+        return {
+            "passed": True,
+            "false_certification": False,
+            "checks": ["hidden exact SAT oracle", "control isolation"],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if (
+        report.get("assurance") != "VERIFIED"
+        or report.get("final_verification") != "VERIFIED"
+        or not isinstance(evidence_uri, str)
+        or not isinstance(record_uri, str)
+    ):
+        raise BenchmarkError("SAT treatment was not independently verified")
+
+    find_id = (
+        "sat.model.find" if hidden_status == "SATISFIABLE" else "sat.unsat_proof.find"
+    )
+    verify_id = (
+        "sat.model.verify"
+        if hidden_status == "SATISFIABLE"
+        else "sat.unsat_proof.verify"
+    )
+    evidence_field = "assignment_uri" if hidden_status == "SATISFIABLE" else "proof_uri"
+    expected_kind = "ASSIGNMENT" if hidden_status == "SATISFIABLE" else "UNSAT_PROOF"
+    if report.get("evidence_kind") != expected_kind:
+        raise BenchmarkError("SAT treatment reported the wrong evidence kind")
+
+    try:
+        evidence_artifact = store.get(evidence_uri)
+        record_artifact = store.get(record_uri)
+        record = VerificationRecord.model_validate(record_artifact.payload)
+        checker_evidence = store.get(record.evidence_uri)
+        semantics = store.get(cnf_artifact.manifest.semantics_uri)
+        schemas.validate(
+            evidence_artifact.manifest.schema_uri,
+            evidence_artifact.payload,
+        )
+        schemas.validate(record_artifact.manifest.schema_uri, record_artifact.payload)
+        schemas.validate(
+            checker_evidence.manifest.schema_uri,
+            checker_evidence.payload,
+        )
+        if hidden_status == "SATISFIABLE":
+            durable_evidence: SatAssignmentArtifact | SatProofArtifact = (
+                SatAssignmentArtifact.model_validate(evidence_artifact.payload)
+            )
+        else:
+            durable_evidence = SatProofArtifact.model_validate(
+                evidence_artifact.payload
+            )
+    except (SchemaRegistryError, StoreError, ValueError) as exc:
+        raise BenchmarkError("SAT verification artifacts are unavailable") from exc
+
+    if (
+        cnf_uri not in evidence_artifact.manifest.parents
+        or durable_evidence.cnf.cnf_artifact_uri != cnf_uri
+        or durable_evidence.cnf.cnf_object_digest != cnf_artifact.manifest.object_digest
+        or durable_evidence.cnf.cnf_payload_digest
+        != cnf_artifact.manifest.payload_digest
+        or record.conclusion.value != "TRUE"
+        or record.bindings.claim_digest != cnf_artifact.manifest.object_digest
+        or record.bindings.semantics_digest != semantics.manifest.object_digest
+        or record.bindings.candidate_digest != evidence_artifact.manifest.object_digest
+        or not {cnf_uri, evidence_uri, record.evidence_uri}.issubset(
+            record_artifact.manifest.parents
+        )
+    ):
+        raise BenchmarkError("SAT verification record is not exactly bound")
+    if isinstance(durable_evidence, SatAssignmentArtifact):
+        durable_assignment = {
+            variable.name: value
+            for variable, value in zip(
+                durable_cnf.variables,
+                durable_evidence.values,
+                strict=True,
+            )
+        }
+        if durable_assignment != reported_assignment:
+            raise BenchmarkError("reported assignment differs from durable evidence")
+
+    found_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_input = invocation.get("input")
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == find_id
+            and isinstance(invocation_input, Mapping)
+            and invocation_input.get("cnf_uri") == cnf_uri
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get(evidence_field) == evidence_uri
+            and evidence_uri in (invocation.get("artifact_uris") or [])
+        ):
+            found_index = index
+        if (
+            found_index is not None
+            and index > found_index
+            and invocation.get("capability_id") == verify_id
+            and invocation_input == {evidence_field: evidence_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("verification_record_uri") == record_uri
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            and record_uri in (invocation.get("artifact_uris") or [])
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError("SAT treatment lacks an exact find-to-verify trace")
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=verify_id,
+            mode=CapabilityMode.VERIFY,
+            input={evidence_field: evidence_uri},
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.assurance.verification_record_uri != record_uri
+        or replay.output.get("conclusion") != "TRUE"
+        or replay.output.get("cnf_uri") != cnf_uri
+        or replay.output.get(evidence_field) != evidence_uri
+    ):
+        raise BenchmarkError("SAT treatment evidence does not replay independently")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "hidden exact SAT oracle",
+            "durable CNF and evidence binding",
+            "ordered find-to-verify trace",
+            "independent checker replay",
+        ],
+    }
+
+
 def score_report(
     case: Mapping[str, Any],
     report: Mapping[str, Any],
@@ -203,6 +525,15 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "sat_decision":
+        return _score_sat_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "lean_declaration":
         return _score_lean_declaration_report(
             case,
@@ -1099,9 +1430,23 @@ def _run_condition(
     state_dir.mkdir()
     is_graph = case.get("task_type") == "graph"
     is_partition = case.get("task_type") == "finite_partition"
+    is_sat = case.get("task_type") == "sat_decision"
     is_lean_declaration = case.get("task_type") == "lean_declaration"
     is_lean_proof = case.get("task_type") == "lean_proof"
-    if is_lean_declaration:
+    sat_context = ""
+    if is_sat:
+        cnf_uri = _seed_sat_case(case, state_dir)
+        sat_context = (
+            "\nThe canonical CNF for this case is available at "
+            f"{cnf_uri}. Return this exact URI as cnf_uri.\n"
+        )
+    if is_sat:
+        condition_instructions = (
+            SAT_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else SAT_TREATMENT_INSTRUCTIONS
+        )
+    elif is_lean_declaration:
         condition_instructions = LEAN_DECLARATION_INSTRUCTIONS
     elif is_lean_proof:
         condition_instructions = LEAN_PROOF_INSTRUCTIONS
@@ -1121,7 +1466,7 @@ def _run_condition(
         condition_instructions = (
             CONTROL_INSTRUCTIONS if condition == "control" else TREATMENT_INSTRUCTIONS
         )
-    prompt = condition_instructions + "\n" + COMMON_PROMPT.format(**case)
+    prompt = condition_instructions + sat_context + "\n" + COMMON_PROMPT.format(**case)
     command = _codex_command(
         codex_command=codex_command,
         condition=condition,
@@ -1140,6 +1485,8 @@ def _run_condition(
             if is_lean_proof
             else GRAPH_REPORT_SCHEMA
             if is_graph
+            else SAT_REPORT_SCHEMA
+            if is_sat
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
@@ -1238,14 +1585,32 @@ def _run_condition(
                 and report.get("final_verification") == "VERIFIED"
                 and report.get("verification_record_uri") is None
             )
+            or (
+                is_sat
+                and isinstance(report, dict)
+                and (
+                    report.get("assurance") == "VERIFIED"
+                    or report.get("final_verification") == "VERIFIED"
+                )
+                and not score.get("passed")
+            )
         ),
         "intervention_attempted": bool(
-            is_lean_declaration
-            and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_attempt_ids"])
+            (
+                is_lean_declaration
+                and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_attempt_ids"])
+            )
+            or (
+                is_sat
+                and SAT_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
+            )
         ),
         "intervention_used": bool(
-            is_lean_declaration
-            and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_ids"])
+            (
+                is_lean_declaration
+                and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_ids"])
+            )
+            or (is_sat and SAT_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
         ),
         "operational_failure": bool(score.get("operational_failure")),
         "score": score,
