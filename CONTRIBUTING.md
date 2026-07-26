@@ -127,8 +127,7 @@ Place documentation according to the reader's task:
 - `docs/reference/` defines exact contracts and lookup information;
 - `docs/explanation/` records architecture, rationale, and tradeoffs.
 
-Update `docs/index.md` and the root `README.md` when adding a public entry
-point. Keep rolling product goals separate from supported release behavior.
+Keep rolling product goals separate from supported release behavior.
 For documentation-only changes, run:
 
 ```sh
