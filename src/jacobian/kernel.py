@@ -207,6 +207,7 @@ class JacobianKernel:
             self.store,
             self.schemas,
             self.artifacts,
+            self.verification,
             self.checkers,
             authorize_checker=install_references,
         )
