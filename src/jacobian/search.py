@@ -57,7 +57,7 @@ from jacobian.plugins.registry import (
     PluginRegistryError,
     ResolvedCapability,
 )
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
@@ -139,22 +139,22 @@ class SearchService:
         self.checkpoint_schema_uri = schemas.register(
             name="jacobian.search-checkpoint",
             version="1",
-            schema=SearchCheckpoint.model_json_schema(),
+            schema=model_schema(SearchCheckpoint),
         )
         self.archive_page_schema_uri = schemas.register(
             name="jacobian.search-archive-page",
             version="1",
-            schema=SearchArchivePage.model_json_schema(),
+            schema=model_schema(SearchArchivePage),
         )
         self.archive_manifest_schema_uri = schemas.register(
             name="jacobian.search-archive",
             version="1",
-            schema=SearchArchiveManifest.model_json_schema(),
+            schema=model_schema(SearchArchiveManifest),
         )
         self.evaluation_schema_uri = schemas.register(
             name="jacobian.evaluation-batch-result",
             version="1",
-            schema=EvaluationBatchResult.model_json_schema(),
+            schema=model_schema(EvaluationBatchResult),
         )
         self._initialize_database()
 

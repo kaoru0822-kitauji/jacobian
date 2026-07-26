@@ -33,7 +33,7 @@ from jacobian.contracts.witness_search import (
 )
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
 
@@ -69,7 +69,7 @@ class WitnessSearchService:
         self.witness_schema_uri = schemas.register(
             name="jacobian.witness-envelope",
             version="1",
-            schema=WitnessEnvelope.model_json_schema(),
+            schema=model_schema(WitnessEnvelope),
         )
 
     def find(

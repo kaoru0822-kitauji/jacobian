@@ -3,13 +3,39 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
 from jacobian.schema_registry import (
     SchemaRegistry,
     SchemaRegistryError,
     SchemaValidationError,
+    model_schema,
 )
 from jacobian.store import ArtifactStore
+
+
+class _CachedSchemaModel(BaseModel):
+    value: int
+
+
+@pytest.mark.contract
+def test_cached_model_schema_returns_independent_copies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = model_schema(_CachedSchemaModel)
+    first["title"] = "mutated"
+
+    def unexpected_regeneration() -> dict[str, object]:
+        pytest.fail("cached schema was regenerated")
+
+    monkeypatch.setattr(
+        _CachedSchemaModel,
+        "model_json_schema",
+        unexpected_regeneration,
+    )
+    second = model_schema(_CachedSchemaModel)
+
+    assert second["title"] == "_CachedSchemaModel"
 
 
 @pytest.mark.contract

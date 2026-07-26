@@ -47,7 +47,7 @@ from jacobian.registry import (
     CheckerRegistry,
     CheckerRegistryError,
 )
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import (
     ArtifactIntegrityError,
     ArtifactNotFoundError,
@@ -166,7 +166,7 @@ class VerificationService:
             kind="schema",
             name="jacobian.verification-record",
             version="1",
-            definition=VerificationRecord.model_json_schema(),
+            definition=model_schema(VerificationRecord),
         )
         self.record_semantics_uri = store.register_descriptor(
             kind="semantics",
@@ -180,13 +180,13 @@ class VerificationService:
             kind="schema",
             name="jacobian.preservation-envelope",
             version="1",
-            definition=PreservationEnvelope.model_json_schema(),
+            definition=model_schema(PreservationEnvelope),
         )
         self.transformation_record_schema_uri = store.register_descriptor(
             kind="schema",
             name="jacobian.transformation-verification-record",
             version="1",
-            definition=TransformationVerificationRecord.model_json_schema(),
+            definition=model_schema(TransformationVerificationRecord),
         )
 
     def _semantics_digest(self, artifact: StoredArtifact) -> str:
