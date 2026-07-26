@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
@@ -15,8 +18,13 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.sat import SatResourceBudget
-from jacobian.kernel import JacobianKernel
+from jacobian.sat import install_sat_artifacts
+from jacobian.schema_registry import SchemaRegistry
+from jacobian.store import ArtifactStore, StoredArtifact
 from jacobian_checkers.sat import check_unsat_proof
+
+_DEFAULT_PROOF = b"-1 0\n0\n"
+ProofRequestFactory = Callable[[bytes], dict[str, Any]]
 
 
 def _sha256_file(path: Path) -> str:
@@ -36,7 +44,7 @@ def _producer() -> CapabilityProviderRuntime:
     )
 
 
-def _checker_artifact(artifact) -> dict[str, object]:
+def _checker_artifact(artifact: StoredArtifact) -> dict[str, Any]:
     return {
         "artifact_uri": artifact.artifact_uri,
         "object_digest": artifact.manifest.object_digest,
@@ -48,64 +56,70 @@ def _checker_artifact(artifact) -> dict[str, object]:
     }
 
 
-def _request(
-    tmp_path: Path,
-    *,
-    proof_bytes: bytes = b"-1 0\n0\n",
-) -> dict[str, object]:
-    kernel = JacobianKernel(tmp_path / "store")
-    cnf_result = kernel.sat.put_cnf(
+@pytest.fixture(scope="module")
+def proof_request_factory(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> ProofRequestFactory:
+    store = ArtifactStore(tmp_path_factory.mktemp("sat-proof-checker-store"))
+    schemas = SchemaRegistry(store)
+    artifacts = ArtifactService(store, schemas)
+    sat = install_sat_artifacts(store, schemas, artifacts)
+    cnf_result = sat.put_cnf(
         variable_names=("x", "y"),
         clauses=((1, 2), (-1, 2), (1, -2), (-1, -2)),
     )
-    proof_result = kernel.sat.put_proof(
-        cnf_uri=cnf_result.artifact_uri,
-        proof=proof_bytes,
-        producer=_producer(),
-        resource_budget=SatResourceBudget(wall_seconds=5),
-    )
-    cnf = kernel.store.get(cnf_result.artifact_uri)
-    proof = kernel.store.get(proof_result.artifact_uri)
-    semantics = kernel.store.get(kernel.sat.installation.semantics_uri)
-    bindings = EvidenceBindings(
-        claim_digest=cnf.manifest.object_digest,
-        semantics_digest=semantics.manifest.object_digest,
-        candidate_digest=proof.manifest.object_digest,
-    )
-    payload = {
-        "cnf_uri": cnf.artifact_uri,
-        "proof_uri": proof.artifact_uri,
-    }
-    certificate = CertificateEnvelope(
-        certificate_type="sat.unsat-proof",
-        format_version="1",
-        bindings=bindings,
-        payload_digest=(
-            "sha256:" + hashlib.sha256(canonicalize_json(payload)).hexdigest()
-        ),
-        payload=payload,
-    )
-    certificate_schema_uri = kernel.schemas.register_model(
+    cnf = store.get(cnf_result.artifact_uri)
+    semantics = store.get(sat.installation.semantics_uri)
+    certificate_schema_uri = schemas.register_model(
         name="jacobian.certificate-envelope",
         version="1",
         model=CertificateEnvelope,
     )
-    certificate_artifact = kernel.artifacts.put(
-        schema_uri=certificate_schema_uri,
-        semantics_uri=kernel.sat.installation.semantics_uri,
-        payload=certificate.model_dump(mode="json"),
-        parents=(cnf.artifact_uri, proof.artifact_uri),
-        summary="SAT UNSAT proof certificate",
-    )
-    stored_certificate = kernel.store.get(certificate_artifact.artifact_uri)
-    return {
-        "request_version": "1",
-        "claim": _checker_artifact(cnf),
-        "candidate": _checker_artifact(proof),
-        "scope": None,
-        "certificate": _checker_artifact(stored_certificate),
-        "expected_bindings": bindings.model_dump(mode="json"),
-    }
+
+    def build(proof_bytes: bytes) -> dict[str, Any]:
+        proof_result = sat.put_proof(
+            cnf_uri=cnf_result.artifact_uri,
+            proof=proof_bytes,
+            producer=_producer(),
+            resource_budget=SatResourceBudget(wall_seconds=5),
+        )
+        proof = store.get(proof_result.artifact_uri)
+        bindings = EvidenceBindings(
+            claim_digest=cnf.manifest.object_digest,
+            semantics_digest=semantics.manifest.object_digest,
+            candidate_digest=proof.manifest.object_digest,
+        )
+        payload = {
+            "cnf_uri": cnf.artifact_uri,
+            "proof_uri": proof.artifact_uri,
+        }
+        certificate = CertificateEnvelope(
+            certificate_type="sat.unsat-proof",
+            format_version="1",
+            bindings=bindings,
+            payload_digest=(
+                "sha256:" + hashlib.sha256(canonicalize_json(payload)).hexdigest()
+            ),
+            payload=payload,
+        )
+        certificate_artifact = artifacts.put(
+            schema_uri=certificate_schema_uri,
+            semantics_uri=sat.installation.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(cnf.artifact_uri, proof.artifact_uri),
+            summary="SAT UNSAT proof certificate",
+        )
+        stored_certificate = store.get(certificate_artifact.artifact_uri)
+        return {
+            "request_version": "1",
+            "claim": _checker_artifact(cnf),
+            "candidate": _checker_artifact(proof),
+            "scope": None,
+            "certificate": _checker_artifact(stored_certificate),
+            "expected_bindings": bindings.model_dump(mode="json"),
+        }
+
+    return build
 
 
 def _fake_checker(tmp_path: Path, body: str) -> tuple[Path, Path]:
@@ -140,6 +154,7 @@ def _install_runtime_environment(
 def test_checker_reconstructs_exact_dimacs_and_forces_ascii_drat(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     executable, marker = _fake_checker(
         tmp_path,
@@ -153,7 +168,7 @@ def test_checker_reconstructs_exact_dimacs_and_forces_ascii_drat(
     )
     _install_runtime_environment(monkeypatch, executable)
 
-    decision = check_unsat_proof(_request(tmp_path))
+    decision = check_unsat_proof(proof_request_factory(_DEFAULT_PROOF))
 
     assert marker.read_text(encoding="utf-8") == "called"
     assert decision["accepted"] is True
@@ -165,14 +180,15 @@ def test_checker_reconstructs_exact_dimacs_and_forces_ascii_drat(
 def test_binding_and_lineage_attacks_are_rejected_before_drat_trim(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     executable, marker = _fake_checker(
         tmp_path,
         "raise AssertionError('must not run')",
     )
     _install_runtime_environment(monkeypatch, executable)
-    original = _request(tmp_path)
-    mutations: list[dict[str, object]] = []
+    original = proof_request_factory(_DEFAULT_PROOF)
+    mutations: list[dict[str, Any]] = []
 
     changed = deepcopy(original)
     changed["claim"]["payload"]["clauses"] = list(
@@ -219,6 +235,7 @@ def test_malformed_or_concatenated_proof_is_rejected_before_drat_trim(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     proof_bytes: bytes,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     executable, marker = _fake_checker(
         tmp_path,
@@ -226,7 +243,7 @@ def test_malformed_or_concatenated_proof_is_rejected_before_drat_trim(
     )
     _install_runtime_environment(monkeypatch, executable)
 
-    decision = check_unsat_proof(_request(tmp_path, proof_bytes=proof_bytes))
+    decision = check_unsat_proof(proof_request_factory(proof_bytes))
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
@@ -245,11 +262,12 @@ def test_only_one_verified_status_with_zero_exit_is_accepted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     body: str,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     executable, _marker = _fake_checker(tmp_path, body)
     _install_runtime_environment(monkeypatch, executable)
 
-    decision = check_unsat_proof(_request(tmp_path))
+    decision = check_unsat_proof(proof_request_factory(_DEFAULT_PROOF))
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
@@ -258,6 +276,7 @@ def test_only_one_verified_status_with_zero_exit_is_accepted(
 def test_excessive_checker_output_is_rejected_without_reading_it_into_memory(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     executable, _marker = _fake_checker(
         tmp_path,
@@ -266,7 +285,7 @@ def test_excessive_checker_output_is_rejected_without_reading_it_into_memory(
     _install_runtime_environment(monkeypatch, executable)
     monkeypatch.setattr("jacobian_checkers.sat.DRAT_TRIM_OUTPUT_LIMIT", 128)
 
-    decision = check_unsat_proof(_request(tmp_path))
+    decision = check_unsat_proof(proof_request_factory(_DEFAULT_PROOF))
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
@@ -275,6 +294,7 @@ def test_excessive_checker_output_is_rejected_without_reading_it_into_memory(
 def test_runtime_digest_mismatch_is_rejected_before_execution(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     executable, marker = _fake_checker(
         tmp_path,
@@ -286,7 +306,7 @@ def test_runtime_digest_mismatch_is_rejected_before_execution(
         "sha256:" + "a" * 64,
     )
 
-    decision = check_unsat_proof(_request(tmp_path))
+    decision = check_unsat_proof(proof_request_factory(_DEFAULT_PROOF))
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
@@ -294,13 +314,13 @@ def test_runtime_digest_mismatch_is_rejected_before_execution(
 
 
 def test_missing_runtime_authorization_is_rejected(
-    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
 ) -> None:
     monkeypatch.delenv("JACOBIAN_CHECKER_EXECUTABLE", raising=False)
     monkeypatch.delenv("JACOBIAN_CHECKER_RUNTIME_DIGEST", raising=False)
 
-    decision = check_unsat_proof(_request(tmp_path))
+    decision = check_unsat_proof(proof_request_factory(_DEFAULT_PROOF))
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
