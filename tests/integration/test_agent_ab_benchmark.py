@@ -263,6 +263,91 @@ def _hnf_report(
     }
 
 
+def _polynomial_normalization_case() -> dict[str, Any]:
+    return {
+        "case_id": "POLY-NORMALIZE-PRIVATE-TEST-001",
+        "version": "1",
+        "task_type": "polynomial_expression_normalization",
+        "prompt": "Normalize the exact supplied typed polynomial expression.",
+        "expression": {
+            "variables": ["x", "y"],
+            "expression": {
+                "kind": "multiply",
+                "operands": [
+                    {
+                        "kind": "add",
+                        "operands": [
+                            {"kind": "variable", "name": "x"},
+                            {"kind": "variable", "name": "y"},
+                        ],
+                    },
+                    {
+                        "kind": "add",
+                        "operands": [
+                            {"kind": "variable", "name": "x"},
+                            {
+                                "kind": "negate",
+                                "operand": {"kind": "variable", "name": "y"},
+                            },
+                        ],
+                    },
+                ],
+            },
+        },
+        "expected_normalized": {
+            "terms": [
+                {
+                    "coefficient": {"num": "1", "den": "1"},
+                    "exponents": [2, 0],
+                },
+                {
+                    "coefficient": {"num": "-1", "den": "1"},
+                    "exponents": [0, 2],
+                },
+            ]
+        },
+    }
+
+
+def _polynomial_normalization_report(
+    *,
+    expression_uri: str | None,
+    normalization_uri: str | None,
+    record_uri: str | None,
+    assurance: str,
+    final_verification: str,
+) -> dict[str, Any]:
+    return {
+        "case_id": "POLY-NORMALIZE-PRIVATE-TEST-001",
+        "status": "NORMALIZATION_PRODUCED",
+        "conclusion": "TRUE",
+        "variables": ["x", "y"],
+        "normalized": {
+            "terms": [
+                {
+                    "coefficient": {"num": "1", "den": "1"},
+                    "exponents": [2, 0],
+                },
+                {
+                    "coefficient": {"num": "-1", "den": "1"},
+                    "exponents": [0, 2],
+                },
+            ]
+        },
+        "assurance": assurance,
+        "final_verification": final_verification,
+        "expression_uri": expression_uri,
+        "normalization_uri": normalization_uri,
+        "verification_record_uri": record_uri,
+        "limitations": ["the exact supplied QQ-polynomial expression only"],
+        "feedback": {
+            "reasoning_focus": ["preserve the declared variable order"],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+
+
 def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     schema_path = PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -1723,6 +1808,101 @@ def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
     with pytest.raises(
         cast(type[Exception], BENCHMARK["BenchmarkError"]),
         match="independent exact oracle",
+    ):
+        score_report(
+            case,
+            wrong,
+            condition="control",
+            state_dir=state_dir,
+            mcp_calls=[],
+        )
+
+
+def test_ab_polynomial_normalization_scorer_requires_bound_replay(
+    tmp_path: Path,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = _polynomial_normalization_case()
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.expression.normalize",
+            mode=CapabilityMode.EXPLORE,
+            input={"expression": case["expression"]},
+        )
+    )
+    expression_uri = cast(str, computed.output["expression_uri"])
+    normalization_uri = cast(str, computed.output["normalization_uri"])
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.expression_normalization.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"normalization_uri": normalization_uri},
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+
+    control = score_report(
+        case,
+        _polynomial_normalization_report(
+            expression_uri=None,
+            normalization_uri=None,
+            record_uri=None,
+            assurance="SELF_CHECKED",
+            final_verification="UNVERIFIED",
+        ),
+        condition="control",
+        state_dir=state_dir,
+        mcp_calls=[],
+    )
+    assert control["passed"] is True
+
+    treatment = score_report(
+        case,
+        _polynomial_normalization_report(
+            expression_uri=expression_uri,
+            normalization_uri=normalization_uri,
+            record_uri=record_uri,
+            assurance="VERIFIED",
+            final_verification="VERIFIED",
+        ),
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[
+            {
+                "capability_id": "polynomial.expression.normalize",
+                "input": {"expression": case["expression"]},
+                "output": computed.output,
+                "artifact_uris": computed.artifact_uris,
+            },
+            {
+                "capability_id": "polynomial.expression_normalization.verify",
+                "input": {"normalization_uri": normalization_uri},
+                "output": verified.output,
+                "artifact_uris": verified.artifact_uris,
+                "assurance": verified.assurance.model_dump(mode="json"),
+            },
+        ],
+    )
+
+    assert treatment["passed"] is True
+    assert treatment["false_certification"] is False
+    assert treatment["replay_success"] is True
+
+    wrong = _polynomial_normalization_report(
+        expression_uri=None,
+        normalization_uri=None,
+        record_uri=None,
+        assurance="SELF_CHECKED",
+        final_verification="UNVERIFIED",
+    )
+    wrong["normalized"]["terms"][1]["coefficient"]["num"] = "-2"
+    with pytest.raises(
+        cast(type[Exception], BENCHMARK["BenchmarkError"]),
+        match="held-out exact oracle",
     ):
         score_report(
             case,

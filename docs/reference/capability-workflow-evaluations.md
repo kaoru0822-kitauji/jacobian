@@ -511,6 +511,41 @@ producer/verifier split, and direct URI handoff without another contract
 revision. As a prescribed-capability pilot, it measures usability and
 assurance discipline rather than autonomous portfolio selection.
 
+### SymPy typed polynomial-normalization pilot
+
+The frozen 2026-07-26 polynomial-normalization pilot used `gpt-5.6-terra`,
+high reasoning effort, a 420-second per-run limit, and one repetition of two
+private typed expressions over `QQ`. One expanded a rational bivariate cubic;
+the other exercised cancellation across three variables. Their case digests
+were
+`sha256:51083df44f4d5b95de6965d84d871be29d5aa38fbf56dcd453adb2da5081f657`
+and
+`sha256:6a331705051832318f6f2f747dabbedfb32229517f41ad22193130f8b39af00a`.
+
+Control normalized the expression directly and could report only
+`SELF_CHECKED/UNVERIFIED`. Treatment was prescribed
+`polynomial.expression.normalize` and
+`polynomial.expression_normalization.verify`. It had to pass the producer's
+`normalization_uri` into the verifier and report the exact sparse rational
+polynomial plus all durable URIs. The hidden scorer independently compared
+every coefficient and exponent to the held-out oracle, checked source and
+candidate bindings, required an ordered compute-to-verify invocation trace,
+and replayed the verification in a clean kernel.
+
+| Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| control | 2 / 2 | 0 | 0 / 2 | 19.130 | 12,862.5 | 0 | 0 |
+| SymPy producer + verifier | 2 / 2 | 0 | 2 / 2 | 56.733 | 117,232 | 4 | 0 |
+
+Both treatments used the intended capabilities without parameter errors,
+capability rejection, or operational failure. Both verification records
+replayed independently. Treatment consumed substantially more time and input
+tokens on these small expressions; this prescribed-capability pilot therefore
+supports the contract and assurance boundary, not a general efficiency or
+autonomous portfolio-value claim. The result supports retaining the typed AST,
+canonical sparse output, producer/verifier split, and direct URI handoff
+without another contract revision.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:

@@ -102,7 +102,7 @@ availability can depend on local backends.
 | Domain | Agent-visible outcomes |
 | --- | --- |
 | Polynomial maps | Evaluate maps, compute Jacobians, search for collisions, independently verify collisions |
-| Polynomial algebra | Factor univariate polynomials, verify identities, verify exact system solutions |
+| Polynomial algebra | Normalize typed expressions, factor univariate polynomials, verify identities, verify exact system solutions |
 | Exact linear algebra | Compute determinants, rank, kernels, and integer row Hermite normal forms; find and verify rational solutions to `Ax = b` |
 | Graphs | Construct and inspect graphs, enumerate paths, realize degree sequences, test isomorphism, search colorings |
 | SAT and SMT | Find models or proof artifacts; independently replay assignments, DRAT proofs, and Alethe proofs |

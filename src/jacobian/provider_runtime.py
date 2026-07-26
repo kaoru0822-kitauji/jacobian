@@ -21,6 +21,9 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
 )
+from jacobian.contracts.polynomial_expressions import (
+    SYMPY_POLYNOMIAL_NORMALIZATION_CONFIGURATION,
+)
 from jacobian.implementation import ImplementationError, package_source_digest
 
 CADICAL_VERSION = "3.0.1"
@@ -33,6 +36,7 @@ DRAT_TRIM_SOURCE_COMMIT = "2e5e29cb0019d5cfd547d4208dca1b3ec290349f"
 DRAT_TRIM_SOURCE_REPOSITORY = "https://github.com/marijnheule/drat-trim"
 PYTHON_FLINT_VERSION = "0.9.0"
 PYTHON_FLINT_HNF_FLINT_VERSION = "3.6.0"
+SYMPY_VERSION = "1.14.0"
 
 
 class ProviderRuntimeError(RuntimeError):
@@ -664,6 +668,43 @@ def known_provider_runtime(
         checker_ids=checker_ids,
         configuration=configuration,
     )
+
+
+def sympy_polynomial_normalization_provider_runtime(
+    *,
+    refresh: bool = False,
+) -> CapabilityProviderRuntime:
+    """Identify the pinned typed polynomial-normalization profile."""
+
+    runtime = python_distribution_provider_runtime(
+        "jacobian.sympy",
+        distribution_name="sympy",
+        import_name="sympy",
+        required_attributes=("Add", "Mul", "Poly", "Pow", "QQ", "Rational", "Symbol"),
+        install_tier=CapabilityInstallTier.T0,
+        license_id="BSD-3-Clause",
+        features=(
+            "typed-polynomial-expression",
+            "exact-rational",
+            "canonical-sparse-normalization",
+        ),
+        configuration=SYMPY_POLYNOMIAL_NORMALIZATION_CONFIGURATION,
+        refresh=refresh,
+    )
+    if (
+        runtime.availability is CapabilityProviderAvailability.AVAILABLE
+        and runtime.version != SYMPY_VERSION
+    ):
+        return _unavailable_runtime(
+            provider="jacobian.sympy",
+            install_tier=CapabilityInstallTier.T0,
+            license_id="BSD-3-Clause",
+            diagnostic=(
+                "SymPy is installed but does not match the pinned "
+                f"{SYMPY_VERSION} polynomial-normalization profile."
+            ),
+        )
+    return runtime
 
 
 def python_flint_provider_runtime(

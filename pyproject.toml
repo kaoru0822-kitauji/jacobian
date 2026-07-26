@@ -18,7 +18,7 @@ dependencies = [
     "pydantic>=2.12,<3",
     "pydantic-core>=2.41,<3",
     "rfc8785==0.1.4",
-    "sympy>=1.14,<2",
+    "sympy==1.14.0",
     "typer>=0.20,<1",
     "z3-solver>=4.15.4,<5",
 ]

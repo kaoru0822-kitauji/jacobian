@@ -74,6 +74,14 @@ from jacobian.polynomial_capabilities import (
     PolynomialInstallation,
     install_polynomial_capabilities,
 )
+from jacobian.polynomial_expression_capabilities import (
+    PolynomialExpressionCheckerInstallation,
+    install_polynomial_expression_checker,
+)
+from jacobian.polynomial_expressions import (
+    PolynomialExpressionArtifactService,
+    install_polynomial_expression_artifacts,
+)
 from jacobian.polynomial_system_capabilities import (
     PolynomialSystemInstallation,
     install_polynomial_system_capabilities,
@@ -87,6 +95,7 @@ from jacobian.provider_runtime import (
     lean_provider_runtime,
     python_flint_hnf_provider_runtime,
     python_flint_provider_runtime,
+    sympy_polynomial_normalization_provider_runtime,
 )
 from jacobian.references import (
     LeanCheckerInstallation,
@@ -112,6 +121,9 @@ from jacobian.smt_capabilities import (
 )
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
+from jacobian.sympy_polynomial_normalization import (
+    install_sympy_polynomial_normalization_capability,
+)
 from jacobian.transformations import TransformationService
 from jacobian.universal_algebra_capabilities import (
     UniversalAlgebraInstallation,
@@ -158,6 +170,13 @@ class JacobianKernel:
         )
         self.matrix_normal_forms: MatrixNormalFormArtifactService = (
             install_matrix_normal_form_artifacts(
+                self.store,
+                self.schemas,
+                self.artifacts,
+            )
+        )
+        self.polynomial_expressions: PolynomialExpressionArtifactService = (
+            install_polynomial_expression_artifacts(
                 self.store,
                 self.schemas,
                 self.artifacts,
@@ -336,6 +355,9 @@ class JacobianKernel:
             else:
                 self.register_capability(linear_find_adapter)
         self._install_matrix_normal_form_capabilities(
+            authorize_checker=install_references
+        )
+        self._install_polynomial_expression_capabilities(
             authorize_checker=install_references
         )
         self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
@@ -563,6 +585,47 @@ class JacobianKernel:
         except (OSError, ValueError) as exc:
             _LOGGER.warning(
                 "Python-FLINT Hermite normal form is not installed: %s",
+                exc,
+            )
+        else:
+            self.register_capability(adapter)
+
+    def _install_polynomial_expression_capabilities(
+        self,
+        *,
+        authorize_checker: bool,
+    ) -> None:
+        self.polynomial_expression_checker: PolynomialExpressionCheckerInstallation
+        verification_adapter, self.polynomial_expression_checker = (
+            install_polynomial_expression_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.polynomial_expressions,
+                self.verification,
+                self.checkers,
+                authorize_checker=authorize_checker,
+            )
+        )
+        if verification_adapter is not None:
+            self.register_capability(verification_adapter)
+
+        self.sympy_polynomial_normalization_runtime: CapabilityProviderRuntime = (
+            sympy_polynomial_normalization_provider_runtime()
+        )
+        if (
+            self.sympy_polynomial_normalization_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            return
+        try:
+            adapter = install_sympy_polynomial_normalization_capability(
+                self.polynomial_expressions,
+                self.sympy_polynomial_normalization_runtime,
+            )
+        except (OSError, ValueError) as exc:
+            _LOGGER.warning(
+                "SymPy typed polynomial normalization is not installed: %s",
                 exc,
             )
         else:

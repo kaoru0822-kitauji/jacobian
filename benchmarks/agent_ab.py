@@ -37,6 +37,11 @@ from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.linear import LinearRationalSystem
 from jacobian.contracts.matrices import ExactIntegerMatrix
+from jacobian.contracts.polynomial_expressions import PolynomialExpressionArtifact
+from jacobian.contracts.polynomials import (
+    RationalPolynomial,
+    SparseRationalPolynomial,
+)
 from jacobian.contracts.sat import (
     CanonicalCnf,
     SatAssignmentArtifact,
@@ -67,6 +72,9 @@ SAT_REPORT_SCHEMA = CASES_ROOT / "sat-report.schema.json"
 SMT_REPORT_SCHEMA = CASES_ROOT / "smt-report.schema.json"
 LINEAR_REPORT_SCHEMA = CASES_ROOT / "linear-report.schema.json"
 HNF_REPORT_SCHEMA = CASES_ROOT / "hnf-report.schema.json"
+POLYNOMIAL_NORMALIZATION_REPORT_SCHEMA = (
+    CASES_ROOT / "polynomial-normalization-report.schema.json"
+)
 LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
@@ -101,6 +109,12 @@ HNF_CAPABILITY_IDS = frozenset(
     {
         "matrix.normal_form.hermite",
         "matrix.normal_form.hermite.verify",
+    }
+)
+POLYNOMIAL_NORMALIZATION_CAPABILITY_IDS = frozenset(
+    {
+        "polynomial.expression.normalize",
+        "polynomial.expression_normalization.verify",
     }
 )
 LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
@@ -247,6 +261,23 @@ VERIFY mode. Provider output alone is not verification. Report VERIFIED only
 when the verifier returns VERIFIED_HERMITE_NORMAL_FORM. Copy the producer's
 exact H and U entries and the exact matrix, normal-form, and verification-record
 URIs.
+"""
+POLYNOMIAL_NORMALIZATION_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. You may write and run local code
+in the empty workspace. Expand the supplied typed rational-polynomial
+expression and return its exact canonical sparse coefficients in descending
+lexicographic exponent order. Report SELF_CHECKED and UNVERIFIED, with null
+durable artifact and verification-record URIs.
+"""
+POLYNOMIAL_NORMALIZATION_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create programs. Describe the exact capability IDs
+polynomial.expression.normalize and
+polynomial.expression_normalization.verify directly. Invoke the producer on
+the supplied typed expression, then pass its normalization_uri to the verifier
+in VERIFY mode. Provider output alone is not verification. Report VERIFIED
+only when the verifier returns VERIFIED_NORMALIZATION. Copy the producer's
+exact canonical coefficients and all durable URIs.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\
@@ -861,6 +892,240 @@ def _score_hnf_report(
     }
 
 
+def _polynomial_expression_case(
+    case: Mapping[str, Any],
+) -> PolynomialExpressionArtifact:
+    try:
+        return PolynomialExpressionArtifact.model_validate(case.get("expression"))
+    except ValueError as exc:
+        raise BenchmarkError(
+            "polynomial normalization case has an invalid typed expression"
+        ) from exc
+
+
+def _expected_polynomial_normalization(
+    case: Mapping[str, Any],
+    source: PolynomialExpressionArtifact,
+) -> SparseRationalPolynomial:
+    try:
+        return RationalPolynomial(
+            variables=source.variables,
+            polynomial=SparseRationalPolynomial.model_validate(
+                case.get("expected_normalized")
+            ),
+        ).polynomial
+    except ValueError as exc:
+        raise BenchmarkError(
+            "polynomial normalization case has an invalid hidden oracle"
+        ) from exc
+
+
+def _reported_polynomial_normalization(
+    report: Mapping[str, Any],
+    source: PolynomialExpressionArtifact,
+) -> SparseRationalPolynomial:
+    try:
+        return RationalPolynomial(
+            variables=source.variables,
+            polynomial=SparseRationalPolynomial.model_validate(
+                report.get("normalized")
+            ),
+        ).polynomial
+    except ValueError as exc:
+        raise BenchmarkError(
+            "polynomial normalization report has invalid canonical coefficients"
+        ) from exc
+
+
+def _matches_polynomial_expression(
+    value: object,
+    expected: PolynomialExpressionArtifact,
+) -> bool:
+    try:
+        return PolynomialExpressionArtifact.model_validate(value) == expected
+    except ValueError:
+        return False
+
+
+def _score_polynomial_normalization_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    shell_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    source = _polynomial_expression_case(case)
+    expected = _expected_polynomial_normalization(case, source)
+    reported = _reported_polynomial_normalization(report, source)
+    if reported != expected:
+        raise BenchmarkError(
+            "polynomial normalization report differs from the held-out exact oracle"
+        )
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("status") != "NORMALIZATION_PRODUCED"
+        or report.get("conclusion") != "TRUE"
+        or report.get("variables") != list(source.variables)
+    ):
+        raise BenchmarkError(
+            "polynomial normalization report has the wrong case, status, or ring"
+        )
+    _validate_feedback(report.get("feedback"))
+
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("polynomial normalization control used an MCP tool")
+        if (
+            report.get("assurance") != "SELF_CHECKED"
+            or report.get("final_verification") != "UNVERIFIED"
+            or report.get("expression_uri") is not None
+            or report.get("normalization_uri") is not None
+            or report.get("verification_record_uri") is not None
+        ):
+            raise BenchmarkError(
+                "polynomial normalization control must remain self-checked without "
+                "durable evidence"
+            )
+        return {
+            "passed": True,
+            "false_certification": False,
+            "replay_success": False,
+            "checks": [
+                "held-out exact coefficient oracle",
+                "no-Jacobian control isolation",
+            ],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if shell_calls:
+        raise BenchmarkError("polynomial normalization treatment used a shell command")
+    if "capability.invoke" not in mcp_calls:
+        raise BenchmarkError(
+            "polynomial normalization treatment did not invoke Jacobian"
+        )
+    if (
+        report.get("assurance") != "VERIFIED"
+        or report.get("final_verification") != "VERIFIED"
+    ):
+        raise BenchmarkError(
+            "polynomial normalization treatment did not report verified assurance"
+        )
+    expression_uri = report.get("expression_uri")
+    normalization_uri = report.get("normalization_uri")
+    record_uri = report.get("verification_record_uri")
+    if not all(
+        isinstance(uri, str) for uri in (expression_uri, normalization_uri, record_uri)
+    ):
+        raise BenchmarkError(
+            "polynomial normalization treatment omitted durable artifact URIs"
+        )
+    assert isinstance(expression_uri, str)
+    assert isinstance(normalization_uri, str)
+    assert isinstance(record_uri, str)
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    try:
+        resolved = kernel.polynomial_expressions.resolve_normalization(
+            normalization_uri
+        )
+        record_artifact = kernel.store.get(record_uri)
+        record = VerificationRecord.model_validate(record_artifact.payload)
+        semantics = kernel.store.get(
+            kernel.polynomial_expressions.installation.semantics_uri
+        )
+    except (StoreError, ValueError) as exc:
+        raise BenchmarkError(
+            "polynomial normalization treatment artifacts are unavailable"
+        ) from exc
+    if (
+        resolved.expression != source
+        or resolved.candidate.normalized != expected
+        or resolved.expression_artifact.artifact_uri != expression_uri
+        or expression_uri not in resolved.artifact.manifest.parents
+        or record.conclusion.value != "TRUE"
+        or record.bindings.claim_digest
+        != resolved.expression_artifact.manifest.object_digest
+        or record.bindings.semantics_digest != semantics.manifest.object_digest
+        or record.bindings.candidate_digest != resolved.artifact.manifest.object_digest
+        or not {expression_uri, normalization_uri, record.evidence_uri}.issubset(
+            record_artifact.manifest.parents
+        )
+    ):
+        raise BenchmarkError(
+            "polynomial normalization verification record is not exactly bound"
+        )
+
+    produced_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_input = invocation.get("input")
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == "polynomial.expression.normalize"
+            and isinstance(invocation_input, Mapping)
+            and _matches_polynomial_expression(
+                invocation_input.get("expression"),
+                source,
+            )
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("expression_uri") == expression_uri
+            and invocation_output.get("normalization_uri") == normalization_uri
+            and normalization_uri in (invocation.get("artifact_uris") or [])
+        ):
+            produced_index = index
+        if (
+            produced_index is not None
+            and index > produced_index
+            and invocation.get("capability_id")
+            == "polynomial.expression_normalization.verify"
+            and invocation_input == {"normalization_uri": normalization_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("verification_record_uri") == record_uri
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            and record_uri in (invocation.get("artifact_uris") or [])
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError(
+            "polynomial normalization treatment lacks an ordered compute-to-verify "
+            "trace"
+        )
+
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.expression_normalization.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"normalization_uri": normalization_uri},
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.assurance.verification_record_uri != record_uri
+        or replay.output.get("conclusion") != "TRUE"
+        or replay.output.get("expression_uri") != expression_uri
+        or replay.output.get("normalization_uri") != normalization_uri
+    ):
+        raise BenchmarkError(
+            "polynomial normalization evidence does not replay independently"
+        )
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "held-out exact coefficient oracle",
+            "durable source and candidate binding",
+            "ordered compute-to-verify trace",
+            "independent checker replay",
+        ],
+    }
+
+
 def _matches_integer_matrix(
     value: object,
     expected: ExactIntegerMatrix,
@@ -1259,6 +1524,16 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "polynomial_expression_normalization":
+        return _score_polynomial_normalization_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            shell_calls=shell_calls,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "matrix_hermite_normal_form":
         return _score_hnf_report(
             case,
@@ -2173,6 +2448,12 @@ def _codex_command(
 
 
 def _condition_instructions(task_type: object, condition: str) -> str:
+    if task_type == "polynomial_expression_normalization":
+        return (
+            POLYNOMIAL_NORMALIZATION_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else POLYNOMIAL_NORMALIZATION_TREATMENT_INSTRUCTIONS
+        )
     if task_type == "matrix_hermite_normal_form":
         return (
             HNF_CONTROL_INSTRUCTIONS
@@ -2242,6 +2523,9 @@ def _run_condition(
     is_smt = case.get("task_type") == "smt_unsat_proof"
     is_linear = case.get("task_type") == "linear_rational_solution"
     is_hnf = case.get("task_type") == "matrix_hermite_normal_form"
+    is_polynomial_normalization = (
+        case.get("task_type") == "polynomial_expression_normalization"
+    )
     is_lean_declaration = case.get("task_type") == "lean_declaration"
     is_lean_proof = case.get("task_type") == "lean_proof"
     sat_context = ""
@@ -2267,6 +2551,14 @@ def _run_condition(
             + json.dumps(matrix.model_dump(mode="json"), sort_keys=True)
             + "\n"
         )
+    polynomial_normalization_context = ""
+    if is_polynomial_normalization:
+        expression = _polynomial_expression_case(case)
+        polynomial_normalization_context = (
+            "\nThe exact typed rational-polynomial expression for this case is:\n"
+            + json.dumps(expression.model_dump(mode="json"), sort_keys=True)
+            + "\n"
+        )
     condition_instructions = _condition_instructions(
         case.get("task_type"),
         condition,
@@ -2276,6 +2568,7 @@ def _run_condition(
         + sat_context
         + linear_context
         + hnf_context
+        + polynomial_normalization_context
         + "\n"
         + COMMON_PROMPT.format(**case)
     )
@@ -2305,6 +2598,8 @@ def _run_condition(
             if is_linear
             else HNF_REPORT_SCHEMA
             if is_hnf
+            else POLYNOMIAL_NORMALIZATION_REPORT_SCHEMA
+            if is_polynomial_normalization
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
@@ -2430,6 +2725,12 @@ def _run_condition(
                 and report.get("final_verification") == "VERIFIED"
                 and not score.get("passed")
             )
+            or (
+                is_polynomial_normalization
+                and isinstance(report, dict)
+                and report.get("final_verification") == "VERIFIED"
+                and not score.get("passed")
+            )
         ),
         "intervention_attempted": bool(
             (
@@ -2454,6 +2755,12 @@ def _run_condition(
                 is_hnf
                 and HNF_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
             )
+            or (
+                is_polynomial_normalization
+                and POLYNOMIAL_NORMALIZATION_CAPABILITY_IDS.intersection(
+                    telemetry["capability_attempt_ids"]
+                )
+            )
         ),
         "intervention_used": bool(
             (
@@ -2467,6 +2774,12 @@ def _run_condition(
                 and LINEAR_CAPABILITY_IDS.intersection(telemetry["capability_ids"])
             )
             or (is_hnf and HNF_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
+            or (
+                is_polynomial_normalization
+                and POLYNOMIAL_NORMALIZATION_CAPABILITY_IDS.intersection(
+                    telemetry["capability_ids"]
+                )
+            )
         ),
         "operational_failure": bool(score.get("operational_failure")),
         "score": score,
