@@ -131,6 +131,7 @@ The base installation currently includes these kernel capability IDs:
 | `parameter.region.promote` | Check one immutable parameter-region subject with an authorized certificate. |
 | `case.partition.finite` | Partition an explicit finite domain and report exact coverage. |
 | `graph.search.atlas` | Search the bounded Graph Atlas and return matching graph candidates with explicit coverage limits. |
+| `graph.realize.degree_sequence` | Construct a simple graph with an exact degree sequence, or return a replayable Erdős–Gallai/basic obstruction. |
 | `graph.compute.properties` | Compute supported exact invariants of an explicit graph. |
 | `graph.compute.neighborhood_independence` | Compute every open-neighborhood independence optimum, witness, sum, and exact rational average. |
 | `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
@@ -155,6 +156,19 @@ remain unverified: a future independently implemented and operator-authorized
 checker must replay a determinant or rank claim before Jacobian may report
 `VERIFIED`.
 
+Optional exact runtimes add narrowly scoped operations only when their pinned
+provider identity is available:
+
+| Capability ID | Availability and outcome |
+| --- | --- |
+| `sat.model.find` | With CaDiCaL 3.0.1, preserve one total assignment candidate without certifying SAT. |
+| `sat.unsat_proof.find` | With CaDiCaL 3.0.1, preserve raw DRAT evidence without certifying UNSAT. |
+| `smt.unsat_proof.find` | With the `smt` extra and cvc5 1.3.4, preserve raw Alethe for one pinned-profile QF query, expose holes, and retain `UNKNOWN`. |
+
+See the [SAT artifact contracts](sat-artifacts.md) and
+[SMT Alethe artifact contracts](smt-artifacts.md) for exact input profiles,
+resource bounds, artifact bindings, and independent verification boundaries.
+
 When the operator enables bundled references, the catalog also includes:
 
 | Capability ID | Outcome |
@@ -162,6 +176,14 @@ When the operator enables bundled references, the catalog also includes:
 | `lean.declaration.search` | Search public declarations by a bounded name and/or elaborated-type constant pattern; retrieval remains computed evidence. |
 | `lean.declaration.inspect` | Resolve one exact declaration with type, kind, docs, source metadata, and pinned environment digest. |
 | `lean.check` | Check a Lean proof in an operator-pinned environment and return its replay evidence. |
+| `lean.proof_state.apply_tactic` | Apply one tactic through the pinned Lean REPL and materialize the resulting goals and replay source. |
+| `lean.retrieve.premises` | Ask pinned Mathlib `exact?` for bounded candidate tactics and declaration references for one proof state. |
+
+The two exploratory Lean capabilities use the maintained
+`leanprover-community/repl` JSON protocol pinned in the Lake manifest. Their
+computed transitions and suggestions are not proof certificates. A completed
+source still requires `lean.check`, whose independent checker binds the exact
+statement, proof, environment, allowed axioms, and runtime revisions.
 
 Operator-installed adapters appear in the same catalog. Agents should call
 `capability.describe` before invoking an unfamiliar capability instead of

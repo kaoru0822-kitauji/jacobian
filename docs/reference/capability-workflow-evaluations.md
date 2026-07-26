@@ -219,11 +219,11 @@ The pinned Lean REPL spike used upstream tag `v4.31.0`, commit
 `0cc60263319308000bbaa5354427f775fe3dc7d0`, against Lean 4.31.0 commit
 `68218e876d2a38b1985b8590fff244a83c321783`. Two protocol tasks completed in
 2.196 seconds with no parameter errors: `constructor` exposed two child goals
-and local-premise application closed its goal. The REPL currently cannot turn a
-completed tactic state back into the originating command or a replayable proof
-artifact. This is enough to keep the pinned spike available for experiments,
-but not enough to recommend `goal.decompose` or premise-retrieval capabilities
-by default. A paired agent evaluation should measure their outcome value;
+and local-premise application closed its goal. The production adapters now use
+that maintained JSON protocol rather than parsing Lean's pretty-printed goals.
+`lean.proof_state.apply_tactic` materializes one transition, child goals, and
+replay source. `lean.retrieve.premises` exposes bounded Mathlib `exact?`
+suggestions and declaration references. Neither adapter certifies a theorem;
 completed source must still go through `lean.check`.
 
 ### Lean declaration-discovery pilot
@@ -274,6 +274,126 @@ scans with a reusable pinned index or persistent query service, keep exact
 environment identity, and make catalog discovery compact. Then rerun these
 same held-out cases and add cases where direct automation does not already
 solve the proposition.
+
+#### Indexed follow-up
+
+The follow-up implementation uses Mathlib's imported module metadata to build
+an atomically materialized, environment-bound catalog. Catalog candidates keep
+their exact deterministic scan positions; Lean resolves them again and checks
+the elaborated type. Exact inspection uses direct environment lookup. The
+backend checks the catalog byte digest before and after reuse and rejects
+identity changes, partial writes, response-ID mismatches, and tampering.
+
+On the same host, a fresh `List.revzip` search that previously exhausted the
+75-second budget completed in 28.886 seconds. Reusing the catalog for the same
+three-result query completed in 9.568 seconds, and exact inspection completed
+in 9.146 seconds. Fresh and reused searches returned the same three
+declarations, `RESULT_LIMIT`, and `scanned_declarations = 145293`. These are
+development measurements, not latency guarantees.
+
+One frozen pair per case was then rerun with the same model, effort, oracle,
+condition isolation, and 600-second condition budget:
+
+| Case | Condition | Correct | Discovery used | Seconds | Input tokens | Calls | Tool errors | Rejected proofs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `List.revzip` | control | yes | no | 166.788 | 252,870 | 6 | 0 | 3 |
+| `List.revzip` | treatment | yes | no | 170.406 | 299,191 | 6 | 0 | 3 |
+| set image/preimage | control | yes | no | 57.268 | 140,354 | 3 | 0 | 0 |
+| set image/preimage | treatment | yes | no | 64.866 | 131,915 | 3 | 0 | 0 |
+
+All four runs produced checker-bound exact results with no false
+certification, parameter error, tool error, shell use, or operational failure.
+The treatment agents did not invoke declaration discovery, so the elapsed and
+token deltas are not intervention effects. This rerun shows that merely making
+the experimental capabilities available did not add calls or failures; it does
+not establish autonomous outcome lift.
+
+The performance revision is accepted at the capability layer. Recommendation
+status remains experimental: keep search and inspection separate and evaluate
+harder held-out statements where direct automation does not already solve the
+proposition before recommending discovery by default. Proof-state exploration
+is evaluated separately below.
+
+### Lean portfolio ablation
+
+The Lean evaluation uses four catalogs under the same model, reasoning effort,
+prompt, timeout, and output schema:
+
+| Condition | Exploratory Lean capabilities |
+| --- | --- |
+| baseline | neither capability |
+| tactic | `lean.proof_state.apply_tactic` only |
+| retrieval | `lean.retrieve.premises` only |
+| combined | both capabilities |
+
+All conditions retain `lean.check`. The runner randomizes condition order per
+case and repetition and creates isolated workspaces and artifact stores. It
+measures exact proof completion, independent replay success, false
+certification, parameter and tool errors, model tokens, tool calls, and wall
+time. A checker-accepted alternative proof is valid; the scorer does not
+require textual equality with the hidden oracle.
+
+The scored tasks are fresh private compositions whose exact theorems are
+disjoint from the discovery rows. Their hidden reference proofs remain outside
+the agent workspace. Public Hugging Face rows, LeanTree/APRIL examples, blog
+posts, Codeforces cases, and repository artifacts are reproduction and
+workflow-mining cases only. They never serve as hidden evaluation tasks.
+
+### SAT certificate portfolio pilot
+
+The frozen 2026-07-26 SAT pilot compared direct local reasoning with the
+four-outcome SAT portfolio under `gpt-5.6-terra`, high reasoning effort, a
+600-second per-run limit, and order seed `20260731`. Two private cases created
+after the interface freeze were each repeated twice: one satisfiable
+14-variable planted formula and one unsatisfiable 12-variable odd-cycle
+formula. Their exact clauses remained outside the repository; the recorded
+case digests were
+`sha256:dca243f518737d9e776bde0c001958dbd98e9fe830e483e47dd5f643671da6ec`
+and
+`sha256:20dac1be40cf5845b7fdba501933bc8adfcc6487d88205273917a7fda84cf4f1`.
+
+Both conditions received the same pre-materialized canonical CNF URI. Control
+had no MCP server and could use local code. Treatment used Jacobian and had to
+compose the applicable producer and verifier. This isolates the value of
+`sat.model.find`, `sat.model.verify`, `sat.unsat_proof.find`, and
+`sat.unsat_proof.verify`; it does not evaluate a CNF-authoring capability.
+
+The hidden scorer brute-forced the exact CNF, limited private cases to at most
+20 variables, checked the report against the durable CNF and evidence,
+required an ordered producer-to-verifier invocation trace, and reopened a
+clean kernel to replay the checker. Public SAT reproductions were explicitly
+unscored.
+
+| Condition | Passed | False certifications | Independent replay | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| control | 4 / 4 | 0 | 0 / 4 | 17.258 | 12,904.0 | 0 | 0 |
+| SAT portfolio | 4 / 4 | 0 | 4 / 4 | 39.788 | 184,739.5 | 7 | 0 |
+
+Every treatment composed the appropriate evidence producer and independent
+verifier, preserved exact bindings, and replayed successfully. Control also
+answered every case correctly, but could only report `SELF_CHECKED` and
+`UNVERIFIED`. This small pilot supports retaining all four outcomes for their
+durable assurance value. It demonstrates no autonomous completion or
+efficiency lift. Treatment was substantially slower and more token-intensive,
+largely because catalog discovery returns the full installed portfolio.
+
+Development runs exposed three interface issues before the frozen pilot.
+They are excluded from the frozen comparison because their cases informed
+contract changes. The report contract did not initially distinguish producer
+evidence from the verifier's witness or certificate. The client then guessed
+nonexistent generic artifact-read capabilities. Finally, a SAT assignment
+artifact exposed canonical variable order and positional values on separate
+objects, and agents joined those values against the prompt's original order.
+The report schema now identifies `assignment_uri` or `proof_uri` as producer
+evidence, and `sat.model.find` returns its constructed assignment as an inline
+name-to-Boolean map beside the durable URI. A development rerun of the
+previously failing noncanonical-order case then passed with clean replay and no
+tool error.
+
+The remaining portfolio work is compact catalog discovery and ranking, not
+consolidation of the SAT outcomes. The frozen sample is too small for a powered
+comparative claim; add new cases and repetitions without reopening these cases
+for tuning.
 
 ## Source policy
 

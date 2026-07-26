@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "case_id": {"type": "string"},
+    "conclusion": {"enum": ["TRUE", "UNKNOWN"]},
+    "proof": {"type": ["string", "null"]},
+    "assurance": {"enum": ["VERIFIED", "UNVERIFIED"]},
+    "replay_success": {"type": "boolean"},
+    "verification_record_uri": {"type": ["string", "null"]},
+    "false_certification": {"type": "boolean"},
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "reasoning_focus": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "infrastructure_work": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "tooling_gaps": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "required": [
+        "reasoning_focus",
+        "infrastructure_work",
+        "tooling_gaps"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "case_id",
+    "conclusion",
+    "proof",
+    "assurance",
+    "replay_success",
+    "verification_record_uri",
+    "false_certification",
+    "feedback"
+  ],
+  "additionalProperties": false
+}

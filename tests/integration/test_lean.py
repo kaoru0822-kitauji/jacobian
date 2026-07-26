@@ -5,6 +5,7 @@ import json
 import shutil
 import threading
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -15,7 +16,10 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.checkers import CheckerDecision
-from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean import (
+    LeanDeclarationSearchRequest,
+    LeanEnvironment,
+)
 from jacobian.contracts.results import (
     Arithmetic,
     Conclusion,
@@ -25,6 +29,10 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.kernel import JacobianKernel
+from jacobian.lean_declarations import (
+    LeanDeclarationBackendError,
+    LeanSubprocessDeclarationBackend,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MATHLIB_OLEAN = (
@@ -43,8 +51,56 @@ MATHLIB_OLEAN = (
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.external_backend,
+    pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),
+    pytest.mark.usefixtures("initialized_kernel_store"),
 ]
+
+
+def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
+    tmp_path: Path,
+) -> None:
+    indexed_kernel = JacobianKernel(tmp_path / "indexed", install_references=True)
+    fresh_kernel = JacobianKernel(tmp_path / "fresh", install_references=True)
+    indexed = indexed_kernel.lean_declarations
+    fresh = fresh_kernel.lean_declarations
+    assert indexed is not None
+    assert fresh is not None
+    indexed_backend = indexed.backend
+    fresh_backend = fresh.backend
+    assert isinstance(indexed_backend, LeanSubprocessDeclarationBackend)
+    assert isinstance(fresh_backend, LeanSubprocessDeclarationBackend)
+    seed = LeanDeclarationSearchRequest(
+        environment=LeanEnvironment.CORE,
+        name_contains="Nat.add",
+        result_limit=2,
+    )
+    target = LeanDeclarationSearchRequest(
+        environment=LeanEnvironment.CORE,
+        name_contains="Nat.mul",
+        result_limit=2,
+    )
+    try:
+        indexed.search(seed)
+        reused = indexed.search(target)
+        baseline = fresh.search(target)
+
+        assert reused.declarations == baseline.declarations
+        assert reused.scanned_declarations == baseline.scanned_declarations
+        assert reused.stop_reason is baseline.stop_reason
+
+        entry = indexed_backend._sessions[LeanEnvironment.CORE]
+        index_path = cast(Any, entry.session)._index_path
+        index_path.write_text("tampered\n", encoding="utf-8")
+
+        with pytest.raises(LeanDeclarationBackendError) as raised:
+            indexed.search(target)
+
+        assert raised.value.code == "LEAN_QUERY_INDEX_CHANGED"
+        assert LeanEnvironment.CORE not in indexed_backend._sessions
+    finally:
+        indexed_backend.close()
+        fresh_backend.close()
 
 
 @pytest.mark.skipif(

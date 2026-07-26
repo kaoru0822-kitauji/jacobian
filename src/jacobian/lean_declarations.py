@@ -7,6 +7,9 @@ import logging
 import os
 import subprocess
 import tempfile
+import threading
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -26,8 +29,11 @@ from jacobian.contracts.lean import (
 
 _LOGGER = logging.getLogger(__name__)
 _RESULT_PREFIX = "JACOBIAN_DECLARATION_RESULT "
+_ERROR_PREFIX = "JACOBIAN_DECLARATION_ERROR "
 _MAX_STDOUT_BYTES = 2 * 1024 * 1024
 _MAX_STDERR_BYTES = 128 * 1024
+_MAX_CATALOG_CANDIDATES = 10_000
+_MAX_CATALOG_NAME_BYTES = 2 * 1024 * 1024
 _QUERY_SOURCE = Path(__file__).with_name("_lean_declaration_query.lean")
 _IMPORT_TOKEN = "{{JACOBIAN_IMPORT}}"
 
@@ -53,8 +59,222 @@ class LeanDeclarationBackendError(RuntimeError):
         self.message = message
 
 
+class _DeclarationQuerySession(Protocol):
+    def request(
+        self,
+        payload: dict[str, Any],
+        *,
+        timeout_seconds: int,
+    ) -> dict[str, Any]: ...
+
+    def close(self) -> None: ...
+
+
+class _ReusableLeanQuerySession:
+    """Run bounded queries while reusing one environment-bound name index."""
+
+    def __init__(
+        self,
+        *,
+        command: list[str],
+        cwd: Path,
+        process_environment: dict[str, str],
+        source: str,
+        memory_mb: str,
+        isolated_home: bool,
+        environment_digest: str,
+    ) -> None:
+        self._closed = False
+        self._temporary_directory = tempfile.TemporaryDirectory(
+            prefix="jacobian-lean-declarations-"
+        )
+        temporary_root = Path(self._temporary_directory.name)
+        self._source_path = temporary_root / "declaration_query.lean"
+        self._source_path.write_text(source, encoding="utf-8")
+        self._request_path = temporary_root / "query.json"
+        self._index_path = temporary_root / "declarations.index"
+        self._index_digest: str | None = None
+        self._environment_digest = environment_digest
+        self._command = command
+        self._cwd = cwd
+        self._memory_mb = memory_mb
+        self._process_environment = dict(process_environment)
+        self._process_environment.update(
+            {
+                "JACOBIAN_LEAN_ENVIRONMENT_DIGEST": environment_digest,
+                "JACOBIAN_LEAN_INDEX_FILE": str(self._index_path),
+                "JACOBIAN_LEAN_QUERY_FILE": str(self._request_path),
+            }
+        )
+        if isolated_home:
+            self._process_environment["HOME"] = str(temporary_root)
+
+    def request(
+        self,
+        payload: dict[str, Any],
+        *,
+        timeout_seconds: int,
+    ) -> dict[str, Any]:
+        if self._closed:
+            raise _query_failed()
+        self._check_index_identity()
+        request_id = uuid.uuid4().hex
+        wire_payload = {
+            **payload,
+            **self._catalog_fields(payload),
+            "request_id": request_id,
+        }
+        try:
+            self._request_path.write_bytes(canonicalize_json(wire_payload))
+            completed = subprocess.run(
+                [
+                    *self._command,
+                    str(self._source_path),
+                    "-t",
+                    "0",
+                    "-T",
+                    "1000000000",
+                    "-M",
+                    self._memory_mb,
+                    "-j",
+                    "1",
+                    "--trust=0",
+                ],
+                cwd=self._cwd,
+                env=self._process_environment,
+                check=False,
+                capture_output=True,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise LeanDeclarationBackendError(
+                "LEAN_QUERY_TIMEOUT",
+                (
+                    "Lean declaration discovery exceeded the "
+                    f"{timeout_seconds}-second per-query budget."
+                ),
+            ) from exc
+        except OSError as exc:
+            raise _query_failed() from exc
+        if len(completed.stdout) > _MAX_STDOUT_BYTES:
+            raise _structured_output_limit()
+        if len(completed.stderr) > _MAX_STDERR_BYTES:
+            raise _diagnostic_output_limit()
+        if completed.returncode != 0:
+            _LOGGER.warning(
+                "Lean declaration query failed: %s",
+                (completed.stdout + completed.stderr)
+                .decode("utf-8", errors="replace")
+                .strip(),
+            )
+            raise _query_failed()
+        output = _parse_process_response(
+            completed.stdout,
+            expected_request_id=request_id,
+        )
+        self._record_or_check_index(payload)
+        return output
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._temporary_directory.cleanup()
+
+    def _check_index_identity(self) -> None:
+        if self._index_digest is None:
+            return
+        try:
+            current_digest = _sha256_file(self._index_path)
+        except OSError as exc:
+            raise _index_changed() from exc
+        if current_digest != self._index_digest:
+            raise _index_changed()
+
+    def _record_or_check_index(self, payload: dict[str, Any]) -> None:
+        if payload.get("operation") != "search":
+            return
+        try:
+            current_digest = _sha256_file(self._index_path)
+            self._validate_index_header()
+        except OSError as exc:
+            raise _protocol_error() from exc
+        if self._index_digest is None:
+            self._index_digest = current_digest
+        elif current_digest != self._index_digest:
+            raise _index_changed()
+
+    def _catalog_fields(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if (
+            payload.get("operation") != "search"
+            or self._index_digest is None
+            or payload.get("name_contains") is None
+        ):
+            return {
+                "candidate_names": [],
+                "candidate_scan_positions": [],
+                "scanned_declarations_total": None,
+            }
+        target_modules = tuple(payload.get("target_module_prefixes", ()))
+        namespaces = tuple(payload.get("namespace_prefixes", ()))
+        kinds = set(payload.get("kinds", ()))
+        name_contains = str(payload["name_contains"])
+        type_constants = tuple(payload.get("type_constants", ()))
+        limit = int(payload["limit"])
+        candidates: list[str] = []
+        positions: list[int] = []
+        candidate_bytes = 0
+        scanned = 0
+        try:
+            with self._index_path.open(encoding="utf-8") as stream:
+                if next(stream).rstrip("\n") != self._environment_digest:
+                    raise ValueError("declaration index environment mismatch")
+                for line in stream:
+                    name, module, kind = line.rstrip("\n").split("\t")
+                    if not _prefix_matches(module, target_modules):
+                        continue
+                    scanned += 1
+                    if (
+                        not _prefix_matches(name, namespaces)
+                        or (kinds and kind not in kinds)
+                        or name_contains not in name
+                    ):
+                        continue
+                    if type_constants or len(candidates) < limit:
+                        candidates.append(name)
+                        positions.append(scanned)
+                        candidate_bytes += len(name.encode("utf-8"))
+                        if (
+                            len(candidates) > _MAX_CATALOG_CANDIDATES
+                            or candidate_bytes > _MAX_CATALOG_NAME_BYTES
+                        ):
+                            return {
+                                "candidate_names": [],
+                                "candidate_scan_positions": [],
+                                "scanned_declarations_total": None,
+                            }
+        except (OSError, StopIteration, ValueError) as exc:
+            raise _index_changed() from exc
+        return {
+            "candidate_names": candidates,
+            "candidate_scan_positions": positions,
+            "scanned_declarations_total": scanned,
+        }
+
+    def _validate_index_header(self) -> None:
+        with self._index_path.open(encoding="utf-8") as stream:
+            if stream.readline().rstrip("\n") != self._environment_digest:
+                raise OSError("declaration index environment mismatch")
+
+
+@dataclass(frozen=True, slots=True)
+class _SessionEntry:
+    environment_digest: str
+    session: _DeclarationQuerySession
+
+
 class LeanSubprocessDeclarationBackend:
-    """Execute one generated read-only query in a validated Lean installation."""
+    """Reuse one catalog across bounded processes for each validated environment."""
 
     def __init__(
         self,
@@ -71,6 +291,10 @@ class LeanSubprocessDeclarationBackend:
             raise RuntimeError(
                 "Lean declaration query source has an invalid import token"
             )
+        self._sessions: dict[LeanEnvironment, _SessionEntry] = {}
+        self._session_locks = {
+            environment: threading.Lock() for environment in LeanEnvironment
+        }
 
     def environment_digest(self, environment: LeanEnvironment) -> str:
         try:
@@ -91,91 +315,125 @@ class LeanSubprocessDeclarationBackend:
         environment: LeanEnvironment,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        environment_digest = self.environment_digest(environment)
+        with self._session_locks[environment]:
+            environment_digest = self.environment_digest(environment)
+            entry = self._sessions.get(environment)
+            if entry is not None and entry.environment_digest != environment_digest:
+                self._discard_session(environment)
+                raise LeanDeclarationBackendError(
+                    "LEAN_ENVIRONMENT_CHANGED",
+                    (
+                        "The pinned Lean environment changed while an indexed "
+                        "declaration session was active."
+                    ),
+                )
+            if entry is None:
+                session = self._start_session(environment, environment_digest)
+                entry = _SessionEntry(
+                    environment_digest=environment_digest,
+                    session=session,
+                )
+                self._sessions[environment] = entry
+                try:
+                    unchanged_after_start = (
+                        self.environment_digest(environment) == environment_digest
+                    )
+                except LeanDeclarationBackendError:
+                    self._discard_session(environment)
+                    raise
+                if not unchanged_after_start:
+                    self._discard_session(environment)
+                    raise LeanDeclarationBackendError(
+                        "LEAN_ENVIRONMENT_CHANGED",
+                        (
+                            "The pinned Lean environment changed while the "
+                            "declaration index was starting."
+                        ),
+                    )
+            try:
+                output = entry.session.request(
+                    payload,
+                    timeout_seconds=self._query_timeout_seconds(environment),
+                )
+            except LeanDeclarationBackendError as exc:
+                if exc.code == "LEAN_DECLARATION_NOT_FOUND":
+                    try:
+                        unchanged = (
+                            self.environment_digest(environment) == environment_digest
+                        )
+                    except LeanDeclarationBackendError:
+                        unchanged = False
+                    if unchanged:
+                        raise
+                self._discard_session(environment)
+                if exc.code == "LEAN_DECLARATION_NOT_FOUND":
+                    raise LeanDeclarationBackendError(
+                        "LEAN_ENVIRONMENT_CHANGED",
+                        (
+                            "The pinned Lean environment changed during "
+                            "declaration inspection."
+                        ),
+                    ) from exc
+                raise
+            try:
+                unchanged_after_query = (
+                    self.environment_digest(environment) == environment_digest
+                )
+            except LeanDeclarationBackendError:
+                self._discard_session(environment)
+                raise
+            if not unchanged_after_query:
+                self._discard_session(environment)
+                raise LeanDeclarationBackendError(
+                    "LEAN_ENVIRONMENT_CHANGED",
+                    "The pinned Lean environment changed during declaration discovery.",
+                )
+            output["_environment_digest"] = environment_digest
+            return output
+
+    def close(self) -> None:
+        """Terminate all active query sessions."""
+
+        for environment, lock in self._session_locks.items():
+            with lock:
+                self._discard_session(environment)
+
+    def _start_session(
+        self,
+        environment: LeanEnvironment,
+        environment_digest: str,
+    ) -> _DeclarationQuerySession:
         import_name = (
             "Init.Prelude" if environment is LeanEnvironment.CORE else "Mathlib"
         )
         source = self._source_template.replace(_IMPORT_TOKEN, import_name)
-        with tempfile.TemporaryDirectory(prefix="jacobian-lean-query-") as directory:
-            temporary_root = Path(directory)
-            query_path = temporary_root / "query.json"
-            query_path.write_bytes(canonicalize_json(payload))
-            command, cwd, memory_mb, timeout_seconds = self._command(
-                environment,
-                temporary_root,
-            )
-            process_environment = self._process_environment(
-                environment,
-                temporary_root,
-                query_path,
-            )
-            try:
-                completed = subprocess.run(
-                    [
-                        *command,
-                        "--stdin",
-                        "-t",
-                        "0",
-                        "-T",
-                        "1000000000",
-                        "-M",
-                        memory_mb,
-                        "-j",
-                        "1",
-                        "--trust=0",
-                    ],
-                    cwd=cwd,
-                    env=process_environment,
-                    input=source,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_seconds,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise LeanDeclarationBackendError(
-                    "LEAN_QUERY_TIMEOUT",
-                    (
-                        f"Lean declaration discovery exceeded the "
-                        f"{timeout_seconds}-second {environment.value} budget."
-                    ),
-                ) from exc
-        if len(completed.stdout.encode("utf-8")) > _MAX_STDOUT_BYTES:
-            raise LeanDeclarationBackendError(
-                "LEAN_QUERY_OUTPUT_LIMIT",
-                "Lean declaration discovery exceeded its structured output budget.",
-            )
-        if len(completed.stderr.encode("utf-8")) > _MAX_STDERR_BYTES:
-            raise LeanDeclarationBackendError(
-                "LEAN_QUERY_OUTPUT_LIMIT",
-                "Lean declaration discovery exceeded its diagnostic output budget.",
-            )
-        if completed.returncode != 0:
-            _LOGGER.warning(
-                "Lean declaration query failed: %s",
-                (completed.stdout + completed.stderr).strip(),
-            )
-            if "declaration not found:" in completed.stderr:
-                name = str(payload.get("declaration_name", "the requested name"))
-                raise LeanDeclarationBackendError(
-                    "LEAN_DECLARATION_NOT_FOUND",
-                    f"Lean did not find the exact declaration {name!r}.",
-                )
-            raise LeanDeclarationBackendError(
-                "LEAN_QUERY_FAILED",
-                (
-                    f"Lean could not complete declaration discovery in the "
-                    f"{environment.value} environment."
-                ),
-            )
-        output = _parse_query_output(completed.stdout)
-        if self.environment_digest(environment) != environment_digest:
-            raise LeanDeclarationBackendError(
-                "LEAN_ENVIRONMENT_CHANGED",
-                "The pinned Lean environment changed during declaration discovery.",
-            )
-        output["_environment_digest"] = environment_digest
-        return output
+        temporary_root = Path(tempfile.gettempdir())
+        command, cwd, memory_mb, _ = self._command(
+            environment,
+            temporary_root,
+        )
+        process_environment = self._process_environment(
+            environment,
+            temporary_root,
+        )
+        return _ReusableLeanQuerySession(
+            command=command,
+            cwd=cwd,
+            process_environment=process_environment,
+            source=source,
+            memory_mb=memory_mb,
+            isolated_home=environment is LeanEnvironment.CORE,
+            environment_digest=environment_digest,
+        )
+
+    def _discard_session(self, environment: LeanEnvironment) -> None:
+        entry = self._sessions.pop(environment, None)
+        if entry is not None:
+            entry.session.close()
+
+    @staticmethod
+    def _query_timeout_seconds(environment: LeanEnvironment) -> int:
+        return 40 if environment is LeanEnvironment.CORE else 105
 
     def _command(
         self,
@@ -197,13 +455,12 @@ class LeanSubprocessDeclarationBackend:
                 "LEAN_ENVIRONMENT_UNAVAILABLE",
                 "The pinned Lake executable for MATHLIB discovery is unavailable.",
             )
-        return [str(lake), "env", "lean"], self.mathlib_runtime, "8192", 75
+        return [str(lake), "env", "lean"], self.mathlib_runtime, "8192", 105
 
     def _process_environment(
         self,
         environment: LeanEnvironment,
         temporary_root: Path,
-        query_path: Path,
     ) -> dict[str, str]:
         lean_bin = str(self.lean_executable.parent)
         existing_path = os.environ.get("PATH")
@@ -219,7 +476,6 @@ class LeanSubprocessDeclarationBackend:
         )
         return {
             "HOME": runtime_home,
-            "JACOBIAN_LEAN_QUERY_FILE": str(query_path),
             "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8",
             "PATH": path,
@@ -359,21 +615,68 @@ def installed_lean_declaration_service(
     )
 
 
-def _parse_query_output(stdout: str) -> dict[str, Any]:
-    payloads = [
-        line.removeprefix(_RESULT_PREFIX)
-        for line in stdout.splitlines()
-        if line.startswith(_RESULT_PREFIX)
+def _parse_process_response(
+    stdout: bytes,
+    *,
+    expected_request_id: str,
+) -> dict[str, Any]:
+    try:
+        lines = stdout.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise _protocol_error() from exc
+    responses = [
+        line for line in lines if line.startswith((_RESULT_PREFIX, _ERROR_PREFIX))
     ]
-    if len(payloads) != 1:
+    if len(responses) != 1:
+        raise _protocol_error()
+    return _parse_session_response(
+        responses[0],
+        expected_request_id=expected_request_id,
+    )
+
+
+def _parse_session_response(
+    line: str,
+    *,
+    expected_request_id: str,
+) -> dict[str, Any]:
+    if line.startswith(_RESULT_PREFIX):
+        response_kind = "result"
+        serialized = line.removeprefix(_RESULT_PREFIX)
+    elif line.startswith(_ERROR_PREFIX):
+        response_kind = "error"
+        serialized = line.removeprefix(_ERROR_PREFIX)
+    else:
         raise _protocol_error()
     try:
-        payload = loads_strict_json(payloads[0])
+        envelope = loads_strict_json(serialized)
     except ValueError as exc:
         raise _protocol_error() from exc
-    if not isinstance(payload, dict):
+    if not isinstance(envelope, dict) or envelope.get("request_id") != (
+        expected_request_id
+    ):
         raise _protocol_error()
-    return payload
+    if response_kind == "result":
+        if set(envelope) != {"request_id", "payload"} or not isinstance(
+            envelope["payload"], dict
+        ):
+            raise _protocol_error()
+        return envelope["payload"]
+    if (
+        set(envelope) != {"request_id", "code", "message"}
+        or not isinstance(envelope["code"], str)
+        or not isinstance(envelope["message"], str)
+    ):
+        raise _protocol_error()
+    if envelope["code"] == "LEAN_DECLARATION_NOT_FOUND":
+        raise LeanDeclarationBackendError(
+            "LEAN_DECLARATION_NOT_FOUND",
+            "Lean did not find the exact requested declaration.",
+        )
+    raise LeanDeclarationBackendError(
+        "LEAN_QUERY_FAILED",
+        "Lean could not complete declaration discovery in the selected environment.",
+    )
 
 
 def _require_operation(payload: dict[str, Any], expected: str) -> None:
@@ -385,6 +688,41 @@ def _protocol_error() -> LeanDeclarationBackendError:
     return LeanDeclarationBackendError(
         "LEAN_QUERY_PROTOCOL_ERROR",
         "Lean declaration discovery returned malformed structured output.",
+    )
+
+
+def _structured_output_limit() -> LeanDeclarationBackendError:
+    return LeanDeclarationBackendError(
+        "LEAN_QUERY_OUTPUT_LIMIT",
+        "Lean declaration discovery exceeded its structured output budget.",
+    )
+
+
+def _diagnostic_output_limit() -> LeanDeclarationBackendError:
+    return LeanDeclarationBackendError(
+        "LEAN_QUERY_OUTPUT_LIMIT",
+        "Lean declaration discovery exceeded its diagnostic output budget.",
+    )
+
+
+def _query_failed() -> LeanDeclarationBackendError:
+    return LeanDeclarationBackendError(
+        "LEAN_QUERY_FAILED",
+        "Lean could not complete declaration discovery in the selected environment.",
+    )
+
+
+def _index_changed() -> LeanDeclarationBackendError:
+    return LeanDeclarationBackendError(
+        "LEAN_QUERY_INDEX_CHANGED",
+        "The reusable Lean declaration index changed between bounded queries.",
+    )
+
+
+def _prefix_matches(value: str, prefixes: tuple[Any, ...]) -> bool:
+    return not prefixes or any(
+        isinstance(prefix, str) and (value == prefix or value.startswith(f"{prefix}."))
+        for prefix in prefixes
     )
 
 

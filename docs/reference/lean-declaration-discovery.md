@@ -30,6 +30,13 @@ in deterministic `Name.lt` order. Each result carries its elaborated
 pretty-printed type, declaration kind, namespace when present, optional source
 module and range, and explicit match reasons.
 
+The first name search in one backend session atomically materializes a compact
+catalog of imported public declaration names, source modules, and kinds. Later
+name searches use that catalog to select ordered candidates and their exact scan
+positions. Lean resolves every candidate again in the pinned environment,
+reapplies the filters, and checks elaborated type constants. Broad queries that
+would exceed the bounded candidate handoff use the full Lean scan instead.
+
 `stop_reason` separates the two possible coverage outcomes:
 
 - `RESULT_LIMIT` means the result budget stopped the scan and completeness is
@@ -45,7 +52,8 @@ is not a mathematical nonexistence conclusion.
 `lean.declaration.inspect` accepts an environment and one exact
 `declaration_name`. It returns the declaration's elaborated type, kind,
 namespace, documentation and source metadata when available. A missing exact
-name is an execution error, not an empty successful result.
+name is an execution error, not an empty successful result. Exact inspection
+uses Lean's environment lookup directly; it does not linearly scan the catalog.
 
 ## Environment identity and execution bounds
 
@@ -62,9 +70,17 @@ metaprogramming modules to implement the query. Provider-local helper
 declarations are never searchable. `MATHLIB` exposes declarations imported by
 the pinned `Mathlib` module.
 
-The subprocess is fail-closed, uses `--trust=0`, one worker, a 40-second `CORE`
-or 75-second `MATHLIB` timeout, and a two-MiB structured-output limit.
-Timeouts, unavailable profiles, malformed output, and Lean errors remain
+The catalog is backend-local optimization state, not mathematical evidence. Its
+header binds the exact `environment_digest`; Jacobian records its byte digest,
+checks it before and after reuse, and discards the session if either identity
+changes. Catalog creation uses an atomic rename, and candidate responses carry a
+fresh request identity. A mismatch, partial index, stale response, or tampering
+fails closed rather than falling back within the same operation.
+
+Each bounded query still runs in a separate subprocess with `--trust=0` and one
+worker. The per-query budget is 40 seconds for `CORE` and 105 seconds for
+`MATHLIB`, with a two-MiB structured-output limit and a 128-KiB diagnostic
+limit. Timeouts, unavailable profiles, malformed output, and Lean errors remain
 execution failures without a mathematical conclusion.
 
 See [Retrieve a Lean theorem and check a proof](../tutorials/lean-declaration-discovery.md)
