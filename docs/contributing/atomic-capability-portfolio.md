@@ -324,6 +324,22 @@ See [Lean declaration-discovery pilot](../reference/capability-workflow-evaluati
 for scorer invariants, per-run measurements, and the excluded operationally
 invalid pair.
 
+The indexed follow-up is implemented. It derives a compact catalog from the
+pinned environment's imported module metadata, binds it to the exact
+environment digest, rechecks its byte identity before and after reuse, and
+keeps final candidate and type matching inside Lean. A fresh held-out
+`List.revzip` search completed in 28.886 seconds instead of timing out; catalog
+reuse completed in 9.568 seconds and direct exact inspection in 9.146 seconds.
+Fresh and reused outputs agreed on declarations, stop reason, and exact scan
+count.
+
+The frozen autonomous rerun passed in both conditions with no tool errors, but
+neither treatment selected discovery. That run therefore does not measure
+intervention lift. Search and inspection remain experimental and
+non-recommended. Before changing recommendation status or exposing interactive
+goal tools, add harder held-out statements where direct automation does not
+already solve the proposition.
+
 ## Wave 2: SAT certificate vertical slice
 
 Use four outcomes rather than one ambiguous solver call:
@@ -342,6 +358,17 @@ projection. Bind every assignment or proof to the source artifact digest,
 variable map, projection version, declared scope, provider version, and
 resource budget. Preserve the raw proof as a durable artifact but keep bounded
 inline summaries small.
+
+The artifact-contract checkpoint was implemented on 2026-07-26. The base
+kernel now registers model-backed schemas for canonical CNF, total assignment,
+and raw DRAT proof artifacts without installing a solver, checker, or SAT
+capability. Canonicalization deterministically renumbers the sorted variable
+map, removes duplicate literals and clauses, omits tautologies, orders the
+remaining clauses, and binds the resulting DIMACS bytes. Assignment and proof
+artifacts bind the exact CNF URI, object and payload digests, variable map,
+projection, full scope, producer runtime, and resource budget. Raw proof
+storage and assignment payloads remain unverified. See
+[SAT artifact contracts](../reference/sat-artifacts.md).
 
 CaDiCaL has a small source build and a command line that accepts DIMACS plus a
 proof path. DRAT-trim independently validates a DRAT proof against the input
@@ -465,7 +492,8 @@ backlog.
    reproduction.
 3. Paired Lean discovery evaluation; decide expose, revise, consolidate into
    examples, or stop.
-4. Canonical CNF, assignment, and proof artifact schemas.
+4. Canonical CNF, assignment, and proof artifact schemas. Implemented; see
+   [SAT artifact contracts](../reference/sat-artifacts.md).
 5. Pure independent SAT-assignment checker with attack tests.
 6. CaDiCaL model and proof-producing exploration adapters.
 7. DRAT-trim clean-process checker, authorization fixture, and attack tests.

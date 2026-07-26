@@ -132,7 +132,9 @@ Controls:
 
 - constrained versioned canonical encoding;
 - domain-separated object identity;
-- validation before persistence;
+- validation before persistence, including registered model-backed cross-field
+  invariants when ordering or derived digests cannot be expressed in JSON
+  Schema alone;
 - size, depth, and dependency limits;
 - digest verification on read.
 
@@ -157,6 +159,24 @@ Controls:
   artifact URIs in the verification record's parents; equal object digests in
   different artifact carriers are insufficient;
 - no caller-controlled checker executable.
+
+### SAT source or projection substitution
+
+An assignment or proof may name another CNF, reuse a variable map with changed
+clauses, change literal numbering, or relabel proof bytes under another format
+version.
+
+Controls:
+
+- canonical CNF artifacts bind the ordered variable map and deterministic
+  DIMACS projection by digest;
+- assignment and raw proof artifacts bind the exact CNF artifact URI, object
+  and payload digests, variable-map and DIMACS digests, projection version,
+  full scope, producer runtime, and resource budget;
+- evidence artifacts retain the exact CNF as a parent;
+- assignment and raw proof storage remains unverified; and
+- future independent checkers must validate every binding before mathematical
+  replay and fail closed on any mismatch.
 
 ### Buggy or compromised checker
 
