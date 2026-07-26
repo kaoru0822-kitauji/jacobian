@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from fractions import Fraction
 from typing import Any
 
+import sympy
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
@@ -113,11 +113,11 @@ class MatrixDeterminantAdapter:
             title="Compute an exact rational matrix determinant",
             description=(
                 "Compute the determinant of one square matrix over QQ using "
-                "fraction-free Bareiss elimination."
+                "SymPy's exact Bareiss algorithm."
             ),
-            provider="jacobian.python",
+            provider="jacobian.sympy",
             provider_runtime=known_provider_runtime(
-                "jacobian.python",
+                "jacobian.sympy",
                 features=("matrix", "determinant", "exact-rational"),
             ),
             modes=(CapabilityMode.EXPLORE,),
@@ -134,11 +134,14 @@ class MatrixDeterminantAdapter:
         validated = _validate(MatrixDeterminantRequest, request.input)
         started = time.monotonic()
         matrix_uri = _materialize_matrix(self.resources, validated.matrix)
-        determinant = _bareiss_determinant(_fractions(validated.matrix))
+        determinant = sympy.Rational(
+            _sympy_matrix(validated.matrix).det(method="bareiss")
+        )
         determinant_value = _wire(determinant)
         artifact = MatrixDeterminantArtifact(
             matrix_uri=matrix_uri,
             determinant=determinant_value,
+            backend_version=sympy.__version__,
         )
         result_uri = self.resources.artifacts.put(
             schema_uri=self.resources.installation.determinant_schema_uri,
@@ -151,6 +154,7 @@ class MatrixDeterminantAdapter:
             matrix_uri=matrix_uri,
             determinant_uri=result_uri,
             determinant=determinant_value,
+            backend_version=sympy.__version__,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -177,9 +181,9 @@ class MatrixRankAdapter:
             description=(
                 "Compute the rank and pivot columns of one rectangular matrix over QQ."
             ),
-            provider="jacobian.python",
+            provider="jacobian.sympy",
             provider_runtime=known_provider_runtime(
-                "jacobian.python",
+                "jacobian.sympy",
                 features=("matrix", "rank", "exact-rational"),
             ),
             modes=(CapabilityMode.EXPLORE,),
@@ -196,11 +200,12 @@ class MatrixRankAdapter:
         validated = _validate(MatrixRankRequest, request.input)
         started = time.monotonic()
         matrix_uri = _materialize_matrix(self.resources, validated.matrix)
-        pivot_columns = _rank_pivots(_fractions(validated.matrix))
+        _, pivot_columns = _sympy_matrix(validated.matrix).rref()
         artifact = MatrixRankArtifact(
             matrix_uri=matrix_uri,
             rank=len(pivot_columns),
             pivot_columns=pivot_columns,
+            backend_version=sympy.__version__,
         )
         result_uri = self.resources.artifacts.put(
             schema_uri=self.resources.installation.rank_schema_uri,
@@ -214,6 +219,7 @@ class MatrixRankAdapter:
             rank_uri=result_uri,
             rank=len(pivot_columns),
             pivot_columns=pivot_columns,
+            backend_version=sympy.__version__,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -257,90 +263,17 @@ def _materialize_matrix(
     ).artifact_uri
 
 
-def _fractions(matrix: ExactRationalMatrix) -> list[list[Fraction]]:
-    return [[entry.as_fraction() for entry in row] for row in matrix.entries]
+def _sympy_matrix(matrix: ExactRationalMatrix) -> sympy.Matrix:
+    return sympy.Matrix(
+        [
+            [sympy.Rational(int(entry.num), int(entry.den)) for entry in row]
+            for row in matrix.entries
+        ]
+    )
 
 
-def _wire(value: Fraction) -> CanonicalRational:
-    return CanonicalRational(num=str(value.numerator), den=str(value.denominator))
-
-
-def _bareiss_determinant(matrix: list[list[Fraction]]) -> Fraction:
-    size = len(matrix)
-    if size == 1:
-        return matrix[0][0]
-    denominators = [value.denominator for row in matrix for value in row]
-    scale = 1
-    for denominator in denominators:
-        scale = _lcm(scale, denominator)
-    work = [[int(value * scale) for value in row] for row in matrix]
-    sign = 1
-    previous = 1
-    for column in range(size - 1):
-        pivot = next(
-            (row for row in range(column, size) if work[row][column] != 0),
-            None,
-        )
-        if pivot is None:
-            return Fraction(0)
-        if pivot != column:
-            work[column], work[pivot] = work[pivot], work[column]
-            sign = -sign
-        pivot_value = work[column][column]
-        for row in range(column + 1, size):
-            for target_column in range(column + 1, size):
-                numerator = (
-                    work[row][target_column] * pivot_value
-                    - work[row][column] * work[column][target_column]
-                )
-                work[row][target_column] = numerator // previous
-            work[row][column] = 0
-        previous = pivot_value
-    return Fraction(sign * work[-1][-1], scale**size)
-
-
-def _rank_pivots(matrix: list[list[Fraction]]) -> tuple[int, ...]:
-    row_count = len(matrix)
-    column_count = len(matrix[0])
-    pivot_row = 0
-    pivots: list[int] = []
-    for column in range(column_count):
-        selected = next(
-            (row for row in range(pivot_row, row_count) if matrix[row][column] != 0),
-            None,
-        )
-        if selected is None:
-            continue
-        matrix[pivot_row], matrix[selected] = matrix[selected], matrix[pivot_row]
-        pivot = matrix[pivot_row][column]
-        matrix[pivot_row] = [value / pivot for value in matrix[pivot_row]]
-        for row in range(row_count):
-            if row == pivot_row or matrix[row][column] == 0:
-                continue
-            factor = matrix[row][column]
-            matrix[row] = [
-                value - factor * pivot_value
-                for value, pivot_value in zip(
-                    matrix[row],
-                    matrix[pivot_row],
-                    strict=True,
-                )
-            ]
-        pivots.append(column)
-        pivot_row += 1
-        if pivot_row == row_count:
-            break
-    return tuple(pivots)
-
-
-def _gcd(left: int, right: int) -> int:
-    while right:
-        left, right = right, left % right
-    return abs(left)
-
-
-def _lcm(left: int, right: int) -> int:
-    return abs(left * right) // _gcd(left, right)
+def _wire(value: sympy.Rational) -> CanonicalRational:
+    return CanonicalRational(num=str(value.p), den=str(value.q))
 
 
 def _computed_result(

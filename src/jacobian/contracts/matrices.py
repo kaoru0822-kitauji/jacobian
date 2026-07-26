@@ -48,6 +48,8 @@ class MatrixDeterminantArtifact(ContractModel):
     matrix_uri: ArtifactUri
     determinant: CanonicalRational
     method: Literal["FRACTION_FREE_BAREISS"] = "FRACTION_FREE_BAREISS"
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str
 
 
 class MatrixRankArtifact(ContractModel):
@@ -56,6 +58,8 @@ class MatrixRankArtifact(ContractModel):
     rank: int = Field(ge=0, le=32)
     pivot_columns: tuple[int, ...] = Field(max_length=32)
     method: Literal["EXACT_RATIONAL_ROW_REDUCTION"] = "EXACT_RATIONAL_ROW_REDUCTION"
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str
 
 
 class MatrixDeterminantOutput(ContractModel):
@@ -67,6 +71,8 @@ class MatrixDeterminantOutput(ContractModel):
     verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     certificate_available: Literal[False] = False
     method: Literal["FRACTION_FREE_BAREISS"] = "FRACTION_FREE_BAREISS"
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str
 
 
 class MatrixRankOutput(ContractModel):
@@ -79,3 +85,5 @@ class MatrixRankOutput(ContractModel):
     verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     certificate_available: Literal[False] = False
     method: Literal["EXACT_RATIONAL_ROW_REDUCTION"] = "EXACT_RATIONAL_ROW_REDUCTION"
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str
