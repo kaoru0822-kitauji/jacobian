@@ -31,6 +31,7 @@ CVC5_VERSION = "1.3.4"
 DRAT_TRIM_RELEASE_TAG = "v05.22.2023"
 DRAT_TRIM_SOURCE_COMMIT = "2e5e29cb0019d5cfd547d4208dca1b3ec290349f"
 DRAT_TRIM_SOURCE_REPOSITORY = "https://github.com/marijnheule/drat-trim"
+PYTHON_FLINT_VERSION = "0.9.0"
 
 
 class ProviderRuntimeError(RuntimeError):
@@ -96,8 +97,7 @@ def _jacobian_identity() -> tuple[str, str, tuple[str, ...]]:
     return distribution.version, digest, _license_files(distribution)
 
 
-@cache
-def _python_distribution_identity(
+def _inspect_python_distribution_identity(
     distribution_name: str,
     import_name: str,
     required_attributes: tuple[str, ...],
@@ -118,6 +118,19 @@ def _python_distribution_identity(
             f"the {distribution_name} provider is not installed and healthy"
         ) from exc
     return distribution.version, digest, _license_files(distribution)
+
+
+@cache
+def _python_distribution_identity(
+    distribution_name: str,
+    import_name: str,
+    required_attributes: tuple[str, ...],
+) -> tuple[str, str, tuple[str, ...]]:
+    return _inspect_python_distribution_identity(
+        distribution_name,
+        import_name,
+        required_attributes,
+    )
 
 
 def _unavailable_runtime(
@@ -224,14 +237,18 @@ def python_distribution_provider_runtime(
     features: tuple[str, ...] = (),
     checker_ids: tuple[str, ...] = (),
     configuration: Mapping[str, Any] | None = None,
+    refresh: bool = False,
 ) -> CapabilityProviderRuntime:
     """Identify one installed Python distribution without trusting an import alone."""
 
     try:
-        version, digest, license_files = _python_distribution_identity(
-            distribution_name,
-            import_name,
-            required_attributes,
+        identity = (
+            _inspect_python_distribution_identity
+            if refresh
+            else _python_distribution_identity
+        )
+        version, digest, license_files = identity(
+            distribution_name, import_name, required_attributes
         )
     except ProviderRuntimeError:
         return _unavailable_runtime(
@@ -646,6 +663,49 @@ def known_provider_runtime(
         checker_ids=checker_ids,
         configuration=configuration,
     )
+
+
+def python_flint_provider_runtime(
+    *,
+    refresh: bool = False,
+) -> CapabilityProviderRuntime:
+    """Identify the exact optional Python-FLINT compatibility profile."""
+
+    runtime = python_distribution_provider_runtime(
+        "python-flint",
+        distribution_name="python-flint",
+        import_name="flint",
+        required_attributes=("fmpq", "fmpq_mat"),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT AND LGPL-3.0-or-later",
+        features=(
+            "exact-rational",
+            "dense-matrix",
+            "reduced-row-echelon-form",
+        ),
+        configuration={
+            "domain": "QQ",
+            "operation": "fmpq_mat.rref",
+            "maximum_rows": 32,
+            "maximum_columns": 32,
+            "free_variable_policy": "ZERO",
+        },
+        refresh=refresh,
+    )
+    if (
+        runtime.availability is CapabilityProviderAvailability.AVAILABLE
+        and runtime.version != PYTHON_FLINT_VERSION
+    ):
+        return _unavailable_runtime(
+            provider="python-flint",
+            install_tier=CapabilityInstallTier.T1,
+            license_id="MIT AND LGPL-3.0-or-later",
+            diagnostic=(
+                "Python-FLINT is installed but does not match the pinned "
+                f"{PYTHON_FLINT_VERSION} compatibility profile."
+            ),
+        )
+    return runtime
 
 
 def lean_provider_runtime(
