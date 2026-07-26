@@ -85,14 +85,18 @@ how its major parts fit together.
 
 Read [CONTRIBUTING.md](../CONTRIBUTING.md) before changing code or public
 documentation. The [issue index](contributing/issues.md) records implementation
-work that has been identified but not necessarily scheduled.
+work that has been identified but not necessarily scheduled. The
+[atomic capability portfolio](contributing/atomic-capability-portfolio.md)
+records the formal-first backend research, ordering, installation tradeoffs,
+and evaluation gates used to decide which mathematical slices to build next.
 
 When adding a document, place it according to the reader's need:
 
 - `tutorials/` for a guided learning experience;
 - `how-to/` for completing one task;
 - `reference/` for contracts and lookup material;
-- `explanation/` for design context and decisions.
+- `explanation/` for design context and decisions; and
+- `contributing/` for maintainer-facing research and planning records.
 
 Do not mix active direction with supported behavior. Product goals guide
 priorities; only an applicable specification or conformance document defines a
