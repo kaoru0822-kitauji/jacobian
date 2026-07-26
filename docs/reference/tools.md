@@ -127,7 +127,8 @@ of catalog membership:
 
 - [SAT artifact contracts](sat-artifacts.md);
 - [SMT Alethe artifact contracts](smt-artifacts.md);
-- [exact rational solution artifacts](linear-rational-solutions.md); and
+- [exact rational solution artifacts](linear-rational-solutions.md);
+- [integer matrix Hermite normal form](matrix-hermite-normal-form.md); and
 - [Lean declaration discovery contract](lean-declaration-discovery.md).
 
 ## Mathematical operation portfolio

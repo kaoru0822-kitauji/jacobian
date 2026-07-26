@@ -478,6 +478,39 @@ discovery and lower-overhead MCP composition remain follow-up work. Because
 this was a prescribed-capability pilot, it measures contract use and assurance
 discipline rather than autonomous portfolio discovery.
 
+### Python-FLINT Hermite-normal-form pilot
+
+The frozen 2026-07-26 HNF pilot used `gpt-5.6-terra`, high reasoning effort, a
+420-second per-run limit, and one repetition of two private exact integer
+matrices. One was a three-by-four matrix and one was a singular four-by-three
+matrix with a zero row. Their case digests were
+`sha256:947a2f92b36cc8003b6d990dc9522f3b6a1cc2819085dded794947699b71320d`
+and
+`sha256:671188addd5934fb2a6b9d95ced1d0aaad819eaa354c16128e0d0af68ecaab38`.
+
+Control computed `H` and `U` directly and could report only
+`SELF_CHECKED/UNVERIFIED`. Treatment was prescribed
+`matrix.normal_form.hermite` and
+`matrix.normal_form.hermite.verify`. It had to pass the producer's
+`normal_form_uri` into the verifier and copy the exact matrices and durable
+URIs. The hidden scorer independently checked `H = U A`, `det(U) = ±1`, every
+FLINT row-HNF condition, artifact bindings, the ordered invocation trace, and
+clean-kernel replay.
+
+| Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| control | 2 / 2 | 0 | 0 / 2 | 73.804 | 40,787.5 | 1.5 | 0 |
+| Python-FLINT producer + verifier | 2 / 2 | 0 | 2 / 2 | 41.524 | 104,488.5 | 4 | 0 |
+
+Both treatments used the intended capabilities without parameter errors,
+capability rejection, or operational failure. Both verification records
+replayed independently. The treatment was faster on these cases but consumed
+more cumulative input tokens, so the small pilot does not establish a general
+runtime advantage. It supports retaining the complete `H, U` output, the
+producer/verifier split, and direct URI handoff without another contract
+revision. As a prescribed-capability pilot, it measures usability and
+assurance discipline rather than autonomous portfolio selection.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:

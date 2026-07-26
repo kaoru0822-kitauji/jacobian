@@ -228,12 +228,14 @@ contracts.
 
 Some capabilities depend on optional backends that are not installed by
 default: CaDiCaL for SAT model and UNSAT proof finding, cvc5 for SMT UNSAT
-proof finding, and the `flint` extra for exact rational linear solutions.
-Solver output always remains unverified until a separate, independent checker
-accepts the bound witness or certificate. See the
+proof finding, and the `flint` extra for exact rational linear solutions and
+integer row Hermite normal forms. Provider output always remains unverified
+until a separate, independent checker accepts the bound witness or certificate.
+See the
 [SAT artifact contracts](docs/reference/sat-artifacts.md),
 [SMT artifact contracts](docs/reference/smt-artifacts.md), and
-[exact rational solution contract](docs/reference/linear-rational-solutions.md)
+[exact rational solution contract](docs/reference/linear-rational-solutions.md),
+and [integer matrix HNF contract](docs/reference/matrix-hermite-normal-form.md)
 for the verification boundaries.
 
 Three direct operational tools, `workspace.open`, `workspace.write`, and

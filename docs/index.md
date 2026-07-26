@@ -61,6 +61,7 @@ expectations.
 - [SAT artifact contracts](reference/sat-artifacts.md)
 - [SMT Alethe artifact contracts](reference/smt-artifacts.md)
 - [Exact rational solution artifacts](reference/linear-rational-solutions.md)
+- [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
 - [v0.2 conformance specification](reference/conformance-v0.2.md)
 - [Plugin conformance contract](reference/plugin-conformance.md)
