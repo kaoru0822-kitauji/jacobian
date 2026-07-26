@@ -24,6 +24,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityMode,
     CapabilityRelationship,
+    CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -39,6 +40,8 @@ from jacobian.contracts.polynomials import (
     PolynomialCollisionOutput,
     PolynomialCollisionPayload,
     PolynomialCollisionRequest,
+    PolynomialCollisionVerifyOutput,
+    PolynomialCollisionVerifyRequest,
     PolynomialEvaluationOutput,
     PolynomialEvaluationRequest,
     PolynomialInjectivityClaim,
@@ -53,11 +56,18 @@ from jacobian.contracts.polynomials import (
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
-from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
+from jacobian.contracts.results import (
+    Conclusion,
+    ContractModel,
+    Execution,
+    ExecutionStatus,
+    Verification,
+)
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.verification import VerificationService
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +88,7 @@ class PolynomialInstallation:
 class PolynomialResources:
     store: ArtifactStore
     artifacts: ArtifactService
+    verification: VerificationService
     installation: PolynomialInstallation
 
 
@@ -85,6 +96,7 @@ def install_polynomial_capabilities(
     store: ArtifactStore,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
+    verification: VerificationService,
     checkers: CheckerRegistry,
     *,
     authorize_checker: bool,
@@ -93,6 +105,7 @@ def install_polynomial_capabilities(
         PolynomialMapEvaluationAdapter,
         PolynomialJacobianAdapter,
         PolynomialCollisionAdapter,
+        PolynomialCollisionVerifyAdapter,
     ],
     PolynomialInstallation,
 ]:
@@ -191,6 +204,7 @@ def install_polynomial_capabilities(
     resources = PolynomialResources(
         store=store,
         artifacts=artifacts,
+        verification=verification,
         installation=installation,
     )
     return (
@@ -198,6 +212,11 @@ def install_polynomial_capabilities(
             PolynomialMapEvaluationAdapter(resources),
             PolynomialJacobianAdapter(resources),
             PolynomialCollisionAdapter(resources),
+            *(
+                (PolynomialCollisionVerifyAdapter(resources),)
+                if collision_checker_id is not None
+                else ()
+            ),
         ),
         installation,
     )
@@ -639,6 +658,148 @@ class PolynomialCollisionAdapter:
                 "the source evaluations were not replayed and any candidate witness "
                 "remains unverified"
             ),
+        )
+
+
+class PolynomialCollisionVerifyAdapter:
+    """Independently verify one explicit exact rational collision."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        checker_id = resources.installation.collision_checker_id
+        assert checker_id is not None
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.map.collision.verify",
+            version="1",
+            title="Verify a polynomial-map collision",
+            description=(
+                "Independently reevaluate one exact map at two supplied distinct "
+                "rational points and verify their claimed common image."
+            ),
+            provider="jacobian.polynomial-collision-checker",
+            provider_runtime=known_provider_runtime(
+                "jacobian.polynomial-collision-checker",
+                features=("exact-rational-collision-replay",),
+                checker_ids=(checker_id,),
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=model_schema(PolynomialCollisionVerifyRequest),
+            output_schema=model_schema(PolynomialCollisionVerifyOutput),
+            tags=("polynomial", "map", "collision", "verification"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialCollisionVerifyRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_COLLISION_VERIFY_REQUEST",
+            operation="collision verification",
+        )
+        _, map_uri = _materialize_map(self.resources, validated.map)
+        candidate = self.resources.store.get(map_uri)
+        claim_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.claim_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=PolynomialInjectivityClaim(map_uri=map_uri).model_dump(mode="json"),
+            parents=(map_uri,),
+            summary="rational polynomial-map injectivity claim",
+        )
+        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        witness = WitnessEnvelope(
+            witness_format="polynomial.map_collision",
+            format_version="1",
+            role=WitnessRole.REFUTES_CLAIM,
+            bindings=EvidenceBindings(
+                claim_digest=claim_artifact.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=candidate.manifest.object_digest,
+            ),
+            payload=PolynomialCollisionPayload(
+                first_point=validated.first_point,
+                second_point=validated.second_point,
+                image=validated.claimed_image,
+            ).model_dump(mode="json"),
+        )
+        witness_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.witness_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=witness.model_dump(mode="json"),
+            parents=(claim_artifact.artifact_uri, map_uri),
+            summary="exact rational polynomial-map collision witness",
+        )
+        checker_id = self.resources.installation.collision_checker_id
+        assert checker_id is not None
+        checked = self.resources.verification.verify_witness(
+            claim_uri=claim_artifact.artifact_uri,
+            candidate_uri=map_uri,
+            witness_uri=witness_artifact.artifact_uri,
+            checker_id=checker_id,
+        )
+        verified = (
+            checked.assurance.verification is Verification.VERIFIED
+            and checked.conclusion is Conclusion.FALSE
+        )
+        output = PolynomialCollisionVerifyOutput(
+            collision_verified=verified,
+            conclusion="FALSE" if verified else "UNKNOWN",
+            map_uri=map_uri,
+            claim_uri=claim_artifact.artifact_uri,
+            witness_uri=witness_artifact.artifact_uri,
+            verification_record_uri=checked.verification_record_uri,
+            checker_id=checker_id,
+            first_point=validated.first_point,
+            second_point=validated.second_point,
+            claimed_image=validated.claimed_image,
+        )
+        artifact_uris = [
+            map_uri,
+            claim_artifact.artifact_uri,
+            witness_artifact.artifact_uri,
+        ]
+        if checked.verification_record_uri is not None:
+            artifact_uris.append(checked.verification_record_uri)
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="one direct collision witness over QQ",
+                parameters={"map_uri": map_uri},
+                artifact_uri=map_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                basis="direct witness verification makes no search coverage claim",
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="polynomial.relation.collision-refutes-injectivity",
+                    source_artifact_uris=(witness_artifact.artifact_uri,),
+                    target_artifact_uris=(claim_artifact.artifact_uri,),
+                    status=CapabilityRelationshipStatus.PROPOSED,
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+                basis=(
+                    "accepted by the authorized independent Fraction-based checker"
+                    if verified
+                    else "the checker did not accept the claimed collision"
+                ),
+                verification_record_uri=checked.verification_record_uri,
+            ),
+            artifact_uris=tuple(artifact_uris),
         )
 
 
