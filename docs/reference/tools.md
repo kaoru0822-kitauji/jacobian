@@ -163,6 +163,7 @@ of catalog membership:
 - [exact rational matrix determinants](matrix-rational-determinant.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
 - [fixed-registry graph invariant batches](graph-invariant-batch.md);
+- [bounded finite exactly-once coverage](finite-coverage-verification.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
 - [Lean declaration discovery contract](lean-declaration-discovery.md); and
 - [Lean formal intermediates](lean-formal-intermediates.md).
