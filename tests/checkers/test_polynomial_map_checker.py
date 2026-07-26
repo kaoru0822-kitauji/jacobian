@@ -3,7 +3,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from jacobian_checkers.polynomial_maps import check_collision, check_jacobian
+from jacobian_checkers.polynomial_maps import (
+    check_collision,
+    check_identity,
+    check_jacobian,
+)
 
 
 def _request() -> dict[str, Any]:
@@ -124,6 +128,91 @@ def test_collision_checker_rejects_binding_substitution() -> None:
     request["witness"]["payload"]["bindings"]["candidate_digest"] = "sha256:" + "9" * 64
 
     decision = check_collision(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def _identity_request() -> dict[str, Any]:
+    bindings = {
+        "claim_digest": "sha256:" + "1" * 64,
+        "semantics_digest": "sha256:" + "2" * 64,
+        "candidate_digest": "sha256:" + "3" * 64,
+        "scope_digest": "sha256:" + "4" * 64,
+        "encoding_digest": None,
+    }
+    left_uri = "artifact://sha256/" + "5" * 64
+    right_uri = "artifact://sha256/" + "6" * 64
+    polynomial = {
+        "terms": [
+            {
+                "coefficient": {"num": "2", "den": "3"},
+                "exponents": [2, 0],
+            },
+            {
+                "coefficient": {"num": "-1", "den": "1"},
+                "exponents": [0, 1],
+            },
+        ]
+    }
+    return {
+        "request_version": "1",
+        "claim": {
+            "payload": {
+                "claim_schema_version": "1",
+                "predicate": "POLYNOMIAL_IDENTITY",
+                "domain": "QQ",
+                "variables": ["x", "y"],
+                "left_uri": left_uri,
+                "right_uri": right_uri,
+            }
+        },
+        "scope": {"artifact_uri": left_uri, "payload": deepcopy(polynomial)},
+        "candidate": {"artifact_uri": right_uri, "payload": deepcopy(polynomial)},
+        "certificate": {
+            "payload": {
+                "evidence_schema_version": "1",
+                "certificate_type": "polynomial.identity_replay",
+                "format_version": "1",
+                "bindings": deepcopy(bindings),
+                "payload_digest": "sha256:" + "7" * 64,
+                "payload": {
+                    "method": "DIRECT_SPARSE_REPLAY",
+                    "variables": ["x", "y"],
+                    "left_uri": left_uri,
+                    "right_uri": right_uri,
+                },
+            }
+        },
+        "expected_bindings": deepcopy(bindings),
+    }
+
+
+def test_identity_checker_accepts_equal_exact_polynomials() -> None:
+    decision = check_identity(_identity_request())
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
+def test_identity_checker_verifies_a_nonidentity_as_false() -> None:
+    request = _identity_request()
+    request["candidate"]["payload"]["terms"][0]["coefficient"] = {
+        "num": "5",
+        "den": "7",
+    }
+
+    decision = check_identity(request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "FALSE"
+
+
+def test_identity_checker_rejects_candidate_substitution() -> None:
+    request = _identity_request()
+    request["candidate"]["artifact_uri"] = "artifact://sha256/" + "8" * 64
+
+    decision = check_identity(request)
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
