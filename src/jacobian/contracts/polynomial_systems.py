@@ -55,6 +55,41 @@ class PolynomialSystemSolutionRequest(ContractModel):
         return self
 
 
+class PolynomialSystemRationalSearchRequest(ContractModel):
+    system: RationalPolynomialSystem
+    max_abs_numerator: int = Field(ge=0, le=8)
+    max_denominator: int = Field(ge=1, le=8)
+
+    @model_validator(mode="after")
+    def require_bounded_grid(self) -> Self:
+        scalar_bound = (2 * self.max_abs_numerator + 1) * self.max_denominator
+        if scalar_bound ** len(self.system.variables) > 10_000:
+            raise ValueError("declared rational grid exceeds 10,000 points")
+        return self
+
+
+class PolynomialSystemRationalSearchOutput(ContractModel):
+    found: bool
+    system_uri: ArtifactUri
+    assignment_uri: ArtifactUri | None = None
+    assignment: tuple[CanonicalRational, ...] | None = None
+    examined_assignment_count: int = Field(ge=0, le=10_000)
+    grid_assignment_count: int = Field(ge=1, le=10_000)
+    checker_id: CheckerUri | None = None
+    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+    coverage: Literal["COMPLETE_SEARCH_OBJECTIVE"] = "COMPLETE_SEARCH_OBJECTIVE"
+
+    @model_validator(mode="after")
+    def bind_candidate(self) -> Self:
+        if self.found != (
+            self.assignment_uri is not None and self.assignment is not None
+        ):
+            raise ValueError("found status must match the assignment candidate")
+        if self.examined_assignment_count > self.grid_assignment_count:
+            raise ValueError("examined count cannot exceed the grid size")
+        return self
+
+
 class PolynomialSystemSolutionClaim(ContractModel):
     claim_schema_version: Literal["1"] = "1"
     predicate: Literal["ASSIGNMENT_SATISFIES_POLYNOMIAL_SYSTEM"] = (
