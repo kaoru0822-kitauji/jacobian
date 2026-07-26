@@ -27,6 +27,15 @@ value. Autonomous portfolio evaluations let agents choose tools and measure how
 well the portfolio supports composition. Evaluate complete portfolios and
 ablations as well as individual capabilities.
 
+Before stabilizing or recommending a capability, search the installed catalog
+by domain, artifact type, and mathematical outcome, then inspect the closest
+matches. If an existing capability already exposes the outcome, first test
+whether the real need is better discovery, a clearer contract, artifact
+handoff, batching, consolidation, or retirement. Run a matched
+current-versus-candidate ablation when overlap remains ambiguous or the
+decision is consequential. Routine additions do not require exhaustive
+pairwise or leave-one-out evaluation.
+
 The current `CapabilityResult` contract makes four composition concerns
 first-class:
 

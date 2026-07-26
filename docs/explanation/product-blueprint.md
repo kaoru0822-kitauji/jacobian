@@ -67,6 +67,15 @@ the stage artifacts and preserve their separate assurance labels. Jacobian does
 not retain parallel top-level MCP tools or compatibility façades for these
 workflows; agents and reusable skills compose the namespaced capabilities.
 
+Design new capabilities against the installed portfolio. When an existing
+typed artifact already exposes the needed mathematical outcome, consume that
+artifact instead of silently recomputing it. Temporary overlap is acceptable
+for experimentation, performance, batching, backend constraints, or a
+genuinely different agent-visible outcome. State the overlap explicitly and
+preserve useful intermediate artifacts. If two capabilities expose the same
+outcome, consider discovery, contract clarity, artifact handoff,
+consolidation, or retirement before adding another stable ID.
+
 ## Ownership model
 
 The boundaries are intentionally narrow:
