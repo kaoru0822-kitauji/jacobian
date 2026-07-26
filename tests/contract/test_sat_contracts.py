@@ -285,6 +285,15 @@ def test_exploration_outputs_never_project_a_solver_status_as_a_conclusion() -> 
             status="ASSIGNMENT_PRODUCED",
             solver_status="SATISFIABLE",
             cnf_uri=_ARTIFACT_A,
+            assignment_uri=_ARTIFACT_A,
+            detail="missing named assignment",
+        )
+    with pytest.raises(ValidationError):
+        SatModelFindOutput(
+            status="ASSIGNMENT_PRODUCED",
+            solver_status="SATISFIABLE",
+            cnf_uri=_ARTIFACT_A,
+            assignment={"x": True},
             detail="missing candidate URI",
         )
     with pytest.raises(ValidationError):

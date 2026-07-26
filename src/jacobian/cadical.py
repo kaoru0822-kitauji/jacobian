@@ -285,6 +285,7 @@ class CadicalModelFindAdapter:
             return _failed_result(self.descriptor, request, resolved, run)
         assert run.solver_status is not None
         assignment_uri: str | None = None
+        assignment: dict[str, bool] | None = None
         if run.solver_status == "SATISFIABLE":
             try:
                 values = _total_assignment(
@@ -315,6 +316,14 @@ class CadicalModelFindAdapter:
                 producer=self.backend.runtime,
                 resource_budget=validated.resource_budget.artifact_budget(),
             ).artifact_uri
+            assignment = {
+                variable.name: value
+                for variable, value in zip(
+                    resolved.cnf.variables,
+                    values,
+                    strict=True,
+                )
+            }
         output = SatModelFindOutput(
             status=(
                 "ASSIGNMENT_PRODUCED"
@@ -324,6 +333,7 @@ class CadicalModelFindAdapter:
             solver_status=run.solver_status,
             cnf_uri=resolved.artifact.artifact_uri,
             assignment_uri=assignment_uri,
+            assignment=assignment,
             detail=(
                 "CaDiCaL produced a total assignment candidate; it remains "
                 "unverified until sat.model.verify accepts it."

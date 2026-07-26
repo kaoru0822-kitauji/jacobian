@@ -108,8 +108,8 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
         install_references=True,
     )
     cnf = kernel.sat.put_cnf(
-        variable_names=("x", "y"),
-        clauses=((1,), (-2,)),
+        variable_names=("y", "x"),
+        clauses=((2,), (-1,)),
     )
 
     result = _invoke(kernel, "sat.model.find", cnf.artifact_uri, conflicts=50)
@@ -118,6 +118,7 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
     assert result.output["status"] == "ASSIGNMENT_PRODUCED"
     assert result.output["solver_status"] == "SATISFIABLE"
     assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["assignment"] == {"x": True, "y": False}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.assurance.verification_record_uri is None
     assignment_uri = result.output["assignment_uri"]
