@@ -335,7 +335,7 @@ wheels = [
 ]
 
 [[package]]
-name = "jacobian-research-kernel"
+name = "jacobian"
 version = "0.2.0a0"
 source = { editable = "." }
 dependencies = [
