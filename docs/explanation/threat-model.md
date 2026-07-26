@@ -174,9 +174,15 @@ Controls:
   and payload digests, variable-map and DIMACS digests, projection version,
   full scope, producer runtime, and resource budget;
 - evidence artifacts retain the exact CNF as a parent;
-- assignment and raw proof storage remains unverified; and
-- future independent checkers must validate every binding before mathematical
-  replay and fail closed on any mismatch.
+- assignment and raw proof storage remains unverified;
+- `sat.model.verify` re-derives the assignment binding before dispatch, then a
+  standard-library-only clean-process checker independently validates the
+  canonical CNF, payload, variable-map and DIMACS digests, assignment,
+  evidence bindings, and lineage before evaluating every clause;
+- SAT assignment checker requests expose exact artifact payload digests and
+  parent lineage in addition to object, schema, and semantics identities; and
+- a rejected assignment, malformed input, timeout, or checker failure remains
+  `UNKNOWN` and never establishes UNSAT.
 
 ### Buggy or compromised checker
 

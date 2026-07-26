@@ -270,6 +270,7 @@ class VerificationService:
         witness_uri: str,
         checker_id: str,
         timeout_seconds: float | None = None,
+        include_artifact_metadata: bool = False,
     ) -> ResultEnvelope:
         """Replay a bound witness with the explicitly selected checker."""
 
@@ -342,28 +343,26 @@ class VerificationService:
             )
             request = {
                 "request_version": "1",
-                "claim": {
-                    "artifact_uri": claim_uri,
-                    "object_digest": claim.manifest.object_digest,
-                    "schema_uri": claim.manifest.schema_uri,
-                    "semantics_uri": claim.manifest.semantics_uri,
-                    "payload": claim.payload,
-                },
-                "candidate": {
-                    "artifact_uri": candidate_uri,
-                    "object_digest": candidate.manifest.object_digest,
-                    "schema_uri": candidate.manifest.schema_uri,
-                    "semantics_uri": candidate.manifest.semantics_uri,
-                    "payload": candidate.payload,
-                },
-                "scope": (self._checker_artifact(scope) if scope is not None else None),
-                "witness": {
-                    "artifact_uri": witness_uri,
-                    "object_digest": witness_artifact.manifest.object_digest,
-                    "schema_uri": witness_artifact.manifest.schema_uri,
-                    "semantics_uri": witness_artifact.manifest.semantics_uri,
-                    "payload": witness.model_dump(mode="json"),
-                },
+                "claim": self._checker_artifact(
+                    claim,
+                    include_storage_metadata=include_artifact_metadata,
+                ),
+                "candidate": self._checker_artifact(
+                    candidate,
+                    include_storage_metadata=include_artifact_metadata,
+                ),
+                "scope": (
+                    self._checker_artifact(
+                        scope,
+                        include_storage_metadata=include_artifact_metadata,
+                    )
+                    if scope is not None
+                    else None
+                ),
+                "witness": self._checker_artifact(
+                    witness_artifact,
+                    include_storage_metadata=include_artifact_metadata,
+                ),
                 "expected_bindings": expected_bindings,
             }
             request_digest = _digest_bytes(canonicalize_json(request))
@@ -1113,19 +1112,27 @@ class VerificationService:
         return self.store.get(sorted(matches)[0])
 
     @staticmethod
-    def _checker_artifact(artifact: StoredArtifact | None) -> dict[str, Any]:
+    def _checker_artifact(
+        artifact: StoredArtifact | None,
+        *,
+        include_storage_metadata: bool = False,
+    ) -> dict[str, Any]:
         if artifact is None:
             raise ValueError(
                 "Verification evidence is incomplete. Recreate it from the exact "
                 "claim and candidate, then retry."
             )
-        return {
+        result = {
             "artifact_uri": artifact.artifact_uri,
             "object_digest": artifact.manifest.object_digest,
             "schema_uri": artifact.manifest.schema_uri,
             "semantics_uri": artifact.manifest.semantics_uri,
             "payload": artifact.payload,
         }
+        if include_storage_metadata:
+            result["payload_digest"] = artifact.manifest.payload_digest
+            result["parents"] = list(artifact.manifest.parents)
+        return result
 
     def _commit_verification_record(
         self,
