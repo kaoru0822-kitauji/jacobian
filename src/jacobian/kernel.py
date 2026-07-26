@@ -34,6 +34,7 @@ from jacobian.finite_partition import (
     FinitePartitionInstallation,
     install_finite_partition,
 )
+from jacobian.flint_linear import install_python_flint_linear_capability
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.graph_isomorphism import (
     GraphIsomorphismInstallation,
@@ -47,6 +48,11 @@ from jacobian.lean_declarations import (
 from jacobian.lean_exploration import (
     LeanExplorationInstallation,
     install_lean_exploration_capabilities,
+)
+from jacobian.linear import LinearArtifactService, install_linear_artifacts
+from jacobian.linear_capabilities import (
+    LinearRationalSolutionCheckerInstallation,
+    install_linear_rational_solution_checker,
 )
 from jacobian.matrix_capabilities import (
     MatrixInstallation,
@@ -70,6 +76,7 @@ from jacobian.provider_runtime import (
     cvc5_provider_runtime,
     drat_trim_provider_runtime,
     lean_provider_runtime,
+    python_flint_provider_runtime,
 )
 from jacobian.references import (
     LeanCheckerInstallation,
@@ -130,6 +137,11 @@ class JacobianKernel:
             self.artifacts,
         )
         self.smt: SmtArtifactService = install_smt_artifacts(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
+        self.linear: LinearArtifactService = install_linear_artifacts(
             self.store,
             self.schemas,
             self.artifacts,
@@ -273,6 +285,39 @@ class JacobianKernel:
         )
         if smt_proof_adapter is not None:
             self.register_capability(smt_proof_adapter)
+        self.linear_solution_checker: LinearRationalSolutionCheckerInstallation
+        linear_verification_adapter, self.linear_solution_checker = (
+            install_linear_rational_solution_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.linear,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        if linear_verification_adapter is not None:
+            self.register_capability(linear_verification_adapter)
+        self.python_flint_runtime: CapabilityProviderRuntime = (
+            python_flint_provider_runtime()
+        )
+        if (
+            self.python_flint_runtime.availability
+            is CapabilityProviderAvailability.AVAILABLE
+        ):
+            try:
+                linear_find_adapter = install_python_flint_linear_capability(
+                    self.linear,
+                    self.python_flint_runtime,
+                )
+            except (OSError, ValueError) as exc:
+                _LOGGER.warning(
+                    "Python-FLINT rational solution exploration is not installed: %s",
+                    exc,
+                )
+            else:
+                self.register_capability(linear_find_adapter)
         self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
         if (
             self.cadical_runtime.availability

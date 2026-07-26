@@ -438,6 +438,46 @@ compact schema discovery and ranking remain portfolio-level follow-up work.
 Because this was a prescribed-capability pilot, it measures contract use and
 assurance discipline rather than autonomous portfolio discovery.
 
+### Python-FLINT rational-solution pilot
+
+The frozen 2026-07-26 Python-FLINT pilot used `gpt-5.6-terra`, high reasoning
+effort, a 600-second per-run limit, and one repetition of two private exact
+rational systems. One was a square three-variable system and one was an
+overdetermined four-equation, three-variable system. Their case digests were
+`sha256:5bc8e162c74075f5c8e67cb3708ec4bb98a5488b8cd11b6268eca2311a945172`
+and
+`sha256:69ef3f37d3b9a372eb7bd31c2fca42ca2e985443bf0230a5d7d882a2d710b571`.
+
+Control solved each system directly and could report only
+`SELF_CHECKED/UNVERIFIED`. Treatment was prescribed the exact capability IDs
+`linear.rational_solution.find` and
+`linear.rational_solution.verify`. It had to preserve declared variable order,
+pass the producer's `solution_uri` to the verifier, and report `VERIFIED` only
+with the returned verification-record URI. The hidden scorer checked every
+equation with an independent exact oracle, durable system and vector bindings,
+the ordered invocation trace, and clean-kernel replay.
+
+| Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| control | 2 / 2 | 0 | 0 / 2 | 19.488 | 12,754 | 0 | 0 |
+| Python-FLINT producer + verifier | 2 / 2 | 0 | 2 / 2 | 36.692 | 111,162 | 4 | 0 |
+
+Both treatments composed the intended operations without parameter errors or
+capability rejection, and both records replayed independently. Agent feedback
+reported no missing mathematical operation. This supports retaining the
+atomic producer/verifier split and its ordered-vector contract. It does not
+show an accuracy gain over direct work on these small systems; its observed
+value is durable exact evidence and an independent promotion boundary.
+
+One earlier development dispatch is excluded: the response schema represented
+the solution as an open-keyed object, which the model API rejected before any
+tokens or tool calls. The frozen schema uses an ordered array aligned with the
+declared variables. Treatment still used about 111,000 median cumulative input
+tokens and about 17 seconds more wall time than control, so compact descriptor
+discovery and lower-overhead MCP composition remain follow-up work. Because
+this was a prescribed-capability pilot, it measures contract use and assurance
+discipline rather than autonomous portfolio discovery.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:

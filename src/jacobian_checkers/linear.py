@@ -1,0 +1,381 @@
+"""Independent exact replay for rational linear-solution witnesses.
+
+This module intentionally uses only the Python standard library. It does not
+import Jacobian contracts, Python-FLINT, SymPy, or any producer implementation.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from fractions import Fraction
+from typing import Any
+
+_ARTIFACT_URI = re.compile(r"^artifact://sha256/[0-9a-f]{64}$")
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
+_VARIABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+_ARTIFACT_KEYS = {
+    "artifact_uri",
+    "object_digest",
+    "payload_digest",
+    "schema_uri",
+    "semantics_uri",
+    "parents",
+    "payload",
+}
+_BINDING_KEYS = {
+    "claim_digest",
+    "semantics_digest",
+    "candidate_digest",
+    "scope_digest",
+    "encoding_digest",
+}
+_SYSTEM_BINDING_KEYS = {
+    "binding_version",
+    "system_artifact_uri",
+    "system_object_digest",
+    "system_payload_digest",
+    "variable_order_digest",
+    "row_count",
+    "column_count",
+}
+_PROVIDER_KEYS = {
+    "runtime_version",
+    "provider",
+    "availability",
+    "version",
+    "digest",
+    "digest_kind",
+    "platform",
+    "install_tier",
+    "license_id",
+    "license_files",
+    "features",
+    "checker_ids",
+    "configuration",
+    "diagnostic",
+}
+MAX_LINEAR_DIMENSION = 32
+MAX_RATIONAL_DIGITS = 256
+
+
+def _reject(detail: str) -> dict[str, Any]:
+    return {
+        "accepted": False,
+        "conclusion": "UNKNOWN",
+        "arithmetic": "EXACT_RATIONAL",
+        "method": "DIRECT_WITNESS",
+        "coverage": "NOT_APPLICABLE",
+        "detail": detail,
+    }
+
+
+def _sha256(value: bytes) -> str:
+    return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def _canonical_json(value: object) -> bytes:
+    # Linear artifacts contain only ASCII strings, lists, and maps. For that
+    # subset this is byte-identical to Jacobian's canonical JSON encoder.
+    return json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+
+def _valid_artifact(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != _ARTIFACT_KEYS:
+        return False
+    if (
+        not isinstance(value["artifact_uri"], str)
+        or _ARTIFACT_URI.fullmatch(value["artifact_uri"]) is None
+        or not isinstance(value["object_digest"], str)
+        or _DIGEST.fullmatch(value["object_digest"]) is None
+        or not isinstance(value["payload_digest"], str)
+        or _DIGEST.fullmatch(value["payload_digest"]) is None
+        or not isinstance(value["schema_uri"], str)
+        or _ARTIFACT_URI.fullmatch(value["schema_uri"]) is None
+        or not isinstance(value["semantics_uri"], str)
+        or _ARTIFACT_URI.fullmatch(value["semantics_uri"]) is None
+    ):
+        return False
+    parents = value["parents"]
+    return (
+        isinstance(parents, list)
+        and len(parents) == len(set(parents))
+        and all(
+            isinstance(parent, str) and _ARTIFACT_URI.fullmatch(parent) is not None
+            for parent in parents
+        )
+    )
+
+
+def _valid_bindings(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != _BINDING_KEYS:
+        return False
+    if value["scope_digest"] is not None or value["encoding_digest"] is not None:
+        return False
+    return all(
+        isinstance(value[key], str) and _DIGEST.fullmatch(value[key]) is not None
+        for key in ("claim_digest", "semantics_digest", "candidate_digest")
+    )
+
+
+def _rational(value: object) -> Fraction:
+    if not isinstance(value, dict) or set(value) != {"num", "den"}:
+        raise ValueError("rational value has an invalid shape")
+    numerator = value["num"]
+    denominator = value["den"]
+    if (
+        not isinstance(numerator, str)
+        or not isinstance(denominator, str)
+        or _INTEGER.fullmatch(numerator) is None
+        or _INTEGER.fullmatch(denominator) is None
+        or len(numerator.lstrip("-")) > MAX_RATIONAL_DIGITS
+        or len(denominator.lstrip("-")) > MAX_RATIONAL_DIGITS
+    ):
+        raise ValueError("rational value is not bounded canonical integer data")
+    result = Fraction(int(numerator), int(denominator))
+    if str(result.numerator) != numerator or str(result.denominator) != denominator:
+        raise ValueError("rational value is not reduced and canonical")
+    return result
+
+
+def _validate_system(
+    payload: object,
+) -> tuple[list[list[Fraction]], list[Fraction], list[str]]:
+    if not isinstance(payload, dict) or set(payload) != {
+        "system_schema_version",
+        "domain",
+        "relation",
+        "variables",
+        "coefficients",
+        "rhs",
+    }:
+        raise ValueError("rational linear system has an invalid shape")
+    if (
+        payload["system_schema_version"] != "1"
+        or payload["domain"] != "QQ"
+        or payload["relation"] != "AX_EQUALS_B"
+    ):
+        raise ValueError("rational linear system uses unsupported semantics")
+    variables = payload["variables"]
+    if (
+        not isinstance(variables, list)
+        or not 1 <= len(variables) <= MAX_LINEAR_DIMENSION
+        or any(
+            not isinstance(variable, str) or _VARIABLE.fullmatch(variable) is None
+            for variable in variables
+        )
+        or len(variables) != len(set(variables))
+    ):
+        raise ValueError("rational linear-system variables are malformed")
+    matrix = payload["coefficients"]
+    if not isinstance(matrix, dict) or set(matrix) != {
+        "matrix_schema_version",
+        "domain",
+        "entries",
+    }:
+        raise ValueError("rational coefficient matrix has an invalid shape")
+    if matrix["matrix_schema_version"] != "1" or matrix["domain"] != "QQ":
+        raise ValueError("rational coefficient matrix uses unsupported semantics")
+    entries = matrix["entries"]
+    rhs = payload["rhs"]
+    if (
+        not isinstance(entries, list)
+        or not isinstance(rhs, list)
+        or not 1 <= len(entries) <= MAX_LINEAR_DIMENSION
+        or len(entries) != len(rhs)
+        or any(
+            not isinstance(row, list) or len(row) != len(variables) for row in entries
+        )
+    ):
+        raise ValueError("rational linear-system dimensions do not match")
+    return (
+        [[_rational(value) for value in row] for row in entries],
+        [_rational(value) for value in rhs],
+        variables,
+    )
+
+
+def _validate_solution(
+    payload: object,
+    *,
+    claim: dict[str, Any],
+    candidate: dict[str, Any],
+    rows: int,
+    columns: int,
+    variables: list[str],
+) -> list[Fraction]:
+    if not isinstance(payload, dict) or set(payload) != {
+        "solution_schema_version",
+        "system",
+        "declared_scope",
+        "values",
+        "producer",
+        "resource_budget",
+        "method",
+    }:
+        raise ValueError("rational solution has an invalid shape")
+    if (
+        payload["solution_schema_version"] != "1"
+        or payload["declared_scope"] != "FULL_SYSTEM"
+        or payload["method"] != "RREF_FREE_VARIABLES_ZERO"
+    ):
+        raise ValueError("rational solution uses unsupported semantics")
+    binding = payload["system"]
+    if not isinstance(binding, dict) or set(binding) != _SYSTEM_BINDING_KEYS:
+        raise ValueError("rational solution system binding is malformed")
+    expected_variable_digest = _sha256(_canonical_json({"variables": variables}))
+    if binding != {
+        "binding_version": "1",
+        "system_artifact_uri": claim["artifact_uri"],
+        "system_object_digest": claim["object_digest"],
+        "system_payload_digest": claim["payload_digest"],
+        "variable_order_digest": expected_variable_digest,
+        "row_count": rows,
+        "column_count": columns,
+    }:
+        raise ValueError("rational solution is not exactly bound to the system")
+    if claim["artifact_uri"] not in candidate["parents"]:
+        raise ValueError("rational solution is missing system lineage")
+    values = payload["values"]
+    if not isinstance(values, list) or len(values) != columns:
+        raise ValueError("rational solution is not a total vector")
+    provider = payload["producer"]
+    if (
+        not isinstance(provider, dict)
+        or set(provider) != _PROVIDER_KEYS
+        or provider["runtime_version"] != "1"
+        or provider["provider"] != "python-flint"
+        or provider["availability"] != "AVAILABLE"
+        or provider["version"] != "0.9.0"
+        or not isinstance(provider["digest"], str)
+        or _DIGEST.fullmatch(provider["digest"]) is None
+        or provider["digest_kind"] != "PYTHON_DISTRIBUTION_RECORD"
+        or provider["install_tier"] != "T1"
+    ):
+        raise ValueError("rational solution producer identity is malformed")
+    budget = payload["resource_budget"]
+    if (
+        not isinstance(budget, dict)
+        or set(budget) != {"budget_version", "wall_seconds"}
+        or budget["budget_version"] != "1"
+        or type(budget["wall_seconds"]) is not int
+        or not 1 <= budget["wall_seconds"] <= 60
+    ):
+        raise ValueError("rational solution resource budget is malformed")
+    return [_rational(value) for value in values]
+
+
+def check_rational_solution(request: dict[str, Any]) -> dict[str, Any]:
+    """Accept only a total exact vector satisfying every bound equation."""
+
+    try:
+        if not isinstance(request, dict) or set(request) != {
+            "request_version",
+            "claim",
+            "candidate",
+            "scope",
+            "witness",
+            "expected_bindings",
+        }:
+            return _reject("malformed checker request")
+        if request["request_version"] != "1" or request["scope"] is not None:
+            return _reject("unsupported checker request")
+        claim = request["claim"]
+        candidate = request["candidate"]
+        witness = request["witness"]
+        if not all(_valid_artifact(item) for item in (claim, candidate, witness)):
+            return _reject("checker artifact metadata is malformed")
+        if not _valid_bindings(request["expected_bindings"]):
+            return _reject("expected evidence bindings are malformed")
+        if (
+            claim["semantics_uri"] != candidate["semantics_uri"]
+            or claim["semantics_uri"] != witness["semantics_uri"]
+        ):
+            return _reject("checker artifacts use different semantics")
+        if claim["payload_digest"] != _sha256(_canonical_json(claim["payload"])):
+            return _reject("linear-system payload digest does not match")
+        if candidate["payload_digest"] != _sha256(
+            _canonical_json(candidate["payload"])
+        ):
+            return _reject("solution payload digest does not match")
+        if witness["payload_digest"] != _sha256(_canonical_json(witness["payload"])):
+            return _reject("linear witness payload digest does not match")
+
+        coefficients, rhs, variables = _validate_system(claim["payload"])
+        values = _validate_solution(
+            candidate["payload"],
+            claim=claim,
+            candidate=candidate,
+            rows=len(coefficients),
+            columns=len(variables),
+            variables=variables,
+        )
+        expected_bindings = request["expected_bindings"]
+        if (
+            expected_bindings["claim_digest"] != claim["object_digest"]
+            or expected_bindings["candidate_digest"] != candidate["object_digest"]
+        ):
+            return _reject("expected evidence bindings do not match artifacts")
+        envelope = witness["payload"]
+        if not isinstance(envelope, dict) or set(envelope) != {
+            "evidence_schema_version",
+            "witness_format",
+            "format_version",
+            "role",
+            "bindings",
+            "payload",
+        }:
+            return _reject("linear witness envelope is malformed")
+        if (
+            envelope["evidence_schema_version"] != "1"
+            or envelope["witness_format"] != "linear.rational_solution"
+            or envelope["format_version"] != "1"
+            or envelope["role"] != "SUPPORTS_CLAIM"
+            or envelope["bindings"] != expected_bindings
+        ):
+            return _reject("linear witness envelope is not exactly bound")
+        witness_payload = envelope["payload"]
+        if not isinstance(witness_payload, dict) or witness_payload != {
+            "system_uri": claim["artifact_uri"],
+            "solution_uri": candidate["artifact_uri"],
+        }:
+            return _reject("linear witness points at different artifacts")
+        if not {
+            claim["artifact_uri"],
+            candidate["artifact_uri"],
+        }.issubset(set(witness["parents"])):
+            return _reject("linear witness is missing required lineage")
+
+        for row, expected in zip(coefficients, rhs, strict=True):
+            if (
+                sum(
+                    (
+                        coefficient * value
+                        for coefficient, value in zip(row, values, strict=True)
+                    ),
+                    Fraction(0),
+                )
+                != expected
+            ):
+                return _reject("candidate does not satisfy every bound equation")
+        return {
+            "accepted": True,
+            "conclusion": "TRUE",
+            "arithmetic": "EXACT_RATIONAL",
+            "method": "DIRECT_WITNESS",
+            "coverage": "NOT_APPLICABLE",
+            "detail": (
+                f"replayed {len(coefficients)} equations over "
+                f"{len(variables)} exact rational variables"
+            ),
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError, OverflowError):
+        return _reject("malformed checker request")

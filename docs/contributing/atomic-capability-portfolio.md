@@ -473,6 +473,12 @@ proof-support claim. See
 
 ### Python-FLINT first
 
+The first rational-solution slice is implemented; see the
+[exact rational solution contract](../reference/linear-rational-solutions.md)
+and the
+[Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
+The remaining sequence stays demand-gated.
+
 Implement one vertical slice at a time:
 
 1. `linear.rational_solution.find` returns one exact vector for a declared
@@ -564,7 +570,10 @@ backlog.
     [SMT Alethe artifact contracts](../reference/smt-artifacts.md#strict-carcara-verification)
     and the
     [SMT Carcara contract pilot](../reference/capability-workflow-evaluations.md#smt-carcara-contract-pilot).
-11. Python-FLINT rational-solution find and verify slice.
+11. Python-FLINT rational-solution find and verify slice. Implemented; see the
+    [exact rational solution contract](../reference/linear-rational-solutions.md)
+    and the
+    [Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
 12. Python-FLINT polynomial or integer-matrix slice chosen from transcript
     demand.
 13. Typed expression AST and one SymPy polynomial-normalization slice.

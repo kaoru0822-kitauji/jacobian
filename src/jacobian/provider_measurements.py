@@ -79,6 +79,13 @@ elif provider == "cvc5":
         proofs = solver.getProof(backend.ProofComponent.FULL)
         assert len(proofs) == 1
         assert solver.proofToString(proofs[0], backend.ProofFormat.ALETHE)
+elif provider == "python-flint":
+    import flint as backend
+    if operation == "reproduction":
+        augmented = backend.fmpq_mat([[2, 1, 5], [1, -1, 1]])
+        reduced, rank = augmented.rref()
+        assert rank == 2
+        assert reduced == backend.fmpq_mat([[1, 0, 2], [0, 1, 1]])
 else:
     import jacobian.canonical as backend
     if operation == "reproduction":
