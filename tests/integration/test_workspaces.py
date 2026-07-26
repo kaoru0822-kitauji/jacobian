@@ -32,6 +32,8 @@ from jacobian.workspaces import (
     WorkspaceReferenceError,
 )
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _open(
     kernel: JacobianKernel,

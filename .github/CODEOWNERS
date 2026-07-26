@@ -1,0 +1,8 @@
+# Request review only for publishing and repository-governance changes.
+/.github/CODEOWNERS @morluto @N0zoM1z0
+/.github/workflows/ci.yml @morluto @N0zoM1z0
+/.github/workflows/release.yml @morluto @N0zoM1z0
+/.release-please-manifest.json @morluto @N0zoM1z0
+/release-please-config.json @morluto @N0zoM1z0
+/pyproject.toml @morluto @N0zoM1z0
+/npm/package.json @morluto @N0zoM1z0

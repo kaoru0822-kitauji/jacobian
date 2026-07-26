@@ -1,0 +1,69 @@
+{
+  "suite_id": "SAT-PUBLIC-REPRODUCTIONS-001",
+  "version": "1",
+  "scored": false,
+  "purpose": "Public artifact-boundary reproductions only; never hidden evaluation",
+  "cases": [
+    {
+      "case_id": "BOOL-MUS-001",
+      "source": "docs/reference/math-scenarios.md#bool-mus-001--checked-shrinking-of-an-unsatisfiable-core",
+      "scope": "Verify the full public formula only; core shrinking is out of scope",
+      "variable_names": ["x", "y", "z"],
+      "clauses": [[1], [-1], [2, 3]],
+      "expected_status": "UNSATISFIABLE",
+      "required_capabilities": [
+        "sat.unsat_proof.find",
+        "sat.unsat_proof.verify"
+      ]
+    },
+    {
+      "case_id": "SAT-SMALL-001",
+      "source": "Jacobian synthetic public reproduction",
+      "scope": "Verify one total satisfying assignment for the full CNF",
+      "variable_names": ["a", "b", "c"],
+      "clauses": [[1, 2], [-1, 3], [-2, 3]],
+      "expected_status": "SATISFIABLE",
+      "required_capabilities": ["sat.model.find", "sat.model.verify"]
+    },
+    {
+      "case_id": "SAT-PIGEONHOLE-3-2-001",
+      "source": "Standard pigeonhole principle encoding",
+      "scope": "Three pigeons, two holes, full CNF",
+      "variable_names": ["p1h1", "p1h2", "p2h1", "p2h2", "p3h1", "p3h2"],
+      "clauses": [
+        [1, 2],
+        [3, 4],
+        [5, 6],
+        [-1, -3],
+        [-1, -5],
+        [-3, -5],
+        [-2, -4],
+        [-2, -6],
+        [-4, -6]
+      ],
+      "expected_status": "UNSATISFIABLE",
+      "required_capabilities": [
+        "sat.unsat_proof.find",
+        "sat.unsat_proof.verify"
+      ]
+    }
+  ],
+  "attack_coverage": [
+    {
+      "variant": "flipped or incomplete assignment",
+      "expected": "REJECTED with UNKNOWN conclusion"
+    },
+    {
+      "variant": "mutated, truncated, or concatenated proof",
+      "expected": "REJECTED with UNKNOWN conclusion"
+    },
+    {
+      "variant": "proof or assignment rebound to a different CNF",
+      "expected": "ERROR or REJECTED with UNKNOWN conclusion"
+    },
+    {
+      "variant": "timeout, crash, excessive output, or runtime substitution",
+      "expected": "No verification record and UNKNOWN conclusion"
+    }
+  ]
+}

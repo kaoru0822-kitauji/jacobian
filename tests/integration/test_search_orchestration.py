@@ -23,7 +23,10 @@ from jacobian.kernel import JacobianKernel
 from jacobian.search import SearchError
 from jacobian.store import StoreError, StoreLimits
 
-pytestmark = pytest.mark.conformance
+pytestmark = [
+    pytest.mark.conformance,
+    pytest.mark.usefixtures("initialized_kernel_store"),
+]
 
 
 def _install_search_plugin(

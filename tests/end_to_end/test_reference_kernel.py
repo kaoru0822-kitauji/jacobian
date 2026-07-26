@@ -15,6 +15,8 @@ from jacobian.contracts.evidence import (
 )
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 @pytest.mark.end_to_end
 def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:

@@ -277,8 +277,8 @@ successful persistence operation is not a mathematical capability result.
 Remote hosts use Streamable HTTP and subject-bound tenant state. Authentication,
 tenant isolation, persistence, and TLS are deployment responsibilities, not
 mathematical primitives. See
-[Deploy the remote MCP server](../how-to/deploy-remote-mcp.md) and the
-[threat model](threat-model.md) for their concrete requirements.
+[Deploy the remote MCP server](../how-to/deploy-remote-mcp.md) for their
+concrete requirements.
 
 ## Product evidence
 

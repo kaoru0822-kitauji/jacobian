@@ -13,6 +13,7 @@ from jacobian.builtin_capabilities import (
     LeanDeclarationInspectAdapter,
     LeanDeclarationSearchAdapter,
 )
+from jacobian.cadical import install_cadical_capabilities
 from jacobian.capabilities import (
     CapabilityAdapter,
     CapabilityService,
@@ -20,8 +21,12 @@ from jacobian.capabilities import (
 )
 from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
-from jacobian.contracts.capabilities import CapabilityProviderAvailability
+from jacobian.contracts.capabilities import (
+    CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
+)
 from jacobian.contracts.lean import LeanEnvironment
+from jacobian.cvc5 import install_cvc5_capability
 from jacobian.evaluation import EvaluationService
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
@@ -47,7 +52,12 @@ from jacobian.polynomial_capabilities import (
     install_polynomial_capabilities,
 )
 from jacobian.polytope import PolytopeService
-from jacobian.provider_runtime import lean_provider_runtime
+from jacobian.provider_runtime import (
+    cadical_provider_runtime,
+    cvc5_provider_runtime,
+    drat_trim_provider_runtime,
+    lean_provider_runtime,
+)
 from jacobian.references import (
     LeanCheckerInstallation,
     PolytopeCheckerInstallation,
@@ -56,9 +66,16 @@ from jacobian.references import (
 )
 from jacobian.registry import CheckerRegistry
 from jacobian.sat import SatArtifactService, install_sat_artifacts
+from jacobian.sat_capabilities import (
+    SatAssignmentCheckerInstallation,
+    SatUnsatProofCheckerInstallation,
+    install_sat_assignment_checker,
+    install_sat_unsat_proof_checker,
+)
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
+from jacobian.smt import SmtArtifactService, install_smt_artifacts
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
@@ -91,6 +108,11 @@ class JacobianKernel:
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
         self.sat: SatArtifactService = install_sat_artifacts(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
+        self.smt: SmtArtifactService = install_smt_artifacts(
             self.store,
             self.schemas,
             self.artifacts,
@@ -190,6 +212,66 @@ class JacobianKernel:
         self.lean_declarations: LeanDeclarationService | None = None
         self.lean_exploration: LeanExplorationInstallation | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
+        self.sat_assignment_checker: SatAssignmentCheckerInstallation
+        sat_assignment_adapter, self.sat_assignment_checker = (
+            install_sat_assignment_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.sat,
+                self.verification,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        if sat_assignment_adapter is not None:
+            self.register_capability(sat_assignment_adapter)
+        self.drat_trim_runtime: CapabilityProviderRuntime = drat_trim_provider_runtime()
+        self.sat_unsat_proof_checker: SatUnsatProofCheckerInstallation
+        proof_adapter, self.sat_unsat_proof_checker = install_sat_unsat_proof_checker(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.sat,
+            self.verification,
+            self.checkers,
+            self.drat_trim_runtime,
+            authorize_checker=install_references,
+        )
+        if proof_adapter is not None:
+            self.register_capability(proof_adapter)
+        self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
+        if (
+            self.cadical_runtime.availability
+            is CapabilityProviderAvailability.AVAILABLE
+        ):
+            try:
+                cadical_adapters = install_cadical_capabilities(
+                    self.sat,
+                    self.cadical_runtime,
+                )
+            except (OSError, ValueError) as exc:
+                _LOGGER.warning(
+                    "CaDiCaL SAT exploration is not installed: %s",
+                    exc,
+                )
+            else:
+                for cadical_adapter in cadical_adapters:
+                    self.register_capability(cadical_adapter)
+        self.cvc5_runtime: CapabilityProviderRuntime = cvc5_provider_runtime()
+        if self.cvc5_runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+            try:
+                cvc5_adapter = install_cvc5_capability(
+                    self.smt,
+                    self.cvc5_runtime,
+                )
+            except (OSError, ValueError) as exc:
+                _LOGGER.warning(
+                    "cvc5 SMT proof exploration is not installed: %s",
+                    exc,
+                )
+            else:
+                self.register_capability(cvc5_adapter)
         for atomic_adapter in install_atomic_capabilities(self):
             self.register_capability(atomic_adapter)
         self.register_capability(KnowledgeSearchAdapter(self.memory))

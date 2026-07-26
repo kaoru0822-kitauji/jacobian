@@ -1,0 +1,22 @@
+{
+    "tests/integration/test_agent_ab_benchmark.py::test_ab_lean_control_ablation_removes_only_declaration_discovery": 3.0131658369937213,
+    "tests/integration/test_agent_ab_benchmark.py::test_ab_lean_scorer_requires_exact_checker_bound_trace": 20.60014637900167,
+    "tests/integration/test_agent_ab_benchmark.py::test_lean_ab_scorer_accepts_any_exact_replayable_proof": 44.45612976499979,
+    "tests/integration/test_capability_service.py::test_lean_capability_projects_repairable_checker_diagnostics": 3.458095444002538,
+    "tests/integration/test_capability_service.py::test_lean_capability_returns_bound_verified_result": 4.014008276004461,
+    "tests/integration/test_lean.py::test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering": 24.78189277600177,
+    "tests/integration/test_lean.py::test_core_lean_check_runs_through_capability_mcp_surface": 6.31251833299757,
+    "tests/integration/test_lean.py::test_core_lean_induction_proof_creates_bound_verification_record": 13.08042386300076,
+    "tests/integration/test_lean.py::test_core_lean_rejects_untrusted_or_invalid_proofs[exact Nat.succ.inj]": 4.043766130002041,
+    "tests/integration/test_lean.py::test_core_lean_rejects_untrusted_or_invalid_proofs[native_decide]": 3.2847506549951504,
+    "tests/integration/test_lean.py::test_core_lean_rejects_untrusted_or_invalid_proofs[run_tac exact q(true)]": 3.378203226988262,
+    "tests/integration/test_lean.py::test_core_lean_rejects_untrusted_or_invalid_proofs[sorry]": 3.3881960309954593,
+    "tests/integration/test_lean.py::test_lean_cache_does_not_reuse_a_revoked_checker_result": 3.249303401003999,
+    "tests/integration/test_lean.py::test_lean_reuses_only_an_exact_active_checker_result": 3.26227642899903,
+    "tests/integration/test_lean.py::test_mathlib_discovery_composes_with_bound_sqrt_two_verification": 71.22062919200835,
+    "tests/integration/test_lean.py::test_mathlib_warmup_starts_only_once": 2.5702896360016894,
+    "tests/integration/test_lean_exploration_capabilities.py::test_apply_tactic_exposes_child_goals_and_replay_source": 4.540713508002227,
+    "tests/integration/test_lean_exploration_capabilities.py::test_apply_tactic_returns_structured_failure_without_conclusion": 4.647448685995187,
+    "tests/integration/test_lean_exploration_capabilities.py::test_kernel_can_ablate_lean_capabilities_without_removing_checker": 3.1214253989965073,
+    "tests/integration/test_lean_exploration_capabilities.py::test_retrieve_premises_returns_exact_mathlib_suggestion": 46.32682941600069
+}

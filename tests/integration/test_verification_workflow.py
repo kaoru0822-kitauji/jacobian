@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
@@ -12,6 +14,8 @@ from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.results import Conclusion, Verification
 from jacobian.kernel import JacobianKernel
 from jacobian.references import ReferenceInstallation
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _claim(

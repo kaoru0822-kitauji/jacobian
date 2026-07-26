@@ -339,6 +339,62 @@ the agent workspace. Public Hugging Face rows, LeanTree/APRIL examples, blog
 posts, Codeforces cases, and repository artifacts are reproduction and
 workflow-mining cases only. They never serve as hidden evaluation tasks.
 
+### SAT certificate portfolio pilot
+
+The frozen 2026-07-26 SAT pilot compared direct local reasoning with the
+four-outcome SAT portfolio under `gpt-5.6-terra`, high reasoning effort, a
+600-second per-run limit, and order seed `20260731`. Two private cases created
+after the interface freeze were each repeated twice: one satisfiable
+14-variable planted formula and one unsatisfiable 12-variable odd-cycle
+formula. Their exact clauses remained outside the repository; the recorded
+case digests were
+`sha256:dca243f518737d9e776bde0c001958dbd98e9fe830e483e47dd5f643671da6ec`
+and
+`sha256:20dac1be40cf5845b7fdba501933bc8adfcc6487d88205273917a7fda84cf4f1`.
+
+Both conditions received the same pre-materialized canonical CNF URI. Control
+had no MCP server and could use local code. Treatment used Jacobian and had to
+compose the applicable producer and verifier. This isolates the value of
+`sat.model.find`, `sat.model.verify`, `sat.unsat_proof.find`, and
+`sat.unsat_proof.verify`; it does not evaluate a CNF-authoring capability.
+
+The hidden scorer brute-forced the exact CNF, limited private cases to at most
+20 variables, checked the report against the durable CNF and evidence,
+required an ordered producer-to-verifier invocation trace, and reopened a
+clean kernel to replay the checker. Public SAT reproductions were explicitly
+unscored.
+
+| Condition | Passed | False certifications | Independent replay | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| control | 4 / 4 | 0 | 0 / 4 | 17.258 | 12,904.0 | 0 | 0 |
+| SAT portfolio | 4 / 4 | 0 | 4 / 4 | 39.788 | 184,739.5 | 7 | 0 |
+
+Every treatment composed the appropriate evidence producer and independent
+verifier, preserved exact bindings, and replayed successfully. Control also
+answered every case correctly, but could only report `SELF_CHECKED` and
+`UNVERIFIED`. This small pilot supports retaining all four outcomes for their
+durable assurance value. It demonstrates no autonomous completion or
+efficiency lift. Treatment was substantially slower and more token-intensive,
+largely because catalog discovery returns the full installed portfolio.
+
+Development runs exposed three interface issues before the frozen pilot.
+They are excluded from the frozen comparison because their cases informed
+contract changes. The report contract did not initially distinguish producer
+evidence from the verifier's witness or certificate. The client then guessed
+nonexistent generic artifact-read capabilities. Finally, a SAT assignment
+artifact exposed canonical variable order and positional values on separate
+objects, and agents joined those values against the prompt's original order.
+The report schema now identifies `assignment_uri` or `proof_uri` as producer
+evidence, and `sat.model.find` returns its constructed assignment as an inline
+name-to-Boolean map beside the durable URI. A development rerun of the
+previously failing noncanonical-order case then passed with clean replay and no
+tool error.
+
+The remaining portfolio work is compact catalog discovery and ranking, not
+consolidation of the SAT outcomes. The frozen sample is too small for a powered
+comparative claim; add new cases and repetitions without reopening these cases
+for tuning.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:
