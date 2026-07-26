@@ -7,14 +7,18 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Literal, cast
 
+from pydantic import ValidationError
+
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
+from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityCompleteness,
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
+    CapabilityDiagnostic,
     CapabilityMode,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
@@ -33,7 +37,7 @@ from jacobian.contracts.polynomial_systems import (
     RationalPolynomialSystem,
 )
 from jacobian.contracts.polynomials import SparseRationalPolynomial
-from jacobian.contracts.results import ExecutionStatus
+from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -172,10 +176,31 @@ class PolynomialSystemSolutionAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        validated = PolynomialSystemSolutionRequest.model_validate(request.input)
+        try:
+            validated = PolynomialSystemSolutionRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_POLYNOMIAL_SYSTEM_SOLUTION_REQUEST",
+                    stage="request_validation",
+                    message=(
+                        "The complete polynomial-system solution request is invalid."
+                    ),
+                    path="system/assignment",
+                    expected=(
+                        "one canonical rational assignment value for every declared "
+                        "variable, with every monomial using that variable order"
+                    ),
+                    hint=(
+                        "Match the assignment and every exponent vector to the "
+                        "system.variables order, then retry."
+                    ),
+                )
+            ) from exc
         installation = self.resources.installation
         checker_id = installation.checker_id
         assert checker_id is not None
+        equation_residuals, inequation_values = _evaluate_request(validated)
         system = self.resources.artifacts.put(
             schema_uri=installation.system_schema_uri,
             semantics_uri=installation.semantics_uri,
@@ -204,6 +229,8 @@ class PolynomialSystemSolutionAdapter:
         replay = PolynomialSystemSolutionReplay(
             system_uri=system.artifact_uri,
             assignment_uri=assignment.artifact_uri,
+            equation_residuals=equation_residuals,
+            inequation_values=inequation_values,
         ).model_dump(mode="json")
         certificate = CertificateEnvelope(
             certificate_type="polynomial.system_solution_replay",
@@ -236,26 +263,33 @@ class PolynomialSystemSolutionAdapter:
         )
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
+            and checked.conclusion in {Conclusion.TRUE, Conclusion.FALSE}
+            and checked.assurance.verification is Verification.VERIFIED
             and checked.verification_record_uri is not None
         )
-        equation_residuals, inequation_values = _evaluate_request(validated)
         conclusion = cast(
             Literal["TRUE", "FALSE", "UNKNOWN"],
             checked.conclusion.value,
         )
+        satisfies = {
+            "TRUE": True,
+            "FALSE": False,
+            "UNKNOWN": None,
+        }[conclusion]
+        record_uri = checked.verification_record_uri if verified else None
         output = PolynomialSystemSolutionOutput(
-            satisfies=conclusion == "TRUE",
+            satisfies=satisfies,
             conclusion=conclusion,
             equation_residuals=equation_residuals,
             inequation_values=inequation_values,
+            residuals_assurance="VERIFIED" if verified else "COMPUTED",
             system_uri=system.artifact_uri,
             assignment_uri=assignment.artifact_uri,
             claim_uri=claim.artifact_uri,
             certificate_uri=evidence.artifact_uri,
-            verification_record_uri=checked.verification_record_uri,
+            verification_record_uri=record_uri,
             checker_id=checker_id,
         )
-        record_uri = checked.verification_record_uri
         artifact_uris = [
             system.artifact_uri,
             assignment.artifact_uri,
@@ -280,38 +314,65 @@ class PolynomialSystemSolutionAdapter:
                 artifact_uri=system.artifact_uri,
             ),
             completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.COMPLETE,
-                basis="the independent checker evaluated every declared constraint",
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if checked.execution.status is ExecutionStatus.COMPLETED
+                    else CapabilityCompletenessStatus.UNKNOWN
+                ),
+                basis=(
+                    "the independent checker evaluated every declared constraint"
+                    if verified
+                    else (
+                        "the adapter computed every declared residual, but the "
+                        "checker did not accept the bound replay"
+                        if checked.execution.status is ExecutionStatus.COMPLETED
+                        else "checker execution did not establish complete coverage"
+                    )
+                ),
                 assurance_level=(
                     CapabilityAssuranceLevel.VERIFIED
                     if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
+                    else (
+                        CapabilityAssuranceLevel.COMPUTED
+                        if checked.execution.status is ExecutionStatus.COMPLETED
+                        else CapabilityAssuranceLevel.HEURISTIC
+                    )
                 ),
                 verification_record_uri=record_uri,
             ),
             relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.satisfies-system",
-                    source_artifact_uris=(assignment.artifact_uri,),
-                    target_artifact_uris=(system.artifact_uri,),
-                    status=(
-                        CapabilityRelationshipStatus.VERIFIED
-                        if verified
-                        else CapabilityRelationshipStatus.PROPOSED
+                (
+                    CapabilityRelationship(
+                        relation_id="polynomial.relation.satisfies-system",
+                        source_artifact_uris=(assignment.artifact_uri,),
+                        target_artifact_uris=(system.artifact_uri,),
+                        status=CapabilityRelationshipStatus.VERIFIED,
+                        verification_record_uri=record_uri,
                     ),
-                    verification_record_uri=record_uri,
-                ),
+                )
+                if conclusion == "TRUE" and verified
+                else ()
             ),
             assurance=CapabilityAssurance(
                 level=(
                     CapabilityAssuranceLevel.VERIFIED
                     if verified
-                    else CapabilityAssuranceLevel.HEURISTIC
+                    else (
+                        CapabilityAssuranceLevel.COMPUTED
+                        if checked.execution.status is ExecutionStatus.COMPLETED
+                        else CapabilityAssuranceLevel.HEURISTIC
+                    )
                 ),
                 basis=(
                     "accepted by the authorized independent exact evaluator"
                     if verified
-                    else "the independent checker did not accept the assignment"
+                    else (
+                        "exact residuals were computed, but the independent checker "
+                        "did not accept the bound replay"
+                        if checked.execution.status is ExecutionStatus.COMPLETED
+                        else "checker execution did not complete; no mathematical "
+                        "conclusion follows"
+                    )
                 ),
                 verification_record_uri=record_uri,
             ),
@@ -322,6 +383,8 @@ class PolynomialSystemSolutionAdapter:
 def _evaluate_request(
     request: PolynomialSystemSolutionRequest,
 ) -> tuple[tuple[CanonicalRational, ...], tuple[CanonicalRational, ...]]:
+    """Compute projected values; the isolated checker independently replays them."""
+
     assignment = tuple(value.as_fraction() for value in request.assignment)
 
     def evaluate(polynomial: SparseRationalPolynomial) -> CanonicalRational:

@@ -156,14 +156,24 @@ def check_solution(request: dict[str, Any]) -> dict[str, Any]:
             != "polynomial.system_solution_replay"
             or certificate.get("format_version") != "1"
             or certificate.get("bindings") != request.get("expected_bindings")
-            or certificate.get("payload")
-            != {
-                "method": "DIRECT_EXACT_EVALUATION",
-                "system_uri": system_artifact["artifact_uri"],
-                "assignment_uri": assignment_artifact["artifact_uri"],
-            }
         ):
             return _reject("unexpected solution certificate or bindings")
+        replay = certificate.get("payload")
+        if (
+            not isinstance(replay, dict)
+            or set(replay)
+            != {
+                "method",
+                "system_uri",
+                "assignment_uri",
+                "equation_residuals",
+                "inequation_values",
+            }
+            or replay.get("method") != "DIRECT_EXACT_EVALUATION"
+            or replay.get("system_uri") != system_artifact["artifact_uri"]
+            or replay.get("assignment_uri") != assignment_artifact["artifact_uri"]
+        ):
+            return _reject("unexpected solution replay payload")
         assignment = tuple(_rational(value) for value in values)
         equation_values = tuple(
             _evaluate(_polynomial(polynomial, len(variables)), assignment)
@@ -173,6 +183,17 @@ def check_solution(request: dict[str, Any]) -> dict[str, Any]:
             _evaluate(_polynomial(polynomial, len(variables)), assignment)
             for polynomial in inequations
         )
+        reported_equation_values = replay["equation_residuals"]
+        reported_inequation_values = replay["inequation_values"]
+        if (
+            not isinstance(reported_equation_values, list)
+            or not isinstance(reported_inequation_values, list)
+            or tuple(_rational(value) for value in reported_equation_values)
+            != equation_values
+            or tuple(_rational(value) for value in reported_inequation_values)
+            != inequation_values
+        ):
+            return _reject("reported residuals do not match independent replay")
         satisfies = all(value == 0 for value in equation_values) and all(
             value != 0 for value in inequation_values
         )

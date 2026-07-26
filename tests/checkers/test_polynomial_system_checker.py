@@ -75,6 +75,8 @@ def _request() -> dict[str, Any]:
                     "method": "DIRECT_EXACT_EVALUATION",
                     "system_uri": system_uri,
                     "assignment_uri": assignment_uri,
+                    "equation_residuals": [{"num": "0", "den": "1"}],
+                    "inequation_values": [{"num": "2", "den": "1"}],
                 },
             }
         },
@@ -92,6 +94,12 @@ def test_solution_checker_accepts_a_valid_assignment() -> None:
 def test_solution_checker_verifies_a_violating_assignment_as_false() -> None:
     request = _request()
     request["candidate"]["payload"]["values"][0] = {"num": "1", "den": "1"}
+    request["certificate"]["payload"]["payload"]["equation_residuals"] = [
+        {"num": "-3", "den": "1"}
+    ]
+    request["certificate"]["payload"]["payload"]["inequation_values"] = [
+        {"num": "1", "den": "1"}
+    ]
 
     decision = check_solution(request)
 
@@ -102,6 +110,19 @@ def test_solution_checker_verifies_a_violating_assignment_as_false() -> None:
 def test_solution_checker_rejects_assignment_substitution() -> None:
     request = _request()
     request["candidate"]["artifact_uri"] = "artifact://sha256/" + "9" * 64
+
+    decision = check_solution(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_solution_checker_rejects_misreported_residuals() -> None:
+    request = _request()
+    request["certificate"]["payload"]["payload"]["equation_residuals"][0] = {
+        "num": "1",
+        "den": "1",
+    }
 
     decision = check_solution(request)
 

@@ -69,13 +69,16 @@ class PolynomialSystemSolutionReplay(ContractModel):
     method: Literal["DIRECT_EXACT_EVALUATION"] = "DIRECT_EXACT_EVALUATION"
     system_uri: ArtifactUri
     assignment_uri: ArtifactUri
+    equation_residuals: tuple[CanonicalRational, ...]
+    inequation_values: tuple[CanonicalRational, ...]
 
 
 class PolynomialSystemSolutionOutput(ContractModel):
-    satisfies: bool
+    satisfies: bool | None
     conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]
     equation_residuals: tuple[CanonicalRational, ...]
     inequation_values: tuple[CanonicalRational, ...]
+    residuals_assurance: Literal["COMPUTED", "VERIFIED"]
     system_uri: ArtifactUri
     assignment_uri: ArtifactUri
     claim_uri: ArtifactUri
@@ -84,3 +87,27 @@ class PolynomialSystemSolutionOutput(ContractModel):
     checker_id: CheckerUri | None = None
     exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
     determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
+
+    @model_validator(mode="after")
+    def preserve_truth_and_residual_assurance(self) -> Self:
+        expected_satisfies = {
+            "TRUE": True,
+            "FALSE": False,
+            "UNKNOWN": None,
+        }[self.conclusion]
+        if self.satisfies is not expected_satisfies:
+            raise ValueError("satisfies must preserve TRUE, FALSE, and UNKNOWN")
+        if self.residuals_assurance == "VERIFIED":
+            if (
+                self.conclusion == "UNKNOWN"
+                or self.verification_record_uri is None
+                or self.checker_id is None
+            ):
+                raise ValueError(
+                    "verified residuals require a decisive checker-backed record"
+                )
+        elif self.verification_record_uri is not None:
+            raise ValueError(
+                "a verification record requires checker-verified residuals"
+            )
+        return self
