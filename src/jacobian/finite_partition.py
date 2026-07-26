@@ -32,6 +32,7 @@ from jacobian.contracts.results import (
     ResultEnvelope,
     Verification,
 )
+from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -193,6 +194,15 @@ class FinitePartitionAdapter:
                 "replay exact coverage and disjointness with an authorized checker."
             ),
             provider="jacobian.finite",
+            provider_runtime=known_provider_runtime(
+                "jacobian.finite",
+                features=("finite-partition",),
+                checker_ids=(
+                    (installation.checker_id,)
+                    if installation.checker_id is not None
+                    else ()
+                ),
+            ),
             modes=modes,
             input_schema={
                 "type": "object",

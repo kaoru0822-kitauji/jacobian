@@ -9,6 +9,7 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityMode,
+    CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -20,6 +21,7 @@ from jacobian.contracts.results import (
 )
 from jacobian.lean import LeanService
 from jacobian.memory import ResearchMemory
+from jacobian.provider_runtime import known_provider_runtime
 
 _OBJECT_SCHEMA: dict[str, Any] = {"type": "object"}
 
@@ -36,6 +38,10 @@ class KnowledgeSearchAdapter:
                 "not promote their mathematical assurance."
             ),
             provider="jacobian.memory",
+            provider_runtime=known_provider_runtime(
+                "jacobian.memory",
+                features=("memory", "retrieval"),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema={
                 "type": "object",
@@ -84,7 +90,11 @@ class KnowledgeSearchAdapter:
 
 
 class LeanCheckAdapter:
-    def __init__(self, lean: LeanService) -> None:
+    def __init__(
+        self,
+        lean: LeanService,
+        provider_runtime: CapabilityProviderRuntime,
+    ) -> None:
         self.lean = lean
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.check",
@@ -95,6 +105,7 @@ class LeanCheckAdapter:
                 "kernel profile."
             ),
             provider="jacobian.lean4",
+            provider_runtime=provider_runtime,
             modes=(CapabilityMode.VERIFY,),
             input_schema={
                 "type": "object",

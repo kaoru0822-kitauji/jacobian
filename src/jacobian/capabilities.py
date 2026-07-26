@@ -20,6 +20,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityObligationStatus,
+    CapabilityProviderAvailability,
     CapabilityRelationshipStatus,
     CapabilityRequest,
     CapabilityResult,
@@ -71,6 +72,18 @@ class CapabilityService:
         if descriptor.capability_id in self._adapters:
             raise CapabilityError(
                 f"duplicate capability ID: {descriptor.capability_id}"
+            )
+        if descriptor.provider_runtime is None:
+            raise CapabilityError(
+                f"capability {descriptor.capability_id} has no provider runtime identity"
+            )
+        if (
+            descriptor.provider_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            raise CapabilityError(
+                f"capability {descriptor.capability_id} is unavailable: "
+                f"{descriptor.provider_runtime.diagnostic}"
             )
         _validator(descriptor.input_schema)
         _validator(descriptor.output_schema)
@@ -127,6 +140,7 @@ class CapabilityService:
                     "available_modes": [mode.value for mode in descriptor.modes],
                 },
             )
+            result = result.model_copy(update=_provider_provenance(descriptor))
             _log_invocation(result, started)
             return result
         try:
@@ -185,6 +199,19 @@ class CapabilityService:
             or result.mode is not request.mode
         ):
             raise CapabilityError("adapter result identity differs from its request")
+        if result.provider is not None and result.provider != descriptor.provider:
+            raise CapabilityError(
+                "adapter result provider runtime differs from its descriptor"
+            )
+        provenance = _provider_provenance(descriptor)
+        if (
+            result.provider_digest is not None
+            and result.provider_digest != provenance["provider_digest"]
+        ):
+            raise CapabilityError(
+                "adapter result provider runtime differs from its descriptor"
+            )
+        result = result.model_copy(update=provenance)
         if result.execution.status is ExecutionStatus.COMPLETED:
             normalized_output = _validate_payload(
                 descriptor.output_schema, result.output
@@ -386,6 +413,7 @@ def _failed_result(
     request: CapabilityRequest,
     diagnostic: CapabilityDiagnostic,
 ) -> CapabilityResult:
+    provenance = _provider_provenance(descriptor)
     return CapabilityResult(
         capability_id=descriptor.capability_id,
         capability_version=descriptor.version,
@@ -400,7 +428,26 @@ def _failed_result(
             level=CapabilityAssuranceLevel.HEURISTIC,
             basis="execution or input failure; no mathematical conclusion",
         ),
+        provider=provenance["provider"],
+        provider_digest=provenance["provider_digest"],
     )
+
+
+def _provider_provenance(
+    descriptor: CapabilityDescriptor,
+) -> dict[str, str]:
+    if descriptor.provider_runtime is None:
+        raise CapabilityError(
+            f"capability {descriptor.capability_id} has no provider runtime identity"
+        )
+    if descriptor.provider_runtime.digest is None:
+        raise CapabilityError(
+            f"capability {descriptor.capability_id} has no provider runtime digest"
+        )
+    return {
+        "provider": descriptor.provider,
+        "provider_digest": descriptor.provider_runtime.digest,
+    }
 
 
 def _resolution_failure(

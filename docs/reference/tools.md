@@ -83,6 +83,12 @@ inputs and returns a typed result with:
 - assurance and any remaining proof obligations;
 - provider and execution provenance.
 
+Installed descriptors expose the exact provider version, digest kind and
+digest, platform, install tier, license metadata, detected features, and fixed
+checker identities. Results repeat the selected provider and provider digest.
+The [provider runtime contract](provider-runtime.md) defines health probing,
+fail-closed registration, and repeatable local measurement.
+
 Backend-call atomicity is not required. An adapter may coordinate several
 backend calls when they jointly implement one coherent operation, but it must
 not hide mathematically useful intermediate artifacts, failures, relationships,

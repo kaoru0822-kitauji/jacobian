@@ -281,7 +281,6 @@ def create_server(
             }
         response: dict[str, Any] = {"capability": descriptor.model_dump(mode="json")}
         if capability_id == "lean.check" and active_kernel.lean_checkers:
-            response["runtime"] = _lean_runtime_metadata(active_kernel)
             response["cache"] = {
                 "key": "exact content-addressed certificate and active checker digest",
                 "max_entries": 128,
@@ -879,24 +878,6 @@ def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
         ensure_ascii=False,
         sort_keys=True,
     )
-
-
-def _lean_runtime_metadata(kernel: JacobianKernel) -> dict[str, Any]:
-    return {
-        "profiles": {
-            environment.value: {
-                "semantics_uri": installation.semantics_uri,
-                "import_name": installation.import_name,
-                "mathlib_commit": installation.mathlib_commit,
-                "allowed_axioms": installation.allowed_axioms,
-                "checker_timeout_seconds": installation.checker_timeout_seconds,
-            }
-            for environment, installation in sorted(
-                kernel.lean_checkers.items(),
-                key=lambda item: item[0].value,
-            )
-        }
-    }
 
 
 def main() -> None:

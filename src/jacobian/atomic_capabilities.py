@@ -38,6 +38,7 @@ from jacobian.contracts.results import (
 )
 from jacobian.contracts.shrinking import ShrinkResult
 from jacobian.contracts.witness_search import WitnessFindResult
+from jacobian.provider_runtime import known_provider_runtime
 from jacobian.store import ArtifactStore, StoreError
 
 if TYPE_CHECKING:
@@ -78,13 +79,15 @@ class AtomicServiceAdapter:
         unverified_basis: str = "deterministic local service result",
         read_only: bool = False,
         tags: tuple[str, ...] = (),
+        provider: str = "jacobian.kernel",
     ) -> None:
         self._descriptor = CapabilityDescriptor(
             capability_id=capability_id,
             version="1",
             title=title,
             description=description,
-            provider="jacobian.kernel",
+            provider=provider,
+            provider_runtime=known_provider_runtime(provider, features=tags),
             modes=modes,
             input_schema=input_schema,
             output_schema=output_schema,

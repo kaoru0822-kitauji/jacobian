@@ -131,6 +131,7 @@ def build_domain_adapters(
             output_schema=PolytopeSeparateResult.model_json_schema(),
             invoke=lambda p: kernel.polytope.separate(PolytopeSeparateRequest(**p)),
             tags=("polytope", "exact"),
+            provider="jacobian.z3",
         ),
         adapter(
             capability_id="parameter.region.promote",

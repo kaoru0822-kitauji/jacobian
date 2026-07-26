@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.results import ContractModel, Execution
 
 CapabilityId = Annotated[
@@ -27,6 +27,90 @@ class CapabilityMode(StrEnum):
 
     EXPLORE = "EXPLORE"
     VERIFY = "VERIFY"
+
+
+class CapabilityInstallTier(StrEnum):
+    """Operational cost and isolation required to install one provider."""
+
+    T0 = "T0"
+    T1 = "T1"
+    T2 = "T2"
+    T3 = "T3"
+
+
+class CapabilityProviderAvailability(StrEnum):
+    """Whether this exact provider runtime is callable in the current process."""
+
+    AVAILABLE = "AVAILABLE"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class CapabilityProviderDigestKind(StrEnum):
+    """What immutable provider material the runtime digest covers."""
+
+    SOURCE_TREE = "SOURCE_TREE"
+    PYTHON_DISTRIBUTION_RECORD = "PYTHON_DISTRIBUTION_RECORD"
+    EXECUTABLE = "EXECUTABLE"
+
+
+class CapabilityProviderRuntime(ContractModel):
+    """Exact runtime identity and operator-facing availability metadata."""
+
+    runtime_version: Literal["1"] = "1"
+    provider: str = Field(
+        pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+        min_length=3,
+        max_length=128,
+    )
+    availability: CapabilityProviderAvailability
+    version: str | None = Field(default=None, min_length=1, max_length=128)
+    digest: Sha256Digest | None = None
+    digest_kind: CapabilityProviderDigestKind | None = None
+    platform: str = Field(min_length=1, max_length=128)
+    install_tier: CapabilityInstallTier
+    license_id: str = Field(min_length=1, max_length=128)
+    license_files: tuple[str, ...] = ()
+    features: tuple[str, ...] = ()
+    checker_ids: tuple[CheckerUri, ...] = ()
+    configuration: dict[str, Any] = Field(default_factory=dict)
+    diagnostic: str | None = Field(default=None, min_length=1, max_length=512)
+
+    @model_validator(mode="after")
+    def validate_runtime_identity(self) -> Self:
+        if self.availability is CapabilityProviderAvailability.AVAILABLE:
+            if self.version is None or self.digest is None or self.digest_kind is None:
+                raise ValueError(
+                    "available provider runtime requires version, digest, "
+                    "and digest kind"
+                )
+            if self.diagnostic is not None:
+                raise ValueError(
+                    "available provider runtime cannot carry an unavailable diagnostic"
+                )
+        elif self.diagnostic is None:
+            raise ValueError("unavailable provider runtime requires a diagnostic")
+        if len(set(self.features)) != len(self.features):
+            raise ValueError("provider features must be unique")
+        if len(set(self.checker_ids)) != len(self.checker_ids):
+            raise ValueError("provider checker IDs must be unique")
+        if len(set(self.license_files)) != len(self.license_files):
+            raise ValueError("provider license files must be unique")
+        for feature in self.features:
+            if not feature or len(feature) > 128:
+                raise ValueError("provider features must contain 1 to 128 characters")
+        for license_file in self.license_files:
+            path = license_file.replace("\\", "/")
+            if (
+                not path
+                or len(path) > 256
+                or path.startswith("/")
+                or any(part in {"", ".", ".."} for part in path.split("/"))
+            ):
+                raise ValueError(
+                    "provider license files must be normalized relative paths"
+                )
+        canonicalize_json(self.configuration)
+        return self
 
 
 class CapabilityAssuranceLevel(StrEnum):
@@ -69,6 +153,7 @@ class CapabilityDescriptor(ContractModel):
     title: str = Field(min_length=1, max_length=128)
     description: str = Field(min_length=1, max_length=512)
     provider: str = Field(min_length=1, max_length=128)
+    provider_runtime: CapabilityProviderRuntime | None = None
     modes: tuple[CapabilityMode, ...]
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
@@ -84,6 +169,11 @@ class CapabilityDescriptor(ContractModel):
             raise ValueError("capability modes must be unique")
         canonicalize_json(self.input_schema)
         canonicalize_json(self.output_schema)
+        if (
+            self.provider_runtime is not None
+            and self.provider_runtime.provider != self.provider
+        ):
+            raise ValueError("descriptor provider must match provider runtime identity")
         return self
 
 
@@ -231,7 +321,7 @@ class CapabilityDiagnostic(ContractModel):
 
 
 class CapabilityResult(ContractModel):
-    """Compact result shared by local, MCP, and remote capability adapters."""
+    """Capability invocation result."""
 
     response_version: Literal["2"] = "2"
     capability_id: CapabilityId
@@ -251,6 +341,8 @@ class CapabilityResult(ContractModel):
     assurance: CapabilityAssurance
     artifact_uris: tuple[ArtifactUri, ...] = ()
     episode_uri: ArtifactUri | None = None
+    provider: str | None = Field(default=None, min_length=1, max_length=128)
+    provider_digest: Sha256Digest | None = None
 
     @model_validator(mode="after")
     def enforce_lane_and_canonical_output(self) -> Self:

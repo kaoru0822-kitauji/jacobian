@@ -28,6 +28,7 @@ from jacobian.experiments import ExperimentError, ExperimentNotFoundError
 from jacobian.implementation import ImplementationError
 from jacobian.kernel import JacobianKernel
 from jacobian.plugins.registry import PluginRegistryError
+from jacobian.provider_measurements import measure_provider
 from jacobian.references import reference_catalog
 from jacobian.registry import (
     CheckerCompatibilityError,
@@ -272,6 +273,43 @@ def initialize(context: typer.Context) -> None:
             universal_algebra=state.kernel.universal_algebra,
             lean=state.kernel.lean_checkers,
         )
+    )
+
+
+@app.command("provider-measure")
+def provider_measure(
+    context: typer.Context,
+    capability_id: str,
+    include_cold_install: Annotated[
+        bool,
+        typer.Option(
+            "--include-cold-install/--skip-cold-install",
+            help=(
+                "Install into a temporary target with a fresh uv cache; "
+                "may require network access."
+            ),
+        ),
+    ] = False,
+) -> None:
+    """Measure the exact provider advertised for one installed capability."""
+
+    descriptors = {
+        descriptor.capability_id: descriptor
+        for descriptor in _state(context).kernel.capabilities.catalog().capabilities
+    }
+    try:
+        runtime = descriptors[capability_id].provider_runtime
+    except KeyError as exc:
+        raise CapabilityError(f"capability {capability_id!r} is not installed") from exc
+    if runtime is None:
+        raise CapabilityError(
+            f"capability {capability_id!r} has no provider runtime identity"
+        )
+    _emit(
+        measure_provider(
+            runtime,
+            include_cold_install=include_cold_install,
+        ).model_dump(mode="json")
     )
 
 

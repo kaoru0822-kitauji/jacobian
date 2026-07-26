@@ -64,8 +64,34 @@ def test_cli_help_exposes_v02_operations() -> None:
         "transform-apply",
         "transform-verify",
         "polytope-separate",
+        "provider-measure",
     ):
         assert command in result.stdout
+
+
+@pytest.mark.integration
+def test_cli_measures_exact_provider_without_implicit_cold_install(
+    tmp_path: Path,
+) -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "--state-dir",
+            str(tmp_path),
+            "--no-install-references",
+            "provider-measure",
+            "graph.compute.properties",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    measurement = json.loads(result.stdout)
+    assert measurement["provider_runtime"]["provider"] == "jacobian.networkx"
+    assert measurement["installed_bytes"] > 0
+    assert measurement["cold_install"]["status"] == "SKIPPED"
+    assert measurement["cold_start"]["status"] == "COMPLETED"
+    assert measurement["cold_start"]["peak_rss_bytes"] > 0
+    assert measurement["reproduction_case"]["status"] == "COMPLETED"
 
 
 @pytest.mark.integration

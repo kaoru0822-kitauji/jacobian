@@ -1,0 +1,180 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from jacobian.capabilities import CapabilityError
+from jacobian.contracts.capabilities import (
+    CapabilityAssurance,
+    CapabilityAssuranceLevel,
+    CapabilityDescriptor,
+    CapabilityInstallTier,
+    CapabilityMode,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
+    CapabilityRequest,
+    CapabilityResult,
+)
+from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.kernel import JacobianKernel
+from jacobian.provider_measurements import _cold_install_spec
+
+
+class UnavailableAdapter:
+    descriptor = CapabilityDescriptor(
+        capability_id="fixture.unavailable",
+        version="1",
+        title="Unavailable fixture",
+        description="Exercise fail-closed provider registration.",
+        provider="tests.unavailable",
+        provider_runtime=CapabilityProviderRuntime(
+            provider="tests.unavailable",
+            availability=CapabilityProviderAvailability.UNAVAILABLE,
+            platform="linux-x86_64",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="MIT",
+            diagnostic="The fixture executable is not installed.",
+        ),
+        modes=(CapabilityMode.EXPLORE,),
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        raise AssertionError(f"unavailable adapter invoked: {request.capability_id}")
+
+
+def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    descriptors = {
+        item.capability_id: item for item in kernel.capabilities.catalog().capabilities
+    }
+
+    assert descriptors
+    assert all(
+        item.provider_runtime.availability is CapabilityProviderAvailability.AVAILABLE
+        for item in descriptors.values()
+    )
+    assert all(
+        item.provider_runtime.digest is not None for item in descriptors.values()
+    )
+    assert descriptors["graph.compute.properties"].provider_runtime.provider == (
+        "jacobian.networkx"
+    )
+    assert (
+        descriptors["polynomial.map.compute_jacobian"].provider_runtime.provider
+        == "jacobian.sympy"
+    )
+    assert (
+        descriptors["universal_algebra.search.countermodel"].provider_runtime.provider
+        == "jacobian.z3"
+    )
+
+
+def test_unavailable_adapter_is_rejected_before_catalog_advertisement(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    with pytest.raises(CapabilityError, match="is unavailable"):
+        kernel.register_capability(UnavailableAdapter())
+
+    assert "fixture.unavailable" not in {
+        item.capability_id for item in kernel.capabilities.catalog().capabilities
+    }
+
+
+def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unavailable = CapabilityProviderRuntime(
+        provider="jacobian.lean4",
+        availability=CapabilityProviderAvailability.UNAVAILABLE,
+        platform="linux-x86_64",
+        install_tier=CapabilityInstallTier.T3,
+        license_id="Apache-2.0",
+        diagnostic="The pinned Lean runtime is unavailable.",
+    )
+    monkeypatch.setattr(
+        "jacobian.kernel.lean_provider_runtime",
+        lambda **_kwargs: unavailable,
+    )
+
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    assert kernel.lean is None
+    assert "lean.check" not in {
+        item.capability_id for item in kernel.capabilities.catalog().capabilities
+    }
+
+
+def test_invocation_binds_descriptor_runtime_to_result_provenance(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    descriptor = next(
+        item
+        for item in kernel.capabilities.catalog().capabilities
+        if item.capability_id == "polynomial.map.evaluate"
+    )
+    # Invalid input is intentional: provenance must also survive failed execution.
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=descriptor.capability_id,
+            mode=CapabilityMode.EXPLORE,
+            input={},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert descriptor.provider_runtime is not None
+    assert result.provider == descriptor.provider
+    assert result.provider_digest == descriptor.provider_runtime.digest
+
+
+def test_runtime_contract_accepts_a_bound_completed_result() -> None:
+    runtime = CapabilityProviderRuntime(
+        provider="tests.fixture",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version="1",
+        digest="sha256:" + "a" * 64,
+        digest_kind=CapabilityProviderDigestKind.SOURCE_TREE,
+        platform="any",
+        install_tier=CapabilityInstallTier.T0,
+        license_id="MIT",
+    )
+    result = CapabilityResult(
+        capability_id="fixture.identity",
+        capability_version="1",
+        mode=CapabilityMode.EXPLORE,
+        execution=Execution(status=ExecutionStatus.COMPLETED),
+        assurance=CapabilityAssurance(
+            level=CapabilityAssuranceLevel.COMPUTED,
+            basis="fixture computation",
+        ),
+        provider=runtime.provider,
+        provider_digest=runtime.digest,
+    )
+
+    assert result.provider == runtime.provider
+    assert result.provider_digest == runtime.digest
+
+
+def test_source_runtime_has_no_implicit_working_directory_install() -> None:
+    runtime = CapabilityProviderRuntime(
+        provider="tests.fixture",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version="1",
+        digest="sha256:" + "a" * 64,
+        digest_kind=CapabilityProviderDigestKind.SOURCE_TREE,
+        platform="any",
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT",
+    )
+
+    assert _cold_install_spec(runtime) is None
