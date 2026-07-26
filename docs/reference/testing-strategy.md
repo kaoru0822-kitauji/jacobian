@@ -36,20 +36,21 @@ make test-fast
 make test-failed
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
-make test-lean
+make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
 make refresh-test-durations
 make refresh-lean-test-durations
 make test-durations
 make check
-make validate
+make validate-full
 ```
 
 `make test-fast` collects only unit, contract, checker, and reference
 directories, then excludes integration-marked cases. Avoiding collection of
 integration and end-to-end modules keeps the loop short without dropping
 independent checker tests. `make check` is the routine local pre-push gate;
-CI owns exhaustive validation. `make validate` remains the local full-suite
-escape hatch. The full
+developers should push after it and let CI own exhaustive validation.
+`make validate-full` is the local full-suite escape hatch for CI reproduction,
+not a routine handoff requirement. The full
 suite uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
 wait on isolated subprocesses. `make test-failed` is the failure-recovery
@@ -83,7 +84,10 @@ collects the full marker-selected suite, so new Lean tests cannot fall outside
 a file allowlist. Refresh `.lean_test_durations` after adding or materially
 changing those tests. Each runner executes its lane serially, avoiding
 concurrent multi-gigabyte Mathlib processes on one machine while shortening
-the CI critical path and preserving real-backend coverage.
+the CI critical path and preserving real-backend coverage. A manually
+dispatched Lean debug workflow accepts one pytest node or file selector and
+provides the same pinned remote environment for focused reproduction when
+local Lean is impractical.
 Python 3.12 shards write raw coverage data; a dependent job combines both
 files before enforcing the repository threshold and producing the XML report.
 Python 3.13 runs the same two groups without duplicate instrumentation.
