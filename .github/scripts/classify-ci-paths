@@ -1,19 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-run_lean=false
-classification=isolated
+force_full=false
+force_lean=false
 
-if (( $# == 0 )); then
-  run_lean=true
+while (( $# > 0 )); do
+  case "$1" in
+    --force-full)
+      force_full=true
+      shift
+      ;;
+    --force-lean)
+      force_lean=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+classification=docs
+run_python=false
+run_lean=false
+run_npm=false
+run_static=false
+run_build=false
+run_security=false
+run_duplicate=false
+
+if [ "$force_full" = "true" ] || (( $# == 0 )); then
   classification=full
 else
   for path in "$@"; do
     case "$path" in
       docs/*|*.md|.github/ISSUE_TEMPLATE/*|.github/CODEOWNERS|npm/*)
+        if [[ "$path" == npm/* ]]; then
+          run_npm=true
+          classification=npm
+        fi
         ;;
       *)
-        run_lean=true
         classification=full
         break
         ;;
@@ -21,4 +52,26 @@ else
   done
 fi
 
-printf 'run-lean=%s\nclassification=%s\n' "$run_lean" "$classification"
+if [ "$classification" = "full" ]; then
+  run_python=true
+  run_lean=true
+  run_npm=true
+  run_static=true
+  run_build=true
+  run_security=true
+  run_duplicate=true
+fi
+
+if [ "$force_lean" = "true" ]; then
+  run_lean=true
+fi
+
+printf '%s\n' \
+  "classification=$classification" \
+  "run-python=$run_python" \
+  "run-lean=$run_lean" \
+  "run-npm=$run_npm" \
+  "run-static=$run_static" \
+  "run-build=$run_build" \
+  "run-security=$run_security" \
+  "run-duplicate=$run_duplicate"

@@ -36,19 +36,29 @@ make test-fast
 make test-failed
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-contracts
+make test-checkers
+make test-mcp PYTEST_ARGS="-k authentication"
+make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
 make refresh-test-durations
 make refresh-lean-test-durations
 make test-durations
 make check
+make check-static
 make validate-full
 ```
 
 `make test-fast` collects only unit, contract, checker, and reference
 directories, then excludes integration-marked cases. Avoiding collection of
 integration and end-to-end modules keeps the loop short without dropping
-independent checker tests. `make check` is the routine local pre-push gate;
-developers should push after it and let CI own exhaustive validation.
+independent checker tests. Named contract, checker, MCP, and storage targets
+make common affected areas discoverable without adding another test runner.
+`make check` combines fast Ruff and non-integration test feedback as the
+routine local pre-push gate. Developers should push after it and let CI own
+dependency and dead-code analysis, strict typing, package builds, and
+exhaustive validation. `make check-static` reproduces those CI-owned static
+and package checks when relevant.
 `make validate-full` is the local full-suite escape hatch for CI reproduction,
 not a routine handoff requirement. The full
 suite uses `pytest-xdist` work stealing and
@@ -88,6 +98,8 @@ the CI critical path and preserving real-backend coverage. A manually
 dispatched Lean debug workflow accepts one pytest node or file selector and
 provides the same pinned remote environment for focused reproduction when
 local Lean is impractical.
+The Python Debug workflow provides the same focused remote reproduction for
+one ordinary pytest file or node on either supported Python version.
 Python 3.12 shards write raw coverage data; a dependent job combines both
 files before enforcing the repository threshold and producing the XML report.
 Python 3.13 runs the same two groups without duplicate instrumentation.
@@ -95,6 +107,16 @@ Coverage.py's subprocess patch includes plugin and checker workers so
 clean-process execution is not misreported as uncovered.
 Measured costs and lane policy are recorded in the
 [test-suite cost audit](../contributing/test-suite-cost-audit.md).
+
+For pull requests, a tested path planner chooses `docs`, `npm`, or `full`.
+Documentation-only changes skip heavy validation lanes. Npm-only or
+documentation-plus-npm changes run npm packaging without Python or Lean.
+Every other path set fails closed to full validation, and pushes to `main`
+always use the full plan. Stable aggregate Python and Lean jobs preserve
+required status semantics when their underlying matrices are conditional.
+Maintainer-applied `ci:full` and `ci:lean` labels can force all lanes or add
+Lean respectively. Overrides are additive only and cannot weaken the plan
+selected from changed paths.
 
 Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
 their loaders, scorers, replay paths, telemetry parsing, and dispatch guards
