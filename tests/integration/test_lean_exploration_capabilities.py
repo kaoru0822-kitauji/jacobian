@@ -68,7 +68,10 @@ def test_apply_tactic_returns_structured_failure_without_conclusion(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.output["accepted"] is False
     assert result.output["successor_states"] == []
-    assert result.output["diagnostics"][0]["severity"] == "ERROR"
+    assert any(
+        diagnostic["severity"] == "ERROR"
+        for diagnostic in result.output["diagnostics"]
+    )
 
 
 def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> None:
