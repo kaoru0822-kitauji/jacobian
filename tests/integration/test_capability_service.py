@@ -472,6 +472,10 @@ def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    shutil.which("lean") is None,
+    reason="Lean is not installed",
+)
 def test_lean_capability_projects_repairable_checker_diagnostics(
     tmp_path: Path,
 ) -> None:
