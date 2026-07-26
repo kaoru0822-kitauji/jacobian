@@ -681,6 +681,14 @@ class VerificationService:
                     "The checker certified a relationship endpoint outside its "
                     "verification request."
                 )
+            if (
+                decision.obligation_uri is not None
+                and decision.obligation_uri not in request_artifact_uris
+            ):
+                raise ValueError(
+                    "The checker certified an obligation outside its verification "
+                    "request."
+                )
 
             verified_assurance = Assurance(
                 arithmetic=decision.arithmetic,

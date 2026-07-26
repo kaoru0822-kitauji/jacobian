@@ -331,6 +331,13 @@ class CapabilityService:
                 raise CapabilityError(
                     "verified relationship endpoints differ from the checked relation"
                 )
+            checked_obligations = (
+                (record.obligation_uri,) if record.obligation_uri is not None else ()
+            )
+            if relationship.obligation_uris != checked_obligations:
+                raise CapabilityError(
+                    "verified relationship obligations differ from the checked relation"
+                )
         for obligation in result.obligations:
             if obligation.status is not CapabilityObligationStatus.DISCHARGED:
                 continue
