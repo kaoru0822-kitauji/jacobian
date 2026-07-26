@@ -6,8 +6,10 @@ from functools import lru_cache
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
-from jsonschema.exceptions import SchemaError, ValidationError
+from jsonschema.exceptions import SchemaError
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel
+from pydantic import ValidationError as PydanticValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.store import ArtifactStore, StoreError
@@ -84,6 +86,7 @@ class SchemaRegistry:
 
     def __init__(self, store: ArtifactStore) -> None:
         self.store = store
+        self._model_contracts: dict[str, type[BaseModel]] = {}
 
     def register(self, *, name: str, version: str, schema: dict[str, Any]) -> str:
         """Register a schema after rejecting unsupported external references."""
@@ -97,6 +100,34 @@ class SchemaRegistry:
             version=version,
             definition=normalized,
         )
+
+    def register_model(
+        self,
+        *,
+        name: str,
+        version: str,
+        model: type[BaseModel],
+    ) -> str:
+        """Register JSON shape plus the model's cross-field contract.
+
+        JSON Schema carries the durable structural contract. The operator-owned
+        model adds invariants JSON Schema cannot express, such as canonical
+        ordering and digests derived from multiple fields. Kernel construction
+        repeats this registration after every restart before accepting writes.
+        """
+
+        schema_uri = self.register(
+            name=name,
+            version=version,
+            schema=model_schema(model),
+        )
+        registered = self._model_contracts.get(schema_uri)
+        if registered is not None and registered is not model:
+            raise SchemaRegistryError(
+                "one schema URI cannot use multiple model-backed contracts"
+            )
+        self._model_contracts[schema_uri] = model
+        return schema_uri
 
     def resolve(self, schema_uri: str) -> dict[str, Any]:
         """Load a previously registered schema definition."""
@@ -125,7 +156,7 @@ class SchemaRegistry:
             key=lambda error: tuple(str(part) for part in error.absolute_path),
         )
         if errors:
-            first: ValidationError = errors[0]
+            first: JsonSchemaValidationError = errors[0]
             location = "/".join(str(part) for part in first.absolute_path) or "$"
             required_field = None
             if (
@@ -146,4 +177,21 @@ class SchemaRegistry:
                 path=location,
                 required_field=required_field,
             )
+        model = self._model_contracts.get(schema_uri)
+        if model is not None:
+            try:
+                normalized = model.model_validate(normalized).model_dump(mode="json")
+            except PydanticValidationError as exc:
+                first_error = exc.errors(include_url=False, include_context=False)[0]
+                raw_location = first_error.get("loc", ())
+                location = "/".join(str(part) for part in raw_location) or "$"
+                required_field = None
+                if first_error.get("type") == "missing" and raw_location:
+                    required_field = str(raw_location[-1])
+                raise SchemaValidationError(
+                    f"{location}: {first_error['msg']}",
+                    path=location,
+                    required_field=required_field,
+                ) from exc
+            normalized = loads_strict_json(canonicalize_json(normalized))
         return normalized

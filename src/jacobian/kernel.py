@@ -51,6 +51,7 @@ from jacobian.references import (
     ReferenceInstaller,
 )
 from jacobian.registry import CheckerRegistry
+from jacobian.sat import SatArtifactService, install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
@@ -85,6 +86,11 @@ class JacobianKernel:
         self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
+        self.sat: SatArtifactService = install_sat_artifacts(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
         self.memory = ResearchMemory(self.store, self.schemas)
         self.workspaces = WorkspaceService(self.store, self.schemas)
         self.plugins = PluginRegistry(self.store)

@@ -359,6 +359,17 @@ variable map, projection version, declared scope, provider version, and
 resource budget. Preserve the raw proof as a durable artifact but keep bounded
 inline summaries small.
 
+The artifact-contract checkpoint was implemented on 2026-07-26. The base
+kernel now registers model-backed schemas for canonical CNF, total assignment,
+and raw DRAT proof artifacts without installing a solver, checker, or SAT
+capability. Canonicalization deterministically renumbers the sorted variable
+map, removes duplicate literals and clauses, omits tautologies, orders the
+remaining clauses, and binds the resulting DIMACS bytes. Assignment and proof
+artifacts bind the exact CNF URI, object and payload digests, variable map,
+projection, full scope, producer runtime, and resource budget. Raw proof
+storage and assignment payloads remain unverified. See
+[SAT artifact contracts](../reference/sat-artifacts.md).
+
 CaDiCaL has a small source build and a command line that accepts DIMACS plus a
 proof path. DRAT-trim independently validates a DRAT proof against the input
 formula. A valid SAT assignment can be checked with a deliberately small
@@ -481,7 +492,8 @@ backlog.
    reproduction.
 3. Paired Lean discovery evaluation; decide expose, revise, consolidate into
    examples, or stop.
-4. Canonical CNF, assignment, and proof artifact schemas.
+4. Canonical CNF, assignment, and proof artifact schemas. Implemented; see
+   [SAT artifact contracts](../reference/sat-artifacts.md).
 5. Pure independent SAT-assignment checker with attack tests.
 6. CaDiCaL model and proof-producing exploration adapters.
 7. DRAT-trim clean-process checker, authorization fixture, and attack tests.
