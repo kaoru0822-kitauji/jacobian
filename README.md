@@ -182,8 +182,20 @@ uv run python benchmarks/agent_mcp.py
 
 Raw transcripts, isolated Jacobian state, reports, structured agent feedback,
 and scores are written to the ignored `benchmarks/results/` directory.
-Use `uv run python benchmarks/agent_ab.py` for paired no-Jacobian versus
-capability-enabled runs once the A/B cases are selected.
+Model-in-the-loop evaluations are local, optional, and never part of
+`make test-fast`, `make test`, `make validate`, or CI. Preview a selected
+paired evaluation without executing a model:
+
+```sh
+make agent-eval EVAL_ARGS="--case ERDOS-STRAUS-AB-001"
+```
+
+After reviewing its case, condition, timeout, and model-run totals, dispatch it
+manually with an explicit process budget:
+
+```sh
+make agent-eval EVAL_ARGS="--case ERDOS-STRAUS-AB-001 --execute --max-model-runs 2"
+```
 
 ### Lean certificates
 
@@ -191,6 +203,12 @@ The `lean.check` capability binds an exact proposition and proof body to its
 result and uses a pinned Lean environment. The bundled `CORE` and `MATHLIB`
 environments pin Lean, their imports, and their allowed trust bases;
 model-supplied imports and packages are rejected.
+
+With bundled references enabled, `lean.proof_state.apply_tactic` and
+`lean.retrieve.premises` expose one-step proof-state interaction and bounded
+Mathlib `exact?` suggestions through the pinned upstream Lean REPL. They are
+exploration aids only; their output cannot become `VERIFIED` without a
+successful exact `lean.check`.
 
 Prepare the pinned local runtime with:
 

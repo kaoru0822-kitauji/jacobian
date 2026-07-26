@@ -131,6 +131,7 @@ The base installation currently includes these kernel capability IDs:
 | `parameter.region.promote` | Check one immutable parameter-region subject with an authorized certificate. |
 | `case.partition.finite` | Partition an explicit finite domain and report exact coverage. |
 | `graph.search.atlas` | Search the bounded Graph Atlas and return matching graph candidates with explicit coverage limits. |
+| `graph.realize.degree_sequence` | Construct a simple graph with an exact degree sequence, or return a replayable Erdős–Gallai/basic obstruction. |
 | `graph.compute.properties` | Compute supported exact invariants of an explicit graph. |
 | `graph.compute.neighborhood_independence` | Compute every open-neighborhood independence optimum, witness, sum, and exact rational average. |
 | `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
@@ -154,6 +155,14 @@ When the operator enables bundled references, the catalog also includes:
 | `lean.declaration.search` | Search public declarations by a bounded name and/or elaborated-type constant pattern; retrieval remains computed evidence. |
 | `lean.declaration.inspect` | Resolve one exact declaration with type, kind, docs, source metadata, and pinned environment digest. |
 | `lean.check` | Check a Lean proof in an operator-pinned environment and return its replay evidence. |
+| `lean.proof_state.apply_tactic` | Apply one tactic through the pinned Lean REPL and materialize the resulting goals and replay source. |
+| `lean.retrieve.premises` | Ask pinned Mathlib `exact?` for bounded candidate tactics and declaration references for one proof state. |
+
+The two exploratory Lean capabilities use the maintained
+`leanprover-community/repl` JSON protocol pinned in the Lake manifest. Their
+computed transitions and suggestions are not proof certificates. A completed
+source still requires `lean.check`, whose independent checker binds the exact
+statement, proof, environment, allowed axioms, and runtime revisions.
 
 Operator-installed adapters appear in the same catalog. Agents should call
 `capability.describe` before invoking an unfamiliar capability instead of

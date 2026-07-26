@@ -219,11 +219,11 @@ The pinned Lean REPL spike used upstream tag `v4.31.0`, commit
 `0cc60263319308000bbaa5354427f775fe3dc7d0`, against Lean 4.31.0 commit
 `68218e876d2a38b1985b8590fff244a83c321783`. Two protocol tasks completed in
 2.196 seconds with no parameter errors: `constructor` exposed two child goals
-and local-premise application closed its goal. The REPL currently cannot turn a
-completed tactic state back into the originating command or a replayable proof
-artifact. This is enough to keep the pinned spike available for experiments,
-but not enough to recommend `goal.decompose` or premise-retrieval capabilities
-by default. A paired agent evaluation should measure their outcome value;
+and local-premise application closed its goal. The production adapters now use
+that maintained JSON protocol rather than parsing Lean's pretty-printed goals.
+`lean.proof_state.apply_tactic` materializes one transition, child goals, and
+replay source. `lean.retrieve.premises` exposes bounded Mathlib `exact?`
+suggestions and declaration references. Neither adapter certifies a theorem;
 completed source must still go through `lean.check`.
 
 ### Lean declaration-discovery pilot
@@ -274,6 +274,31 @@ scans with a reusable pinned index or persistent query service, keep exact
 environment identity, and make catalog discovery compact. Then rerun these
 same held-out cases and add cases where direct automation does not already
 solve the proposition.
+
+### Lean portfolio ablation
+
+The Lean evaluation uses four catalogs under the same model, reasoning effort,
+prompt, timeout, and output schema:
+
+| Condition | Exploratory Lean capabilities |
+| --- | --- |
+| baseline | neither capability |
+| tactic | `lean.proof_state.apply_tactic` only |
+| retrieval | `lean.retrieve.premises` only |
+| combined | both capabilities |
+
+All conditions retain `lean.check`. The runner randomizes condition order per
+case and repetition and creates isolated workspaces and artifact stores. It
+measures exact proof completion, independent replay success, false
+certification, parameter and tool errors, model tokens, tool calls, and wall
+time. A checker-accepted alternative proof is valid; the scorer does not
+require textual equality with the hidden oracle.
+
+The scored tasks are fresh private compositions whose exact theorems are
+disjoint from the discovery rows. Their hidden reference proofs remain outside
+the agent workspace. Public Hugging Face rows, LeanTree/APRIL examples, blog
+posts, Codeforces cases, and repository artifacts are reproduction and
+workflow-mining cases only. They never serve as hidden evaluation tasks.
 
 ## Source policy
 

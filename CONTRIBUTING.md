@@ -26,7 +26,7 @@ make setup
 make test-fast
 ```
 
-`make test-fast` is the short unit-and-contract feedback loop. Before handoff,
+`make test-fast` is the short non-integration feedback loop. Before handoff,
 run `make validate`, which performs lint, formatting, dependency, type, full
 test-suite, and package-build checks. Run `make help` for focused commands.
 Tests can be narrowed without learning another wrapper:
