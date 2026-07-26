@@ -59,10 +59,6 @@ The source bundle is:
 | [PyPI JSON metadata][pypi-json] | Dated compressed-wheel size snapshot; not installed size or runtime memory |
 | Local pinned Lean installation | One development-host measurement used only to show ecosystem scale |
 
-The later [primitive mathematics mining record](primitive-math-capability-mining.md)
-tracks a spreadsheet-driven experimental breadth batch and its weaker
-`COMPUTED` trust boundary separately from this formal-first ordering.
-
 Public examples and known answers are suitable for contract reproduction and
 regression. They must not become hidden evaluation cases. Comparative claims
 require frozen, held-out variants and independent oracles under the
