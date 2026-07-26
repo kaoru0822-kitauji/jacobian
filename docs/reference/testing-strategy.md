@@ -38,30 +38,39 @@ make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-lean
 make validate
+make test-durations
 ```
 
 `make test-fast` is the short marker-filtered loop, while `make validate`
-includes the full suite. The full suite uses `pytest-xdist` work stealing and
-at most four workers because test durations vary substantially and many tests
-wait on isolated subprocesses. `make test-failed` is the failure-recovery
-shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
-execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
-120-second per-test backstop prevents local deadlocks from hanging indefinitely
-and is disabled automatically by pytest-timeout while debugging. Parallel
-workers retain separate `tmp_path` roots; tests that add shared external state
-must coordinate it explicitly.
+includes both the full non-Lean suite and the dedicated serial Lean suite. The
+non-Lean suite uses `pytest-xdist` work stealing and at most four workers
+because test durations vary substantially and many tests wait on isolated
+subprocesses. Do not use unfiltered `uv run pytest` as the normal full-suite
+command: it mixes memory-heavy Lean tests into that general worker pool.
+`make test-failed` is the failure-recovery shortcut. Use
+`PYTEST_ARGS="-n 0"` for debugger-friendly, single-process execution and
+`PYTEST_ARGS="--durations=25"` when investigating regressions. A 120-second
+per-test backstop prevents local deadlocks from hanging indefinitely and is
+disabled automatically by pytest-timeout while debugging. Parallel workers
+retain separate `tmp_path` roots; tests that add shared external state must
+coordinate it explicitly.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
 CI splits each supported Python run into two disjoint groups and retains xdist
-parallelism inside each group. Tests marked `lean_runtime` are excluded from
-those shards and run serially in a dedicated job with pinned Lean and Mathlib
-caches. This avoids concurrent multi-gigabyte Mathlib processes while
-preserving real-backend coverage. Python 3.12 shards write raw coverage data; a
-dependent job combines both files before enforcing the repository threshold
-and producing the XML report. Python 3.13 runs the same two groups without
-duplicate instrumentation. Coverage.py's subprocess patch includes plugin and
-checker workers so clean-process execution is not misreported as uncovered.
+parallelism inside each group. The committed `.test_durations` file supplies
+the `least_duration` assignment; refresh it with `make test-durations` after a
+material suite expansion or observed shard imbalance. Tests marked
+`lean_runtime` are excluded from those shards and run serially in a dedicated
+job with pinned Lean and Mathlib caches. This avoids concurrent
+multi-gigabyte Mathlib processes while preserving real-backend coverage.
+Python 3.12 shards write raw coverage data; a dependent job combines both
+files before enforcing the repository threshold and producing the XML report.
+Python 3.13 runs the same two groups without duplicate instrumentation.
+Coverage.py's subprocess patch includes plugin and checker workers so
+clean-process execution is not misreported as uncovered. The measured costs
+and lane policy are recorded in the
+[test-suite cost audit](../contributing/test-suite-cost-audit.md).
 
 Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
 their loaders, scorers, replay paths, telemetry parsing, and dispatch guards

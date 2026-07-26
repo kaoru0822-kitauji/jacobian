@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed build validate agent-eval
+.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed test-durations build validate agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -39,6 +39,9 @@ test-lean: ## Run pinned Lean integration tests serially.
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf $(PYTEST_ARGS)
+
+test-durations: ## Refresh the committed non-Lean CI shard timings.
+	$(UV_RUN) pytest -m "not lean_runtime" --store-durations --clean-durations $(PYTEST_ARGS)
 
 build: ## Build Python source and wheel distributions.
 	uv build

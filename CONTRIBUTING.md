@@ -29,7 +29,9 @@ make test-fast
 `make test-fast` is the short non-integration feedback loop. Before handoff,
 run `make validate`, which performs lint, formatting, dependency, type, full
 test-suite, and package-build checks. Run `make help` for focused commands.
-Tests can be narrowed without learning another wrapper:
+Tests can be narrowed without learning another wrapper. The measured costs and
+reasoning behind these lanes are recorded in the
+[test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
 
 ```sh
 make test TESTS=tests/integration/test_mcp_adapter.py
@@ -61,7 +63,10 @@ of the normal xdist pool because Mathlib processes can retain several
 gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
 dedicated job.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
-and unfiltered `uv run pytest` before handoff.
+and `make validate` before handoff. Do not use unfiltered `uv run pytest` as the
+normal complete-suite command because it mixes Lean into the general xdist
+pool. After a material suite expansion or observed CI shard imbalance, run
+`make test-durations` and commit the updated `.test_durations` file.
 
 ## Verification rules
 
