@@ -143,6 +143,10 @@ proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
 `sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound
 model or text-DRAT evidence. Solver status and produced bytes remain
 unverified; assignment and proof checking are separate capability boundaries.
+With bundled references and an operator-provenanced pinned DRAT-trim runtime,
+`sat.unsat_proof.verify` can independently replay the exact CNF-bound proof and
+create a verification record. Runtime failure or proof rejection remains
+`UNKNOWN`.
 
 Three direct operational tools—`workspace.open`, `workspace.write`, and
 `workspace.query`—provide durable, revisioned paper-like working state outside

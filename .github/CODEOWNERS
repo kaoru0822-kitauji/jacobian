@@ -1,16 +1,1 @@
-# Jacobian code owners
-# Global owners
-* @morluto
-
-# Core kernel and contracts
-src/jacobian/ @morluto
-src/jacobian_checkers/ @morluto
-
-# CI, build, and workflow
-.github/ @morluto
-Makefile @morluto
-pyproject.toml @morluto
-
-# Documentation
-docs/ @morluto
-*.md @morluto
+* @morluto @N0zoM1z0

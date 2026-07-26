@@ -28,7 +28,8 @@ before pushing; it performs lint, formatting, dependency, type, fast tests,
 and package-build checks. CI owns the full Python matrix, integration,
 end-to-end, coverage, and real-Lean validation. `make validate` remains
 available for exhaustive local validation. Run `make help` for focused
-commands.
+commands. The measured costs and reasoning behind these lanes are recorded in
+the [test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
 Tests can be narrowed without learning another wrapper:
 
 ```sh
@@ -67,6 +68,8 @@ dedicated pair of serial lanes on separate runners.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
 and `make check` before pushing. Use
 `make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
+Do not use unfiltered `uv run pytest` as the normal complete-suite command
+because it mixes Lean into the general xdist pool.
 Refresh `.test_durations` after major suite changes; the target replaces the
 committed timings only after a successful non-Lean run on Linux with Python
 3.12. Also refresh when the slower CI shard exceeds the faster shard by more

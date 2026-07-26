@@ -286,58 +286,26 @@ jobs:
           name: build-timing
           path: build-timing.log
 
-  publish:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: needs.release-please.outputs.release_created == 'true'
-    needs: [release-please, build]
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
-
-  publish-npm:
-    name: Publish to npm
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: needs.release-please.outputs.release_created == 'true'
-    needs: [release-please, npm-package]
-    environment: npm
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
-      - run: npm test
-        working-directory: npm
-      - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: npm
-
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: write
       contents: write
       issues: write
       pull-requests: write
     if: github.ref == 'refs/heads/main'
     needs: [lint, validate-agents-md, security-audit, test, lean-test, coverage, duplicate-code, npm-package, build]
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
+      - name: Dispatch release publishing
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: >-
+          gh workflow run release.yml
+          --ref "$RELEASE_TAG"
+          --field tag="$RELEASE_TAG"

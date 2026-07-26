@@ -39,6 +39,7 @@ make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 
 make test-lean
 make refresh-test-durations
 make refresh-lean-test-durations
+make test-durations
 make check
 make validate
 ```
@@ -88,6 +89,8 @@ files before enforcing the repository threshold and producing the XML report.
 Python 3.13 runs the same two groups without duplicate instrumentation.
 Coverage.py's subprocess patch includes plugin and checker workers so
 clean-process execution is not misreported as uncovered.
+Measured costs and lane policy are recorded in the
+[test-suite cost audit](../contributing/test-suite-cost-audit.md).
 
 Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
 their loaders, scorers, replay paths, telemetry parsing, and dispatch guards

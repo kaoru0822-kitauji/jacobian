@@ -388,6 +388,19 @@ Solver status, failure to produce the requested evidence, timeout, malformed
 output, and stored proof bytes remain unverified and carry `UNKNOWN`. See
 [SAT artifact contracts](../reference/sat-artifacts.md#cadical-exploration).
 
+The DRAT-trim checker checkpoint was implemented on 2026-07-26.
+`sat.unsat_proof.verify` is installed only with bundled references and an
+operator-provenanced DRAT-trim `v05.22.2023` executable. The runtime digest and
+exact upstream source commit are bound into checker authorization, rechecked
+at selection and around clean-process replay, and included in the verification
+environment. The independent checker reconstructs canonical DIMACS and
+validates certificate, payload, binding, lineage, and admitted text-proof
+syntax before bounded DRAT replay. Only exit zero with exactly one
+`s VERIFIED` creates a `VerificationRecord`; mutation, concatenation,
+cross-CNF replay, warnings, excessive output, timeout, and runtime replacement
+fail closed as `UNKNOWN`. See
+[UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
+
 CaDiCaL has a small source build and a command line that accepts DIMACS plus a
 proof path. DRAT-trim independently validates a DRAT proof against the input
 formula. Later, evaluate whether a compatible emission or conversion path to
@@ -516,6 +529,8 @@ backlog.
 6. CaDiCaL model and proof-producing exploration adapters. Implemented; see
    [SAT artifact contracts](../reference/sat-artifacts.md#cadical-exploration).
 7. DRAT-trim clean-process checker, authorization fixture, and attack tests.
+   Implemented; see
+   [UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
 8. SAT public reproductions and held-out portfolio ablation.
 9. cvc5 Alethe proof-production spike for quantifier-free EUF and linear
    arithmetic.

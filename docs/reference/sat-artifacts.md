@@ -4,7 +4,8 @@
 
 - Status: Experimental pre-stable contract
 - Optional operations: `sat.model.find` and `sat.unsat_proof.find` when exact
-  CaDiCaL 3.0.1 is installed
+  CaDiCaL 3.0.1 is installed; `sat.unsat_proof.verify` when the operator
+  installs bundled references and an exactly identified DRAT-trim runtime
 - Installed operations: `sat.model.verify` when the operator installs the
   bundled reference checkers
 - Related plan:
@@ -16,7 +17,8 @@ the pinned CaDiCaL runtime is available, but does not install the solver.
 These artifacts begin as typed, unverified evidence. Storing an assignment does
 not establish SAT, and storing proof bytes does not establish UNSAT. An
 operator may separately authorize the bundled assignment checker and expose
-`sat.model.verify`.
+`sat.model.verify`. Proof verification additionally requires a pinned
+DRAT-trim executable with operator-supplied provenance.
 
 ## Registered descriptors
 
@@ -30,10 +32,12 @@ registered by the current kernel:
 | Schema | `jacobian.sat-assignment@1` | Total assignment candidate bound to one CNF |
 | Schema | `jacobian.sat-proof@1` | Preserved raw DRAT bytes bound to one CNF |
 | Schema | `jacobian.witness-envelope@1` | Exact assignment replay evidence |
+| Schema | `jacobian.certificate-envelope@1` | Exact UNSAT proof replay evidence |
 
 The schema URIs are content addressed. They are not capability IDs. The
 assignment verification capability appears in `capability://catalog` only
-when its checker is operator authorized.
+when its checker is operator authorized. The proof verification capability
+also requires an available authorized DRAT-trim runtime.
 
 The SAT schemas are model backed. JSON Schema checks their closed structural
 shape, and the same registry validation path also applies the domain
@@ -203,14 +207,67 @@ truncated, or adversarial bytes may be retained as unverified evidence for
 later fail-closed replay. The current artifact store has a 10 MiB payload
 limit, and this contract bounds the base64 field to 8,000,000 characters.
 
+## UNSAT proof verification
+
+`sat.unsat_proof.verify` accepts one `proof_uri` in `VERIFY` mode. Its adapter
+resolves the raw proof and exact parent CNF, re-derives every CNF binding field,
+requires the source lineage, and materializes a `sat.unsat-proof@1`
+`CertificateEnvelope`. The certificate binds the CNF claim, proof candidate,
+SAT semantics, exact artifact URIs, payload digests, and parents.
+
+The capability is installed only when bundled references are enabled and the
+operator authorizes an available DRAT-trim runtime. The supported runtime is
+upstream release `v05.22.2023`, source commit
+`2e5e29cb0019d5cfd547d4208dca1b3ec290349f`. DRAT-trim does not expose a
+stable machine-readable version identity, so Jacobian requires a sibling
+`drat-trim.jacobian-runtime.json` file with exactly:
+
+```json
+{
+  "runtime_manifest_version": "1",
+  "provider": "drat-trim",
+  "release_tag": "v05.22.2023",
+  "source_repository": "https://github.com/marijnheule/drat-trim",
+  "source_commit": "2e5e29cb0019d5cfd547d4208dca1b3ec290349f",
+  "executable_sha256": "sha256:<64 lowercase hexadecimal digits>"
+}
+```
+
+The sidecar is an operator assertion about the installed build, not upstream
+attestation. The executable digest and provenance become part of the
+authorized checker identity. The registry rehashes the executable when the
+checker is selected; the clean worker checks it before and after replay and
+binds it into the verification environment digest.
+
+The standard-library-only checker adapter independently validates the closed
+CNF, proof, certificate, evidence bindings, payload digests, and lineage. It
+reconstructs canonical DIMACS and admits a bounded ASCII `drat-text/v1`
+profile. Malformed clauses, duplicate or complementary literals, integer
+overflow, deletion of the empty clause, or proof steps after the empty clause
+are rejected before external dispatch. A fixed benign comment is prepended to
+force DRAT-trim's text parser; it does not alter the stored proof bytes.
+
+DRAT-trim runs against temporary CNF and proof files with `-W`, fixed locale,
+bounded time and output, and the exact authorized executable. Acceptance
+requires exit zero, empty stderr, protocol-only output, and exactly one
+`s VERIFIED` line. Any other status, warning, malformed output, excessive
+output, mutation, cross-CNF replay, runtime replacement, timeout,
+cancellation, or crash yields no mathematical conclusion.
+
+Acceptance creates the ordinary kernel `VerificationRecord`, bound to the
+certificate and all three artifacts, and permits `VERIFIED_UNSAT` with
+conclusion `TRUE`. Rejection reports `UNKNOWN`; it does not establish SAT.
+
 ## Trust boundary
 
-The following are deliberately outside this slice:
+The two producer/checker pairs remain separate:
 
-- no DRAT-trim process or checker authorization;
-- no UNSAT conclusion from assignment rejection; and
-- no verification of raw proof bytes.
+- CaDiCaL output and raw proof storage remain unverified;
+- assignment rejection never establishes UNSAT;
+- DRAT-trim rejection never establishes SAT; and
+- only the operator-authorized checker accepting the exact bound certificate
+  may create a `VERIFIED` record.
 
 CaDiCaL is a producer, not a checker. Its status is retained only as an
-unverified operational report. The next slice adds independent clean-process
-DRAT replay as a separate capability and authorization boundary.
+unverified operational report. DRAT-trim replay is an independent
+clean-process capability and authorization boundary.

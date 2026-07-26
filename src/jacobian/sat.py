@@ -48,6 +48,13 @@ class ResolvedSatAssignment:
     cnf_artifact: StoredArtifact
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedSatProof:
+    artifact: StoredArtifact
+    proof: SatProofArtifact
+    cnf_artifact: StoredArtifact
+
+
 class SatArtifactService:
     """Materialize SAT instances and unverified evidence with exact bindings."""
 
@@ -211,6 +218,41 @@ class SatArtifactService:
             payload=proof_artifact.model_dump(mode="json"),
             parents=(cnf_uri,),
             summary="unverified raw DRAT proof",
+        )
+
+    def resolve_proof(self, proof_uri: str) -> ResolvedSatProof:
+        """Resolve raw proof bytes whose payload and lineage bind one exact CNF."""
+
+        try:
+            artifact = self.store.get(proof_uri)
+        except StoreError as exc:
+            raise SatArtifactError(
+                "source is not an available SAT proof artifact"
+            ) from exc
+        if (
+            artifact.manifest.schema_uri != self.installation.proof_schema_uri
+            or artifact.manifest.semantics_uri != self.installation.semantics_uri
+        ):
+            raise SatArtifactError("source is not a SAT proof artifact")
+        try:
+            normalized = self.schemas.validate(
+                self.installation.proof_schema_uri,
+                artifact.payload,
+            )
+            proof = SatProofArtifact.model_validate(normalized)
+        except (SchemaRegistryError, ValueError, ValidationError) as exc:
+            raise SatArtifactError("source is not a valid SAT proof artifact") from exc
+        binding = self.bind_cnf(proof.cnf.cnf_artifact_uri)
+        if proof.cnf != binding:
+            raise SatArtifactError(
+                "SAT proof binding does not match its exact canonical CNF"
+            )
+        if binding.cnf_artifact_uri not in artifact.manifest.parents:
+            raise SatArtifactError("SAT proof is missing its canonical CNF parent")
+        return ResolvedSatProof(
+            artifact=artifact,
+            proof=proof,
+            cnf_artifact=self.store.get(binding.cnf_artifact_uri),
         )
 
 

@@ -92,6 +92,8 @@ work that has been identified but not necessarily scheduled. The
 [atomic capability portfolio](contributing/atomic-capability-portfolio.md)
 records the formal-first backend research, ordering, installation tradeoffs,
 and evaluation gates used to decide which mathematical slices to build next.
+The [test-suite cost audit](contributing/test-suite-cost-audit.md) records the
+measured test lanes, retained trust-boundary costs, and fast-feedback policy.
 
 When adding a document, place it according to the reader's need:
 

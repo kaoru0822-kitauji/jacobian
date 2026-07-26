@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from jacobian.bounded_process import run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.artifacts import ArtifactPutResult
+from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.checkers import CheckerDecision, EvidenceKind
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -97,18 +98,20 @@ def _digest_bytes(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def _environment_digest(checker_digest: str) -> str:
-    return _digest_bytes(
-        canonicalize_json(
-            {
-                "environment_version": "1",
-                "python": platform.python_version(),
-                "implementation": platform.python_implementation(),
-                "platform": platform.platform(),
-                "checker_digest": checker_digest,
-            }
-        )
-    )
+def _environment_digest(
+    checker_digest: str,
+    provider_runtime: CapabilityProviderRuntime | None = None,
+) -> str:
+    identity: dict[str, Any] = {
+        "environment_version": "1",
+        "python": platform.python_version(),
+        "implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "checker_digest": checker_digest,
+    }
+    if provider_runtime is not None:
+        identity["provider_runtime"] = provider_runtime.model_dump(mode="json")
+    return _digest_bytes(canonicalize_json(identity))
 
 
 def _checker_failure_detail(response: Any) -> str:
@@ -202,6 +205,7 @@ class VerificationService:
         entrypoint: str,
         expected_digest: str,
         request: dict[str, Any],
+        provider_runtime: CapabilityProviderRuntime | None = None,
         timeout_seconds: float | None = None,
     ) -> CheckerDecision:
         environment = dict(os.environ)
@@ -210,14 +214,21 @@ class VerificationService:
             30 if timeout_seconds is None else timeout_seconds,
             self.checker_timeout_seconds,
         )
+        command = [
+            sys.executable,
+            "-m",
+            "jacobian.checker_worker",
+            entrypoint,
+            expected_digest,
+        ]
+        if provider_runtime is not None:
+            command.append(
+                canonicalize_json(provider_runtime.model_dump(mode="json")).decode(
+                    "utf-8"
+                )
+            )
         completed = run_bounded_process(
-            [
-                sys.executable,
-                "-m",
-                "jacobian.checker_worker",
-                entrypoint,
-                expected_digest,
-            ],
+            command,
             input_bytes=canonicalize_json(request),
             timeout_seconds=effective_timeout,
             environment=environment,
@@ -249,6 +260,15 @@ class VerificationService:
         if response.get("measured_checker_digest") != expected_digest:
             _LOGGER.warning(
                 "checker worker measured an unexpected implementation: %r",
+                response,
+            )
+            raise CheckerExecutionError(_CHECKER_CHANGED)
+        expected_runtime_digest = (
+            provider_runtime.digest if provider_runtime is not None else None
+        )
+        if response.get("measured_runtime_digest") != expected_runtime_digest:
+            _LOGGER.warning(
+                "checker worker measured an unexpected external runtime: %r",
                 response,
             )
             raise CheckerExecutionError(_CHECKER_CHANGED)
@@ -370,6 +390,7 @@ class VerificationService:
                 entrypoint=checker.entrypoint,
                 expected_digest=checker.executable_digest,
                 request=request,
+                provider_runtime=checker.provider_runtime,
                 timeout_seconds=timeout_seconds,
             )
             runtime_ms = int((time.monotonic() - started) * 1000)
@@ -415,7 +436,10 @@ class VerificationService:
                 method=decision.method,
                 coverage=decision.coverage,
                 request_digest=request_digest,
-                environment_digest=_environment_digest(checker.executable_digest),
+                environment_digest=_environment_digest(
+                    checker.executable_digest,
+                    checker.provider_runtime,
+                ),
             )
             parent_uris = [claim_uri, candidate_uri, witness_uri]
             if scope is not None:
@@ -492,6 +516,7 @@ class VerificationService:
         certificate_uri: str,
         checker_id: str | None = None,
         timeout_seconds: float | None = None,
+        include_artifact_metadata: bool = False,
     ) -> ResultEnvelope:
         """Run a specified compatible checker or uniquely select one."""
 
@@ -573,11 +598,27 @@ class VerificationService:
                 )
             request = {
                 "request_version": "1",
-                "claim": self._checker_artifact(claim),
-                "candidate": self._checker_artifact(candidate),
-                "scope": self._checker_artifact(scope) if scope is not None else None,
+                "claim": self._checker_artifact(
+                    claim,
+                    include_storage_metadata=include_artifact_metadata,
+                ),
+                "candidate": self._checker_artifact(
+                    candidate,
+                    include_storage_metadata=include_artifact_metadata,
+                ),
+                "scope": (
+                    self._checker_artifact(
+                        scope,
+                        include_storage_metadata=include_artifact_metadata,
+                    )
+                    if scope is not None
+                    else None
+                ),
                 "certificate": {
-                    **self._checker_artifact(certificate_artifact),
+                    **self._checker_artifact(
+                        certificate_artifact,
+                        include_storage_metadata=include_artifact_metadata,
+                    ),
                     "payload": certificate.model_dump(mode="json"),
                 },
                 "expected_bindings": certificate.bindings.model_dump(mode="json"),
@@ -587,6 +628,7 @@ class VerificationService:
                 entrypoint=checker.entrypoint,
                 expected_digest=checker.executable_digest,
                 request=request,
+                provider_runtime=checker.provider_runtime,
                 timeout_seconds=timeout_seconds,
             )
             runtime_ms = int((time.monotonic() - started) * 1000)
@@ -632,7 +674,10 @@ class VerificationService:
                 method=decision.method,
                 coverage=decision.coverage,
                 request_digest=request_digest,
-                environment_digest=_environment_digest(checker.executable_digest),
+                environment_digest=_environment_digest(
+                    checker.executable_digest,
+                    checker.provider_runtime,
+                ),
                 relation_id=decision.relation_id,
                 obligation_uri=decision.obligation_uri,
             )
@@ -786,6 +831,7 @@ class VerificationService:
                 entrypoint=checker.entrypoint,
                 expected_digest=checker.executable_digest,
                 request=request,
+                provider_runtime=checker.provider_runtime,
             )
             runtime_ms = int((time.monotonic() - started) * 1000)
             if not decision.accepted:
@@ -830,7 +876,10 @@ class VerificationService:
                 method=decision.method,
                 coverage=decision.coverage,
                 request_digest=request_digest,
-                environment_digest=_environment_digest(checker.executable_digest),
+                environment_digest=_environment_digest(
+                    checker.executable_digest,
+                    checker.provider_runtime,
+                ),
             )
             record_artifact = self._commit_verification_record(
                 checker_id=checker.checker_id,
@@ -981,6 +1030,7 @@ class VerificationService:
                 entrypoint=checker.entrypoint,
                 expected_digest=checker.executable_digest,
                 request=request,
+                provider_runtime=checker.provider_runtime,
             )
             runtime_ms = int((time.monotonic() - started) * 1000)
             if not decision.accepted:
@@ -1024,7 +1074,10 @@ class VerificationService:
                 method=decision.method,
                 coverage=decision.coverage,
                 request_digest=request_digest,
-                environment_digest=_environment_digest(checker.executable_digest),
+                environment_digest=_environment_digest(
+                    checker.executable_digest,
+                    checker.provider_runtime,
+                ),
             )
             record_artifact = self._commit_verification_record(
                 checker_id=checker.checker_id,
