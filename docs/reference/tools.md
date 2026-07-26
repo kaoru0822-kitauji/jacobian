@@ -131,7 +131,8 @@ of catalog membership:
 - [exact rational matrix determinants](matrix-rational-determinant.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
-- [Lean declaration discovery contract](lean-declaration-discovery.md).
+- [Lean declaration discovery contract](lean-declaration-discovery.md);
+- [Lean statement proposal and direct elaboration](lean-statement-elaboration.md).
 
 ## Mathematical operation portfolio
 
