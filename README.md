@@ -1,6 +1,6 @@
 # Jacobian
 
-> A composable mathematical workbench for AI agents — built for conjectures,
+> A composable mathematical workbench for AI agents. Built for conjectures,
 > counterexamples, and checkable evidence.
 
 [![CI](https://github.com/morluto/jacobian/actions/workflows/ci.yml/badge.svg)](https://github.com/morluto/jacobian/actions/workflows/ci.yml)
@@ -12,7 +12,7 @@
 Jacobian is an MCP server, CLI, and Python library that gives AI agents
 composable mathematical capabilities for high-level mathematics. Agents
 retrieve premises, construct objects, compute invariants, search for
-witnesses, and independently verify certificates — the operations an agent
+witnesses, and independently verify certificates: the operations an agent
 needs to make trustworthy progress on conjectures and other problems where a
 model's answer is not enough and checkable evidence is what counts.
 
@@ -20,9 +20,9 @@ model's answer is not enough and checkable evidence is what counts.
 
 Frontier models can now find counterexamples to open conjectures and propose
 proofs that span pages of subtle algebra. The hard part is no longer only the
-search — it is trust. A model's summary is not a proof, a solver's `SAT` label
-is not a witness, and a high score is not a theorem. Jacobian is built for that
-gap. It gives agents the operations to search, transform, and check
+search. It is trust. A model's summary is not a proof, a solver's `SAT` label
+is not a witness, and a high score is not a theorem. Jacobian is built for
+that gap. It gives agents the operations to search, transform, and check
 mathematical objects, and it keeps search, evaluation, and verification in
 separate lanes so a claim becomes trusted only when an independent checker
 accepts evidence bound to the exact statement.
@@ -30,9 +30,9 @@ accepts evidence bound to the exact statement.
 This matters for the work that is hardest to verify by eye: a candidate
 counterexample to a long-standing conjecture, a polynomial map that should or
 should not be invertible, a finite witness that collapses a universal claim.
-Jacobian exposes those as typed, inspectable artifacts — the witness, the
-certificate, the rejected candidate, the stale attempt — so a human reviewer or
-a downstream agent can see what was tried, what passed, and what did not.
+Jacobian exposes those as typed, inspectable artifacts: the witness, the
+certificate, the rejected candidate, the stale attempt. A human reviewer or a
+downstream agent can see what was tried, what passed, and what did not.
 
 Capabilities have mathematically atomic, agent-visible outcomes: retrieve
 premises, construct an object, compute an invariant, transform a claim, search
@@ -58,6 +58,37 @@ separate assurance lane:
 > operator-authorized checker accepts evidence bound to the exact claim,
 > semantics, candidate, scope, certificate format, and checker version.
 
+## Bundled capabilities
+
+The kernel ships with capabilities across several mathematical domains. Each
+one is a separately invocable operation with typed artifacts and explicit
+assurance; agents compose them into research strategies.
+
+- **Polynomial maps**: evaluate maps, compute Jacobians, search for and
+  independently verify collisions (the witness type that refutes invertibility
+  claims).
+- **Polynomial systems and factorization**: verify exact solutions, factor
+  polynomials, check identities.
+- **Linear algebra**: compute determinants, rank, and kernels; find and
+  verify exact rational `A x = b` solutions (optional `flint` extra).
+- **SAT**: find models and UNSAT proofs with CaDiCaL, independently replay
+  total assignments and DRAT proofs.
+- **SMT**: find UNSAT proofs with cvc5, independently replay Alethe proofs
+  with Carcara.
+- **Graphs**: construct graphs, compute properties, enumerate paths, realize
+  degree sequences, test isomorphism, search colorings.
+- **Universal algebra**: evaluate finite magma laws, search for
+  countermodels.
+- **Polytopes**: convex combinations, linear separation.
+- **Lean**: check proofs against pinned `CORE` and `MATHLIB` environments,
+  discover declarations, retrieve premises, apply tactics.
+- **Research memory**: durable, revisioned workspace for scratch entries,
+  findings, attempts, and dependency-linked context.
+
+See the [tool reference](docs/reference/tools.md) for the full contract per
+capability and the [atomic capability portfolio](docs/contributing/atomic-capability-portfolio.md)
+for the backend order and per-slice evaluation gates.
+
 ## Get started
 
 Jacobian uses Python 3.12 and `uv`. Initialize the locked development
@@ -68,7 +99,46 @@ uv sync --dev
 uv run jacobian --state-dir .jacobian init
 ```
 
-### macOS and Z3
+### A first verified result
+
+Find a graph with an incomplete path list, evaluate the claim, find an omitted
+path, and verify it with an independent checker. The full script is in
+[Find and verify a counterexample](docs/tutorials/first-verified-result.md);
+the core sequence is:
+
+```python
+# Evaluate whether the proposed path list is complete.
+evaluation = await tool(client, "capability.invoke", {
+    "capability_id": "evaluate.batch",
+    "mode": "EXPLORE",
+    "payload": {"claim_uri": claim_uri, "candidate_uris": [candidate_uri], ...},
+})
+# evaluation: FALSE HEURISTIC  <- heuristic evidence, not yet verified
+
+# Find a witness: an omitted path that defeats the candidate.
+found = await tool(client, "capability.invoke", {
+    "capability_id": "witness.find",
+    "mode": "EXPLORE",
+    "payload": {"claim_uri": claim_uri, "candidate_uri": candidate_uri, ...},
+})
+
+# Independently verify the witness with an authorized checker.
+verified = await tool(client, "capability.invoke", {
+    "capability_id": "witness.verify",
+    "mode": "VERIFY",
+    "payload": {"witness_uri": found["output"]["witness_uri"], ...},
+})
+# verification: FALSE VERIFIED  <- now a trusted conclusion
+```
+
+The gap between `FALSE HEURISTIC` and `FALSE VERIFIED` is the whole point:
+search produces evidence, an independent checker produces trust.
+
+Run `uv run jacobian --help` to inspect the CLI or `uv run jacobian-mcp` to
+start the MCP adapter.
+
+<details>
+<summary><strong>macOS and Z3</strong></summary>
 
 The locked environment currently uses `z3-solver` 4.16.0.0. Its upstream
 macOS wheels are built for macOS 15 or newer on both Apple silicon and Intel.
@@ -94,10 +164,7 @@ include that command output and the diagnostics above in a bug report. See the
 [`z3-solver` 4.16.0.0 files on PyPI](https://pypi.org/project/z3-solver/4.16.0.0/#files)
 for the upstream wheel compatibility tags.
 
-Then follow
-[Find and verify a counterexample](docs/tutorials/first-verified-result.md)
-for a complete first experiment. Run `uv run jacobian --help` to inspect the
-CLI or `uv run jacobian-mcp` to start the MCP adapter.
+</details>
 
 ## Direction
 
