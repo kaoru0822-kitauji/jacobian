@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.checkers import (
     CheckerAuditEvent,
     CheckerRegistration,
@@ -55,6 +56,32 @@ def compute_entrypoint_digest(entrypoint: str) -> str:
             "The checker entrypoint could not be loaded. Check that the "
             "module:function entrypoint is installed, then retry."
         ) from exc
+
+
+def _require_runtime_unchanged(runtime: CapabilityProviderRuntime | None) -> None:
+    if runtime is None:
+        return
+    executable = runtime.configuration.get("executable")
+    if not isinstance(executable, str) or runtime.digest is None:
+        raise CheckerExecutableChangedError(
+            "The authorized checker runtime identity is incomplete."
+        )
+    try:
+        resolved = Path(executable).resolve(strict=True)
+        digest = hashlib.sha256()
+        with resolved.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+    except OSError as exc:
+        raise CheckerExecutableChangedError(
+            "The authorized checker runtime is unavailable."
+        ) from exc
+    measured = "sha256:" + digest.hexdigest()
+    if measured != runtime.digest:
+        raise CheckerExecutableChangedError(
+            "The checker runtime changed after authorization. Authorize the "
+            "current runtime, then retry."
+        )
 
 
 class CheckerRegistry:
@@ -138,6 +165,7 @@ class CheckerRegistry:
         candidate_schema_uris: tuple[str, ...],
         target_schema_uris: tuple[str, ...] = (),
         target_semantics_uris: tuple[str, ...] = (),
+        provider_runtime: CapabilityProviderRuntime | None = None,
         reason: str = "operator authorization",
     ) -> CheckerRegistration:
         """Authorize one measured checker for explicit evidence compatibility."""
@@ -153,12 +181,14 @@ class CheckerRegistry:
         )
         if scope_error is not None:
             raise CheckerRegistryError(scope_error)
+        _require_runtime_unchanged(provider_runtime)
         executable_digest = compute_entrypoint_digest(entrypoint)
         unbound_registration = CheckerRegistration(
             checker_id="checker://sha256/" + "0" * 64,
             name=name,
             entrypoint=entrypoint,
             executable_digest=executable_digest,
+            provider_runtime=provider_runtime,
             evidence_kind=selected_kind,
             format_id=format_id,
             format_version=format_version,
@@ -172,7 +202,9 @@ class CheckerRegistry:
         registration = unbound_registration.model_copy(
             update={"checker_id": _checker_identifier(unbound_registration)}
         )
-        encoded = canonicalize_json(registration.model_dump(mode="json"))
+        encoded = canonicalize_json(
+            registration.model_dump(mode="json", exclude_none=True)
+        )
 
         with self._connect() as connection:
             existing = connection.execute(
@@ -273,6 +305,7 @@ class CheckerRegistry:
                 "The checker changed after authorization. Authorize the current "
                 "checker version, then retry."
             )
+        _require_runtime_unchanged(registration.provider_runtime)
         return registration
 
     def require_compatible(
@@ -447,7 +480,7 @@ class CheckerRegistry:
 
 
 def _checker_identifier(registration: CheckerRegistration) -> str:
-    identity_payload = registration.model_dump(mode="json")
+    identity_payload = registration.model_dump(mode="json", exclude_none=True)
     del identity_payload["checker_id"]
     del identity_payload["authorized"]
     identifier = hashlib.sha256(

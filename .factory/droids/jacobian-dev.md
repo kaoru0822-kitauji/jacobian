@@ -38,12 +38,9 @@ the research strategy.
 ## Development Workflow
 
 ```sh
-uv sync --dev
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv build
+make setup
+make test-fast
+make validate
 ```
 
 ## Package Structure
@@ -60,4 +57,4 @@ uv build
 - Ruff linting with extensive rule selection (A, B, C4, C90, E, F, I, N, PIE, PTH, RUF, SIM, TD, UP)
 - Coverage threshold: 50% minimum
 - All TODO comments must reference an issue: `TODO(#123): description`
-- Pre-commit hooks enforce lint, format, type-check, and secret scanning
+- Pre-commit hooks enforce formatting, syntax checks, and secret scanning

@@ -6,6 +6,8 @@ import pytest
 
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 @pytest.mark.integration
 def test_isomorphic_graphs_share_one_canonical_object(tmp_path: Path) -> None:

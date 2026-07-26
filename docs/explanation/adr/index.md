@@ -28,4 +28,3 @@ Related project-control documents:
 
 - [Architecture](../architecture.md)
 - [Product goals](../goals.md)
-- [Threat model](../threat-model.md)

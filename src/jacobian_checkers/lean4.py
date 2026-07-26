@@ -16,6 +16,7 @@ LEAN_COMMIT = "68218e876d2a38b1985b8590fff244a83c321783"
 LEAN_TOOLCHAIN = f"leanprover/lean4:v{LEAN_VERSION}"
 MATHLIB_COMMIT = "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
 MATHLIB_AXIOMS = frozenset({"Classical.choice", "Quot.sound", "propext"})
+_TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 15
 _FORBIDDEN = re.compile(
     r"\b(?:admit|axiom|elab|import|macro|native_decide|opaque|run_tac|"
     r"set_option|sorry|syntax|unsafe)\b|#",
@@ -134,7 +135,7 @@ def _validate_lean(
             check=True,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
         ).stdout.strip()
         commit = subprocess.run(
             [*command, "-g"],
@@ -142,7 +143,7 @@ def _validate_lean(
             check=True,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
         ).stdout.strip()
     except subprocess.SubprocessError as exc:
         raise _LeanSetupError(

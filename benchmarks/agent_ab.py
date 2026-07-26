@@ -1,17 +1,18 @@
-"""Run paired Codex portfolio-ablation evaluations.
+"""Run model-in-the-loop Jacobian capability evaluations.
 
 This benchmark measures whether Jacobian changes agent outcomes. It is
 separate from ``agent_mcp.py``, which validates MCP and checker integration.
 
-Run a three-pair baseline pilot with:
+Preview a one-pair pilot with:
 
     uv run python benchmarks/agent_ab.py --case ERDOS-STRAUS-AB-001
 
-Run the held-out Lean declaration-discovery pilot with:
+Execute it only after reviewing the printed plan:
 
-    uv run python benchmarks/agent_ab.py --case LEAN-DECLARATION-AB-001 \
-        --case LEAN-DECLARATION-AB-002 --model gpt-5.6-sol \
-        --reasoning-effort high
+    uv run python benchmarks/agent_ab.py \
+        --case ERDOS-STRAUS-AB-001 \
+        --execute \
+        --max-model-runs 2
 """
 
 from __future__ import annotations
@@ -27,9 +28,18 @@ import subprocess
 import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from itertools import product
 from pathlib import Path
 from typing import Any, cast
 
+from jacobian.artifacts import ArtifactService
+from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
+from jacobian.contracts.sat import (
+    CanonicalCnf,
+    SatAssignmentArtifact,
+    SatProofArtifact,
+    canonicalize_cnf,
+)
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.eval_graph_oracle import (
     GraphOracleError,
@@ -39,6 +49,8 @@ from jacobian.eval_graph_oracle import (
     normalize_graph,
 )
 from jacobian.eval_telemetry import parse_agent_transcript as parse_transcript
+from jacobian.kernel import JacobianKernel
+from jacobian.sat import install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
 
@@ -47,7 +59,9 @@ CASES_ROOT = Path(__file__).with_name("ab_cases")
 REPORT_SCHEMA = CASES_ROOT / "report.schema.json"
 GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
 PARTITION_REPORT_SCHEMA = CASES_ROOT / "partition-report.schema.json"
-LEAN_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
+SAT_REPORT_SCHEMA = CASES_ROOT / "sat-report.schema.json"
+LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
+LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
 CONDITIONS = ("control", "treatment")
 LEAN_DISCOVERY_IDS = frozenset(
@@ -56,6 +70,21 @@ LEAN_DISCOVERY_IDS = frozenset(
         "lean.declaration.inspect",
     }
 )
+SAT_CAPABILITY_IDS = frozenset(
+    {
+        "sat.model.find",
+        "sat.model.verify",
+        "sat.unsat_proof.find",
+        "sat.unsat_proof.verify",
+    }
+)
+LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
+LEAN_PROOF_CAPABILITY_EXCLUSIONS = {
+    "baseline": ("lean.proof_state.apply_tactic", "lean.retrieve.premises"),
+    "tactic": ("lean.retrieve.premises",),
+    "retrieval": ("lean.proof_state.apply_tactic",),
+    "combined": (),
+}
 
 COMMON_PROMPT = """\
 Complete mathematical evaluation case {case_id}.
@@ -115,7 +144,30 @@ use shell commands or create programs. Copy the returned durable URIs. Report
 VERIFIED only when the capability returns VERIFIED assurance.
 """
 
-LEAN_INSTRUCTIONS = """\
+SAT_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. You may write and run local code
+in the empty workspace. Decide the exact supplied CNF directly. A satisfying
+assignment is acceptable evidence for SAT; do not invent an UNSAT certificate.
+Report SELF_CHECKED and UNVERIFIED, with null durable evidence and verification
+record URIs.
+"""
+
+SAT_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create programs. The exact canonical CNF has already been materialized at the
+URI supplied below. Inspect the installed catalog, then compose the appropriate
+SAT evidence producer and its independent verifier. A solver status, failed
+search, assignment artifact, or proof artifact alone is not verification.
+Report VERIFIED only when the matching verify capability returns VERIFIED and
+copy its exact verification-record URI. Set evidence_uri to the producer output
+passed into that verifier: assignment_uri from sat.model.find or proof_uri from
+sat.unsat_proof.find. Do not substitute the verifier's witness_uri or
+certificate_uri. For a SAT result, copy the named assignment map returned
+inline by sat.model.find; do not reinterpret the durable artifact's positional
+values against the prompt's pre-canonical variable order.
+"""
+
+LEAN_DECLARATION_INSTRUCTIONS = """\
 Use only the jacobian_local MCP server for mathematical work. Do not use shell
 commands or create programs. Inspect the installed capability catalog, construct
 a Lean proof body for the exact MATHLIB statement, and independently replay it
@@ -124,6 +176,15 @@ lean.check, without a leading `by`. List declarations explicitly cited by that
 body. Report VERIFIED only when lean.check returns VERIFIED assurance, and copy
 its exact verification_record_uri. Retrieval or inspection alone is not
 verification.
+"""
+
+LEAN_PROOF_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create files. Inspect the installed capability catalog and use the available
+capabilities as you judge useful. The catalog deliberately varies by condition.
+Report TRUE and VERIFIED only if lean.check accepts the exact statement and
+proof and returns a verification_record_uri. Otherwise report UNKNOWN and
+UNVERIFIED. Public examples are not evaluation answers.
 """
 
 
@@ -138,21 +199,319 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return payload
 
 
-def load_cases(selected: Sequence[str]) -> list[dict[str, Any]]:
-    cases = [
-        _load_json_object(path)
+def load_cases(
+    selected: Sequence[str],
+    case_files: Sequence[Path] = (),
+) -> list[dict[str, Any]]:
+    public_paths = [
+        path
         for path in sorted(CASES_ROOT.glob("*.json"))
         if not path.name.endswith(".schema.json")
     ]
+    external_paths = [path.resolve() for path in case_files]
+    cases = []
+    for path in (*public_paths, *external_paths):
+        case = _load_json_object(path)
+        case["_case_path"] = str(path.resolve())
+        cases.append(case)
     indexed = {str(case.get("case_id")): case for case in cases}
     if len(indexed) != len(cases):
         raise BenchmarkError("A/B case IDs must be unique")
-    if not selected or selected == ["all"]:
+    external_ids = [str(case.get("case_id")) for case in cases[len(public_paths) :]]
+    if not selected and not external_ids:
+        raise BenchmarkError(
+            "select a case with --case or --case-file, or explicitly use --case all"
+        )
+    if "all" in selected and selected != ["all"]:
+        raise BenchmarkError("--case all cannot be combined with named cases")
+    if selected == ["all"]:
         return cases
-    missing = sorted(set(selected) - set(indexed))
+    requested = list(dict.fromkeys([*selected, *external_ids]))
+    missing = sorted(set(requested) - set(indexed))
     if missing:
         raise BenchmarkError(f"unknown A/B cases: {', '.join(missing)}")
-    return [indexed[case_id] for case_id in selected]
+    return [indexed[case_id] for case_id in requested]
+
+
+def _sat_case_cnf(case: Mapping[str, Any]) -> CanonicalCnf:
+    variable_names = case.get("variable_names")
+    clauses = case.get("clauses")
+    if (
+        not isinstance(variable_names, list)
+        or not all(isinstance(name, str) for name in variable_names)
+        or not isinstance(clauses, list)
+        or not all(isinstance(clause, list) for clause in clauses)
+    ):
+        raise BenchmarkError("SAT case must contain variable_names and clauses")
+    try:
+        return canonicalize_cnf(variable_names=variable_names, clauses=clauses)
+    except ValueError as exc:
+        raise BenchmarkError("SAT case contains an invalid CNF") from exc
+
+
+def _seed_sat_case(case: Mapping[str, Any], state_dir: Path) -> str:
+    cnf = _sat_case_cnf(case)
+    store = ArtifactStore(state_dir)
+    schemas = SchemaRegistry(store)
+    artifacts = ArtifactService(store, schemas)
+    sat = install_sat_artifacts(store, schemas, artifacts)
+    stored = sat.put_cnf(
+        variable_names=tuple(variable.name for variable in cnf.variables),
+        clauses=tuple(clause.literals for clause in cnf.clauses),
+    )
+    return stored.artifact_uri
+
+
+def _sat_assignment_satisfies(
+    cnf: CanonicalCnf,
+    assignment: Mapping[str, bool],
+) -> bool:
+    names = {variable.id: variable.name for variable in cnf.variables}
+    return all(
+        any(
+            assignment[names[abs(literal)]]
+            if literal > 0
+            else not assignment[names[abs(literal)]]
+            for literal in clause.literals
+        )
+        for clause in cnf.clauses
+    )
+
+
+def _sat_hidden_status(cnf: CanonicalCnf) -> str:
+    if len(cnf.variables) > 20:
+        raise BenchmarkError("held-out SAT oracle is limited to 20 variables")
+    names = tuple(variable.name for variable in cnf.variables)
+    for values in product((False, True), repeat=len(names)):
+        assignment = dict(zip(names, values, strict=True))
+        if _sat_assignment_satisfies(cnf, assignment):
+            return "SATISFIABLE"
+    return "UNSATISFIABLE"
+
+
+def _reported_sat_assignment(
+    report: Mapping[str, Any],
+    *,
+    cnf: CanonicalCnf,
+    hidden_status: str,
+) -> dict[str, bool] | None:
+    assignment_value = report.get("assignment")
+    if hidden_status != "SATISFIABLE":
+        if assignment_value is not None:
+            raise BenchmarkError("UNSAT report must not contain an assignment")
+        return None
+    if not isinstance(assignment_value, Mapping) or not all(
+        isinstance(name, str) and isinstance(value, bool)
+        for name, value in assignment_value.items()
+    ):
+        raise BenchmarkError("SAT report omitted a Boolean assignment")
+    assignment = dict(assignment_value)
+    if set(assignment) != {
+        variable.name for variable in cnf.variables
+    } or not _sat_assignment_satisfies(cnf, assignment):
+        raise BenchmarkError("SAT report assignment does not satisfy the exact CNF")
+    if report.get("evidence_kind") != "ASSIGNMENT":
+        raise BenchmarkError("SAT report mislabeled its assignment evidence")
+    return assignment
+
+
+def _score_sat_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    expected = case.get("expected")
+    if not isinstance(expected, Mapping):
+        raise BenchmarkError("SAT expected must be an object")
+    expected_cnf = _sat_case_cnf(case)
+    hidden_status = _sat_hidden_status(expected_cnf)
+    if expected.get("status") != hidden_status:
+        raise BenchmarkError("SAT case expectation differs from the hidden oracle")
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("status") != hidden_status
+        or report.get("conclusion") != "TRUE"
+    ):
+        raise BenchmarkError("SAT report has the wrong case, status, or conclusion")
+    _validate_feedback(report.get("feedback"))
+
+    cnf_uri = report.get("cnf_uri")
+    if not isinstance(cnf_uri, str):
+        raise BenchmarkError("SAT report omitted its canonical CNF URI")
+    store = ArtifactStore(state_dir)
+    try:
+        cnf_artifact = store.get(cnf_uri)
+        schemas = SchemaRegistry(store)
+        schemas.validate(cnf_artifact.manifest.schema_uri, cnf_artifact.payload)
+        durable_cnf = CanonicalCnf.model_validate(cnf_artifact.payload)
+    except (SchemaRegistryError, StoreError, ValueError) as exc:
+        raise BenchmarkError("SAT canonical CNF artifact is unavailable") from exc
+    if durable_cnf != expected_cnf:
+        raise BenchmarkError("SAT durable CNF differs from the held-out case")
+
+    reported_assignment = _reported_sat_assignment(
+        report,
+        cnf=durable_cnf,
+        hidden_status=hidden_status,
+    )
+
+    evidence_uri = report.get("evidence_uri")
+    record_uri = report.get("verification_record_uri")
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("SAT control condition used an MCP tool")
+        if (
+            report.get("assurance") != "SELF_CHECKED"
+            or report.get("final_verification") != "UNVERIFIED"
+            or evidence_uri is not None
+            or record_uri is not None
+        ):
+            raise BenchmarkError("SAT control condition falsely projected verification")
+        expected_kind = "ASSIGNMENT" if hidden_status == "SATISFIABLE" else "NONE"
+        if report.get("evidence_kind") != expected_kind:
+            raise BenchmarkError("SAT control report has the wrong evidence kind")
+        return {
+            "passed": True,
+            "false_certification": False,
+            "checks": ["hidden exact SAT oracle", "control isolation"],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if (
+        report.get("assurance") != "VERIFIED"
+        or report.get("final_verification") != "VERIFIED"
+        or not isinstance(evidence_uri, str)
+        or not isinstance(record_uri, str)
+    ):
+        raise BenchmarkError("SAT treatment was not independently verified")
+
+    find_id = (
+        "sat.model.find" if hidden_status == "SATISFIABLE" else "sat.unsat_proof.find"
+    )
+    verify_id = (
+        "sat.model.verify"
+        if hidden_status == "SATISFIABLE"
+        else "sat.unsat_proof.verify"
+    )
+    evidence_field = "assignment_uri" if hidden_status == "SATISFIABLE" else "proof_uri"
+    expected_kind = "ASSIGNMENT" if hidden_status == "SATISFIABLE" else "UNSAT_PROOF"
+    if report.get("evidence_kind") != expected_kind:
+        raise BenchmarkError("SAT treatment reported the wrong evidence kind")
+
+    try:
+        evidence_artifact = store.get(evidence_uri)
+        record_artifact = store.get(record_uri)
+        record = VerificationRecord.model_validate(record_artifact.payload)
+        checker_evidence = store.get(record.evidence_uri)
+        semantics = store.get(cnf_artifact.manifest.semantics_uri)
+        schemas.validate(
+            evidence_artifact.manifest.schema_uri,
+            evidence_artifact.payload,
+        )
+        schemas.validate(record_artifact.manifest.schema_uri, record_artifact.payload)
+        schemas.validate(
+            checker_evidence.manifest.schema_uri,
+            checker_evidence.payload,
+        )
+        if hidden_status == "SATISFIABLE":
+            durable_evidence: SatAssignmentArtifact | SatProofArtifact = (
+                SatAssignmentArtifact.model_validate(evidence_artifact.payload)
+            )
+        else:
+            durable_evidence = SatProofArtifact.model_validate(
+                evidence_artifact.payload
+            )
+    except (SchemaRegistryError, StoreError, ValueError) as exc:
+        raise BenchmarkError("SAT verification artifacts are unavailable") from exc
+
+    if (
+        cnf_uri not in evidence_artifact.manifest.parents
+        or durable_evidence.cnf.cnf_artifact_uri != cnf_uri
+        or durable_evidence.cnf.cnf_object_digest != cnf_artifact.manifest.object_digest
+        or durable_evidence.cnf.cnf_payload_digest
+        != cnf_artifact.manifest.payload_digest
+        or record.conclusion.value != "TRUE"
+        or record.bindings.claim_digest != cnf_artifact.manifest.object_digest
+        or record.bindings.semantics_digest != semantics.manifest.object_digest
+        or record.bindings.candidate_digest != evidence_artifact.manifest.object_digest
+        or not {cnf_uri, evidence_uri, record.evidence_uri}.issubset(
+            record_artifact.manifest.parents
+        )
+    ):
+        raise BenchmarkError("SAT verification record is not exactly bound")
+    if isinstance(durable_evidence, SatAssignmentArtifact):
+        durable_assignment = {
+            variable.name: value
+            for variable, value in zip(
+                durable_cnf.variables,
+                durable_evidence.values,
+                strict=True,
+            )
+        }
+        if durable_assignment != reported_assignment:
+            raise BenchmarkError("reported assignment differs from durable evidence")
+
+    found_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_input = invocation.get("input")
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == find_id
+            and isinstance(invocation_input, Mapping)
+            and invocation_input.get("cnf_uri") == cnf_uri
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get(evidence_field) == evidence_uri
+            and evidence_uri in (invocation.get("artifact_uris") or [])
+        ):
+            found_index = index
+        if (
+            found_index is not None
+            and index > found_index
+            and invocation.get("capability_id") == verify_id
+            and invocation_input == {evidence_field: evidence_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("verification_record_uri") == record_uri
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            and record_uri in (invocation.get("artifact_uris") or [])
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError("SAT treatment lacks an exact find-to-verify trace")
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=verify_id,
+            mode=CapabilityMode.VERIFY,
+            input={evidence_field: evidence_uri},
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.assurance.verification_record_uri != record_uri
+        or replay.output.get("conclusion") != "TRUE"
+        or replay.output.get("cnf_uri") != cnf_uri
+        or replay.output.get(evidence_field) != evidence_uri
+    ):
+        raise BenchmarkError("SAT treatment evidence does not replay independently")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "hidden exact SAT oracle",
+            "durable CNF and evidence binding",
+            "ordered find-to-verify trace",
+            "independent checker replay",
+        ],
+    }
 
 
 def score_report(
@@ -166,8 +525,17 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "sat_decision":
+        return _score_sat_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "lean_declaration":
-        return _score_lean_report(
+        return _score_lean_declaration_report(
             case,
             report,
             condition=condition,
@@ -188,6 +556,15 @@ def score_report(
         )
     if case.get("task_type") == "finite_partition":
         return _score_partition_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            capability_invocations=capability_invocations,
+        )
+    if case.get("task_type") == "lean_proof":
+        return _score_lean_proof_report(
             case,
             report,
             condition=condition,
@@ -242,7 +619,7 @@ def score_report(
     return {"passed": True, "checks": checks}
 
 
-def _score_lean_report(
+def _score_lean_declaration_report(
     case: Mapping[str, Any],
     report: Mapping[str, Any],
     *,
@@ -406,7 +783,7 @@ def _score_lean_record(
     statement: str,
     proof: str,
     environment: str,
-) -> None:
+) -> VerificationRecord:
     store = ArtifactStore(state_dir)
     try:
         record_artifact = store.get(record_uri)
@@ -463,6 +840,7 @@ def _score_lean_record(
         or record.bindings.claim_digest != claim.manifest.object_digest
     ):
         raise BenchmarkError("Lean verification bindings do not match exact artifacts")
+    return record
 
 
 def _lean_false_certification(
@@ -492,6 +870,147 @@ def _lean_false_certification(
     except (BenchmarkError, KeyError):
         return True
     return False
+
+
+def _score_lean_proof_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    if condition not in LEAN_PROOF_CONDITIONS:
+        raise BenchmarkError(f"unknown Lean proof condition: {condition}")
+    if report.get("case_id") != case.get("case_id"):
+        raise BenchmarkError("Lean proof report has the wrong case ID")
+    _validate_feedback(report.get("feedback"))
+    claimed_verified = (
+        report.get("conclusion") == "TRUE"
+        or report.get("assurance") == "VERIFIED"
+        or report.get("replay_success") is True
+    )
+    proof = report.get("proof")
+    record_uri = report.get("verification_record_uri")
+    exact_trace = _find_exact_lean_check_trace(
+        case=case,
+        proof=proof,
+        record_uri=record_uri,
+        capability_invocations=capability_invocations,
+    )
+    exact_completion = False
+    replay_success = False
+    replay_error: str | None = None
+    record: VerificationRecord | None = None
+    if exact_trace:
+        try:
+            record = _score_lean_record(
+                state_dir=state_dir,
+                record_uri=cast(str, record_uri),
+                statement=str(case["statement"]),
+                proof=cast(str, proof),
+                environment=str(case["environment"]),
+            )
+            exact_completion = True
+        except (BenchmarkError, KeyError) as exc:
+            replay_error = str(exc)
+    if record is not None:
+        try:
+            _replay_lean_certificate(record=record, state_dir=state_dir)
+            replay_success = True
+        except BenchmarkError as exc:
+            replay_error = str(exc)
+    checks = ["exact statement binding", "independent certificate replay"]
+    if exact_completion and replay_success:
+        if "capability.invoke" not in mcp_calls:
+            raise BenchmarkError("verified Lean proof run has no capability invocation")
+        return {
+            "passed": True,
+            "exact_proof_completion": True,
+            "replay_success": True,
+            "false_certification": False,
+            "checks": checks,
+        }
+    if claimed_verified and not exact_completion:
+        return {
+            "passed": False,
+            "exact_proof_completion": False,
+            "replay_success": False,
+            "false_certification": True,
+            "error": replay_error or "Lean certification was not exactly replayable",
+            "checks": checks,
+        }
+    return {
+        "passed": False,
+        "exact_proof_completion": exact_completion,
+        "replay_success": replay_success,
+        "false_certification": False,
+        "error": replay_error or "no independently replayed Lean proof",
+        "checks": checks,
+    }
+
+
+def _validate_feedback(feedback: object) -> None:
+    if (
+        not isinstance(feedback, Mapping)
+        or set(feedback) != {"reasoning_focus", "infrastructure_work", "tooling_gaps"}
+        or not all(
+            isinstance(value, list) and all(isinstance(item, str) for item in value)
+            for value in feedback.values()
+        )
+    ):
+        raise BenchmarkError("report feedback has an invalid structure")
+
+
+def _find_exact_lean_check_trace(
+    *,
+    case: Mapping[str, Any],
+    proof: object,
+    record_uri: object,
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> bool:
+    if not isinstance(proof, str) or not isinstance(record_uri, str):
+        return False
+    expected_input = {
+        "statement": case.get("statement"),
+        "proof": proof,
+        "environment": case.get("environment"),
+    }
+    return any(
+        invocation.get("capability_id") == "lean.check"
+        and invocation.get("input") == expected_input
+        and isinstance(invocation.get("output"), Mapping)
+        and invocation["output"].get("conclusion") == "TRUE"
+        and invocation["output"].get("verification_record_uri") == record_uri
+        and isinstance(invocation.get("assurance"), Mapping)
+        and invocation["assurance"].get("level") == "VERIFIED"
+        for invocation in capability_invocations
+    )
+
+
+def _replay_lean_certificate(
+    *,
+    record: VerificationRecord,
+    state_dir: Path,
+) -> None:
+    kernel = JacobianKernel(state_dir, install_references=True)
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="certificate.verify",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "certificate_uri": record.evidence_uri,
+                "checker_id": record.checker_id,
+            },
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.output.get("conclusion") != "TRUE"
+    ):
+        detail = replay.execution.detail or "checker returned no verified conclusion"
+        raise BenchmarkError(f"independent Lean certificate replay failed: {detail}")
 
 
 def _score_partition_report(
@@ -814,6 +1333,7 @@ def _codex_command(
     reasoning_effort: str,
     report_schema: Path = REPORT_SCHEMA,
     task_type: str | None = None,
+    excluded_capability_ids: Sequence[str] = (),
 ) -> list[str]:
     command = [
         codex_command,
@@ -835,11 +1355,12 @@ def _codex_command(
         "-c",
         "model_reasoning_effort=" + json.dumps(reasoning_effort),
     ]
-    if condition == "treatment" or task_type == "lean_declaration":
+    lean_task = task_type in {"lean_declaration", "lean_proof"}
+    if condition == "treatment" or lean_task:
         uv_command = shutil.which("uv")
         if uv_command is None:
             raise BenchmarkError("uv is required for the treatment MCP server")
-        if task_type == "lean_declaration":
+        if lean_task:
             server_args = [
                 "run",
                 "--project",
@@ -849,9 +1370,11 @@ def _codex_command(
                 "--state-dir",
                 str(state_dir),
             ]
-            if condition == "control":
+            if task_type == "lean_declaration" and condition == "control":
                 for capability_id in sorted(LEAN_DISCOVERY_IDS):
                     server_args.extend(["--exclude-capability", capability_id])
+            for capability_id in excluded_capability_ids:
+                server_args.extend(["--exclude-capability", capability_id])
         else:
             server_args = [
                 "run",
@@ -874,7 +1397,7 @@ def _codex_command(
                 "-c",
                 "mcp_servers.jacobian_local.required=true",
                 "-c",
-                "mcp_servers.jacobian_local.startup_timeout_sec=30",
+                "mcp_servers.jacobian_local.startup_timeout_sec=120",
                 "-c",
                 "mcp_servers.jacobian_local.tool_timeout_sec=360",
             ]
@@ -907,9 +1430,26 @@ def _run_condition(
     state_dir.mkdir()
     is_graph = case.get("task_type") == "graph"
     is_partition = case.get("task_type") == "finite_partition"
-    is_lean = case.get("task_type") == "lean_declaration"
-    if is_lean:
-        condition_instructions = LEAN_INSTRUCTIONS
+    is_sat = case.get("task_type") == "sat_decision"
+    is_lean_declaration = case.get("task_type") == "lean_declaration"
+    is_lean_proof = case.get("task_type") == "lean_proof"
+    sat_context = ""
+    if is_sat:
+        cnf_uri = _seed_sat_case(case, state_dir)
+        sat_context = (
+            "\nThe canonical CNF for this case is available at "
+            f"{cnf_uri}. Return this exact URI as cnf_uri.\n"
+        )
+    if is_sat:
+        condition_instructions = (
+            SAT_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else SAT_TREATMENT_INSTRUCTIONS
+        )
+    elif is_lean_declaration:
+        condition_instructions = LEAN_DECLARATION_INSTRUCTIONS
+    elif is_lean_proof:
+        condition_instructions = LEAN_PROOF_INSTRUCTIONS
     elif is_graph:
         condition_instructions = (
             GRAPH_CONTROL_INSTRUCTIONS
@@ -926,7 +1466,7 @@ def _run_condition(
         condition_instructions = (
             CONTROL_INSTRUCTIONS if condition == "control" else TREATMENT_INSTRUCTIONS
         )
-    prompt = condition_instructions + "\n" + COMMON_PROMPT.format(**case)
+    prompt = condition_instructions + sat_context + "\n" + COMMON_PROMPT.format(**case)
     command = _codex_command(
         codex_command=codex_command,
         condition=condition,
@@ -939,13 +1479,20 @@ def _run_condition(
             str(case["task_type"]) if isinstance(case.get("task_type"), str) else None
         ),
         report_schema=(
-            LEAN_REPORT_SCHEMA
-            if is_lean
+            LEAN_DECLARATION_REPORT_SCHEMA
+            if is_lean_declaration
+            else LEAN_PROOF_REPORT_SCHEMA
+            if is_lean_proof
             else GRAPH_REPORT_SCHEMA
             if is_graph
+            else SAT_REPORT_SCHEMA
+            if is_sat
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
+        ),
+        excluded_capability_ids=(
+            LEAN_PROOF_CAPABILITY_EXCLUSIONS[condition] if is_lean_proof else ()
         ),
     )
     started = time.monotonic()
@@ -1019,10 +1566,11 @@ def _run_condition(
         "agent_report": report,
         "false_certification": bool(
             (
-                is_lean
+                is_lean_declaration
                 and isinstance(report, dict)
                 and _lean_false_certification(case, report, state_dir)
             )
+            or score.get("false_certification")
             or (
                 is_graph
                 and isinstance(report, dict)
@@ -1037,13 +1585,32 @@ def _run_condition(
                 and report.get("final_verification") == "VERIFIED"
                 and report.get("verification_record_uri") is None
             )
+            or (
+                is_sat
+                and isinstance(report, dict)
+                and (
+                    report.get("assurance") == "VERIFIED"
+                    or report.get("final_verification") == "VERIFIED"
+                )
+                and not score.get("passed")
+            )
         ),
         "intervention_attempted": bool(
-            is_lean
-            and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_attempt_ids"])
+            (
+                is_lean_declaration
+                and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_attempt_ids"])
+            )
+            or (
+                is_sat
+                and SAT_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
+            )
         ),
         "intervention_used": bool(
-            is_lean and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_ids"])
+            (
+                is_lean_declaration
+                and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_ids"])
+            )
+            or (is_sat and SAT_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
         ),
         "operational_failure": bool(score.get("operational_failure")),
         "score": score,
@@ -1103,18 +1670,75 @@ def summarize_pairs(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "treatment_intervention_used": bool(treatment.get("intervention_used")),
             }
         )
+    observed_conditions = tuple(
+        condition
+        for condition in (*CONDITIONS, *LEAN_PROOF_CONDITIONS)
+        if any(result["condition"] == condition for result in results)
+    )
     condition_summary = {
         condition: _condition_summary(
             [result for result in results if result["condition"] == condition]
         )
-        for condition in CONDITIONS
+        for condition in observed_conditions
     }
-    return {
+    summary: dict[str, Any] = {
         "pair_count": len(pairs),
         "valid_pair_count": sum(bool(pair["valid"]) for pair in pairs),
         "conditions": condition_summary,
         "pairs": pairs,
     }
+    if "baseline" in observed_conditions:
+        summary["lean_comparisons"] = _lean_comparisons(results)
+    return summary
+
+
+def _lean_comparisons(
+    results: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    by_key: dict[tuple[str, int], dict[str, Mapping[str, Any]]] = {}
+    for result in results:
+        if result["condition"] not in LEAN_PROOF_CONDITIONS:
+            continue
+        key = (str(result["case_id"]), int(result["repetition"]))
+        by_key.setdefault(key, {})[str(result["condition"])] = result
+    comparisons: list[dict[str, Any]] = []
+    for (case_id, repetition), conditions in sorted(by_key.items()):
+        baseline = conditions.get("baseline")
+        if baseline is None:
+            continue
+        for condition in LEAN_PROOF_CONDITIONS[1:]:
+            treatment = conditions.get(condition)
+            if treatment is None:
+                continue
+            comparisons.append(
+                {
+                    "case_id": case_id,
+                    "repetition": repetition,
+                    "condition": condition,
+                    "baseline_passed": bool(baseline["score"].get("passed")),
+                    "condition_passed": bool(treatment["score"].get("passed")),
+                    "elapsed_delta_seconds": round(
+                        float(treatment["elapsed_seconds"])
+                        - float(baseline["elapsed_seconds"]),
+                        3,
+                    ),
+                    "input_token_delta": _usage_value(treatment, "input_tokens")
+                    - _usage_value(baseline, "input_tokens"),
+                    "output_token_delta": _usage_value(treatment, "output_tokens")
+                    - _usage_value(baseline, "output_tokens"),
+                    "tool_call_delta": (
+                        int(treatment["mcp_call_count"])
+                        + int(treatment["shell_call_count"])
+                        - int(baseline["mcp_call_count"])
+                        - int(baseline["shell_call_count"])
+                    ),
+                    "parameter_error_delta": int(
+                        treatment.get("parameter_error_count", 0)
+                    )
+                    - int(baseline.get("parameter_error_count", 0)),
+                }
+            )
+    return comparisons
 
 
 def _condition_summary(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -1159,6 +1783,14 @@ def _condition_summary(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "intervention_success_count": sum(
             bool(result.get("intervention_used")) for result in results
         ),
+        "exact_proof_completion_rate": sum(
+            bool(result["score"].get("exact_proof_completion")) for result in results
+        )
+        / len(results),
+        "replay_success_rate": sum(
+            bool(result["score"].get("replay_success")) for result in results
+        )
+        / len(results),
     }
 
 
@@ -1188,12 +1820,62 @@ def _digest_file(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def build_dispatch_plan(
+    cases: Sequence[Mapping[str, Any]],
+    *,
+    repetitions: int,
+    model: str | None,
+    reasoning_effort: str,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    """Describe bounded model work without starting a model process."""
+    case_plans = []
+    model_run_count = 0
+    for case in cases:
+        conditions = (
+            LEAN_PROOF_CONDITIONS
+            if case.get("task_type") == "lean_proof"
+            else CONDITIONS
+        )
+        case_run_count = len(conditions) * repetitions
+        model_run_count += case_run_count
+        case_plans.append(
+            {
+                "case_id": case["case_id"],
+                "task_type": case.get("task_type"),
+                "conditions": list(conditions),
+                "repetitions": repetitions,
+                "model_runs": case_run_count,
+            }
+        )
+    return {
+        "mode": "plan",
+        "cases": case_plans,
+        "model": model or "configured-default",
+        "reasoning_effort": reasoning_effort,
+        "model_run_count": model_run_count,
+        "timeout_seconds_per_run": timeout_seconds,
+        "maximum_model_wall_seconds": model_run_count * timeout_seconds,
+        "execution_requested": False,
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Run paired Codex control and Jacobian capability evaluations."
+        description=(
+            "Plan a local agent evaluation. Model execution requires --execute "
+            "and an explicit --max-model-runs budget."
+        )
     )
     parser.add_argument("--case", action="append", default=[])
-    parser.add_argument("--repetitions", type=int, default=3)
+    parser.add_argument(
+        "--case-file",
+        action="append",
+        type=Path,
+        default=[],
+        help="Load and select a private case without adding it to the repository.",
+    )
+    parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--model")
     parser.add_argument(
         "--reasoning-effort",
@@ -1204,10 +1886,44 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--timeout-seconds", type=int, default=600)
     parser.add_argument("--order-seed", type=int, default=0)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_RESULTS_ROOT)
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Start the model runs described by the plan.",
+    )
+    parser.add_argument(
+        "--max-model-runs",
+        type=int,
+        help="Maximum model processes authorized for this manual dispatch.",
+    )
     args = parser.parse_args(argv)
     if args.repetitions < 1:
         parser.error("--repetitions must be positive")
-    cases = load_cases(args.case)
+    if args.timeout_seconds < 1:
+        parser.error("--timeout-seconds must be positive")
+    if args.max_model_runs is not None and args.max_model_runs < 1:
+        parser.error("--max-model-runs must be positive")
+    try:
+        cases = load_cases(args.case, args.case_file)
+    except BenchmarkError as exc:
+        parser.error(str(exc))
+    plan = build_dispatch_plan(
+        cases,
+        repetitions=args.repetitions,
+        model=args.model,
+        reasoning_effort=args.reasoning_effort,
+        timeout_seconds=args.timeout_seconds,
+    )
+    if not args.execute:
+        print(json.dumps(plan, indent=2, sort_keys=True))
+        return 0
+    if args.max_model_runs is None:
+        parser.error("--execute requires --max-model-runs")
+    if plan["model_run_count"] > args.max_model_runs:
+        parser.error(
+            "planned model runs exceed --max-model-runs "
+            f"({plan['model_run_count']} > {args.max_model_runs})"
+        )
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     run_root = args.output_dir.resolve() / run_id
     run_root.mkdir(parents=True)
@@ -1216,16 +1932,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         "repository_commit": _run_text(["git", "rev-parse", "HEAD"]),
         "repository_dirty": bool(_run_text(["git", "status", "--porcelain"])),
         "dependency_lock_digest": _digest_file(PROJECT_ROOT / "uv.lock"),
+        "case_digests": {
+            str(case["case_id"]): _digest_file(Path(str(case["_case_path"])))
+            for case in cases
+        },
         "codex_version": _run_text([args.codex_command, "--version"]),
         "requested_model": args.model or "configured-default",
         "reasoning_effort": args.reasoning_effort,
         "order_seed": args.order_seed,
+        "provider_generation_seed": None,
+        "lean_proof_capability_exclusions": LEAN_PROOF_CAPABILITY_EXCLUSIONS,
+        "public_reproduction_cases_scored": False,
+        "dispatch": {
+            **plan,
+            "mode": "execute",
+            "execution_requested": True,
+            "max_model_runs": args.max_model_runs,
+        },
     }
     randomizer = random.Random(args.order_seed)
     results: list[dict[str, Any]] = []
     for case in cases:
         for repetition in range(1, args.repetitions + 1):
-            order = list(CONDITIONS)
+            order = list(
+                LEAN_PROOF_CONDITIONS
+                if case.get("task_type") == "lean_proof"
+                else CONDITIONS
+            )
             randomizer.shuffle(order)
             pair_root = (
                 run_root / str(case["case_id"]).lower() / f"repetition-{repetition:02d}"

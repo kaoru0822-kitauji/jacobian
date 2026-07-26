@@ -26,6 +26,35 @@ discovery, examples, ranking, defaults, consolidation, and retirement; they do
 not gate experimental capability availability and never upgrade evidence to
 verified status.
 
+## Local execution boundary
+
+Model-in-the-loop evaluation is a separate, optional local activity. It is not
+called by `make test-fast`, `make test`, `make validate-full`, CI, release
+jobs, or pre-commit hooks. Those paths may test case loading, scoring, replay,
+telemetry, and dispatch guards with deterministic fixtures, but they never
+launch an evaluated model.
+
+Use the dedicated entry point with explicit cases. Without `--execute`, it
+prints a plan and exits without starting Codex:
+
+```sh
+make agent-eval EVAL_ARGS="--case-file /path/to/private-case.json"
+```
+
+The plan lists every condition, repetition, model process, per-process timeout,
+and maximum model wall time. Execute only after reviewing it, and bound the
+manual dispatch explicitly:
+
+```sh
+make agent-eval EVAL_ARGS="--case-file /path/to/private-case.json --execute --max-model-runs 4"
+```
+
+No case is selected implicitly. `--case-file` loads a local case without
+putting its task or oracle in the repository. `--case all` is available only
+as an explicit choice, and the requested model-run count must fit within
+`--max-model-runs`. Preparing a case or validating the harness does not
+authorize execution.
+
 ## Experimental conditions
 
 Each scenario compares at least:
@@ -437,16 +466,35 @@ For every case and repetition:
 - the summary reports per-condition pass rate and paired token, time, shell,
   and MCP-call deltas.
 
-Run the default three-pair pilot with:
+Preview one selected pair without starting Codex:
 
 ```sh
 uv run python benchmarks/agent_ab.py --case ERDOS-STRAUS-AB-001
+```
+
+The preview reports two planned model processes. Dispatch that exact local run
+only after reviewing it:
+
+```sh
+uv run python benchmarks/agent_ab.py \
+  --case ERDOS-STRAUS-AB-001 \
+  --execute \
+  --max-model-runs 2
 ```
 
 The initial public case is an executable harness check, not a sufficient
 product claim. Product conclusions require multiple held-out cases and
 repetitions. Report all runs, use paired deltas, and reject any treatment that
 improves efficiency by increasing unsupported mathematical conclusions.
+
+`sat_decision` cases provide `variable_names`, exact clauses, and an expected
+status. The runner canonicalizes and pre-materializes the same CNF into each
+condition's isolated state, then gives both agents the same URI. Its hidden
+oracle brute-forces cases of at most 20 variables. A treatment passes only when
+its report matches that oracle, its producer evidence and verification record
+bind the durable CNF, the transcript contains the ordered find-to-verify
+composition, and a clean kernel independently replays the verifier. Public SAT
+reproductions are always marked unscored.
 
 Development pairs may validate the harness or reveal interface problems, but
 they are not product evidence. Keep their reports with the run artifacts.
