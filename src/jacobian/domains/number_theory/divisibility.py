@@ -3,19 +3,18 @@
 from jacobian.contracts.number_theory import (
     BooleanResult,
     DivisibilityRequest,
-    DivisorListResult,
     ExtendedGcdResult,
     IntegerPairRequest,
     IntegerValueRequest,
     IntegerValueResult,
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
-    PrimeFactorizationResult,
     ValuationRequest,
 )
 from jacobian.domains.number_theory._support import (
     number_theory_operation,
 )
+from jacobian.domains.number_theory.factorization import FACTORIZATION_CAPABILITIES
 from jacobian.domains.number_theory.operations import (
     compute_aliquot_sum,
     compute_divisor_count,
@@ -33,12 +32,10 @@ from jacobian.domains.number_theory.operations import (
     decide_perfect,
     decide_square,
     decide_squarefree,
-    enumerate_divisors,
-    enumerate_proper_divisors,
-    factorize_primes,
 )
 
 DIVISIBILITY_CAPABILITIES = (
+    *FACTORIZATION_CAPABILITIES,
     number_theory_operation(
         "integer.compute.gcd",
         "Compute integer gcd",
@@ -68,36 +65,6 @@ DIVISIBILITY_CAPABILITIES = (
         compute_extended_gcd,
         "number-theory",
         "certificate",
-    ),
-    number_theory_operation(
-        "integer.compute.divisors",
-        "Enumerate positive divisors",
-        "Enumerate every positive divisor of one nonzero integer.",
-        IntegerValueRequest,
-        DivisorListResult,
-        enumerate_divisors,
-        "number-theory",
-        "enumeration",
-    ),
-    number_theory_operation(
-        "integer.compute.proper_divisors",
-        "Enumerate proper divisors",
-        "Enumerate every positive proper divisor of one nonzero integer.",
-        IntegerValueRequest,
-        DivisorListResult,
-        enumerate_proper_divisors,
-        "number-theory",
-        "enumeration",
-    ),
-    number_theory_operation(
-        "integer.compute.prime_factorization",
-        "Factor an integer",
-        "Compute the complete prime-power factorization of one nonzero integer.",
-        IntegerValueRequest,
-        PrimeFactorizationResult,
-        factorize_primes,
-        "number-theory",
-        "factorization",
     ),
     number_theory_operation(
         "integer.compute.valuation",

@@ -7,6 +7,7 @@ import platform
 import sympy
 
 from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.domains.number_theory.derived import DERIVED_NUMBER_THEORY_CAPABILITIES
 from jacobian.domains.number_theory.divisibility import DIVISIBILITY_CAPABILITIES
 from jacobian.domains.number_theory.modular import MODULAR_CAPABILITIES
 from jacobian.domains.number_theory.primes import PRIME_CAPABILITIES
@@ -41,6 +42,7 @@ NUMBER_THEORY_BUNDLE = DomainBundle(
         *DIVISIBILITY_CAPABILITIES,
         *PRIME_CAPABILITIES,
         *MODULAR_CAPABILITIES,
+        *DERIVED_NUMBER_THEORY_CAPABILITIES,
     ),
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(

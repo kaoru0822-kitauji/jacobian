@@ -22,6 +22,9 @@ from jacobian.contracts.results import ContractModel
 # ---------------------------------------------------------------------------
 
 _MAX_INTEGER_LENGTH = 256
+# These small bounds deliberately keep arithmetic functions that may factor
+# their input (totient, Möbius, divisor sigma, square-free predicates, and
+# multiplicative order) safe for in-process SymPy execution.
 _MAX_N_SMALL = 1_000
 _MAX_MODULUS = 10_000
 _MAX_CRT_SIZE = 64
@@ -47,6 +50,21 @@ class IntegerValueRequest(ContractModel):
     """One canonical integer supplied to a unary number-theory operation."""
 
     value: BoundedInteger
+
+
+class FactorizationResourceBudget(ContractModel):
+    """Execution budget for complete integer factorization-derived operations."""
+
+    wall_seconds: StrictInt = Field(default=5, ge=1, le=30)
+
+
+class FactorizationRequest(ContractModel):
+    """One integer and an explicit budget for an isolated SymPy computation."""
+
+    value: BoundedInteger
+    resource_budget: FactorizationResourceBudget = Field(
+        default_factory=FactorizationResourceBudget
+    )
 
 
 class IntegerPairRequest(ContractModel):
@@ -85,6 +103,48 @@ class PositiveIntegerRequest(ContractModel):
     """One bounded positive integer (1 <= n <= 1 000)."""
 
     n: StrictInt = Field(ge=1, le=_MAX_N_SMALL)
+
+
+class FloorSquareRootRequest(ContractModel):
+    n: StrictInt = Field(ge=0, le=1_000_000_000_000)
+
+
+class FloorSquareRootResult(ContractModel):
+    """The exact floor of the nonnegative integer square root."""
+
+    root: StrictInt = Field(ge=0, le=1_000_000)
+
+
+class LegendreSymbolRequest(ContractModel):
+    """Arguments for the Legendre symbol with a bounded odd prime denominator."""
+
+    a: StrictInt = Field(ge=-(2**53 - 1), le=2**53 - 1)
+    prime: StrictInt = Field(ge=3, le=10_000_000)
+
+    @model_validator(mode="after")
+    def require_odd_denominator(self) -> Self:
+        if self.prime % 2 == 0:
+            raise ValueError("Legendre denominator must be odd")
+        return self
+
+
+class LegendreSymbolResult(ContractModel):
+    a: StrictInt
+    prime: StrictInt = Field(ge=3, le=10_000_000)
+    symbol: Literal[-1, 0, 1]
+
+
+class FactorialValuationRequest(ContractModel):
+    """Arguments for the largest exponent ``e`` such that ``base**e`` divides ``n!``."""
+
+    n: StrictInt = Field(ge=0, le=100_000)
+    base: StrictInt = Field(ge=2, le=1_000_000)
+
+
+class FactorialValuationResult(ContractModel):
+    n: StrictInt = Field(ge=0, le=100_000)
+    base: StrictInt = Field(ge=2, le=1_000_000)
+    valuation: StrictInt = Field(ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -286,9 +346,7 @@ class DiscreteLogarithmObligation(ContractModel):
     """Independent checks still open for a completed producer result."""
 
     obligation_schema_version: Literal["1"] = "1"
-    predicate: Literal["MODULAR_DISCRETE_LOGARITHM"] = (
-        "MODULAR_DISCRETE_LOGARITHM"
-    )
+    predicate: Literal["MODULAR_DISCRETE_LOGARITHM"] = "MODULAR_DISCRETE_LOGARITHM"
     base: StrictInt = Field(ge=0, le=_MAX_MODULUS)
     target: StrictInt = Field(ge=0, le=_MAX_MODULUS)
     modulus: StrictInt = Field(ge=2, le=_MAX_MODULUS)

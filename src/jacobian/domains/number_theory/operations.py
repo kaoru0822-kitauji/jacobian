@@ -24,11 +24,18 @@ from jacobian.contracts.number_theory import (
     DivisibilityRequest,
     DivisorListResult,
     ExtendedGcdResult,
+    FactorialValuationRequest,
+    FactorialValuationResult,
+    FactorizationRequest,
+    FloorSquareRootRequest,
+    FloorSquareRootResult,
     IntegerPairRequest,
     IntegerValueRequest,
     IntegerValueResult,
     JacobiSymbolRequest,
     JacobiSymbolResult,
+    LegendreSymbolRequest,
+    LegendreSymbolResult,
     ModularValueRequest,
     ModulusRequest,
     NonnegativeIntegerRequest,
@@ -83,7 +90,7 @@ def enumerate_divisors(request: ContractModel) -> ContractModel:
     """Enumerate all positive divisors using ``sympy.divisors``."""
     from sympy import divisors as sympy_divisors
 
-    value = int(cast(IntegerValueRequest, request).value)
+    value = int(cast(FactorizationRequest, request).value)
     if value == 0:
         raise ValueError("zero has infinitely many divisors")
     return DivisorListResult(
@@ -95,7 +102,7 @@ def enumerate_proper_divisors(request: ContractModel) -> ContractModel:
     """Enumerate all positive proper divisors using ``sympy.divisors(proper=True)``."""
     from sympy import divisors as sympy_divisors
 
-    value = int(cast(IntegerValueRequest, request).value)
+    value = int(cast(FactorizationRequest, request).value)
     if value == 0:
         raise ValueError("zero has infinitely many divisors")
     return DivisorListResult(
@@ -107,7 +114,7 @@ def factorize_primes(request: ContractModel) -> ContractModel:
     """Compute the complete prime-power factorization using ``sympy.factorint``."""
     from sympy import factorint
 
-    value = int(cast(IntegerValueRequest, request).value)
+    value = int(cast(FactorizationRequest, request).value)
     if value == 0:
         raise ValueError("zero has no finite prime factorization")
     factors = tuple(
@@ -251,6 +258,41 @@ def compute_prime_count(request: ContractModel) -> ContractModel:
 
     n = cast(NonnegativeIntegerRequest, request).n
     return IntegerValueResult(value=str(int(primepi(n))))
+
+
+def compute_floor_square_root(request: ContractModel) -> ContractModel:
+    """Return the exact floor square-root."""
+    from sympy import integer_nthroot
+
+    n = cast(FloorSquareRootRequest, request).n
+    root, _ = integer_nthroot(n, 2)
+    return FloorSquareRootResult(root=int(root))
+
+
+def compute_legendre_symbol(request: ContractModel) -> ContractModel:
+    """Compute ``(a / p)`` after checking that ``p`` is prime."""
+    from sympy import isprime, legendre_symbol
+
+    value = cast(LegendreSymbolRequest, request)
+    if not isprime(value.prime):
+        raise ValueError("Legendre denominator must be prime")
+    return LegendreSymbolResult(
+        a=value.a,
+        prime=value.prime,
+        symbol=cast(Literal[-1, 0, 1], int(legendre_symbol(value.a, value.prime))),
+    )
+
+
+def compute_factorial_valuation(request: ContractModel) -> ContractModel:
+    """Compute the valuation of ``n!`` at an arbitrary composite base."""
+    from sympy.ntheory import multiplicity_in_factorial
+
+    value = cast(FactorialValuationRequest, request)
+    return FactorialValuationResult(
+        n=value.n,
+        base=value.base,
+        valuation=int(multiplicity_in_factorial(value.base, value.n)),
+    )
 
 
 def compute_nth_prime(request: ContractModel) -> ContractModel:
