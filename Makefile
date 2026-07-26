@@ -24,6 +24,7 @@ lint: ## Check lint, formatting, and dependency declarations.
 	$(UV_RUN) ruff check .
 	$(UV_RUN) ruff format --check .
 	$(UV_RUN) deptry .
+	$(UV_RUN) vulture src tests --min-confidence=80
 
 typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy

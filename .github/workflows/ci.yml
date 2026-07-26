@@ -29,6 +29,34 @@ jobs:
       - run: uv sync --frozen --dev
       - run: make lint
       - run: make typecheck
+      - name: Check TODO comments reference issues
+        run: |
+          violations="$(rg -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"
+          if [ -n "$violations" ]; then
+            echo "::error::TODOs must reference an issue: TODO(#123)"
+            echo "$violations"
+            exit 1
+          fi
+
+  validate-agents-md:
+    name: Validate AGENTS.md
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv sync --frozen --dev
+      - run: make build
+      - run: uv run --frozen jacobian --help
+      - run: uv run --frozen jacobian-mcp --help
 
   test:
     name: Tests (Python ${{ matrix.python-version }}, shard ${{ matrix.shard }}/2)
@@ -196,6 +224,13 @@ jobs:
           echo "::group::Build timing"
           /usr/bin/time -v make build 2>&1 | tee build-timing.log
           echo "::endgroup::"
+      - name: Extract build metrics
+        if: always()
+        run: |
+          echo "## Build Performance" >> "$GITHUB_STEP_SUMMARY"
+          grep -E '(Elapsed|Maximum resident|User time|System time)' build-timing.log | while read -r line; do
+            echo "- $line" >> "$GITHUB_STEP_SUMMARY"
+          done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
@@ -255,7 +290,7 @@ jobs:
       issues: write
       pull-requests: write
     if: github.ref == 'refs/heads/main'
-    needs: [lint, test, lean-test, coverage, duplicate-code, npm-package, build]
+    needs: [lint, validate-agents-md, test, lean-test, coverage, duplicate-code, npm-package, build]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     steps:
