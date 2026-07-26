@@ -30,7 +30,6 @@ still pre-stable:
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current implementation and trust boundaries |
 | What direction is the project taking? | [Product goals](explanation/goals.md) | Rolling goals pursued in parallel |
 | Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
-| Which properties and trust boundaries must hold? | [Threat model](explanation/threat-model.md) | Current protected properties and exclusions |
 | What is the supported release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative for `0.2.0a0` |
 
 ## Tutorials
@@ -59,6 +58,8 @@ expectations.
 - [Tool surface](reference/tools.md)
 - [Provider runtime contract](reference/provider-runtime.md)
 - [Lean declaration discovery](reference/lean-declaration-discovery.md)
+- [SAT artifact contracts](reference/sat-artifacts.md)
+- [SMT Alethe artifact contracts](reference/smt-artifacts.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
 - [v0.2 conformance specification](reference/conformance-v0.2.md)
 - [Plugin conformance contract](reference/plugin-conformance.md)
@@ -76,7 +77,6 @@ how its major parts fit together.
 
 - [Architecture](explanation/architecture.md)
 - [Product model](explanation/product-blueprint.md)
-- [Threat model](explanation/threat-model.md)
 - [Product goals](explanation/goals.md)
 - [Durable search runtime](explanation/search-runtime.md)
 - [Architecture decision log](explanation/adr/index.md)
@@ -93,6 +93,8 @@ work that has been identified but not necessarily scheduled. The
 [atomic capability portfolio](contributing/atomic-capability-portfolio.md)
 records the formal-first backend research, ordering, installation tradeoffs,
 and evaluation gates used to decide which mathematical slices to build next.
+The [test-suite cost audit](contributing/test-suite-cost-audit.md) records the
+measured test lanes, retained trust-boundary costs, and fast-feedback policy.
 
 When adding a document, place it according to the reader's need:
 

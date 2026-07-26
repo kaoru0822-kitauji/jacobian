@@ -27,6 +27,8 @@ from jacobian.contracts.results import (
 )
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 TEST_RUNTIME = CapabilityProviderRuntime(
     provider="tests",
     availability=CapabilityProviderAvailability.AVAILABLE,
@@ -447,6 +449,7 @@ def test_first_class_relationship_endpoints_must_be_exposed(
 
 
 @pytest.mark.integration
+@pytest.mark.lean_runtime
 @pytest.mark.skipif(
     shutil.which("lean") is None,
     reason="Lean is not installed",
@@ -472,6 +475,7 @@ def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.lean_runtime
 @pytest.mark.skipif(
     shutil.which("lean") is None,
     reason="Lean is not installed",

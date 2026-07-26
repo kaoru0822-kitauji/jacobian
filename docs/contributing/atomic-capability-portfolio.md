@@ -359,13 +359,54 @@ variable map, projection version, declared scope, provider version, and
 resource budget. Preserve the raw proof as a durable artifact but keep bounded
 inline summaries small.
 
+The artifact-contract checkpoint was implemented on 2026-07-26. The base
+kernel now registers model-backed schemas for canonical CNF, total assignment,
+and raw DRAT proof artifacts without installing a solver, checker, or SAT
+capability. Canonicalization deterministically renumbers the sorted variable
+map, removes duplicate literals and clauses, omits tautologies, orders the
+remaining clauses, and binds the resulting DIMACS bytes. Assignment and proof
+artifacts bind the exact CNF URI, object and payload digests, variable map,
+projection, full scope, producer runtime, and resource budget. Raw proof
+storage and assignment payloads remain unverified when created. See
+[SAT artifact contracts](../reference/sat-artifacts.md).
+
+The assignment-checker checkpoint was implemented on 2026-07-26.
+`sat.model.verify` is installed only with an operator-authorized bundled
+checker. Its standard-library-only clean-process implementation independently
+validates the canonical CNF and all source, projection, assignment, evidence,
+and lineage bindings before evaluating every clause. Acceptance uses the
+kernel's existing `VerificationRecord` path. Rejection, malformed input, and
+operational failure remain `UNKNOWN` and cannot establish UNSAT.
+
+The CaDiCaL producer checkpoint was implemented on 2026-07-26.
+`sat.model.find` and `sat.unsat_proof.find` are installed only when the exact
+pinned CaDiCaL 3.0.1 executable is available. The adapters recheck its
+executable digest, execute the deterministic DIMACS projection under enforced
+wall-time and optional conflict limits, validate the competition status
+protocol, and materialize only a total model or bounded raw text DRAT artifact.
+Solver status, failure to produce the requested evidence, timeout, malformed
+output, and stored proof bytes remain unverified and carry `UNKNOWN`. See
+[SAT artifact contracts](../reference/sat-artifacts.md#cadical-exploration).
+
+The DRAT-trim checker checkpoint was implemented on 2026-07-26.
+`sat.unsat_proof.verify` is installed only with bundled references and an
+operator-provenanced DRAT-trim `v05.22.2023` executable. The runtime digest and
+exact upstream source commit are bound into checker authorization, rechecked
+at selection and around clean-process replay, and included in the verification
+environment. The independent checker reconstructs canonical DIMACS and
+validates certificate, payload, binding, lineage, and admitted text-proof
+syntax before bounded DRAT replay. Only exit zero with exactly one
+`s VERIFIED` creates a `VerificationRecord`; mutation, concatenation,
+cross-CNF replay, warnings, excessive output, timeout, and runtime replacement
+fail closed as `UNKNOWN`. See
+[UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
+
 CaDiCaL has a small source build and a command line that accepts DIMACS plus a
 proof path. DRAT-trim independently validates a DRAT proof against the input
-formula. A valid SAT assignment can be checked with a deliberately small
-implementation that shares no solver code. Later, evaluate whether a
-compatible emission or conversion path to a verified checker such as CakeLPR
-actually exists. Do not assume format compatibility or block the first
-independent-checker slice on that hardening.
+formula. Later, evaluate whether a compatible emission or conversion path to
+a verified checker such as CakeLPR actually exists. Do not assume format
+compatibility or block the first independent proof-checker slice on that
+hardening.
 
 Write attack tests before authorizing the UNSAT checker:
 
@@ -380,6 +421,18 @@ Write attack tests before authorizing the UNSAT checker:
 Use `BOOL-MUS-001`, a small satisfiable instance, and a pigeonhole UNSAT
 instance as public reproductions. Core extraction and shrinking are later
 operations; first prove that the model/proof artifact boundary is sound.
+
+The public-reproduction and held-out-evaluation checkpoint was implemented on
+2026-07-26. The real CaDiCaL-to-checker reproductions pass for all three public
+cases and remain explicitly unscored. After interface tuning was frozen, a
+private four-pair pilot passed 4/4 under both direct control reasoning and the
+SAT portfolio. All treatment runs preserved exact producer-to-verifier traces
+and independently replayed, with zero false certification or tool error.
+Treatment cost was materially higher, and the small sample demonstrates
+assurance value rather than completion or efficiency lift. Retain the four
+atomic outcomes while prioritizing compact catalog discovery over another SAT
+operation. See
+[SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
 
 ## Wave 3: theory-bounded SMT proof slice
 
@@ -404,6 +457,17 @@ the first slice.
 
 Keep Z3 as an existing exploration and differential provider. Its broad tactic
 surface has uneven proof support, so a Z3 result must not verify itself.
+
+The cvc5 producer checkpoint was implemented on 2026-07-26. The optional
+`cvc5==1.3.4` wheel now exposes `smt.unsat_proof.find` for exact single-query
+`QF_UF`, `QF_LIA`, and `QF_LRA` inputs. It runs in a bounded isolated worker,
+materializes the exact SMT-LIB source and bound raw Alethe bytes, reports
+lexical holes, and always returns `conclusion: UNKNOWN`. Public reproductions
+found a zero-hole equality contradiction in `QF_UF` and explicit holes in
+small linear integer and rational contradictions. This is useful producer
+evidence and a concrete compatibility target for item 10, not a broad
+proof-support claim. See
+[SMT Alethe artifact contracts](../reference/smt-artifacts.md).
 
 ## Wave 4: shared exact mathematics
 
@@ -481,13 +545,20 @@ backlog.
    reproduction.
 3. Paired Lean discovery evaluation; decide expose, revise, consolidate into
    examples, or stop.
-4. Canonical CNF, assignment, and proof artifact schemas.
-5. Pure independent SAT-assignment checker with attack tests.
-6. CaDiCaL model and proof-producing exploration adapters.
+4. Canonical CNF, assignment, and proof artifact schemas. Implemented; see
+   [SAT artifact contracts](../reference/sat-artifacts.md).
+5. Pure independent SAT-assignment checker with attack tests. Implemented; see
+   [SAT artifact contracts](../reference/sat-artifacts.md#assignment-verification).
+6. CaDiCaL model and proof-producing exploration adapters. Implemented; see
+   [SAT artifact contracts](../reference/sat-artifacts.md#cadical-exploration).
 7. DRAT-trim clean-process checker, authorization fixture, and attack tests.
-8. SAT public reproductions and held-out portfolio ablation.
+   Implemented; see
+   [UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
+8. SAT public reproductions and held-out portfolio ablation. Implemented; see
+   [SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
 9. cvc5 Alethe proof-production spike for quantifier-free EUF and linear
-   arithmetic.
+   arithmetic. Implemented; see
+   [SMT Alethe artifact contracts](../reference/smt-artifacts.md).
 10. Carcara compatibility matrix, checker adapter, mutations, and paired
     evaluation.
 11. Python-FLINT rational-solution find and verify slice.

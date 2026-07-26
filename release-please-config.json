@@ -3,7 +3,7 @@
   "packages": {
     ".": {
       "release-type": "python",
-      "package-name": "jacobian-research-kernel",
+      "package-name": "jacobian",
       "extra-files": [
         "npm/package.json"
       ]

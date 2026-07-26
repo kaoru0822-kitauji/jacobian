@@ -29,38 +29,101 @@ exhaustive, and a checked SAT proof or proof-assistant term may certify a claim
 through another assurance route. In every case, only an operator-authorized
 checker may originate `verification = VERIFIED`.
 
-The current local validation commands are:
+The current local development entry points are:
 
 ```sh
-uv run pytest
-uv run pytest --lf
-uv run pytest --sw
-uv run pytest -m "not integration and not end_to_end"
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy
-uv run deptry .
-uv build
+make test-fast
+make test-failed
+make test TESTS=tests/integration/test_mcp_adapter.py
+make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-contracts
+make test-checkers
+make test-mcp PYTEST_ARGS="-k authentication"
+make test-storage PYTEST_ARGS="-k workspace"
+make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
+make refresh-test-durations
+make refresh-lean-test-durations
+make test-durations
+make check
+make check-static
+make validate-full
 ```
 
-The first command is the full suite. It uses `pytest-xdist` work stealing and
+`make test-fast` collects only unit, contract, checker, and reference
+directories, then excludes integration-marked cases. Avoiding collection of
+integration and end-to-end modules keeps the loop short without dropping
+independent checker tests. Named contract, checker, MCP, and storage targets
+make common affected areas discoverable without adding another test runner.
+`make check` combines fast Ruff and non-integration test feedback as the
+routine local pre-push gate. Developers should push after it and let CI own
+dependency and dead-code analysis, strict typing, package builds, and
+exhaustive validation. `make check-static` reproduces those CI-owned static
+and package checks when relevant.
+`make validate-full` is the local full-suite escape hatch for CI reproduction,
+not a routine handoff requirement. The full
+suite uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
-wait on isolated subprocesses. The `--lf` and `--sw` commands are failure
-recovery shortcuts; the marker-filtered command is the fast local loop. Use
-`-n 0` for debugger-friendly, single-process execution and `--durations=25`
-when investigating regressions. A 120-second per-test backstop prevents local
-deadlocks from hanging indefinitely and is disabled automatically by
-`pytest-timeout` while debugging. Parallel workers retain separate `tmp_path`
-roots; tests that add shared external state must coordinate it explicitly.
+wait on isolated subprocesses. `make test-failed` is the failure-recovery
+shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
+execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
+120-second per-test backstop prevents local deadlocks from hanging indefinitely
+and is disabled automatically by pytest-timeout while debugging. Parallel
+workers retain separate `tmp_path` roots; tests that add shared external state
+must coordinate it explicitly.
+Workflow tests that repeatedly construct the kernel may opt into
+`initialized_kernel_store`. Each xdist worker builds the core descriptor store
+once, then the fixture physically copies that snapshot into the test's own
+`tmp_path` before construction. SQLite metadata and blobs remain isolated per
+test; no kernel service, process, or mutable database is shared. Tests whose
+subject is fresh-store bootstrap, quota accounting, migration, or descriptor
+installation must not use this fixture.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
 CI splits each supported Python run into two disjoint groups and retains xdist
-parallelism inside each group. Python 3.12 shards write raw coverage data; a
-dependent job combines both files before enforcing the repository threshold
-and producing the XML report. Python 3.13 runs the same two groups without
-duplicate instrumentation. Coverage.py's subprocess patch includes plugin and
-checker workers so clean-process execution is not misreported as uncovered.
+parallelism inside each group. The committed `.test_durations` gives
+`pytest-split` measured input for `least_duration`; refresh it with
+`make refresh-test-durations` on Linux with Python 3.12 after a major suite
+change, or when the slower shard exceeds the faster shard by more than 10% in
+two representative CI runs. Routine test edits do not require refreshes. The
+target enforces its platform, replaces timings only after a successful run,
+and leaves the previous file intact on interruption or failure. Tests marked
+`lean_runtime` are excluded from those shards and divided by measured duration
+between two dedicated runners with pinned Lean and Mathlib caches. The split
+collects the full marker-selected suite, so new Lean tests cannot fall outside
+a file allowlist. Refresh `.lean_test_durations` after adding or materially
+changing those tests. Each runner executes its lane serially, avoiding
+concurrent multi-gigabyte Mathlib processes on one machine while shortening
+the CI critical path and preserving real-backend coverage. A manually
+dispatched Lean debug workflow accepts one pytest node or file selector and
+provides the same pinned remote environment for focused reproduction when
+local Lean is impractical.
+The Python Debug workflow provides the same focused remote reproduction for
+one ordinary pytest file or node on either supported Python version.
+Python 3.12 shards write raw coverage data; a dependent job combines both
+files before enforcing the repository threshold and producing the XML report.
+Python 3.13 runs the same two groups without duplicate instrumentation.
+Coverage.py's subprocess patch includes plugin and checker workers so
+clean-process execution is not misreported as uncovered.
+Measured costs and lane policy are recorded in the
+[test-suite cost audit](../contributing/test-suite-cost-audit.md).
+
+For pull requests, a tested path planner chooses `docs`, `npm`, or `full`.
+Documentation-only changes skip heavy validation lanes. Npm-only or
+documentation-plus-npm changes run npm packaging without Python or Lean.
+Every other path set fails closed to full validation, and pushes to `main`
+always use the full plan. Stable aggregate Python and Lean jobs preserve
+required status semantics when their underlying matrices are conditional.
+Maintainer-applied `ci:full` and `ci:lean` labels can force all lanes or add
+Lean respectively. Overrides are additive only and cannot weaken the plan
+selected from changed paths.
+
+Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
+their loaders, scorers, replay paths, telemetry parsing, and dispatch guards
+with deterministic fixtures, but never start an evaluated model. A human must
+use the separate `make agent-eval` entry point, select cases explicitly, review
+the plan, and opt into execution with a bounded model-run count. See
+[Agent evaluations](agent-evaluations.md#local-execution-boundary).
 
 ## Criticality classes
 

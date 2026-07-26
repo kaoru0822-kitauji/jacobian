@@ -14,6 +14,8 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 @pytest.mark.integration
 def test_graph_atlas_search_is_bounded_complete_and_replayable(

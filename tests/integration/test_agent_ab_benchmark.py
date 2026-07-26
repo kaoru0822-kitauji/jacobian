@@ -5,13 +5,22 @@ import runpy
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
+    CapabilityInstallTier,
     CapabilityMode,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
     CapabilityRequest,
 )
+from jacobian.contracts.sat import SatResourceBudget
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "agent_ab.py"))
@@ -36,6 +45,81 @@ def _report(
             "tooling_gaps": [],
         },
     }
+
+
+def _lean_proof_case() -> dict[str, Any]:
+    return {
+        "case_id": "LEAN-PRIVATE-TEST-001",
+        "version": "1",
+        "task_type": "lean_proof",
+        "prompt": "Prove the exact private test proposition.",
+        "statement": "∀ n : Nat, Nat.gcd n 0 = n",
+        "environment": "MATHLIB",
+    }
+
+
+def _write_private_case(tmp_path: Path) -> Path:
+    path = tmp_path / "private-case.json"
+    path.write_text(json.dumps(_lean_proof_case()), encoding="utf-8")
+    return path
+
+
+def _sat_producer() -> CapabilityProviderRuntime:
+    return CapabilityProviderRuntime(
+        provider="cadical",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version="3.0.1",
+        digest="sha256:" + "d" * 64,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform="linux-x86_64",
+        install_tier=CapabilityInstallTier.T2,
+        license_id="MIT",
+    )
+
+
+def _sat_report(
+    *,
+    case_id: str,
+    cnf_uri: str,
+    assignment_uri: str | None,
+    record_uri: str | None,
+    assurance: str,
+    final_verification: str,
+) -> dict[str, Any]:
+    return {
+        "case_id": case_id,
+        "status": "SATISFIABLE",
+        "conclusion": "TRUE",
+        "assurance": assurance,
+        "final_verification": final_verification,
+        "evidence_kind": "ASSIGNMENT",
+        "assignment": {"a": False, "b": True},
+        "cnf_uri": cnf_uri,
+        "evidence_uri": assignment_uri,
+        "verification_record_uri": record_uri,
+        "limitations": ["exact supplied CNF only"],
+        "feedback": {
+            "reasoning_focus": ["distinguish model production from verification"],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+
+
+def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
+    schema_path = PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    description = schema["properties"]["evidence_uri"]["description"]
+
+    assert "assignment_uri from sat.model.find" in description
+    assert "proof_uri from sat.unsat_proof.find" in description
+    assert "never the verifier's witness_uri or certificate_uri" in description
+    assert (
+        "Do not substitute the verifier's witness_uri"
+        in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    )
+    assert "named assignment map returned" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    assert "pre-canonical variable order" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
 
 
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:
@@ -301,6 +385,233 @@ def test_ab_summary_reports_paired_deltas() -> None:
     assert summary["pairs"][0]["input_token_delta"] == -40
     assert summary["pairs"][0]["elapsed_delta_seconds"] == -4
     assert summary["conditions"]["treatment"]["median_tool_calls"] == 1
+
+
+def test_agent_eval_is_plan_only_without_explicit_execute(
+    monkeypatch: Any,
+    capsys: Any,
+) -> None:
+    main = cast(Any, BENCHMARK["main"])
+
+    def unexpected_run(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("plan mode started a model evaluation")
+
+    monkeypatch.setitem(main.__globals__, "_run_condition", unexpected_run)
+
+    assert main(["--case", "ERDOS-STRAUS-AB-001"]) == 0
+
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["mode"] == "plan"
+    assert plan["execution_requested"] is False
+    assert plan["model_run_count"] == 2
+    assert plan["maximum_model_wall_seconds"] == 1200
+
+
+def test_agent_eval_requires_explicit_case_selection() -> None:
+    main = cast(Any, BENCHMARK["main"])
+
+    with pytest.raises(SystemExit):
+        main([])
+
+
+def test_agent_eval_requires_sufficient_manual_run_budget(tmp_path: Path) -> None:
+    main = cast(Any, BENCHMARK["main"])
+    case_path = _write_private_case(tmp_path)
+
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--case-file",
+                str(case_path),
+                "--execute",
+                "--max-model-runs",
+                "3",
+            ]
+        )
+
+
+def test_agent_eval_plan_counts_each_lean_capability_condition(
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    main = cast(Any, BENCHMARK["main"])
+    case_path = _write_private_case(tmp_path)
+
+    assert (
+        main(
+            [
+                "--case-file",
+                str(case_path),
+                "--repetitions",
+                "2",
+            ]
+        )
+        == 0
+    )
+
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["model_run_count"] == 8
+    assert plan["cases"][0]["conditions"] == [
+        "baseline",
+        "tactic",
+        "retrieval",
+        "combined",
+    ]
+
+
+@pytest.mark.lean_runtime
+def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = _lean_proof_case()
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    proof = "intro n\nsimp"
+    checked = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.check",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "statement": case["statement"],
+                "proof": proof,
+                "environment": case["environment"],
+            },
+        )
+    )
+    record_uri = checked.assurance.verification_record_uri
+    assert record_uri is not None
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "proof": proof,
+        "assurance": "VERIFIED",
+        "replay_success": True,
+        "verification_record_uri": record_uri,
+        "false_certification": False,
+        "feedback": {
+            "reasoning_focus": [],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+    trace = {
+        "capability_id": "lean.check",
+        "input": {
+            "statement": case["statement"],
+            "proof": proof,
+            "environment": case["environment"],
+        },
+        "output": checked.output,
+        "assurance": checked.assurance.model_dump(mode="json"),
+        "artifact_uris": list(checked.artifact_uris),
+    }
+
+    score = score_report(
+        case,
+        report,
+        condition="combined",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[trace],
+    )
+
+    assert score["passed"] is True
+    assert score["exact_proof_completion"] is True
+    assert score["replay_success"] is True
+    assert score["false_certification"] is False
+
+    def unavailable_replay(**_kwargs: object) -> None:
+        raise BENCHMARK["BenchmarkError"]("replay runtime unavailable")
+
+    monkeypatch.setitem(
+        score_report.__globals__,
+        "_replay_lean_certificate",
+        unavailable_replay,
+    )
+    replay_failure = score_report(
+        case,
+        report,
+        condition="combined",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[trace],
+    )
+    assert replay_failure["passed"] is False
+    assert replay_failure["exact_proof_completion"] is True
+    assert replay_failure["replay_success"] is False
+    assert replay_failure["false_certification"] is False
+
+
+def test_lean_ab_scorer_marks_unbound_verified_claim_as_false_certification(
+    tmp_path: Path,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = _lean_proof_case()
+    report = {
+        "case_id": case["case_id"],
+        "conclusion": "TRUE",
+        "proof": "exact bogus",
+        "assurance": "VERIFIED",
+        "replay_success": True,
+        "verification_record_uri": "artifact://sha256/" + "0" * 64,
+        "false_certification": False,
+        "feedback": {
+            "reasoning_focus": [],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+
+    score = score_report(
+        case,
+        report,
+        condition="baseline",
+        state_dir=tmp_path,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[],
+    )
+
+    assert score["passed"] is False
+    assert score["false_certification"] is True
+
+
+def test_lean_ab_summary_compares_each_ablation_to_baseline() -> None:
+    summarize_pairs = cast(Any, BENCHMARK["summarize_pairs"])
+    results = []
+    for index, condition in enumerate(("baseline", "tactic", "retrieval", "combined")):
+        results.append(
+            {
+                "case_id": "LEAN-C",
+                "repetition": 1,
+                "condition": condition,
+                "score": {
+                    "passed": condition != "baseline",
+                    "exact_proof_completion": condition != "baseline",
+                    "replay_success": condition != "baseline",
+                },
+                "elapsed_seconds": 10 + index,
+                "usage": {"input_tokens": 100 + index, "output_tokens": 20},
+                "shell_call_count": 0,
+                "mcp_call_count": 1 + index,
+                "tool_error_count": 0,
+                "parameter_error_count": index,
+                "false_certification": False,
+            }
+        )
+
+    summary = summarize_pairs(results)
+
+    assert set(summary["conditions"]) == {
+        "baseline",
+        "tactic",
+        "retrieval",
+        "combined",
+    }
+    assert len(summary["lean_comparisons"]) == 3
+    assert summary["conditions"]["combined"]["exact_proof_completion_rate"] == 1
+    assert summary["lean_comparisons"][2]["parameter_error_delta"] == 3
 
 
 def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
@@ -596,6 +907,7 @@ def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
         raise AssertionError("duplicate partition case identifiers were accepted")
 
 
+@pytest.mark.lean_runtime
 def test_ab_lean_scorer_requires_exact_checker_bound_trace(tmp_path: Path) -> None:
     load_cases = cast(Any, BENCHMARK["load_cases"])
     score_report = cast(Any, BENCHMARK["score_report"])
@@ -814,7 +1126,10 @@ def test_ab_lean_scorer_separates_checker_runtime_failure(tmp_path: Path) -> Non
     assert "toolchain is unavailable" in score["error"]
 
 
-def test_ab_lean_control_ablation_keeps_checker_only(tmp_path: Path) -> None:
+@pytest.mark.lean_runtime
+def test_ab_lean_control_ablation_removes_only_declaration_discovery(
+    tmp_path: Path,
+) -> None:
     kernel = JacobianKernel(
         tmp_path,
         install_references=True,
@@ -832,7 +1147,11 @@ def test_ab_lean_control_ablation_keeps_checker_only(tmp_path: Path) -> None:
         if descriptor.capability_id.startswith("lean.")
     }
 
-    assert lean_ids == {"lean.check"}
+    assert lean_ids == {
+        "lean.check",
+        "lean.proof_state.apply_tactic",
+        "lean.retrieve.premises",
+    }
     excluded = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.search",
@@ -869,3 +1188,130 @@ def test_ab_lean_codex_command_uses_same_mcp_with_control_ablation(
     assert "agent_ab_mcp.py" in " ".join(treatment)
     assert " ".join(control).count("--exclude-capability") == 2
     assert "--exclude-capability" not in " ".join(treatment)
+
+
+def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
+    tmp_path: Path,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = {
+        "case_id": "SAT-PRIVATE-TEST-001",
+        "version": "1",
+        "task_type": "sat_decision",
+        "prompt": "Decide the private CNF.",
+        "variable_names": ["a", "b"],
+        "clauses": [[1, 2], [-1, 2]],
+        "expected": {"status": "SATISFIABLE"},
+    }
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    cnf = kernel.sat.put_cnf(
+        variable_names=("a", "b"),
+        clauses=((1, 2), (-1, 2)),
+    )
+    assignment = kernel.sat.put_assignment(
+        cnf_uri=cnf.artifact_uri,
+        values=(False, True),
+        producer=_sat_producer(),
+        resource_budget=SatResourceBudget(wall_seconds=5),
+    )
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.model.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"assignment_uri": assignment.artifact_uri},
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+
+    control = score_report(
+        case,
+        _sat_report(
+            case_id=str(case["case_id"]),
+            cnf_uri=cnf.artifact_uri,
+            assignment_uri=None,
+            record_uri=None,
+            assurance="SELF_CHECKED",
+            final_verification="UNVERIFIED",
+        ),
+        condition="control",
+        state_dir=state_dir,
+        mcp_calls=[],
+    )
+    assert control["passed"] is True
+
+    treatment = score_report(
+        case,
+        _sat_report(
+            case_id=str(case["case_id"]),
+            cnf_uri=cnf.artifact_uri,
+            assignment_uri=assignment.artifact_uri,
+            record_uri=record_uri,
+            assurance="VERIFIED",
+            final_verification="VERIFIED",
+        ),
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[
+            {
+                "capability_id": "sat.model.find",
+                "input": {
+                    "cnf_uri": cnf.artifact_uri,
+                    "resource_budget": {"wall_seconds": 5},
+                },
+                "output": {
+                    "cnf_uri": cnf.artifact_uri,
+                    "assignment_uri": assignment.artifact_uri,
+                },
+                "artifact_uris": [assignment.artifact_uri],
+            },
+            {
+                "capability_id": "sat.model.verify",
+                "input": {"assignment_uri": assignment.artifact_uri},
+                "output": verified.output,
+                "artifact_uris": verified.artifact_uris,
+                "assurance": verified.assurance.model_dump(mode="json"),
+            },
+        ],
+    )
+    assert treatment["passed"] is True
+    assert treatment["false_certification"] is False
+    assert treatment["replay_success"] is True
+
+
+def test_ab_sat_scorer_rejects_unbound_verified_claim(tmp_path: Path) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    benchmark_error = cast(type[Exception], BENCHMARK["BenchmarkError"])
+    case = {
+        "case_id": "SAT-PRIVATE-TEST-002",
+        "version": "1",
+        "task_type": "sat_decision",
+        "prompt": "Decide the private CNF.",
+        "variable_names": ["a"],
+        "clauses": [[1]],
+        "expected": {"status": "SATISFIABLE"},
+    }
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    cnf = kernel.sat.put_cnf(variable_names=("a",), clauses=((1,),))
+    report = _sat_report(
+        case_id=str(case["case_id"]),
+        cnf_uri=cnf.artifact_uri,
+        assignment_uri="artifact://sha256/" + "a" * 64,
+        record_uri=None,
+        assurance="VERIFIED",
+        final_verification="VERIFIED",
+    )
+    report["assignment"] = {"a": True}
+
+    with pytest.raises(benchmark_error, match="not independently verified"):
+        score_report(
+            case,
+            report,
+            condition="treatment",
+            state_dir=state_dir,
+            mcp_calls=["capability.invoke"],
+            capability_invocations=[],
+        )

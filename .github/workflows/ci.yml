@@ -11,13 +11,72 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  plan:
+    name: Plan CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      classification: ${{ steps.classify.outputs.classification }}
+      run-python: ${{ steps.classify.outputs.run-python }}
+      run-lean: ${{ steps.classify.outputs.run-lean }}
+      run-npm: ${{ steps.classify.outputs.run-npm }}
+      run-static: ${{ steps.classify.outputs.run-static }}
+      run-build: ${{ steps.classify.outputs.run-build }}
+      run-security: ${{ steps.classify.outputs.run-security }}
+      run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: classify
+        name: Classify changed paths
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+          FORCE_LEAN: ${{ contains(github.event.pull_request.labels.*.name, 'ci:lean') }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            mapfile -d '' changed_paths < <(
+              git diff --name-only -z "$BASE_SHA" "$HEAD_SHA"
+            )
+            planner_args=(--)
+            if [ "$FORCE_FULL" = "true" ]; then
+              planner_args=(--force-full --)
+            elif [ "$FORCE_LEAN" = "true" ]; then
+              planner_args=(--force-lean --)
+            fi
+            plan_output=$(
+              .github/scripts/classify-ci-paths \
+                "${planner_args[@]}" "${changed_paths[@]}"
+            )
+          else
+            plan_output=$(.github/scripts/classify-ci-paths --force-full)
+          fi
+
+          printf '%s\n' "$plan_output" >> "$GITHUB_OUTPUT"
+          classification=$(sed -n 's/^classification=//p' <<< "$plan_output")
+          {
+            echo "## CI plan"
+            echo ""
+            echo "- Classification: \`$classification\`"
+            echo ""
+            echo '```text'
+            echo "$plan_output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   lint:
     name: Lint & Format
+    needs: plan
+    if: needs.plan.outputs.run-static == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -27,13 +86,63 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
-      - run: uv run --frozen ruff check .
-      - run: uv run --frozen ruff format --check .
-      - run: uv run --frozen mypy
-      - run: uv run --frozen deptry .
+      - run: make lint-full
+      - run: make typecheck
+      - name: Check TODO comments reference issues
+        run: |
+          violations="$(rg --pcre2 -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"
+          if [ -n "$violations" ]; then
+            echo "::error::TODOs must reference an issue: TODO(#123)"
+            echo "$violations"
+            exit 1
+          fi
+
+  security-audit:
+    name: Security Audit
+    needs: plan
+    if: needs.plan.outputs.run-security == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv sync --frozen --dev
+      - run: make security-audit
+
+  validate-agents-md:
+    name: Validate AGENTS.md
+    needs: plan
+    if: needs.plan.outputs.run-build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv sync --frozen --dev
+      - run: make build
+      - run: uv run --frozen jacobian --help
+      - run: uv run --frozen jacobian-mcp --help
 
   test:
     name: Tests (Python ${{ matrix.python-version }}, shard ${{ matrix.shard }}/2)
+    needs: plan
+    if: needs.plan.outputs.run-python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -42,8 +151,8 @@ jobs:
         python-version: ["3.12", "3.13"]
         shard: [1, 2]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -53,36 +162,119 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
+      - run: >-
+          uv run --frozen python -c
+          "import json, pathlib;
+          data = json.loads(pathlib.Path('.test_durations').read_text());
+          assert data, '.test_durations must contain measured test timings'"
       - if: matrix.python-version == '3.12'
         run: >-
           uv run --frozen pytest
+          -m "not lean_runtime"
           --splits 2 --group ${{ matrix.shard }}
           --splitting-algorithm least_duration
+          --durations-path .test_durations
           --cov --cov-report= --cov-fail-under=0
           --durations=10
       - if: matrix.python-version != '3.12'
         run: >-
           uv run --frozen pytest
+          -m "not lean_runtime"
           --splits 2 --group ${{ matrix.shard }}
           --splitting-algorithm least_duration
+          --durations-path .test_durations
           --durations=10
       - if: matrix.python-version == '3.12'
         run: mv .coverage .coverage.shard-${{ matrix.shard }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ always() && matrix.python-version == '3.12' }}
         with:
           name: coverage-data-${{ matrix.shard }}
           path: .coverage.shard-${{ matrix.shard }}
           include-hidden-files: true
 
+  python-test:
+    name: Python Tests
+    if: always()
+    needs: [plan, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require planned Python validation
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          if [ "$RUN_PYTHON" = "true" ]; then
+            test "$TEST_RESULT" = "success"
+          else
+            test "$TEST_RESULT" = "skipped"
+          fi
+
+  lean-test-shards:
+    name: Lean Tests (${{ matrix.lane }})
+    needs: plan
+    if: needs.plan.outputs.run-lean == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare Lean test environment
+        uses: ./.github/actions/setup-lean
+      - name: Run Lean tests
+        run: |
+          started=$SECONDS
+          set +e
+          make test-lean
+          status=$?
+          set -e
+          echo "| Selected Lean tests | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+        env:
+          PYTEST_ARGS: >-
+            --splits 2 --group ${{ matrix.lane }}
+            --splitting-algorithm least_duration
+            --durations-path .lean_test_durations
+            --durations=10
+
+  lean-test:
+    name: Lean Tests
+    if: always()
+    needs: [plan, lean-test-shards]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require planned Lean validation
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_LEAN: ${{ needs.plan.outputs.run-lean }}
+          SHARD_RESULT: ${{ needs.lean-test-shards.result }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          if [ "$RUN_LEAN" = "true" ]; then
+            test "$SHARD_RESULT" = "success"
+          else
+            test "$SHARD_RESULT" = "skipped"
+          fi
+
   coverage:
     name: Coverage
+    if: always() && needs.plan.outputs.run-python == 'true' && needs.test.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: test
+    needs: [plan, test]
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -92,37 +284,84 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           pattern: coverage-data-*
           path: coverage-data
           merge-multiple: true
       - run: uv run --frozen coverage combine coverage-data
-      - run: uv run --frozen coverage report
+      - run: uv run --frozen coverage report | tee coverage-report.txt
+        shell: bash -o pipefail {0}
       - run: uv run --frozen coverage xml
-      - uses: actions/upload-artifact@v4
+      - name: Post coverage summary to PR
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.type != 'Bot' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          pct="$(awk '$1 == "TOTAL" { value = $NF; sub(/%$/, "", value); print value }' coverage-report.txt)"
+          test -n "$pct"
+          {
+            echo "<!-- jacobian-coverage-report -->"
+            echo "## Coverage Report"
+            echo ""
+            echo '```'
+            cat coverage-report.txt
+            echo '```'
+            echo ""
+            echo "**Total coverage: ${pct}%** (threshold: 50%)"
+            echo ""
+            echo "Branch coverage enabled. Complexity tracked via Ruff C90 (max 28)."
+            echo "Duplicate code detection via jscpd (threshold 10)."
+          } > coverage-summary.md
+          jq -n --rawfile body coverage-summary.md '{body: $body}' > coverage-comment.json
+          mapfile -t comment_ids < <(
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | select((.body | contains("<!-- jacobian-coverage-report -->")) or (.body | startswith("## Coverage Report"))) | .id'
+          )
+          if [ "${#comment_ids[@]}" -eq 0 ]; then
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input coverage-comment.json
+          else
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/${comment_ids[0]}" \
+              --input coverage-comment.json
+            for duplicate_id in "${comment_ids[@]:1}"; do
+              gh api --method DELETE \
+                "repos/$GITHUB_REPOSITORY/issues/comments/$duplicate_id"
+            done
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-3.12
           path: coverage.xml
 
   duplicate-code:
     name: Duplicate Code Detection
+    needs: plan
+    if: needs.plan.outputs.run-duplicate == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
       - run: npx --yes jscpd@5.0.12 --config .jscpd.json .
 
   npm-package:
     name: npm Package
+    needs: plan
+    if: needs.plan.outputs.run-npm == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           package-manager-cache: false
@@ -133,11 +372,13 @@ jobs:
 
   build:
     name: Build
+    needs: plan
+    if: needs.plan.outputs.run-build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -148,64 +389,28 @@ jobs:
             uv.lock
       - run: |
           echo "::group::Build timing"
-          /usr/bin/time -v uv build 2>&1 | tee build-timing.log
+          /usr/bin/time -v make build 2>&1 | tee build-timing.log
           echo "::endgroup::"
-      - uses: actions/upload-artifact@v4
+      - name: Extract build metrics
+        if: always()
+        run: |
+          {
+            echo "## Build Performance"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            grep -oP '(Elapsed \(wall clock\) time.*|Maximum resident set size.*|User time.*|System time.*)' build-timing.log | while IFS=: read -r key val; do
+              echo "| $(echo "$key" | xargs) | $(echo "$val" | xargs) |"
+            done
+            echo ""
+            echo "Build cache: setup-uv (enabled), dependency cache keyed on pyproject.toml + uv.lock"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
           path: dist/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: build-timing
           path: build-timing.log
-
-  publish:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: needs.release-please.outputs.release_created == 'true'
-    needs: [release-please, build]
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v5
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
-
-  publish-npm:
-    name: Publish to npm
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: needs.release-please.outputs.release_created == 'true'
-    needs: [release-please, npm-package]
-    environment: npm
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
-      - run: npm test
-        working-directory: npm
-      - run: npm publish --access public
-        working-directory: npm
-
-  release-please:
-    name: Release Please
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: github.ref == 'refs/heads/main'
-    needs: [lint, test, coverage, duplicate-code, npm-package, build]
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-    steps:
-      - uses: googleapis/release-please-action@v4
-        id: release

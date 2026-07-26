@@ -51,6 +51,34 @@ elif provider == "jacobian.z3":
         solver = backend.Solver()
         solver.add(x == 1)
         assert solver.check() == backend.sat
+elif provider == "cvc5":
+    import cvc5 as backend
+    if operation == "reproduction":
+        solver = backend.Solver()
+        solver.setOption("produce-proofs", "true")
+        solver.setOption("proof-format-mode", "alethe")
+        parser = backend.InputParser(solver)
+        parser.setStringInput(
+            backend.InputLanguage.SMT_LIB_2_6,
+            "(set-logic QF_UF)\n"
+            "(declare-fun p () Bool)\n"
+            "(assert p)\n"
+            "(assert (not p))\n"
+            "(check-sat)\n",
+            "provider-measure.smt2",
+        )
+        result = None
+        while True:
+            command = parser.nextCommand()
+            if command.isNull():
+                break
+            output = command.invoke(solver, parser.getSymbolManager())
+            if command.getCommandName() == "check-sat":
+                result = output.strip()
+        assert result == "unsat"
+        proofs = solver.getProof(backend.ProofComponent.FULL)
+        assert len(proofs) == 1
+        assert solver.proofToString(proofs[0], backend.ProofFormat.ALETHE)
 else:
     import jacobian.canonical as backend
     if operation == "reproduction":

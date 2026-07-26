@@ -6,6 +6,7 @@ import importlib
 import logging
 import re
 import time
+from functools import lru_cache
 from typing import TYPE_CHECKING, Protocol, cast
 
 from jsonschema import Draft202012Validator
@@ -374,12 +375,18 @@ def load_capability_adapter(
     return cast(CapabilityAdapter, adapter)
 
 
-def _validator(schema: dict[str, object]) -> Draft202012Validator:
+@lru_cache(maxsize=256)
+def _compiled_validator(canonical_schema: bytes) -> Draft202012Validator:
+    normalized = loads_strict_json(canonical_schema)
     try:
-        Draft202012Validator.check_schema(schema)
+        Draft202012Validator.check_schema(normalized)
     except SchemaError as exc:
         raise CapabilityError("capability JSON Schema is invalid") from exc
-    return Draft202012Validator(schema)
+    return Draft202012Validator(normalized)
+
+
+def _validator(schema: dict[str, object]) -> Draft202012Validator:
+    return _compiled_validator(canonicalize_json(schema))
 
 
 def _validate_payload(

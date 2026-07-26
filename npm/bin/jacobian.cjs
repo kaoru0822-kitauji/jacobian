@@ -35,7 +35,7 @@ Clients:
 
 Environment:
   JACOBIAN_STATE_DIR    State directory (default: ./.jacobian)
-  JACOBIAN_PACKAGE      Python package spec (default: jacobian-research-kernel)
+  JACOBIAN_PACKAGE      Python package spec (default: jacobian)
 `;
 
 function main() {

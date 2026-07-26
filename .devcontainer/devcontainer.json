@@ -21,6 +21,6 @@
             }
         }
     },
-    "postCreateCommand": "uv sync --dev",
+    "postCreateCommand": "make setup",
     "remoteUser": "vscode"
 }
