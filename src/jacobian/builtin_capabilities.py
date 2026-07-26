@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from jacobian.capabilities import CapabilityInvocationError
@@ -26,6 +27,7 @@ from jacobian.contracts.lean import (
     LeanDeclarationSearchStopReason,
     LeanEnvironment,
 )
+from jacobian.contracts.memory import MemorySearchResult
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
@@ -48,11 +50,11 @@ class KnowledgeSearchAdapter:
         self.memory = memory
         self._descriptor = CapabilityDescriptor(
             capability_id="knowledge.search",
-            version="1",
+            version="2",
             title="Search research memory",
             description=(
-                "Retrieve trust-labeled prior capability episodes; retrieval does "
-                "not promote their mathematical assurance."
+                "Retrieve trust-labeled prior capability episodes with exact domain, "
+                "tag, and failure filters; retrieval does not promote assurance."
             ),
             provider="jacobian.memory",
             provider_runtime=known_provider_runtime(
@@ -65,12 +67,43 @@ class KnowledgeSearchAdapter:
                 "properties": {
                     "query": {"type": "string", "maxLength": 512},
                     "capability_id": {"type": "string"},
+                    "domains": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "maxItems": 32,
+                        "uniqueItems": True,
+                    },
+                    "tags_all": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "maxItems": 32,
+                        "uniqueItems": True,
+                    },
+                    "tags_any": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "maxItems": 32,
+                        "uniqueItems": True,
+                    },
+                    "failure_stages": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "maxItems": 32,
+                        "uniqueItems": True,
+                    },
+                    "failure_classifications": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "maxItems": 32,
+                        "uniqueItems": True,
+                    },
                     "assurance_level": {"enum": ["HEURISTIC", "COMPUTED", "VERIFIED"]},
+                    "cutoff": {"type": "string", "format": "date-time"},
                     "limit": {"type": "integer", "minimum": 1, "maximum": 100},
                 },
                 "additionalProperties": False,
             },
-            output_schema=_OBJECT_SCHEMA,
+            output_schema=model_schema(MemorySearchResult),
             read_only=True,
             records_episode=False,
             tags=("memory", "retrieval"),
@@ -87,7 +120,21 @@ class KnowledgeSearchAdapter:
             capability_id=(
                 str(selected["capability_id"]) if "capability_id" in selected else None
             ),
+            domains=tuple(str(value) for value in selected.get("domains", ())),
+            tags_all=tuple(str(value) for value in selected.get("tags_all", ())),
+            tags_any=tuple(str(value) for value in selected.get("tags_any", ())),
+            failure_stages=tuple(
+                str(value) for value in selected.get("failure_stages", ())
+            ),
+            failure_classifications=tuple(
+                str(value) for value in selected.get("failure_classifications", ())
+            ),
             assurance_level=selected.get("assurance_level"),
+            cutoff=(
+                datetime.fromisoformat(str(selected["cutoff"]).replace("Z", "+00:00"))
+                if "cutoff" in selected
+                else None
+            ),
             limit=int(selected.get("limit", 10)),
         )
         return CapabilityResult(
@@ -96,6 +143,39 @@ class KnowledgeSearchAdapter:
             mode=request.mode,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=result.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="exact filters evaluated against one immutable index snapshot",
+                parameters={
+                    "index_snapshot": result.index_snapshot,
+                    "indexed_episode_count": result.indexed_episode_count,
+                    "query": result.query,
+                    "capability_id": selected.get("capability_id"),
+                    "domains": selected.get("domains", []),
+                    "tags_all": selected.get("tags_all", []),
+                    "tags_any": selected.get("tags_any", []),
+                    "failure_stages": selected.get("failure_stages", []),
+                    "failure_classifications": selected.get(
+                        "failure_classifications", []
+                    ),
+                    "assurance_level": selected.get("assurance_level"),
+                    "cutoff": selected.get("cutoff"),
+                    "limit": int(selected.get("limit", 10)),
+                },
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.PARTIAL
+                    if result.truncated
+                    else CapabilityCompletenessStatus.COMPLETE
+                ),
+                basis=(
+                    "all matching episodes in the bound index snapshot were returned"
+                    if not result.truncated
+                    else "the result limit omitted matching episodes from the bound "
+                    "index snapshot"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
