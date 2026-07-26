@@ -1,0 +1,123 @@
+from pathlib import Path
+
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityRequest,
+)
+from jacobian.contracts.geometry import (
+    LinePairRequest,
+    PointLineRequest,
+    PointPairRequest,
+    PointQuadrupleRequest,
+    PointSetRequest,
+    PointTripleRequest,
+    PolygonRequest,
+)
+from jacobian.contracts.results import ExecutionStatus
+from jacobian.geometry_capabilities import SPECS
+from jacobian.kernel import JacobianKernel
+
+ZERO = {"num": "0", "den": "1"}
+ONE = {"num": "1", "den": "1"}
+TWO = {"num": "2", "den": "1"}
+P0 = {"x": ZERO, "y": ZERO}
+PX = {"x": TWO, "y": ZERO}
+PY = {"x": ZERO, "y": TWO}
+PXY = {"x": TWO, "y": TWO}
+
+
+def test_geometry_capabilities_are_distinct_and_every_contract_completes(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    line_x = {"first": P0, "second": PX}
+    line_y = {"first": P0, "second": PY}
+    payloads = {
+        PointPairRequest: {"first": P0, "second": PXY},
+        PointTripleRequest: {"first": P0, "second": PX, "third": PY},
+        PointQuadrupleRequest: {
+            "first": P0,
+            "second": PX,
+            "third": PY,
+            "fourth": PXY,
+        },
+        LinePairRequest: {"first_line": line_x, "second_line": line_y},
+        PointLineRequest: {"point": PXY, "line": line_x},
+        PolygonRequest: {"points": [P0, PX, PY]},
+        PointSetRequest: {"points": [P0, PX, PY, PXY]},
+    }
+    ids = [spec.capability_id for spec in SPECS]
+
+    assert len(ids) == 13
+    assert len(ids) == len(set(ids))
+    for spec in SPECS:
+        result = kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id=spec.capability_id,
+                input=payloads[spec.request_model],
+            )
+        )
+        assert result.execution.status is ExecutionStatus.COMPLETED, (
+            spec.capability_id,
+            result.diagnostics,
+        )
+        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+        assert len(result.artifact_uris) == 2
+
+
+def test_geometry_exact_outputs_are_inline_and_materialized(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    distance = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.points.compute.squared_distance",
+            input={"first": P0, "second": PXY},
+        )
+    )
+    circle = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.triangle.compute.circumcircle",
+            input={"first": P0, "second": PX, "third": PY},
+        )
+    )
+
+    assert distance.output["result"] == {"value": {"num": "8", "den": "1"}}
+    assert circle.output["result"] == {
+        "center": {"x": ONE, "y": ONE},
+        "radius_squared": {"num": "2", "den": "1"},
+    }
+    assert (
+        kernel.store.get(distance.output["result_uri"]).payload
+        == distance.output["result"]
+    )
+
+
+def test_degenerate_geometry_fails_before_artifact_writes(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    invalid_line = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.lines.compute.intersection",
+            input={
+                "first_line": {"first": P0, "second": P0},
+                "second_line": {"first": P0, "second": PX},
+            },
+        )
+    )
+    collinear_circle = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.triangle.compute.circumcircle",
+            input={
+                "first": P0,
+                "second": {"x": ONE, "y": ONE},
+                "third": PXY,
+            },
+        )
+    )
+
+    assert invalid_line.execution.status is ExecutionStatus.ERROR
+    assert invalid_line.diagnostics[0].code == "INVALID_GEOMETRY_REQUEST"
+    assert collinear_circle.execution.status is ExecutionStatus.ERROR
+    assert collinear_circle.diagnostics[0].code == "GEOMETRY_OPERATION_NOT_APPLICABLE"
+    assert invalid_line.artifact_uris == ()
+    assert collinear_circle.artifact_uris == ()
