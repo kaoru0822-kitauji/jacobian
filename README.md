@@ -140,6 +140,15 @@ construction and properties, exact rational polynomial maps, finite magma law
 evaluation and countermodel search, reference-domain exploration and
 verification, Lean checking, and local research-memory search.
 
+The optional `flint` extra pins Python-FLINT 0.9.0 and adds
+`linear.rational_solution.find` for one exact finite rational `A x = b`
+candidate. A returned vector remains `COMPUTED`; a not-found outcome makes no
+consistency claim. With bundled references enabled,
+`linear.rational_solution.verify` independently replays every equation using
+standard-library exact rational arithmetic and alone may create a bound
+verification record. See the
+[exact rational solution contract](docs/reference/linear-rational-solutions.md).
+
 The base kernel also registers canonical CNF, total assignment, and raw DRAT
 proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
 `sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound

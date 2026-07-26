@@ -34,6 +34,8 @@ from typing import Any, cast
 
 from jacobian.artifacts import ArtifactService
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
+from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.linear import LinearRationalSystem
 from jacobian.contracts.sat import (
     CanonicalCnf,
     SatAssignmentArtifact,
@@ -62,6 +64,7 @@ GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
 PARTITION_REPORT_SCHEMA = CASES_ROOT / "partition-report.schema.json"
 SAT_REPORT_SCHEMA = CASES_ROOT / "sat-report.schema.json"
 SMT_REPORT_SCHEMA = CASES_ROOT / "smt-report.schema.json"
+LINEAR_REPORT_SCHEMA = CASES_ROOT / "linear-report.schema.json"
 LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
@@ -84,6 +87,12 @@ SMT_CAPABILITY_IDS = frozenset(
     {
         "smt.unsat_proof.find",
         "smt.unsat_proof.verify",
+    }
+)
+LINEAR_CAPABILITY_IDS = frozenset(
+    {
+        "linear.rational_solution.find",
+        "linear.rational_solution.verify",
     }
 )
 LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
@@ -192,6 +201,25 @@ Report VERIFIED only when the verifier returns VERIFIED_UNSAT and a
 verification-record URI. If the verifier rejects the proof, preserve the
 producer's problem_uri and proof_uri but report COMPUTED and UNVERIFIED;
 rejection does not establish SAT.
+"""
+
+LINEAR_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. You may write and run local code
+in the empty workspace. Return one exact rational vector satisfying every
+supplied equation. Report SELF_CHECKED and UNVERIFIED, with null durable
+artifact and verification-record URIs.
+"""
+
+LINEAR_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create programs. Describe the exact capability IDs
+linear.rational_solution.find and linear.rational_solution.verify directly.
+Invoke the producer on the supplied exact rational system, then pass its
+solution_uri to the verifier in VERIFY mode. A produced vector alone is not
+verification. Report VERIFIED only when the verifier returns
+VERIFIED_SOLUTION and copy the exact system, solution, and
+verification-record URIs. Copy the producer's ordered solution values in the
+declared variable order.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\
@@ -340,6 +368,199 @@ def _reported_sat_assignment(
     if report.get("evidence_kind") != "ASSIGNMENT":
         raise BenchmarkError("SAT report mislabeled its assignment evidence")
     return assignment
+
+
+def _linear_case_system(case: Mapping[str, Any]) -> LinearRationalSystem:
+    system = case.get("system")
+    if not isinstance(system, Mapping):
+        raise BenchmarkError("linear case must contain an exact system object")
+    try:
+        return LinearRationalSystem.model_validate(system)
+    except ValueError as exc:
+        raise BenchmarkError("linear case contains an invalid exact system") from exc
+
+
+def _reported_linear_solution(
+    report: Mapping[str, Any],
+    *,
+    system: LinearRationalSystem,
+) -> tuple[CanonicalRational, ...]:
+    solution = report.get("solution")
+    if not isinstance(solution, list) or len(solution) != len(system.variables):
+        raise BenchmarkError(
+            "linear report must contain one ordered value per declared variable"
+        )
+    try:
+        values = tuple(CanonicalRational.model_validate(value) for value in solution)
+    except ValueError as exc:
+        raise BenchmarkError("linear report contains a noncanonical rational") from exc
+    for row, rhs in zip(system.coefficients.entries, system.rhs, strict=True):
+        actual = sum(
+            (
+                coefficient.as_fraction() * value.as_fraction()
+                for coefficient, value in zip(row, values, strict=True)
+            ),
+            start=0,
+        )
+        if actual != rhs.as_fraction():
+            raise BenchmarkError(
+                "linear report vector does not satisfy every exact equation"
+            )
+    return values
+
+
+def _matches_linear_system(value: object, expected: LinearRationalSystem) -> bool:
+    try:
+        return LinearRationalSystem.model_validate(value) == expected
+    except ValueError:
+        return False
+
+
+def _score_linear_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    shell_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    system = _linear_case_system(case)
+    values = _reported_linear_solution(report, system=system)
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("status") != "SOLUTION_FOUND"
+        or report.get("conclusion") != "TRUE"
+    ):
+        raise BenchmarkError("linear report has the wrong case, status, or conclusion")
+    _validate_feedback(report.get("feedback"))
+
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("linear control used an MCP tool")
+        if (
+            report.get("assurance") != "SELF_CHECKED"
+            or report.get("final_verification") != "UNVERIFIED"
+            or report.get("system_uri") is not None
+            or report.get("solution_uri") is not None
+            or report.get("verification_record_uri") is not None
+        ):
+            raise BenchmarkError(
+                "linear control must remain self-checked without durable evidence"
+            )
+        return {
+            "passed": True,
+            "false_certification": False,
+            "replay_success": False,
+            "checks": [
+                "independent exact equation oracle",
+                "no-Jacobian control isolation",
+            ],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if shell_calls:
+        raise BenchmarkError("linear treatment used a shell command")
+    if "capability.invoke" not in mcp_calls:
+        raise BenchmarkError("linear treatment did not invoke a Jacobian capability")
+    if (
+        report.get("assurance") != "VERIFIED"
+        or report.get("final_verification") != "VERIFIED"
+    ):
+        raise BenchmarkError("linear treatment did not report verified assurance")
+    system_uri = report.get("system_uri")
+    solution_uri = report.get("solution_uri")
+    record_uri = report.get("verification_record_uri")
+    if not all(isinstance(uri, str) for uri in (system_uri, solution_uri, record_uri)):
+        raise BenchmarkError("linear treatment omitted durable artifact URIs")
+    assert isinstance(system_uri, str)
+    assert isinstance(solution_uri, str)
+    assert isinstance(record_uri, str)
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    try:
+        resolved = kernel.linear.resolve_solution(solution_uri)
+        record_artifact = kernel.store.get(record_uri)
+        record = VerificationRecord.model_validate(record_artifact.payload)
+        semantics = kernel.store.get(kernel.linear.installation.semantics_uri)
+    except (StoreError, ValueError) as exc:
+        raise BenchmarkError("linear treatment artifacts are unavailable") from exc
+    if (
+        resolved.system != system
+        or resolved.solution.values != values
+        or resolved.system_artifact.artifact_uri != system_uri
+        or system_uri not in resolved.artifact.manifest.parents
+        or record.conclusion.value != "TRUE"
+        or record.bindings.claim_digest
+        != resolved.system_artifact.manifest.object_digest
+        or record.bindings.semantics_digest != semantics.manifest.object_digest
+        or record.bindings.candidate_digest != resolved.artifact.manifest.object_digest
+        or not {system_uri, solution_uri, record.evidence_uri}.issubset(
+            record_artifact.manifest.parents
+        )
+    ):
+        raise BenchmarkError("linear verification record is not exactly bound")
+
+    found_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_input = invocation.get("input")
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == "linear.rational_solution.find"
+            and isinstance(invocation_input, Mapping)
+            and _matches_linear_system(invocation_input.get("system"), system)
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("system_uri") == system_uri
+            and invocation_output.get("solution_uri") == solution_uri
+            and solution_uri in (invocation.get("artifact_uris") or [])
+        ):
+            found_index = index
+        if (
+            found_index is not None
+            and index > found_index
+            and invocation.get("capability_id") == "linear.rational_solution.verify"
+            and invocation_input == {"solution_uri": solution_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("verification_record_uri") == record_uri
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            and record_uri in (invocation.get("artifact_uris") or [])
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError(
+            "linear treatment lacks an exact ordered find-to-verify trace"
+        )
+
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="linear.rational_solution.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"solution_uri": solution_uri},
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.assurance.verification_record_uri != record_uri
+        or replay.output.get("conclusion") != "TRUE"
+        or replay.output.get("system_uri") != system_uri
+        or replay.output.get("solution_uri") != solution_uri
+    ):
+        raise BenchmarkError("linear treatment evidence does not replay independently")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "independent exact equation oracle",
+            "durable system and solution binding",
+            "ordered find-to-verify trace",
+            "independent checker replay",
+        ],
+    }
 
 
 def _score_sat_report(
@@ -730,6 +951,16 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "linear_rational_solution":
+        return _score_linear_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            shell_calls=shell_calls,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "smt_unsat_proof":
         return _score_smt_report(
             case,
@@ -1624,6 +1855,12 @@ def _codex_command(
 
 
 def _condition_instructions(task_type: object, condition: str) -> str:
+    if task_type == "linear_rational_solution":
+        return (
+            LINEAR_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else LINEAR_TREATMENT_INSTRUCTIONS
+        )
     if task_type == "smt_unsat_proof":
         return (
             SMT_CONTROL_INSTRUCTIONS
@@ -1679,6 +1916,7 @@ def _run_condition(
     is_partition = case.get("task_type") == "finite_partition"
     is_sat = case.get("task_type") == "sat_decision"
     is_smt = case.get("task_type") == "smt_unsat_proof"
+    is_linear = case.get("task_type") == "linear_rational_solution"
     is_lean_declaration = case.get("task_type") == "lean_declaration"
     is_lean_proof = case.get("task_type") == "lean_proof"
     sat_context = ""
@@ -1688,11 +1926,25 @@ def _run_condition(
             "\nThe canonical CNF for this case is available at "
             f"{cnf_uri}. Return this exact URI as cnf_uri.\n"
         )
+    linear_context = ""
+    if is_linear:
+        system = _linear_case_system(case)
+        linear_context = (
+            "\nThe exact rational system for this case is:\n"
+            + json.dumps(system.model_dump(mode="json"), sort_keys=True)
+            + "\n"
+        )
     condition_instructions = _condition_instructions(
         case.get("task_type"),
         condition,
     )
-    prompt = condition_instructions + sat_context + "\n" + COMMON_PROMPT.format(**case)
+    prompt = (
+        condition_instructions
+        + sat_context
+        + linear_context
+        + "\n"
+        + COMMON_PROMPT.format(**case)
+    )
     command = _codex_command(
         codex_command=codex_command,
         condition=condition,
@@ -1715,6 +1967,8 @@ def _run_condition(
             if is_sat
             else SMT_REPORT_SCHEMA
             if is_smt
+            else LINEAR_REPORT_SCHEMA
+            if is_linear
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
@@ -1828,6 +2082,12 @@ def _run_condition(
                 and report.get("final_verification") == "VERIFIED"
                 and not score.get("passed")
             )
+            or (
+                is_linear
+                and isinstance(report, dict)
+                and report.get("final_verification") == "VERIFIED"
+                and not score.get("passed")
+            )
         ),
         "intervention_attempted": bool(
             (
@@ -1842,6 +2102,12 @@ def _run_condition(
                 is_smt
                 and SMT_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
             )
+            or (
+                is_linear
+                and LINEAR_CAPABILITY_IDS.intersection(
+                    telemetry["capability_attempt_ids"]
+                )
+            )
         ),
         "intervention_used": bool(
             (
@@ -1850,6 +2116,10 @@ def _run_condition(
             )
             or (is_sat and SAT_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
             or (is_smt and SMT_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
+            or (
+                is_linear
+                and LINEAR_CAPABILITY_IDS.intersection(telemetry["capability_ids"])
+            )
         ),
         "operational_failure": bool(score.get("operational_failure")),
         "score": score,

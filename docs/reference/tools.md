@@ -126,7 +126,8 @@ Domain reference documents define constraints that remain useful independent
 of catalog membership:
 
 - [SAT artifact contracts](sat-artifacts.md);
-- [SMT Alethe artifact contracts](smt-artifacts.md); and
+- [SMT Alethe artifact contracts](smt-artifacts.md);
+- [exact rational solution artifacts](linear-rational-solutions.md); and
 - [Lean declaration discovery contract](lean-declaration-discovery.md).
 
 ## Mathematical operation portfolio

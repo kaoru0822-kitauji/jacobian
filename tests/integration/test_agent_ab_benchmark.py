@@ -162,6 +162,64 @@ def _sat_report(
     }
 
 
+def _linear_case() -> dict[str, Any]:
+    return {
+        "case_id": "LINEAR-PRIVATE-TEST-001",
+        "version": "1",
+        "task_type": "linear_rational_solution",
+        "prompt": "Find one exact solution of the supplied rational system.",
+        "system": {
+            "variables": ["u", "v"],
+            "coefficients": {
+                "entries": [
+                    [
+                        {"num": "2", "den": "1"},
+                        {"num": "1", "den": "1"},
+                    ],
+                    [
+                        {"num": "1", "den": "1"},
+                        {"num": "-1", "den": "1"},
+                    ],
+                ]
+            },
+            "rhs": [
+                {"num": "5", "den": "1"},
+                {"num": "1", "den": "1"},
+            ],
+        },
+    }
+
+
+def _linear_report(
+    *,
+    system_uri: str | None,
+    solution_uri: str | None,
+    record_uri: str | None,
+    assurance: str,
+    final_verification: str,
+) -> dict[str, Any]:
+    return {
+        "case_id": "LINEAR-PRIVATE-TEST-001",
+        "status": "SOLUTION_FOUND",
+        "conclusion": "TRUE",
+        "solution": [
+            {"num": "2", "den": "1"},
+            {"num": "1", "den": "1"},
+        ],
+        "assurance": assurance,
+        "final_verification": final_verification,
+        "system_uri": system_uri,
+        "solution_uri": solution_uri,
+        "verification_record_uri": record_uri,
+        "limitations": ["one exact vector; no uniqueness claim"],
+        "feedback": {
+            "reasoning_focus": ["preserve exact variable order"],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+
+
 def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     schema_path = PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -1440,6 +1498,101 @@ def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
     assert treatment["passed"] is True
     assert treatment["false_certification"] is False
     assert treatment["replay_success"] is True
+
+
+def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
+    tmp_path: Path,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = _linear_case()
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    found = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="linear.rational_solution.find",
+            mode=CapabilityMode.EXPLORE,
+            input={"system": case["system"]},
+        )
+    )
+    solution_uri = cast(str, found.output["solution_uri"])
+    system_uri = cast(str, found.output["system_uri"])
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="linear.rational_solution.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"solution_uri": solution_uri},
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+
+    control = score_report(
+        case,
+        _linear_report(
+            system_uri=None,
+            solution_uri=None,
+            record_uri=None,
+            assurance="SELF_CHECKED",
+            final_verification="UNVERIFIED",
+        ),
+        condition="control",
+        state_dir=state_dir,
+        mcp_calls=[],
+    )
+    assert control["passed"] is True
+
+    treatment = score_report(
+        case,
+        _linear_report(
+            system_uri=system_uri,
+            solution_uri=solution_uri,
+            record_uri=record_uri,
+            assurance="VERIFIED",
+            final_verification="VERIFIED",
+        ),
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[
+            {
+                "capability_id": "linear.rational_solution.find",
+                "input": {"system": case["system"]},
+                "output": found.output,
+                "artifact_uris": found.artifact_uris,
+            },
+            {
+                "capability_id": "linear.rational_solution.verify",
+                "input": {"solution_uri": solution_uri},
+                "output": verified.output,
+                "artifact_uris": verified.artifact_uris,
+                "assurance": verified.assurance.model_dump(mode="json"),
+            },
+        ],
+    )
+
+    assert treatment["passed"] is True
+    assert treatment["false_certification"] is False
+    assert treatment["replay_success"] is True
+
+    wrong = _linear_report(
+        system_uri=None,
+        solution_uri=None,
+        record_uri=None,
+        assurance="SELF_CHECKED",
+        final_verification="UNVERIFIED",
+    )
+    wrong["solution"][0] = {"num": "0", "den": "1"}
+    with pytest.raises(
+        cast(type[Exception], BENCHMARK["BenchmarkError"]),
+        match="does not satisfy",
+    ):
+        score_report(
+            case,
+            wrong,
+            condition="control",
+            state_dir=state_dir,
+            mcp_calls=[],
+        )
 
 
 def test_ab_sat_scorer_rejects_unbound_verified_claim(tmp_path: Path) -> None:
