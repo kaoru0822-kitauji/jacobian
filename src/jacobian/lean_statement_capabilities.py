@@ -3,9 +3,10 @@
 Two domain-atomic capabilities, each producing exactly one inspectable
 artifact:
 
-* ``lean.statement.propose`` — type-check one proposed Lean statement
-  against an informal claim. Returns elaboration status; does NOT certify
-  that the formal statement matches the informal claim.
+* ``lean.statement.propose`` — either type-check one proposed Lean statement
+  against an informal claim or directly elaborate one proposition. Returns
+  durable environment-bound elaboration details; does NOT certify truth or
+  that a formal statement matches an informal claim.
 
 * ``lean.statement.compare`` — compare two Lean statements syntactically
   and by axiom set. Fail-closed: never claims semantic equivalence; if
@@ -17,6 +18,7 @@ unavailable/diagnostic behavior rather than a silent success.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import shutil
@@ -25,10 +27,12 @@ import tempfile
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -45,6 +49,8 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_statement import (
+    LeanElaborationDiagnostic,
+    LeanElaborationOption,
     LeanStatementComparisonArtifact,
     LeanStatementComparisonOutput,
     LeanStatementComparisonRequest,
@@ -92,6 +98,31 @@ class _ElaborationResult:
     sorry_count: int
     messages: tuple[str, ...]
     errors: tuple[str, ...]
+    elaborated_expression: str | None = None
+    used_imports: tuple[str, ...] = ()
+    used_declarations: tuple[str, ...] = ()
+    options: tuple[LeanElaborationOption, ...] = ()
+
+
+_DIRECT_ELABORATION_IMPORTS = ("Init.Prelude",)
+_DIRECT_ELABORATION_OPTIONS = (
+    LeanElaborationOption(name="pp.all", value="true"),
+    LeanElaborationOption(name="pp.explicit", value="true"),
+    LeanElaborationOption(name="pp.universes", value="true"),
+)
+_LEAN_NAME = re.compile(r"\b[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z0-9_']+)*\b")
+_LEAN_KEYWORDS = frozenset(
+    {
+        "Prop",
+        "Sort",
+        "Type",
+        "false",
+        "fun",
+        "let",
+        "match",
+        "true",
+    }
+)
 
 
 @cache
@@ -134,6 +165,54 @@ def _elaborate_statement(
     return _run_lean_source(source, timeout_seconds=timeout_seconds)
 
 
+def _elaborate_proposition(
+    statement: str,
+    *,
+    timeout_seconds: int = _ELAPSED_TIMEOUT_SECONDS,
+) -> _ElaborationResult:
+    """Elaborate one expression against expected type ``Prop``."""
+
+    if shutil.which("lean") is None:
+        raise _LeanUnavailableError("lean is not on PATH")
+    _validate_statement(statement)
+    source = "\n".join(
+        (
+            "set_option pp.all true in",
+            "set_option pp.explicit true in",
+            "set_option pp.universes true in",
+            f"#check ({statement} : Prop)",
+        )
+    )
+    output = _execute_lean_source(source, timeout_seconds=timeout_seconds)
+    messages = tuple(_parse_lean_messages(output))
+    errors = tuple(message for message in messages if "error:" in message.lower())
+    expression = None if errors else _parse_elaborated_expression(output)
+    if not errors and expression is None:
+        errors = ("error: Lean did not emit the elaborated proposition",)
+        messages = (*messages, *errors)
+    declarations = (
+        tuple(
+            sorted(
+                name
+                for name in set(_LEAN_NAME.findall(expression))
+                if name not in _LEAN_KEYWORDS
+            )
+        )
+        if expression is not None
+        else ()
+    )
+    return _ElaborationResult(
+        elaborates=expression is not None,
+        sorry_count=0,
+        messages=messages,
+        errors=errors,
+        elaborated_expression=expression,
+        used_imports=_DIRECT_ELABORATION_IMPORTS,
+        used_declarations=declarations,
+        options=_DIRECT_ELABORATION_OPTIONS,
+    )
+
+
 def _check_proof(
     statement: str,
     proof: str,
@@ -156,6 +235,19 @@ def _run_lean_source(
     *,
     timeout_seconds: int,
 ) -> _ElaborationResult:
+    output = _execute_lean_source(source, timeout_seconds=timeout_seconds)
+    messages = _parse_lean_messages(output)
+    errors = tuple(m for m in messages if "error:" in m.lower())
+    elaborates = len(errors) == 0
+    return _ElaborationResult(
+        elaborates=elaborates,
+        sorry_count=1 if elaborates else 0,
+        messages=tuple(messages),
+        errors=errors,
+    )
+
+
+def _execute_lean_source(source: str, *, timeout_seconds: int) -> str:
     fd, temp_path = tempfile.mkstemp(suffix=".lean")
     try:
         with os.fdopen(fd, "w") as handle:
@@ -173,16 +265,14 @@ def _run_lean_source(
         raise _LeanUnavailableError(f"lean timed out after {timeout_seconds}s") from exc
     finally:
         Path(temp_path).unlink(missing_ok=True)
-    output = (result.stdout or "") + (result.stderr or "")
-    messages = _parse_lean_messages(output)
-    errors = tuple(m for m in messages if "error:" in m.lower())
-    elaborates = len(errors) == 0
-    return _ElaborationResult(
-        elaborates=elaborates,
-        sorry_count=1 if elaborates else 0,
-        messages=tuple(messages),
-        errors=errors,
-    )
+    return (result.stdout or "") + (result.stderr or "")
+
+
+def _parse_elaborated_expression(output: str) -> str | None:
+    match = re.search(r"\binfo:\s*(.+?)\s*:\s*Prop(?:\s|$)", output, re.DOTALL)
+    if match is None:
+        return None
+    return " ".join(match.group(1).split())
 
 
 def _parse_lean_messages(output: str) -> list[str]:
@@ -196,6 +286,41 @@ def _parse_lean_messages(output: str) -> list[str]:
         ) or stripped.lower().startswith(("error:", "warning:", "info:")):
             messages.append(stripped)
     return messages
+
+
+def _diagnostics(messages: tuple[str, ...]) -> tuple[LeanElaborationDiagnostic, ...]:
+    diagnostics: list[LeanElaborationDiagnostic] = []
+    for message in messages:
+        lowered = message.lower()
+        severity: Literal["ERROR", "WARNING", "INFO"] = (
+            "ERROR"
+            if "error:" in lowered
+            else ("WARNING" if "warning:" in lowered else "INFO")
+        )
+        diagnostics.append(
+            LeanElaborationDiagnostic(severity=severity, message=message)
+        )
+    return tuple(diagnostics)
+
+
+def _environment_digest(
+    *,
+    environment: LeanEnvironment,
+    lean_version: str,
+    lean_commit: str,
+    mathlib_commit: str | None,
+    imports: tuple[str, ...],
+    options: tuple[LeanElaborationOption, ...],
+) -> str:
+    payload = {
+        "environment": environment.value,
+        "lean_version": lean_version,
+        "lean_commit": lean_commit,
+        "mathlib_commit": mathlib_commit,
+        "imports": list(imports),
+        "options": [option.model_dump(mode="json") for option in options],
+    }
+    return "sha256:" + hashlib.sha256(canonicalize_json(payload)).hexdigest()
 
 
 def _indent_proof(proof: str) -> str:
@@ -271,15 +396,19 @@ def install_lean_statement_capabilities(
         version="1",
         definition={
             "description": (
-                "atomic Lean statement proposal and statement comparison; "
-                "neither certifies semantic intent"
+                "atomic Lean statement proposal, direct proposition "
+                "elaboration, and statement comparison; "
+                "none certify theoremhood, truth, or semantic intent"
             ),
-            "verification": "none; type-checking does not certify intent",
+            "verification": (
+                "none; elaboration establishes a well-typed Prop expression "
+                "in the bound environment but does not establish truth"
+            ),
         },
     )
     proposal_schema_uri = schemas.register(
         name="jacobian.lean4-statement-proposal",
-        version="1",
+        version="2",
         schema=LeanStatementProposalArtifact.model_json_schema(),
     )
     comparison_schema_uri = schemas.register(
@@ -322,17 +451,17 @@ class LeanStatementProposalAdapter:
             version="1",
             title="Propose one Lean statement with type-check status",
             description=(
-                "Validate that a proposed Lean statement elaborates under the "
-                "pinned Lean kernel. Returns elaboration status, sorry count, "
-                "and compiler messages. Does NOT certify that the formal "
-                "statement matches the informal claim."
+                "Validate either a proposed statement against an informal "
+                "claim or directly elaborate one proposition without an "
+                "informal claim. Returns durable environment-bound elaboration "
+                "details. It does not establish truth or semantic intent."
             ),
             provider="jacobian.lean4",
             provider_runtime=resources.provider_runtime,
             modes=(CapabilityMode.EXPLORE,),
             input_schema=LeanStatementProposalRequest.model_json_schema(),
             output_schema=LeanStatementProposalOutput.model_json_schema(),
-            tags=("lean", "statement", "elaboration", "proposal"),
+            tags=("lean", "statement", "elaboration", "proposal", "proposition"),
         )
 
     @property
@@ -369,7 +498,11 @@ class LeanStatementProposalAdapter:
                 )
             )
         try:
-            elaboration = _elaborate_statement(validated.proposed_statement)
+            elaboration = (
+                _elaborate_statement(validated.proposed_statement)
+                if validated.operation == "PROPOSE"
+                else _elaborate_proposition(validated.proposed_statement)
+            )
         except _LeanUnavailableError as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
@@ -383,14 +516,30 @@ class LeanStatementProposalAdapter:
                 )
             ) from exc
         version, commit = _lean_version_info()
+        imports = elaboration.used_imports
+        options = elaboration.options
         artifact_payload = LeanStatementProposalArtifact(
+            operation=validated.operation,
             environment=validated.environment,
+            environment_digest=_environment_digest(
+                environment=validated.environment,
+                lean_version=version,
+                lean_commit=commit,
+                mathlib_commit=None,
+                imports=imports,
+                options=options,
+            ),
             informal_claim=validated.informal_claim,
             proposed_statement=validated.proposed_statement,
             elaborates=elaboration.elaborates,
+            elaborated_expression=elaboration.elaborated_expression,
             sorry_count=elaboration.sorry_count,
             goals=(),
             messages=elaboration.messages,
+            diagnostics=_diagnostics(elaboration.messages),
+            used_imports=imports,
+            used_declarations=elaboration.used_declarations,
+            options=options,
             lean_version=version,
             lean_commit=commit,
             source_locator=validated.source_locator,
@@ -400,7 +549,7 @@ class LeanStatementProposalAdapter:
             semantics_uri=self.resources.semantics_uri,
             payload=artifact_payload.model_dump(mode="json"),
             summary=(
-                "Lean statement proposal with type-check status "
+                "Lean statement operation with elaboration status "
                 f"(elaborates={elaboration.elaborates})"
             ),
         )
@@ -415,27 +564,33 @@ class LeanStatementProposalAdapter:
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=output.model_dump(mode="json"),
             scope=CapabilityScope(
-                description="one Lean statement elaborated with sorry as proof",
+                description=(
+                    "one Lean proposition directly elaborated against Prop"
+                    if validated.operation == "ELABORATE_PROPOSITION"
+                    else "one Lean statement elaborated with sorry as proof"
+                ),
                 parameters={
+                    "operation": validated.operation,
                     "environment": validated.environment.value,
                     "proposed_statement": validated.proposed_statement,
+                    "environment_digest": artifact_payload.environment_digest,
                 },
                 artifact_uri=artifact.artifact_uri,
             ),
             completeness=CapabilityCompleteness(
                 status=CapabilityCompletenessStatus.COMPLETE,
                 basis=(
-                    "the pinned Lean kernel elaborated the statement or "
-                    "reported elaboration errors"
+                    "the pinned Lean frontend elaborated the proposition or "
+                    "reported complete diagnostics for this bounded request"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(
-                    "Lean elaboration confirms the statement type-checks; "
-                    "this does not certify that the formal statement matches "
-                    "the informal claim"
+                    "Lean elaboration reports whether the expression is a "
+                    "well-typed proposition in the bound environment; it does "
+                    "not establish truth, theoremhood, or semantic intent"
                 ),
             ),
             artifact_uris=(artifact.artifact_uri,),
