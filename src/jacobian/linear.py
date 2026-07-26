@@ -12,6 +12,7 @@ from jacobian.artifacts import ArtifactService
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.linear import (
+    LinearRationalInconsistencyArtifact,
     LinearRationalResourceBudget,
     LinearRationalSolutionArtifact,
     LinearRationalSystem,
@@ -31,6 +32,7 @@ class LinearArtifactInstallation:
     semantics_uri: str
     system_schema_uri: str
     solution_schema_uri: str
+    inconsistency_schema_uri: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,8 +50,16 @@ class ResolvedLinearSolution:
     system: LinearRationalSystem
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedLinearInconsistency:
+    artifact: StoredArtifact
+    certificate: LinearRationalInconsistencyArtifact
+    system_artifact: StoredArtifact
+    system: LinearRationalSystem
+
+
 class LinearArtifactService:
-    """Materialize exact systems and unverified vectors with strict bindings."""
+    """Materialize exact systems and unverified evidence with strict bindings."""
 
     def __init__(
         self,
@@ -185,13 +195,85 @@ class LinearArtifactService:
             system=resolved_system.system,
         )
 
+    def put_inconsistency(
+        self,
+        *,
+        system_uri: str,
+        left_witness: Sequence[Any],
+        rhs_pairing: Any,
+        producer: CapabilityProviderRuntime,
+        resource_budget: LinearRationalResourceBudget | dict[str, Any],
+    ) -> ArtifactPutResult:
+        """Materialize one normalized inconsistency witness without checking it."""
+
+        resolved = self.resolve_system(system_uri)
+        certificate = LinearRationalInconsistencyArtifact(
+            system=resolved.binding,
+            left_witness=tuple(left_witness),
+            rhs_pairing=rhs_pairing,
+            producer=producer,
+            resource_budget=LinearRationalResourceBudget.model_validate(
+                resource_budget
+            ),
+        )
+        return self.artifacts.put(
+            schema_uri=self.installation.inconsistency_schema_uri,
+            semantics_uri=self.installation.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(resolved.artifact.artifact_uri,),
+            summary="unverified exact rational inconsistency certificate",
+        )
+
+    def resolve_inconsistency(
+        self,
+        certificate_uri: str,
+    ) -> ResolvedLinearInconsistency:
+        """Resolve a certificate whose payload and lineage bind one exact system."""
+
+        try:
+            artifact = self.store.get(certificate_uri)
+        except StoreError as exc:
+            raise LinearArtifactError(
+                "source is not an available rational inconsistency artifact"
+            ) from exc
+        if (
+            artifact.manifest.schema_uri != self.installation.inconsistency_schema_uri
+            or artifact.manifest.semantics_uri != self.installation.semantics_uri
+        ):
+            raise LinearArtifactError("source is not a rational inconsistency artifact")
+        try:
+            normalized = self.schemas.validate(
+                self.installation.inconsistency_schema_uri,
+                artifact.payload,
+            )
+            certificate = LinearRationalInconsistencyArtifact.model_validate(normalized)
+        except (SchemaRegistryError, ValueError, ValidationError) as exc:
+            raise LinearArtifactError(
+                "source is not a valid rational inconsistency artifact"
+            ) from exc
+        resolved_system = self.resolve_system(certificate.system.system_artifact_uri)
+        if certificate.system != resolved_system.binding:
+            raise LinearArtifactError(
+                "inconsistency binding does not match its exact rational system"
+            )
+        if resolved_system.artifact.artifact_uri not in artifact.manifest.parents:
+            raise LinearArtifactError(
+                "inconsistency certificate is missing its rational-system parent"
+            )
+        return ResolvedLinearInconsistency(
+            artifact=artifact,
+            certificate=certificate,
+            system_artifact=resolved_system.artifact,
+            system=resolved_system.system,
+        )
+
 
 def install_linear_artifacts(
     store: ArtifactStore,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> LinearArtifactService:
-    """Register exact rational system and candidate-vector contracts."""
+    """Register exact rational system and evidence-candidate contracts."""
 
     semantics_uri = store.register_descriptor(
         kind="semantics",
@@ -199,7 +281,13 @@ def install_linear_artifacts(
         version="1",
         definition={
             "domain": "finite linear systems over the rational field QQ",
-            "relation": "A candidate x supports the exact claim A x = b",
+            "relations": {
+                "solution": "a candidate x supports the exact claim A x = b",
+                "inconsistency": (
+                    "a left witness y with y^T A = 0 and y^T b = 1 supports "
+                    "that A x = b has no solution"
+                ),
+            },
             "variable_order": (
                 "coefficient columns and candidate entries follow the declared "
                 "ordered unique variable list"
@@ -207,6 +295,10 @@ def install_linear_artifacts(
             "candidate": (
                 "a total exact rational vector bound by payload and lineage to one "
                 "system; producing or storing it does not verify the relation"
+            ),
+            "inconsistency_certificate": (
+                "a normalized exact left witness bound by payload and lineage to "
+                "one system; producing or storing it does not verify the relation"
             ),
             "not_found": (
                 "failure to produce a candidate makes no consistency or "
@@ -230,6 +322,11 @@ def install_linear_artifacts(
             name="jacobian.linear-rational-solution",
             version="1",
             model=LinearRationalSolutionArtifact,
+        ),
+        inconsistency_schema_uri=schemas.register_model(
+            name="jacobian.linear-rational-inconsistency",
+            version="1",
+            model=LinearRationalInconsistencyArtifact,
         ),
     )
     return LinearArtifactService(store, schemas, artifacts, installation)

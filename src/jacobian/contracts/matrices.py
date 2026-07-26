@@ -118,6 +118,42 @@ class MatrixDeterminantOutput(ContractModel):
     backend_version: str
 
 
+class MatrixDeterminantVerificationRequest(ContractModel):
+    determinant_uri: ArtifactUri
+
+
+class MatrixDeterminantVerificationOutput(ContractModel):
+    """Projection of an independent exact determinant recomputation."""
+
+    status: Literal[
+        "VERIFIED_DETERMINANT",
+        "REJECTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    matrix_uri: ArtifactUri
+    determinant_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_projection(self) -> Self:
+        if self.status == "VERIFIED_DETERMINANT":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified determinant output requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError(
+                "non-verified determinant output cannot carry a conclusion or record"
+            )
+        return self
+
+
 class MatrixRankOutput(ContractModel):
     matrix_uri: ArtifactUri
     rank_uri: ArtifactUri

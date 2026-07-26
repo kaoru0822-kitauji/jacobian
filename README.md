@@ -114,7 +114,7 @@ availability can depend on local backends.
 | --- | --- |
 | Polynomial maps | Evaluate maps, compute Jacobians, search for collisions, independently verify collisions |
 | Polynomial algebra | Normalize typed expressions, factor univariate polynomials, verify identities, verify exact system solutions |
-| Exact linear algebra | Compute determinants, rank, kernels, and integer row Hermite normal forms; find and verify rational solutions to `Ax = b` |
+| Exact linear algebra | Compute determinants, rank, kernels, and integer row Hermite normal forms; find and independently verify rational solutions or inconsistency certificates for `Ax = b` |
 | Graphs | Construct and inspect graphs, enumerate paths, realize degree sequences, test isomorphism, search colorings |
 | SAT and SMT | Find models or proof artifacts; independently replay assignments, DRAT proofs, and Alethe proofs |
 | Universal algebra | Evaluate finite magma laws and search for countermodels |
@@ -160,7 +160,8 @@ agent-authored state; workspace entries remain `UNVERIFIED`.
 Specialized contracts cover
 [SAT artifacts](docs/reference/sat-artifacts.md),
 [SMT/Alethe artifacts](docs/reference/smt-artifacts.md),
-[exact rational solutions](docs/reference/linear-rational-solutions.md),
+[exact rational linear-system evidence](docs/reference/linear-rational-solutions.md),
+[exact rational matrix determinants](docs/reference/matrix-rational-determinant.md),
 [integer matrix HNF](docs/reference/matrix-hermite-normal-form.md), and
 [Lean declaration discovery](docs/reference/lean-declaration-discovery.md).
 Architecture decisions are recorded in the
@@ -183,8 +184,8 @@ Some capabilities use backends that are not installed by default:
 
 - CaDiCaL finds SAT models and UNSAT proof artifacts.
 - cvc5 produces SMT UNSAT proofs; Carcara independently checks Alethe.
-- The `flint` extra accelerates exact rational linear algebra and integer row
-  Hermite normal forms.
+- The `flint` extra produces exact rational solution and inconsistency
+  witnesses and integer row Hermite normal forms.
 - Pinned Lean `CORE` and `MATHLIB` environments check formal certificates.
 
 Backend availability is not verification authority. Provider output remains
