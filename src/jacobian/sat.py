@@ -35,6 +35,13 @@ class SatArtifactInstallation:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedSatCnf:
+    artifact: StoredArtifact
+    cnf: CanonicalCnf
+    binding: SatCnfBinding
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedSatAssignment:
     artifact: StoredArtifact
     assignment: SatAssignmentArtifact
@@ -75,8 +82,8 @@ class SatArtifactService:
             ),
         )
 
-    def bind_cnf(self, cnf_uri: str) -> SatCnfBinding:
-        """Resolve one canonical CNF and bind its exact stored identity."""
+    def resolve_cnf(self, cnf_uri: str) -> ResolvedSatCnf:
+        """Resolve one valid canonical CNF and its exact stored identity."""
 
         try:
             artifact = self.store.get(cnf_uri)
@@ -99,7 +106,7 @@ class SatArtifactService:
             raise SatArtifactError(
                 "source is not a valid canonical CNF artifact"
             ) from exc
-        return SatCnfBinding(
+        binding = SatCnfBinding(
             cnf_artifact_uri=artifact.artifact_uri,
             cnf_object_digest=artifact.manifest.object_digest,
             cnf_payload_digest=artifact.manifest.payload_digest,
@@ -110,6 +117,16 @@ class SatArtifactService:
             variable_count=len(cnf.variables),
             clause_count=len(cnf.clauses),
         )
+        return ResolvedSatCnf(
+            artifact=artifact,
+            cnf=cnf,
+            binding=binding,
+        )
+
+    def bind_cnf(self, cnf_uri: str) -> SatCnfBinding:
+        """Resolve one canonical CNF and bind its exact stored identity."""
+
+        return self.resolve_cnf(cnf_uri).binding
 
     def put_assignment(
         self,

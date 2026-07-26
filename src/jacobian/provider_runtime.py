@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 import importlib
 import importlib.metadata
+import os
+import shutil
 import sysconfig
 from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
 from typing import Any
 
+from jacobian.bounded_process import run_bounded_process
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
     CapabilityProviderAvailability,
@@ -18,6 +21,8 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.implementation import ImplementationError, package_source_digest
+
+CADICAL_VERSION = "3.0.1"
 
 
 class ProviderRuntimeError(RuntimeError):
@@ -244,6 +249,73 @@ def python_distribution_provider_runtime(
         configuration={
             "distribution": distribution_name,
             **dict(configuration or {}),
+        },
+    )
+
+
+def cadical_provider_runtime(
+    executable: str | Path = "cadical",
+) -> CapabilityProviderRuntime:
+    """Inspect the exact pinned CaDiCaL competition CLI runtime."""
+
+    resolved_name = shutil.which(os.fspath(executable))
+    if resolved_name is None:
+        return _unavailable_runtime(
+            provider="cadical",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="MIT",
+            diagnostic=(
+                f"The pinned CaDiCaL {CADICAL_VERSION} executable is unavailable."
+            ),
+        )
+    try:
+        resolved = Path(resolved_name).resolve(strict=True)
+        completed = run_bounded_process(
+            [str(resolved), "--version"],
+            input_bytes=b"",
+            timeout_seconds=5,
+            environment={
+                **os.environ,
+                "LANG": "C",
+                "LC_ALL": "C",
+                "TZ": "UTC",
+            },
+            stdout_limit=1024,
+            stderr_limit=4096,
+        )
+        version = completed.stdout.decode("ascii").strip()
+        if (
+            completed.timed_out
+            or completed.stdout_exceeded
+            or completed.stderr_exceeded
+            or completed.returncode != 0
+            or version != CADICAL_VERSION
+        ):
+            raise ProviderRuntimeError("CaDiCaL version probe did not match the pin")
+        digest = _sha256_file(resolved)
+    except (OSError, UnicodeDecodeError, ProviderRuntimeError):
+        return _unavailable_runtime(
+            provider="cadical",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="MIT",
+            diagnostic=(
+                f"The pinned CaDiCaL {CADICAL_VERSION} executable is unavailable."
+            ),
+        )
+    return CapabilityProviderRuntime(
+        provider="cadical",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version=CADICAL_VERSION,
+        digest=digest,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform=_platform_tag(),
+        install_tier=CapabilityInstallTier.T2,
+        license_id="MIT",
+        features=("competition-cli", "total-model", "drat-text-proof"),
+        configuration={
+            "executable": str(resolved),
+            "projection": "jacobian.dimacs.cnf/v1",
+            "proof_format": "drat-text/v1",
         },
     )
 

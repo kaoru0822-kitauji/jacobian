@@ -15,8 +15,11 @@ from jacobian.contracts.sat import (
     CanonicalCnf,
     SatAssignmentArtifact,
     SatCnfBinding,
+    SatExplorationRequest,
+    SatModelFindOutput,
     SatProofArtifact,
     SatResourceBudget,
+    SatUnsatProofFindOutput,
     canonicalize_cnf,
 )
 
@@ -230,3 +233,64 @@ def test_binding_and_budget_fields_are_required_and_fail_closed() -> None:
     assignment["resource_budget"] = {"wall_seconds": 0}
     with pytest.raises(ValidationError):
         SatAssignmentArtifact.model_validate(assignment)
+
+
+@pytest.mark.contract
+def test_exploration_request_exposes_only_enforced_budget_fields() -> None:
+    request = SatExplorationRequest.model_validate(
+        {
+            "cnf_uri": _ARTIFACT_A,
+            "resource_budget": {
+                "wall_seconds": 5,
+                "conflicts": 100,
+            },
+        }
+    )
+
+    assert request.resource_budget.artifact_budget() == SatResourceBudget(
+        wall_seconds=5,
+        conflicts=100,
+    )
+    with pytest.raises(ValidationError):
+        SatExplorationRequest.model_validate(
+            {
+                "cnf_uri": _ARTIFACT_A,
+                "resource_budget": {
+                    "wall_seconds": 5,
+                    "memory_bytes": 1024,
+                },
+            }
+        )
+
+
+@pytest.mark.contract
+def test_exploration_outputs_never_project_a_solver_status_as_a_conclusion() -> None:
+    model = SatModelFindOutput(
+        status="NO_ASSIGNMENT_PRODUCED",
+        solver_status="UNSATISFIABLE",
+        cnf_uri=_ARTIFACT_A,
+        detail="no assignment was produced",
+    )
+    proof = SatUnsatProofFindOutput(
+        status="NO_PROOF_PRODUCED",
+        solver_status="SATISFIABLE",
+        cnf_uri=_ARTIFACT_A,
+        detail="no proof was produced",
+    )
+
+    assert model.conclusion == "UNKNOWN"
+    assert proof.conclusion == "UNKNOWN"
+    with pytest.raises(ValidationError):
+        SatModelFindOutput(
+            status="ASSIGNMENT_PRODUCED",
+            solver_status="SATISFIABLE",
+            cnf_uri=_ARTIFACT_A,
+            detail="missing candidate URI",
+        )
+    with pytest.raises(ValidationError):
+        SatUnsatProofFindOutput(
+            status="PROOF_PRODUCED",
+            solver_status="UNSATISFIABLE",
+            cnf_uri=_ARTIFACT_A,
+            detail="missing proof URI",
+        )

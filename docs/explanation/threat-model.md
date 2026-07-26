@@ -175,6 +175,17 @@ Controls:
   full scope, producer runtime, and resource budget;
 - evidence artifacts retain the exact CNF as a parent;
 - assignment and raw proof storage remains unverified;
+- optional CaDiCaL exploration requires exact version 3.0.1, records the
+  executable digest, and rechecks that digest before and after every bounded
+  invocation;
+- model output must be a unique total in-range assignment under a consistent
+  competition status and exit code before materialization;
+- proof output uses explicit text DRAT mode, a bounded non-symlink regular
+  file, and exact raw-byte preservation; timeout, output overflow, malformed
+  protocol, runtime replacement, and unsafe proof output create no solver
+  evidence;
+- every CaDiCaL status remains an unverified producer report with mathematical
+  conclusion `UNKNOWN`;
 - `sat.model.verify` re-derives the assignment binding before dispatch, then a
   standard-library-only clean-process checker independently validates the
   canonical CNF, payload, variable-map and DIMACS digests, assignment,

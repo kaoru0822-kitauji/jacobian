@@ -141,8 +141,10 @@ evaluation and countermodel search, reference-domain exploration and
 verification, Lean checking, and local research-memory search.
 
 The base kernel also registers canonical CNF, total assignment, and raw DRAT
-proof artifact contracts. They do not add SAT capabilities or mathematical
-assurance; solver and independent-checker slices remain separate.
+proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
+`sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound
+model or text-DRAT evidence. Solver status and produced bytes remain
+unverified; assignment and proof checking are separate capability boundaries.
 
 Three direct operational tools—`workspace.open`, `workspace.write`, and
 `workspace.query`—provide durable, revisioned paper-like working state outside
