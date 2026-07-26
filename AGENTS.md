@@ -22,7 +22,7 @@ proof obligations remain visible. Results and artifacts report execution
 status, provenance, scope, completeness, exactness, assurance, completion,
 available certificates, and required checkers.
 
-Agents own multi-step strategy. Put workflows in agent strategies and skills.
+Agents own multi-step strategy.
 Workflow capabilities must expose intermediate artifacts and verification
 boundaries.
 
