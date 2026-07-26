@@ -834,6 +834,7 @@ class PolynomialCollisionSearchAdapter:
             )
         ]
         if found is not None:
+            assert first_evaluation_result is not None
             assert second_evaluation_result is not None
             assert claim_uri is not None
             assert witness_uri is not None
