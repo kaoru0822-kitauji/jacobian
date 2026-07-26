@@ -114,7 +114,7 @@ def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None
     assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
     assert result.output["left_uri"] != result.output["right_uri"]
 
-    semantics_uri = kernel.polynomial.polynomial_semantics_uri
+    semantics_uri = kernel.polynomial.identity_semantics_uri
     assert semantics_uri != kernel.polynomial.semantics_uri
     semantics = kernel.store.get(semantics_uri)
     assert semantics.payload["name"] == "jacobian.sparse-rational-polynomial-ring"
@@ -126,8 +126,24 @@ def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None
         record.payload["bindings"]["semantics_digest"]
         == semantics.manifest.object_digest
     )
+    assert record.payload["relationship_source_artifact_uris"] == [
+        result.output["left_uri"]
+    ]
+    assert record.payload["relationship_target_artifact_uris"] == [
+        result.output["right_uri"]
+    ]
+    assert record.payload["obligation_uri"] is None
     checker = kernel.checkers.get(result.output["checker_id"])
     assert checker.semantics_uris == (semantics_uri,)
+
+    rejected = kernel.verification.verify_certificate(
+        certificate_uri=result.output["certificate_uri"],
+        checker_id=result.output["checker_id"],
+        supporting_artifact_uris=(result.output["claim_uri"],),
+    )
+    assert rejected.input.status is InputStatus.REJECTED
+    assert rejected.conclusion is Conclusion.UNKNOWN
+    assert rejected.verification_record_uri is None
 
 
 @pytest.mark.integration

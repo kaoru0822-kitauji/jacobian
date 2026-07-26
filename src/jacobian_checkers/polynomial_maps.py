@@ -228,6 +228,7 @@ def check_identity(request: dict[str, Any]) -> dict[str, Any]:
         candidate = request["candidate"]
         scope = request["scope"]
         certificate = request["certificate"]["payload"]
+        supporting_artifacts = request.get("supporting_artifacts", [])
         if (
             not isinstance(claim, dict)
             or claim.get("claim_schema_version") != "1"
@@ -235,6 +236,7 @@ def check_identity(request: dict[str, Any]) -> dict[str, Any]:
             or claim.get("domain") != "QQ"
             or not isinstance(candidate, dict)
             or not isinstance(scope, dict)
+            or supporting_artifacts != []
             or claim.get("left_uri") != scope.get("artifact_uri")
             or claim.get("right_uri") != candidate.get("artifact_uri")
         ):
@@ -304,6 +306,18 @@ def check_identity(request: dict[str, Any]) -> dict[str, Any]:
                 else "polynomials differ in at least one exact coefficient"
             ),
             **({"relation_id": "polynomial.relation.identity"} if equal else {}),
+            **(
+                {
+                    "relationship_source_artifact_uris": [
+                        scope["artifact_uri"],
+                    ],
+                    "relationship_target_artifact_uris": [
+                        candidate["artifact_uri"],
+                    ],
+                }
+                if equal
+                else {}
+            ),
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return _reject("malformed polynomial identity request")

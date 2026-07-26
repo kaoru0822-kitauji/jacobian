@@ -209,6 +209,12 @@ def test_identity_checker_accepts_equal_exact_polynomials() -> None:
 
     assert decision["accepted"] is True
     assert decision["conclusion"] == "TRUE"
+    assert decision["relationship_source_artifact_uris"] == [
+        "artifact://sha256/" + "5" * 64
+    ]
+    assert decision["relationship_target_artifact_uris"] == [
+        "artifact://sha256/" + "6" * 64
+    ]
 
 
 def test_identity_checker_verifies_a_nonidentity_as_false() -> None:
@@ -223,6 +229,8 @@ def test_identity_checker_verifies_a_nonidentity_as_false() -> None:
     assert decision["accepted"] is True
     assert decision["conclusion"] == "FALSE"
     assert "relation_id" not in decision
+    assert "relationship_source_artifact_uris" not in decision
+    assert "relationship_target_artifact_uris" not in decision
 
 
 def test_identity_checker_rejects_candidate_substitution() -> None:
@@ -238,6 +246,24 @@ def test_identity_checker_rejects_candidate_substitution() -> None:
 def test_identity_checker_rejects_polynomial_ring_substitution() -> None:
     request = _identity_request()
     request["candidate"]["payload"]["variables"] = ["y", "x"]
+
+    decision = check_identity(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_identity_checker_rejects_unrelated_supporting_artifact() -> None:
+    request = _identity_request()
+    request["supporting_artifacts"] = [
+        {
+            "artifact_uri": "artifact://sha256/" + "9" * 64,
+            "object_digest": "sha256:" + "9" * 64,
+            "schema_uri": "artifact://sha256/" + "a" * 64,
+            "semantics_uri": "artifact://sha256/" + "b" * 64,
+            "payload": {},
+        }
+    ]
 
     decision = check_identity(request)
 

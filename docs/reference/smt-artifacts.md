@@ -2,11 +2,12 @@
 
 [Documentation home](../index.md)
 
-- Status: Experimental pre-stable producer contract
+- Status: Experimental pre-stable producer and verifier contracts
 - Optional operation: `smt.unsat_proof.find` when the exact cvc5 1.3.4
   Python distribution is installed
-- Verification operation: not yet installed; a compatible independent
-  Carcara adapter is the next portfolio checkpoint
+- Verification operation: `smt.unsat_proof.verify` for the pinned zero-hole
+  `QF_UF` compatibility profile when an operator-authorized Carcara runtime is
+  installed
 - Related plan:
   [Atomic capability portfolio](../contributing/atomic-capability-portfolio.md#wave-3-theory-bounded-smt-proof-slice)
 
@@ -130,18 +131,95 @@ and hole metadata at assurance level `COMPUTED`. `SATISFIABLE` or `UNKNOWN`
 returns `NO_PROOF_PRODUCED`; it does not produce a model, prove SAT, or imply
 anything from failure to find a proof.
 
-## Reproduction cases
+## Strict Carcara verification
+
+`smt.unsat_proof.verify` accepts one `proof_uri` in `VERIFY` mode. It resolves
+the exact proof and parent problem, re-derives the problem binding, and creates
+an `smt.unsat-proof@1` `CertificateEnvelope`. The certificate binds the
+problem claim, proof candidate, SMT semantics, exact artifact URIs, payload
+digests, and required lineage.
+
+The capability is installed only when bundled references are enabled and the
+operator authorizes an available Carcara runtime. The pinned checker is
+Carcara `1.1.0` at source commit
+`394edbb15ba95c47893f1d821fddde7e016af178`, the revision selected by cvc5
+1.3.4's
+[`get-carcara-checker`](https://github.com/cvc5/cvc5/blob/cvc5-1.3.4/contrib/get-carcara-checker)
+helper. Build that exact revision and place the executable on `PATH`. The
+pinned source requires Cargo 1.87 or newer.
+
+```sh
+cargo install \
+  --git https://github.com/ufmg-smite/carcara.git \
+  --rev 394edbb15ba95c47893f1d821fddde7e016af178 \
+  --locked carcara-cli
+```
+
+Add a sibling `carcara.jacobian-runtime.json` file containing exactly:
+
+```json
+{
+  "runtime_manifest_version": "1",
+  "provider": "carcara",
+  "version": "1.1.0",
+  "source_repository": "https://github.com/ufmg-smite/carcara",
+  "source_commit": "394edbb15ba95c47893f1d821fddde7e016af178",
+  "compatible_cvc5_version": "1.3.4",
+  "executable_sha256": "sha256:<64 lowercase hexadecimal digits>"
+}
+```
+
+The sidecar is an operator assertion about the installed build, not upstream
+attestation. Jacobian checks the exact version output, required command-line
+surface, executable digest, and provenance before authorization. The registry
+rehashes the executable when the checker is selected; the clean worker checks
+it before and after replay and binds it into the verification environment
+digest.
+
+The checker module uses only the Python standard library and does not import
+the SMT producer contracts or cvc5. It independently validates the closed
+problem, proof, certificate, evidence bindings, payload digests, producer
+identity, and lineage. Version 1 admits only:
+
+- logic `QF_UF`;
+- profile `jacobian.smtlib2.qf-unsat/v1`;
+- cvc5 `1.3.4` Alethe format `cvc5.alethe/1.3.4`; and
+- proof bytes whose bound metadata and lexical hole count both report zero.
+
+The external command is fixed to:
+
+```text
+carcara check --strict-parsing --parse-hole-args \
+  --allow-int-real-subtyping --expand-let-bindings PROOF PROBLEM
+```
+
+The checker never passes `--ignore-unknown-rules` or `--allowed-rules`;
+Carcara documents both paths as treating unsupported rules as holes.
+Acceptance requires exit zero, exact stdout `valid` plus one LF, empty stderr,
+bounded output and time, and an unchanged runtime digest. In particular,
+`holey` is rejected even though Carcara returns exit zero for that status.
+
+Acceptance creates the ordinary kernel `VerificationRecord` and permits
+`VERIFIED_UNSAT` with conclusion `TRUE`. Rejection reports `UNKNOWN`; it does
+not establish satisfiability. Carcara is an independently implemented
+proof checker, not a formally verified checker, so this profile narrows the
+trusted implementation boundary without eliminating it.
+
+## Compatibility matrix and reproduction cases
 
 The pinned public spike exercises three small cases:
 
-| Logic | Query shape | Observed producer behavior |
-| --- | --- | --- |
-| `QF_UF` | `a = b` and `not (a = b)` | Alethe produced with zero lexical holes |
-| `QF_LIA` | integer `x >= 1` and `x <= 0` | Alethe produced with at least one explicit hole |
-| `QF_LRA` | real `x > 1` and `x < 0` | Alethe produced with explicit holes |
+| Logic | Query shape | cvc5 1.3.4 proof | Strict Carcara result | Jacobian assurance |
+| --- | --- | --- | --- | --- |
+| `QF_UF` | `a = b` and `not (a = b)` | zero holes | `valid` | `VERIFIED` |
+| `QF_LIA` | integer `x >= 1` and `x <= 0` | one hole | `holey` | `COMPUTED`, `UNKNOWN` |
+| `QF_LRA` | real `x > 1` and `x < 0` | multiple holes | `holey` | `COMPUTED`, `UNKNOWN` |
 
 These observations are version-bound regression cases, not a compatibility
-claim for all inputs in a logic. cvc5's own
+claim for all `QF_UF` inputs. The checker contract intentionally excludes
+`QF_LIA` and `QF_LRA` even if a future producer happens to emit a zero-hole
+proof; expanding the intersection requires new compatibility and mutation
+evidence. cvc5's own
 [Alethe output documentation](https://cvc5.github.io/docs/latest/proofs/output_alethe.html)
 also shows that proof output may contain untranslated rewrites represented as
 holes.
@@ -161,8 +239,7 @@ Operational failure returns `ERROR` or `TIMEOUT`, heuristic assurance, and no
 mathematical conclusion. The already materialized exact problem may remain as
 the operation's sole artifact.
 
-The next slice will pin a separately installed compatible
-[Carcara](https://github.com/ufmg-smite/carcara) revision, define its supported
-rule and theory intersection, replay adversarial mutations, and expose
-`smt.unsat_proof.verify` only through operator-authorized checker identity.
-Until then there is no SMT path to `VERIFIED`.
+The verifier additionally rejects holes, unsupported logics, unknown-rule
+mutations, cross-problem replay, malformed or extra checker output, warnings,
+runtime replacement, timeout, cancellation, and crash. None of these failures
+is converted into SAT or UNSAT.
