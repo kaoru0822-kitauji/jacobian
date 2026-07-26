@@ -151,11 +151,15 @@ When the operator enables bundled references, the catalog also includes:
 
 | Capability ID | Outcome |
 | --- | --- |
+| `lean.declaration.search` | Search public declarations by a bounded name and/or elaborated-type constant pattern; retrieval remains computed evidence. |
+| `lean.declaration.inspect` | Resolve one exact declaration with type, kind, docs, source metadata, and pinned environment digest. |
 | `lean.check` | Check a Lean proof in an operator-pinned environment and return its replay evidence. |
 
 Operator-installed adapters appear in the same catalog. Agents should call
 `capability.describe` before invoking an unfamiliar capability instead of
-guessing payload fields.
+guessing payload fields. The
+[Lean declaration discovery contract](lean-declaration-discovery.md) defines
+its matching, coverage, environment identity, and assurance semantics.
 
 ## Mathematical operation portfolio
 

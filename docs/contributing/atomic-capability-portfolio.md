@@ -289,6 +289,23 @@ improve task completion or provenance enough to justify their catalog and token
 cost; otherwise improve `lean.check` examples or use an agent-side retrieval
 skill.
 
+The contract spike implemented on 2026-07-26 chose an exact-constant type
+pattern over pretty-printed type text. All named constants must occur in Lean's
+elaborated type expression. This keeps the query structural and makes a full
+no-match Mathlib scan practical without a custom index. On the development
+host with warm filesystem caches, direct helper measurements were:
+
+- 11.1 seconds for a one-result Mathlib name search;
+- 29.8 seconds to exhaust 626,944 public declarations for a no-match type
+  pattern; and
+- 69.0 seconds for the tested public search, inspect, and independent
+  `lean.check` composition.
+
+The first two operations return `COMPUTED` retrieval evidence and bind the
+exact pinned environment-manifest digest. The last operation alone returned
+`VERIFIED`. These measurements establish a workable spike, not portfolio lift;
+the held-out paired evaluation remains the next separate queue item.
+
 ## Wave 2: SAT certificate vertical slice
 
 Use four outcomes rather than one ambiguous solver call:

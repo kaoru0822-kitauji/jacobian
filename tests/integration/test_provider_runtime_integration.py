@@ -108,9 +108,14 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
     kernel = JacobianKernel(tmp_path, install_references=True)
 
     assert kernel.lean is None
-    assert "lean.check" not in {
+    capability_ids = {
         item.capability_id for item in kernel.capabilities.catalog().capabilities
     }
+    assert {
+        "lean.check",
+        "lean.declaration.inspect",
+        "lean.declaration.search",
+    }.isdisjoint(capability_ids)
 
 
 def test_invocation_binds_descriptor_runtime_to_result_provenance(

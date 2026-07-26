@@ -9,6 +9,11 @@ from pathlib import Path
 import pytest
 
 from jacobian.adapters.mcp.server import create_server
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityMode,
+    CapabilityRequest,
+)
 from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.results import (
@@ -46,12 +51,44 @@ pytestmark = [
     not MATHLIB_OLEAN.is_file(),
     reason="the pinned mathlib runtime has not been built",
 )
-def test_mathlib_sqrt_two_proof_creates_bound_verification_record(
+@pytest.mark.timeout(240)
+def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
     tmp_path: Path,
 ) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     assert kernel.lean is not None
+    assert kernel.lean_declarations is not None
     assert kernel.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds == 105
+
+    searched = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.declaration.search",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "environment": "MATHLIB",
+                "name_contains": "irrational_sqrt_two",
+                "result_limit": 1,
+            },
+        )
+    )
+    inspected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.declaration.inspect",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "environment": "MATHLIB",
+                "declaration_name": "irrational_sqrt_two",
+            },
+        )
+    )
+
+    assert searched.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert searched.assurance.verification_record_uri is None
+    assert searched.output["declarations"][0]["name"] == "irrational_sqrt_two"
+    assert inspected.output["declaration"]["type"] == "Irrational √2"
+    assert (
+        inspected.output["environment_digest"] == searched.output["environment_digest"]
+    )
 
     verified = kernel.lean.verify(
         environment=LeanEnvironment.MATHLIB,
@@ -78,6 +115,31 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
 ) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     assert kernel.lean is not None
+
+    inspected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.declaration.inspect",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "environment": "CORE",
+                "declaration_name": "Nat.add",
+            },
+        )
+    )
+    outside_profile = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.declaration.search",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "environment": "CORE",
+                "name_contains": "Lean.Meta.ppExpr",
+            },
+        )
+    )
+
+    assert inspected.output["declaration"]["type"] == "Nat → Nat → Nat"
+    assert outside_profile.output["declarations"] == []
+    assert outside_profile.output["stop_reason"] == "EXHAUSTED"
 
     verified = kernel.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
