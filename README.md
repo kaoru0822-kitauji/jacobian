@@ -71,15 +71,26 @@ start the MCP adapter.
 
 ## How verification works
 
+Jacobian separates finding evidence from deciding what that evidence proves.
+Suppose an agent is testing the claim **“`F` is injective.”**
+
 <p align="center">
-  <img src="docs/assets/verification-flow.jpg" width="100%" alt="An archival-style chalkboard traces a proposed polynomial collision through an exact witness and independent check to a verified result, with failures remaining unknown.">
+  <img src="docs/assets/verification-flow.jpg" width="100%" alt="The claim that F is injective leads to a candidate collision, an exact independent check, and a verification record. Missing witnesses, timeouts, cancellation, and errors remain unknown.">
 </p>
 
-Search and evaluation are allowed to be incomplete or wrong. They produce
-candidates and inspectable evidence. Verification begins only when an
-independent checker replays that evidence against the precise claim.
+**Claim → candidate witness → independent check → verification record**
 
-The first tutorial follows the complete transition:
+| Stage | Output | What it establishes |
+| --- | --- | --- |
+| Claim | `F` is injective | The statement to investigate; not yet trusted |
+| Search | A candidate witness `(F, p, q)` | Inspectable evidence, not a conclusion |
+| Independent check | Confirm `p ≠ q` and `F(p) − F(q) = 0` exactly | The candidate is a genuine collision |
+| Record | Bind the checked collision to the original claim and checker identity | The injectivity claim is `FALSE · VERIFIED` |
+
+> **No witness is not proof.** A failed search, timeout, cancellation, or error
+> leaves the claim `UNKNOWN`.
+
+In the introductory tutorial, the same boundary appears as:
 
 ```text
 evaluate.batch   →  FALSE  · HEURISTIC
@@ -87,8 +98,8 @@ witness.find     →  exact witness artifact
 witness.verify   →  FALSE  · VERIFIED
 ```
 
-That gap between `FALSE · HEURISTIC` and `FALSE · VERIFIED` is the point of
-Jacobian. Follow
+`FALSE · HEURISTIC` is an evaluation. `FALSE · VERIFIED` is a conclusion
+backed by independently checked evidence. Follow
 [Find and verify a counterexample](docs/tutorials/first-verified-result.md)
 for a runnable example.
 
