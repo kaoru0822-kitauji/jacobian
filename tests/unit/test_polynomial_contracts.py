@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from jacobian.contracts.polynomials import (
     PolynomialCollisionOutput,
     PolynomialCollisionPayload,
+    PolynomialCollisionRequest,
     PolynomialEvaluationRequest,
     PolynomialJacobianRequest,
     PolynomialMapEvaluation,
@@ -69,8 +70,21 @@ def test_collision_payload_enforces_all_dimensions() -> None:
         )
 
 
+def test_collision_request_requires_two_distinct_evaluation_artifacts() -> None:
+    artifact_uri = "artifact://sha256/" + "a" * 64
+
+    with pytest.raises(ValidationError, match="distinct evaluation artifacts"):
+        PolynomialCollisionRequest.model_validate(
+            {
+                "first_evaluation_uri": artifact_uri,
+                "second_evaluation_uri": artifact_uri,
+            }
+        )
+
+
 def test_collision_output_enforces_distinct_points_and_equal_images() -> None:
     artifact_uri = "artifact://sha256/" + "a" * 64
+    second_artifact_uri = "artifact://sha256/" + "c" * 64
     checker_id = "checker://sha256/" + "b" * 64
 
     with pytest.raises(ValidationError, match="collision status"):
@@ -79,16 +93,15 @@ def test_collision_output_enforces_distinct_points_and_equal_images() -> None:
                 "claim_uri": artifact_uri,
                 "candidate_uri": artifact_uri,
                 "first_evaluation_uri": artifact_uri,
-                "second_evaluation_uri": artifact_uri,
+                "second_evaluation_uri": second_artifact_uri,
                 "first_point": [_rational(0)],
                 "second_point": [_rational(0)],
                 "first_image": [_rational(1)],
                 "second_image": [_rational(1)],
-                "is_collision": True,
+                "candidate_collision": True,
                 "witness_uri": artifact_uri,
                 "checker_id": checker_id,
                 "certificate_available": True,
-                "backend_version": "1.14.0",
             }
         )
 

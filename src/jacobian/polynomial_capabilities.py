@@ -56,7 +56,7 @@ from jacobian.contracts.polynomials import (
 from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 
 
 @dataclass(frozen=True, slots=True)
@@ -431,7 +431,7 @@ class PolynomialJacobianAdapter:
 
 
 class PolynomialCollisionAdapter:
-    """Materialize exact collision evidence without certifying injectivity."""
+    """Compare exact evaluation artifacts and materialize collision evidence."""
 
     def __init__(self, resources: PolynomialResources) -> None:
         self.resources = resources
@@ -440,14 +440,15 @@ class PolynomialCollisionAdapter:
             version="1",
             title="Construct a polynomial-map collision witness",
             description=(
-                "Evaluate two exact rational points and materialize a bound collision "
-                "witness when their images agree and the points are distinct."
+                "Compare the declared canonical rational values in two structurally "
+                "compatible point-evaluation artifacts for the same polynomial map "
+                "and materialize an unverified candidate collision witness."
             ),
-            provider="jacobian.sympy",
+            provider="jacobian.artifact-comparison",
             modes=(CapabilityMode.EXPLORE,),
             input_schema=PolynomialCollisionRequest.model_json_schema(),
             output_schema=PolynomialCollisionOutput.model_json_schema(),
-            tags=("polynomial", "map", "collision", "witness"),
+            tags=("polynomial", "map", "collision", "witness", "artifact-composition"),
         )
 
     @property
@@ -462,24 +463,41 @@ class PolynomialCollisionAdapter:
             operation="collision construction",
         )
         started = time.monotonic()
-        polynomial_map = validated.map
-        polynomial_map, candidate_uri = _materialize_map(self.resources, polynomial_map)
-        first_point = RationalPolynomialPoint(values=validated.first_point)
-        second_point = RationalPolynomialPoint(values=validated.second_point)
-        first_image = _evaluate(polynomial_map, first_point)
-        second_image = _evaluate(polynomial_map, second_point)
-        _, first_evaluation_uri = _materialize_evaluation(
+        first_evaluation, first_evaluation_artifact = _load_evaluation(
             self.resources,
-            map_uri=candidate_uri,
-            point=first_point,
-            image=first_image,
+            validated.first_evaluation_uri,
+            path="first_evaluation_uri",
         )
-        _, second_evaluation_uri = _materialize_evaluation(
+        second_evaluation, second_evaluation_artifact = _load_evaluation(
             self.resources,
-            map_uri=candidate_uri,
-            point=second_point,
-            image=second_image,
+            validated.second_evaluation_uri,
+            path="second_evaluation_uri",
         )
+        if first_evaluation.map_uri != second_evaluation.map_uri:
+            raise _polynomial_error(
+                "POLYNOMIAL_EVALUATION_MAP_MISMATCH",
+                "collision_validation",
+                "Collision evaluation artifacts must reference the same polynomial map.",
+            )
+        candidate_uri = first_evaluation.map_uri
+        polynomial_map, candidate = _load_polynomial_map(
+            self.resources,
+            candidate_uri,
+        )
+        dimension = len(polynomial_map.variables)
+        if any(
+            len(evaluation.point.values) != dimension
+            for evaluation in (first_evaluation, second_evaluation)
+        ):
+            raise _polynomial_error(
+                "POLYNOMIAL_EVALUATION_DIMENSION_MISMATCH",
+                "collision_validation",
+                "Collision evaluation dimensions must match the polynomial map.",
+            )
+        first_point = first_evaluation.point
+        second_point = second_evaluation.point
+        first_image = first_evaluation.image
+        second_image = second_evaluation.image
         claim = PolynomialInjectivityClaim(map_uri=candidate_uri)
         claim_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.installation.claim_schema_uri,
@@ -488,15 +506,16 @@ class PolynomialCollisionAdapter:
             parents=(candidate_uri,),
             summary="rational polynomial-map injectivity claim",
         )
-        is_collision = (
+        candidate_collision = (
             first_point.values != second_point.values and first_image == second_image
         )
         witness_uri = None
-        if is_collision:
+        if candidate_collision:
+            # Evaluation payloads are candidate evidence. The independent checker,
+            # not this comparison adapter, replays the map at both points.
             semantics = self.resources.store.get(
                 self.resources.installation.semantics_uri
             )
-            candidate = self.resources.store.get(candidate_uri)
             witness = WitnessEnvelope(
                 witness_format="polynomial.map_collision",
                 format_version="1",
@@ -516,7 +535,12 @@ class PolynomialCollisionAdapter:
                 schema_uri=self.resources.installation.witness_schema_uri,
                 semantics_uri=self.resources.installation.semantics_uri,
                 payload=witness.model_dump(mode="json"),
-                parents=(claim_artifact.artifact_uri, candidate_uri),
+                parents=(
+                    claim_artifact.artifact_uri,
+                    candidate_uri,
+                    first_evaluation_artifact.artifact_uri,
+                    second_evaluation_artifact.artifact_uri,
+                ),
                 summary="unverified rational polynomial-map collision witness",
             )
             witness_uri = witness_artifact.artifact_uri
@@ -524,52 +548,74 @@ class PolynomialCollisionAdapter:
         output = PolynomialCollisionOutput(
             claim_uri=claim_artifact.artifact_uri,
             candidate_uri=candidate_uri,
-            first_evaluation_uri=first_evaluation_uri,
-            second_evaluation_uri=second_evaluation_uri,
+            first_evaluation_uri=first_evaluation_artifact.artifact_uri,
+            second_evaluation_uri=second_evaluation_artifact.artifact_uri,
             first_point=first_point.values,
             second_point=second_point.values,
             first_image=first_image,
             second_image=second_image,
-            is_collision=is_collision,
+            candidate_collision=candidate_collision,
             witness_uri=witness_uri,
             checker_id=checker_id,
             certificate_available=witness_uri is not None and checker_id is not None,
-            backend_version=sympy.__version__,
         )
         artifact_uris = [
             candidate_uri,
             claim_artifact.artifact_uri,
-            first_evaluation_uri,
-            second_evaluation_uri,
+            first_evaluation_artifact.artifact_uri,
+            second_evaluation_artifact.artifact_uri,
         ]
         if witness_uri is not None:
             artifact_uris.append(witness_uri)
+        relationships = [
+            CapabilityRelationship(
+                relation_id="polynomial.relation.evaluation-of",
+                source_artifact_uris=(candidate_uri,),
+                target_artifact_uris=(
+                    first_evaluation_artifact.artifact_uri,
+                    second_evaluation_artifact.artifact_uri,
+                ),
+            )
+        ]
+        if witness_uri is not None:
+            relationships.append(
+                CapabilityRelationship(
+                    relation_id="polynomial.relation.collision-derived-from",
+                    source_artifact_uris=(
+                        first_evaluation_artifact.artifact_uri,
+                        second_evaluation_artifact.artifact_uri,
+                    ),
+                    target_artifact_uris=(witness_uri,),
+                )
+            )
         return _computed_result(
             descriptor=self.descriptor,
             request=request,
             started=started,
             output=output.model_dump(mode="json"),
             scope=CapabilityScope(
-                description="two exact point evaluations for one polynomial map",
+                description=(
+                    "exact comparison of two point-evaluation artifacts for one "
+                    "polynomial map"
+                ),
                 parameters={
                     "candidate_uri": candidate_uri,
-                    "first_point": first_point.model_dump(mode="json")["values"],
-                    "second_point": second_point.model_dump(mode="json")["values"],
+                    "first_evaluation_uri": first_evaluation_artifact.artifact_uri,
+                    "second_evaluation_uri": second_evaluation_artifact.artifact_uri,
                 },
                 artifact_uri=candidate_uri,
             ),
-            relationships=(
-                CapabilityRelationship(
-                    relation_id="polynomial.relation.evaluation-of",
-                    source_artifact_uris=(candidate_uri,),
-                    target_artifact_uris=(
-                        first_evaluation_uri,
-                        second_evaluation_uri,
-                    ),
-                ),
-            ),
+            relationships=tuple(relationships),
             artifact_uris=tuple(artifact_uris),
-            completeness_basis="both requested points were evaluated exactly",
+            completeness_basis=(
+                "both supplied evaluation artifact payloads were structurally "
+                "validated and their declared values were compared exactly"
+            ),
+            assurance_basis=(
+                "deterministic structural comparison of canonical rational payloads; "
+                "the source evaluations were not replayed and any candidate witness "
+                "remains unverified"
+            ),
         )
 
 
@@ -584,6 +630,115 @@ def _materialize_map(
         summary="exact sparse rational polynomial map",
     )
     return polynomial_map, artifact.artifact_uri
+
+
+def _load_evaluation(
+    resources: PolynomialResources,
+    evaluation_uri: str,
+    *,
+    path: str,
+) -> tuple[PolynomialMapEvaluation, StoredArtifact]:
+    try:
+        artifact = resources.store.get(evaluation_uri)
+    except StoreError as exc:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="POLYNOMIAL_EVALUATION_ARTIFACT_NOT_FOUND",
+                stage="evaluation_resolution",
+                message="The requested polynomial evaluation artifact is unavailable.",
+                path=path,
+                schema_uri=resources.installation.evaluation_schema_uri,
+                hint="Use an evaluation URI returned by polynomial.map.evaluate.",
+            )
+        ) from exc
+    if (
+        artifact.manifest.schema_uri != resources.installation.evaluation_schema_uri
+        or artifact.manifest.semantics_uri != resources.installation.semantics_uri
+        or not isinstance(artifact.payload, dict)
+    ):
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="INCOMPATIBLE_POLYNOMIAL_EVALUATION_ARTIFACT",
+                stage="evaluation_validation",
+                message="The artifact is not a compatible polynomial-map evaluation.",
+                path=path,
+                schema_uri=resources.installation.evaluation_schema_uri,
+                hint="Use an evaluation URI returned by polynomial.map.evaluate.",
+            )
+        )
+    try:
+        evaluation = PolynomialMapEvaluation.model_validate(artifact.payload)
+    except ValidationError as exc:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="INCOMPATIBLE_POLYNOMIAL_EVALUATION_ARTIFACT",
+                stage="evaluation_validation",
+                message="The polynomial-map evaluation artifact payload is malformed.",
+                path=path,
+                schema_uri=resources.installation.evaluation_schema_uri,
+                hint="Recreate the artifact through polynomial.map.evaluate.",
+            )
+        ) from exc
+    if evaluation.map_uri not in artifact.manifest.parents:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="MISBOUND_POLYNOMIAL_EVALUATION_ARTIFACT",
+                stage="evaluation_validation",
+                message="The evaluation artifact is not bound to its declared map.",
+                path=path,
+                schema_uri=resources.installation.evaluation_schema_uri,
+                hint="Recreate the artifact through polynomial.map.evaluate.",
+            )
+        )
+    return evaluation, artifact
+
+
+def _load_polynomial_map(
+    resources: PolynomialResources,
+    map_uri: str,
+) -> tuple[RationalPolynomialMap, StoredArtifact]:
+    try:
+        artifact = resources.store.get(map_uri)
+    except StoreError as exc:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="POLYNOMIAL_MAP_ARTIFACT_NOT_FOUND",
+                stage="map_resolution",
+                message="The polynomial map referenced by an evaluation is unavailable.",
+                path="evaluation.map_uri",
+                schema_uri=resources.installation.map_schema_uri,
+                hint="Recreate the evaluations through polynomial.map.evaluate.",
+            )
+        ) from exc
+    if (
+        artifact.manifest.schema_uri != resources.installation.map_schema_uri
+        or artifact.manifest.semantics_uri != resources.installation.semantics_uri
+        or not isinstance(artifact.payload, dict)
+    ):
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="INCOMPATIBLE_POLYNOMIAL_MAP_ARTIFACT",
+                stage="map_validation",
+                message="An evaluation references an incompatible polynomial map.",
+                path="evaluation.map_uri",
+                schema_uri=resources.installation.map_schema_uri,
+                hint="Recreate the evaluations through polynomial.map.evaluate.",
+            )
+        )
+    try:
+        polynomial_map = RationalPolynomialMap.model_validate(artifact.payload)
+    except ValidationError as exc:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="INCOMPATIBLE_POLYNOMIAL_MAP_ARTIFACT",
+                stage="map_validation",
+                message="The referenced polynomial map artifact payload is malformed.",
+                path="evaluation.map_uri",
+                schema_uri=resources.installation.map_schema_uri,
+                hint="Recreate the evaluations through polynomial.map.evaluate.",
+            )
+        ) from exc
+    return polynomial_map, artifact
 
 
 def _validate_request[RequestModel: ContractModel](
@@ -708,6 +863,10 @@ def _computed_result(
     relationships: tuple[CapabilityRelationship, ...],
     artifact_uris: tuple[str, ...],
     completeness_basis: str,
+    assurance_basis: str = (
+        "deterministic exact SymPy arithmetic over QQ; the computation did not "
+        "authorize or invoke an independent checker"
+    ),
 ) -> CapabilityResult:
     return CapabilityResult(
         capability_id=descriptor.capability_id,
@@ -730,10 +889,7 @@ def _computed_result(
         relationships=relationships,
         assurance=CapabilityAssurance(
             level=CapabilityAssuranceLevel.COMPUTED,
-            basis=(
-                "deterministic exact SymPy arithmetic over QQ; the computation did "
-                "not authorize or invoke an independent checker"
-            ),
+            basis=assurance_basis,
         ),
         artifact_uris=artifact_uris,
     )

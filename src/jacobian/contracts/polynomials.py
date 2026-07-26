@@ -133,15 +133,15 @@ class PolynomialJacobianRequest(ContractModel):
 
 
 class PolynomialCollisionRequest(ContractModel):
-    map: RationalPolynomialMap
-    first_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
-    second_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    first_evaluation_uri: ArtifactUri
+    second_evaluation_uri: ArtifactUri
 
     @model_validator(mode="after")
-    def require_point_dimensions(self) -> Self:
-        dimension = len(self.map.variables)
-        if len(self.first_point) != dimension or len(self.second_point) != dimension:
-            raise ValueError("collision point dimensions must match the polynomial map")
+    def require_distinct_evaluation_artifacts(self) -> Self:
+        if self.first_evaluation_uri == self.second_evaluation_uri:
+            raise ValueError(
+                "collision comparison requires distinct evaluation artifacts"
+            )
         return self
 
 
@@ -280,18 +280,21 @@ class PolynomialCollisionOutput(ContractModel):
     second_point: tuple[CanonicalRational, ...]
     first_image: tuple[CanonicalRational, ...]
     second_image: tuple[CanonicalRational, ...]
-    is_collision: bool
+    candidate_collision: bool
     witness_uri: ArtifactUri | None = None
     checker_id: CheckerUri | None = None
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
     verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
     certificate_available: bool
-    backend: Literal["sympy"] = "sympy"
-    backend_version: str
+    comparison_method: Literal["EXACT_EVALUATION_ARTIFACT_COMPARISON"] = (
+        "EXACT_EVALUATION_ARTIFACT_COMPARISON"
+    )
 
     @model_validator(mode="after")
     def witness_matches_collision(self) -> Self:
+        if self.first_evaluation_uri == self.second_evaluation_uri:
+            raise ValueError("collision output requires distinct evaluation artifacts")
         if not (
             len(self.first_point)
             == len(self.second_point)
@@ -303,12 +306,12 @@ class PolynomialCollisionOutput(ContractModel):
             self.first_point != self.second_point
             and self.first_image == self.second_image
         )
-        if self.is_collision != expected_collision:
+        if self.candidate_collision != expected_collision:
             raise ValueError(
-                "collision status must match distinct points with equal images"
+                "candidate collision status must match distinct points with equal images"
             )
-        if self.is_collision != (self.witness_uri is not None):
-            raise ValueError("only exact collisions may carry a witness")
+        if self.candidate_collision != (self.witness_uri is not None):
+            raise ValueError("only candidate collisions may carry a witness")
         if self.certificate_available != (
             self.witness_uri is not None and self.checker_id is not None
         ):
