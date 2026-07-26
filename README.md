@@ -115,6 +115,9 @@ Release contracts and engineering evidence are:
 - [Tool surface](docs/reference/tools.md)
 - [Provider runtime contract](docs/reference/provider-runtime.md) for
   availability, exact backend identity, install tiers, and local measurement.
+- [SAT artifact contracts](docs/reference/sat-artifacts.md) for canonical CNF,
+  total assignment, and raw proof identity before solver or checker
+  installation.
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
 - [Testing strategy](docs/reference/testing-strategy.md),
@@ -137,6 +140,10 @@ adapter registry and trust-labeled artifacts. Bundled capabilities cover graph
 construction and properties, exact rational polynomial maps, finite magma law
 evaluation and countermodel search, reference-domain exploration and
 verification, Lean checking, and local research-memory search.
+
+The base kernel also registers canonical CNF, total assignment, and raw DRAT
+proof artifact contracts. They do not add SAT capabilities or mathematical
+assurance; solver and independent-checker slices remain separate.
 
 Three direct operational tools—`workspace.open`, `workspace.write`, and
 `workspace.query`—provide durable, revisioned paper-like working state outside
