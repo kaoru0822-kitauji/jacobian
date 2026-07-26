@@ -3,14 +3,16 @@
 [Documentation home](../index.md)
 
 - Status: Experimental pre-stable contract
-- Installed operations: none
+- Installed operations: `sat.model.verify` when the operator installs the
+  bundled reference checkers
 - Related plan:
   [Atomic capability portfolio](../contributing/atomic-capability-portfolio.md#wave-2-sat-certificate-vertical-slice)
 
 Jacobian installs canonical CNF, total assignment, and raw DRAT proof artifact
-contracts before installing any SAT solver or checker. These artifacts are
-typed inputs and unverified evidence. Storing an assignment does not establish
-SAT, and storing proof bytes does not establish UNSAT.
+contracts without installing a SAT solver. These artifacts begin as typed,
+unverified evidence. Storing an assignment does not establish SAT, and storing
+proof bytes does not establish UNSAT. An operator may separately authorize the
+bundled assignment checker and expose `sat.model.verify`.
 
 ## Registered descriptors
 
@@ -23,9 +25,11 @@ registered by the current kernel:
 | Schema | `jacobian.canonical-cnf@1` | Canonical named-variable CNF and DIMACS binding |
 | Schema | `jacobian.sat-assignment@1` | Total assignment candidate bound to one CNF |
 | Schema | `jacobian.sat-proof@1` | Preserved raw DRAT bytes bound to one CNF |
+| Schema | `jacobian.witness-envelope@1` | Exact assignment replay evidence |
 
-The schema URIs are content addressed. They are not capability IDs and do not
-add tools to `capability://catalog`.
+The schema URIs are content addressed. They are not capability IDs. The
+assignment verification capability appears in `capability://catalog` only
+when its checker is operator authorized.
 
 The SAT schemas are model backed. JSON Schema checks their closed structural
 shape, and the same registry validation path also applies the domain
@@ -98,8 +102,34 @@ records:
   memory and conflict bounds.
 
 The assignment schema has no conclusion, verification status, checker ID, or
-certificate claim. A later `sat.model.verify` capability must load the bound
-CNF and independently evaluate every clause.
+certificate claim.
+
+## Assignment verification
+
+`sat.model.verify` accepts one `assignment_uri` in `VERIFY` mode. Before
+starting a checker process, its adapter:
+
+1. validates the stored assignment with the model-backed schema;
+2. resolves the CNF named inside the assignment;
+3. derives the current CNF binding from that stored artifact;
+4. requires every binding field to match and the CNF to be an assignment
+   parent; and
+5. materializes a `sat.assignment@1` witness bound to the exact CNF,
+   assignment, and SAT semantics.
+
+The authorized checker then runs in a clean process. Its implementation uses
+only the Python standard library and no solver code or Jacobian SAT contract
+implementation. It independently validates the closed canonical CNF shape,
+variable ordering, clause ordering, payload, variable-map and DIMACS digests,
+assignment binding, total strict-Boolean vector, evidence bindings, and
+lineage. It returns `TRUE` only after evaluating every clause successfully.
+
+Acceptance creates the ordinary kernel `VerificationRecord` and allows the
+capability result to report `VERIFIED`. Assignment rejection reports
+`UNKNOWN`: it does not establish UNSAT. A malformed or misbound artifact fails
+before checker dispatch. Timeout, checker error, cancellation, and incomplete
+execution likewise remain non-verified and carry no SAT or UNSAT conclusion.
+Direct witness replay makes no enumeration-completeness claim.
 
 ## Raw proof artifacts
 
@@ -123,12 +153,11 @@ limit, and this contract bounds the base64 field to 8,000,000 characters.
 
 The following are deliberately outside this slice:
 
-- no assignment evaluator;
 - no CaDiCaL invocation or solver-status interpretation;
 - no DRAT-trim process or checker authorization;
-- no SAT or UNSAT conclusion; and
-- no `VERIFIED` result.
+- no UNSAT conclusion from assignment rejection; and
+- no verification of raw proof bytes.
 
-The next slice adds the deliberately small independent assignment checker.
-Proof production and independent clean-process proof replay remain later,
-separate changes.
+The next slice adds CaDiCaL model and proof production as unverified
+exploration. Independent clean-process proof replay remains a later, separate
+change.

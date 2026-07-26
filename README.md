@@ -116,8 +116,7 @@ Release contracts and engineering evidence are:
 - [Provider runtime contract](docs/reference/provider-runtime.md) for
   availability, exact backend identity, install tiers, and local measurement.
 - [SAT artifact contracts](docs/reference/sat-artifacts.md) for canonical CNF,
-  total assignment, and raw proof identity before solver or checker
-  installation.
+  raw model and proof identity, and independently checked total assignments.
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
 - [Testing strategy](docs/reference/testing-strategy.md),

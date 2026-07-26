@@ -23,7 +23,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
 )
-from jacobian.contracts.common import ArtifactUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 
 SatVariableName = Annotated[
@@ -183,6 +183,44 @@ class SatAssignmentArtifact(ContractModel):
                 "assignment must contain one value for every bound variable"
             )
         _require_available_producer(self.producer)
+        return self
+
+
+class SatAssignmentVerificationRequest(ContractModel):
+    """Verify one stored total assignment against its exact bound CNF."""
+
+    assignment_uri: ArtifactUri
+
+
+class SatAssignmentVerificationOutput(ContractModel):
+    """Model-facing projection of one independent assignment replay."""
+
+    status: Literal[
+        "VERIFIED_SATISFYING",
+        "REJECTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    cnf_uri: ArtifactUri
+    assignment_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_projection(self) -> Self:
+        if self.status == "VERIFIED_SATISFYING":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified satisfying output requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError(
+                "non-verified assignment output cannot carry a conclusion or record"
+            )
         return self
 
 
