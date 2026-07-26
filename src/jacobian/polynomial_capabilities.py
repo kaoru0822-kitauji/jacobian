@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import time
 from dataclasses import dataclass
+from fractions import Fraction
+from itertools import product
 from typing import Any, cast
 
 import sympy
@@ -39,6 +41,9 @@ from jacobian.contracts.polynomials import (
     PolynomialCollisionOutput,
     PolynomialCollisionPayload,
     PolynomialCollisionRequest,
+    PolynomialCollisionSearchOutput,
+    PolynomialCollisionSearchRequest,
+    PolynomialCollisionSearchStopReason,
     PolynomialEvaluationOutput,
     PolynomialEvaluationRequest,
     PolynomialFactorizationArtifact,
@@ -101,6 +106,7 @@ def install_polynomial_capabilities(
         PolynomialMapEvaluationAdapter,
         PolynomialJacobianAdapter,
         PolynomialCollisionAdapter,
+        PolynomialCollisionSearchAdapter,
         PolynomialFactorAdapter,
     ],
     PolynomialInstallation,
@@ -251,6 +257,7 @@ def install_polynomial_capabilities(
             PolynomialMapEvaluationAdapter(resources),
             PolynomialJacobianAdapter(resources),
             PolynomialCollisionAdapter(resources),
+            PolynomialCollisionSearchAdapter(resources),
             PolynomialFactorAdapter(resources),
         ),
         installation,
@@ -696,6 +703,262 @@ class PolynomialCollisionAdapter:
         )
 
 
+class PolynomialCollisionSearchAdapter:
+    """Search one fully declared finite rational grid for a collision."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.map.collision.search",
+            version="1",
+            title="Search a bounded rational grid for a collision",
+            description=(
+                "Enumerate one deterministic finite rational grid and return its "
+                "first exact polynomial-map collision with reconciled accounting."
+            ),
+            provider="jacobian.sympy",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sympy",
+                features=("bounded-rational-grid-search",),
+                checker_ids=(
+                    (resources.installation.collision_checker_id,)
+                    if resources.installation.collision_checker_id is not None
+                    else ()
+                ),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(PolynomialCollisionSearchRequest),
+            output_schema=model_schema(PolynomialCollisionSearchOutput),
+            tags=("polynomial", "map", "collision", "bounded-search"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialCollisionSearchRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_COLLISION_SEARCH_REQUEST",
+            operation="collision search",
+        )
+        started = time.monotonic()
+        polynomial_map, map_uri = _materialize_map(self.resources, validated.map)
+        scalar_values = tuple(
+            CanonicalRational(num=str(value.numerator), den=str(value.denominator))
+            for value in sorted(
+                {
+                    Fraction(numerator, denominator)
+                    for denominator in range(1, validated.max_denominator + 1)
+                    for numerator in range(
+                        -validated.max_abs_numerator,
+                        validated.max_abs_numerator + 1,
+                    )
+                }
+            )
+        )
+        grid_point_count = len(scalar_values) ** len(polynomial_map.variables)
+        seen: dict[
+            tuple[tuple[str, str], ...],
+            tuple[tuple[CanonicalRational, ...], str],
+        ] = {}
+        found: (
+            tuple[
+                tuple[CanonicalRational, ...],
+                tuple[CanonicalRational, ...],
+                tuple[CanonicalRational, ...],
+                str,
+                str,
+            ]
+            | None
+        ) = None
+        evaluation_uris: list[str] = []
+        examined = 0
+        for point_values in product(
+            scalar_values,
+            repeat=len(polynomial_map.variables),
+        ):
+            examined += 1
+            point = RationalPolynomialPoint(values=point_values)
+            image = _evaluate(polynomial_map, point)
+            _, evaluation_uri = _materialize_evaluation(
+                self.resources,
+                map_uri=map_uri,
+                point=point,
+                image=image,
+            )
+            evaluation_uris.append(evaluation_uri)
+            key = tuple((value.num, value.den) for value in image)
+            previous = seen.get(key)
+            if previous is not None and previous[0] != point_values:
+                found = (
+                    previous[0],
+                    point_values,
+                    image,
+                    previous[1],
+                    evaluation_uri,
+                )
+                break
+            seen[key] = (point_values, evaluation_uri)
+        claim_uri: str | None = None
+        witness_uri: str | None = None
+        first_point_result: tuple[CanonicalRational, ...] | None = None
+        second_point_result: tuple[CanonicalRational, ...] | None = None
+        image_result: tuple[CanonicalRational, ...] | None = None
+        first_evaluation_result: str | None = None
+        second_evaluation_result: str | None = None
+        if found is not None:
+            (
+                first_point_result,
+                second_point_result,
+                image_result,
+                first_evaluation_result,
+                second_evaluation_result,
+            ) = found
+            assert first_evaluation_result is not None
+            assert second_evaluation_result is not None
+            candidate = self.resources.store.get(map_uri)
+            claim = self.resources.artifacts.put(
+                schema_uri=self.resources.installation.claim_schema_uri,
+                semantics_uri=self.resources.installation.semantics_uri,
+                payload=PolynomialInjectivityClaim(map_uri=map_uri).model_dump(
+                    mode="json"
+                ),
+                parents=(map_uri,),
+                summary="rational polynomial-map injectivity claim",
+            )
+            semantics = self.resources.store.get(
+                self.resources.installation.semantics_uri
+            )
+            witness = WitnessEnvelope(
+                witness_format="polynomial.map_collision",
+                format_version="1",
+                role=WitnessRole.REFUTES_CLAIM,
+                bindings=EvidenceBindings(
+                    claim_digest=claim.object_digest,
+                    semantics_digest=semantics.manifest.object_digest,
+                    candidate_digest=candidate.manifest.object_digest,
+                ),
+                payload=PolynomialCollisionPayload(
+                    first_point=first_point_result,
+                    second_point=second_point_result,
+                    image=image_result,
+                ).model_dump(mode="json"),
+            )
+            witness_artifact = self.resources.artifacts.put(
+                schema_uri=self.resources.installation.witness_schema_uri,
+                semantics_uri=self.resources.installation.semantics_uri,
+                payload=witness.model_dump(mode="json"),
+                parents=(
+                    claim.artifact_uri,
+                    map_uri,
+                    first_evaluation_result,
+                    second_evaluation_result,
+                ),
+                summary="unverified bounded-search collision witness",
+            )
+            claim_uri = claim.artifact_uri
+            witness_uri = witness_artifact.artifact_uri
+        output = PolynomialCollisionSearchOutput(
+            found=found is not None,
+            map_uri=map_uri,
+            examined_point_count=examined,
+            grid_point_count=grid_point_count,
+            first_point=first_point_result,
+            second_point=second_point_result,
+            common_image=image_result,
+            first_evaluation_uri=first_evaluation_result,
+            second_evaluation_uri=second_evaluation_result,
+            claim_uri=claim_uri,
+            witness_uri=witness_uri,
+            checker_id=self.resources.installation.collision_checker_id,
+            stop_reason=(
+                PolynomialCollisionSearchStopReason.FIRST_COLLISION
+                if found is not None
+                else PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
+            ),
+        )
+        artifacts = [map_uri, *evaluation_uris]
+        relationships = [
+            CapabilityRelationship(
+                relation_id="polynomial.relation.evaluation-of",
+                source_artifact_uris=(map_uri,),
+                target_artifact_uris=tuple(evaluation_uris),
+            )
+        ]
+        if found is not None:
+            assert first_evaluation_result is not None
+            assert second_evaluation_result is not None
+            assert claim_uri is not None
+            assert witness_uri is not None
+            artifacts.extend(
+                [
+                    second_evaluation_result,
+                    claim_uri,
+                    witness_uri,
+                ]
+            )
+            relationships.extend(
+                (
+                    CapabilityRelationship(
+                        relation_id="polynomial.relation.injectivity-claim-of",
+                        source_artifact_uris=(map_uri,),
+                        target_artifact_uris=(claim_uri,),
+                    ),
+                    CapabilityRelationship(
+                        relation_id="polynomial.relation.collision-derived-from",
+                        source_artifact_uris=(
+                            first_evaluation_result,
+                            second_evaluation_result,
+                        ),
+                        target_artifact_uris=(witness_uri,),
+                    ),
+                    CapabilityRelationship(
+                        relation_id=(
+                            "polynomial.relation.collision-refutes-injectivity"
+                        ),
+                        source_artifact_uris=(witness_uri,),
+                        target_artifact_uris=(claim_uri,),
+                    ),
+                )
+            )
+        exhausted_grid = examined == grid_point_count
+        return _computed_result(
+            descriptor=self.descriptor,
+            request=request,
+            started=started,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="declared finite rational grid",
+                parameters={
+                    "max_abs_numerator": validated.max_abs_numerator,
+                    "max_denominator": validated.max_denominator,
+                    "grid_point_count": grid_point_count,
+                },
+                artifact_uri=map_uri,
+            ),
+            relationships=tuple(relationships),
+            artifact_uris=tuple(
+                dict.fromkeys(uri for uri in artifacts if uri is not None)
+            ),
+            completeness_basis=(
+                "the deterministic grid was fully enumerated"
+                if exhausted_grid
+                else "the canonical prefix through the first collision was enumerated"
+            ),
+            completeness_status=(
+                CapabilityCompletenessStatus.COMPLETE
+                if exhausted_grid
+                else CapabilityCompletenessStatus.PARTIAL
+            ),
+            assurance_basis=(
+                "deterministic exact SymPy search; any returned witness remains "
+                "unverified until independent replay"
+            ),
+        )
+
+
 class PolynomialFactorAdapter:
     """Factor one univariate sparse polynomial over QQ."""
 
@@ -1054,6 +1317,9 @@ def _computed_result(
     relationships: tuple[CapabilityRelationship, ...],
     artifact_uris: tuple[str, ...],
     completeness_basis: str,
+    completeness_status: CapabilityCompletenessStatus = (
+        CapabilityCompletenessStatus.COMPLETE
+    ),
     assurance_basis: str = (
         "deterministic exact SymPy arithmetic over QQ; the computation did not "
         "authorize or invoke an independent checker"
@@ -1070,7 +1336,7 @@ def _computed_result(
         output=output,
         scope=scope,
         completeness=CapabilityCompleteness(
-            status=CapabilityCompletenessStatus.COMPLETE,
+            status=completeness_status,
             basis=(
                 f"{completeness_basis}; no mathematical conclusion or independent "
                 "verification is claimed"
