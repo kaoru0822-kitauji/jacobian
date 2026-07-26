@@ -36,6 +36,10 @@ from jacobian.exact_domain_checkers import (
 )
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
+from jacobian.finite_coverage import (
+    FiniteCoverageInstallation,
+    install_finite_coverage,
+)
 from jacobian.finite_partition import (
     FinitePartitionInstallation,
     install_finite_partition,
@@ -467,6 +471,17 @@ class JacobianKernel:
             authorize_checker=install_references,
         )
         self.register_capability(finite_partition)
+        self.finite_coverage: FiniteCoverageInstallation
+        finite_coverage, self.finite_coverage = install_finite_coverage(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if finite_coverage is not None:
+            self.register_capability(finite_coverage)
         self.graph: GraphInstallation
         graph_adapters, self.graph = install_graph_capabilities(
             self.store,
