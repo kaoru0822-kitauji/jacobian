@@ -1,6 +1,6 @@
 ---
 name: discover-math-capabilities
-description: Mine row-level mathematical datasets, known solutions, formal artifacts, research cases, agent traces, and maintained backends for recurring mathematical moves that justify additions or changes to Jacobian's capability portfolio. Use when asked what mathematical tools Jacobian should add, expand, split, consolidate, improve, or retire; when extracting tool ideas from proofs, counterexamples, transcripts, datasets, or failed attempts; or when turning public cases into typed capability proposals and reproduction cases. This skill performs open workflow mining with answers visible; use evaluate-math-capabilities for held-out comparative evaluation.
+description: Mine row-level mathematical datasets, known solutions, formal artifacts, research cases, agent traces, and maintained backends for recurring mathematical moves that justify additions or changes to Jacobian's capability portfolio. Use when asked what mathematical tools Jacobian should add, expand, split, consolidate, improve, or retire; when extracting tool ideas from proofs, counterexamples, transcripts, datasets, or failed attempts; or when turning public cases into typed capability proposals and reproduction cases. This skill performs open workflow mining with answers visible; hand accepted implementation-ready candidates to implement-math-capability and use evaluate-math-capabilities for held-out comparative evaluation.
 ---
 
 # Discover Math Capabilities
@@ -191,6 +191,26 @@ reproduce known work:
 These are public reproduction and regression cases. They show contract fitness,
 not general portfolio value. Do not call a capability beneficial merely because
 it replays the examples that inspired it.
+
+## Hand off implementation-ready candidates
+
+Hand an accepted candidate to `implement-math-capability` only when the
+candidate gate is complete enough to freeze an experimental contract. Supply:
+
+- the single mathematical outcome and proposed domain-owned ID;
+- supporting move episodes and any fundamental-primitive exception;
+- current catalog overlap and the smallest justified portfolio change;
+- typed input, output, artifacts, relationships, and normalization;
+- resource bounds and every failure or non-conclusion state;
+- provider identity, version, deployment, and license constraints;
+- attainable assurance and independent-checker obligations;
+- public reproduction and adversarial cases; and
+- the evaluation hypothesis and proposed control ablation.
+
+Discovery does not authorize implementation to broaden the scope, add nearby
+backend functions, or promote the result to `VERIFIED`. If the candidate needs
+an independent verification path after its producer contract is stable, use
+`implement-math-capability-checker`.
 
 ## Hand off comparative questions
 
