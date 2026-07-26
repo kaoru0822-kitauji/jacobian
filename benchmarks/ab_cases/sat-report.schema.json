@@ -18,7 +18,8 @@
     },
     "evidence_uri": {
       "type": ["string", "null"],
-      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$",
+      "description": "Producer evidence passed into the verifier: assignment_uri from sat.model.find or proof_uri from sat.unsat_proof.find; never the verifier's witness_uri or certificate_uri."
     },
     "verification_record_uri": {
       "type": ["string", "null"],

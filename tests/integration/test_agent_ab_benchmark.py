@@ -106,6 +106,19 @@ def _sat_report(
     }
 
 
+def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
+    schema_path = PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    description = schema["properties"]["evidence_uri"]["description"]
+
+    assert "assignment_uri from sat.model.find" in description
+    assert "proof_uri from sat.unsat_proof.find" in description
+    assert "never the verifier's witness_uri or certificate_uri" in description
+    assert "Do not substitute the verifier's witness_uri" in BENCHMARK[
+        "SAT_TREATMENT_INSTRUCTIONS"
+    ]
+
+
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:
     parse_transcript = cast(Any, BENCHMARK["parse_transcript"])
     transcript = tmp_path / "transcript.jsonl"

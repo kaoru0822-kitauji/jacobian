@@ -159,7 +159,10 @@ URI supplied below. Inspect the installed catalog, then compose the appropriate
 SAT evidence producer and its independent verifier. A solver status, failed
 search, assignment artifact, or proof artifact alone is not verification.
 Report VERIFIED only when the matching verify capability returns VERIFIED and
-copy its exact evidence and verification-record URIs.
+copy its exact verification-record URI. Set evidence_uri to the producer output
+passed into that verifier: assignment_uri from sat.model.find or proof_uri from
+sat.unsat_proof.find. Do not substitute the verifier's witness_uri or
+certificate_uri.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\
