@@ -133,6 +133,60 @@ class UniversalAlgebraCountermodelSearchRequest(ContractModel):
         return self
 
 
+class FiniteMagmaTableEnumerationRequest(ContractModel):
+    order: int = Field(ge=1, le=2)
+
+
+class FiniteMagmaTableEnumerationArtifact(ContractModel):
+    enumeration_schema_version: Literal["1"] = "1"
+    order: int = Field(ge=1, le=2)
+    table_uris: tuple[ArtifactUri, ...] = Field(min_length=1, max_length=16)
+    enumerated_count: int = Field(ge=1, le=16)
+    total_count: int = Field(ge=1, le=16)
+    ordering: Literal["LEXICOGRAPHIC_ROW_MAJOR"] = "LEXICOGRAPHIC_ROW_MAJOR"
+    complete: Literal[True] = True
+
+    @model_validator(mode="after")
+    def require_exact_complete_enumeration(self) -> Self:
+        expected = self.order ** (self.order * self.order)
+        if (
+            self.total_count != expected
+            or self.enumerated_count != expected
+            or len(self.table_uris) != expected
+            or len(set(self.table_uris)) != expected
+        ):
+            raise ValueError(
+                "complete magma-table enumeration must contain every table once"
+            )
+        return self
+
+
+class FiniteMagmaTableEnumerationOutput(ContractModel):
+    enumeration_uri: ArtifactUri
+    order: int = Field(ge=1, le=2)
+    table_uris: tuple[ArtifactUri, ...] = Field(min_length=1, max_length=16)
+    enumerated_count: int = Field(ge=1, le=16)
+    total_count: int = Field(ge=1, le=16)
+    ordering: Literal["LEXICOGRAPHIC_ROW_MAJOR"] = "LEXICOGRAPHIC_ROW_MAJOR"
+    exactness: Literal["EXACT_FINITE"] = "EXACT_FINITE"
+    completeness: Literal["COMPLETE"] = "COMPLETE"
+    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+
+    @model_validator(mode="after")
+    def require_exact_output_count(self) -> Self:
+        expected = self.order ** (self.order * self.order)
+        if (
+            self.total_count != expected
+            or self.enumerated_count != expected
+            or len(self.table_uris) != expected
+            or len(set(self.table_uris)) != expected
+        ):
+            raise ValueError(
+                "complete magma-table output must contain every table once"
+            )
+        return self
+
+
 class MagmaAssignmentValue(ContractModel):
     variable: Identifier
     value: int = Field(ge=0, le=7)
