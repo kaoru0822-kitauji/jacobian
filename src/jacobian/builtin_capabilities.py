@@ -38,6 +38,7 @@ from jacobian.lean_declarations import (
 )
 from jacobian.memory import ResearchMemory
 from jacobian.provider_runtime import known_provider_runtime
+from jacobian.schema_registry import model_schema
 
 _OBJECT_SCHEMA: dict[str, Any] = {"type": "object"}
 
@@ -210,8 +211,8 @@ class LeanDeclarationSearchAdapter:
             provider="jacobian.lean4",
             provider_runtime=provider_runtime,
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=LeanDeclarationSearchRequest.model_json_schema(),
-            output_schema=LeanDeclarationSearchOutput.model_json_schema(),
+            input_schema=model_schema(LeanDeclarationSearchRequest),
+            output_schema=model_schema(LeanDeclarationSearchOutput),
             read_only=True,
             tags=("lean", "declaration", "retrieval", "premise-discovery"),
         )
@@ -289,8 +290,8 @@ class LeanDeclarationInspectAdapter:
             provider="jacobian.lean4",
             provider_runtime=provider_runtime,
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=LeanDeclarationInspectRequest.model_json_schema(),
-            output_schema=LeanDeclarationInspectOutput.model_json_schema(),
+            input_schema=model_schema(LeanDeclarationInspectRequest),
+            output_schema=model_schema(LeanDeclarationInspectOutput),
             read_only=True,
             tags=("lean", "declaration", "retrieval", "inspection"),
         )
