@@ -162,7 +162,9 @@ Report VERIFIED only when the matching verify capability returns VERIFIED and
 copy its exact verification-record URI. Set evidence_uri to the producer output
 passed into that verifier: assignment_uri from sat.model.find or proof_uri from
 sat.unsat_proof.find. Do not substitute the verifier's witness_uri or
-certificate_uri.
+certificate_uri. For a SAT assignment, read the assignment artifact through its
+artifact:// resource to copy the variable values; artifact.get is not a
+capability.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\
