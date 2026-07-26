@@ -152,7 +152,7 @@ class PolynomialFactorizationArtifact(ContractModel):
     factorization_schema_version: Literal["1"] = "1"
     variable: PolynomialVariable
     source_polynomial_uri: ArtifactUri
-    unit: CanonicalRational
+    coefficient: CanonicalRational
     factors: tuple[PolynomialFactorRecord, ...] = Field(max_length=1024)
     reconstructed: SparseRationalPolynomial
     backend: Literal["sympy"] = "sympy"
@@ -163,7 +163,7 @@ class PolynomialFactorOutput(ContractModel):
     source_polynomial_uri: ArtifactUri
     factorization_uri: ArtifactUri
     variable: PolynomialVariable
-    unit: CanonicalRational
+    coefficient: CanonicalRational
     factors: tuple[PolynomialFactorRecord, ...]
     reconstructed: SparseRationalPolynomial
     exactness: Literal["EXACT"] = "EXACT"

@@ -68,6 +68,7 @@ from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 class PolynomialInstallation:
     semantics_uri: str
     polynomial_semantics_uri: str
+    factorization_semantics_uri: str
     map_schema_uri: str
     evaluation_schema_uri: str
     jacobian_schema_uri: str
@@ -135,6 +136,23 @@ def install_polynomial_capabilities(
             ),
             "domain": "QQ",
             "maximum_terms": 1024,
+        },
+    )
+    factorization_semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.univariate-rational-polynomial-factorization",
+        version="1",
+        definition={
+            "description": (
+                "a rational coefficient and multiplicity-bearing irreducible "
+                "factors over QQ whose product reconstructs one source polynomial"
+            ),
+            "domain": "QQ",
+            "zero_representation": {
+                "coefficient": {"num": "0", "den": "1"},
+                "factors": [],
+            },
+            "irreducibility_assurance": "unverified",
         },
     )
     map_schema_uri = schemas.register(
@@ -210,6 +228,7 @@ def install_polynomial_capabilities(
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,
+        factorization_semantics_uri=factorization_semantics_uri,
         map_schema_uri=map_schema_uri,
         evaluation_schema_uri=evaluation_schema_uri,
         jacobian_schema_uri=jacobian_schema_uri,
@@ -687,7 +706,7 @@ class PolynomialFactorAdapter:
             version="1",
             title="Factor a univariate rational polynomial",
             description=(
-                "Compute a unit and multiplicity-bearing factor list over QQ, "
+                "Compute a coefficient and multiplicity-bearing factor list over QQ, "
                 "together with an exact reconstructed product."
             ),
             provider="jacobian.sympy",
@@ -721,7 +740,7 @@ class PolynomialFactorAdapter:
         )
         generator = cast(tuple[Any, ...], symbols(validated.variable, seq=True))
         polynomial = _sympy_polynomial(validated.polynomial, generator)
-        unit_value, raw_factors = sympy.factor_list(polynomial)
+        coefficient_value, raw_factors = polynomial.factor_list()
         factors = tuple(
             PolynomialFactorRecord(
                 factor=_wire_polynomial(factor),
@@ -729,7 +748,7 @@ class PolynomialFactorAdapter:
             )
             for factor, multiplicity in raw_factors
         )
-        reconstructed_expression = sympy.Rational(unit_value)
+        reconstructed_expression = sympy.Rational(coefficient_value)
         for factor, multiplicity in raw_factors:
             reconstructed_expression *= factor.as_expr() ** multiplicity
         reconstructed = _wire_polynomial(
@@ -742,14 +761,14 @@ class PolynomialFactorAdapter:
         artifact_payload = PolynomialFactorizationArtifact(
             variable=validated.variable,
             source_polynomial_uri=source.artifact_uri,
-            unit=_wire_rational(unit_value),
+            coefficient=_wire_rational(coefficient_value),
             factors=factors,
             reconstructed=reconstructed,
             backend_version=sympy.__version__,
         )
         factorization = self.resources.artifacts.put(
             schema_uri=self.resources.installation.factorization_schema_uri,
-            semantics_uri=self.resources.installation.polynomial_semantics_uri,
+            semantics_uri=self.resources.installation.factorization_semantics_uri,
             payload=artifact_payload.model_dump(mode="json"),
             parents=(source.artifact_uri,),
             summary="computed univariate rational polynomial factorization",
@@ -758,7 +777,7 @@ class PolynomialFactorAdapter:
             source_polynomial_uri=source.artifact_uri,
             factorization_uri=factorization.artifact_uri,
             variable=validated.variable,
-            unit=artifact_payload.unit,
+            coefficient=artifact_payload.coefficient,
             factors=factors,
             reconstructed=reconstructed,
             backend_version=sympy.__version__,
