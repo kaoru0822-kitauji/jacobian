@@ -258,6 +258,22 @@ Controls:
   equality and inequality;
 - changed coefficients, margins, bindings, or scopes are rejected.
 
+### Polynomial-system assignment substitution
+
+A claimed solution may replace the assignment, omit a constraint, change an
+equation into an inequation, or alter the declared variable order.
+
+Controls:
+
+- the certificate binds the complete system as scope, the assignment as
+  candidate, the exact claim, and the polynomial-system semantics;
+- an independent checker reparses canonical rationals and evaluates every
+  equation and inequation without importing a solver or the capability adapter;
+- both satisfying and violating assignments receive explicit checker-backed
+  conclusions, while malformed or misbound requests remain unknown; and
+- verified completeness requires exhaustive coverage of the finite declared
+  constraint list.
+
 ### Remote client or tenant
 
 A remote caller may omit authentication, present an invalid token, choose a
