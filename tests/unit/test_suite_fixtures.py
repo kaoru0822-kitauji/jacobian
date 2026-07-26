@@ -31,13 +31,25 @@ def _copy_and_check_store(
     assert descriptor["name"] == "jacobian.research-episode"
 
 
-def test_kernel_store_freeze_makes_wal_snapshot_safe_to_copy(tmp_path: Path) -> None:
+def _research_episode_schema_uri(root: Path) -> str:
+    connection = sqlite3.connect(root / "metadata.sqlite3")
+    try:
+        row = connection.execute(
+            "SELECT artifact_uri FROM artifacts WHERE summary = ?",
+            ("schema: jacobian.research-episode@1",),
+        ).fetchone()
+    finally:
+        connection.close()
+    assert row is not None
+    return str(row[0])
+
+
+def test_kernel_store_freeze_removes_deferred_wal_files(tmp_path: Path) -> None:
     template = tmp_path / "template"
     gc_was_enabled = gc.isenabled()
     gc.disable()
     try:
         kernel = JacobianKernel(template)
-        descriptor_uri = kernel.memory.episode_schema_uri
         del kernel
 
         assert (template / "metadata.sqlite3-wal").exists()
@@ -52,21 +64,39 @@ def test_kernel_store_freeze_makes_wal_snapshot_safe_to_copy(tmp_path: Path) -> 
             assert connection.execute("PRAGMA journal_mode").fetchone() == ("delete",)
         finally:
             connection.close()
-
-        destinations = [tmp_path / f"clone-{index}" for index in range(8)]
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [
-                executor.submit(
-                    _copy_and_check_store,
-                    template,
-                    destination,
-                    descriptor_uri=descriptor_uri,
-                )
-                for destination in destinations
-            ]
-            for future in futures:
-                future.result()
     finally:
         gc.collect()
         if gc_was_enabled:
             gc.enable()
+
+
+def test_kernel_store_template_is_quiescent_and_copyable(
+    kernel_store_template: Path,
+    tmp_path: Path,
+) -> None:
+    database = kernel_store_template / "metadata.sqlite3"
+    assert not database.with_name(f"{database.name}-wal").exists()
+    assert not database.with_name(f"{database.name}-shm").exists()
+
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute("PRAGMA journal_mode").fetchone() == ("delete",)
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    finally:
+        connection.close()
+
+    descriptor_uri = _research_episode_schema_uri(kernel_store_template)
+    destinations = [tmp_path / f"clone-{index}" for index in range(8)]
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [
+            executor.submit(
+                _copy_and_check_store,
+                kernel_store_template,
+                destination,
+                descriptor_uri=descriptor_uri,
+            )
+            for destination in destinations
+        ]
+        for future in futures:
+            future.result()
+    gc.collect()
