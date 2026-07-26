@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from pathlib import Path
 
 import pytest
 
 from jacobian.canonical import canonicalize_json
+from jacobian.contracts.capabilities import (
+    CapabilityInstallTier,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
+)
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.registry import (
     CheckerCompatibilityError,
+    CheckerExecutableChangedError,
     CheckerNotFoundError,
     CheckerRegistry,
     CheckerRegistryError,
@@ -174,3 +182,44 @@ def test_checker_authorization_requires_explicit_compatibility_scope(
             target_schema_uris=targets,
             target_semantics_uris=targets,
         )
+
+
+@pytest.mark.integration
+@pytest.mark.conformance
+def test_checker_registry_binds_external_runtime_identity(tmp_path: Path) -> None:
+    executable = tmp_path / "external-checker"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    runtime = CapabilityProviderRuntime(
+        provider="external-checker",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version="1",
+        digest="sha256:" + hashlib.sha256(executable.read_bytes()).hexdigest(),
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform="linux-x86_64",
+        install_tier=CapabilityInstallTier.T2,
+        license_id="MIT",
+        configuration={"executable": str(executable.resolve())},
+    )
+    registry = CheckerRegistry(ArtifactStore(tmp_path / "store").db_path)
+    checker = registry.authorize(
+        name="externally-backed-v1",
+        entrypoint="jacobian_checkers.reject:check",
+        evidence_kind="WITNESS",
+        format_id="example.witness",
+        format_version="1",
+        claim_schema_uris=(CLAIM_SCHEMA_A,),
+        semantics_uris=(CLAIM_SCHEMA_A,),
+        candidate_schema_uris=(CLAIM_SCHEMA_A,),
+        provider_runtime=runtime,
+    )
+
+    assert registry.require_active(checker.checker_id).provider_runtime == runtime
+
+    executable.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    executable.chmod(0o755)
+    with pytest.raises(
+        CheckerExecutableChangedError,
+        match="changed after authorization",
+    ):
+        registry.require_active(checker.checker_id)

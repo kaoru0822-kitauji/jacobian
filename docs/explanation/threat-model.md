@@ -191,9 +191,20 @@ Controls:
   canonical CNF, payload, variable-map and DIMACS digests, assignment,
   evidence bindings, and lineage before evaluating every clause;
 - SAT assignment checker requests expose exact artifact payload digests and
-  parent lineage in addition to object, schema, and semantics identities; and
+  parent lineage in addition to object, schema, and semantics identities;
+- `sat.unsat_proof.verify` independently reconstructs DIMACS and validates the
+  proof certificate, artifact payloads, evidence bindings, and lineage before
+  invoking DRAT-trim;
+- exact DRAT-trim release, source commit, operator provenance sidecar, and
+  executable digest are bound into the checker identity and verification
+  environment, with digest checks at registry selection and before and after
+  clean-process replay;
+- the admitted text proof profile rejects malformed clauses and steps after an
+  empty clause, while bounded replay accepts only exit zero and exactly one
+  `s VERIFIED` status; and
 - a rejected assignment, malformed input, timeout, or checker failure remains
-  `UNKNOWN` and never establishes UNSAT.
+  `UNKNOWN`; proof rejection or operational failure likewise remains
+  `UNKNOWN` and never establishes SAT.
 
 ### Buggy or compromised checker
 

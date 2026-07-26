@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Literal
 
 from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -15,11 +17,14 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityMode,
+    CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
 )
 from jacobian.contracts.evidence import (
+    CertificateEnvelope,
     EvidenceBindings,
     WitnessEnvelope,
     WitnessRole,
@@ -32,6 +37,8 @@ from jacobian.contracts.results import (
 from jacobian.contracts.sat import (
     SatAssignmentVerificationOutput,
     SatAssignmentVerificationRequest,
+    SatUnsatProofVerificationOutput,
+    SatUnsatProofVerificationRequest,
 )
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
@@ -44,6 +51,12 @@ from jacobian.verification import VerificationService
 @dataclass(frozen=True, slots=True)
 class SatAssignmentCheckerInstallation:
     witness_schema_uri: str
+    checker_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SatUnsatProofCheckerInstallation:
+    certificate_schema_uri: str
     checker_id: str | None
 
 
@@ -89,6 +102,58 @@ def install_sat_assignment_checker(
             sat=sat,
             verification=verification,
             installation=installation,
+        )
+    return adapter, installation
+
+
+def install_sat_unsat_proof_checker(
+    store: ArtifactStore,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    sat: SatArtifactService,
+    verification: VerificationService,
+    checkers: CheckerRegistry,
+    runtime: CapabilityProviderRuntime,
+    *,
+    authorize_checker: bool,
+) -> tuple[CapabilityAdapter | None, SatUnsatProofCheckerInstallation]:
+    """Install the proof certificate schema and optionally authorize DRAT replay."""
+
+    certificate_schema_uri = schemas.register_model(
+        name="jacobian.certificate-envelope",
+        version="1",
+        model=CertificateEnvelope,
+    )
+    checker_id = None
+    if (
+        authorize_checker
+        and runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    ):
+        checker_id = checkers.authorize(
+            name="pinned DRAT-trim exact SAT UNSAT proof checker",
+            entrypoint="jacobian_checkers.sat:check_unsat_proof",
+            evidence_kind="CERTIFICATE",
+            format_id="sat.unsat-proof",
+            format_version="1",
+            claim_schema_uris=(sat.installation.cnf_schema_uri,),
+            semantics_uris=(sat.installation.semantics_uri,),
+            candidate_schema_uris=(sat.installation.proof_schema_uri,),
+            provider_runtime=runtime,
+            reason="operator-authorized pinned DRAT-trim proof replay",
+        ).checker_id
+    installation = SatUnsatProofCheckerInstallation(
+        certificate_schema_uri=certificate_schema_uri,
+        checker_id=checker_id,
+    )
+    adapter: CapabilityAdapter | None = None
+    if checker_id is not None:
+        adapter = SatUnsatProofVerificationAdapter(
+            store=store,
+            artifacts=artifacts,
+            sat=sat,
+            verification=verification,
+            installation=installation,
+            runtime=runtime,
         )
     return adapter, installation
 
@@ -291,6 +356,217 @@ class SatAssignmentVerificationAdapter:
                     if verified
                     else (
                         "checker replay completed without accepting the assignment; "
+                        "no opposite conclusion follows"
+                        if checked.execution.status is ExecutionStatus.COMPLETED
+                        else "checker execution did not complete; no mathematical "
+                        "conclusion follows"
+                    )
+                ),
+                verification_record_uri=record_uri,
+            ),
+            artifact_uris=tuple(artifact_uris),
+        )
+
+
+class SatUnsatProofVerificationAdapter:
+    """Verify one raw proof; rejection never establishes satisfiability."""
+
+    def __init__(
+        self,
+        *,
+        store: ArtifactStore,
+        artifacts: ArtifactService,
+        sat: SatArtifactService,
+        verification: VerificationService,
+        installation: SatUnsatProofCheckerInstallation,
+        runtime: CapabilityProviderRuntime,
+    ) -> None:
+        checker_id = installation.checker_id
+        if checker_id is None:
+            raise ValueError("SAT UNSAT proof checker is not authorized")
+        self.store = store
+        self.artifacts = artifacts
+        self.sat = sat
+        self.verification = verification
+        self.installation = installation
+        descriptor_runtime = runtime.model_copy(update={"checker_ids": (checker_id,)})
+        self._descriptor = CapabilityDescriptor(
+            capability_id="sat.unsat_proof.verify",
+            version="1",
+            title="Verify a SAT UNSAT proof",
+            description=(
+                "Replay exact raw text DRAT against its bound canonical CNF in "
+                "operator-authorized pinned DRAT-trim."
+            ),
+            provider="drat-trim",
+            provider_runtime=descriptor_runtime,
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=model_schema(SatUnsatProofVerificationRequest),
+            output_schema=model_schema(SatUnsatProofVerificationOutput),
+            tags=("sat", "cnf", "unsat", "proof", "verification", "drat"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = SatUnsatProofVerificationRequest.model_validate(request.input)
+        try:
+            resolved = self.sat.resolve_proof(validated.proof_uri)
+            semantics = self.store.get(self.sat.installation.semantics_uri)
+        except (SatArtifactError, StoreError) as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_SAT_UNSAT_PROOF",
+                    stage="artifact_resolution",
+                    message=str(exc),
+                    path="proof_uri",
+                    schema_uri=self.sat.installation.proof_schema_uri,
+                    expected=(
+                        "a valid raw DRAT proof artifact bound by payload and "
+                        "lineage to one canonical CNF"
+                    ),
+                    hint=(
+                        "Create the proof with SatArtifactService.put_proof against "
+                        "the intended canonical CNF."
+                    ),
+                )
+            ) from exc
+
+        checker_id = self.installation.checker_id
+        assert checker_id is not None
+        bindings = EvidenceBindings(
+            claim_digest=resolved.cnf_artifact.manifest.object_digest,
+            semantics_digest=semantics.manifest.object_digest,
+            candidate_digest=resolved.artifact.manifest.object_digest,
+        )
+        payload = {
+            "cnf_uri": resolved.cnf_artifact.artifact_uri,
+            "proof_uri": resolved.artifact.artifact_uri,
+        }
+        certificate = CertificateEnvelope(
+            certificate_type="sat.unsat-proof",
+            format_version="1",
+            bindings=bindings,
+            payload_digest=(
+                "sha256:" + hashlib.sha256(canonicalize_json(payload)).hexdigest()
+            ),
+            payload=payload,
+        )
+        certificate_artifact = self.artifacts.put(
+            schema_uri=self.installation.certificate_schema_uri,
+            semantics_uri=self.sat.installation.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(
+                resolved.cnf_artifact.artifact_uri,
+                resolved.artifact.artifact_uri,
+            ),
+            summary="SAT UNSAT proof verification certificate",
+        )
+        checked = self.verification.verify_certificate(
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=checker_id,
+            include_artifact_metadata=True,
+        )
+        verified = (
+            checked.execution.status is ExecutionStatus.COMPLETED
+            and checked.conclusion is Conclusion.TRUE
+            and checked.assurance.verification is Verification.VERIFIED
+            and checked.verification_record_uri is not None
+        )
+        status: Literal[
+            "VERIFIED_UNSAT",
+            "REJECTED",
+            "TIMEOUT",
+            "CANCELLED",
+            "ERROR",
+        ]
+        if verified:
+            status = "VERIFIED_UNSAT"
+        elif checked.execution.status is ExecutionStatus.COMPLETED:
+            status = "REJECTED"
+        elif checked.execution.status is ExecutionStatus.TIMEOUT:
+            status = "TIMEOUT"
+        elif checked.execution.status is ExecutionStatus.CANCELLED:
+            status = "CANCELLED"
+        else:
+            status = "ERROR"
+        detail = checked.execution.detail
+        if detail is None and checked.input.errors:
+            detail = checked.input.errors[0]
+        if detail is None:
+            detail = (
+                "the authorized DRAT checker accepted the exact bound proof"
+                if verified
+                else "the proof was not independently accepted"
+            )
+        output = SatUnsatProofVerificationOutput(
+            status=status,
+            conclusion="TRUE" if verified else "UNKNOWN",
+            cnf_uri=resolved.cnf_artifact.artifact_uri,
+            proof_uri=resolved.artifact.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=checker_id,
+            verification_record_uri=(
+                checked.verification_record_uri if verified else None
+            ),
+            detail=detail,
+        )
+        record_uri = checked.verification_record_uri if verified else None
+        artifact_uris = [
+            resolved.cnf_artifact.artifact_uri,
+            resolved.artifact.artifact_uri,
+            certificate_artifact.artifact_uri,
+        ]
+        if record_uri is not None:
+            artifact_uris.append(record_uri)
+        assurance_level = (
+            CapabilityAssuranceLevel.VERIFIED
+            if verified
+            else (
+                CapabilityAssuranceLevel.COMPUTED
+                if checked.execution.status is ExecutionStatus.COMPLETED
+                else CapabilityAssuranceLevel.HEURISTIC
+            )
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="the full exact canonical CNF bound by the raw proof",
+                parameters={
+                    "declared_scope": "FULL_CNF",
+                    "variable_count": resolved.proof.cnf.variable_count,
+                    "clause_count": resolved.proof.cnf.clause_count,
+                    "proof_format": resolved.proof.proof_format,
+                    "proof_format_version": resolved.proof.proof_format_version,
+                },
+                artifact_uri=resolved.cnf_artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                basis=(
+                    "certificate replay checks one exact proof and makes no "
+                    "enumeration-completeness claim"
+                ),
+                assurance_level=(
+                    CapabilityAssuranceLevel.COMPUTED
+                    if checked.execution.status is ExecutionStatus.COMPLETED
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=assurance_level,
+                basis=(
+                    "accepted by the operator-authorized external DRAT-trim "
+                    "runtime bound into the checker registration"
+                    if verified
+                    else (
+                        "checker replay completed without accepting the proof; "
                         "no opposite conclusion follows"
                         if checked.execution.status is ExecutionStatus.COMPLETED
                         else "checker execution did not complete; no mathematical "

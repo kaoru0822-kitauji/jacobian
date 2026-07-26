@@ -342,6 +342,44 @@ class SatProofArtifact(ContractModel):
         return _decode_base64(self.proof_base64)
 
 
+class SatUnsatProofVerificationRequest(ContractModel):
+    """Verify one stored raw DRAT proof against its exact bound CNF."""
+
+    proof_uri: ArtifactUri
+
+
+class SatUnsatProofVerificationOutput(ContractModel):
+    """Model-facing projection of one independent DRAT replay."""
+
+    status: Literal[
+        "VERIFIED_UNSAT",
+        "REJECTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    cnf_uri: ArtifactUri
+    proof_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_unsat_projection(self) -> Self:
+        if self.status == "VERIFIED_UNSAT":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified UNSAT output requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError(
+                "non-verified proof output cannot carry a conclusion or record"
+            )
+        return self
+
+
 def canonicalize_cnf(
     *,
     variable_names: Sequence[str],

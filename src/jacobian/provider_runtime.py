@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from jacobian.bounded_process import run_bounded_process
+from jacobian.canonical import loads_strict_json
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
     CapabilityProviderAvailability,
@@ -23,6 +24,9 @@ from jacobian.contracts.capabilities import (
 from jacobian.implementation import ImplementationError, package_source_digest
 
 CADICAL_VERSION = "3.0.1"
+DRAT_TRIM_RELEASE_TAG = "v05.22.2023"
+DRAT_TRIM_SOURCE_COMMIT = "2e5e29cb0019d5cfd547d4208dca1b3ec290349f"
+DRAT_TRIM_SOURCE_REPOSITORY = "https://github.com/marijnheule/drat-trim"
 
 
 class ProviderRuntimeError(RuntimeError):
@@ -316,6 +320,102 @@ def cadical_provider_runtime(
             "executable": str(resolved),
             "projection": "jacobian.dimacs.cnf/v1",
             "proof_format": "drat-text/v1",
+        },
+    )
+
+
+def drat_trim_provider_runtime(
+    executable: str | Path = "drat-trim",
+    *,
+    provenance_file: str | Path | None = None,
+) -> CapabilityProviderRuntime:
+    """Inspect an operator-provenanced pinned DRAT-trim runtime."""
+
+    resolved_name = shutil.which(os.fspath(executable))
+    if resolved_name is None:
+        return _unavailable_runtime(
+            provider="drat-trim",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="MIT",
+            diagnostic=(
+                f"The pinned DRAT-trim {DRAT_TRIM_RELEASE_TAG} runtime is unavailable."
+            ),
+        )
+    try:
+        resolved = Path(resolved_name).resolve(strict=True)
+        manifest_path = (
+            Path(provenance_file).resolve(strict=True)
+            if provenance_file is not None
+            else resolved.with_name(resolved.name + ".jacobian-runtime.json").resolve(
+                strict=True
+            )
+        )
+        manifest = loads_strict_json(manifest_path.read_bytes())
+        expected_manifest = {
+            "runtime_manifest_version": "1",
+            "provider": "drat-trim",
+            "release_tag": DRAT_TRIM_RELEASE_TAG,
+            "source_repository": DRAT_TRIM_SOURCE_REPOSITORY,
+            "source_commit": DRAT_TRIM_SOURCE_COMMIT,
+        }
+        if (
+            not isinstance(manifest, dict)
+            or set(manifest) != {*expected_manifest, "executable_sha256"}
+            or any(
+                manifest.get(key) != value for key, value in expected_manifest.items()
+            )
+            or not isinstance(manifest.get("executable_sha256"), str)
+        ):
+            raise ProviderRuntimeError("DRAT-trim provenance is invalid")
+        digest = _sha256_file(resolved)
+        if manifest["executable_sha256"] != digest:
+            raise ProviderRuntimeError("DRAT-trim executable digest changed")
+        completed = run_bounded_process(
+            [str(resolved), "-h"],
+            input_bytes=b"",
+            timeout_seconds=5,
+            environment={
+                **os.environ,
+                "LANG": "C",
+                "LC_ALL": "C",
+                "TZ": "UTC",
+            },
+            stdout_limit=16_000,
+            stderr_limit=16_000,
+        )
+        if (
+            completed.timed_out
+            or completed.stdout_exceeded
+            or completed.stderr_exceeded
+            or completed.returncode != 0
+            or b"usage: drat-trim" not in completed.stdout
+        ):
+            raise ProviderRuntimeError("DRAT-trim health probe failed")
+    except (OSError, ProviderRuntimeError, ValueError):
+        return _unavailable_runtime(
+            provider="drat-trim",
+            install_tier=CapabilityInstallTier.T2,
+            license_id="MIT",
+            diagnostic=(
+                f"The pinned DRAT-trim {DRAT_TRIM_RELEASE_TAG} runtime and "
+                "operator provenance are unavailable."
+            ),
+        )
+    return CapabilityProviderRuntime(
+        provider="drat-trim",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version=DRAT_TRIM_RELEASE_TAG,
+        digest=digest,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform=_platform_tag(),
+        install_tier=CapabilityInstallTier.T2,
+        license_id="MIT",
+        features=("drat-text/v1", "unsat-proof-replay"),
+        configuration={
+            "executable": str(resolved),
+            "provenance_file": str(manifest_path),
+            "source_repository": DRAT_TRIM_SOURCE_REPOSITORY,
+            "source_commit": DRAT_TRIM_SOURCE_COMMIT,
         },
     )
 
