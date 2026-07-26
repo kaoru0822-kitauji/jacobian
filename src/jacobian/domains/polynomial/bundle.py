@@ -3,6 +3,10 @@
 import sympy
 
 from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.domains.polynomial.elementary import (
+    INTEGER_POLYNOMIAL_CAPABILITIES,
+    RATIONAL_POLYNOMIAL_CAPABILITIES,
+)
 from jacobian.domains.polynomial.groebner import POLYNOMIAL_GROEBNER_CAPABILITY
 from jacobian.domains.polynomial.invariants import (
     POLYNOMIAL_INVARIANT_CAPABILITIES,
@@ -26,6 +30,12 @@ POLYNOMIAL_BUNDLE = DomainBundle(
                 "standard univariate convention: linear is 1; constant and zero are 0"
             ),
             "square_free_normalization": "separate coefficient and monic factors",
+            "integer_polynomials": (
+                "dense canonical descending-degree coefficient strings over ZZ"
+            ),
+            "elementary_rational_polynomials": (
+                "sparse descending-lexicographic terms over QQ"
+            ),
             "assurance": "computed; no independent checker",
         },
     ),
@@ -37,6 +47,8 @@ POLYNOMIAL_BUNDLE = DomainBundle(
     capabilities=(
         *POLYNOMIAL_INVARIANT_CAPABILITIES,
         POLYNOMIAL_GROEBNER_CAPABILITY,
+        *INTEGER_POLYNOMIAL_CAPABILITIES,
+        *RATIONAL_POLYNOMIAL_CAPABILITIES,
     ),
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(

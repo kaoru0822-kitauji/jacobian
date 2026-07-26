@@ -6,7 +6,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import CanonicalInteger, CanonicalRational
 from jacobian.contracts.polynomials import (
     PolynomialVariable,
     RationalPolynomial,
@@ -20,6 +20,8 @@ _MAX_GCD_DEGREE = 127
 _MAX_ELIMINATION_DEGREE_SUM = 64
 _MAX_DISCRIMINANT_DEGREE = 32
 _MAX_SQUARE_FREE_EXPONENT = 64
+_MAX_ELEMENTARY_DEGREE = 127
+_MAX_INTEGER_COEFFICIENT_DIGITS = 256
 
 
 def _coefficient_digits(polynomial: RationalPolynomial) -> int:
@@ -276,7 +278,193 @@ class PolynomialGroebnerBasisObligation(ContractModel):
     verification_status: Literal["UNVERIFIED"] = "UNVERIFIED"
 
 
+class IntegerPolynomial(ContractModel):
+    """Canonical dense polynomial in ``ZZ[x]``, highest degree first."""
+
+    coefficient_order: Literal["DESCENDING_DEGREE"] = "DESCENDING_DEGREE"
+    coefficients: tuple[CanonicalInteger, ...] = Field(
+        min_length=1,
+        max_length=_MAX_ELEMENTARY_DEGREE + 1,
+    )
+
+    @model_validator(mode="after")
+    def require_canonical_coefficients(self) -> Self:
+        if len(self.coefficients) > 1 and self.coefficients[0] == "0":
+            raise ValueError("leading zero coefficients must be omitted")
+        if any(
+            len(coefficient.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS
+            for coefficient in self.coefficients
+        ):
+            raise ValueError("integer coefficient exceeds the decimal-digit budget")
+        return self
+
+
+class IntegerPolynomialRequest(ContractModel):
+    polynomial: IntegerPolynomial
+
+
+class IntegerPolynomialPairRequest(ContractModel):
+    left: IntegerPolynomial
+    right: IntegerPolynomial
+
+
+class IntegerPolynomialGcdResult(ContractModel):
+    gcd: IntegerPolynomial
+    left_content: CanonicalInteger
+    right_content: CanonicalInteger
+    gcd_content: CanonicalInteger
+    normalization: Literal["NONNEGATIVE_LEADING_COEFFICIENT"] = (
+        "NONNEGATIVE_LEADING_COEFFICIENT"
+    )
+
+
+class IntegerPolynomialContentResult(ContractModel):
+    content: CanonicalInteger
+    convention: Literal["NONNEGATIVE_COEFFICIENT_GCD"] = (
+        "NONNEGATIVE_COEFFICIENT_GCD"
+    )
+
+
+class IntegerPolynomialPrimitivePartResult(ContractModel):
+    content: CanonicalInteger
+    primitive_part: IntegerPolynomial
+    reconstruction: IntegerPolynomial
+    convention: Literal["NONNEGATIVE_CONTENT"] = "NONNEGATIVE_CONTENT"
+
+
+class IntegerPolynomialEvaluationRequest(IntegerPolynomialRequest):
+    point: CanonicalInteger
+
+    @model_validator(mode="after")
+    def require_bounded_point(self) -> Self:
+        if len(self.point.lstrip("-")) > _MAX_INTEGER_COEFFICIENT_DIGITS:
+            raise ValueError("evaluation point exceeds the decimal-digit budget")
+        return self
+
+
+class IntegerPolynomialEvaluationResult(ContractModel):
+    point: CanonicalInteger
+    value: CanonicalInteger
+
+
+class IntegerPolynomialCompositionRequest(ContractModel):
+    outer: IntegerPolynomial
+    inner: IntegerPolynomial
+
+    @model_validator(mode="after")
+    def require_bounded_output_degree(self) -> Self:
+        outer_degree = len(self.outer.coefficients) - 1
+        inner_degree = len(self.inner.coefficients) - 1
+        if outer_degree * inner_degree > _MAX_ELEMENTARY_DEGREE:
+            raise ValueError("composition exceeds the degree-127 output budget")
+        return self
+
+
+class IntegerPolynomialCompositionResult(ContractModel):
+    composition: IntegerPolynomial
+
+
+class RationalPolynomialRequest(ContractModel):
+    polynomial: RationalPolynomial
+
+    @model_validator(mode="after")
+    def require_univariate_budget(self) -> Self:
+        if len(self.polynomial.variables) != 1:
+            raise ValueError("elementary polynomial operations require one variable")
+        _require_polynomial_budget(
+            self.polynomial,
+            maximum_terms=_MAX_GCD_TERMS,
+            maximum_exponent=_MAX_ELEMENTARY_DEGREE,
+        )
+        return self
+
+
+class RationalPolynomialDivisionRequest(PolynomialPairRequest):
+    @model_validator(mode="after")
+    def require_division_budget(self) -> Self:
+        if len(self.left.variables) != 1:
+            raise ValueError("polynomial division requires one variable")
+        if not self.right.polynomial.terms:
+            raise ValueError("divisor polynomial must be nonzero")
+        for polynomial in (self.left, self.right):
+            _require_polynomial_budget(
+                polynomial,
+                maximum_terms=_MAX_GCD_TERMS,
+                maximum_exponent=_MAX_ELEMENTARY_DEGREE,
+            )
+        return self
+
+
+class RationalPolynomialDivisionResult(ContractModel):
+    quotient: RationalPolynomial
+    remainder: RationalPolynomial
+    reconstruction: RationalPolynomial
+
+
+class RationalPolynomialEvaluationRequest(RationalPolynomialRequest):
+    point: CanonicalRational
+
+
+class RationalPolynomialEvaluationResult(ContractModel):
+    point: CanonicalRational
+    value: CanonicalRational
+
+
+class RationalPolynomialDerivativeResult(ContractModel):
+    derivative: RationalPolynomial
+
+
+class RationalPolynomialIntegralResult(ContractModel):
+    antiderivative: RationalPolynomial
+    integration_constant: Literal["ZERO"] = "ZERO"
+
+
+class RationalFunctionRequest(ContractModel):
+    numerator: RationalPolynomial
+    denominator: RationalPolynomial
+
+    @model_validator(mode="after")
+    def require_matching_univariate_ring_and_budget(self) -> Self:
+        if self.numerator.variables != self.denominator.variables:
+            raise ValueError("numerator and denominator must use the same ring")
+        if len(self.numerator.variables) != 1:
+            raise ValueError("partial fractions require one variable")
+        if not self.denominator.polynomial.terms:
+            raise ValueError("denominator polynomial must be nonzero")
+        for polynomial in (self.numerator, self.denominator):
+            _require_polynomial_budget(
+                polynomial,
+                maximum_terms=_MAX_INVARIANT_TERMS,
+                maximum_exponent=_MAX_ELEMENTARY_DEGREE,
+            )
+        return self
+
+
+class RationalPartialFractionTerm(ContractModel):
+    numerator: RationalPolynomial
+    denominator_factor: RationalPolynomial
+    denominator_exponent: int = Field(ge=1, le=_MAX_ELEMENTARY_DEGREE)
+
+
+class RationalPartialFractionResult(ContractModel):
+    polynomial_part: RationalPolynomial
+    terms: tuple[RationalPartialFractionTerm, ...] = Field(max_length=128)
+    reconstruction_numerator: RationalPolynomial
+    reconstruction_denominator: RationalPolynomial
+    decomposition_field: Literal["QQ"] = "QQ"
+
+
 __all__ = [
+    "IntegerPolynomial",
+    "IntegerPolynomialCompositionRequest",
+    "IntegerPolynomialCompositionResult",
+    "IntegerPolynomialContentResult",
+    "IntegerPolynomialEvaluationRequest",
+    "IntegerPolynomialEvaluationResult",
+    "IntegerPolynomialGcdResult",
+    "IntegerPolynomialPairRequest",
+    "IntegerPolynomialPrimitivePartResult",
+    "IntegerPolynomialRequest",
     "PolynomialBezoutIdentity",
     "PolynomialDiscriminantRequest",
     "PolynomialDiscriminantResult",
@@ -295,4 +483,14 @@ __all__ = [
     "PolynomialSquareFreeFactor",
     "PolynomialSquareFreeRequest",
     "PolynomialValue",
+    "RationalFunctionRequest",
+    "RationalPartialFractionResult",
+    "RationalPartialFractionTerm",
+    "RationalPolynomialDerivativeResult",
+    "RationalPolynomialDivisionRequest",
+    "RationalPolynomialDivisionResult",
+    "RationalPolynomialEvaluationRequest",
+    "RationalPolynomialEvaluationResult",
+    "RationalPolynomialIntegralResult",
+    "RationalPolynomialRequest",
 ]
