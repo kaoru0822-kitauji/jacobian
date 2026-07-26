@@ -165,8 +165,9 @@ of catalog membership:
 - [fixed-registry graph invariant batches](graph-invariant-batch.md);
 - [bounded finite exactly-once coverage](finite-coverage-verification.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
-- [Lean declaration discovery contract](lean-declaration-discovery.md); and
-- [Lean formal intermediates](lean-formal-intermediates.md).
+- [Lean declaration discovery contract](lean-declaration-discovery.md);
+- [Lean formal intermediates](lean-formal-intermediates.md); and
+- [Lean statement proposal and direct elaboration](lean-statement-elaboration.md).
 
 ## Mathematical operation portfolio
 
