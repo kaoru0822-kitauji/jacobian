@@ -473,9 +473,10 @@ proof-support claim. See
 
 ### Python-FLINT first
 
-The first rational-solution slice is implemented; see the
+The rational-solution and integer row-HNF slices are implemented; see the
 [exact rational solution contract](../reference/linear-rational-solutions.md)
-and the
+and [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md).
+The rational-solution usability evidence is recorded in the
 [Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
 The remaining sequence stays demand-gated.
 
@@ -486,8 +487,9 @@ Implement one vertical slice at a time:
    `A x = b`. Failure to find a vector says nothing about consistency.
 2. Add an inconsistent-system outcome only with a separately checkable
    left-nullspace or equivalent certificate.
-3. Add `matrix.normal_form.hermite` only when the pinned binding returns enough
-   transformation data to check the exact relation and normal-form conditions.
+3. `matrix.normal_form.hermite` is implemented with the binding's complete
+   left transformation. Independent replay checks `H = U A`, unimodularity,
+   and every FLINT row-HNF condition.
 4. Add `polynomial.factor` with a product relation. Checking that the factors
    multiply to the input does not by itself certify irreducibility or
    completeness; keep those as open obligations until separately checked.
@@ -574,8 +576,10 @@ backlog.
     [exact rational solution contract](../reference/linear-rational-solutions.md)
     and the
     [Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
-12. Python-FLINT polynomial or integer-matrix slice chosen from transcript
-    demand.
+12. Python-FLINT integer-matrix row-HNF slice. Implemented; see the
+    [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md)
+    and the
+    [Python-FLINT HNF pilot](../reference/capability-workflow-evaluations.md#python-flint-hermite-normal-form-pilot).
 13. Typed expression AST and one SymPy polynomial-normalization slice.
 14. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
     and HiGHS from accumulated workflow evidence.

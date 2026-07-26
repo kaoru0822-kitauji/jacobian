@@ -34,6 +34,7 @@ from jacobian.finite_partition import (
     FinitePartitionInstallation,
     install_finite_partition,
 )
+from jacobian.flint_hnf import install_python_flint_hnf_capability
 from jacobian.flint_linear import install_python_flint_linear_capability
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.graph_isomorphism import (
@@ -58,6 +59,14 @@ from jacobian.matrix_capabilities import (
     MatrixInstallation,
     install_matrix_capabilities,
 )
+from jacobian.matrix_normal_form_capabilities import (
+    MatrixNormalFormCheckerInstallation,
+    install_matrix_normal_form_checker,
+)
+from jacobian.matrix_normal_forms import (
+    MatrixNormalFormArtifactService,
+    install_matrix_normal_form_artifacts,
+)
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
@@ -76,6 +85,7 @@ from jacobian.provider_runtime import (
     cvc5_provider_runtime,
     drat_trim_provider_runtime,
     lean_provider_runtime,
+    python_flint_hnf_provider_runtime,
     python_flint_provider_runtime,
 )
 from jacobian.references import (
@@ -145,6 +155,13 @@ class JacobianKernel:
             self.store,
             self.schemas,
             self.artifacts,
+        )
+        self.matrix_normal_forms: MatrixNormalFormArtifactService = (
+            install_matrix_normal_form_artifacts(
+                self.store,
+                self.schemas,
+                self.artifacts,
+            )
         )
         self.memory = ResearchMemory(self.store, self.schemas)
         self.workspaces = WorkspaceService(self.store, self.schemas)
@@ -318,6 +335,9 @@ class JacobianKernel:
                 )
             else:
                 self.register_capability(linear_find_adapter)
+        self._install_matrix_normal_form_capabilities(
+            authorize_checker=install_references
+        )
         self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
         if (
             self.cadical_runtime.availability
@@ -506,6 +526,47 @@ class JacobianKernel:
                 )
         for entrypoint in capability_adapter_entrypoints:
             self.register_capability(load_capability_adapter(entrypoint, self))
+
+    def _install_matrix_normal_form_capabilities(
+        self,
+        *,
+        authorize_checker: bool,
+    ) -> None:
+        self.matrix_normal_form_checker: MatrixNormalFormCheckerInstallation
+        verification_adapter, self.matrix_normal_form_checker = (
+            install_matrix_normal_form_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.matrix_normal_forms,
+                self.verification,
+                self.checkers,
+                authorize_checker=authorize_checker,
+            )
+        )
+        if verification_adapter is not None:
+            self.register_capability(verification_adapter)
+
+        self.python_flint_hnf_runtime: CapabilityProviderRuntime = (
+            python_flint_hnf_provider_runtime()
+        )
+        if (
+            self.python_flint_hnf_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            return
+        try:
+            adapter = install_python_flint_hnf_capability(
+                self.matrix_normal_forms,
+                self.python_flint_hnf_runtime,
+            )
+        except (OSError, ValueError) as exc:
+            _LOGGER.warning(
+                "Python-FLINT Hermite normal form is not installed: %s",
+                exc,
+            )
+        else:
+            self.register_capability(adapter)
 
     def register_capability(self, adapter: CapabilityAdapter) -> None:
         """Install an operator-owned adapter without changing the kernel or MCP."""

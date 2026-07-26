@@ -36,6 +36,7 @@ from jacobian.artifacts import ArtifactService
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.linear import LinearRationalSystem
+from jacobian.contracts.matrices import ExactIntegerMatrix
 from jacobian.contracts.sat import (
     CanonicalCnf,
     SatAssignmentArtifact,
@@ -65,6 +66,7 @@ PARTITION_REPORT_SCHEMA = CASES_ROOT / "partition-report.schema.json"
 SAT_REPORT_SCHEMA = CASES_ROOT / "sat-report.schema.json"
 SMT_REPORT_SCHEMA = CASES_ROOT / "smt-report.schema.json"
 LINEAR_REPORT_SCHEMA = CASES_ROOT / "linear-report.schema.json"
+HNF_REPORT_SCHEMA = CASES_ROOT / "hnf-report.schema.json"
 LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
@@ -93,6 +95,12 @@ LINEAR_CAPABILITY_IDS = frozenset(
     {
         "linear.rational_solution.find",
         "linear.rational_solution.verify",
+    }
+)
+HNF_CAPABILITY_IDS = frozenset(
+    {
+        "matrix.normal_form.hermite",
+        "matrix.normal_form.hermite.verify",
     }
 )
 LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
@@ -220,6 +228,25 @@ verification. Report VERIFIED only when the verifier returns
 VERIFIED_SOLUTION and copy the exact system, solution, and
 verification-record URIs. Copy the producer's ordered solution values in the
 declared variable order.
+"""
+
+HNF_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. You may write and run local code
+in the empty workspace. Return exact integer matrices H and U such that H is
+the row Hermite normal form of the supplied A and H = U A with det(U) = +/-1.
+Report SELF_CHECKED and UNVERIFIED, with null durable artifact and
+verification-record URIs.
+"""
+
+HNF_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create programs. Describe the exact capability IDs matrix.normal_form.hermite
+and matrix.normal_form.hermite.verify directly. Invoke the producer on the
+supplied exact integer matrix, then pass its normal_form_uri to the verifier in
+VERIFY mode. Provider output alone is not verification. Report VERIFIED only
+when the verifier returns VERIFIED_HERMITE_NORMAL_FORM. Copy the producer's
+exact H and U entries and the exact matrix, normal-form, and verification-record
+URIs.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\
@@ -561,6 +588,287 @@ def _score_linear_report(
             "independent checker replay",
         ],
     }
+
+
+def _hnf_case_matrix(case: Mapping[str, Any]) -> ExactIntegerMatrix:
+    matrix = case.get("matrix")
+    if not isinstance(matrix, Mapping):
+        raise BenchmarkError("HNF case must contain an exact integer matrix")
+    try:
+        return ExactIntegerMatrix.model_validate(matrix)
+    except ValueError as exc:
+        raise BenchmarkError("HNF case contains an invalid integer matrix") from exc
+
+
+def _reported_hnf_matrix(
+    report: Mapping[str, Any],
+    field: str,
+) -> ExactIntegerMatrix:
+    entries = report.get(field)
+    if not isinstance(entries, list):
+        raise BenchmarkError(f"HNF report omitted {field}")
+    try:
+        return ExactIntegerMatrix(entries=entries)
+    except ValueError as exc:
+        raise BenchmarkError(f"HNF report contains an invalid {field}") from exc
+
+
+def _integer_entries(matrix: ExactIntegerMatrix) -> list[list[int]]:
+    return [[int(value) for value in row] for row in matrix.entries]
+
+
+def _multiply_integer_matrices(
+    left: list[list[int]],
+    right: list[list[int]],
+) -> list[list[int]]:
+    return [
+        [
+            sum(
+                left_value * right[row][column]
+                for row, left_value in enumerate(left_row)
+            )
+            for column in range(len(right[0]))
+        ]
+        for left_row in left
+    ]
+
+
+def _integer_determinant_bareiss(matrix: list[list[int]]) -> int:
+    size = len(matrix)
+    if any(len(row) != size for row in matrix):
+        raise BenchmarkError("HNF transformation must be square")
+    if size == 1:
+        return matrix[0][0]
+    work = [row[:] for row in matrix]
+    sign = 1
+    previous_pivot = 1
+    for column in range(size - 1):
+        pivot_row = next(
+            (row for row in range(column, size) if work[row][column] != 0),
+            None,
+        )
+        if pivot_row is None:
+            return 0
+        if pivot_row != column:
+            work[column], work[pivot_row] = work[pivot_row], work[column]
+            sign = -sign
+        pivot = work[column][column]
+        for row in range(column + 1, size):
+            for target_column in range(column + 1, size):
+                numerator = (
+                    work[row][target_column] * pivot
+                    - work[row][column] * work[column][target_column]
+                )
+                quotient, remainder = divmod(numerator, previous_pivot)
+                if remainder:
+                    raise BenchmarkError("HNF determinant oracle division failed")
+                work[row][target_column] = quotient
+            work[row][column] = 0
+        previous_pivot = pivot
+    return sign * work[-1][-1]
+
+
+def _is_row_hnf_oracle(matrix: list[list[int]]) -> bool:
+    last_nonzero_row = -1
+    for row, values in enumerate(matrix):
+        if any(value != 0 for value in values):
+            last_nonzero_row = row
+    previous_pivot_column = -1
+    for row in range(last_nonzero_row + 1):
+        pivot_column = next(
+            (column for column, value in enumerate(matrix[row]) if value != 0),
+            None,
+        )
+        if pivot_column is None or pivot_column <= previous_pivot_column:
+            return False
+        pivot = matrix[row][pivot_column]
+        if pivot < 0 or any(
+            matrix[above][pivot_column] < 0 or matrix[above][pivot_column] >= pivot
+            for above in range(row)
+        ):
+            return False
+        previous_pivot_column = pivot_column
+    return all(
+        all(value == 0 for value in matrix[row])
+        for row in range(last_nonzero_row + 1, len(matrix))
+    )
+
+
+def _score_hnf_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    shell_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    source = _hnf_case_matrix(case)
+    normal_form = _reported_hnf_matrix(report, "normal_form")
+    transformation = _reported_hnf_matrix(report, "transformation")
+    source_entries = _integer_entries(source)
+    normal_entries = _integer_entries(normal_form)
+    transform_entries = _integer_entries(transformation)
+    if (
+        len(normal_entries) != len(source_entries)
+        or len(normal_entries[0]) != len(source_entries[0])
+        or len(transform_entries) != len(source_entries)
+        or len(transform_entries[0]) != len(source_entries)
+        or _multiply_integer_matrices(transform_entries, source_entries)
+        != normal_entries
+        or abs(_integer_determinant_bareiss(transform_entries)) != 1
+        or not _is_row_hnf_oracle(normal_entries)
+    ):
+        raise BenchmarkError("HNF report fails the independent exact oracle")
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("status") != "NORMAL_FORM_PRODUCED"
+        or report.get("conclusion") != "TRUE"
+    ):
+        raise BenchmarkError("HNF report has the wrong case, status, or conclusion")
+    _validate_feedback(report.get("feedback"))
+
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("HNF control used an MCP tool")
+        if (
+            report.get("assurance") != "SELF_CHECKED"
+            or report.get("final_verification") != "UNVERIFIED"
+            or report.get("matrix_uri") is not None
+            or report.get("normal_form_uri") is not None
+            or report.get("verification_record_uri") is not None
+        ):
+            raise BenchmarkError(
+                "HNF control must remain self-checked without durable evidence"
+            )
+        return {
+            "passed": True,
+            "false_certification": False,
+            "replay_success": False,
+            "checks": [
+                "independent exact HNF oracle",
+                "no-Jacobian control isolation",
+            ],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if shell_calls:
+        raise BenchmarkError("HNF treatment used a shell command")
+    if "capability.invoke" not in mcp_calls:
+        raise BenchmarkError("HNF treatment did not invoke a Jacobian capability")
+    if (
+        report.get("assurance") != "VERIFIED"
+        or report.get("final_verification") != "VERIFIED"
+    ):
+        raise BenchmarkError("HNF treatment did not report verified assurance")
+    matrix_uri = report.get("matrix_uri")
+    normal_form_uri = report.get("normal_form_uri")
+    record_uri = report.get("verification_record_uri")
+    if not all(
+        isinstance(uri, str) for uri in (matrix_uri, normal_form_uri, record_uri)
+    ):
+        raise BenchmarkError("HNF treatment omitted durable artifact URIs")
+    assert isinstance(matrix_uri, str)
+    assert isinstance(normal_form_uri, str)
+    assert isinstance(record_uri, str)
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    try:
+        resolved = kernel.matrix_normal_forms.resolve_hermite_normal_form(
+            normal_form_uri
+        )
+        record_artifact = kernel.store.get(record_uri)
+        record = VerificationRecord.model_validate(record_artifact.payload)
+        semantics = kernel.store.get(
+            kernel.matrix_normal_forms.installation.semantics_uri
+        )
+    except (StoreError, ValueError) as exc:
+        raise BenchmarkError("HNF treatment artifacts are unavailable") from exc
+    if (
+        resolved.matrix != source
+        or resolved.candidate.normal_form != normal_form
+        or resolved.candidate.transformation != transformation
+        or resolved.matrix_artifact.artifact_uri != matrix_uri
+        or matrix_uri not in resolved.artifact.manifest.parents
+        or record.conclusion.value != "TRUE"
+        or record.bindings.claim_digest
+        != resolved.matrix_artifact.manifest.object_digest
+        or record.bindings.semantics_digest != semantics.manifest.object_digest
+        or record.bindings.candidate_digest != resolved.artifact.manifest.object_digest
+        or not {matrix_uri, normal_form_uri, record.evidence_uri}.issubset(
+            record_artifact.manifest.parents
+        )
+    ):
+        raise BenchmarkError("HNF verification record is not exactly bound")
+
+    produced_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_input = invocation.get("input")
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == "matrix.normal_form.hermite"
+            and isinstance(invocation_input, Mapping)
+            and _matches_integer_matrix(invocation_input.get("matrix"), source)
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("matrix_uri") == matrix_uri
+            and invocation_output.get("normal_form_uri") == normal_form_uri
+            and normal_form_uri in (invocation.get("artifact_uris") or [])
+        ):
+            produced_index = index
+        if (
+            produced_index is not None
+            and index > produced_index
+            and invocation.get("capability_id") == "matrix.normal_form.hermite.verify"
+            and invocation_input == {"normal_form_uri": normal_form_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("verification_record_uri") == record_uri
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            and record_uri in (invocation.get("artifact_uris") or [])
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError("HNF treatment lacks an ordered compute-to-verify trace")
+
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.normal_form.hermite.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"normal_form_uri": normal_form_uri},
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.assurance.verification_record_uri != record_uri
+        or replay.output.get("conclusion") != "TRUE"
+        or replay.output.get("matrix_uri") != matrix_uri
+        or replay.output.get("normal_form_uri") != normal_form_uri
+    ):
+        raise BenchmarkError("HNF treatment evidence does not replay independently")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "independent exact HNF oracle",
+            "durable source and candidate binding",
+            "ordered compute-to-verify trace",
+            "independent checker replay",
+        ],
+    }
+
+
+def _matches_integer_matrix(
+    value: object,
+    expected: ExactIntegerMatrix,
+) -> bool:
+    try:
+        return ExactIntegerMatrix.model_validate(value) == expected
+    except ValueError:
+        return False
 
 
 def _score_sat_report(
@@ -951,6 +1259,16 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "matrix_hermite_normal_form":
+        return _score_hnf_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            shell_calls=shell_calls,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "linear_rational_solution":
         return _score_linear_report(
             case,
@@ -1855,6 +2173,12 @@ def _codex_command(
 
 
 def _condition_instructions(task_type: object, condition: str) -> str:
+    if task_type == "matrix_hermite_normal_form":
+        return (
+            HNF_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else HNF_TREATMENT_INSTRUCTIONS
+        )
     if task_type == "linear_rational_solution":
         return (
             LINEAR_CONTROL_INSTRUCTIONS
@@ -1917,6 +2241,7 @@ def _run_condition(
     is_sat = case.get("task_type") == "sat_decision"
     is_smt = case.get("task_type") == "smt_unsat_proof"
     is_linear = case.get("task_type") == "linear_rational_solution"
+    is_hnf = case.get("task_type") == "matrix_hermite_normal_form"
     is_lean_declaration = case.get("task_type") == "lean_declaration"
     is_lean_proof = case.get("task_type") == "lean_proof"
     sat_context = ""
@@ -1934,6 +2259,14 @@ def _run_condition(
             + json.dumps(system.model_dump(mode="json"), sort_keys=True)
             + "\n"
         )
+    hnf_context = ""
+    if is_hnf:
+        matrix = _hnf_case_matrix(case)
+        hnf_context = (
+            "\nThe exact integer matrix A for this case is:\n"
+            + json.dumps(matrix.model_dump(mode="json"), sort_keys=True)
+            + "\n"
+        )
     condition_instructions = _condition_instructions(
         case.get("task_type"),
         condition,
@@ -1942,6 +2275,7 @@ def _run_condition(
         condition_instructions
         + sat_context
         + linear_context
+        + hnf_context
         + "\n"
         + COMMON_PROMPT.format(**case)
     )
@@ -1969,6 +2303,8 @@ def _run_condition(
             if is_smt
             else LINEAR_REPORT_SCHEMA
             if is_linear
+            else HNF_REPORT_SCHEMA
+            if is_hnf
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
@@ -2088,6 +2424,12 @@ def _run_condition(
                 and report.get("final_verification") == "VERIFIED"
                 and not score.get("passed")
             )
+            or (
+                is_hnf
+                and isinstance(report, dict)
+                and report.get("final_verification") == "VERIFIED"
+                and not score.get("passed")
+            )
         ),
         "intervention_attempted": bool(
             (
@@ -2108,6 +2450,10 @@ def _run_condition(
                     telemetry["capability_attempt_ids"]
                 )
             )
+            or (
+                is_hnf
+                and HNF_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
+            )
         ),
         "intervention_used": bool(
             (
@@ -2120,6 +2466,7 @@ def _run_condition(
                 is_linear
                 and LINEAR_CAPABILITY_IDS.intersection(telemetry["capability_ids"])
             )
+            or (is_hnf and HNF_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
         ),
         "operational_failure": bool(score.get("operational_failure")),
         "score": score,

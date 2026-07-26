@@ -220,6 +220,49 @@ def _linear_report(
     }
 
 
+def _hnf_case() -> dict[str, Any]:
+    return {
+        "case_id": "HNF-PRIVATE-TEST-001",
+        "version": "1",
+        "task_type": "matrix_hermite_normal_form",
+        "prompt": "Compute the exact row Hermite normal form.",
+        "matrix": {
+            "entries": [
+                ["0", "2", "4"],
+                ["0", "6", "8"],
+            ]
+        },
+    }
+
+
+def _hnf_report(
+    *,
+    matrix_uri: str | None,
+    normal_form_uri: str | None,
+    record_uri: str | None,
+    assurance: str,
+    final_verification: str,
+) -> dict[str, Any]:
+    return {
+        "case_id": "HNF-PRIVATE-TEST-001",
+        "status": "NORMAL_FORM_PRODUCED",
+        "conclusion": "TRUE",
+        "normal_form": [["0", "2", "0"], ["0", "0", "4"]],
+        "transformation": [["-2", "1"], ["3", "-1"]],
+        "assurance": assurance,
+        "final_verification": final_verification,
+        "matrix_uri": matrix_uri,
+        "normal_form_uri": normal_form_uri,
+        "verification_record_uri": record_uri,
+        "limitations": ["the exact supplied integer matrix only"],
+        "feedback": {
+            "reasoning_focus": ["preserve row-HNF and transform conventions"],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+
+
 def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     schema_path = PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -1585,6 +1628,101 @@ def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
     with pytest.raises(
         cast(type[Exception], BENCHMARK["BenchmarkError"]),
         match="does not satisfy",
+    ):
+        score_report(
+            case,
+            wrong,
+            condition="control",
+            state_dir=state_dir,
+            mcp_calls=[],
+        )
+
+
+def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
+    tmp_path: Path,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = _hnf_case()
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.normal_form.hermite",
+            mode=CapabilityMode.EXPLORE,
+            input={"matrix": case["matrix"]},
+        )
+    )
+    normal_form_uri = cast(str, computed.output["normal_form_uri"])
+    matrix_uri = cast(str, computed.output["matrix_uri"])
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.normal_form.hermite.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"normal_form_uri": normal_form_uri},
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+
+    control = score_report(
+        case,
+        _hnf_report(
+            matrix_uri=None,
+            normal_form_uri=None,
+            record_uri=None,
+            assurance="SELF_CHECKED",
+            final_verification="UNVERIFIED",
+        ),
+        condition="control",
+        state_dir=state_dir,
+        mcp_calls=[],
+    )
+    assert control["passed"] is True
+
+    treatment = score_report(
+        case,
+        _hnf_report(
+            matrix_uri=matrix_uri,
+            normal_form_uri=normal_form_uri,
+            record_uri=record_uri,
+            assurance="VERIFIED",
+            final_verification="VERIFIED",
+        ),
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[
+            {
+                "capability_id": "matrix.normal_form.hermite",
+                "input": {"matrix": case["matrix"]},
+                "output": computed.output,
+                "artifact_uris": computed.artifact_uris,
+            },
+            {
+                "capability_id": "matrix.normal_form.hermite.verify",
+                "input": {"normal_form_uri": normal_form_uri},
+                "output": verified.output,
+                "artifact_uris": verified.artifact_uris,
+                "assurance": verified.assurance.model_dump(mode="json"),
+            },
+        ],
+    )
+
+    assert treatment["passed"] is True
+    assert treatment["false_certification"] is False
+    assert treatment["replay_success"] is True
+
+    wrong = _hnf_report(
+        matrix_uri=None,
+        normal_form_uri=None,
+        record_uri=None,
+        assurance="SELF_CHECKED",
+        final_verification="UNVERIFIED",
+    )
+    wrong["transformation"][0][0] = "0"
+    with pytest.raises(
+        cast(type[Exception], BENCHMARK["BenchmarkError"]),
+        match="independent exact oracle",
     ):
         score_report(
             case,

@@ -140,14 +140,16 @@ construction and properties, exact rational polynomial maps, finite magma law
 evaluation and countermodel search, reference-domain exploration and
 verification, Lean checking, and local research-memory search.
 
-The optional `flint` extra pins Python-FLINT 0.9.0 and adds
-`linear.rational_solution.find` for one exact finite rational `A x = b`
-candidate. A returned vector remains `COMPUTED`; a not-found outcome makes no
-consistency claim. With bundled references enabled,
-`linear.rational_solution.verify` independently replays every equation using
-standard-library exact rational arithmetic and alone may create a bound
-verification record. See the
-[exact rational solution contract](docs/reference/linear-rational-solutions.md).
+The optional `flint` extra pins Python-FLINT 0.9.0 and adds two exact producer
+slices. `linear.rational_solution.find` returns one finite rational `A x = b`
+candidate, while `matrix.normal_form.hermite` returns integer matrices `H` and
+`U` for the proposed relation `H = U A`. Both remain `COMPUTED`. With bundled
+references enabled, separate standard-library checkers can verify every
+rational equation or the full HNF relation, unimodularity, and row-normal-form
+conditions. See the
+[exact rational solution contract](docs/reference/linear-rational-solutions.md)
+and the
+[integer matrix HNF contract](docs/reference/matrix-hermite-normal-form.md).
 
 The base kernel also registers canonical CNF, total assignment, and raw DRAT
 proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional

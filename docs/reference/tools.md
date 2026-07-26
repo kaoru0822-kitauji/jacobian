@@ -170,10 +170,12 @@ provider identity is available:
 | `sat.unsat_proof.find` | With CaDiCaL 3.0.1, preserve raw DRAT evidence without certifying UNSAT. |
 | `smt.unsat_proof.find` | With the `smt` extra and cvc5 1.3.4, preserve raw Alethe for one pinned-profile QF query, expose holes, and retain `UNKNOWN`. |
 | `linear.rational_solution.find` | With the `flint` extra and Python-FLINT 0.9.0, produce one exact rational vector for a declared `A x = b` system; not-found remains a non-conclusion. |
+| `matrix.normal_form.hermite` | With the `flint` extra and Python-FLINT 0.9.0, produce exact `H` and `U` for the proposed row-HNF relation `H = U A`; the provider does not verify the relation or form. |
 
 See the [SAT artifact contracts](sat-artifacts.md) and
 [SMT Alethe artifact contracts](smt-artifacts.md), and
-[exact rational solution artifacts](linear-rational-solutions.md) for exact
+[exact rational solution artifacts](linear-rational-solutions.md) and
+[integer matrix Hermite normal form](matrix-hermite-normal-form.md) for exact
 input profiles, resource bounds, artifact bindings, and independent
 verification boundaries.
 
@@ -187,6 +189,7 @@ When the operator enables bundled references, the catalog also includes:
 | `lean.proof_state.apply_tactic` | Apply one tactic through the pinned Lean REPL and materialize the resulting goals and replay source. |
 | `lean.retrieve.premises` | Ask pinned Mathlib `exact?` for bounded candidate tactics and declaration references for one proof state. |
 | `linear.rational_solution.verify` | Independently replay every equation for one exact stored vector; rejection does not prove inconsistency. |
+| `matrix.normal_form.hermite.verify` | Independently check `H = U A`, `det(U) = ±1`, and every FLINT row-HNF condition for one exact stored candidate. |
 
 The two exploratory Lean capabilities use the maintained
 `leanprover-community/repl` JSON protocol pinned in the Lake manifest. Their
