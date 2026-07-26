@@ -98,6 +98,9 @@ goals are part of the working project record. Start with:
   contract, ownership boundaries, agent-facing API, and evaluation direction.
 - [Product goals](docs/explanation/goals.md) for the rolling priorities and
   planning model.
+- [Atomic capability portfolio](docs/contributing/atomic-capability-portfolio.md)
+  for the formal-first backend order, installation tradeoffs, and per-slice
+  evaluation gates.
 - [Architecture decision log](docs/explanation/adr/index.md) for accepted
   cross-cutting decisions and their release scope.
 - [Epistemic workspace ADR](docs/explanation/adr/0005-direct-epistemic-workspaces.md)
