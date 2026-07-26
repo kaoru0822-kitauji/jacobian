@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "case_id": {"type": "string"},
+    "status": {"enum": ["SATISFIABLE", "UNSATISFIABLE", "UNKNOWN"]},
+    "conclusion": {"enum": ["TRUE", "UNKNOWN"]},
+    "assurance": {"enum": ["SELF_CHECKED", "COMPUTED", "VERIFIED"]},
+    "final_verification": {"enum": ["UNVERIFIED", "VERIFIED"]},
+    "evidence_kind": {"enum": ["ASSIGNMENT", "UNSAT_PROOF", "NONE"]},
+    "assignment": {
+      "type": ["object", "null"],
+      "additionalProperties": {"type": "boolean"}
+    },
+    "cnf_uri": {
+      "type": "string",
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "evidence_uri": {
+      "type": ["string", "null"],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "verification_record_uri": {
+      "type": ["string", "null"],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "reasoning_focus": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "infrastructure_work": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "tooling_gaps": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "required": ["reasoning_focus", "infrastructure_work", "tooling_gaps"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "case_id",
+    "status",
+    "conclusion",
+    "assurance",
+    "final_verification",
+    "evidence_kind",
+    "assignment",
+    "cnf_uri",
+    "evidence_uri",
+    "verification_record_uri",
+    "limitations",
+    "feedback"
+  ],
+  "additionalProperties": false
+}

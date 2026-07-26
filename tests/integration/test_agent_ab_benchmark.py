@@ -10,9 +10,14 @@ import pytest
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
+    CapabilityInstallTier,
     CapabilityMode,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
     CapabilityRequest,
 )
+from jacobian.contracts.sat import SatResourceBudget
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
@@ -57,6 +62,48 @@ def _write_private_case(tmp_path: Path) -> Path:
     path = tmp_path / "private-case.json"
     path.write_text(json.dumps(_lean_proof_case()), encoding="utf-8")
     return path
+
+
+def _sat_producer() -> CapabilityProviderRuntime:
+    return CapabilityProviderRuntime(
+        provider="cadical",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version="3.0.1",
+        digest="sha256:" + "d" * 64,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform="linux-x86_64",
+        install_tier=CapabilityInstallTier.T2,
+        license_id="MIT",
+    )
+
+
+def _sat_report(
+    *,
+    case_id: str,
+    cnf_uri: str,
+    assignment_uri: str | None,
+    record_uri: str | None,
+    assurance: str,
+    final_verification: str,
+) -> dict[str, Any]:
+    return {
+        "case_id": case_id,
+        "status": "SATISFIABLE",
+        "conclusion": "TRUE",
+        "assurance": assurance,
+        "final_verification": final_verification,
+        "evidence_kind": "ASSIGNMENT",
+        "assignment": {"a": False, "b": True},
+        "cnf_uri": cnf_uri,
+        "evidence_uri": assignment_uri,
+        "verification_record_uri": record_uri,
+        "limitations": ["exact supplied CNF only"],
+        "feedback": {
+            "reasoning_focus": ["distinguish model production from verification"],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
 
 
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:
@@ -1125,3 +1172,129 @@ def test_ab_lean_codex_command_uses_same_mcp_with_control_ablation(
     assert "agent_ab_mcp.py" in " ".join(treatment)
     assert " ".join(control).count("--exclude-capability") == 2
     assert "--exclude-capability" not in " ".join(treatment)
+
+
+def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
+    tmp_path: Path,
+) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    case = {
+        "case_id": "SAT-PRIVATE-TEST-001",
+        "version": "1",
+        "task_type": "sat_decision",
+        "prompt": "Decide the private CNF.",
+        "variable_names": ["a", "b"],
+        "clauses": [[1, 2], [-1, 2]],
+        "expected": {"status": "SATISFIABLE"},
+    }
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    cnf = kernel.sat.put_cnf(
+        variable_names=("a", "b"),
+        clauses=((1, 2), (-1, 2)),
+    )
+    assignment = kernel.sat.put_assignment(
+        cnf_uri=cnf.artifact_uri,
+        values=(False, True),
+        producer=_sat_producer(),
+        resource_budget=SatResourceBudget(wall_seconds=5),
+    )
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.model.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"assignment_uri": assignment.artifact_uri},
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+
+    control = score_report(
+        case,
+        _sat_report(
+            case_id=str(case["case_id"]),
+            cnf_uri=cnf.artifact_uri,
+            assignment_uri=None,
+            record_uri=None,
+            assurance="SELF_CHECKED",
+            final_verification="UNVERIFIED",
+        ),
+        condition="control",
+        state_dir=state_dir,
+        mcp_calls=[],
+    )
+    assert control["passed"] is True
+
+    treatment = score_report(
+        case,
+        _sat_report(
+            case_id=str(case["case_id"]),
+            cnf_uri=cnf.artifact_uri,
+            assignment_uri=assignment.artifact_uri,
+            record_uri=record_uri,
+            assurance="VERIFIED",
+            final_verification="VERIFIED",
+        ),
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.invoke"],
+        capability_invocations=[
+            {
+                "capability_id": "sat.model.find",
+                "input": {
+                    "cnf_uri": cnf.artifact_uri,
+                    "resource_budget": {"wall_seconds": 5},
+                },
+                "output": {
+                    "cnf_uri": cnf.artifact_uri,
+                    "assignment_uri": assignment.artifact_uri,
+                },
+                "artifact_uris": [assignment.artifact_uri],
+            },
+            {
+                "capability_id": "sat.model.verify",
+                "input": {"assignment_uri": assignment.artifact_uri},
+                "output": verified.output,
+                "artifact_uris": verified.artifact_uris,
+                "assurance": verified.assurance.model_dump(mode="json"),
+            },
+        ],
+    )
+    assert treatment["passed"] is True
+    assert treatment["false_certification"] is False
+
+
+def test_ab_sat_scorer_rejects_unbound_verified_claim(tmp_path: Path) -> None:
+    score_report = cast(Any, BENCHMARK["score_report"])
+    benchmark_error = cast(type[Exception], BENCHMARK["BenchmarkError"])
+    case = {
+        "case_id": "SAT-PRIVATE-TEST-002",
+        "version": "1",
+        "task_type": "sat_decision",
+        "prompt": "Decide the private CNF.",
+        "variable_names": ["a"],
+        "clauses": [[1]],
+        "expected": {"status": "SATISFIABLE"},
+    }
+    state_dir = tmp_path / "state"
+    kernel = JacobianKernel(state_dir, install_references=True)
+    cnf = kernel.sat.put_cnf(variable_names=("a",), clauses=((1,),))
+    report = _sat_report(
+        case_id=str(case["case_id"]),
+        cnf_uri=cnf.artifact_uri,
+        assignment_uri="artifact://sha256/" + "a" * 64,
+        record_uri=None,
+        assurance="VERIFIED",
+        final_verification="VERIFIED",
+    )
+    report["assignment"] = {"a": True}
+
+    with pytest.raises(benchmark_error, match="not independently verified"):
+        score_report(
+            case,
+            report,
+            condition="treatment",
+            state_dir=state_dir,
+            mcp_calls=["capability.invoke"],
+            capability_invocations=[],
+        )
