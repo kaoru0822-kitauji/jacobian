@@ -33,16 +33,14 @@ jobs:
       - run: uv run --frozen deptry .
 
   test:
-    name: Tests (Python ${{ matrix.python-version }})
+    name: Tests (Python ${{ matrix.python-version }}, shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - python-version: "3.12"
-            coverage: true
-          - python-version: "3.13"
-            coverage: false
+        python-version: ["3.12", "3.13"]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -55,14 +53,56 @@ jobs:
             pyproject.toml
             uv.lock
       - run: uv sync --frozen --dev
-      - if: matrix.coverage
-        run: uv run --frozen pytest --cov --cov-report=xml --cov-report=term --durations=10
-      - if: ${{ !matrix.coverage }}
-        run: uv run --frozen pytest --durations=10
+      - if: matrix.python-version == '3.12'
+        run: >-
+          uv run --frozen pytest
+          --splits 2 --group ${{ matrix.shard }}
+          --splitting-algorithm least_duration
+          --cov --cov-report= --cov-fail-under=0
+          --durations=10
+      - if: matrix.python-version != '3.12'
+        run: >-
+          uv run --frozen pytest
+          --splits 2 --group ${{ matrix.shard }}
+          --splitting-algorithm least_duration
+          --durations=10
+      - if: matrix.python-version == '3.12'
+        run: mv .coverage .coverage.shard-${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
-        if: ${{ always() && matrix.coverage }}
+        if: ${{ always() && matrix.python-version == '3.12' }}
         with:
-          name: coverage-${{ matrix.python-version }}
+          name: coverage-data-${{ matrix.shard }}
+          path: .coverage.shard-${{ matrix.shard }}
+          include-hidden-files: true
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv sync --frozen --dev
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: coverage-data-*
+          path: coverage-data
+          merge-multiple: true
+      - run: uv run --frozen coverage combine coverage-data
+      - run: uv run --frozen coverage report
+      - run: uv run --frozen coverage xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-3.12
           path: coverage.xml
 
   duplicate-code:
@@ -163,7 +203,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.ref == 'refs/heads/main'
-    needs: [lint, test, duplicate-code, npm-package, build]
+    needs: [lint, test, coverage, duplicate-code, npm-package, build]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     steps:
