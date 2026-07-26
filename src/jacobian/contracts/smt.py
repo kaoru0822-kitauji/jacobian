@@ -21,7 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
 )
-from jacobian.contracts.common import ArtifactUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 
 SmtLogic = Literal["QF_UF", "QF_LIA", "QF_LRA"]
@@ -363,4 +363,42 @@ class SmtUnsatProofFindOutput(ContractModel):
             raise ValueError("a proof requires an UNSATISFIABLE solver report")
         if produced and self.contains_holes != (self.alethe_hole_count > 0):  # type: ignore[operator]
             raise ValueError("Alethe hole fields are inconsistent")
+        return self
+
+
+class SmtUnsatProofVerificationRequest(ContractModel):
+    """Verify one stored Alethe proof against its exact bound SMT query."""
+
+    proof_uri: ArtifactUri
+
+
+class SmtUnsatProofVerificationOutput(ContractModel):
+    """Model-facing projection of one independent strict Carcara replay."""
+
+    status: Literal[
+        "VERIFIED_UNSAT",
+        "REJECTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    problem_uri: ArtifactUri
+    proof_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_unsat_projection(self) -> Self:
+        if self.status == "VERIFIED_UNSAT":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified UNSAT output requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError(
+                "non-verified proof output cannot carry a conclusion or record"
+            )
         return self

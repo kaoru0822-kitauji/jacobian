@@ -116,7 +116,7 @@ Release contracts and engineering evidence are:
 - [SAT artifact contracts](docs/reference/sat-artifacts.md) for canonical CNF,
   raw model and proof identity, and independently checked total assignments.
 - [SMT Alethe artifact contracts](docs/reference/smt-artifacts.md) for the
-  pinned quantifier-free cvc5 producer and its unverified proof boundary.
+  pinned quantifier-free cvc5 producer and strict Carcara verification profile.
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
 - [Testing strategy](docs/reference/testing-strategy.md),
