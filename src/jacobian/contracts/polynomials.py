@@ -11,7 +11,7 @@ from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.contracts.common import ArtifactUri, CheckerUri
 from jacobian.contracts.exact import CanonicalRational
-from jacobian.contracts.results import Conclusion, ContractModel
+from jacobian.contracts.results import Conclusion, ContractModel, InputValidation
 
 PolynomialVariable = Annotated[
     str,
@@ -240,6 +240,27 @@ class PolynomialCollisionSearchRequest(ContractModel):
 class PolynomialCollisionSearchStopReason(StrEnum):
     FIRST_COLLISION = "FIRST_COLLISION"
     GRID_EXHAUSTED = "GRID_EXHAUSTED"
+
+
+class PolynomialCollisionVerifyRequest(ContractModel):
+    map: RationalPolynomialMap
+    first_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    second_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    claimed_image: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def require_collision_dimensions_and_distinct_points(self) -> Self:
+        dimension = len(self.map.variables)
+        if not (
+            len(self.first_point)
+            == len(self.second_point)
+            == len(self.claimed_image)
+            == dimension
+        ):
+            raise ValueError("collision points and image must match the map dimension")
+        if self.first_point == self.second_point:
+            raise ValueError("collision verification requires distinct points")
+        return self
 
 
 class PolynomialMapEvaluation(ContractModel):
@@ -503,3 +524,19 @@ class PolynomialCollisionSearchOutput(ContractModel):
         ):
             raise ValueError("not-found results require an exhausted grid")
         return self
+
+
+class PolynomialCollisionVerifyOutput(ContractModel):
+    collision_verified: bool
+    conclusion: Literal["FALSE", "UNKNOWN"]
+    verification_input: InputValidation
+    map_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri
+    first_point: tuple[CanonicalRational, ...]
+    second_point: tuple[CanonicalRational, ...]
+    claimed_image: tuple[CanonicalRational, ...]
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+    coverage: Literal["NOT_APPLICABLE"] = "NOT_APPLICABLE"

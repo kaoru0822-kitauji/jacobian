@@ -1,33 +1,83 @@
 # Jacobian
 
-Jacobian is an MCP server, CLI, and Python library that exposes composable
-mathematical capabilities to AI agents. Its goal is to help agents and human
-researchers make trustworthy progress on conjectures and other problems that
-benefit from executable search and checkable evidence.
+> A composable mathematical workbench for AI agents. Built for conjectures,
+> counterexamples, and checkable evidence.
 
-Capabilities have mathematically atomic, agent-visible outcomes: retrieve
-premises, construct an object, compute an invariant, transform a claim, search
-for a witness, or check a certificate. Agents compose these operations into
-research strategies. Optional workflows preserve their intermediate artifacts,
-and independent checkers verify exact claims and evidence.
+[![CI](https://github.com/morluto/jacobian/actions/workflows/ci.yml/badge.svg)](https://github.com/morluto/jacobian/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/jacobian)](https://pypi.org/project/jacobian/)
+[![npm](https://img.shields.io/npm/v/jacobian)](https://www.npmjs.com/package/jacobian)
+[![Python](https://img.shields.io/pypi/pyversions/jacobian)](https://pypi.org/project/jacobian/)
+[![License: MIT](https://img.shields.io/github/license/morluto/jacobian)](LICENSE)
 
-Each operation returns typed, inspectable results with explicit relationships,
-scope, execution status, assurance, and provenance. Existing mathematical
-software and domain plugins supply the mathematics; capability adapters expose
-it through a common contract. Jacobian supplies operations, artifacts,
-execution policy, and trust boundaries—not a prescribed research strategy.
+Jacobian is an MCP server, CLI, and Python library that gives AI agents
+composable mathematical capabilities for high-level mathematics. Agents
+retrieve premises, construct objects, compute invariants, search for
+witnesses, and independently verify certificates: the operations an agent
+needs to make trustworthy progress on conjectures and other problems where a
+model's answer is not enough and checkable evidence is what counts.
 
-The public kernel is domain-agnostic. Graphs, matrices, finite algebra,
-optimization problems, numerical claims, and formal proof goals acquire their
-mathematical meaning through plugins. Those plugins share the same artifact,
-evaluation, witness, shrinking, provenance, and verification substrate.
-Exploration may use models, heuristics, solvers, and external mathematical
-systems. Evidence that needs to become a trusted conclusion must enter a
-separate assurance lane:
+## Why Jacobian?
+
+Frontier models can now find counterexamples to open conjectures and propose
+proofs that span pages of subtle algebra. The hard part is no longer only the
+search. It is trust. A model's summary is not a proof, a solver's `SAT` label
+is not a witness, and a high score is not a theorem. Jacobian is built for
+that gap. It gives agents the operations to search, transform, and check
+mathematical objects, and it keeps search, evaluation, and verification in
+separate lanes so a claim becomes trusted only when an independent checker
+accepts evidence bound to the exact statement.
+
+This matters for the work that is hardest to verify by eye: a candidate
+counterexample to a long-standing conjecture, a polynomial map that should or
+should not be invertible, a finite witness that collapses a universal claim.
+Jacobian exposes those as typed, inspectable artifacts: the witness, the
+certificate, the rejected candidate, the stale attempt. A human reviewer or a
+downstream agent can see what was tried, what passed, and what did not.
+
+Each capability has one mathematically atomic, agent-visible outcome and
+returns typed results with explicit scope, execution status, assurance, and
+provenance. Existing mathematical software supplies the mathematics; capability
+adapters expose it through a common contract. Jacobian supplies operations,
+artifacts, execution policy, and trust boundaries, not a prescribed research
+strategy. The public kernel is domain-agnostic: graphs, matrices, finite
+algebra, optimization problems, and formal proof goals acquire their meaning
+through plugins that share the same artifact, evaluation, witness, and
+verification substrate.
 
 > Search and evaluation may be wrong. A result becomes verified only when an
 > operator-authorized checker accepts evidence bound to the exact claim,
 > semantics, candidate, scope, certificate format, and checker version.
+
+## Bundled capabilities
+
+The kernel ships with capabilities across several mathematical domains. Each
+one is a separately invocable operation with typed artifacts and explicit
+assurance; agents compose them into research strategies.
+
+- **Polynomial maps**: evaluate maps, compute Jacobians, search for and
+  independently verify collisions (the witness type that refutes invertibility
+  claims).
+- **Polynomial systems and factorization**: verify exact solutions, factor
+  polynomials, check identities.
+- **Linear algebra**: compute determinants, rank, and kernels; find and
+  verify exact rational `A x = b` solutions (optional `flint` extra).
+- **SAT**: find models and UNSAT proofs with CaDiCaL, independently replay
+  total assignments and DRAT proofs.
+- **SMT**: find UNSAT proofs with cvc5, independently replay Alethe proofs
+  with Carcara.
+- **Graphs**: construct graphs, compute properties, enumerate paths, realize
+  degree sequences, test isomorphism, search colorings.
+- **Universal algebra**: evaluate finite magma laws, search for
+  countermodels.
+- **Polytopes**: convex combinations, linear separation.
+- **Lean**: check proofs against pinned `CORE` and `MATHLIB` environments,
+  discover declarations, retrieve premises, apply tactics.
+- **Research memory**: durable, revisioned workspace for scratch entries,
+  findings, attempts, and dependency-linked context.
+
+See the [tool reference](docs/reference/tools.md) for the full contract per
+capability and the [atomic capability portfolio](docs/contributing/atomic-capability-portfolio.md)
+for the backend order and per-slice evaluation gates.
 
 ## Get started
 
@@ -39,7 +89,46 @@ uv sync --dev
 uv run jacobian --state-dir .jacobian init
 ```
 
-### macOS and Z3
+### A first verified result
+
+Find a graph with an incomplete path list, evaluate the claim, find an omitted
+path, and verify it with an independent checker. The full script is in
+[Find and verify a counterexample](docs/tutorials/first-verified-result.md);
+the core sequence is:
+
+```python
+# Evaluate whether the proposed path list is complete.
+evaluation = await tool(client, "capability.invoke", {
+    "capability_id": "evaluate.batch",
+    "mode": "EXPLORE",
+    "payload": {"claim_uri": claim_uri, "candidate_uris": [candidate_uri], ...},
+})
+# evaluation: FALSE HEURISTIC  <- heuristic evidence, not yet verified
+
+# Find a witness: an omitted path that defeats the candidate.
+found = await tool(client, "capability.invoke", {
+    "capability_id": "witness.find",
+    "mode": "EXPLORE",
+    "payload": {"claim_uri": claim_uri, "candidate_uri": candidate_uri, ...},
+})
+
+# Independently verify the witness with an authorized checker.
+verified = await tool(client, "capability.invoke", {
+    "capability_id": "witness.verify",
+    "mode": "VERIFY",
+    "payload": {"witness_uri": found["output"]["witness_uri"], ...},
+})
+# verification: FALSE VERIFIED  <- now a trusted conclusion
+```
+
+The gap between `FALSE HEURISTIC` and `FALSE VERIFIED` is the whole point:
+search produces evidence, an independent checker produces trust.
+
+Run `uv run jacobian --help` to inspect the CLI or `uv run jacobian-mcp` to
+start the MCP adapter.
+
+<details>
+<summary><strong>macOS and Z3</strong></summary>
 
 The locked environment currently uses `z3-solver` 4.16.0.0. Its upstream
 macOS wheels are built for macOS 15 or newer on both Apple silicon and Intel.
@@ -65,10 +154,7 @@ include that command output and the diagnostics above in a bug report. See the
 [`z3-solver` 4.16.0.0 files on PyPI](https://pypi.org/project/z3-solver/4.16.0.0/#files)
 for the upstream wheel compatibility tags.
 
-Then follow
-[Find and verify a counterexample](docs/tutorials/first-verified-result.md)
-for a complete first experiment. Run `uv run jacobian --help` to inspect the
-CLI or `uv run jacobian-mcp` to start the MCP adapter.
+</details>
 
 ## Direction
 
@@ -135,50 +221,34 @@ documentation placement, and pull-request expectations.
 Jacobian is implemented as a Python package, CLI, and local or remote MCP
 adapter. The agent-facing MCP surface uses `capability.describe` for exact
 contracts and `capability.invoke` for execution, backed by an extensible
-adapter registry and trust-labeled artifacts. Bundled capabilities cover graph
-construction and properties, exact rational polynomial maps, finite magma law
-evaluation and countermodel search, reference-domain exploration and
-verification, Lean checking, and local research-memory search.
+adapter registry and trust-labeled artifacts. See the
+[Bundled capabilities](#bundled-capabilities) section above for the operation
+portfolio, and the [tool reference](docs/reference/tools.md) for per-capability
+contracts.
 
-The optional `flint` extra pins Python-FLINT 0.9.0 and adds two exact producer
-slices. `linear.rational_solution.find` returns one finite rational `A x = b`
-candidate, while `matrix.normal_form.hermite` returns integer matrices `H` and
-`U` for the proposed relation `H = U A`. Both remain `COMPUTED`. With bundled
-references enabled, separate standard-library checkers can verify every
-rational equation or the full HNF relation, unimodularity, and row-normal-form
-conditions. See the
-[exact rational solution contract](docs/reference/linear-rational-solutions.md)
-and the
-[integer matrix HNF contract](docs/reference/matrix-hermite-normal-form.md).
+Some capabilities depend on optional backends that are not installed by
+default: CaDiCaL for SAT model and UNSAT proof finding, cvc5 for SMT UNSAT
+proof finding, and the `flint` extra for exact rational linear solutions and
+integer row Hermite normal forms. Provider output always remains unverified
+until a separate, independent checker accepts the bound witness or certificate.
+See the
+[SAT artifact contracts](docs/reference/sat-artifacts.md),
+[SMT artifact contracts](docs/reference/smt-artifacts.md), and
+[exact rational solution contract](docs/reference/linear-rational-solutions.md),
+and [integer matrix HNF contract](docs/reference/matrix-hermite-normal-form.md)
+for the verification boundaries.
 
-The base kernel also registers canonical CNF, total assignment, and raw DRAT
-proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
-`sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound
-model or text-DRAT evidence. Solver status and produced bytes remain
-unverified; assignment and proof checking are separate capability boundaries.
-With bundled references and an operator-provenanced pinned DRAT-trim runtime,
-`sat.unsat_proof.verify` can independently replay the exact CNF-bound proof and
-create a verification record. Runtime failure or proof rejection remains
-`UNKNOWN`.
-
-Three direct operational tools—`workspace.open`, `workspace.write`, and
-`workspace.query`—provide durable, revisioned paper-like working state outside
+Three direct operational tools, `workspace.open`, `workspace.write`, and
+`workspace.query`, provide durable, revisioned paper-like working state outside
 the mathematical capability and assurance model. Scratch entries, findings,
 attempts, focus, and append-only lifecycle marks remain agent-authored and
 `UNVERIFIED`. Explicit dependency links support bounded context retrieval and
 derived stale warnings without promoting a claim.
 
 All public capability contracts and artifact formats remain pre-stable unless
-a release specification explicitly says otherwise.
-
-Development commands and test-selection guidance live in
-[CONTRIBUTING.md](CONTRIBUTING.md) and the
+a release specification explicitly says otherwise. Development commands and
+test-selection guidance live in [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [testing strategy](docs/reference/testing-strategy.md).
-
-The MCP adapter remains isolated from the mathematical kernel. Exact
-finite-polytope generation uses Z3 rational constraints, but Z3 output remains
-unverified until the separate `Fraction`-based checker accepts the bound
-witness or certificate.
 
 ### MCP clients
 
