@@ -142,17 +142,13 @@ finite-polytope generation uses Z3 rational constraints, but Z3 output remains
 unverified until the separate `Fraction`-based checker accepts the bound
 witness or certificate.
 
-### Local Codex
+### MCP clients
 
-The repository includes a trusted-project Codex profile at
-`.codex/config.toml`. Run Codex from the repository root and inspect
-`jacobian_local` with `/mcp`; the profile starts `uv run jacobian-mcp` over
-STDIO with the compact two-tool capability surface and stores durable local state
-under the ignored `.jacobian/` directory. The profile advertises
-`capability.describe` and `capability.invoke`. Describe an unfamiliar
-capability before invoking it; reference domains include exact predicate and
-candidate schemas plus executable examples. `capability://catalog` remains a
-resource-level catalog for clients that support MCP resources.
+Configure a client against `jacobian-mcp` or the remote endpoint described
+below. The server advertises `capability.describe` and `capability.invoke`;
+describe an unfamiliar capability before invoking it.
+`capability://catalog` remains a resource-level catalog for clients that
+support MCP resources.
 
 For ChatGPT and other remote clients, the server supports Streamable HTTP and
 SSE, bearer-token authentication, and subject-bound tenant state. Follow
@@ -160,9 +156,9 @@ SSE, bearer-token authentication, and subject-bound tenant state. Follow
 are an initial controlled-deployment mechanism, not a full hosted identity
 platform.
 
-The public known-answer agent pilot launches a real Codex CLI against this
-profile and validates the resulting durable verification records rather than
-trusting the model's summary:
+The public known-answer agent pilot validates durable verification records
+rather than trusting the model's summary. It requires an operator-configured
+Jacobian MCP connector:
 
 ```sh
 uv run python benchmarks/agent_mcp.py
