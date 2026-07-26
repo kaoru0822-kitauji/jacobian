@@ -69,6 +69,8 @@ Python, npm, Lean, static, package, security, and duplicate-code lanes.
 Documentation plus npm or npm-only changes run npm packaging without the
 Python and Lean lanes. Source, dependency, workflow, mixed, empty, and unknown
 change sets run complete validation, as does every push to `main`.
+Required status contexts still complete after checking the plan when their
+expensive validation is intentionally omitted.
 Maintainers can add the `ci:full` label to force every lane or `ci:lean` to
 add real-Lean validation to an otherwise isolated plan. These overrides only
 add work; labels cannot reduce the fail-closed path classification.

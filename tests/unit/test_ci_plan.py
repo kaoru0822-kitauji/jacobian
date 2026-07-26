@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 PLANNER = Path(__file__).parents[2] / ".github" / "scripts" / "classify-ci-paths"
+VALIDATOR = Path(__file__).parents[2] / ".github" / "scripts" / "validate-ci-plan"
 
 
 @pytest.mark.parametrize(
@@ -152,3 +153,67 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
         "run-security": "false",
         "run-duplicate": "false",
     }
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("README.md",),
+        ("npm/package.json",),
+        ("src/jacobian/kernel.py",),
+        ("--force-lean", "--", "README.md"),
+        ("--force-lean", "--", "npm/package.json"),
+    ],
+)
+def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
+    plan = subprocess.run(
+        [PLANNER, *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+    subprocess.run([VALIDATOR], input=plan, check=True, text=True)
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        "",
+        "classification=docs\nrun-python=flase\n",
+        "classification=full\n"
+        "run-python=false\n"
+        "run-lean=false\n"
+        "run-npm=false\n"
+        "run-static=false\n"
+        "run-build=false\n"
+        "run-security=false\n"
+        "run-duplicate=false\n",
+        "classification=docs\n"
+        "classification=docs\n"
+        "run-python=false\n"
+        "run-lean=false\n"
+        "run-npm=false\n"
+        "run-static=false\n"
+        "run-build=false\n"
+        "run-security=false\n"
+        "run-duplicate=false\n",
+        "classification=docs\n"
+        "run-python=false\n"
+        "run-lean=false\n"
+        "run-npm=true\n"
+        "run-static=false\n"
+        "run-build=false\n"
+        "run-security=false\n"
+        "run-duplicate=false\n",
+    ],
+)
+def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> None:
+    completed = subprocess.run(
+        [VALIDATOR],
+        input=plan,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode != 0
