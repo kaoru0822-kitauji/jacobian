@@ -1,0 +1,108 @@
+"""Typed contracts for exact finite-graph invariant capabilities."""
+
+from __future__ import annotations
+
+from fractions import Fraction
+from typing import Annotated, Literal, Self
+
+from pydantic import Field, StringConstraints, model_validator
+
+from jacobian.contracts.common import ArtifactUri, CheckerUri
+from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.results import ContractModel
+
+GraphVertex = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=128, strict=True),
+]
+
+
+class GraphNeighborhoodIndependenceRequest(ContractModel):
+    graph_uri: ArtifactUri
+
+
+class GraphNeighborhoodIndependenceRecord(ContractModel):
+    vertex: GraphVertex
+    neighborhood: tuple[GraphVertex, ...] = Field(max_length=24)
+    independent_set: tuple[GraphVertex, ...] = Field(max_length=24)
+    independence_number: int = Field(ge=0, le=24)
+
+    @model_validator(mode="after")
+    def require_canonical_witness(self) -> Self:
+        if self.neighborhood != tuple(sorted(set(self.neighborhood))):
+            raise ValueError("neighborhood labels must be unique and sorted")
+        if self.independent_set != tuple(sorted(set(self.independent_set))):
+            raise ValueError("independent-set labels must be unique and sorted")
+        if not set(self.independent_set) <= set(self.neighborhood):
+            raise ValueError("independent-set witness must lie in the neighborhood")
+        if len(self.independent_set) != self.independence_number:
+            raise ValueError("independent-set witness size must match the optimum")
+        return self
+
+
+class GraphNeighborhoodIndependenceArtifact(ContractModel):
+    invariant_schema_version: Literal["1"] = "1"
+    graph_uri: ArtifactUri
+    records: tuple[GraphNeighborhoodIndependenceRecord, ...] = Field(max_length=256)
+    total: int = Field(ge=0)
+    average: CanonicalRational
+    maximum_neighborhood_order: Literal[24] = 24
+    backend: Literal["networkx"] = "networkx"
+    backend_version: str = Field(min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def require_complete_consistent_profile(self) -> Self:
+        vertices = tuple(record.vertex for record in self.records)
+        if vertices != tuple(sorted(set(vertices))):
+            raise ValueError("profile vertices must be unique and sorted")
+        if self.total != sum(record.independence_number for record in self.records):
+            raise ValueError("profile total must equal the sum of local optima")
+        expected_average = (
+            Fraction(self.total, len(self.records)) if self.records else Fraction(0)
+        )
+        if self.average.as_fraction() != expected_average:
+            raise ValueError("profile average must equal total divided by graph order")
+        return self
+
+
+class GraphNeighborhoodIndependenceClaim(ContractModel):
+    claim_schema_version: Literal["1"] = "1"
+    predicate: Literal["EXACT_NEIGHBORHOOD_INDEPENDENCE_PROFILE"] = (
+        "EXACT_NEIGHBORHOOD_INDEPENDENCE_PROFILE"
+    )
+    source_graph_uri: ArtifactUri
+
+
+class GraphNeighborhoodIndependenceReplayPayload(ContractModel):
+    method: Literal["EXACT_STDLIB_BRANCH_AND_BOUND"] = "EXACT_STDLIB_BRANCH_AND_BOUND"
+    source_graph_uri: ArtifactUri
+    invariant_uri: ArtifactUri
+
+
+class GraphNeighborhoodIndependenceOutput(ContractModel):
+    graph_uri: ArtifactUri
+    invariant_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    checker_id: CheckerUri | None = None
+    records: tuple[GraphNeighborhoodIndependenceRecord, ...]
+    total: int
+    average: CanonicalRational
+    exactness: Literal["EXACT"] = "EXACT"
+    completeness: Literal["COMPLETE"] = "COMPLETE"
+    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
+    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+    certificate_available: Literal[True] = True
+    backend: Literal["networkx"] = "networkx"
+    backend_version: str
+
+    @model_validator(mode="after")
+    def require_consistent_summary(self) -> Self:
+        if self.total != sum(record.independence_number for record in self.records):
+            raise ValueError("output total must equal the sum of local optima")
+        expected_average = (
+            Fraction(self.total, len(self.records)) if self.records else Fraction(0)
+        )
+        if self.average.as_fraction() != expected_average:
+            raise ValueError("output average must equal total divided by graph order")
+        return self
