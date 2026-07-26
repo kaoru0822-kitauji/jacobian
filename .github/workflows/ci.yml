@@ -31,7 +31,7 @@ jobs:
       - run: make typecheck
       - name: Check TODO comments reference issues
         run: |
-          violations="$(rg -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"
+          violations="$(rg --pcre2 -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"
           if [ -n "$violations" ]; then
             echo "::error::TODOs must reference an issue: TODO(#123)"
             echo "$violations"
@@ -173,6 +173,7 @@ jobs:
     timeout-minutes: 10
     needs: test
     permissions:
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
