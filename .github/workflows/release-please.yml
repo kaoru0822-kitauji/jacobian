@@ -1,0 +1,58 @@
+name: Release Please
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Update or create the release
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - id: validated-head
+        name: Require CI for the current main head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current=true
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            main_sha=$(
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" \
+                --jq '.object.sha'
+            )
+            if [ "$VALIDATED_SHA" != "$main_sha" ]; then
+              current=false
+              echo "Skipping stale CI result for \`$VALIDATED_SHA\`; current main is \`$main_sha\`." \
+                >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+      - if: steps.validated-head.outputs.current == 'true'
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        id: release
+      - name: Dispatch release publishing
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: >-
+          gh workflow run release.yml
+          --ref "$RELEASE_TAG"
+          --field tag="$RELEASE_TAG"

@@ -10,6 +10,8 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
     divisor = math.gcd(numerator, denominator)

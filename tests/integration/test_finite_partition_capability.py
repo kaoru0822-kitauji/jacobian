@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -8,6 +10,8 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _request(mode: CapabilityMode, *, missing_last: bool = False) -> CapabilityRequest:

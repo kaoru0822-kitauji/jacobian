@@ -13,6 +13,8 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import Conclusion
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _variable(name: str) -> dict[str, object]:
     return {"kind": "VARIABLE", "variable": name, "left": None, "right": None}

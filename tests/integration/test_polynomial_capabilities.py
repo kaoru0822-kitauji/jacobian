@@ -22,6 +22,8 @@ from jacobian.contracts.evidence import (
 from jacobian.contracts.results import Conclusion, InputStatus, Verification
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _wire_fraction(value: Fraction | int) -> dict[str, str]:
     rational = Fraction(value)

@@ -53,6 +53,11 @@ starts, `lean.check` is absent from `capability://catalog`, and no invocation is
 attempted. Explicit operator-installed adapters fail registration instead of
 silently falling back to another provider.
 
+The optional cvc5 Alethe producer follows the same rule. The exact 1.3.4 wheel
+must expose the required SMT-LIB parser and proof APIs and have a hashed RECORD
+manifest. Otherwise `smt.unsat_proof.find` is absent while the base kernel and
+SMT artifact schemas remain available.
+
 Source-backed adapters can construct metadata without importing their
 implementation:
 
@@ -73,6 +78,22 @@ runtime = source_provider_runtime(
 
 The adapter places `runtime` in its descriptor. Registration remains
 fail-closed if the source identity cannot be resolved.
+
+### External checker runtimes
+
+An independently authorized checker may itself depend on an external
+executable. In that case its `CheckerRegistration` carries an available
+`EXECUTABLE` provider runtime. The runtime identity contributes to the checker
+ID, is persisted with the authorization record, and is rehashed when the
+checker is selected and before and after clean-process execution. The
+verification environment digest also includes that runtime identity.
+
+Some executables do not provide a trustworthy machine-readable version. Their
+provider probe may require a strict operator-managed provenance sidecar that
+binds the expected upstream release and source commit to the locally measured
+executable digest. Such a sidecar records the operator's authorization basis;
+it is not mathematical evidence or upstream attestation. A missing, malformed,
+or digest-mismatched sidecar leaves the checker capability unavailable.
 
 ## Repeatable measurement
 

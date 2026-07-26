@@ -6,6 +6,8 @@ import pytest
 
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 @pytest.mark.integration
 @pytest.mark.subprocess

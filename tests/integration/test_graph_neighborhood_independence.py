@@ -12,6 +12,8 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import Conclusion
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 _LEFT = tuple(range(6))
 _RIGHT = tuple(range(6, 14))
 _MISSING = {

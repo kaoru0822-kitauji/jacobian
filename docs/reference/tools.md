@@ -138,6 +138,8 @@ The base installation currently includes these kernel capability IDs:
 | `polynomial.map.compute_jacobian` | Compute an exact Jacobian matrix and determinant for one sparse rational polynomial map. |
 | `polynomial.map.collision_witness` | Compare two exact point-evaluation artifacts and materialize a candidate collision witness. |
 | `polynomial.factor.compute` | Factor one univariate polynomial over QQ and materialize its exact reconstructed product without self-certifying irreducibility. |
+| `matrix.determinant.compute` | Compute the exact determinant of one square rational matrix and materialize the result. |
+| `matrix.rank.compute` | Compute the exact rank and pivot columns of one rectangular rational matrix. |
 | `universal_algebra.evaluate_laws` | Exhaust finite magma laws or return the first canonical failing valuation. |
 | `universal_algebra.search.countermodel` | Search all operation tables of one bounded carrier order for a source-law model falsifying a target law. |
 | `knowledge.search` | Retrieve locally indexed capability episodes without changing their assurance. |
@@ -148,6 +150,25 @@ for the same map, compares their declared canonical rational values, and
 exposes any resulting candidate witness for independent replay. It does not
 recompute or certify either evaluation. This keeps evaluation and witness
 construction separate while making their composition explicit to the agent.
+
+`matrix.determinant.compute` and `matrix.rank.compute` use deterministic exact
+rational arithmetic and return `COMPUTED` assurance. Their result artifacts
+remain unverified: a future independently implemented and operator-authorized
+checker must replay a determinant or rank claim before Jacobian may report
+`VERIFIED`.
+
+Optional exact runtimes add narrowly scoped operations only when their pinned
+provider identity is available:
+
+| Capability ID | Availability and outcome |
+| --- | --- |
+| `sat.model.find` | With CaDiCaL 3.0.1, preserve one total assignment candidate without certifying SAT. |
+| `sat.unsat_proof.find` | With CaDiCaL 3.0.1, preserve raw DRAT evidence without certifying UNSAT. |
+| `smt.unsat_proof.find` | With the `smt` extra and cvc5 1.3.4, preserve raw Alethe for one pinned-profile QF query, expose holes, and retain `UNKNOWN`. |
+
+See the [SAT artifact contracts](sat-artifacts.md) and
+[SMT Alethe artifact contracts](smt-artifacts.md) for exact input profiles,
+resource bounds, artifact bindings, and independent verification boundaries.
 
 When the operator enables bundled references, the catalog also includes:
 
