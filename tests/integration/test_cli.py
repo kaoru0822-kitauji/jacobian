@@ -27,7 +27,10 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
         "graph_paths",
         "matrices",
         "finite_polytopes",
+        "finite_magmas",
         "lean4",
+        "rational_polynomial_maps",
+        "simple_undirected_graphs",
     }
     assert catalog["erdos_straus"]["witness_checker_ids"][
         "erdos_straus.decomposition_table"

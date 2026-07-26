@@ -25,11 +25,15 @@ from jacobian.finite_partition import (
     FinitePartitionInstallation,
     install_finite_partition,
 )
-from jacobian.graph_capabilities import install_graph_capabilities
+from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.lean import LeanService
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
+from jacobian.polynomial_capabilities import (
+    PolynomialInstallation,
+    install_polynomial_capabilities,
+)
 from jacobian.polytope import PolytopeService
 from jacobian.references import (
     LeanCheckerInstallation,
@@ -44,6 +48,10 @@ from jacobian.shrinking import ShrinkService
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
+from jacobian.universal_algebra_capabilities import (
+    UniversalAlgebraInstallation,
+    install_universal_algebra_capabilities,
+)
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
 
@@ -166,12 +174,38 @@ class JacobianKernel:
             authorize_checker=install_references,
         )
         self.capabilities.register(finite_partition)
-        for graph_adapter in install_graph_capabilities(
+        self.graph: GraphInstallation
+        graph_adapters, self.graph = install_graph_capabilities(
             self.store,
             self.schemas,
             self.artifacts,
-        ):
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        for graph_adapter in graph_adapters:
             self.capabilities.register(graph_adapter)
+        self.polynomial: PolynomialInstallation
+        polynomial_adapters, self.polynomial = install_polynomial_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        for polynomial_adapter in polynomial_adapters:
+            self.capabilities.register(polynomial_adapter)
+        self.universal_algebra: UniversalAlgebraInstallation
+        universal_algebra_adapters, self.universal_algebra = (
+            install_universal_algebra_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.checkers,
+                authorize_checker=install_references,
+            )
+        )
+        for universal_algebra_adapter in universal_algebra_adapters:
+            self.capabilities.register(universal_algebra_adapter)
         if install_references:
             self.references = self.reference_installer.install_all()
             self.polytope_checkers = self.reference_installer.install_polytope_checkers(

@@ -127,8 +127,9 @@ Jacobian is implemented as a Python package, CLI, and local or remote MCP
 adapter. The agent-facing MCP surface uses `capability.describe` for exact
 contracts and `capability.invoke` for execution, backed by an extensible
 adapter registry and trust-labeled artifacts. Bundled capabilities cover graph
-construction and properties, reference-domain exploration and verification,
-Lean checking, and local research-memory search.
+construction and properties, exact rational polynomial maps, finite magma law
+evaluation and countermodel search, reference-domain exploration and
+verification, Lean checking, and local research-memory search.
 
 All public capability contracts and artifact formats remain pre-stable unless
 a release specification explicitly says otherwise.

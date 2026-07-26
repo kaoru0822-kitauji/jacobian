@@ -694,8 +694,11 @@ class ReferenceInstaller:
 def reference_catalog(
     references: dict[str, ReferenceInstallation],
     *,
+    graph: Any | None = None,
     polytope: Any | None = None,
     polytope_checkers: PolytopeCheckerInstallation | None = None,
+    polynomial: Any | None = None,
+    universal_algebra: Any | None = None,
     lean: dict[LeanEnvironment, LeanCheckerInstallation] | None = None,
 ) -> dict[str, Any]:
     """Return stable operator-facing identifiers for installed references."""
@@ -720,6 +723,22 @@ def reference_catalog(
         }
         for name, reference in sorted(references.items())
     }
+    if graph is not None:
+        catalog["simple_undirected_graphs"] = {
+            "domain_id": "jacobian.simple-undirected-graph",
+            "domain_version": "1",
+            "semantics_uri": graph.semantics_uri,
+            "graph_schema_uri": graph.graph_schema_uri,
+            "neighborhood_independence_schema_uri": graph.neighborhood_schema_uri,
+            "neighborhood_independence_claim_schema_uri": (
+                graph.neighborhood_claim_schema_uri
+            ),
+            "certificate_schema_uri": graph.certificate_schema_uri,
+            "neighborhood_independence_certificate_format": (
+                "graph.neighborhood_independence"
+            ),
+            "neighborhood_independence_checker_id": (graph.neighborhood_checker_id),
+        }
     if polytope is not None:
         catalog["finite_polytopes"] = {
             "semantics_uri": polytope.semantics_uri,
@@ -736,6 +755,36 @@ def reference_catalog(
                 if polytope_checkers is not None
                 else None
             ),
+        }
+    if polynomial is not None:
+        catalog["rational_polynomial_maps"] = {
+            "domain_id": "jacobian.rational-polynomial-map",
+            "domain_version": "1",
+            "semantics_uri": polynomial.semantics_uri,
+            "map_schema_uri": polynomial.map_schema_uri,
+            "evaluation_schema_uri": polynomial.evaluation_schema_uri,
+            "jacobian_schema_uri": polynomial.jacobian_schema_uri,
+            "claim_schema_uri": polynomial.claim_schema_uri,
+            "jacobian_claim_schema_uri": polynomial.jacobian_claim_schema_uri,
+            "witness_schema_uri": polynomial.witness_schema_uri,
+            "certificate_schema_uri": polynomial.certificate_schema_uri,
+            "witness_format": "polynomial.map_collision",
+            "collision_checker_id": polynomial.collision_checker_id,
+            "jacobian_certificate_format": "polynomial.jacobian_replay",
+            "jacobian_checker_id": polynomial.jacobian_checker_id,
+        }
+    if universal_algebra is not None:
+        catalog["finite_magmas"] = {
+            "domain_id": "jacobian.finite-magma-laws",
+            "domain_version": "1",
+            "semantics_uri": universal_algebra.semantics_uri,
+            "problem_schema_uri": universal_algebra.problem_schema_uri,
+            "evaluation_schema_uri": universal_algebra.evaluation_schema_uri,
+            "countermodel_schema_uri": universal_algebra.countermodel_schema_uri,
+            "claim_schema_uri": universal_algebra.claim_schema_uri,
+            "certificate_schema_uri": universal_algebra.certificate_schema_uri,
+            "certificate_format": "universal_algebra.law_evaluation",
+            "evaluation_checker_id": universal_algebra.evaluation_checker_id,
         }
     if lean is not None and LeanEnvironment.CORE in lean:
         core = lean[LeanEnvironment.CORE]

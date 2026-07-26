@@ -1,0 +1,591 @@
+"""Exact finite universal-algebra capabilities."""
+
+from __future__ import annotations
+
+import hashlib
+import time
+from dataclasses import dataclass
+from itertools import product
+from typing import Any
+
+import z3  # type: ignore[import-untyped]
+from pydantic import ValidationError
+
+from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json
+from jacobian.capabilities import CapabilityInvocationError
+from jacobian.contracts.capabilities import (
+    CapabilityAssurance,
+    CapabilityAssuranceLevel,
+    CapabilityCompleteness,
+    CapabilityCompletenessStatus,
+    CapabilityDescriptor,
+    CapabilityDiagnostic,
+    CapabilityMode,
+    CapabilityRelationship,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityScope,
+)
+from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
+from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.contracts.universal_algebra import (
+    CountermodelSearchStatus,
+    FiniteMagma,
+    FiniteMagmaCountermodelArtifact,
+    FiniteMagmaLawEvaluationArtifact,
+    FiniteMagmaLawEvaluationClaim,
+    FiniteMagmaLawProblem,
+    FiniteMagmaLawReplayPayload,
+    MagmaAssignmentValue,
+    MagmaLaw,
+    MagmaLawCounterexample,
+    MagmaLawCoverage,
+    MagmaLawEvaluationRecord,
+    MagmaTerm,
+    UniversalAlgebraCountermodelSearchOutput,
+    UniversalAlgebraCountermodelSearchRequest,
+    UniversalAlgebraEvaluationOutput,
+    UniversalAlgebraEvaluationRequest,
+)
+from jacobian.registry import CheckerRegistry
+from jacobian.schema_registry import SchemaRegistry
+from jacobian.store import ArtifactStore
+
+_COUNTERMODEL_TIMEOUT_MS = 10_000
+
+
+@dataclass(frozen=True, slots=True)
+class UniversalAlgebraInstallation:
+    semantics_uri: str
+    problem_schema_uri: str
+    evaluation_schema_uri: str
+    countermodel_schema_uri: str
+    claim_schema_uri: str
+    certificate_schema_uri: str
+    evaluation_checker_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class UniversalAlgebraResources:
+    store: ArtifactStore
+    artifacts: ArtifactService
+    installation: UniversalAlgebraInstallation
+
+
+def install_universal_algebra_capabilities(
+    store: ArtifactStore,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    checkers: CheckerRegistry,
+    *,
+    authorize_checker: bool,
+) -> tuple[
+    tuple[
+        UniversalAlgebraEvaluateLawsAdapter,
+        UniversalAlgebraSearchCountermodelAdapter,
+    ],
+    UniversalAlgebraInstallation,
+]:
+    """Install exact bounded finite-magma law evaluation."""
+
+    semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.finite-magma-laws",
+        version="1",
+        definition={
+            "description": (
+                "one total binary operation on the carrier 0 through n-1 and "
+                "equational laws represented by ordered binary term trees"
+            ),
+            "maximum_order": 8,
+            "maximum_variables_per_law": 4,
+            "maximum_term_nodes": 31,
+            "maximum_total_valuations": 1_000_000,
+            "valuation_order": "lexicographic in sorted variable order",
+            "countermodel_timeout_ms": _COUNTERMODEL_TIMEOUT_MS,
+        },
+    )
+    problem_schema_uri = schemas.register(
+        name="jacobian.finite-magma-law-problem",
+        version="1",
+        schema=FiniteMagmaLawProblem.model_json_schema(),
+    )
+    evaluation_schema_uri = schemas.register(
+        name="jacobian.finite-magma-law-evaluation",
+        version="1",
+        schema=FiniteMagmaLawEvaluationArtifact.model_json_schema(),
+    )
+    countermodel_schema_uri = schemas.register(
+        name="jacobian.finite-magma-countermodel-search",
+        version="1",
+        schema=FiniteMagmaCountermodelArtifact.model_json_schema(),
+    )
+    claim_schema_uri = schemas.register(
+        name="jacobian.finite-magma-law-evaluation-claim",
+        version="1",
+        schema=FiniteMagmaLawEvaluationClaim.model_json_schema(),
+    )
+    certificate_schema_uri = schemas.register(
+        name="jacobian.certificate-envelope",
+        version="1",
+        schema=CertificateEnvelope.model_json_schema(),
+    )
+    evaluation_checker_id = None
+    if authorize_checker:
+        evaluation_checker_id = checkers.authorize(
+            name="exact finite magma law evaluation replay checker",
+            entrypoint=("jacobian_checkers.universal_algebra:check_law_evaluation"),
+            evidence_kind="CERTIFICATE",
+            format_id="universal_algebra.law_evaluation",
+            format_version="1",
+            claim_schema_uris=(claim_schema_uri,),
+            semantics_uris=(semantics_uri,),
+            candidate_schema_uris=(evaluation_schema_uri,),
+            reason="bundled independent finite table evaluator",
+        ).checker_id
+    installation = UniversalAlgebraInstallation(
+        semantics_uri=semantics_uri,
+        problem_schema_uri=problem_schema_uri,
+        evaluation_schema_uri=evaluation_schema_uri,
+        countermodel_schema_uri=countermodel_schema_uri,
+        claim_schema_uri=claim_schema_uri,
+        certificate_schema_uri=certificate_schema_uri,
+        evaluation_checker_id=evaluation_checker_id,
+    )
+    resources = UniversalAlgebraResources(
+        store=store,
+        artifacts=artifacts,
+        installation=installation,
+    )
+    return (
+        UniversalAlgebraEvaluateLawsAdapter(resources),
+        UniversalAlgebraSearchCountermodelAdapter(resources),
+    ), installation
+
+
+class UniversalAlgebraEvaluateLawsAdapter:
+    """Evaluate finite magma laws in deterministic lexicographic order."""
+
+    def __init__(self, resources: UniversalAlgebraResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="universal_algebra.evaluate_laws",
+            version="1",
+            title="Evaluate laws on a finite magma",
+            description=(
+                "Evaluate each equational law exactly on a finite binary-operation "
+                "table, returning exhaustive truth evidence or the first failing "
+                "valuation."
+            ),
+            provider="jacobian.finite-table",
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=UniversalAlgebraEvaluationRequest.model_json_schema(),
+            output_schema=UniversalAlgebraEvaluationOutput.model_json_schema(),
+            tags=(
+                "universal-algebra",
+                "finite-model",
+                "law-evaluation",
+                "counterexample",
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = UniversalAlgebraEvaluationRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_FINITE_MAGMA_LAW_REQUEST",
+                    stage="request_validation",
+                    message="The complete finite-magma law request is invalid.",
+                )
+            ) from exc
+        started = time.monotonic()
+        problem = validated.problem
+        problem_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.problem_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=problem.model_dump(mode="json"),
+            summary="finite magma and equational laws",
+        )
+        records = tuple(_evaluate_law(problem.structure, law) for law in problem.laws)
+        evaluation = FiniteMagmaLawEvaluationArtifact(
+            problem_uri=problem_artifact.artifact_uri,
+            records=records,
+        )
+        evaluation_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.evaluation_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=evaluation.model_dump(mode="json"),
+            parents=(problem_artifact.artifact_uri,),
+            summary="exact finite magma law evaluation",
+        )
+        claim = FiniteMagmaLawEvaluationClaim(problem_uri=problem_artifact.artifact_uri)
+        claim_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.claim_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=claim.model_dump(mode="json"),
+            parents=(
+                problem_artifact.artifact_uri,
+                evaluation_artifact.artifact_uri,
+            ),
+            summary="exact finite magma law evaluation claim",
+        )
+        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        certificate_payload = FiniteMagmaLawReplayPayload(
+            problem_uri=problem_artifact.artifact_uri,
+            evaluation_uri=evaluation_artifact.artifact_uri,
+        ).model_dump(mode="json")
+        certificate = CertificateEnvelope(
+            certificate_type="universal_algebra.law_evaluation",
+            format_version="1",
+            bindings=EvidenceBindings(
+                claim_digest=claim_artifact.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=evaluation_artifact.object_digest,
+                scope_digest=problem_artifact.object_digest,
+            ),
+            payload_digest=(
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(certificate_payload)).hexdigest()
+            ),
+            payload=certificate_payload,
+        )
+        certificate_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.certificate_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(
+                claim_artifact.artifact_uri,
+                evaluation_artifact.artifact_uri,
+                problem_artifact.artifact_uri,
+            ),
+            summary="unverified finite magma law evaluation certificate",
+        )
+        output = UniversalAlgebraEvaluationOutput(
+            problem_uri=problem_artifact.artifact_uri,
+            evaluation_uri=evaluation_artifact.artifact_uri,
+            claim_uri=claim_artifact.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=self.resources.installation.evaluation_checker_id,
+            records=records,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description=(
+                    "all valuations of each stated law on one finite magma, "
+                    "stopping a false law at its first counterexample"
+                ),
+                parameters={
+                    "problem_uri": problem_artifact.artifact_uri,
+                    "order": problem.structure.order,
+                    "law_count": len(problem.laws),
+                    "valuation_order": "LEXICOGRAPHIC",
+                },
+                artifact_uri=problem_artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.COMPLETE,
+                basis=(
+                    "every true law exhausted its finite valuation space and every "
+                    "false law produced an exact counterexample; verification is "
+                    "separate"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="universal_algebra.relation.evaluation-of",
+                    source_artifact_uris=(problem_artifact.artifact_uri,),
+                    target_artifact_uris=(evaluation_artifact.artifact_uri,),
+                ),
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "deterministic exact finite-table evaluation; the bundled "
+                    "certificate was not invoked"
+                ),
+            ),
+            artifact_uris=(
+                problem_artifact.artifact_uri,
+                evaluation_artifact.artifact_uri,
+                claim_artifact.artifact_uri,
+                certificate_artifact.artifact_uri,
+            ),
+        )
+
+
+class UniversalAlgebraSearchCountermodelAdapter:
+    """Search all fixed-order operation tables through a complete SMT encoding."""
+
+    def __init__(self, resources: UniversalAlgebraResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="universal_algebra.search.countermodel",
+            version="1",
+            title="Search for a fixed-order finite magma countermodel",
+            description=(
+                "Search binary-operation tables of one exact carrier order for a "
+                "magma satisfying every source law and falsifying one target law."
+            ),
+            provider="jacobian.z3",
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=UniversalAlgebraCountermodelSearchRequest.model_json_schema(),
+            output_schema=UniversalAlgebraCountermodelSearchOutput.model_json_schema(),
+            tags=(
+                "universal-algebra",
+                "finite-model",
+                "countermodel",
+                "bounded-search",
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = UniversalAlgebraCountermodelSearchRequest.model_validate(
+                request.input
+            )
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_FINITE_MAGMA_COUNTERMODEL_REQUEST",
+                    stage="request_validation",
+                    message="The complete finite-magma countermodel request is invalid.",
+                )
+            ) from exc
+        started = time.monotonic()
+        search = _search_countermodel(validated)
+        search_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.countermodel_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=search.model_dump(mode="json"),
+            summary="fixed-order finite magma countermodel search",
+        )
+        output = UniversalAlgebraCountermodelSearchOutput(
+            search_uri=search_artifact.artifact_uri,
+            status=search.status,
+            structure=search.structure,
+            source_records=search.source_records,
+            target_record=search.target_record,
+        )
+        complete = search.status is not CountermodelSearchStatus.INDETERMINATE
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description=(
+                    "all total binary operation tables on the fixed carrier "
+                    f"0 through {validated.order - 1}"
+                ),
+                parameters={
+                    "order": validated.order,
+                    "table_count": validated.order
+                    ** (validated.order * validated.order),
+                    "source_law_count": len(validated.source_laws),
+                    "target_law_id": validated.target_law.law_id,
+                    "encoding": "COMPLETE_FIXED_ORDER_FINITE_TABLE",
+                },
+                artifact_uri=search_artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if complete
+                    else CapabilityCompletenessStatus.UNKNOWN
+                ),
+                basis=(
+                    "Z3 settled the complete fixed-order finite-table encoding; "
+                    "the solver result is computed evidence, not a verified "
+                    "mathematical conclusion"
+                    if complete
+                    else "Z3 did not settle the complete fixed-order encoding"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "bounded Z3 finite-table search; any returned table must be "
+                    "replayed with universal_algebra.evaluate_laws and its "
+                    "independent certificate checker"
+                ),
+            ),
+            artifact_uris=(search_artifact.artifact_uri,),
+        )
+
+
+def _search_countermodel(
+    request: UniversalAlgebraCountermodelSearchRequest,
+) -> FiniteMagmaCountermodelArtifact:
+    order = request.order
+    solver = z3.Solver()
+    solver.set(random_seed=0, timeout=_COUNTERMODEL_TIMEOUT_MS)
+    cells = tuple(
+        tuple(z3.Int(f"mul_{left}_{right}") for right in range(order))
+        for left in range(order)
+    )
+    for row in cells:
+        for cell in row:
+            solver.add(cell >= 0, cell < order)
+    for law in request.source_laws:
+        for values in product(range(order), repeat=len(law.variables)):
+            assignment = dict(zip(law.variables, values, strict=True))
+            solver.add(
+                _z3_evaluate_term(law.left, cells, assignment, order)
+                == _z3_evaluate_term(law.right, cells, assignment, order)
+            )
+    target_assignment = {
+        variable: z3.Int(f"target_{variable}")
+        for variable in request.target_law.variables
+    }
+    for value in target_assignment.values():
+        solver.add(value >= 0, value < order)
+    solver.add(
+        _z3_evaluate_term(
+            request.target_law.left,
+            cells,
+            target_assignment,
+            order,
+        )
+        != _z3_evaluate_term(
+            request.target_law.right,
+            cells,
+            target_assignment,
+            order,
+        )
+    )
+    result = solver.check()
+    if result == z3.unknown:
+        return FiniteMagmaCountermodelArtifact(
+            order=order,
+            source_laws=request.source_laws,
+            target_law=request.target_law,
+            status=CountermodelSearchStatus.INDETERMINATE,
+            backend_version=z3.get_version_string(),
+        )
+    if result == z3.unsat:
+        return FiniteMagmaCountermodelArtifact(
+            order=order,
+            source_laws=request.source_laws,
+            target_law=request.target_law,
+            status=CountermodelSearchStatus.NO_WITNESS_FOUND,
+            backend_version=z3.get_version_string(),
+        )
+    model = solver.model()
+    structure = FiniteMagma(
+        order=order,
+        table=tuple(
+            tuple(model.eval(cell, model_completion=True).as_long() for cell in row)
+            for row in cells
+        ),
+    )
+    source_records = tuple(_evaluate_law(structure, law) for law in request.source_laws)
+    target_record = _evaluate_law(structure, request.target_law)
+    return FiniteMagmaCountermodelArtifact(
+        order=order,
+        source_laws=request.source_laws,
+        target_law=request.target_law,
+        status=CountermodelSearchStatus.WITNESS_FOUND,
+        structure=structure,
+        source_records=source_records,
+        target_record=target_record,
+        backend_version=z3.get_version_string(),
+    )
+
+
+def _z3_evaluate_term(
+    term: MagmaTerm,
+    cells: tuple[tuple[Any, ...], ...],
+    assignment: dict[str, Any],
+    order: int,
+) -> Any:
+    if term.kind == "VARIABLE":
+        assert term.variable is not None
+        return assignment[term.variable]
+    assert term.left is not None and term.right is not None
+    left = _z3_evaluate_term(term.left, cells, assignment, order)
+    right = _z3_evaluate_term(term.right, cells, assignment, order)
+    selected: Any = cells[-1][-1]
+    for left_index in reversed(range(order)):
+        for right_index in reversed(range(order)):
+            selected = z3.If(
+                z3.And(left == left_index, right == right_index),
+                cells[left_index][right_index],
+                selected,
+            )
+    return selected
+
+
+def _evaluate_law(
+    structure: FiniteMagma,
+    law: MagmaLaw,
+) -> MagmaLawEvaluationRecord:
+    checked = 0
+    for values in product(range(structure.order), repeat=len(law.variables)):
+        checked += 1
+        assignment = dict(zip(law.variables, values, strict=True))
+        left_value = _evaluate_term(law.left, structure.table, assignment)
+        right_value = _evaluate_term(law.right, structure.table, assignment)
+        if left_value != right_value:
+            return MagmaLawEvaluationRecord(
+                law_id=law.law_id,
+                holds=False,
+                coverage=MagmaLawCoverage.COUNTEREXAMPLE_FOUND,
+                checked_valuations=checked,
+                counterexample=MagmaLawCounterexample(
+                    assignment=tuple(
+                        MagmaAssignmentValue(variable=variable, value=value)
+                        for variable, value in zip(
+                            law.variables,
+                            values,
+                            strict=True,
+                        )
+                    ),
+                    left_value=left_value,
+                    right_value=right_value,
+                ),
+            )
+    return MagmaLawEvaluationRecord(
+        law_id=law.law_id,
+        holds=True,
+        coverage=MagmaLawCoverage.EXHAUSTIVE,
+        checked_valuations=checked,
+    )
+
+
+def _evaluate_term(
+    term: MagmaTerm,
+    table: tuple[tuple[int, ...], ...],
+    assignment: dict[str, int],
+) -> int:
+    if term.kind == "VARIABLE":
+        assert term.variable is not None
+        return assignment[term.variable]
+    assert term.left is not None and term.right is not None
+    left = _evaluate_term(term.left, table, assignment)
+    right = _evaluate_term(term.right, table, assignment)
+    return table[left][right]

@@ -281,8 +281,11 @@ def create_server(
         return json.dumps(
             reference_catalog(
                 active_kernel.references,
+                graph=active_kernel.graph,
                 polytope=active_kernel.polytope,
                 polytope_checkers=active_kernel.polytope_checkers,
+                polynomial=active_kernel.polynomial,
+                universal_algebra=active_kernel.universal_algebra,
                 lean=active_kernel.lean_checkers,
             ),
             ensure_ascii=False,
