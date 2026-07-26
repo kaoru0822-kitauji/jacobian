@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/jacobian-hero.svg" width="100%" alt="Three distinct inputs map to one output beside a constant Jacobian determinant and a verified exact collision.">
+  <img src="docs/assets/jacobian-hero.jpg" width="100%" alt="An archival-style black-and-white photograph of a mathematician working at a chalkboard, with a constant Jacobian determinant and three distinct inputs mapping to one output.">
 </p>
 
 <h1 align="center">Jacobian</h1>
