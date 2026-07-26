@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from jacobian.artifacts import ArtifactService
@@ -17,6 +18,7 @@ from jacobian.capabilities import (
 )
 from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
+from jacobian.contracts.capabilities import CapabilityProviderAvailability
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.evaluation import EvaluationService
 from jacobian.experiment_router import ExperimentRouter
@@ -35,6 +37,7 @@ from jacobian.polynomial_capabilities import (
     install_polynomial_capabilities,
 )
 from jacobian.polytope import PolytopeService
+from jacobian.provider_runtime import lean_provider_runtime
 from jacobian.references import (
     LeanCheckerInstallation,
     PolytopeCheckerInstallation,
@@ -55,6 +58,8 @@ from jacobian.universal_algebra_capabilities import (
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
 from jacobian.workspaces import WorkspaceService
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class JacobianKernel:
@@ -216,13 +221,42 @@ class JacobianKernel:
                 point_schema_uri=self.polytope.point_schema_uri,
             )
             self.lean_checkers = self.reference_installer.install_lean_checkers()
-            self.lean = LeanService(
-                self.store,
-                self.artifacts,
-                self.verification,
-                self.lean_checkers,
+            profiles = {
+                environment.value: {
+                    "semantics_uri": installation.semantics_uri,
+                    "import_name": installation.import_name,
+                    "mathlib_commit": installation.mathlib_commit,
+                    "allowed_axioms": list(installation.allowed_axioms),
+                    "checker_timeout_seconds": (installation.checker_timeout_seconds),
+                }
+                for environment, installation in sorted(
+                    self.lean_checkers.items(),
+                    key=lambda item: item[0].value,
+                )
+            }
+            runtime = lean_provider_runtime(
+                profiles=profiles,
+                checker_ids=tuple(
+                    installation.checker_id
+                    for _, installation in sorted(
+                        self.lean_checkers.items(),
+                        key=lambda item: item[0].value,
+                    )
+                ),
             )
-            self.capabilities.register(LeanCheckAdapter(self.lean))
+            if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+                self.lean = LeanService(
+                    self.store,
+                    self.artifacts,
+                    self.verification,
+                    self.lean_checkers,
+                )
+                self.capabilities.register(LeanCheckAdapter(self.lean, runtime))
+            else:
+                _LOGGER.warning(
+                    "lean.check is not installed: %s",
+                    runtime.diagnostic,
+                )
         for entrypoint in capability_adapter_entrypoints:
             self.capabilities.register(load_capability_adapter(entrypoint, self))
 

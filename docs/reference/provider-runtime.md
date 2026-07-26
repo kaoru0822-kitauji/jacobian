@@ -1,0 +1,112 @@
+# Provider runtime contract
+
+Jacobian advertises a capability only when its exact provider runtime is
+installed and passes its local health probe. Provider availability is a catalog
+condition. An absent optional backend is not left for the agent to discover
+during invocation.
+
+This contract describes operational provenance. It does not change
+mathematical assurance: an available provider, successful measurement, solver
+status, or package digest is never evidence that a mathematical claim is
+`VERIFIED`.
+
+## Descriptor metadata
+
+Every registered `CapabilityDescriptor` carries `provider_runtime`:
+
+| Field | Meaning |
+| --- | --- |
+| `provider` | Stable provider family selected for this operation |
+| `availability` | `AVAILABLE` for catalog entries; `UNAVAILABLE` is load-time state only |
+| `version` | Exact installed provider version |
+| `digest` | SHA-256 identity with the coverage declared by `digest_kind` |
+| `digest_kind` | `SOURCE_TREE`, `PYTHON_DISTRIBUTION_RECORD`, or `EXECUTABLE` |
+| `platform` | Current Python platform tag |
+| `install_tier` | `T0`, `T1`, `T2`, or `T3` deployment rule |
+| `license_id` and `license_files` | Declared license and installed license-file paths |
+| `features` | Health-probed feature flags used by the adapter |
+| `checker_ids` | Exact authorized checker identities, when the operation has fixed checkers |
+| `configuration` | Canonical provider-specific data, such as Lean profiles |
+
+`PYTHON_DISTRIBUTION_RECORD` hashes a canonical ordering of the installed
+distribution's RECORD paths, recorded hashes, and sizes. It identifies the
+installed manifest; the digest kind deliberately does not claim that Jacobian
+rehashes every package byte at startup. `SOURCE_TREE` covers the source package
+used by an entrypoint. `EXECUTABLE` covers the executable bytes.
+
+The result repeats the selected `provider` and `provider_digest`. This binds the
+invocation to the exact descriptor runtime without repeating all discovery
+metadata in every response. Provider metadata remains separate from execution
+status, conclusion, evidence type, and assurance.
+
+## Availability
+
+`CapabilityService.register` rejects descriptors without runtime identity and
+descriptors whose runtime is `UNAVAILABLE`. Built-in locked Python providers
+must import, expose the required feature symbols, and have a hashed
+distribution RECORD. The Lean probe validates the pinned Lean version and
+commit, resolves and hashes the actual executable, and validates the pinned
+Mathlib checkout before `lean.check` is registered.
+
+If the separately managed Lean runtime is absent or unhealthy, the kernel still
+starts, `lean.check` is absent from `capability://catalog`, and no invocation is
+attempted. Explicit operator-installed adapters fail registration instead of
+silently falling back to another provider.
+
+Source-backed adapters can construct metadata without importing their
+implementation:
+
+```python
+from jacobian.contracts.capabilities import CapabilityInstallTier
+from jacobian.provider_runtime import source_provider_runtime
+
+runtime = source_provider_runtime(
+    "example.provider",
+    version="1",
+    entrypoint="example_adapter:create_adapter",
+    install_tier=CapabilityInstallTier.T1,
+    license_id="MIT",
+    license_files=("LICENSE",),
+    features=("exact-example-operation",),
+)
+```
+
+The adapter places `runtime` in its descriptor. Registration remains
+fail-closed if the source identity cannot be resolved.
+
+## Repeatable measurement
+
+Measure the provider selected for one installed capability:
+
+```sh
+uv run jacobian --no-install-references \
+  provider-measure graph.compute.properties
+```
+
+The JSON result records:
+
+- current installed bytes;
+- cold-start elapsed time and peak resident memory;
+- a small provider-specific reproduction elapsed time and peak resident
+  memory;
+- cold-install status, elapsed time, and temporary installed bytes.
+
+Cold install is skipped by default because it performs network and filesystem
+work. Request it explicitly:
+
+```sh
+uv run jacobian --no-install-references \
+  provider-measure graph.compute.properties --include-cold-install
+```
+
+For Python-distribution providers, the cold-install probe uses a temporary
+target and a fresh `uv` cache, installs the exact recorded version without
+dependencies, and deletes the temporary files afterward. Source-tree and T3
+providers without a safe automated installer report `SKIPPED` rather than
+guessing an install source. Probes use bounded subprocess timeouts, bounded
+output, sanitized environments, generic public errors, and temporary
+directories.
+
+Measurements are machine-local observations. Compare records only when the
+provider digest, platform, probe contract, and environment are appropriate for
+the decision being made.

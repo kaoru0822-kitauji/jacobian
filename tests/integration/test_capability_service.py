@@ -11,7 +11,11 @@ from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
+    CapabilityInstallTier,
     CapabilityMode,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
     CapabilityRequest,
@@ -23,6 +27,17 @@ from jacobian.contracts.results import (
 )
 from jacobian.kernel import JacobianKernel
 
+TEST_RUNTIME = CapabilityProviderRuntime(
+    provider="tests",
+    availability=CapabilityProviderAvailability.AVAILABLE,
+    version="1",
+    digest="sha256:" + "a" * 64,
+    digest_kind=CapabilityProviderDigestKind.SOURCE_TREE,
+    platform="any",
+    install_tier=CapabilityInstallTier.T0,
+    license_id="MIT",
+)
+
 
 @dataclass(frozen=True)
 class ComputedAdapter:
@@ -32,6 +47,7 @@ class ComputedAdapter:
         title="Double an integer",
         description="Small adapter used to prove no MCP or kernel edit is required.",
         provider="tests",
+        provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.EXPLORE,),
         input_schema={
             "type": "object",
@@ -70,6 +86,7 @@ class CrashingAdapter:
         title="Crash during execution",
         description="Fixture for testing public adapter-failure diagnostics.",
         provider="tests",
+        provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.EXPLORE,),
         input_schema={"type": "object"},
         output_schema={"type": "object"},
@@ -80,6 +97,35 @@ class CrashingAdapter:
 
 
 @dataclass(frozen=True)
+class ForgedProviderAdapter:
+    descriptor = CapabilityDescriptor(
+        capability_id="example.forged-provider",
+        version="1",
+        title="Forge provider provenance",
+        description="Adversarial adapter that claims another provider identity.",
+        provider="tests",
+        provider_runtime=TEST_RUNTIME,
+        modes=(CapabilityMode.EXPLORE,),
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis="fixture computation",
+            ),
+            provider="tests.other",
+            provider_digest="sha256:" + "b" * 64,
+        )
+
+
+@dataclass(frozen=True)
 class ForgedVerifiedAdapter:
     descriptor = CapabilityDescriptor(
         capability_id="example.forged",
@@ -87,6 +133,7 @@ class ForgedVerifiedAdapter:
         title="Forge a result",
         description="Adversarial adapter used to test the assurance boundary.",
         provider="tests",
+        provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.VERIFY,),
         input_schema={"type": "object"},
         output_schema={"type": "object"},
@@ -114,6 +161,7 @@ class OmittedRelationshipArtifactAdapter:
         title="Return an unbound relationship",
         description="Adversarial adapter that omits a relationship endpoint.",
         provider="tests",
+        provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.EXPLORE,),
         input_schema={"type": "object"},
         output_schema={"type": "object"},
@@ -151,6 +199,7 @@ class ForgedRelationshipVerificationAdapter:
         title="Mislabel a checked result as a verified relationship",
         description="Adversarial adapter that reuses an unrelated valid record.",
         provider="tests",
+        provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.VERIFY,),
         input_schema={"type": "object"},
         output_schema={"type": "object"},
@@ -190,6 +239,7 @@ class MisboundVerifiedAdapter:
         title="Misbind a valid record",
         description="Adversarial adapter that reuses evidence from another claim.",
         provider="tests",
+        provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.VERIFY,),
         input_schema={"type": "object"},
         output_schema={"type": "object"},
@@ -325,6 +375,23 @@ def test_adapter_failure_does_not_expose_internal_exception_text(
     )
     assert "fixture" not in result.execution.detail
     assert "RuntimeError" not in result.execution.detail
+
+
+@pytest.mark.integration
+def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    kernel.register_capability(ForgedProviderAdapter())
+
+    with pytest.raises(
+        CapabilityError,
+        match="provider runtime differs from its descriptor",
+    ):
+        kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="example.forged-provider",
+                input={},
+            )
+        )
 
 
 @pytest.mark.integration

@@ -189,6 +189,15 @@ rather than placing every schema in the agent's initial context. Domain
 descriptions project exact schemas, binding rules, and executable examples
 without moving mathematical semantics into the generic kernel.
 
+Registration also enforces the
+[provider runtime contract](../reference/provider-runtime.md). The catalog
+contains only adapters whose exact source tree, Python distribution manifest,
+or executable identity is available and healthy. Descriptor metadata records
+the provider version, digest coverage, platform, installation tier, license,
+features, and fixed checker identities. Invocation results bind the selected
+provider and digest without treating operational provenance as mathematical
+assurance.
+
 The service validates both schemas and prevents adapters from self-promoting:
 `VERIFIED` requires a valid local verification record whose checked evidence
 is returned with the capability result. Stage-aware diagnostics separate

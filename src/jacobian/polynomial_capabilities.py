@@ -54,6 +54,7 @@ from jacobian.contracts.polynomials import (
     SparseRationalPolynomial,
 )
 from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
+from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
@@ -216,6 +217,10 @@ class PolynomialMapEvaluationAdapter:
                 "square polynomial map over QQ."
             ),
             provider="jacobian.sympy",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sympy",
+                features=("rational-polynomial-evaluation",),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=PolynomialEvaluationRequest.model_json_schema(),
             output_schema=PolynomialEvaluationOutput.model_json_schema(),
@@ -290,6 +295,15 @@ class PolynomialJacobianAdapter:
                 "square polynomial map over QQ."
             ),
             provider="jacobian.sympy",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sympy",
+                features=("symbolic-jacobian", "rational-polynomials"),
+                checker_ids=(
+                    (resources.installation.jacobian_checker_id,)
+                    if resources.installation.jacobian_checker_id is not None
+                    else ()
+                ),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=PolynomialJacobianRequest.model_json_schema(),
             output_schema=PolynomialJacobianOutput.model_json_schema(),
@@ -445,6 +459,15 @@ class PolynomialCollisionAdapter:
                 "and materialize an unverified candidate collision witness."
             ),
             provider="jacobian.artifact-comparison",
+            provider_runtime=known_provider_runtime(
+                "jacobian.artifact-comparison",
+                features=("polynomial-collision-witness",),
+                checker_ids=(
+                    (resources.installation.collision_checker_id,)
+                    if resources.installation.collision_checker_id is not None
+                    else ()
+                ),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=PolynomialCollisionRequest.model_json_schema(),
             output_schema=PolynomialCollisionOutput.model_json_schema(),

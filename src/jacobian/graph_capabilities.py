@@ -38,6 +38,7 @@ from jacobian.contracts.graph_invariants import (
     GraphNeighborhoodIndependenceRequest,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore, StoreError
@@ -278,6 +279,10 @@ class GraphAtlasSearchAdapter:
                 "(0-7) using exact NetworkX-computed constraints."
             ),
             provider="jacobian.networkx",
+            provider_runtime=known_provider_runtime(
+                "jacobian.networkx",
+                features=("graph-atlas", "simple-undirected-graphs"),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema={
                 "type": "object",
@@ -452,6 +457,10 @@ class GraphPropertyAdapter:
                 "Jacobian simple-undirected-graph artifact."
             ),
             provider="jacobian.networkx",
+            provider_runtime=known_provider_runtime(
+                "jacobian.networkx",
+                features=("graph-properties", "simple-undirected-graphs"),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema={
                 "type": "object",
@@ -585,6 +594,15 @@ class GraphNeighborhoodIndependenceAdapter:
                 "Neighborhoods are limited to 24 vertices."
             ),
             provider="jacobian.networkx",
+            provider_runtime=known_provider_runtime(
+                "jacobian.networkx",
+                features=("neighborhood-independence", "simple-undirected-graphs"),
+                checker_ids=(
+                    (resources.neighborhood_checker_id,)
+                    if resources.neighborhood_checker_id is not None
+                    else ()
+                ),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=GraphNeighborhoodIndependenceRequest.model_json_schema(),
             output_schema=GraphNeighborhoodIndependenceOutput.model_json_schema(),

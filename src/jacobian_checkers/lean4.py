@@ -245,6 +245,46 @@ def _mathlib_runtime() -> Path:
     return runtime
 
 
+def inspect_runtime(*, require_mathlib: bool) -> tuple[Path, Path | None]:
+    """Validate the pinned runtime and return the exact executable and profile root."""
+
+    command = _lean_command("lean")
+    _validate_lean(command)
+    if len(command) == 1:
+        executable = Path(command[0])
+    else:
+        environment = {
+            "ELAN_TOOLCHAIN": LEAN_TOOLCHAIN,
+            **({"PATH": os.environ["PATH"]} if "PATH" in os.environ else {}),
+            **({"HOME": os.environ["HOME"]} if "HOME" in os.environ else {}),
+            **(
+                {"ELAN_HOME": os.environ["ELAN_HOME"]}
+                if "ELAN_HOME" in os.environ
+                else {}
+            ),
+        }
+        try:
+            resolved = subprocess.run(
+                [command[0], "which", "lean"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                env=environment,
+            ).stdout.strip()
+        except subprocess.SubprocessError as exc:
+            raise _LeanSetupError(
+                f"The pinned Lean {LEAN_VERSION} executable could not be resolved."
+            ) from exc
+        executable = Path(resolved)
+    if not executable.is_file():
+        raise _LeanSetupError(
+            f"The pinned Lean {LEAN_VERSION} executable is unavailable."
+        )
+    mathlib_runtime = _mathlib_runtime() if require_mathlib else None
+    return executable, mathlib_runtime
+
+
 def _run_lean(
     source: str,
     *,

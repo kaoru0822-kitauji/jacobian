@@ -7,11 +7,13 @@ from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
+    CapabilityInstallTier,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.provider_runtime import source_provider_runtime
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,14 @@ class FixtureAdapter:
         title="Increment an integer",
         description="External fixture adapter loaded through an operator entrypoint.",
         provider="tests.fixture",
+        provider_runtime=source_provider_runtime(
+            "tests.fixture",
+            version="1",
+            entrypoint="tests.fixtures.capability_functions:create_adapter",
+            install_tier=CapabilityInstallTier.T0,
+            license_id="MIT",
+            features=("integer-increment",),
+        ),
         modes=(CapabilityMode.EXPLORE,),
         input_schema={
             "type": "object",

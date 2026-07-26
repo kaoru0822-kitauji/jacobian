@@ -68,7 +68,25 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 descriptor["capability_id"] for descriptor in catalog["capabilities"]
             }
             assert "knowledge.search" in capability_ids
-            assert "lean.check" in capability_ids
+            assert all(
+                descriptor["provider_runtime"]["availability"] == "AVAILABLE"
+                for descriptor in catalog["capabilities"]
+            )
+            if "lean.check" in capability_ids:
+                lean_result = await client.call_tool(
+                    "capability.describe",
+                    {"capability_id": "lean.check"},
+                )
+                lean_contract = json.loads(lean_result.content[0].text)
+                lean_runtime = lean_contract["capability"]["provider_runtime"]
+                assert lean_runtime["install_tier"] == "T3"
+                assert (
+                    lean_runtime["configuration"]["profiles"]["MATHLIB"][
+                        "mathlib_commit"
+                    ]
+                    == "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
+                )
+                assert "runtime" not in lean_contract
 
             reference_result = await client.read_resource("reference://catalog")
             references = json.loads(reference_result.contents[0].text)
@@ -384,6 +402,9 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             )
             contract = json.loads(described.content[0].text)
             assert contract["capability"]["capability_id"] == "knowledge.search"
+            assert contract["capability"]["provider_runtime"]["digest"].startswith(
+                "sha256:"
+            )
 
             result = await client.call_tool(
                 "capability.invoke",
@@ -396,6 +417,9 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             response = json.loads(result.content[0].text)
             assert response["execution"]["status"] == "COMPLETED"
             assert response["assurance"]["level"] == "COMPUTED"
+            runtime = contract["capability"]["provider_runtime"]
+            assert response["provider"] == runtime["provider"]
+            assert response["provider_digest"] == runtime["digest"]
 
             unknown = await client.call_tool(
                 "capability.invoke",

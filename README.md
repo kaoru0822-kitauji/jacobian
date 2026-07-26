@@ -113,6 +113,8 @@ goals are part of the working project record. Start with:
 Release contracts and engineering evidence are:
 
 - [Tool surface](docs/reference/tools.md)
+- [Provider runtime contract](docs/reference/provider-runtime.md) for
+  availability, exact backend identity, install tiers, and local measurement.
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
 - [Testing strategy](docs/reference/testing-strategy.md),

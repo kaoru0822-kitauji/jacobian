@@ -252,6 +252,14 @@ Complete this once, before adding several backends:
 This groundwork changes packaging and descriptors, not the mathematical
 assurance model and not the top-level MCP tool count.
 
+The initial availability, identity, install-tier, and measurement contract is
+implemented in the
+[provider runtime reference](../reference/provider-runtime.md). It covers
+source-tree, Python RECORD, and executable identities; fail-closed catalog
+registration; compact result provenance; and the repeatable
+`provider-measure` command. Provider-specific subprocess hardening and
+reproduction measurements remain part of each later backend slice.
+
 ## Wave 1: Lean discovery experiment
 
 Treat these names as contract sketches:

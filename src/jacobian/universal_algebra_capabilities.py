@@ -48,6 +48,7 @@ from jacobian.contracts.universal_algebra import (
     UniversalAlgebraEvaluationOutput,
     UniversalAlgebraEvaluationRequest,
 )
+from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -179,6 +180,15 @@ class UniversalAlgebraEvaluateLawsAdapter:
                 "valuation."
             ),
             provider="jacobian.finite-table",
+            provider_runtime=known_provider_runtime(
+                "jacobian.finite-table",
+                features=("finite-magma-law-evaluation",),
+                checker_ids=(
+                    (resources.installation.evaluation_checker_id,)
+                    if resources.installation.evaluation_checker_id is not None
+                    else ()
+                ),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=UniversalAlgebraEvaluationRequest.model_json_schema(),
             output_schema=UniversalAlgebraEvaluationOutput.model_json_schema(),
@@ -343,6 +353,10 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 "magma satisfying every source law and falsifying one target law."
             ),
             provider="jacobian.z3",
+            provider_runtime=known_provider_runtime(
+                "jacobian.z3",
+                features=("finite-magma-countermodel-search",),
+            ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=UniversalAlgebraCountermodelSearchRequest.model_json_schema(),
             output_schema=UniversalAlgebraCountermodelSearchOutput.model_json_schema(),
