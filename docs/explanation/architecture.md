@@ -70,7 +70,7 @@ transformations, invariants, witness meanings, and required checker roles.
 Independent checker packages implement replay and are authorized by an
 operator, never by the plugin or adapter whose output they check.
 
-Agent workflows and skills own multi-step exploration and proof strategies.
+Agents own multi-step exploration and proof strategies.
 Capability adapters may provide durable execution or coordinate backend calls
 that jointly produce one coherent mathematical outcome. They must not hide a
 multi-step research strategy behind an opaque operation: material stage

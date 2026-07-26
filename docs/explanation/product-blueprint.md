@@ -65,7 +65,7 @@ Broad actions such as “investigate this conjecture” are workflows, not
 primitives. A workflow may coordinate many primitive calls, but it must expose
 the stage artifacts and preserve their separate assurance labels. Jacobian does
 not retain parallel top-level MCP tools or compatibility façades for these
-workflows; agents and reusable skills compose the namespaced capabilities.
+workflows; agents compose the namespaced capabilities.
 
 Design new capabilities against the installed portfolio. When an existing
 typed artifact already exposes the needed mathematical outcome, consume that
@@ -89,7 +89,7 @@ The boundaries are intentionally narrow:
 - Domain plugins own mathematical schemas, transformations, invariants,
   witness meanings, and required checker roles.
 - Independent checker packages implement replay; operators authorize them.
-- Agent workflows and skills own multi-step exploration and proof strategies.
+- Agents own multi-step exploration and proof strategies.
 - Reference scenarios and benchmarks own worked examples.
 
 This separation lets a new mathematical operation or external engine appear

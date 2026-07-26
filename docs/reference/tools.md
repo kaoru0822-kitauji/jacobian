@@ -160,8 +160,8 @@ Useful low-level operations may retain descriptive IDs such as
 `certificate.verify`. Those names identify capabilities invoked through
 `capability.invoke`; they are not separate MCP tools.
 
-Opaque multi-stage commands are not part of the public surface. Agents and
-skills should compose generation, evaluation, ranking, falsification,
+Opaque multi-stage commands are not part of the public surface. Agents should
+compose generation, evaluation, ranking, falsification,
 refinement, and verification from separately invocable capabilities. An
 optional workflow capability is appropriate only when it has one coherent
 mathematical outcome and preserves visible intermediate artifacts and
