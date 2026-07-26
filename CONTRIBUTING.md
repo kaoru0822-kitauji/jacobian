@@ -102,11 +102,31 @@ Verify every relative Markdown link before submitting the change.
 ## Releases
 
 The manifest-driven Release Please configuration keeps the Python and npm
-package versions synchronized. CI tests and packs the npm launcher
-independently, then publishes both distributions after a release is created.
-The `jacobian` package on npm must authorize `.github/workflows/ci.yml` as its
-trusted GitHub Actions publisher, using the `npm` environment; releases use
-OIDC rather than a long-lived npm token.
+package versions synchronized. After the generated release pull request is
+merged, CI validates the exact tree and creates the GitHub release. It then
+dispatches the separate `Release` workflow at that immutable tag. The release
+workflow builds both distributions before its independent PyPI and npm publish
+jobs start.
+
+Both registries use OIDC rather than long-lived tokens. Configure their trusted
+GitHub Actions publishers for repository `morluto/jacobian`, workflow
+`release.yml`, and their matching `pypi` or `npm` environment. Restrict those
+environments to protected release tags and add required reviewers when manual
+approval is desired. Enable GitHub release immutability before the first
+release; publishing fails closed unless GitHub reports that the release tag is
+locked.
+
+The `Release` workflow is normally dispatched automatically. Its manual
+dispatch is a recovery path for an existing GitHub release tag and must run
+from the same tag, for example:
+
+```sh
+gh workflow run release.yml --ref v0.2.0 --field tag=v0.2.0
+```
+
+It does not create or version a release. If one registry publish fails, rerun
+only that failed job so the successful immutable upload is not attempted
+twice.
 
 ## Pull requests
 
