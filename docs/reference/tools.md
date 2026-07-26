@@ -136,6 +136,7 @@ The base installation currently includes these kernel capability IDs:
 | `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
 | `polynomial.map.compute_jacobian` | Compute an exact Jacobian matrix and determinant for one sparse rational polynomial map. |
 | `polynomial.map.collision_witness` | Compare two exact point-evaluation artifacts and materialize a candidate collision witness. |
+| `polynomial.system.solution.verify` | Independently check one exact rational assignment against every equation and inequation in a finite polynomial system. |
 | `universal_algebra.evaluate_laws` | Exhaust finite magma laws or return the first canonical failing valuation. |
 | `universal_algebra.search.countermodel` | Search all operation tables of one bounded carrier order for a source-law model falsifying a target law. |
 | `knowledge.search` | Retrieve locally indexed capability episodes without changing their assurance. |
