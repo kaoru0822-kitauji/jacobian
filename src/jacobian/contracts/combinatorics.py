@@ -42,6 +42,18 @@ class RationalResult(ContractModel):
     value: CanonicalRational
 
 
+class FibonacciPairResult(ContractModel):
+    """Two consecutive Fibonacci values forming one recurrence boundary."""
+
+    n: StrictInt = Field(ge=0, le=10_000)
+    f_n: CanonicalInteger
+    f_n_plus_one: CanonicalInteger
+
+
+class FibonacciPairRequest(ContractModel):
+    n: StrictInt = Field(ge=0, le=10_000)
+
+
 class IntegerPartitionEnumerationRequest(ContractModel):
     """Enumerate every partition of n containing at most max_parts summands."""
 
@@ -71,7 +83,9 @@ class IntegerPartitionEnumerationResult(ContractModel):
             if sum(partition) != self.n:
                 raise ValueError("partition parts must sum to n")
             if previous is not None and previous <= partition:
-                raise ValueError("partitions must be unique in descending lexicographic order")
+                raise ValueError(
+                    "partitions must be unique in descending lexicographic order"
+                )
             previous = tuple(partition)
         if self.n == 0 and self.partitions != ((),):
             raise ValueError("zero has exactly one empty partition")

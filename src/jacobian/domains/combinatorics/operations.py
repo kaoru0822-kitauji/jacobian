@@ -7,6 +7,8 @@ from operator import mul
 from typing import cast
 
 from jacobian.contracts.combinatorics import (
+    FibonacciPairRequest,
+    FibonacciPairResult,
     IntegerListRequest,
     IntegerPartitionEnumerationRequest,
     IntegerPartitionEnumerationResult,
@@ -132,6 +134,18 @@ def fibonacci(request: ContractModel) -> ContractModel:
 
     n = cast(NonnegativeIntegerRequest, request).n
     return _integer_result(sympy.fibonacci(n))
+
+
+def fibonacci_pair(request: ContractModel) -> ContractModel:
+    """Compute two consecutive Fibonacci values."""
+    import sympy
+
+    n = cast(FibonacciPairRequest, request).n
+    return FibonacciPairResult(
+        n=n,
+        f_n=str(sympy.fibonacci(n)),
+        f_n_plus_one=str(sympy.fibonacci(n + 1)),
+    )
 
 
 def lucas(request: ContractModel) -> ContractModel:

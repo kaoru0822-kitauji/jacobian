@@ -1,6 +1,8 @@
 """Recurrence-owned exact combinatorics capabilities."""
 
 from jacobian.contracts.combinatorics import (
+    FibonacciPairRequest,
+    FibonacciPairResult,
     IntegerResult,
     NonnegativeIntegerRequest,
     RationalResult,
@@ -11,6 +13,7 @@ from jacobian.domains.combinatorics._support import (
 from jacobian.domains.combinatorics.operations import (
     bernoulli,
     fibonacci,
+    fibonacci_pair,
     lucas,
 )
 
@@ -24,6 +27,17 @@ RECURRENCE_CAPABILITIES = (
         fibonacci,
         "combinatorics",
         "sequence",
+    ),
+    combinatorics_operation(
+        "combinatorics.compute.fibonacci_pair",
+        "Compute consecutive Fibonacci values",
+        "Return F_n and F_(n+1) as one exact recurrence boundary.",
+        FibonacciPairRequest,
+        FibonacciPairResult,
+        fibonacci_pair,
+        "combinatorics",
+        "fibonacci",
+        "recurrence-boundary",
     ),
     combinatorics_operation(
         "combinatorics.compute.lucas",

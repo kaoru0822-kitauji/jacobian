@@ -303,6 +303,16 @@ class IntegerPolynomialRequest(ContractModel):
     polynomial: IntegerPolynomial
 
 
+class IntegerPolynomialShiftRequest(IntegerPolynomialRequest):
+    shift: StrictInt = Field(ge=-10_000, le=10_000)
+
+
+class IntegerPolynomialShiftResult(ContractModel):
+    shift: StrictInt = Field(ge=-10_000, le=10_000)
+    shifted: IntegerPolynomial
+    convention: Literal["SUBSTITUTE_X_PLUS_SHIFT"] = "SUBSTITUTE_X_PLUS_SHIFT"
+
+
 class IntegerPolynomialPairRequest(ContractModel):
     left: IntegerPolynomial
     right: IntegerPolynomial
@@ -320,9 +330,7 @@ class IntegerPolynomialGcdResult(ContractModel):
 
 class IntegerPolynomialContentResult(ContractModel):
     content: CanonicalInteger
-    convention: Literal["NONNEGATIVE_COEFFICIENT_GCD"] = (
-        "NONNEGATIVE_COEFFICIENT_GCD"
-    )
+    convention: Literal["NONNEGATIVE_COEFFICIENT_GCD"] = "NONNEGATIVE_COEFFICIENT_GCD"
 
 
 class IntegerPolynomialPrimitivePartResult(ContractModel):

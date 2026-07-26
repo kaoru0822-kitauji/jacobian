@@ -8,25 +8,29 @@ from typing import Any
 import sympy
 from sympy.matrices.normalforms import smith_normal_form
 
-from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.matrix_operations import (
     CharacteristicPolynomialResult,
-    IntegerMatrix,
     IntegerMatrixRequest,
+    IntegerOutputMatrix,
+    MatrixAdjugateResult,
     MatrixInverseResult,
     MatrixTraceResult,
     NullspaceResult,
+    OutputRational,
+    RationalLinearSolveRequest,
+    RationalLinearSolveResult,
     RationalMatrix,
     RationalMatrixRequest,
+    RationalOutputMatrix,
     RrefResult,
     SmithNormalFormResult,
     SquareRationalMatrixRequest,
 )
 
 
-def _rational(value: Any) -> CanonicalRational:
+def _rational(value: Any) -> OutputRational:
     fraction = Fraction(value)
-    return CanonicalRational(
+    return OutputRational(
         num=str(fraction.numerator),
         den=str(fraction.denominator),
     )
@@ -46,7 +50,7 @@ def compute_rref(request: RationalMatrixRequest) -> RrefResult:
     columns = reduced.cols
     pivot_columns = tuple(int(column) for column in pivots)
     return RrefResult(
-        reduced_matrix=RationalMatrix(
+        reduced_matrix=RationalOutputMatrix(
             entries=tuple(
                 tuple(_rational(reduced[row, column]) for column in range(columns))
                 for row in range(reduced.rows)
@@ -70,7 +74,7 @@ def compute_nullspace(request: RationalMatrixRequest) -> NullspaceResult:
     pivot_row_by_column = {
         pivot_column: row for row, pivot_column in enumerate(pivot_columns)
     }
-    basis: list[tuple[CanonicalRational, ...]] = []
+    basis: list[tuple[OutputRational, ...]] = []
     for free_column in free_columns:
         vector = [sympy.S.Zero] * matrix.cols
         vector[free_column] = sympy.S.One
@@ -111,7 +115,7 @@ def compute_smith_normal_form(
     for index, value in enumerate(invariant_factors):
         canonical[index, index] = value
     return SmithNormalFormResult(
-        normal_form=IntegerMatrix(
+        normal_form=IntegerOutputMatrix(
             entries=tuple(
                 tuple(str(int(canonical[row, column])) for column in range(raw.cols))
                 for row in range(raw.rows)
@@ -132,7 +136,7 @@ def compute_inverse(request: IntegerMatrixRequest) -> MatrixInverseResult:
         raise ValueError("matrix is singular; inverse does not exist")
     inverse = source.inv()
     return MatrixInverseResult(
-        inverse=RationalMatrix(
+        inverse=RationalOutputMatrix(
             entries=tuple(
                 tuple(_rational(inverse[row, column]) for column in range(inverse.cols))
                 for row in range(inverse.rows)
@@ -148,3 +152,37 @@ def compute_trace(request: IntegerMatrixRequest) -> MatrixTraceResult:
     if source.rows != source.cols:
         raise ValueError("trace requires a square matrix")
     return MatrixTraceResult(trace=str(int(source.trace())))
+
+
+def compute_rational_linear_solve(
+    request: RationalLinearSolveRequest,
+) -> RationalLinearSolveResult:
+    source = _qq_matrix(request.matrix)
+    rhs = sympy.Matrix(
+        [sympy.Rational(int(value.num), int(value.den)) for value in request.rhs]
+    )
+    solution, parameters = source.gauss_jordan_solve(rhs)
+    if parameters.rows:
+        raise ValueError("linear system does not have a unique solution")
+    return RationalLinearSolveResult(
+        solution=tuple(_rational(value) for value in solution)
+    )
+
+
+def compute_adjugate(request: IntegerMatrixRequest) -> MatrixAdjugateResult:
+    source = sympy.Matrix(
+        [[int(value) for value in row] for row in request.matrix.entries]
+    )
+    if source.rows != source.cols:
+        raise ValueError("adjugate requires a square matrix")
+    adjugate = source.adjugate()
+    return MatrixAdjugateResult(
+        adjugate=IntegerOutputMatrix(
+            entries=tuple(
+                tuple(
+                    str(int(adjugate[row, column])) for column in range(adjugate.cols)
+                )
+                for row in range(adjugate.rows)
+            )
+        )
+    )

@@ -3,23 +3,31 @@
 from collections.abc import Callable
 from typing import Any
 
+from pydantic import ValidationError
+
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.matrix_operations import (
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
+    MatrixAdjugateResult,
     MatrixInverseResult,
     MatrixTraceResult,
     NullspaceResult,
+    RationalLinearSolveRequest,
+    RationalLinearSolveResult,
     RationalMatrixRequest,
     RrefResult,
     SmithNormalFormResult,
+    SquareIntegerMatrixRequest,
     SquareRationalMatrixRequest,
 )
-from jacobian.contracts.results import ContractModel
+from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.domains.matrix_lattice.operations import (
+    compute_adjugate,
     compute_characteristic_polynomial,
     compute_inverse,
     compute_nullspace,
+    compute_rational_linear_solve,
     compute_rref,
     compute_smith_normal_form,
     compute_trace,
@@ -29,6 +37,7 @@ from jacobian.operations import (
     ComputedOperation,
     ComputedOutcome,
     ComputedSuccess,
+    OperationExecutionFailure,
 )
 
 
@@ -45,6 +54,22 @@ def matrix_operation(
     def implementation(request: ContractModel) -> ComputedOutcome[Any]:
         try:
             return ComputedSuccess(operation(request))
+        except ValidationError as exc:
+            return OperationExecutionFailure(
+                status=ExecutionStatus.ERROR,
+                diagnostic=CapabilityDiagnostic(
+                    code="MATRIX_OUTPUT_LIMIT_EXCEEDED",
+                    stage="matrix_result_validation",
+                    message=(
+                        "The exact matrix result exceeded its bounded output "
+                        f"contract: {exc}"
+                    ),
+                    hint=(
+                        "Reduce the matrix dimension or scalar size; no result "
+                        "artifact was retained."
+                    ),
+                ),
+            )
         except (ArithmeticError, TypeError, ValueError) as exc:
             return ComputedNotApplicable(
                 CapabilityDiagnostic(
@@ -69,10 +94,34 @@ def matrix_operation(
 
 MATRIX_CAPABILITIES = (
     matrix_operation(
+        "matrix.rational_linear_system.solve",
+        "Solve an exact rational linear system",
+        "Compute the unique solution to a bounded square system Ax=b over QQ.",
+        RationalLinearSolveRequest,
+        RationalLinearSolveResult,
+        compute_rational_linear_solve,
+        "matrix.relation.solution-of",
+        "matrix",
+        "linear-system",
+        "exact-rational",
+    ),
+    matrix_operation(
+        "matrix.adjugate.compute",
+        "Compute an exact matrix adjugate",
+        "Compute the classical adjugate of a square integer matrix.",
+        SquareIntegerMatrixRequest,
+        MatrixAdjugateResult,
+        compute_adjugate,
+        "matrix.relation.adjugate-of",
+        "matrix",
+        "adjugate",
+        "exact-integer",
+    ),
+    matrix_operation(
         "matrix.inverse.compute",
         "Compute the exact inverse of an integer matrix",
         "Compute the rational two-sided inverse of a nonsingular square matrix.",
-        IntegerMatrixRequest,
+        SquareIntegerMatrixRequest,
         MatrixInverseResult,
         compute_inverse,
         "matrix.relation.inverse-of",
@@ -84,7 +133,7 @@ MATRIX_CAPABILITIES = (
         "matrix.trace.compute",
         "Compute the exact trace of an integer matrix",
         "Compute the sum of the diagonal entries of a square integer matrix.",
-        IntegerMatrixRequest,
+        SquareIntegerMatrixRequest,
         MatrixTraceResult,
         compute_trace,
         "matrix.relation.trace-of",

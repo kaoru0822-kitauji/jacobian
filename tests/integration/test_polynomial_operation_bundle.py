@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -291,3 +292,38 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     assert timeout_result.execution.status is ExecutionStatus.TIMEOUT
     assert timeout_result.diagnostics[0].code == "POLYNOMIAL_GROEBNER_TIMEOUT"
     assert timeout_result.artifact_uris == ()
+
+
+def test_polynomial_output_budget_failure_is_explicit_and_writes_no_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    artifact_writes: list[object] = []
+    original_put = cast(Any, kernel.artifacts.put)
+
+    def recording_put(*args: object, **kwargs: object) -> object:
+        artifact_writes.append((args, kwargs))
+        return original_put(*args, **kwargs)
+
+    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(
+        "jacobian.domains.polynomial.operations._MAX_OUTPUT_TERMS",
+        0,
+    )
+
+    result = _invoke(
+        kernel,
+        "polynomial.compute.gcd",
+        {
+            "left": _polynomial(["x"], [(2, 1, 1), (0, -1, 1)]),
+            "right": _polynomial(["x"], [(1, 1, 1), (0, -1, 1)]),
+        },
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "POLYNOMIAL_OUTPUT_LIMIT_EXCEEDED"
+    assert result.diagnostics[0].stage == "polynomial_output_validation"
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+    assert artifact_writes == []

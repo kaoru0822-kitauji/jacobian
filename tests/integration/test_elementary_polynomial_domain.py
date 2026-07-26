@@ -61,11 +61,14 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
         "gcd_content": "2",
         "normalization": "NONNEGATIVE_LEADING_COEFFICIENT",
     }
-    assert _invoke(
-        kernel,
-        "polynomial.integer.compute.content",
-        {"polynomial": {"coefficients": ["-6", "-6", "0"]}},
-    )["content"] == "6"
+    assert (
+        _invoke(
+            kernel,
+            "polynomial.integer.compute.content",
+            {"polynomial": {"coefficients": ["-6", "-6", "0"]}},
+        )["content"]
+        == "6"
+    )
 
     # The legacy adapter flipped the primitive part's sign without also
     # flipping its content, so its two reported values did not reconstruct a
@@ -109,9 +112,7 @@ def test_rational_polynomial_operations_return_typed_intermediates(
     )
     assert division["quotient"] == _polynomial([(1, 1, 1), (0, 1, 1)])
     assert division["remainder"] == _polynomial([])
-    assert division["reconstruction"] == _polynomial(
-        [(2, 1, 1), (0, -1, 1)]
-    )
+    assert division["reconstruction"] == _polynomial([(2, 1, 1), (0, -1, 1)])
 
     assert _invoke(
         kernel,
@@ -131,9 +132,7 @@ def test_rational_polynomial_operations_return_typed_intermediates(
         "polynomial.rational.compute.integral",
         {"polynomial": _polynomial([(2, 3, 1), (0, 2, 1)])},
     )
-    assert integral["antiderivative"] == _polynomial(
-        [(3, 1, 1), (1, 2, 1)]
-    )
+    assert integral["antiderivative"] == _polynomial([(3, 1, 1), (1, 2, 1)])
     assert integral["integration_constant"] == "ZERO"
 
 
@@ -142,9 +141,7 @@ def test_partial_fraction_output_is_structured_and_reconstructs(
 ) -> None:
     kernel = JacobianKernel(tmp_path)
     numerator = _polynomial([(2, 1, 1), (1, 2, 1), (0, 3, 1)])
-    denominator = _polynomial(
-        [(3, 1, 1), (2, 4, 1), (1, 5, 1), (0, 2, 1)]
-    )
+    denominator = _polynomial([(3, 1, 1), (2, 4, 1), (1, 5, 1), (0, 2, 1)])
 
     result = _invoke(
         kernel,

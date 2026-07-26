@@ -9,8 +9,16 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
+from jacobian.contracts.matrix_operations import (
+    MAX_OUTPUT_SCALAR_DIGITS,
+    IntegerMatrix,
+    MatrixTraceResult,
+    SquareIntegerMatrixRequest,
+)
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.domains.matrix_lattice.capabilities import matrix_operation
 from jacobian.kernel import JacobianKernel
+from jacobian.operations import OperationExecutionFailure
 
 
 def _q(value: int, denominator: int = 1) -> dict[str, str]:
@@ -167,9 +175,59 @@ def test_singular_matrix_inverse_is_not_applicable(tmp_path: Path) -> None:
         )
     )
 
-    assert result.execution.status is ExecutionStatus.NOT_APPLICABLE
+    assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "MATRIX_OPERATION_NOT_APPLICABLE"
     assert result.artifact_uris == ()
+
+
+def test_inverse_accepts_exact_growth_from_maximum_size_input(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    diagonal = "9" * 256
+    determinant = str(int(diagonal) ** 2 - 1)
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.inverse.compute",
+            input={
+                "matrix": {
+                    "domain": "ZZ",
+                    "entries": [[diagonal, "1"], ["1", diagonal]],
+                }
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"]["inverse"]["entries"] == [
+        [
+            {"num": diagonal, "den": determinant},
+            {"num": "-1", "den": determinant},
+        ],
+        [
+            {"num": "-1", "den": determinant},
+            {"num": diagonal, "den": determinant},
+        ],
+    ]
+
+
+def test_matrix_output_contract_failure_is_operational_error() -> None:
+    request = SquareIntegerMatrixRequest(matrix=IntegerMatrix(entries=(("1",),)))
+    operation = matrix_operation(
+        "matrix.test.compute",
+        "Test matrix output boundary",
+        "Exercise result validation in the matrix operation declaration.",
+        SquareIntegerMatrixRequest,
+        MatrixTraceResult,
+        lambda _request: MatrixTraceResult(trace="9" * (MAX_OUTPUT_SCALAR_DIGITS + 1)),
+        "matrix.relation.test-of",
+    )
+
+    outcome = operation.implementation(request)
+
+    assert isinstance(outcome, OperationExecutionFailure)
+    assert outcome.status is ExecutionStatus.ERROR
+    assert outcome.diagnostic.code == "MATRIX_OUTPUT_LIMIT_EXCEEDED"
 
 
 def test_lattice_lll_returns_exact_left_transformation(tmp_path: Path) -> None:

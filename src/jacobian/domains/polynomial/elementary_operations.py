@@ -17,6 +17,8 @@ from jacobian.contracts.polynomial_operations import (
     IntegerPolynomialPairRequest,
     IntegerPolynomialPrimitivePartResult,
     IntegerPolynomialRequest,
+    IntegerPolynomialShiftRequest,
+    IntegerPolynomialShiftResult,
     RationalFunctionRequest,
     RationalPartialFractionResult,
     RationalPartialFractionTerm,
@@ -44,7 +46,9 @@ def _integer_poly(polynomial: IntegerPolynomial) -> Poly:
 
 def _integer_wire(polynomial: Poly) -> IntegerPolynomial:
     return IntegerPolynomial(
-        coefficients=tuple(str(int(coefficient)) for coefficient in polynomial.all_coeffs())
+        coefficients=tuple(
+            str(int(coefficient)) for coefficient in polynomial.all_coeffs()
+        )
     )
 
 
@@ -91,6 +95,16 @@ def integer_polynomial_compose(request: ContractModel) -> ContractModel:
     request = cast(IntegerPolynomialCompositionRequest, request)
     composition = _integer_poly(request.outer).compose(_integer_poly(request.inner))
     return IntegerPolynomialCompositionResult(composition=_integer_wire(composition))
+
+
+def integer_polynomial_shift(request: ContractModel) -> ContractModel:
+    """Compute ``p(x + a)`` using SymPy's exact dense shift."""
+    request = cast(IntegerPolynomialShiftRequest, request)
+    shifted = _integer_poly(request.polynomial).shift(request.shift)
+    return IntegerPolynomialShiftResult(
+        shift=request.shift,
+        shifted=_integer_wire(shifted),
+    )
 
 
 def rational_polynomial_division(request: ContractModel) -> ContractModel:
@@ -177,7 +191,9 @@ def rational_partial_fraction_decomposition(
 ) -> ContractModel:
     request = cast(RationalFunctionRequest, request)
     variables = request.numerator.variables
-    source = cancel(_poly(request.numerator).as_expr() / _poly(request.denominator).as_expr())
+    source = cancel(
+        _poly(request.numerator).as_expr() / _poly(request.denominator).as_expr()
+    )
     decomposition = apart(source, _X)
     polynomial_part = Poly(0, _X, domain="QQ")
     proper_terms: list[RationalPartialFractionTerm] = []

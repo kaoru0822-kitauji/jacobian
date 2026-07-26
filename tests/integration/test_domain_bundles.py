@@ -24,6 +24,9 @@ from jacobian.contracts.combinatorics import (
     IntegerListRequest as CombIntegerListRequest,
 )
 from jacobian.contracts.combinatorics import (
+    IntegerPartitionEnumerationRequest,
+)
+from jacobian.contracts.combinatorics import (
     NonnegativeIntegerRequest as CombNonnegIntRequest,
 )
 from jacobian.contracts.combinatorics import (
@@ -32,7 +35,9 @@ from jacobian.contracts.combinatorics import (
 from jacobian.contracts.finite_sets import FiniteSetPairRequest
 from jacobian.contracts.number_theory import (
     ChineseRemainderRequest,
+    DiscreteLogarithmRequest,
     DivisibilityRequest,
+    JacobiSymbolRequest,
     ModularValueRequest,
     ModulusRequest,
     PositiveIntegerRequest,
@@ -57,6 +62,7 @@ from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
 from jacobian.domains.sequences import SEQUENCE_BUNDLE
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
+from jacobian.operations import BoundedSearchOperation
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
@@ -79,6 +85,7 @@ EXPECTED_IDS: frozenset[str] = frozenset(
         "combinatorics.compute.permutations",
         "combinatorics.compute.stirling_first",
         "combinatorics.compute.stirling_second",
+        "combinatorics.enumerate.integer_partitions",
         "finite_set.compute.difference",
         "finite_set.compute.intersection",
         "finite_set.compute.intersection_cardinality",
@@ -124,9 +131,11 @@ EXPECTED_IDS: frozenset[str] = frozenset(
         "integer.decide.squarefree",
         "integer.transform.base_digits",
         "modular.compute.inverse",
+        "modular.compute.discrete_logarithm",
         "modular.compute.multiplicative_order",
         "modular.enumerate.quadratic_residues",
         "modular.solve.chinese_remainder",
+        "number_theory.compute.jacobi_symbol",
         "rational.compute.absolute_value",
         "rational.compute.ceiling",
         "rational.compute.continued_fraction",
@@ -188,6 +197,7 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (CombNonnegIntRequest, {"n": 5}),
     (CombNonnegPairRequest, {"n": 5, "k": 2}),
     (CombIntegerListRequest, {"values": ["2", "1", "1"]}),
+    (IntegerPartitionEnumerationRequest, {"n": 5, "max_parts": 3}),
     (
         FiniteSetPairRequest,
         {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
@@ -201,6 +211,11 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (ModularValueRequest, {"value": "3", "modulus": 7}),
     (ModulusRequest, {"modulus": 7}),
     (ChineseRemainderRequest, {"residues": [2, 3], "moduli": [3, 5]}),
+    (JacobiSymbolRequest, {"a": "10", "n": 21}),
+    (
+        DiscreteLogarithmRequest,
+        {"base": 7, "target": 15, "modulus": 41},
+    ),
     (RationalValueRequest, {"value": {"num": "1", "den": "2"}}),
     (
         RationalPairRequest,
@@ -306,31 +321,22 @@ def test_representative_payloads_invoke_all_operations(
                 result.diagnostics,
             )
             assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-            assert len(result.artifact_uris) == 2
-            assert result.output["backend_version"] == bundle.backend_version
+            if isinstance(operation, BoundedSearchOperation):
+                assert len(result.artifact_uris) == 3
+                assert len(result.obligations) == 1
+            else:
+                assert len(result.artifact_uris) == 2
+                assert result.output["backend_version"] == bundle.backend_version
             assert result.relationships[0].relation_id == operation.relation_id
-
-
-def test_completed_invocations_materialize_artifacts_with_parents(
-    service: CapabilityService,
-) -> None:
-    store = service.store
-    for bundle in ALL_BUNDLES:
-        for operation in bundle.capabilities:
-            payload = REPRESENTATIVE_PAYLOADS.get(operation.request_model)
-            assert payload is not None, (
-                f"{operation.capability_id}: no payload for {operation.request_model}"
-            )
-            result = service.invoke(
-                CapabilityRequest(capability_id=operation.capability_id, input=payload)
-            )
-            if result.execution.status is not ExecutionStatus.COMPLETED:
-                continue
-            input_uri, result_uri = result.artifact_uris
-            assert store.get(result_uri).manifest.parents == (input_uri,), (
+            input_uri, result_uri, *_ = result.artifact_uris
+            assert service.store.get(result_uri).manifest.parents == (input_uri,), (
                 f"{operation.capability_id}: parent mismatch"
             )
-            assert store.get(result_uri).payload == result.output["result"], (
+            expected_output = (
+                result.output
+                if isinstance(operation, BoundedSearchOperation)
+                else result.output["result"]
+            )
+            assert service.store.get(result_uri).payload == expected_output, (
                 f"{operation.capability_id}: materialized payload mismatch"
             )
-            break

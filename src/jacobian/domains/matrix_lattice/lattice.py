@@ -6,14 +6,14 @@ import sys
 
 from pydantic import ValidationError
 
-from jacobian.bounded_process import run_bounded_process
+from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityProviderAvailability,
 )
 from jacobian.contracts.matrix_operations import (
-    IntegerMatrix,
+    IntegerOutputMatrix,
     LatticeReductionRequest,
     LatticeReductionResult,
 )
@@ -87,6 +87,10 @@ def reduce_lattice_basis(
             },
             stdout_limit=STDOUT_LIMIT,
             stderr_limit=STDERR_LIMIT,
+            resource_limits=ProcessResourceLimits(
+                cpu_seconds=request.resource_budget.wall_seconds + 1,
+                address_space_bytes=1024 * 1024 * 1024,
+            ),
         )
     except OSError:
         return _failure(
@@ -124,8 +128,8 @@ def reduce_lattice_basis(
         if output["protocol"] != PROTOCOL:
             raise ValueError("LLL worker protocol does not match")
         result = LatticeReductionResult(
-            reduced_basis=IntegerMatrix(entries=output["reduced_basis"]),
-            transformation=IntegerMatrix(entries=output["transformation"]),
+            reduced_basis=IntegerOutputMatrix(entries=output["reduced_basis"]),
+            transformation=IntegerOutputMatrix(entries=output["transformation"]),
             rank=output["rank"],
         )
     except (TypeError, ValueError, ValidationError):
