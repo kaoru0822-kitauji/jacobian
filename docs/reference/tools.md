@@ -137,6 +137,8 @@ The base installation currently includes these kernel capability IDs:
 | `polynomial.map.evaluate` | Evaluate one sparse rational polynomial map at one exact rational point. |
 | `polynomial.map.compute_jacobian` | Compute an exact Jacobian matrix and determinant for one sparse rational polynomial map. |
 | `polynomial.map.collision_witness` | Compare two exact point-evaluation artifacts and materialize a candidate collision witness. |
+| `matrix.determinant.compute` | Compute the exact determinant of one square rational matrix and materialize the result. |
+| `matrix.rank.compute` | Compute the exact rank and pivot columns of one rectangular rational matrix. |
 | `universal_algebra.evaluate_laws` | Exhaust finite magma laws or return the first canonical failing valuation. |
 | `universal_algebra.search.countermodel` | Search all operation tables of one bounded carrier order for a source-law model falsifying a target law. |
 | `knowledge.search` | Retrieve locally indexed capability episodes without changing their assurance. |
@@ -147,6 +149,12 @@ for the same map, compares their declared canonical rational values, and
 exposes any resulting candidate witness for independent replay. It does not
 recompute or certify either evaluation. This keeps evaluation and witness
 construction separate while making their composition explicit to the agent.
+
+`matrix.determinant.compute` and `matrix.rank.compute` use deterministic exact
+rational arithmetic and return `COMPUTED` assurance. Their result artifacts
+remain unverified: a future independently implemented and operator-authorized
+checker must replay a determinant or rank claim before Jacobian may report
+`VERIFIED`.
 
 Optional exact runtimes add narrowly scoped operations only when their pinned
 provider identity is available:
