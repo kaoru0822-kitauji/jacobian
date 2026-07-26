@@ -130,6 +130,7 @@ of catalog membership:
 - [exact rational linear-system evidence](linear-rational-solutions.md);
 - [exact rational matrix determinants](matrix-rational-determinant.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
+- [fixed-registry graph invariant batches](graph-invariant-batch.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
 - [Lean declaration discovery contract](lean-declaration-discovery.md).
 
