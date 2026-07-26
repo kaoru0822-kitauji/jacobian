@@ -62,6 +62,74 @@ def _point(*values: Fraction | int) -> list[dict[str, str]]:
     return [_wire_fraction(value) for value in values]
 
 
+def _identity_input(
+    *,
+    right_coefficient: Fraction | int = 2,
+) -> dict[str, Any]:
+    return {
+        "variables": ["x", "y"],
+        "left": {
+            "terms": [
+                {
+                    "coefficient": _wire_fraction(2),
+                    "exponents": [2, 0],
+                },
+                {
+                    "coefficient": _wire_fraction(-1),
+                    "exponents": [0, 1],
+                },
+            ]
+        },
+        "right": {
+            "terms": [
+                {
+                    "coefficient": _wire_fraction(right_coefficient),
+                    "exponents": [2, 0],
+                },
+                {
+                    "coefficient": _wire_fraction(-1),
+                    "exponents": [0, 1],
+                },
+            ]
+        },
+    }
+
+
+@pytest.mark.integration
+def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.identity.verify",
+            mode=CapabilityMode.VERIFY,
+            input=_identity_input(),
+        )
+    )
+
+    assert result.output["identical"] is True
+    assert result.output["conclusion"] == "TRUE"
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert result.assurance.verification_record_uri is not None
+
+
+@pytest.mark.integration
+def test_polynomial_identity_verifies_a_difference(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="polynomial.identity.verify",
+            mode=CapabilityMode.VERIFY,
+            input=_identity_input(right_coefficient=3),
+        )
+    )
+
+    assert result.output["identical"] is False
+    assert result.output["conclusion"] == "FALSE"
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+
 @pytest.mark.integration
 def test_jacobian_canonically_omits_zero_partial_derivatives(
     tmp_path: Path,
