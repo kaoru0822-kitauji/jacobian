@@ -54,10 +54,15 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
         "UNSATISFIABLE",
         "SATISFIABLE",
     ]
-    assert len(result.artifact_uris) == 2
-    input_uri, output_uri = result.artifact_uris
+    assert len(result.artifact_uris) == 3
+    input_uri, output_uri, obligation_uri = result.artifact_uris
     assert kernel.store.get(output_uri).manifest.parents == (input_uri,)
     assert kernel.store.get(output_uri).payload == result.output
+    assert frozenset(kernel.store.get(obligation_uri).manifest.parents) == frozenset(
+        (input_uri, output_uri)
+    )
+    assert result.obligations[0].obligation_uri == obligation_uri
+    assert result.relationships[0].obligation_uris == (obligation_uri,)
 
     coloring = result.output["coloring"]
     assert set(coloring) == {"a", "b", "c"}
@@ -99,8 +104,11 @@ def test_chromatic_number_timeout_is_unknown_and_preserves_bounds(
     assert result.output["chromatic_number"] is None
     assert result.output["lower_bound"] <= result.output["upper_bound"]
     assert result.output["tested"][-1]["status"] == "UNKNOWN"
-    assert len(result.artifact_uris) == 2
+    assert len(result.artifact_uris) == 3
     assert kernel.store.get(result.artifact_uris[1]).payload["status"] == "UNKNOWN"
+    obligation = kernel.store.get(result.artifact_uris[2])
+    assert obligation.payload["claimed_value"] is None
+    assert obligation.payload["status"] == "UNKNOWN"
 
 
 def test_chromatic_number_rejects_repeated_undirected_edges(

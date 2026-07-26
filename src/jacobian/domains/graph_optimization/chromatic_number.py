@@ -5,9 +5,11 @@ from __future__ import annotations
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.graph_coloring import (
     ChromaticNumberBudget,
+    GraphChromaticNumberObligation,
     GraphChromaticNumberOutput,
     GraphChromaticNumberRequest,
 )
+from jacobian.contracts.results import ContractModel
 from jacobian.domains.graph_optimization.operations import (
     build_simple_graph,
     solve_chromatic_number,
@@ -61,6 +63,21 @@ def _chromatic_number_scope_parameters(
     }
 
 
+def _chromatic_number_obligation(
+    request: GraphChromaticNumberRequest,
+    result: GraphChromaticNumberOutput,
+) -> ContractModel:
+    return GraphChromaticNumberObligation(
+        graph=request.graph,
+        status=result.status,
+        claimed_value=result.chromatic_number,
+        lower_bound=result.lower_bound,
+        upper_bound=result.upper_bound,
+        coloring=result.coloring,
+        tested=result.tested,
+    )
+
+
 CHROMATIC_NUMBER_CAPABILITY = BoundedSearchOperation(
     capability_id="graph.invariant.chromatic_number.compute",
     title="Exact chromatic number",
@@ -75,6 +92,8 @@ CHROMATIC_NUMBER_CAPABILITY = BoundedSearchOperation(
     relation_id="graph.invariant.chromatic_number.relation",
     scope_parameters=_chromatic_number_scope_parameters,
     is_complete=lambda result: result.status == "EXACT",
+    obligation_model=GraphChromaticNumberObligation,
+    obligation=_chromatic_number_obligation,
     incomplete_basis=(
         "the declared wall-clock budget ended before exactness was established"
     ),

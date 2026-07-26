@@ -17,6 +17,8 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityMode,
+    CapabilityObligation,
+    CapabilityObligationStatus,
     CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
@@ -25,6 +27,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.domain_operations import ComputedOperationOutput
 from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
 from jacobian.operations import (
+    BoundedSearchInterrupted,
     BoundedSearchNotApplicable,
     BoundedSearchOperation,
     BoundedSearchWitness,
@@ -32,6 +35,7 @@ from jacobian.operations import (
     ComputedOperation,
     DomainBundle,
     DomainOperation,
+    OperationExecutionFailure,
 )
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
@@ -45,6 +49,7 @@ class InstalledDomainBundle:
     semantics_uri: str
     input_schema_uris: dict[type[ContractModel], str]
     result_schema_uris: dict[str, str]
+    obligation_schema_uris: dict[str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +58,37 @@ class _OperationResources:
     semantics_uri: str
     input_schema_uris: dict[type[ContractModel], str]
     result_schema_uris: dict[str, str]
+    obligation_schema_uris: dict[str, str]
+
+
+def _execution_failure_result(
+    *,
+    operation: DomainOperation,
+    request: CapabilityRequest,
+    outcome: OperationExecutionFailure,
+    started: float,
+) -> CapabilityResult:
+    return CapabilityResult(
+        capability_id=operation.capability_id,
+        capability_version=operation.version,
+        mode=request.mode,
+        execution=Execution(
+            status=outcome.status,
+            runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
+            detail=outcome.diagnostic.message,
+        ),
+        output={
+            "error": outcome.diagnostic.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
+        },
+        diagnostics=(outcome.diagnostic,),
+        assurance=CapabilityAssurance(
+            level=CapabilityAssuranceLevel.HEURISTIC,
+            basis="operation did not complete; no mathematical conclusion",
+        ),
+    )
 
 
 class OperationInstaller:
@@ -93,11 +129,23 @@ class OperationInstaller:
             )
             for operation in bundle.capabilities
         }
+        obligation_schema_uris = {
+            operation.capability_id: self.schemas.register_model(
+                name=(
+                    f"{bundle.schema_namespace}-obligation.{operation.capability_id}"
+                ),
+                version=operation.version,
+                model=operation.obligation_model,
+            )
+            for operation in bundle.capabilities
+            if isinstance(operation, BoundedSearchOperation)
+        }
         resources = _OperationResources(
             artifacts=self.artifacts,
             semantics_uri=semantics_uri,
             input_schema_uris=input_schema_uris,
             result_schema_uris=result_schema_uris,
+            obligation_schema_uris=obligation_schema_uris,
         )
         adapters = tuple(
             self._adapter(operation, bundle, resources)
@@ -108,6 +156,7 @@ class OperationInstaller:
             semantics_uri=semantics_uri,
             input_schema_uris=input_schema_uris,
             result_schema_uris=result_schema_uris,
+            obligation_schema_uris=obligation_schema_uris,
         )
 
     @staticmethod
@@ -172,13 +221,21 @@ class ComputedOperationAdapter:
             )
         except ValidationError as exc:
             raise CapabilityInvocationError(
-                self.bundle.diagnostics.invalid_request
+                self.operation.invalid_request
+                or self.bundle.diagnostics.invalid_request
             ) from exc
 
         started = time.monotonic()
         outcome = self.operation.implementation(validated_request)
         if isinstance(outcome, ComputedNotApplicable):
             raise CapabilityInvocationError(outcome.diagnostic)
+        if isinstance(outcome, OperationExecutionFailure):
+            return _execution_failure_result(
+                operation=self.operation,
+                request=request,
+                outcome=outcome,
+                started=started,
+            )
         validated_result = self.operation.result_model.model_validate(outcome.value)
         request_payload = validated_request.model_dump(mode="json")
         result_payload = validated_result.model_dump(mode="json")
@@ -273,15 +330,29 @@ class BoundedSearchOperationAdapter:
             )
         except ValidationError as exc:
             raise CapabilityInvocationError(
-                self.bundle.diagnostics.invalid_request
+                self.operation.invalid_request
+                or self.bundle.diagnostics.invalid_request
             ) from exc
 
         started = time.monotonic()
         outcome = self.operation.implementation(validated_request)
         if isinstance(outcome, BoundedSearchNotApplicable):
             raise CapabilityInvocationError(outcome.diagnostic)
+        if isinstance(outcome, OperationExecutionFailure):
+            return _execution_failure_result(
+                operation=self.operation,
+                request=request,
+                outcome=outcome,
+                started=started,
+            )
         validated_result = self.operation.result_model.model_validate(outcome.value)
+        validated_obligation = self.operation.obligation_model.model_validate(
+            self.operation.obligation(validated_request, validated_result)
+        )
         witness_outcome = isinstance(outcome, BoundedSearchWitness)
+        interrupted_outcome = (
+            outcome if isinstance(outcome, BoundedSearchInterrupted) else None
+        )
         complete = self.operation.is_complete(validated_result)
         if complete != witness_outcome:
             raise ValueError(
@@ -302,13 +373,31 @@ class BoundedSearchOperationAdapter:
             parents=(input_uri,),
             summary=f"{self.operation.capability_id} bounded-search result",
         ).artifact_uri
+        obligation_uri = self.resources.artifacts.put(
+            schema_uri=self.resources.obligation_schema_uris[
+                self.operation.capability_id
+            ],
+            semantics_uri=self.resources.semantics_uri,
+            payload=validated_obligation.model_dump(mode="json"),
+            parents=(input_uri, result_uri),
+            summary=f"{self.operation.capability_id} optimality obligation",
+        ).artifact_uri
         return CapabilityResult(
             capability_id=self.operation.capability_id,
             capability_version=self.operation.version,
             mode=request.mode,
             execution=Execution(
-                status=ExecutionStatus.COMPLETED,
+                status=(
+                    interrupted_outcome.status
+                    if interrupted_outcome is not None
+                    else ExecutionStatus.COMPLETED
+                ),
                 runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
+                detail=(
+                    interrupted_outcome.diagnostic.message
+                    if interrupted_outcome is not None
+                    else None
+                ),
             ),
             output=result_payload,
             scope=CapabilityScope(
@@ -330,18 +419,43 @@ class BoundedSearchOperationAdapter:
                     if complete
                     else self.operation.incomplete_basis
                 ),
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+                assurance_level=(
+                    CapabilityAssuranceLevel.HEURISTIC
+                    if interrupted_outcome is not None
+                    else CapabilityAssuranceLevel.COMPUTED
+                ),
             ),
             relationships=(
                 CapabilityRelationship(
                     relation_id=self.operation.relation_id,
                     source_artifact_uris=(input_uri,),
                     target_artifact_uris=(result_uri,),
+                    obligation_uris=(obligation_uri,),
                 ),
             ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=self.bundle.assurance_basis,
+            obligations=(
+                CapabilityObligation(
+                    obligation_uri=obligation_uri,
+                    status=CapabilityObligationStatus.OPEN,
+                ),
             ),
-            artifact_uris=(input_uri, result_uri),
+            diagnostics=(
+                (interrupted_outcome.diagnostic,)
+                if interrupted_outcome is not None
+                else ()
+            ),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.HEURISTIC
+                    if interrupted_outcome is not None
+                    else CapabilityAssuranceLevel.COMPUTED
+                ),
+                basis=(
+                    "bounded execution was interrupted; partial artifacts carry "
+                    "no mathematical conclusion"
+                    if interrupted_outcome is not None
+                    else self.bundle.assurance_basis
+                ),
+            ),
+            artifact_uris=(input_uri, result_uri, obligation_uri),
         )

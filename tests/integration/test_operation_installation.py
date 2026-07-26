@@ -14,6 +14,7 @@ from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian.operation_installation import OperationInstaller
 from jacobian.operations import (
+    BoundedSearchInterrupted,
     BoundedSearchOperation,
     BoundedSearchWitness,
     ComputedNotApplicable,
@@ -22,6 +23,7 @@ from jacobian.operations import (
     DomainBundle,
     DomainDiagnostics,
     DomainSemantics,
+    OperationExecutionFailure,
 )
 from jacobian.provider_runtime import known_provider_runtime
 
@@ -153,6 +155,143 @@ def test_synthetic_bundle_fails_closed_before_artifact_writes(tmp_path: Path) ->
     assert result.episode_uri is None
 
 
+@pytest.mark.parametrize(
+    "status",
+    (
+        ExecutionStatus.ERROR,
+        ExecutionStatus.TIMEOUT,
+        ExecutionStatus.CANCELLED,
+    ),
+)
+def test_computed_adapter_preserves_operational_failure_status(
+    tmp_path: Path,
+    status: ExecutionStatus,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_OPERATION_FAILED",
+        stage="synthetic_computation",
+        message="The synthetic operation did not complete.",
+    )
+    failed = replace(
+        bundle.capabilities[0],
+        implementation=lambda _request: OperationExecutionFailure(status, diagnostic),
+    )
+    _install(kernel, replace(bundle, capabilities=(failed,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.compute.double",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is status
+    assert result.diagnostics == (diagnostic,)
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+
+
+def test_computed_failure_rejects_conclusive_status() -> None:
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_OPERATION_FAILED",
+        stage="synthetic_computation",
+        message="The synthetic operation did not complete.",
+    )
+
+    with pytest.raises(ValueError, match="operational failure status"):
+        OperationExecutionFailure(ExecutionStatus.COMPLETED, diagnostic)
+
+
+def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_SEARCH_TIMEOUT",
+        stage="synthetic_search",
+        message="The synthetic search exceeded its wall budget.",
+    )
+    operation = BoundedSearchOperation(
+        capability_id="synthetic.search.timeout",
+        title="Timed out synthetic search",
+        description="Exercise bounded operational failure mapping.",
+        request_model=_SyntheticRequest,
+        result_model=_BoundedResult,
+        implementation=lambda _request: OperationExecutionFailure(
+            ExecutionStatus.TIMEOUT,
+            diagnostic,
+        ),
+        relation_id="synthetic.search.timeout.relation",
+        scope_parameters=lambda _request, _result: {},
+        is_complete=lambda result: result.complete,
+        obligation_model=_BoundedResult,
+        obligation=lambda _request, result: result,
+        incomplete_basis="the synthetic search did not complete",
+    )
+    _install(kernel, replace(bundle, capabilities=(operation,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.search.timeout",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.diagnostics == (diagnostic,)
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+
+
+def test_bounded_adapter_materializes_interrupted_partial_result(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_SEARCH_TIMEOUT",
+        stage="synthetic_search",
+        message="The synthetic search retained a partial result.",
+    )
+    operation = BoundedSearchOperation(
+        capability_id="synthetic.search.partial_timeout",
+        title="Interrupted synthetic search",
+        description="Exercise inspectable bounded interruption mapping.",
+        request_model=_SyntheticRequest,
+        result_model=_BoundedResult,
+        implementation=lambda _request: BoundedSearchInterrupted(
+            value=_BoundedResult(complete=False),
+            status=ExecutionStatus.TIMEOUT,
+            diagnostic=diagnostic,
+        ),
+        relation_id="synthetic.search.partial-timeout.relation",
+        scope_parameters=lambda _request, _result: {},
+        is_complete=lambda result: result.complete,
+        obligation_model=_BoundedResult,
+        obligation=lambda _request, result: result,
+        incomplete_basis="the synthetic search did not complete",
+    )
+    _install(kernel, replace(bundle, capabilities=(operation,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.search.partial_timeout",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.output == {"complete": False}
+    assert result.diagnostics == (diagnostic,)
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert len(result.artifact_uris) == 3
+    assert len(result.obligations) == 1
+
+
 def test_computed_adapter_rejects_invalid_implementation_result(
     tmp_path: Path,
 ) -> None:
@@ -230,6 +369,8 @@ def test_bounded_outcome_cannot_contradict_completion_semantics(
         relation_id="synthetic.search.relation",
         scope_parameters=lambda _request, _result: {},
         is_complete=lambda result: result.complete,
+        obligation_model=_BoundedResult,
+        obligation=lambda _request, result: result,
         incomplete_basis="the synthetic search did not complete",
     )
     _install(kernel, replace(bundle, capabilities=(contradictory,)))

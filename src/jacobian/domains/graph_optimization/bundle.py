@@ -8,6 +8,9 @@ from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.graph_optimization.chromatic_number import (
     CHROMATIC_NUMBER_CAPABILITY,
 )
+from jacobian.domains.graph_optimization.finite_optimization import (
+    FINITE_GRAPH_OPTIMIZATION_CAPABILITIES,
+)
 from jacobian.operations import (
     DomainBundle,
     DomainDiagnostics,
@@ -30,6 +33,18 @@ GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
             "max_order": 32,
             "max_edges": 496,
             "budget": "explicit wall_seconds per request",
+            "search_budget": (
+                "finite optimizers also bind max_order and max_solver_calls"
+            ),
+            "conventions": {
+                "domination": "ordinary closed-neighborhood domination",
+                "saturation_number": "minimum cardinality maximal matching",
+                "induced_forest": "empty induced graph allowed",
+                "induced_tree": (
+                    "nonempty connected acyclic; empty source has optimum zero"
+                ),
+                "induced_bipartite": "empty induced graph allowed",
+            },
             "timeout_or_cancellation": (
                 "UNKNOWN partial result with preserved bounds and tested obligations"
             ),
@@ -38,10 +53,17 @@ GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
     ),
     provider_runtime=known_provider_runtime(
         "jacobian.z3",
-        features=("bounded-k-colorability", "timeout-aware"),
+        features=(
+            "bounded-k-colorability",
+            "finite-graph-optimization",
+            "timeout-aware",
+        ),
     ),
     backend_version=z3.get_version_string(),
-    capabilities=(CHROMATIC_NUMBER_CAPABILITY,),
+    capabilities=(
+        CHROMATIC_NUMBER_CAPABILITY,
+        *FINITE_GRAPH_OPTIMIZATION_CAPABILITIES,
+    ),
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(
             code="INVALID_CHROMATIC_NUMBER_REQUEST",
@@ -57,10 +79,10 @@ GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
     ),
     scope_description="one bounded simple undirected graph",
     completeness_basis=(
-        "Z3 settled every k-colorability decision through the first satisfying k"
+        "Z3 settled every stronger threshold needed to bind the reported optimum"
     ),
     assurance_basis=(
-        "bounded Z3 computation; an independent graph-coloring checker "
-        "would still be required for VERIFIED assurance"
+        "bounded Z3 computation with NetworkX witness predicates; an "
+        "independent checker is still required for VERIFIED assurance"
     ),
 )

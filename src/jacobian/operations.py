@@ -10,7 +10,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityProviderRuntime,
 )
-from jacobian.contracts.results import ContractModel
+from jacobian.contracts.results import ContractModel, ExecutionStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,8 +27,24 @@ class ComputedNotApplicable:
     diagnostic: CapabilityDiagnostic
 
 
+@dataclass(frozen=True, slots=True)
+class OperationExecutionFailure:
+    """Operational failure that carries no mathematical conclusion."""
+
+    status: ExecutionStatus
+    diagnostic: CapabilityDiagnostic
+
+    def __post_init__(self) -> None:
+        if self.status not in {
+            ExecutionStatus.ERROR,
+            ExecutionStatus.TIMEOUT,
+            ExecutionStatus.CANCELLED,
+        }:
+            raise ValueError("computed failure must use an operational failure status")
+
+
 type ComputedOutcome[ResultT: ContractModel] = (
-    ComputedSuccess[ResultT] | ComputedNotApplicable
+    ComputedSuccess[ResultT] | ComputedNotApplicable | OperationExecutionFailure
 )
 
 
@@ -47,6 +63,7 @@ class ComputedOperation[
     implementation: Callable[[RequestT], ComputedOutcome[ResultT]]
     relation_id: str
     tags: tuple[str, ...] = ()
+    invalid_request: CapabilityDiagnostic | None = None
     version: str = "1"
 
 
@@ -130,6 +147,25 @@ class BoundedSearchIncomplete[ResultT: ContractModel]:
 
 
 @dataclass(frozen=True, slots=True)
+class BoundedSearchInterrupted[ResultT: ContractModel]:
+    """Inspectable partial result from an interrupted bounded execution."""
+
+    value: ResultT
+    status: ExecutionStatus
+    diagnostic: CapabilityDiagnostic
+
+    def __post_init__(self) -> None:
+        if self.status not in {
+            ExecutionStatus.ERROR,
+            ExecutionStatus.TIMEOUT,
+            ExecutionStatus.CANCELLED,
+        }:
+            raise ValueError(
+                "bounded-search interruption must use an operational failure status"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class BoundedSearchNotApplicable:
     """Valid request outside an operation's mathematical domain."""
 
@@ -139,7 +175,9 @@ class BoundedSearchNotApplicable:
 type BoundedSearchOutcome[ResultT: ContractModel] = (
     BoundedSearchWitness[ResultT]
     | BoundedSearchIncomplete[ResultT]
+    | BoundedSearchInterrupted[ResultT]
     | BoundedSearchNotApplicable
+    | OperationExecutionFailure
 )
 
 
@@ -159,8 +197,11 @@ class BoundedSearchOperation[
     relation_id: str
     scope_parameters: Callable[[RequestT, ResultT], dict[str, Any]]
     is_complete: Callable[[ResultT], bool]
+    obligation_model: type[ContractModel]
+    obligation: Callable[[RequestT, ResultT], ContractModel]
     incomplete_basis: str
     tags: tuple[str, ...] = ()
+    invalid_request: CapabilityDiagnostic | None = None
     version: str = "1"
 
 
