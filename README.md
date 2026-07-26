@@ -1,9 +1,38 @@
 # Jacobian
 
-Jacobian is an MCP server, CLI, and Python library that exposes composable
-mathematical capabilities to AI agents. Its goal is to help agents and human
-researchers make trustworthy progress on conjectures and other problems that
-benefit from executable search and checkable evidence.
+> A composable mathematical workbench for AI agents — built for conjectures,
+> counterexamples, and checkable evidence.
+
+[![CI](https://github.com/morluto/jacobian/actions/workflows/ci.yml/badge.svg)](https://github.com/morluto/jacobian/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/jacobian)](https://pypi.org/project/jacobian/)
+[![npm](https://img.shields.io/npm/v/jacobian)](https://www.npmjs.com/package/jacobian)
+[![Python](https://img.shields.io/pypi/pyversions/jacobian)](https://pypi.org/project/jacobian/)
+[![License: MIT](https://img.shields.io/github/license/morluto/jacobian)](LICENSE)
+
+Jacobian is an MCP server, CLI, and Python library that gives AI agents
+composable mathematical capabilities for high-level mathematics. Agents
+retrieve premises, construct objects, compute invariants, search for
+witnesses, and independently verify certificates — the operations an agent
+needs to make trustworthy progress on conjectures and other problems where a
+model's answer is not enough and checkable evidence is what counts.
+
+## Why Jacobian?
+
+Frontier models can now find counterexamples to open conjectures and propose
+proofs that span pages of subtle algebra. The hard part is no longer only the
+search — it is trust. A model's summary is not a proof, a solver's `SAT` label
+is not a witness, and a high score is not a theorem. Jacobian is built for that
+gap. It gives agents the operations to search, transform, and check
+mathematical objects, and it keeps search, evaluation, and verification in
+separate lanes so a claim becomes trusted only when an independent checker
+accepts evidence bound to the exact statement.
+
+This matters for the work that is hardest to verify by eye: a candidate
+counterexample to a long-standing conjecture, a polynomial map that should or
+should not be invertible, a finite witness that collapses a universal claim.
+Jacobian exposes those as typed, inspectable artifacts — the witness, the
+certificate, the rejected candidate, the stale attempt — so a human reviewer or
+a downstream agent can see what was tried, what passed, and what did not.
 
 Capabilities have mathematically atomic, agent-visible outcomes: retrieve
 premises, construct an object, compute an invariant, transform a claim, search
