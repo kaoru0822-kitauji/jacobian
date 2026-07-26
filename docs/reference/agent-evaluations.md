@@ -29,10 +29,10 @@ verified status.
 ## Local execution boundary
 
 Model-in-the-loop evaluation is a separate, optional local activity. It is not
-called by `make test-fast`, `make test`, `make validate`, CI, release jobs, or
-pre-commit hooks. Those paths may test case loading, scoring, replay, telemetry,
-and dispatch guards with deterministic fixtures, but they never launch an
-evaluated model.
+called by `make test-fast`, `make test`, `make validate-full`, CI, release
+jobs, or pre-commit hooks. Those paths may test case loading, scoring, replay,
+telemetry, and dispatch guards with deterministic fixtures, but they never
+launch an evaluated model.
 
 Use the dedicated entry point with explicit cases. Without `--execute`, it
 prints a plan and exits without starting Codex:
@@ -486,6 +486,15 @@ The initial public case is an executable harness check, not a sufficient
 product claim. Product conclusions require multiple held-out cases and
 repetitions. Report all runs, use paired deltas, and reject any treatment that
 improves efficiency by increasing unsupported mathematical conclusions.
+
+`sat_decision` cases provide `variable_names`, exact clauses, and an expected
+status. The runner canonicalizes and pre-materializes the same CNF into each
+condition's isolated state, then gives both agents the same URI. Its hidden
+oracle brute-forces cases of at most 20 variables. A treatment passes only when
+its report matches that oracle, its producer evidence and verification record
+bind the durable CNF, the transcript contains the ordered find-to-verify
+composition, and a clean kernel independently replays the verifier. Public SAT
+reproductions are always marked unscored.
 
 Development pairs may validate the harness or reveal interface problems, but
 they are not product evidence. Keep their reports with the run artifacts.

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -9,6 +11,8 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import Conclusion
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def test_degree_sequence_realization_materializes_replayable_graph(

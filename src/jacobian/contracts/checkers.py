@@ -7,7 +7,12 @@ from typing import Literal, Self
 
 from pydantic import model_validator
 
-from jacobian.contracts.capabilities import CapabilityId
+from jacobian.contracts.capabilities import (
+    CapabilityId,
+    CapabilityProviderAvailability,
+    CapabilityProviderDigestKind,
+    CapabilityProviderRuntime,
+)
 from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.evidence import FormatIdentifier
 from jacobian.contracts.plugins import Entrypoint
@@ -33,6 +38,7 @@ class CheckerRegistration(ContractModel):
     name: str
     entrypoint: Entrypoint
     executable_digest: Sha256Digest
+    provider_runtime: CapabilityProviderRuntime | None = None
     evidence_kind: EvidenceKind
     format_id: FormatIdentifier
     format_version: str
@@ -42,6 +48,26 @@ class CheckerRegistration(ContractModel):
     target_schema_uris: tuple[ArtifactUri, ...] = ()
     target_semantics_uris: tuple[ArtifactUri, ...] = ()
     authorized: bool = True
+
+    @model_validator(mode="after")
+    def require_exact_external_runtime(self) -> Self:
+        runtime = self.provider_runtime
+        if runtime is None:
+            return self
+        if (
+            runtime.availability is not CapabilityProviderAvailability.AVAILABLE
+            or runtime.digest_kind is not CapabilityProviderDigestKind.EXECUTABLE
+            or runtime.digest is None
+            or not isinstance(runtime.configuration.get("executable"), str)
+        ):
+            raise ValueError(
+                "checker provider runtime must identify an available executable"
+            )
+        if runtime.checker_ids:
+            raise ValueError(
+                "checker provider runtime cannot recursively contain checker IDs"
+            )
+        return self
 
 
 class CheckerAuditEvent(ContractModel):

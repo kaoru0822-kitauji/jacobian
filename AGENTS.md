@@ -64,9 +64,6 @@ checker authorization out of plugins and search code.
   certificate format, and checker identity.
 - Plugins and search code cannot authorize checkers or change trust policy.
 - Independent checkers cannot depend on the search implementation they certify.
-- For trust-sensitive changes, write the attack or invariant test first,
-  replay it in a clean process, and update
-  `docs/explanation/threat-model.md`.
 
 ## Repository Gotchas
 

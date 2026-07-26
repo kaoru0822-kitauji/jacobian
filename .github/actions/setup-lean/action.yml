@@ -1,0 +1,60 @@
+name: Prepare Lean test environment
+description: Restore pinned Lean and Mathlib, install Python dependencies, and build the Jacobian REPL.
+
+inputs:
+  timing-heading:
+    description: Heading used in the GitHub step summary
+    required: false
+    default: Lean phase timing
+
+runs:
+  using: composite
+  steps:
+    - name: Start Lean setup timing
+      shell: bash
+      run: echo "LEAN_SETUP_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+    - name: Set up Lean and restore Mathlib cache
+      uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1
+      with:
+        lake-package-directory: lean
+        use-mathlib-cache: true
+        test: false
+        lint: false
+    - name: Record Lean setup timing
+      shell: bash
+      env:
+        TIMING_HEADING: ${{ inputs.timing-heading }}
+      run: |
+        duration=$(($(date +%s) - LEAN_SETUP_STARTED_AT))
+        {
+          echo "## $TIMING_HEADING"
+          echo ""
+          echo "| Phase | Seconds |"
+          echo "| --- | ---: |"
+          echo "| Toolchain and Mathlib cache | $duration |"
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: Set up Python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      with:
+        python-version: "3.12"
+    - name: Set up uv
+      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      with:
+        enable-cache: true
+        cache-dependency-glob: |
+          pyproject.toml
+          uv.lock
+    - name: Install Python dependencies
+      shell: bash
+      run: uv sync --frozen --dev
+    - name: Build Lean REPL
+      shell: bash
+      working-directory: lean
+      run: |
+        started=$SECONDS
+        set +e
+        lake build repl
+        status=$?
+        set -e
+        echo "| Build Jacobian Lean REPL | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
+        exit "$status"
