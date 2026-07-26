@@ -52,10 +52,15 @@ when investigating regressions. A 120-second per-test backstop prevents local
 deadlocks from hanging indefinitely and is disabled automatically by
 `pytest-timeout` while debugging. Parallel workers retain separate `tmp_path`
 roots; tests that add shared external state must coordinate it explicitly.
-CI collects coverage once on Python 3.12 and runs the full compatibility suite
-without duplicate instrumentation on Python 3.13. Coverage.py's subprocess
-patch includes plugin and checker workers so clean-process execution is not
-misreported as uncovered.
+Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
+marker during collection, preventing a missing module decorator from silently
+expanding the fast loop.
+CI splits each supported Python run into two disjoint groups and retains xdist
+parallelism inside each group. Python 3.12 shards write raw coverage data; a
+dependent job combines both files before enforcing the repository threshold
+and producing the XML report. Python 3.13 runs the same two groups without
+duplicate instrumentation. Coverage.py's subprocess patch includes plugin and
+checker workers so clean-process execution is not misreported as uncovered.
 
 ## Criticality classes
 

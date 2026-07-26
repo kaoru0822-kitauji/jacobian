@@ -34,7 +34,7 @@ from jacobian.contracts.results import (
 )
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
 
@@ -136,7 +136,7 @@ def install_finite_partition(
     certificate_schema_uri = schemas.register(
         name="jacobian.certificate-envelope",
         version="1",
-        schema=CertificateEnvelope.model_json_schema(),
+        schema=model_schema(CertificateEnvelope),
     )
     checker_id = None
     if authorize_checker:

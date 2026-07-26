@@ -16,6 +16,7 @@ from jacobian.contracts.transformations import (
     TransformationApplyResult,
     TransformationRelation,
 )
+from jacobian.schema_registry import model_schema
 
 if TYPE_CHECKING:
     from jacobian.atomic_capabilities import AtomicServiceAdapter
@@ -69,7 +70,7 @@ def build_domain_adapters(
                     "wall_seconds",
                 ),
             ),
-            output_schema=TransformationApplyResult.model_json_schema(),
+            output_schema=model_schema(TransformationApplyResult),
             invoke=lambda p: kernel.transformations.apply(
                 **{
                     **p,
@@ -96,7 +97,7 @@ def build_domain_adapters(
                 {"transformation_uri": artifact_uri},
                 required=("transformation_uri",),
             ),
-            output_schema=ResultEnvelope.model_json_schema(),
+            output_schema=model_schema(ResultEnvelope),
             invoke=lambda p: kernel.verification.verify_transformation(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis=("the checker did not accept the transformation relation"),
@@ -128,7 +129,7 @@ def build_domain_adapters(
                 },
                 required=("point_uri", "generator_set_uri"),
             ),
-            output_schema=PolytopeSeparateResult.model_json_schema(),
+            output_schema=model_schema(PolytopeSeparateResult),
             invoke=lambda p: kernel.polytope.separate(PolytopeSeparateRequest(**p)),
             tags=("polytope", "exact"),
             provider="jacobian.z3",
@@ -148,7 +149,7 @@ def build_domain_adapters(
                 },
                 required=("subject_uri", "verification_record_uri"),
             ),
-            output_schema=ParameterRegion.model_json_schema(),
+            output_schema=model_schema(ParameterRegion),
             invoke=lambda p: kernel.conjectures.promote_parameter_region(**p),
             read_only=True,
             tags=("parameter", "verification"),

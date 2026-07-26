@@ -43,7 +43,7 @@ from jacobian.plugins.registry import (
     PluginRegistryError,
     ResolvedCapability,
 )
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.search import SearchError, SearchService
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 from jacobian.verification import VerificationService
@@ -91,12 +91,12 @@ class ConjectureService:
         self.transformation_schema_uri = schemas.register(
             name="jacobian.hypothesis-transformation",
             version="1",
-            schema=HypothesisTransformationRecord.model_json_schema(),
+            schema=model_schema(HypothesisTransformationRecord),
         )
         self.parameter_region_subject_schema_uri = schemas.register(
             name="jacobian.parameter-region-subject",
             version="1",
-            schema=ParameterRegionSubject.model_json_schema(),
+            schema=model_schema(ParameterRegionSubject),
         )
 
     def run(

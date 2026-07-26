@@ -33,7 +33,7 @@ from jacobian.contracts.transformations import (
 )
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoreError
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,12 +66,12 @@ class TransformationService:
         self.claim_schema_uri = schemas.register(
             name="jacobian.transformation-claim",
             version="1",
-            schema=TransformationClaim.model_json_schema(),
+            schema=model_schema(TransformationClaim),
         )
         self.envelope_schema_uri = schemas.register(
             name="jacobian.transformation-envelope",
             version="1",
-            schema=TransformationEnvelope.model_json_schema(),
+            schema=model_schema(TransformationEnvelope),
         )
 
     def apply(

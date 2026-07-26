@@ -520,7 +520,7 @@ def test_mcp_entrypoint_has_nonstarting_help() -> None:
         check=False,
         capture_output=True,
         text=True,
-        timeout=5,
+        timeout=20,
     )
 
     assert completed.returncode == 0

@@ -40,7 +40,7 @@ from jacobian.contracts.graph_invariants import (
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
 
 _ARTIFACT_URI_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
@@ -206,17 +206,17 @@ def install_graph_capabilities(
     neighborhood_schema_uri = schemas.register(
         name="jacobian.graph-neighborhood-independence",
         version="1",
-        schema=GraphNeighborhoodIndependenceArtifact.model_json_schema(),
+        schema=model_schema(GraphNeighborhoodIndependenceArtifact),
     )
     neighborhood_claim_schema_uri = schemas.register(
         name="jacobian.graph-neighborhood-independence-claim",
         version="1",
-        schema=GraphNeighborhoodIndependenceClaim.model_json_schema(),
+        schema=model_schema(GraphNeighborhoodIndependenceClaim),
     )
     certificate_schema_uri = schemas.register(
         name="jacobian.certificate-envelope",
         version="1",
-        schema=CertificateEnvelope.model_json_schema(),
+        schema=model_schema(CertificateEnvelope),
     )
     neighborhood_checker_id = None
     if authorize_checker:
@@ -604,8 +604,8 @@ class GraphNeighborhoodIndependenceAdapter:
                 ),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=GraphNeighborhoodIndependenceRequest.model_json_schema(),
-            output_schema=GraphNeighborhoodIndependenceOutput.model_json_schema(),
+            input_schema=model_schema(GraphNeighborhoodIndependenceRequest),
+            output_schema=model_schema(GraphNeighborhoodIndependenceOutput),
             tags=(
                 "graph",
                 "neighborhood",

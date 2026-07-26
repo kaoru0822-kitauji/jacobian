@@ -39,6 +39,7 @@ from jacobian.contracts.results import (
 from jacobian.contracts.shrinking import ShrinkResult
 from jacobian.contracts.witness_search import WitnessFindResult
 from jacobian.provider_runtime import known_provider_runtime
+from jacobian.schema_registry import model_schema
 from jacobian.store import ArtifactStore, StoreError
 
 if TYPE_CHECKING:
@@ -188,7 +189,7 @@ def install_atomic_capabilities(
                 },
                 required=("schema_uri", "semantics_uri", "payload"),
             ),
-            output_schema=ArtifactPutResult.model_json_schema(),
+            output_schema=model_schema(ArtifactPutResult),
             invoke=lambda p: kernel.artifacts.put(
                 schema_uri=p["schema_uri"],
                 semantics_uri=p["semantics_uri"],
@@ -207,7 +208,7 @@ def install_atomic_capabilities(
                 {"claim_uri": _ARTIFACT_URI, "plugin_id": _ARTIFACT_URI},
                 required=("claim_uri", "plugin_id"),
             ),
-            output_schema=ClaimValidationResult.model_json_schema(),
+            output_schema=model_schema(ClaimValidationResult),
             invoke=lambda p: kernel.claims.validate(**p),
             read_only=True,
             tags=("claim", "validation"),
@@ -244,7 +245,7 @@ def install_atomic_capabilities(
                     "wall_seconds",
                 ),
             ),
-            output_schema=EvaluationBatchResult.model_json_schema(),
+            output_schema=model_schema(EvaluationBatchResult),
             invoke=lambda p: kernel.evaluation.evaluate_batch(
                 **{
                     **p,
@@ -288,7 +289,7 @@ def install_atomic_capabilities(
                     "wall_seconds",
                 ),
             ),
-            output_schema=WitnessFindResult.model_json_schema(),
+            output_schema=model_schema(WitnessFindResult),
             invoke=lambda p: kernel.witnesses.find(
                 **{**p, "witness_role": WitnessRole(p["witness_role"])}
             ),
@@ -310,7 +311,7 @@ def install_atomic_capabilities(
                 },
                 required=("claim_uri", "candidate_uri", "witness_uri", "checker_id"),
             ),
-            output_schema=ResultEnvelope.model_json_schema(),
+            output_schema=model_schema(ResultEnvelope),
             invoke=lambda p: kernel.verification.verify_witness(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis="the checker did not accept the supplied witness",
@@ -325,7 +326,7 @@ def install_atomic_capabilities(
                 {"certificate_uri": _ARTIFACT_URI, "checker_id": _CHECKER_URI},
                 required=("certificate_uri",),
             ),
-            output_schema=ResultEnvelope.model_json_schema(),
+            output_schema=model_schema(ResultEnvelope),
             invoke=lambda p: kernel.verification.verify_certificate(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis="the checker did not accept the supplied certificate",
@@ -371,7 +372,7 @@ def install_atomic_capabilities(
                     "evaluation_budget",
                 ),
             ),
-            output_schema=ShrinkResult.model_json_schema(),
+            output_schema=model_schema(ShrinkResult),
             invoke=lambda p: kernel.shrinking.run(
                 **{
                     **p,

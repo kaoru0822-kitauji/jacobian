@@ -43,7 +43,7 @@ from jacobian.evaluation import (
 from jacobian.experiment_runtime import new_experiment_uri, open_experiment_database
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.structures import StructureService
 
@@ -110,17 +110,17 @@ class ExperimentService:
         self.archive_page_schema_uri = schemas.register(
             name="jacobian.enumeration-archive-page",
             version="1",
-            schema=EnumerationArchive.model_json_schema(),
+            schema=model_schema(EnumerationArchive),
         )
         self.archive_manifest_schema_uri = schemas.register(
             name="jacobian.enumeration-archive",
             version="1",
-            schema=EnumerationArchiveManifest.model_json_schema(),
+            schema=model_schema(EnumerationArchiveManifest),
         )
         self.evaluation_schema_uri = schemas.register(
             name="jacobian.evaluation-batch-result",
             version="1",
-            schema=EvaluationBatchResult.model_json_schema(),
+            schema=model_schema(EvaluationBatchResult),
         )
 
     def _put_internal_artifact(

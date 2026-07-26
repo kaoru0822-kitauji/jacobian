@@ -56,7 +56,7 @@ from jacobian.contracts.polynomials import (
 from jacobian.contracts.results import ContractModel, Execution, ExecutionStatus
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 
 
@@ -119,37 +119,37 @@ def install_polynomial_capabilities(
     map_schema_uri = schemas.register(
         name="jacobian.rational-polynomial-map",
         version="1",
-        schema=RationalPolynomialMap.model_json_schema(),
+        schema=model_schema(RationalPolynomialMap),
     )
     evaluation_schema_uri = schemas.register(
         name="jacobian.polynomial-map-evaluation",
         version="1",
-        schema=PolynomialMapEvaluation.model_json_schema(),
+        schema=model_schema(PolynomialMapEvaluation),
     )
     jacobian_schema_uri = schemas.register(
         name="jacobian.polynomial-jacobian",
         version="1",
-        schema=PolynomialJacobian.model_json_schema(),
+        schema=model_schema(PolynomialJacobian),
     )
     claim_schema_uri = schemas.register(
         name="jacobian.polynomial-map-injectivity-claim",
         version="1",
-        schema=PolynomialInjectivityClaim.model_json_schema(),
+        schema=model_schema(PolynomialInjectivityClaim),
     )
     jacobian_claim_schema_uri = schemas.register(
         name="jacobian.polynomial-jacobian-claim",
         version="1",
-        schema=PolynomialJacobianClaim.model_json_schema(),
+        schema=model_schema(PolynomialJacobianClaim),
     )
     witness_schema_uri = schemas.register(
         name="jacobian.witness-envelope",
         version="1",
-        schema=WitnessEnvelope.model_json_schema(),
+        schema=model_schema(WitnessEnvelope),
     )
     certificate_schema_uri = schemas.register(
         name="jacobian.certificate-envelope",
         version="1",
-        schema=CertificateEnvelope.model_json_schema(),
+        schema=model_schema(CertificateEnvelope),
     )
     collision_checker_id = None
     jacobian_checker_id = None
@@ -222,8 +222,8 @@ class PolynomialMapEvaluationAdapter:
                 features=("rational-polynomial-evaluation",),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=PolynomialEvaluationRequest.model_json_schema(),
-            output_schema=PolynomialEvaluationOutput.model_json_schema(),
+            input_schema=model_schema(PolynomialEvaluationRequest),
+            output_schema=model_schema(PolynomialEvaluationOutput),
             tags=("polynomial", "map", "evaluation", "exact-computation"),
         )
 
@@ -305,8 +305,8 @@ class PolynomialJacobianAdapter:
                 ),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=PolynomialJacobianRequest.model_json_schema(),
-            output_schema=PolynomialJacobianOutput.model_json_schema(),
+            input_schema=model_schema(PolynomialJacobianRequest),
+            output_schema=model_schema(PolynomialJacobianOutput),
             tags=("polynomial", "jacobian", "determinant", "exact-computation"),
         )
 
@@ -469,8 +469,8 @@ class PolynomialCollisionAdapter:
                 ),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=PolynomialCollisionRequest.model_json_schema(),
-            output_schema=PolynomialCollisionOutput.model_json_schema(),
+            input_schema=model_schema(PolynomialCollisionRequest),
+            output_schema=model_schema(PolynomialCollisionOutput),
             tags=("polynomial", "map", "collision", "witness", "artifact-composition"),
         )
 

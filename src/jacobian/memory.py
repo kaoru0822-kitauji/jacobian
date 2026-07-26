@@ -12,7 +12,7 @@ from jacobian.contracts.capabilities import (
     CapabilityMode,
 )
 from jacobian.contracts.memory import MemoryHit, MemorySearchResult, ResearchEpisode
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 
 
@@ -25,7 +25,7 @@ class ResearchMemory:
         self.episode_schema_uri = schemas.register(
             name="jacobian.research-episode",
             version="1",
-            schema=ResearchEpisode.model_json_schema(),
+            schema=model_schema(ResearchEpisode),
         )
         self.episode_semantics_uri = store.register_descriptor(
             kind="semantics",

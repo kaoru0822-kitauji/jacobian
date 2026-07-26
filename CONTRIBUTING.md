@@ -36,6 +36,17 @@ source-build failure from `uv sync --dev`.
 Use focused tests while implementing. Run the complete applicable validation
 before handing off the final tree, and report only checks that actually ran.
 
+For a quick local feedback loop, skip the integration and end-to-end layers:
+
+```sh
+uv run pytest -m "not integration and not end_to_end"
+```
+
+Pytest assigns these layer markers from the test directories, so new
+integration tests join the right loop without repeated file-level boilerplate.
+Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
+and unfiltered `uv run pytest` before handoff.
+
 ## Verification rules
 
 - Do not turn a timeout, cancellation, error, incomplete enumeration, or

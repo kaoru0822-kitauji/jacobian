@@ -40,7 +40,7 @@ from jacobian.contracts.workspaces import (
     WorkspaceWriteRequest,
     WorkspaceWriteResult,
 )
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
 
 
@@ -97,7 +97,7 @@ class WorkspaceService:
         self.revision_schema_uri = schemas.register(
             name="jacobian.workspace-revision",
             version="1",
-            schema=WorkspaceRevision.model_json_schema(),
+            schema=model_schema(WorkspaceRevision),
         )
         self.revision_semantics_uri = store.register_descriptor(
             kind="semantics",

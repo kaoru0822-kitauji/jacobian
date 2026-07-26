@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError, ValidationError
+from pydantic import BaseModel
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.store import ArtifactStore, StoreError
@@ -29,6 +30,19 @@ class SchemaValidationError(SchemaRegistryError):
         super().__init__(message)
         self.path = path
         self.required_field = required_field
+
+
+@lru_cache(maxsize=128)
+def _model_schema_bytes(model: type[BaseModel]) -> bytes:
+    """Generate one canonical JSON Schema per Pydantic model and process."""
+
+    return canonicalize_json(model.model_json_schema())
+
+
+def model_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """Return a fresh copy of a cached Pydantic model JSON Schema."""
+
+    return cast(dict[str, Any], loads_strict_json(_model_schema_bytes(model)))
 
 
 def _reject_external_references(value: Any) -> None:

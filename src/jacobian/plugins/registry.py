@@ -22,7 +22,7 @@ from jacobian.implementation import (
     ImplementationError,
     package_source_digest,
 )
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class PluginRegistry:
         self.snapshot_schema_uri = self.schemas.register(
             name="jacobian.plugin-registry-snapshot",
             version="1",
-            schema=PluginRegistrySnapshot.model_json_schema(),
+            schema=model_schema(PluginRegistrySnapshot),
         )
         self.snapshot_semantics_uri = store.register_descriptor(
             kind="semantics",

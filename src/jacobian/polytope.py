@@ -43,7 +43,7 @@ from jacobian.contracts.results import (
     ResultEnvelope,
     Verification,
 )
-from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
+from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 
 _LOGGER = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ class PolytopeService:
             name="jacobian.rational-point",
             version="1",
             schema=_require_schema_version(
-                RationalPoint.model_json_schema(),
+                model_schema(RationalPoint),
                 "point_schema_version",
             ),
         )
@@ -125,24 +125,24 @@ class PolytopeService:
             name="jacobian.finite-generator-set",
             version="1",
             schema=_require_schema_version(
-                FiniteGeneratorSet.model_json_schema(),
+                model_schema(FiniteGeneratorSet),
                 "generator_set_schema_version",
             ),
         )
         self.claim_schema_uri = schemas.register(
             name="jacobian.polytope-claim",
             version="1",
-            schema=PolytopeClaim.model_json_schema(),
+            schema=model_schema(PolytopeClaim),
         )
         self.witness_schema_uri = schemas.register(
             name="jacobian.witness-envelope",
             version="1",
-            schema=WitnessEnvelope.model_json_schema(),
+            schema=model_schema(WitnessEnvelope),
         )
         self.certificate_schema_uri = schemas.register(
             name="jacobian.certificate-envelope",
             version="1",
-            schema=CertificateEnvelope.model_json_schema(),
+            schema=model_schema(CertificateEnvelope),
         )
 
     def separate(

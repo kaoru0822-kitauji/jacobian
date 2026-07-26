@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,7 +15,7 @@ from jacobian.contracts.lean import LeanCandidate, LeanClaim, LeanEnvironment
 from jacobian.contracts.plugins import PluginManifest
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 
 
@@ -82,17 +81,17 @@ class ReferenceInstaller:
         self.manifest_schema_uri = schemas.register(
             name="jacobian.plugin-manifest",
             version="1",
-            schema=PluginManifest.model_json_schema(),
+            schema=model_schema(PluginManifest),
         )
         self.witness_schema_uri = schemas.register(
             name="jacobian.witness-envelope",
             version="1",
-            schema=WitnessEnvelope.model_json_schema(),
+            schema=model_schema(WitnessEnvelope),
         )
         self.certificate_schema_uri = schemas.register(
             name="jacobian.certificate-envelope",
             version="1",
-            schema=CertificateEnvelope.model_json_schema(),
+            schema=model_schema(CertificateEnvelope),
         )
         self.manifest_semantics_uri = store.register_descriptor(
             kind="semantics",
@@ -154,12 +153,12 @@ class ReferenceInstaller:
         claim_schema_uri = self.schemas.register(
             name="jacobian.lean4.claim",
             version="1",
-            schema=LeanClaim.model_json_schema(),
+            schema=model_schema(LeanClaim),
         )
         candidate_schema_uri = self.schemas.register(
             name="jacobian.lean4.candidate",
             version="1",
-            schema=LeanCandidate.model_json_schema(),
+            schema=model_schema(LeanCandidate),
         )
         configurations: dict[
             LeanEnvironment,
@@ -819,7 +818,7 @@ def _claim_schema(
     *,
     predicate_parameters: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
-    schema = deepcopy(ClaimSpec.model_json_schema())
+    schema = model_schema(ClaimSpec)
     predicate = schema["$defs"]["PredicateSpec"]
     predicate["properties"]["name"]["enum"] = list(predicate_parameters)
     schema["allOf"] = [

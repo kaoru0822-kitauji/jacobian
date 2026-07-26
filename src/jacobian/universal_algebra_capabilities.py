@@ -50,7 +50,7 @@ from jacobian.contracts.universal_algebra import (
 )
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
+from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 
 _COUNTERMODEL_TIMEOUT_MS = 10_000
@@ -110,27 +110,27 @@ def install_universal_algebra_capabilities(
     problem_schema_uri = schemas.register(
         name="jacobian.finite-magma-law-problem",
         version="1",
-        schema=FiniteMagmaLawProblem.model_json_schema(),
+        schema=model_schema(FiniteMagmaLawProblem),
     )
     evaluation_schema_uri = schemas.register(
         name="jacobian.finite-magma-law-evaluation",
         version="1",
-        schema=FiniteMagmaLawEvaluationArtifact.model_json_schema(),
+        schema=model_schema(FiniteMagmaLawEvaluationArtifact),
     )
     countermodel_schema_uri = schemas.register(
         name="jacobian.finite-magma-countermodel-search",
         version="1",
-        schema=FiniteMagmaCountermodelArtifact.model_json_schema(),
+        schema=model_schema(FiniteMagmaCountermodelArtifact),
     )
     claim_schema_uri = schemas.register(
         name="jacobian.finite-magma-law-evaluation-claim",
         version="1",
-        schema=FiniteMagmaLawEvaluationClaim.model_json_schema(),
+        schema=model_schema(FiniteMagmaLawEvaluationClaim),
     )
     certificate_schema_uri = schemas.register(
         name="jacobian.certificate-envelope",
         version="1",
-        schema=CertificateEnvelope.model_json_schema(),
+        schema=model_schema(CertificateEnvelope),
     )
     evaluation_checker_id = None
     if authorize_checker:
@@ -190,8 +190,8 @@ class UniversalAlgebraEvaluateLawsAdapter:
                 ),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=UniversalAlgebraEvaluationRequest.model_json_schema(),
-            output_schema=UniversalAlgebraEvaluationOutput.model_json_schema(),
+            input_schema=model_schema(UniversalAlgebraEvaluationRequest),
+            output_schema=model_schema(UniversalAlgebraEvaluationOutput),
             tags=(
                 "universal-algebra",
                 "finite-model",
@@ -358,8 +358,8 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 features=("finite-magma-countermodel-search",),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema=UniversalAlgebraCountermodelSearchRequest.model_json_schema(),
-            output_schema=UniversalAlgebraCountermodelSearchOutput.model_json_schema(),
+            input_schema=model_schema(UniversalAlgebraCountermodelSearchRequest),
+            output_schema=model_schema(UniversalAlgebraCountermodelSearchOutput),
             tags=(
                 "universal-algebra",
                 "finite-model",

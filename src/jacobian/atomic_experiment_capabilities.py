@@ -22,6 +22,7 @@ from jacobian.contracts.search import (
     ExperimentControlResult,
     SearchExperimentSnapshot,
 )
+from jacobian.schema_registry import model_schema
 
 if TYPE_CHECKING:
     from jacobian.atomic_capabilities import AtomicServiceAdapter
@@ -60,7 +61,7 @@ def build_experiment_adapters(
                 },
                 required=("structure_uri", "plugin_id", "wall_seconds"),
             ),
-            output_schema=StructureCanonicalizationResult.model_json_schema(),
+            output_schema=model_schema(StructureCanonicalizationResult),
             invoke=lambda p: kernel.structures.canonicalize(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis="plugin canonicalization is not independently verified",
@@ -86,7 +87,7 @@ def build_experiment_adapters(
                 },
                 required=("claim_uri", "plugin_id", "bounds", "budget"),
             ),
-            output_schema=ExperimentHandle.model_json_schema(),
+            output_schema=model_schema(ExperimentHandle),
             invoke=lambda p: kernel.experiments.start_enumeration(p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis=(
