@@ -503,18 +503,21 @@ shared exact provider than importing SageMath.
 
 ### SymPy second
 
-Define a small versioned expression AST with explicit symbols, coefficient
-domains, functions, and assumptions. Convert that AST to SymPy internally.
-Never pass unsanitized user strings to `sympify`, `parse_expr`, `lambdify`, or
-Python evaluation; the [SymPy documentation][sympy-parsing] explicitly warns
-that these paths use `eval`.
+The first typed normalization slice is implemented; see the
+[typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
+and the
+[SymPy normalization pilot](../reference/capability-workflow-evaluations.md#sympy-typed-polynomial-normalization-pilot).
+It defines a small versioned polynomial AST with explicit symbols and
+coefficients, then constructs SymPy objects internally. It never passes
+unsanitized user strings to `sympify`, `parse_expr`, `lambdify`, or Python
+evaluation; the [SymPy documentation][sympy-parsing] explicitly warns that
+these paths use `eval`.
 
-Start with polynomial normalization where canonical coefficients provide a
-clear independent relation. Follow with narrowly scoped differentiation or
-simplification only when the output records assumptions, domains, branch
-conditions, and remaining obligations. Symbolic integration should not be an
-early slice: condition sets, branch cuts, and unevaluated results make its
-contract and verification boundary substantially larger.
+Any follow-up differentiation or simplification remains demand-gated and must
+record assumptions, domains, branch conditions, and remaining obligations.
+Symbolic integration should not be an early slice: condition sets, branch
+cuts, and unevaluated results make its contract and verification boundary
+substantially larger.
 
 Avoid duplicate public IDs backed separately by FLINT and SymPy. Choose the
 provider that best fits the declared domain, record it in provenance, and use
@@ -581,6 +584,10 @@ backlog.
     and the
     [Python-FLINT HNF pilot](../reference/capability-workflow-evaluations.md#python-flint-hermite-normal-form-pilot).
 13. Typed expression AST and one SymPy polynomial-normalization slice.
+    Implemented; see the
+    [typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
+    and the
+    [SymPy normalization pilot](../reference/capability-workflow-evaluations.md#sympy-typed-polynomial-normalization-pilot).
 14. Re-rank E/Vampire, Metamath, nauty, Singular, PARI, Normaliz, GAP, fplll,
     and HiGHS from accumulated workflow evidence.
 
