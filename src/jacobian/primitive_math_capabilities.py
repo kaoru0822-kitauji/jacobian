@@ -12,7 +12,7 @@ from fractions import Fraction
 from functools import reduce
 from itertools import pairwise
 from operator import mul
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import sympy
 from pydantic import ValidationError
@@ -34,6 +34,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.primitive_math import (
     ChineseRemainderRequest,
+    IntegerBaseDigitsResult,
     IntegerListRequest,
     IntegerModulusRequest,
     IntegerPairRequest,
@@ -169,7 +170,10 @@ def _multiplicative_order(request: ContractModel) -> str:
 
 def _quadratic_residues(request: ContractModel) -> list[str]:
     modulus = cast(IntegerModulusRequest, request).modulus
-    return [str(value) for value in sorted({(x * x) % modulus for x in range(modulus)})]
+    return [
+        str(value)
+        for value in sympy.ntheory.residue_ntheory.quadratic_residues(modulus)
+    ]
 
 
 def _crt(request: ContractModel) -> dict[str, str]:
@@ -251,11 +255,14 @@ def _is_arithmetic(request: ContractModel) -> bool:
 
 def _is_geometric(request: ContractModel) -> bool:
     values = _values(request)
-    if len(values) < 3:
+    if len(values) < 2:
         return True
+    if values[0] == 0:
+        return all(value == 0 for value in values)
+    ratio = Fraction(values[1], values[0])
     return all(
-        values[i] * values[1] == values[i - 1] * values[2]
-        for i in range(2, len(values))
+        right * ratio.denominator == left * ratio.numerator
+        for left, right in pairwise(values)
     )
 
 
@@ -268,19 +275,16 @@ def _integer_root(n: int, k: int) -> dict[str, Any]:
     return {"root": str(-root if n < 0 else root), "exact": exact}
 
 
-def _base_digits(request: ContractModel) -> list[str]:
+def _base_digits(request: ContractModel) -> IntegerBaseDigitsResult:
     modular = cast(IntegerModulusRequest, request)
     value, base = _i(modular.value), modular.modulus
-    if value == 0:
-        return ["0"]
-    digits: list[str] = []
-    remaining = abs(value)
-    while remaining:
-        remaining, digit = divmod(remaining, base)
-        digits.append(str(digit))
-    if value < 0:
-        digits.append("-")
-    return list(reversed(digits))
+    digits = sympy.ntheory.digits(abs(value), base)[1:]
+    sign: Literal[-1, 0, 1] = -1 if value < 0 else (1 if value > 0 else 0)
+    return IntegerBaseDigitsResult(
+        sign=sign,
+        base=base,
+        digits=tuple(str(digit) for digit in digits),
+    )
 
 
 def _set_pair(request: ContractModel) -> tuple[set[int], set[int]]:
@@ -323,13 +327,8 @@ def _running(request: ContractModel, fn: Callable[[int, int], int]) -> list[str]
 
 
 def _continued_fraction(value: Fraction) -> list[str]:
-    terms: list[str] = []
-    numerator, denominator = value.numerator, value.denominator
-    while denominator:
-        quotient, remainder = divmod(numerator, denominator)
-        terms.append(str(quotient))
-        numerator, denominator = denominator, remainder
-    return terms
+    rational = sympy.Rational(value.numerator, value.denominator)
+    return [str(term) for term in sympy.continued_fraction(rational)]
 
 
 def _spec(

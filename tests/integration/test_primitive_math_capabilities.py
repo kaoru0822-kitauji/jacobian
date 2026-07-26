@@ -141,6 +141,26 @@ def test_representative_exact_results(tmp_path: Path) -> None:
             {"values": ["18", "24", "15"]},
             ["18", "6", "3"],
         ),
+        (
+            "modular.enumerate.quadratic_residues",
+            {"value": "0", "modulus": 10},
+            ["0", "1", "4", "5", "6", "9"],
+        ),
+        (
+            "rational.compute.continued_fraction",
+            {"value": {"num": "-7", "den": "5"}},
+            ["-2", "1", "1", "2"],
+        ),
+        (
+            "integer.transform.base_digits",
+            {"value": "-10", "modulus": 2},
+            {"sign": -1, "base": 2, "digits": ["1", "0", "1", "0"]},
+        ),
+        (
+            "integer.transform.base_digits",
+            {"value": "0", "modulus": 10},
+            {"sign": 0, "base": 10, "digits": ["0"]},
+        ),
     )
 
     for capability_id, payload, expected in cases:
@@ -149,3 +169,25 @@ def test_representative_exact_results(tmp_path: Path) -> None:
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.output["result"] == expected
+
+
+def test_geometric_sequence_handles_zero_terms_exactly(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    cases = (
+        (["0", "0", "1"], False),
+        (["1", "0", "0"], True),
+        (["0", "0", "0"], True),
+        (["2", "4", "8", "16"], True),
+        (["8", "-4", "2", "-1"], True),
+        (["2", "4", "9"], False),
+    )
+
+    for values, expected in cases:
+        result = kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="sequence.decide.geometric",
+                input={"values": values},
+            )
+        )
+        assert result.execution.status is ExecutionStatus.COMPLETED
+        assert result.output["result"] is expected

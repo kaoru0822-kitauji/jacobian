@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, model_validator
 
@@ -17,7 +17,37 @@ BoundedInteger = Annotated[
         strict=True,
     ),
 ]
-PrimitiveMathValue = str | bool | tuple[str, ...] | dict[str, str | bool]
+BaseDigit = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^(?:0|[1-9][0-9]*)$",
+        max_length=4,
+        strict=True,
+    ),
+]
+
+
+class IntegerBaseDigitsResult(ContractModel):
+    """One integer's sign and positional digits in a declared base."""
+
+    sign: Literal[-1, 0, 1]
+    base: int = Field(ge=2, le=10_000)
+    digits: tuple[BaseDigit, ...] = Field(min_length=1, max_length=1_024)
+
+    @model_validator(mode="after")
+    def require_canonical_digits(self) -> IntegerBaseDigitsResult:
+        if any(int(digit) >= self.base for digit in self.digits):
+            raise ValueError("every positional digit must be smaller than the base")
+        if self.sign == 0 and self.digits != ("0",):
+            raise ValueError("zero sign requires the canonical zero digit")
+        if self.sign != 0 and self.digits[0] == "0":
+            raise ValueError("nonzero positional digits cannot have a leading zero")
+        return self
+
+
+PrimitiveMathValue = (
+    IntegerBaseDigitsResult | str | bool | tuple[str, ...] | dict[str, str | bool]
+)
 
 
 class IntegerValueRequest(ContractModel):
