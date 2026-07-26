@@ -23,7 +23,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
 )
-from jacobian.contracts.common import ArtifactUri, Sha256Digest
+from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 
 SatVariableName = Annotated[
@@ -166,6 +166,33 @@ class SatResourceBudget(ContractModel):
     )
 
 
+class SatExplorationBudget(ContractModel):
+    """CaDiCaL limits that the exploration adapter actually enforces."""
+
+    budget_version: Literal["1"] = "1"
+    wall_seconds: StrictInt = Field(ge=1, le=86_400)
+    conflicts: StrictInt | None = Field(
+        default=None,
+        ge=1,
+        le=(1 << 53) - 1,
+    )
+
+    def artifact_budget(self) -> SatResourceBudget:
+        """Project enforced limits into durable SAT evidence provenance."""
+
+        return SatResourceBudget(
+            wall_seconds=self.wall_seconds,
+            conflicts=self.conflicts,
+        )
+
+
+class SatExplorationRequest(ContractModel):
+    """Run one bounded producer against an exact canonical CNF artifact."""
+
+    cnf_uri: ArtifactUri
+    resource_budget: SatExplorationBudget
+
+
 class SatAssignmentArtifact(ContractModel):
     """One total, exact, but not self-verifying assignment candidate."""
 
@@ -183,6 +210,86 @@ class SatAssignmentArtifact(ContractModel):
                 "assignment must contain one value for every bound variable"
             )
         _require_available_producer(self.producer)
+        return self
+
+
+class SatAssignmentVerificationRequest(ContractModel):
+    """Verify one stored total assignment against its exact bound CNF."""
+
+    assignment_uri: ArtifactUri
+
+
+class SatAssignmentVerificationOutput(ContractModel):
+    """Model-facing projection of one independent assignment replay."""
+
+    status: Literal[
+        "VERIFIED_SATISFYING",
+        "REJECTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    cnf_uri: ArtifactUri
+    assignment_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_projection(self) -> Self:
+        if self.status == "VERIFIED_SATISFYING":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified satisfying output requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError(
+                "non-verified assignment output cannot carry a conclusion or record"
+            )
+        return self
+
+
+class SatModelFindOutput(ContractModel):
+    """Unverified result of one bounded model-production attempt."""
+
+    status: Literal["ASSIGNMENT_PRODUCED", "NO_ASSIGNMENT_PRODUCED"]
+    solver_status: Literal["SATISFIABLE", "UNSATISFIABLE", "UNKNOWN"]
+    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
+    cnf_uri: ArtifactUri
+    assignment_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_assignment_to_status(self) -> Self:
+        produced = self.status == "ASSIGNMENT_PRODUCED"
+        if produced != (self.assignment_uri is not None):
+            raise ValueError(
+                "only an assignment-produced result may carry an assignment URI"
+            )
+        if produced and self.solver_status != "SATISFIABLE":
+            raise ValueError("an assignment requires a SATISFIABLE solver report")
+        return self
+
+
+class SatUnsatProofFindOutput(ContractModel):
+    """Unverified result of one bounded DRAT-production attempt."""
+
+    status: Literal["PROOF_PRODUCED", "NO_PROOF_PRODUCED"]
+    solver_status: Literal["SATISFIABLE", "UNSATISFIABLE", "UNKNOWN"]
+    conclusion: Literal["UNKNOWN"] = "UNKNOWN"
+    cnf_uri: ArtifactUri
+    proof_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_proof_to_status(self) -> Self:
+        produced = self.status == "PROOF_PRODUCED"
+        if produced != (self.proof_uri is not None):
+            raise ValueError("only a proof-produced result may carry a proof URI")
+        if produced and self.solver_status != "UNSATISFIABLE":
+            raise ValueError("a proof requires an UNSATISFIABLE solver report")
         return self
 
 

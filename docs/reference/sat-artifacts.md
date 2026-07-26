@@ -3,14 +3,20 @@
 [Documentation home](../index.md)
 
 - Status: Experimental pre-stable contract
-- Installed operations: none
+- Optional operations: `sat.model.find` and `sat.unsat_proof.find` when exact
+  CaDiCaL 3.0.1 is installed
+- Installed operations: `sat.model.verify` when the operator installs the
+  bundled reference checkers
 - Related plan:
   [Atomic capability portfolio](../contributing/atomic-capability-portfolio.md#wave-2-sat-certificate-vertical-slice)
 
-Jacobian installs canonical CNF, total assignment, and raw DRAT proof artifact
-contracts before installing any SAT solver or checker. These artifacts are
-typed inputs and unverified evidence. Storing an assignment does not establish
-SAT, and storing proof bytes does not establish UNSAT.
+Jacobian always installs canonical CNF, total assignment, and raw DRAT proof
+artifact contracts. It conditionally exposes two exploration capabilities when
+the pinned CaDiCaL runtime is available, but does not install the solver.
+These artifacts begin as typed, unverified evidence. Storing an assignment does
+not establish SAT, and storing proof bytes does not establish UNSAT. An
+operator may separately authorize the bundled assignment checker and expose
+`sat.model.verify`.
 
 ## Registered descriptors
 
@@ -23,9 +29,11 @@ registered by the current kernel:
 | Schema | `jacobian.canonical-cnf@1` | Canonical named-variable CNF and DIMACS binding |
 | Schema | `jacobian.sat-assignment@1` | Total assignment candidate bound to one CNF |
 | Schema | `jacobian.sat-proof@1` | Preserved raw DRAT bytes bound to one CNF |
+| Schema | `jacobian.witness-envelope@1` | Exact assignment replay evidence |
 
-The schema URIs are content addressed. They are not capability IDs and do not
-add tools to `capability://catalog`.
+The schema URIs are content addressed. They are not capability IDs. The
+assignment verification capability appears in `capability://catalog` only
+when its checker is operator authorized.
 
 The SAT schemas are model backed. JSON Schema checks their closed structural
 shape, and the same registry validation path also applies the domain
@@ -98,8 +106,84 @@ records:
   memory and conflict bounds.
 
 The assignment schema has no conclusion, verification status, checker ID, or
-certificate claim. A later `sat.model.verify` capability must load the bound
-CNF and independently evaluate every clause.
+certificate claim.
+
+## CaDiCaL exploration
+
+The base kernel probes `cadical` on `PATH`. It installs `sat.model.find` and
+`sat.unsat_proof.find` only when `cadical --version` reports exactly `3.0.1`.
+The runtime record uses install tier T2, license identifier `MIT`, the resolved
+executable path, platform, supported projection and proof formats, and the
+SHA-256 digest of the executable. Every invocation checks that digest before
+and after execution. A missing executable, another version, or a changed
+executable leaves the capabilities absent or makes the invocation fail without
+evidence.
+
+The implementation is tested against upstream tag `rel-3.0.1`, commit
+`c60730422e758ef1cebe7aeddf2dda31c996bf04`. Jacobian does not download or
+vendor a binary. An operator may build that revision using the upstream
+`./configure && make` path and place the resulting `cadical` executable on
+`PATH`; the locally built executable receives its own recorded digest.
+
+Both operations accept:
+
+- one exact canonical `cnf_uri`; and
+- an enforced wall-time bound plus an optional CaDiCaL conflict bound.
+
+They do not accept a memory bound because this adapter does not yet enforce
+one. The exact canonical DIMACS bytes are written to an isolated temporary
+directory. CaDiCaL runs in a bounded process group with fixed `C` locale,
+bounded stdout and stderr, and descendant termination on timeout or excess
+output.
+
+`sat.model.find` accepts only the documented competition protocol: exit 10
+plus `s SATISFIABLE` and a unique, range-checked, zero-terminated literal for
+every declared variable. It then stores the Boolean vector through
+`SatArtifactService.put_assignment`. The result reports
+`ASSIGNMENT_PRODUCED`, `solver_status: SATISFIABLE`, and
+`conclusion: UNKNOWN`. The candidate becomes mathematically assured only if a
+later `sat.model.verify` invocation independently accepts it.
+
+`sat.unsat_proof.find` invokes CaDiCaL with `--no-binary` and an explicit proof
+path. Exit 20 plus `s UNSATISFIABLE` permits the adapter to read at most
+6,000,000 bytes from a non-symlink regular file and preserve them as
+`drat-text/v1`. Empty proof bytes are allowed because an input containing an
+empty clause can require no added proof step. The result still reports
+`conclusion: UNKNOWN`; no solver status or stored bytes establish UNSAT.
+
+Exit 0 is recorded only as solver status `UNKNOWN`. A SAT report from the
+proof producer, an UNSAT report from the model producer, or any bounded attempt
+without the requested evidence returns `NO_*_PRODUCED` and `UNKNOWN`. Timeout,
+non-protocol exit, inconsistent text status, malformed or partial model,
+oversized output, unsafe proof file, and runtime replacement are operational
+failures. None creates solver evidence or an opposite conclusion.
+
+## Assignment verification
+
+`sat.model.verify` accepts one `assignment_uri` in `VERIFY` mode. Before
+starting a checker process, its adapter:
+
+1. validates the stored assignment with the model-backed schema;
+2. resolves the CNF named inside the assignment;
+3. derives the current CNF binding from that stored artifact;
+4. requires every binding field to match and the CNF to be an assignment
+   parent; and
+5. materializes a `sat.assignment@1` witness bound to the exact CNF,
+   assignment, and SAT semantics.
+
+The authorized checker then runs in a clean process. Its implementation uses
+only the Python standard library and no solver code or Jacobian SAT contract
+implementation. It independently validates the closed canonical CNF shape,
+variable ordering, clause ordering, payload, variable-map and DIMACS digests,
+assignment binding, total strict-Boolean vector, evidence bindings, and
+lineage. It returns `TRUE` only after evaluating every clause successfully.
+
+Acceptance creates the ordinary kernel `VerificationRecord` and allows the
+capability result to report `VERIFIED`. Assignment rejection reports
+`UNKNOWN`: it does not establish UNSAT. A malformed or misbound artifact fails
+before checker dispatch. Timeout, checker error, cancellation, and incomplete
+execution likewise remain non-verified and carry no SAT or UNSAT conclusion.
+Direct witness replay makes no enumeration-completeness claim.
 
 ## Raw proof artifacts
 
@@ -123,12 +207,10 @@ limit, and this contract bounds the base64 field to 8,000,000 characters.
 
 The following are deliberately outside this slice:
 
-- no assignment evaluator;
-- no CaDiCaL invocation or solver-status interpretation;
 - no DRAT-trim process or checker authorization;
-- no SAT or UNSAT conclusion; and
-- no `VERIFIED` result.
+- no UNSAT conclusion from assignment rejection; and
+- no verification of raw proof bytes.
 
-The next slice adds the deliberately small independent assignment checker.
-Proof production and independent clean-process proof replay remain later,
-separate changes.
+CaDiCaL is a producer, not a checker. Its status is retained only as an
+unverified operational report. The next slice adds independent clean-process
+DRAT replay as a separate capability and authorization boundary.

@@ -114,8 +114,7 @@ Release contracts and engineering evidence are:
 - [Provider runtime contract](docs/reference/provider-runtime.md) for
   availability, exact backend identity, install tiers, and local measurement.
 - [SAT artifact contracts](docs/reference/sat-artifacts.md) for canonical CNF,
-  total assignment, and raw proof identity before solver or checker
-  installation.
+  raw model and proof identity, and independently checked total assignments.
 - [v0.2 specification](docs/reference/specifications/v0.2.md) and
   [conformance gate](docs/reference/conformance-v0.2.md)
 - [Testing strategy](docs/reference/testing-strategy.md),
@@ -140,8 +139,10 @@ evaluation and countermodel search, reference-domain exploration and
 verification, Lean checking, and local research-memory search.
 
 The base kernel also registers canonical CNF, total assignment, and raw DRAT
-proof artifact contracts. They do not add SAT capabilities or mathematical
-assurance; solver and independent-checker slices remain separate.
+proof artifact contracts. When exact CaDiCaL 3.0.1 is present, optional
+`sat.model.find` and `sat.unsat_proof.find` capabilities can materialize bound
+model or text-DRAT evidence. Solver status and produced bytes remain
+unverified; assignment and proof checking are separate capability boundaries.
 
 Three direct operational tools—`workspace.open`, `workspace.write`, and
 `workspace.query`—provide durable, revisioned paper-like working state outside
