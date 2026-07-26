@@ -178,6 +178,20 @@ Controls:
 - future independent checkers must validate every binding before mathematical
   replay and fail closed on any mismatch.
 
+### Graph-isomorphism mapping substitution
+
+An adjacency-preserving mapping may be replayed against another graph pair, or
+a mapping may omit, duplicate, or introduce vertices while preserving only the
+listed edges.
+
+Controls:
+
+- the certificate binds the exact graph-pair scope and mapping candidate;
+- the independent checker requires a total bijection between the declared
+  vertex sets; and
+- it compares the complete mapped edge relation with the target edge relation,
+  thereby checking both adjacency and nonadjacency.
+
 ### Buggy or compromised checker
 
 An authorized checker may contain a defect or later become untrusted.
