@@ -40,6 +40,13 @@ obligations inside opaque workflow tools. Agent-visible mathematical atomicity
 matters; backend-call atomicity does not. A capability may coordinate several
 backend operations when they jointly produce one coherent outcome.
 
+Design capabilities with the existing portfolio in mind. Prefer consuming an
+existing typed artifact when it already exposes the needed mathematical
+outcome. Temporary or justified overlap is acceptable for experimentation,
+performance, batching, backend constraints, or a genuinely different
+agent-visible outcome. Make the overlap explicit and preserve useful
+intermediate artifacts.
+
 Higher-level workflows belong in agent strategies and reusable skills. A
 workflow exposed as a capability must preserve its intermediate artifacts,
 relationships, obligations, scope, assurance, and independent verification
@@ -64,8 +71,12 @@ authority are separate:
   proposing, searching, or evaluating implementation.
 
 Use held-out evaluations and real transcripts to improve discovery, examples,
-ranking, defaults, consolidation, and retirement. Evaluate complete portfolios
-and ablations as well as individual capabilities. Let agents choose tools when
+ranking, defaults, consolidation, and retirement. Before stabilizing or
+recommending a capability, query the catalog by domain, artifact types, and
+mathematical outcome, then inspect the small set of closest matches. If overlap
+remains ambiguous or the decision is consequential, compare the current
+portfolio with and without the candidate. Do not require exhaustive pairwise or
+leave-one-out evaluation for routine additions. Let agents choose tools when
 measuring autonomous composition; prescribed-tool cases test contract usability
 and conformance, not portfolio value.
 
