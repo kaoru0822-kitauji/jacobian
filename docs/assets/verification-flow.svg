@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="360" viewBox="0 0 1440 360" role="img" aria-labelledby="title desc">
+  <title id="title">From mathematical candidate to verified record</title>
+  <desc id="desc">An agent proposes a claim, computation produces an artifact, and an independent checker either emits a verified record or returns a non-conclusion.</desc>
+  <defs>
+    <linearGradient id="background" x1="40" y1="40" x2="1400" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#081321"/>
+      <stop offset="1" stop-color="#10182B"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="295" y1="180" x2="1125" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DD3FC"/>
+      <stop offset="0.5" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#6EE7B7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#020617" flood-opacity="0.34"/>
+    </filter>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#94A3B8"/>
+    </marker>
+  </defs>
+
+  <rect width="1440" height="360" rx="24" fill="url(#background)"/>
+  <path d="M70 54H1370M70 306H1370" stroke="#94A3B8" stroke-opacity="0.12"/>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="99" width="260" height="162" rx="18" fill="#11233E" stroke="#7DD3FC" stroke-opacity="0.38"/>
+    <text x="96" y="134" fill="#7DD3FC" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" letter-spacing="1.5">01 · CANDIDATE</text>
+    <text x="96" y="183" fill="#F8FAFC" font-family="Georgia, Cambria, serif" font-size="30" font-style="italic">F(p) = F(q)</text>
+    <text x="96" y="219" fill="#B8C7D9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18">p ≠ q</text>
+    <text x="96" y="242" fill="#8197AF" font-family="system-ui, -apple-system, sans-serif" font-size="14">PROPOSED · not yet trusted</text>
+
+    <rect x="405" y="99" width="260" height="162" rx="18" fill="#17213B" stroke="#A78BFA" stroke-opacity="0.38"/>
+    <text x="431" y="134" fill="#C4B5FD" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" letter-spacing="1.5">02 · ARTIFACT</text>
+    <text x="431" y="181" fill="#F8FAFC" font-family="system-ui, -apple-system, sans-serif" font-size="23">Exact witness</text>
+    <text x="431" y="214" fill="#B8C7D9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17">(F, p, q, scope)</text>
+    <text x="431" y="242" fill="#8197AF" font-family="system-ui, -apple-system, sans-serif" font-size="14">COMPUTED · inspectable</text>
+
+    <rect x="740" y="75" width="304" height="210" rx="18" fill="#18233B" stroke="#D4CCFF" stroke-opacity="0.45"/>
+    <text x="766" y="111" fill="#D8D2FF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" letter-spacing="1.5">03 · CHECKER BOUNDARY</text>
+    <text x="766" y="157" fill="#F8FAFC" font-family="system-ui, -apple-system, sans-serif" font-size="23">Replay independently</text>
+    <path d="M766 176H1018" stroke="#94A3B8" stroke-opacity="0.18"/>
+    <text x="766" y="210" fill="#B8C7D9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">✓ exact inputs</text>
+    <text x="766" y="236" fill="#B8C7D9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">✓ claim binding</text>
+    <text x="766" y="262" fill="#B8C7D9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">✓ authorized checker</text>
+
+    <rect x="1119" y="99" width="251" height="162" rx="18" fill="#0E2B2B" stroke="#6EE7B7" stroke-opacity="0.48"/>
+    <text x="1145" y="134" fill="#6EE7B7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" letter-spacing="1.5">04 · RECORD</text>
+    <text x="1145" y="185" fill="#F8FAFC" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="26">FALSE</text>
+    <rect x="1145" y="204" width="134" height="32" rx="16" fill="#0B3B35"/>
+    <circle cx="1164" cy="220" r="5" fill="#6EE7B7"/>
+    <text x="1180" y="226" fill="#BDF9E3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="15" letter-spacing="1.3">VERIFIED</text>
+  </g>
+
+  <path d="M342 180H392" fill="none" stroke="url(#arrow)" stroke-width="3" marker-end="url(#arrowhead)"/>
+  <path d="M677 180H727" fill="none" stroke="url(#arrow)" stroke-width="3" marker-end="url(#arrowhead)"/>
+  <path d="M1056 180H1106" fill="none" stroke="url(#arrow)" stroke-width="3" marker-end="url(#arrowhead)"/>
+
+  <path d="M892 294V322H1195" fill="none" stroke="#94A3B8" stroke-opacity="0.45" stroke-width="2" stroke-dasharray="6 7" marker-end="url(#arrowhead)"/>
+  <text x="904" y="316" fill="#8197AF" font-family="system-ui, -apple-system, sans-serif" font-size="13">timeout · error · missing witness → UNKNOWN</text>
+</svg>
