@@ -14,7 +14,9 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.validated_analysis import VALIDATED_ANALYSIS_BUNDLE
+from jacobian.domains.analysis import REAL_ANALYSIS_BUNDLE
+from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
+from jacobian.domains.probability import FINITE_PROBABILITY_BUNDLE
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
@@ -33,13 +35,15 @@ def analysis_runtime(tmp_path_factory: pytest.TempPathFactory) -> _Runtime:
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     capabilities = CapabilityService(store, ResearchMemory(store, schemas))
-    installed = OperationInstaller(
-        store,
-        schemas,
-        artifacts,
-    ).install(VALIDATED_ANALYSIS_BUNDLE)
-    for adapter in installed.adapters:
-        capabilities.register(adapter)
+    installer = OperationInstaller(store, schemas, artifacts)
+    for bundle in (
+        REAL_ANALYSIS_BUNDLE,
+        FINITE_PROBABILITY_BUNDLE,
+        RATIONAL_OPTIMIZATION_BUNDLE,
+    ):
+        installed = installer.install(bundle)
+        for adapter in installed.adapters:
+            capabilities.register(adapter)
     return _Runtime(store=store, capabilities=capabilities)
 
 
@@ -47,6 +51,37 @@ def analysis_runtime(tmp_path_factory: pytest.TempPathFactory) -> _Runtime:
 class _Runtime:
     store: ArtifactStore
     capabilities: CapabilityService
+
+
+def test_subject_bundles_preserve_wire_contracts_and_report_one_backend() -> None:
+    assert {
+        bundle.domain_id: (
+            bundle.provider_runtime.provider,
+            bundle.schema_namespace,
+            tuple(operation.capability_id for operation in bundle.capabilities),
+        )
+        for bundle in (
+            REAL_ANALYSIS_BUNDLE,
+            FINITE_PROBABILITY_BUNDLE,
+            RATIONAL_OPTIMIZATION_BUNDLE,
+        )
+    } == {
+        "analysis": (
+            "python-flint",
+            "jacobian.validated-analysis",
+            ("analysis.real_function.point_enclosure.compute",),
+        ),
+        "probability": (
+            "python-flint",
+            "jacobian.validated-analysis",
+            ("probability.finite_distribution.raw_moment.compute",),
+        ),
+        "optimization": (
+            "jacobian.sympy",
+            "jacobian.validated-analysis",
+            ("optimization.linear.rational_optimum.compute",),
+        ),
+    }
 
 
 def test_arb_point_enclosure_materializes_exact_dyadics_and_obligation(
@@ -106,10 +141,9 @@ def test_arb_nonfinite_and_timeout_are_non_conclusions(
     assert nonfinite.completeness.status is CapabilityCompletenessStatus.UNKNOWN
     assert nonfinite.obligations[0].status is CapabilityObligationStatus.OPEN
 
-    from jacobian.domains.validated_analysis import operations
+    from jacobian.domains.analysis import operations
 
     def timeout(
-        _operation: str,
         _payload: dict[str, object],
         *,
         wall_seconds: int,
@@ -186,7 +220,7 @@ def test_invalid_finite_distribution_fails_before_artifact_writes(
     )
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.diagnostics[0].code == "INVALID_VALIDATED_ANALYSIS_REQUEST"
+    assert result.diagnostics[0].code == "INVALID_FINITE_PROBABILITY_REQUEST"
     assert result.artifact_uris == ()
 
 
