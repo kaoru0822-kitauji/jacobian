@@ -38,6 +38,7 @@ make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-lean
 make refresh-test-durations
+make refresh-lean-test-durations
 make check
 make validate
 ```
@@ -75,11 +76,13 @@ change, or when the slower shard exceeds the faster shard by more than 10% in
 two representative CI runs. Routine test edits do not require refreshes. The
 target enforces its platform, replaces timings only after a successful run,
 and leaves the previous file intact on interruption or failure. Tests marked
-`lean_runtime` are excluded from those shards and divided by file between two
-dedicated runners with pinned Lean and Mathlib caches. Each runner executes its
-lane serially, avoiding concurrent multi-gigabyte Mathlib processes on one
-machine while shortening the CI critical path and preserving real-backend
-coverage.
+`lean_runtime` are excluded from those shards and divided by measured duration
+between two dedicated runners with pinned Lean and Mathlib caches. The split
+collects the full marker-selected suite, so new Lean tests cannot fall outside
+a file allowlist. Refresh `.lean_test_durations` after adding or materially
+changing those tests. Each runner executes its lane serially, avoiding
+concurrent multi-gigabyte Mathlib processes on one machine while shortening
+the CI critical path and preserving real-backend coverage.
 Python 3.12 shards write raw coverage data; a dependent job combines both
 files before enforcing the repository threshold and producing the XML report.
 Python 3.13 runs the same two groups without duplicate instrumentation.

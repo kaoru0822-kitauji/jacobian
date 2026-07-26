@@ -135,14 +135,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - lane: checker
-            tests: tests/integration/test_lean.py
-          - lane: capabilities
-            tests: >-
-              tests/integration/test_agent_ab_benchmark.py
-              tests/integration/test_capability_service.py
-              tests/integration/test_lean_exploration_capabilities.py
+        lane: [1, 2]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1
@@ -165,7 +158,11 @@ jobs:
         working-directory: lean
       - run: make test-lean
         env:
-          PYTEST_ARGS: --durations=10 ${{ matrix.tests }}
+          PYTEST_ARGS: >-
+            --splits 2 --group ${{ matrix.lane }}
+            --splitting-algorithm least_duration
+            --durations-path .lean_test_durations
+            --durations=10
 
   coverage:
     name: Coverage
@@ -194,6 +191,7 @@ jobs:
           merge-multiple: true
       - run: uv run --frozen coverage combine coverage-data
       - run: uv run --frozen coverage report | tee coverage-report.txt
+        shell: bash -o pipefail {0}
       - run: uv run --frozen coverage xml
       - name: Post coverage summary to PR
         if: github.event_name == 'pull_request'

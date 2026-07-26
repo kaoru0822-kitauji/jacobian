@@ -36,6 +36,7 @@ make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-lean
 make refresh-test-durations
+make refresh-lean-test-durations
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,
@@ -70,6 +71,9 @@ Refresh `.test_durations` after major suite changes; the target replaces the
 committed timings only after a successful non-Lean run on Linux with Python
 3.12. Also refresh when the slower CI shard exceeds the faster shard by more
 than 10% in two representative runs. Do not refresh for routine test edits.
+Refresh `.lean_test_durations` after adding or materially changing
+`lean_runtime` tests; its target runs all Lean tests serially before replacing
+the committed file.
 
 ## Verification rules
 

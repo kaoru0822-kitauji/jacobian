@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed refresh-test-durations build check validate agent-eval
+.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed refresh-test-durations refresh-lean-test-durations build check validate agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -57,6 +57,15 @@ refresh-test-durations: ## Refresh CI shard timings after major suite changes.
 		--clean-durations --durations-path "$$durations" && \
 	chmod 0644 "$$durations" && \
 	mv "$$durations" .test_durations
+
+refresh-lean-test-durations: ## Refresh Lean CI shard timings serially.
+	@durations=$$(mktemp .lean_test_durations.XXXXXX); \
+	trap 'rm -f "$$durations"' EXIT; \
+	printf '{}\n' > "$$durations"; \
+	$(UV_RUN) pytest -n 0 -m lean_runtime --store-durations \
+		--clean-durations --durations-path "$$durations" && \
+	chmod 0644 "$$durations" && \
+	mv "$$durations" .lean_test_durations
 
 build: ## Build Python source and wheel distributions.
 	uv build
