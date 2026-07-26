@@ -7,8 +7,15 @@ from typing import Any
 import pytest
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope
-from jacobian.contracts.results import Conclusion, Verification
+from jacobian.contracts.results import (
+    Arithmetic,
+    Conclusion,
+    Coverage,
+    Method,
+    Verification,
+)
 from jacobian.registry import CheckerRegistry
 from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
@@ -304,6 +311,57 @@ def test_omitted_path_witness_is_independently_verified(tmp_path: Path) -> None:
     assert result.conclusion is Conclusion.FALSE
     assert result.assurance.verification is Verification.VERIFIED
     assert result.verification_record_uri is not None
+
+
+@pytest.mark.integration
+def test_witness_checker_cannot_certify_artifacts_outside_its_request(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path
+    )
+    foreign_uri = "artifact://sha256/" + "f" * 64
+    decisions = (
+        CheckerDecision(
+            accepted=True,
+            conclusion=Conclusion.FALSE,
+            arithmetic=Arithmetic.EXACT_INTEGER,
+            method=Method.DIRECT_WITNESS,
+            coverage=Coverage.NOT_APPLICABLE,
+            relation_id="graph.relation.omitted-path",
+            relationship_source_artifact_uris=(foreign_uri,),
+            relationship_target_artifact_uris=(claim_uri,),
+        ),
+        CheckerDecision(
+            accepted=True,
+            conclusion=Conclusion.FALSE,
+            arithmetic=Arithmetic.EXACT_INTEGER,
+            method=Method.DIRECT_WITNESS,
+            coverage=Coverage.NOT_APPLICABLE,
+            obligation_uri=foreign_uri,
+        ),
+    )
+
+    for decision in decisions:
+        monkeypatch.setattr(
+            service,
+            "_run_checker",
+            lambda decision=decision, **_kwargs: decision,
+        )
+
+        result = service.verify_witness(
+            claim_uri=claim_uri,
+            candidate_uri=candidate_uri,
+            witness_uri=witness_uri,
+            checker_id=checker_id,
+        )
+
+        assert result.conclusion is Conclusion.UNKNOWN
+        assert result.assurance.verification is Verification.UNVERIFIED
+        assert result.verification_record_uri is None
+        assert result.input.status.value == "REJECTED"
+        assert "outside its verification request" in result.input.errors[0]
 
 
 @pytest.mark.integration

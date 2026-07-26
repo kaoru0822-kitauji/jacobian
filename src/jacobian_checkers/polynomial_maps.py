@@ -164,7 +164,8 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
     try:
         if request.get("request_version") != "1":
             return _reject("unsupported request version")
-        claim = request["claim"]["payload"]
+        claim_artifact = request["claim"]
+        claim = claim_artifact["payload"]
         candidate_artifact = request["candidate"]
         if (
             not isinstance(claim, dict)
@@ -176,7 +177,8 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
             or claim.get("map_uri") != candidate_artifact.get("artifact_uri")
         ):
             return _reject("unexpected polynomial-map claim")
-        witness = request["witness"]["payload"]
+        witness_artifact = request["witness"]
+        witness = witness_artifact["payload"]
         if (
             not isinstance(witness, dict)
             or witness.get("evidence_schema_version") != "1"
@@ -204,6 +206,10 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
         second_image = _evaluate(coordinates, second)
         if first_image != second_image or first_image != declared_image:
             return _reject("declared collision does not replay exactly")
+        witness_uri = witness_artifact.get("artifact_uri")
+        claim_uri = claim_artifact.get("artifact_uri")
+        if not isinstance(witness_uri, str) or not isinstance(claim_uri, str):
+            return _reject("collision relationship endpoints are unavailable")
         return {
             "accepted": True,
             "conclusion": "FALSE",
@@ -214,6 +220,8 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
                 "distinct rational points have the same exact polynomial-map image"
             ),
             "relation_id": "polynomial.relation.collision-refutes-injectivity",
+            "relationship_source_artifact_uris": [witness_uri],
+            "relationship_target_artifact_uris": [claim_uri],
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return _reject("malformed polynomial-map collision request")

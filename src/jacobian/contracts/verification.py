@@ -31,4 +31,6 @@ class VerificationRecord(ContractModel):
     request_digest: Sha256Digest
     environment_digest: Sha256Digest
     relation_id: CapabilityId | None = None
+    relationship_source_artifact_uris: tuple[ArtifactUri, ...] = ()
+    relationship_target_artifact_uris: tuple[ArtifactUri, ...] = ()
     obligation_uri: ArtifactUri | None = None
