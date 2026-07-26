@@ -67,7 +67,7 @@ def test_apply_tactic_returns_structured_failure_without_conclusion(
 def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
-    result = kernel.capabilities.invoke(
+    suggested = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.retrieve.premises",
             input={
@@ -79,19 +79,7 @@ def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> N
         )
     )
 
-    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert result.output["candidates"]
-    assert result.output["candidates"][0]["tactic"] == "exact Nat.gcd_zero_right n"
-    assert "Nat.gcd_zero_right" in result.output["candidates"][0]["declaration_names"]
-    assert result.output["retrieval_uri"] in result.artifact_uris
-
-
-def test_retrieve_premises_preserves_empty_result_as_nonconclusion(
-    tmp_path: Path,
-) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-
-    result = kernel.capabilities.invoke(
+    empty = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.retrieve.premises",
             input={
@@ -103,9 +91,16 @@ def test_retrieve_premises_preserves_empty_result_as_nonconclusion(
         )
     )
 
-    assert result.execution.status.value == "COMPLETED"
-    assert result.output["candidates"] == []
-    assert result.output["exhaustive"] is False
+    assert suggested.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert suggested.output["candidates"]
+    assert suggested.output["candidates"][0]["tactic"] == ("exact Nat.gcd_zero_right n")
+    assert (
+        "Nat.gcd_zero_right" in suggested.output["candidates"][0]["declaration_names"]
+    )
+    assert suggested.output["retrieval_uri"] in suggested.artifact_uris
+    assert empty.execution.status.value == "COMPLETED"
+    assert empty.output["candidates"] == []
+    assert empty.output["exhaustive"] is False
 
 
 def test_kernel_can_ablate_lean_capabilities_without_removing_checker(

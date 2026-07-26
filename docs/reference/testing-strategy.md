@@ -36,6 +36,7 @@ make test-fast
 make test-failed
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-lean
 make validate
 ```
 
@@ -53,7 +54,10 @@ Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
 CI splits each supported Python run into two disjoint groups and retains xdist
-parallelism inside each group. Python 3.12 shards write raw coverage data; a
+parallelism inside each group. Tests marked `lean_runtime` are excluded from
+those shards and run serially in a dedicated job with pinned Lean and Mathlib
+caches. This avoids concurrent multi-gigabyte Mathlib processes while
+preserving real-backend coverage. Python 3.12 shards write raw coverage data; a
 dependent job combines both files before enforcing the repository threshold
 and producing the XML report. Python 3.13 runs the same two groups without
 duplicate instrumentation. Coverage.py's subprocess patch includes plugin and

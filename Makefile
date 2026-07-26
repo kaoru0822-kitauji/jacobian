@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint typecheck test test-fast test-failed build validate agent-eval
+.PHONY: help setup hooks fix lint typecheck test test-fast test-lean test-failed build validate agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -33,6 +33,9 @@ test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
 
 test-fast: ## Run the sequential non-integration feedback loop.
 	$(UV_RUN) pytest -n 0 -m "not integration and not end_to_end" $(PYTEST_ARGS)
+
+test-lean: ## Run pinned Lean integration tests serially.
+	$(UV_RUN) pytest -n 0 -m lean_runtime $(PYTEST_ARGS)
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf $(PYTEST_ARGS)

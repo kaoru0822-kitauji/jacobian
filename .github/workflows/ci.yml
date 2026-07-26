@@ -99,7 +99,7 @@ jobs:
       - run: uv sync --frozen --dev
       - run: lake build repl
         working-directory: lean
-      - run: uv run --frozen pytest -n 0 -m lean_runtime --durations=10
+      - run: make test-lean PYTEST_ARGS="--durations=10"
 
   coverage:
     name: Coverage

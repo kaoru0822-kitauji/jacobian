@@ -34,6 +34,7 @@ Tests can be narrowed without learning another wrapper:
 ```sh
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-lean
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,
@@ -55,6 +56,10 @@ uv run pytest -m "not integration and not end_to_end"
 
 Pytest assigns these layer markers from the test directories, so new
 integration tests join the right loop without repeated file-level boilerplate.
+Tests marked `lean_runtime` run serially through `make test-lean`; keep them out
+of the normal xdist pool because Mathlib processes can retain several
+gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
+dedicated job.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
 and unfiltered `uv run pytest` before handoff.
 
