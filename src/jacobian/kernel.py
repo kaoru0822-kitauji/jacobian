@@ -30,6 +30,10 @@ from jacobian.finite_partition import (
     install_finite_partition,
 )
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
+from jacobian.graph_isomorphism import (
+    GraphIsomorphismInstallation,
+    install_graph_isomorphism,
+)
 from jacobian.lean import LeanService
 from jacobian.lean_declarations import (
     LeanDeclarationService,
@@ -213,6 +217,17 @@ class JacobianKernel:
         )
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
+        self.graph_isomorphism: GraphIsomorphismInstallation
+        graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if graph_isomorphism is not None:
+            self.register_capability(graph_isomorphism)
         self.polynomial: PolynomialInstallation
         polynomial_adapters, self.polynomial = install_polynomial_capabilities(
             self.store,
