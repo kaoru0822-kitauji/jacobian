@@ -9,14 +9,14 @@ const { join } = require("node:path");
  * Jacobian npm launcher.
  *
  * Detects a usable Python runtime (preferring uv), ensures the
- * `jacobian-research-kernel` package is installed in a shared virtual
+ * `jacobian` package is installed in a shared virtual
  * environment, and spawns the requested Jacobian entry point.
  *
  * The launcher never runs npm lifecycle scripts.  It is a thin Node wrapper
  * that delegates all heavy work to the Python package on PyPI or git.
  */
 
-const PACKAGE_NAME = "jacobian-research-kernel";
+const PACKAGE_NAME = "jacobian";
 const PACKAGE_SPEC = process.env.JACOBIAN_PACKAGE || PACKAGE_NAME;
 const VENV_NAME = "jacobian-venv";
 const STATE_DIR_ENV = "JACOBIAN_STATE_DIR";

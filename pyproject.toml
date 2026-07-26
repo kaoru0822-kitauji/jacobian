@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "jacobian-research-kernel"
+name = "jacobian"
 version = "0.2.0a0"
 description = "A capability-first MCP workbench for executable mathematics"
 readme = "README.md"

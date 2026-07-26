@@ -74,7 +74,7 @@ def _license_files(
 @cache
 def _jacobian_identity() -> tuple[str, str, tuple[str, ...]]:
     try:
-        distribution = importlib.metadata.distribution("jacobian-research-kernel")
+        distribution = importlib.metadata.distribution("jacobian")
         digest = package_source_digest("jacobian.capabilities:CapabilityService")
     except (importlib.metadata.PackageNotFoundError, ImplementationError) as exc:
         raise ProviderRuntimeError(
