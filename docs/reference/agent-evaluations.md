@@ -487,6 +487,15 @@ product claim. Product conclusions require multiple held-out cases and
 repetitions. Report all runs, use paired deltas, and reject any treatment that
 improves efficiency by increasing unsupported mathematical conclusions.
 
+`sat_decision` cases provide `variable_names`, exact clauses, and an expected
+status. The runner canonicalizes and pre-materializes the same CNF into each
+condition's isolated state, then gives both agents the same URI. Its hidden
+oracle brute-forces cases of at most 20 variables. A treatment passes only when
+its report matches that oracle, its producer evidence and verification record
+bind the durable CNF, the transcript contains the ordered find-to-verify
+composition, and a clean kernel independently replays the verifier. Public SAT
+reproductions are always marked unscored.
+
 Development pairs may validate the harness or reveal interface problems, but
 they are not product evidence. Keep their reports with the run artifacts.
 Publish a comparative result only when the protocol's held-out-case,

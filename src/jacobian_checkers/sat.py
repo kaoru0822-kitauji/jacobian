@@ -424,8 +424,10 @@ def _validate_drat_text_profile(proof: bytes) -> None:
             or any(-literal in literals for literal in literals)
         ):
             raise ValueError("DRAT text proof has a malformed clause")
-        if empty_clause_seen:
-            raise ValueError("DRAT text proof has steps after the empty clause")
+        if empty_clause_seen and not deletion:
+            raise ValueError(
+                "DRAT text proof has a non-deletion step after the empty clause"
+            )
         if not literals:
             if deletion:
                 raise ValueError("DRAT text proof deletes the empty clause")
@@ -491,7 +493,7 @@ def _bounded_drat_trim(
         stderr_exceeded = threading.Event()
         timed_out = False
         process = subprocess.Popen(
-            [str(executable), str(cnf_path), str(proof_path), "-W"],
+            [str(executable), str(cnf_path), str(proof_path), "-f", "-W"],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -551,7 +553,13 @@ def _bounded_drat_trim(
                 reader.join(timeout=0.1)
         if timed_out:
             raise subprocess.TimeoutExpired(
-                cmd=[str(executable), str(cnf_path), str(proof_path), "-W"],
+                cmd=[
+                    str(executable),
+                    str(cnf_path),
+                    str(proof_path),
+                    "-f",
+                    "-W",
+                ],
                 timeout=DRAT_TRIM_TIMEOUT_SECONDS,
             )
         if stdout_exceeded.is_set() or stderr_exceeded.is_set():
