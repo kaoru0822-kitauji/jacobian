@@ -95,6 +95,7 @@ from jacobian.polynomial_system_capabilities import (
     PolynomialSystemInstallation,
     install_polynomial_system_capabilities,
 )
+from jacobian.polynomial_system_search import PolynomialSystemRationalSearchAdapter
 from jacobian.polytope import PolytopeService
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
@@ -481,6 +482,11 @@ class JacobianKernel:
         )
         if polynomial_system_adapter is not None:
             self.register_capability(polynomial_system_adapter)
+        self.register_capability(
+            PolynomialSystemRationalSearchAdapter(
+                self.artifacts, self.polynomial_system
+            )
+        )
         self.universal_algebra: UniversalAlgebraInstallation
         universal_algebra_adapters, self.universal_algebra = (
             install_universal_algebra_capabilities(
