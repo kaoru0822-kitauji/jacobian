@@ -72,7 +72,7 @@ start the MCP adapter.
 ## How verification works
 
 <p align="center">
-  <img src="docs/assets/verification-flow.svg" width="100%" alt="A candidate becomes an exact artifact, crosses an independent checker boundary, and becomes either a verified record or a non-conclusion.">
+  <img src="docs/assets/verification-flow.jpg" width="100%" alt="An archival-style chalkboard traces a proposed polynomial collision through an exact witness and independent check to a verified result, with failures remaining unknown.">
 </p>
 
 Search and evaluation are allowed to be incomplete or wrong. They produce
