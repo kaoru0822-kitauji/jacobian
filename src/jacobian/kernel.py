@@ -35,6 +35,10 @@ from jacobian.finite_partition import (
     install_finite_partition,
 )
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
+from jacobian.graph_isomorphism import (
+    GraphIsomorphismInstallation,
+    install_graph_isomorphism,
+)
 from jacobian.lean import LeanService
 from jacobian.lean_declarations import (
     LeanDeclarationService,
@@ -62,6 +66,7 @@ from jacobian.polynomial_system_capabilities import (
 from jacobian.polytope import PolytopeService
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
+    carcara_provider_runtime,
     cvc5_provider_runtime,
     drat_trim_provider_runtime,
     lean_provider_runtime,
@@ -84,6 +89,10 @@ from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
 from jacobian.smt import SmtArtifactService, install_smt_artifacts
+from jacobian.smt_capabilities import (
+    SmtUnsatProofCheckerInstallation,
+    install_smt_unsat_proof_checker,
+)
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
@@ -248,6 +257,22 @@ class JacobianKernel:
         )
         if proof_adapter is not None:
             self.register_capability(proof_adapter)
+        self.carcara_runtime: CapabilityProviderRuntime = carcara_provider_runtime()
+        self.smt_unsat_proof_checker: SmtUnsatProofCheckerInstallation
+        smt_proof_adapter, self.smt_unsat_proof_checker = (
+            install_smt_unsat_proof_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.smt,
+                self.verification,
+                self.checkers,
+                self.carcara_runtime,
+                authorize_checker=install_references,
+            )
+        )
+        if smt_proof_adapter is not None:
+            self.register_capability(smt_proof_adapter)
         self.cadical_runtime: CapabilityProviderRuntime = cadical_provider_runtime()
         if (
             self.cadical_runtime.availability
@@ -303,6 +328,18 @@ class JacobianKernel:
         )
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
+        self.graph_isomorphism: GraphIsomorphismInstallation
+        graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.verification,
+            self.checkers,
+            self.graph,
+            authorize_checker=install_references,
+        )
+        if graph_isomorphism is not None:
+            self.register_capability(graph_isomorphism)
         self.polynomial: PolynomialInstallation
         polynomial_adapters, self.polynomial = install_polynomial_capabilities(
             self.store,

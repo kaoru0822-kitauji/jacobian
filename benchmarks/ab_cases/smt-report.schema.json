@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "status",
+    "assurance",
+    "final_verification",
+    "problem_uri",
+    "proof_uri",
+    "verification_record_uri",
+    "detail",
+    "feedback"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "UNSATISFIABLE"
+      ]
+    },
+    "assurance": {
+      "enum": [
+        "SELF_CHECKED",
+        "COMPUTED",
+        "VERIFIED"
+      ]
+    },
+    "final_verification": {
+      "enum": [
+        "UNVERIFIED",
+        "VERIFIED"
+      ]
+    },
+    "problem_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "proof_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "verification_record_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasoning_focus",
+        "infrastructure_work",
+        "tooling_gaps"
+      ],
+      "properties": {
+        "reasoning_focus": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "infrastructure_work": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tooling_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

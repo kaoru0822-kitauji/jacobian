@@ -40,6 +40,7 @@ from jacobian.contracts.sat import (
     SatProofArtifact,
     canonicalize_cnf,
 )
+from jacobian.contracts.smt import SmtAletheProofArtifact, SmtProblemArtifact
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.eval_graph_oracle import (
     GraphOracleError,
@@ -60,6 +61,7 @@ REPORT_SCHEMA = CASES_ROOT / "report.schema.json"
 GRAPH_REPORT_SCHEMA = CASES_ROOT / "graph-report.schema.json"
 PARTITION_REPORT_SCHEMA = CASES_ROOT / "partition-report.schema.json"
 SAT_REPORT_SCHEMA = CASES_ROOT / "sat-report.schema.json"
+SMT_REPORT_SCHEMA = CASES_ROOT / "smt-report.schema.json"
 LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
@@ -76,6 +78,12 @@ SAT_CAPABILITY_IDS = frozenset(
         "sat.model.verify",
         "sat.unsat_proof.find",
         "sat.unsat_proof.verify",
+    }
+)
+SMT_CAPABILITY_IDS = frozenset(
+    {
+        "smt.unsat_proof.find",
+        "smt.unsat_proof.verify",
     }
 )
 LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
@@ -165,6 +173,25 @@ sat.unsat_proof.find. Do not substitute the verifier's witness_uri or
 certificate_uri. For a SAT result, copy the named assignment map returned
 inline by sat.model.find; do not reinterpret the durable artifact's positional
 values against the prompt's pre-canonical variable order.
+"""
+
+SMT_CONTROL_INSTRUCTIONS = """\
+Jacobian and all MCP servers are unavailable. Decide the exact supplied
+SMT-LIB query directly. Report SELF_CHECKED and UNVERIFIED, with null durable
+artifact and verification-record URIs.
+"""
+
+SMT_TREATMENT_INSTRUCTIONS = """\
+Use only jacobian_local for mathematical work. Do not use shell commands or
+create programs. Describe the exact capability IDs smt.unsat_proof.find and
+smt.unsat_proof.verify directly; do not request the full catalog. Invoke the
+producer on the exact supplied query, preserving its required final LF, then
+pass any produced proof_uri to the verifier in VERIFY mode. A cvc5 solver
+status, proof artifact, or zero lexical hole count alone is not verification.
+Report VERIFIED only when the verifier returns VERIFIED_UNSAT and a
+verification-record URI. If the verifier rejects the proof, preserve the
+producer's problem_uri and proof_uri but report COMPUTED and UNVERIFIED;
+rejection does not establish SAT.
 """
 
 LEAN_DECLARATION_INSTRUCTIONS = """\
@@ -514,6 +541,184 @@ def _score_sat_report(
     }
 
 
+def _score_smt_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    shell_calls: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    expected = case.get("expected")
+    logic = case.get("logic")
+    smtlib_text = case.get("smtlib_text")
+    if (
+        not isinstance(expected, Mapping)
+        or expected.get("status") != "UNSATISFIABLE"
+        or expected.get("verification_status") not in {"VERIFIED_UNSAT", "REJECTED"}
+        or logic not in {"QF_UF", "QF_LIA", "QF_LRA"}
+        or not isinstance(smtlib_text, str)
+    ):
+        raise BenchmarkError("SMT case has an invalid hidden expectation")
+    if (
+        report.get("case_id") != case.get("case_id")
+        or report.get("status") != "UNSATISFIABLE"
+    ):
+        raise BenchmarkError("SMT report has the wrong case or status")
+    _validate_feedback(report.get("feedback"))
+    problem_uri = report.get("problem_uri")
+    proof_uri = report.get("proof_uri")
+    record_uri = report.get("verification_record_uri")
+    if condition == "control":
+        if mcp_calls:
+            raise BenchmarkError("SMT control condition used an MCP tool")
+        if (
+            report.get("assurance") != "SELF_CHECKED"
+            or report.get("final_verification") != "UNVERIFIED"
+            or problem_uri is not None
+            or proof_uri is not None
+            or record_uri is not None
+        ):
+            raise BenchmarkError("SMT control condition falsely projected verification")
+        return {
+            "passed": True,
+            "false_certification": False,
+            "checks": ["hidden UNSAT expectation", "control isolation"],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if shell_calls:
+        raise BenchmarkError("SMT treatment used a shell command")
+    if "capability.invoke" not in mcp_calls:
+        raise BenchmarkError("SMT treatment did not invoke a Jacobian capability")
+    if not isinstance(problem_uri, str) or not isinstance(proof_uri, str):
+        raise BenchmarkError("SMT treatment omitted durable producer evidence")
+
+    expected_verification = str(expected["verification_status"])
+    if expected_verification == "VERIFIED_UNSAT":
+        if (
+            report.get("assurance") != "VERIFIED"
+            or report.get("final_verification") != "VERIFIED"
+            or not isinstance(record_uri, str)
+        ):
+            raise BenchmarkError("SMT treatment omitted independent verification")
+    elif (
+        report.get("assurance") != "COMPUTED"
+        or report.get("final_verification") != "UNVERIFIED"
+        or record_uri is not None
+    ):
+        raise BenchmarkError("SMT treatment falsely promoted rejected proof evidence")
+
+    store = ArtifactStore(state_dir)
+    schemas = SchemaRegistry(store)
+    try:
+        problem_artifact = store.get(problem_uri)
+        proof_artifact = store.get(proof_uri)
+        schemas.validate(
+            problem_artifact.manifest.schema_uri,
+            problem_artifact.payload,
+        )
+        schemas.validate(proof_artifact.manifest.schema_uri, proof_artifact.payload)
+        durable_problem = SmtProblemArtifact.model_validate(problem_artifact.payload)
+        durable_proof = SmtAletheProofArtifact.model_validate(proof_artifact.payload)
+    except (SchemaRegistryError, StoreError, ValueError) as exc:
+        raise BenchmarkError("SMT producer artifacts are unavailable") from exc
+    if (
+        durable_problem.logic != logic
+        or durable_problem.smtlib_text != smtlib_text
+        or durable_proof.problem.problem_artifact_uri != problem_uri
+        or durable_proof.problem.problem_object_digest
+        != problem_artifact.manifest.object_digest
+        or durable_proof.problem.problem_payload_digest
+        != problem_artifact.manifest.payload_digest
+        or problem_uri not in proof_artifact.manifest.parents
+    ):
+        raise BenchmarkError("SMT proof is not bound to the held-out query")
+
+    found_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_input = invocation.get("input")
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == "smt.unsat_proof.find"
+            and isinstance(invocation_input, Mapping)
+            and invocation_input.get("logic") == logic
+            and invocation_input.get("smtlib_text") == smtlib_text
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("solver_status") == "UNSATISFIABLE"
+            and invocation_output.get("problem_uri") == problem_uri
+            and invocation_output.get("proof_uri") == proof_uri
+            and {problem_uri, proof_uri}.issubset(
+                set(invocation.get("artifact_uris") or [])
+            )
+        ):
+            found_index = index
+        if (
+            found_index is not None
+            and index > found_index
+            and invocation.get("capability_id") == "smt.unsat_proof.verify"
+            and invocation_input == {"proof_uri": proof_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("status") == expected_verification
+            and invocation_output.get("problem_uri") == problem_uri
+            and invocation_output.get("proof_uri") == proof_uri
+            and invocation_output.get("verification_record_uri") == record_uri
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError("SMT treatment lacks an exact find-to-verify trace")
+
+    if expected_verification == "VERIFIED_UNSAT":
+        assert isinstance(record_uri, str)
+        try:
+            record_artifact = store.get(record_uri)
+            record = VerificationRecord.model_validate(record_artifact.payload)
+            semantics = store.get(problem_artifact.manifest.semantics_uri)
+        except (StoreError, ValueError) as exc:
+            raise BenchmarkError("SMT verification record is unavailable") from exc
+        if (
+            record.conclusion.value != "TRUE"
+            or record.bindings.claim_digest != problem_artifact.manifest.object_digest
+            or record.bindings.semantics_digest != semantics.manifest.object_digest
+            or record.bindings.candidate_digest != proof_artifact.manifest.object_digest
+            or not {problem_uri, proof_uri, record.evidence_uri}.issubset(
+                record_artifact.manifest.parents
+            )
+        ):
+            raise BenchmarkError("SMT verification record is not exactly bound")
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="smt.unsat_proof.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"proof_uri": proof_uri},
+        )
+    )
+    if (
+        replay.output.get("status") != expected_verification
+        or replay.output.get("problem_uri") != problem_uri
+        or replay.output.get("proof_uri") != proof_uri
+        or replay.output.get("verification_record_uri") != record_uri
+    ):
+        raise BenchmarkError("SMT treatment evidence does not replay independently")
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": expected_verification == "VERIFIED_UNSAT",
+        "checks": [
+            "hidden UNSAT expectation",
+            "durable exact SMT-LIB and Alethe binding",
+            "ordered find-to-verify trace",
+            "clean-kernel checker replay",
+        ],
+    }
+
+
 def score_report(
     case: Mapping[str, Any],
     report: Mapping[str, Any],
@@ -525,6 +730,16 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "smt_unsat_proof":
+        return _score_smt_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            shell_calls=shell_calls,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "sat_decision":
         return _score_sat_report(
             case,
@@ -1408,6 +1623,38 @@ def _codex_command(
     return command
 
 
+def _condition_instructions(task_type: object, condition: str) -> str:
+    if task_type == "smt_unsat_proof":
+        return (
+            SMT_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else SMT_TREATMENT_INSTRUCTIONS
+        )
+    if task_type == "sat_decision":
+        return (
+            SAT_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else SAT_TREATMENT_INSTRUCTIONS
+        )
+    if task_type == "lean_declaration":
+        return LEAN_DECLARATION_INSTRUCTIONS
+    if task_type == "lean_proof":
+        return LEAN_PROOF_INSTRUCTIONS
+    if task_type == "graph":
+        return (
+            GRAPH_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else GRAPH_TREATMENT_INSTRUCTIONS
+        )
+    if task_type == "finite_partition":
+        return (
+            PARTITION_CONTROL_INSTRUCTIONS
+            if condition == "control"
+            else PARTITION_TREATMENT_INSTRUCTIONS
+        )
+    return CONTROL_INSTRUCTIONS if condition == "control" else TREATMENT_INSTRUCTIONS
+
+
 def _run_condition(
     case: dict[str, Any],
     *,
@@ -1431,6 +1678,7 @@ def _run_condition(
     is_graph = case.get("task_type") == "graph"
     is_partition = case.get("task_type") == "finite_partition"
     is_sat = case.get("task_type") == "sat_decision"
+    is_smt = case.get("task_type") == "smt_unsat_proof"
     is_lean_declaration = case.get("task_type") == "lean_declaration"
     is_lean_proof = case.get("task_type") == "lean_proof"
     sat_context = ""
@@ -1440,32 +1688,10 @@ def _run_condition(
             "\nThe canonical CNF for this case is available at "
             f"{cnf_uri}. Return this exact URI as cnf_uri.\n"
         )
-    if is_sat:
-        condition_instructions = (
-            SAT_CONTROL_INSTRUCTIONS
-            if condition == "control"
-            else SAT_TREATMENT_INSTRUCTIONS
-        )
-    elif is_lean_declaration:
-        condition_instructions = LEAN_DECLARATION_INSTRUCTIONS
-    elif is_lean_proof:
-        condition_instructions = LEAN_PROOF_INSTRUCTIONS
-    elif is_graph:
-        condition_instructions = (
-            GRAPH_CONTROL_INSTRUCTIONS
-            if condition == "control"
-            else GRAPH_TREATMENT_INSTRUCTIONS
-        )
-    elif is_partition:
-        condition_instructions = (
-            PARTITION_CONTROL_INSTRUCTIONS
-            if condition == "control"
-            else PARTITION_TREATMENT_INSTRUCTIONS
-        )
-    else:
-        condition_instructions = (
-            CONTROL_INSTRUCTIONS if condition == "control" else TREATMENT_INSTRUCTIONS
-        )
+    condition_instructions = _condition_instructions(
+        case.get("task_type"),
+        condition,
+    )
     prompt = condition_instructions + sat_context + "\n" + COMMON_PROMPT.format(**case)
     command = _codex_command(
         codex_command=codex_command,
@@ -1487,6 +1713,8 @@ def _run_condition(
             if is_graph
             else SAT_REPORT_SCHEMA
             if is_sat
+            else SMT_REPORT_SCHEMA
+            if is_smt
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
@@ -1594,6 +1822,12 @@ def _run_condition(
                 )
                 and not score.get("passed")
             )
+            or (
+                is_smt
+                and isinstance(report, dict)
+                and report.get("final_verification") == "VERIFIED"
+                and not score.get("passed")
+            )
         ),
         "intervention_attempted": bool(
             (
@@ -1604,6 +1838,10 @@ def _run_condition(
                 is_sat
                 and SAT_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
             )
+            or (
+                is_smt
+                and SMT_CAPABILITY_IDS.intersection(telemetry["capability_attempt_ids"])
+            )
         ),
         "intervention_used": bool(
             (
@@ -1611,6 +1849,7 @@ def _run_condition(
                 and LEAN_DISCOVERY_IDS.intersection(telemetry["capability_ids"])
             )
             or (is_sat and SAT_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
+            or (is_smt and SMT_CAPABILITY_IDS.intersection(telemetry["capability_ids"]))
         ),
         "operational_failure": bool(score.get("operational_failure")),
         "score": score,
