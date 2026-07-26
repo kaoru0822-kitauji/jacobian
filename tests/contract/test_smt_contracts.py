@@ -18,6 +18,7 @@ from jacobian.contracts.smt import (
     SmtProblemArtifact,
     SmtProblemBinding,
     SmtUnsatProofFindOutput,
+    SmtUnsatProofVerificationOutput,
 )
 
 _PROBLEM_URI = "artifact://sha256/" + "1" * 64
@@ -158,4 +159,45 @@ def test_producer_output_never_projects_solver_status_or_holes_to_a_conclusion()
             contains_holes=False,
             alethe_hole_count=0,
             detail="inconsistent",
+        )
+
+
+def test_only_independently_verified_smt_unsat_output_carries_true() -> None:
+    record_uri = "artifact://sha256/" + "4" * 64
+    checker_id = "checker://sha256/" + "5" * 64
+    certificate_uri = "artifact://sha256/" + "6" * 64
+
+    verified = SmtUnsatProofVerificationOutput(
+        status="VERIFIED_UNSAT",
+        conclusion="TRUE",
+        problem_uri=_PROBLEM_URI,
+        proof_uri=_PROOF_URI,
+        certificate_uri=certificate_uri,
+        checker_id=checker_id,
+        verification_record_uri=record_uri,
+        detail="strict Carcara replay accepted the exact proof",
+    )
+
+    assert verified.verification_record_uri == record_uri
+    with pytest.raises(ValidationError):
+        SmtUnsatProofVerificationOutput(
+            status="REJECTED",
+            conclusion="TRUE",
+            problem_uri=_PROBLEM_URI,
+            proof_uri=_PROOF_URI,
+            certificate_uri=certificate_uri,
+            checker_id=checker_id,
+            verification_record_uri=None,
+            detail="Carcara reported holey",
+        )
+    with pytest.raises(ValidationError):
+        SmtUnsatProofVerificationOutput(
+            status="VERIFIED_UNSAT",
+            conclusion="TRUE",
+            problem_uri=_PROBLEM_URI,
+            proof_uri=_PROOF_URI,
+            certificate_uri=certificate_uri,
+            checker_id=checker_id,
+            verification_record_uri=None,
+            detail="missing verification record",
         )

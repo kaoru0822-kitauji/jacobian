@@ -560,7 +560,10 @@ backlog.
    arithmetic. Implemented; see
    [SMT Alethe artifact contracts](../reference/smt-artifacts.md).
 10. Carcara compatibility matrix, checker adapter, mutations, and paired
-    evaluation.
+    evaluation. Implemented; see
+    [SMT Alethe artifact contracts](../reference/smt-artifacts.md#strict-carcara-verification)
+    and the
+    [SMT Carcara contract pilot](../reference/capability-workflow-evaluations.md#smt-carcara-contract-pilot).
 11. Python-FLINT rational-solution find and verify slice.
 12. Python-FLINT polynomial or integer-matrix slice chosen from transcript
     demand.

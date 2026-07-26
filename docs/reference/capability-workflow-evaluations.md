@@ -395,6 +395,49 @@ consolidation of the SAT outcomes. The frozen sample is too small for a powered
 comparative claim; add new cases and repetitions without reopening these cases
 for tuning.
 
+### SMT Carcara contract pilot
+
+The frozen 2026-07-26 SMT pilot used `gpt-5.6-terra`, high reasoning effort,
+a 600-second per-run limit, and one repetition of two private `QF_UF` cases.
+One case was a direct Boolean contradiction whose cvc5 1.3.4 Alethe proof was
+accepted by the pinned strict Carcara checker. The other used equality
+transitivity; cvc5 produced two holes and verification had to reject it. The
+case digests were
+`sha256:5a064aaabc5e83064dd9c864200826522ab47c5e0d955e0fa3130417f2687f4c`
+and
+`sha256:b30099a1188a4cc16335e9d0f9300abd4a26f034d3202cb1fc84f644ae872704`.
+
+Control decided each exact query directly and could report only
+`SELF_CHECKED/UNVERIFIED`. Treatment was prescribed the two exact capability
+IDs, had to compose `smt.unsat_proof.find` with
+`smt.unsat_proof.verify`, and had to preserve rejection rather than treating a
+solver status, zero lexical holes, or proof artifact as verification. The
+hidden scorer checked the durable problem/proof binding, ordered invocation
+trace, expected verifier status, and a clean-kernel replay.
+
+| Condition | Passed | False certifications | Clean replay behavior | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| control | 2 / 2 | 0 | 0 / 2 | 11.805 | 12,572.5 | 0 | 0 |
+| SMT producer + verifier | 2 / 2 | 0 | 2 / 2 | 36.213 | 101,213.5 | 4 | 0 |
+
+The accepted case created an independently replayable verification record.
+The holey case preserved the exact producer artifacts but reported
+`COMPUTED/UNVERIFIED`; the scorer observed one expected capability rejection
+and no false certification. This supports retaining the producer/verifier
+split and the zero-hole, strict-Carcara gate. It does not establish broad
+`QF_UF` rule coverage or justify admitting arithmetic logics.
+
+Two development pairs are excluded. A benchmark routing bug initially
+overwrote the SMT condition with an unrelated workflow prompt; the scorer
+correctly rejected the resulting cross-claim verification record. A separate
+development run requested the full capability catalog and consumed about
+682,000 input tokens. After selecting the intended condition and describing
+the two exact IDs directly, frozen treatments used four calls and about
+101,000 median input tokens. Exact descriptors remain too context-heavy, so
+compact schema discovery and ranking remain portfolio-level follow-up work.
+Because this was a prescribed-capability pilot, it measures contract use and
+assurance discipline rather than autonomous portfolio discovery.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:
