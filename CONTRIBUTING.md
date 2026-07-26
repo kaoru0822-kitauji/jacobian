@@ -67,7 +67,7 @@ For documentation-only changes, run:
 
 ```sh
 git diff --check
-git diff -- README.md CONTRIBUTING.md docs/
+git diff -- AGENTS.md README.md CONTRIBUTING.md docs/
 ```
 
 Verify every relative Markdown link before submitting the change.
