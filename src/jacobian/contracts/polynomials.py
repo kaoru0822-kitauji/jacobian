@@ -186,6 +186,24 @@ class PolynomialCollisionRequest(ContractModel):
         return self
 
 
+class PolynomialCollisionSearchRequest(ContractModel):
+    map: RationalPolynomialMap
+    max_abs_numerator: int = Field(ge=0, le=8)
+    max_denominator: int = Field(ge=1, le=8)
+
+    @model_validator(mode="after")
+    def require_bounded_grid(self) -> Self:
+        scalar_upper_bound = (2 * self.max_abs_numerator + 1) * self.max_denominator
+        if scalar_upper_bound ** len(self.map.variables) > 10_000:
+            raise ValueError("declared rational grid exceeds the 10,000-point limit")
+        return self
+
+
+class PolynomialCollisionSearchStopReason(StrEnum):
+    FIRST_COLLISION = "FIRST_COLLISION"
+    GRID_EXHAUSTED = "GRID_EXHAUSTED"
+
+
 class PolynomialCollisionVerifyRequest(ContractModel):
     map: RationalPolynomialMap
     first_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
@@ -378,6 +396,51 @@ class PolynomialCollisionOutput(ContractModel):
             self.witness_uri is not None and self.checker_id is not None
         ):
             raise ValueError("certificate availability requires witness and checker")
+        return self
+
+
+class PolynomialCollisionSearchOutput(ContractModel):
+    found: bool
+    map_uri: ArtifactUri
+    examined_point_count: int = Field(ge=0, le=10_000)
+    grid_point_count: int = Field(ge=1, le=10_000)
+    first_point: tuple[CanonicalRational, ...] | None = None
+    second_point: tuple[CanonicalRational, ...] | None = None
+    common_image: tuple[CanonicalRational, ...] | None = None
+    first_evaluation_uri: ArtifactUri | None = None
+    second_evaluation_uri: ArtifactUri | None = None
+    claim_uri: ArtifactUri | None = None
+    witness_uri: ArtifactUri | None = None
+    checker_id: CheckerUri | None = None
+    stop_reason: PolynomialCollisionSearchStopReason
+    verification: PolynomialVerificationStatus = PolynomialVerificationStatus.UNVERIFIED
+
+    @model_validator(mode="after")
+    def require_complete_candidate_bundle(self) -> Self:
+        candidate_fields = (
+            self.first_point,
+            self.second_point,
+            self.common_image,
+            self.first_evaluation_uri,
+            self.second_evaluation_uri,
+            self.claim_uri,
+            self.witness_uri,
+        )
+        if self.found and not all(value is not None for value in candidate_fields):
+            raise ValueError("found status must match the complete collision bundle")
+        if not self.found and any(value is not None for value in candidate_fields):
+            raise ValueError("not-found results cannot carry a collision bundle")
+        if self.examined_point_count > self.grid_point_count:
+            raise ValueError("examined point count cannot exceed grid size")
+        if self.found and (
+            self.stop_reason is not PolynomialCollisionSearchStopReason.FIRST_COLLISION
+        ):
+            raise ValueError("found results must stop at the first collision")
+        if not self.found and (
+            self.stop_reason is not PolynomialCollisionSearchStopReason.GRID_EXHAUSTED
+            or self.examined_point_count != self.grid_point_count
+        ):
+            raise ValueError("not-found results require an exhausted grid")
         return self
 
 
