@@ -56,6 +56,7 @@ jobs:
             plan_output=$(.github/scripts/classify-ci-paths --force-full)
           fi
 
+          printf '%s\n' "$plan_output" | .github/scripts/validate-ci-plan
           printf '%s\n' "$plan_output" >> "$GITHUB_OUTPUT"
           classification=$(sed -n 's/^classification=//p' <<< "$plan_output")
           {
@@ -71,24 +72,41 @@ jobs:
   lint:
     name: Lint & Format
     needs: plan
-    if: needs.plan.outputs.run-static == 'true'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Require a valid static-analysis plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_STATIC: ${{ needs.plan.outputs.run-static }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          case "$RUN_STATIC" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+      - if: needs.plan.outputs.run-static == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: needs.plan.outputs.run-static == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - if: needs.plan.outputs.run-static == 'true'
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv sync --frozen --dev
-      - run: make lint-full
-      - run: make typecheck
+      - if: needs.plan.outputs.run-static == 'true'
+        run: uv sync --frozen --dev
+      - if: needs.plan.outputs.run-static == 'true'
+        run: make lint-full
+      - if: needs.plan.outputs.run-static == 'true'
+        run: make typecheck
       - name: Check TODO comments reference issues
+        if: needs.plan.outputs.run-static == 'true'
         run: |
           violations="$(rg --pcre2 -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"
           if [ -n "$violations" ]; then
@@ -142,7 +160,7 @@ jobs:
   test:
     name: Tests (Python ${{ matrix.python-version }}, shard ${{ matrix.shard }}/2)
     needs: plan
-    if: needs.plan.outputs.run-python == 'true'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -151,23 +169,40 @@ jobs:
         python-version: ["3.12", "3.13"]
         shard: [1, 2]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Require a valid Python plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          case "$RUN_PYTHON" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+      - if: needs.plan.outputs.run-python == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: needs.plan.outputs.run-python == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - if: needs.plan.outputs.run-python == 'true'
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv sync --frozen --dev
-      - run: >-
+      - if: needs.plan.outputs.run-python == 'true'
+        run: uv sync --frozen --dev
+      - if: needs.plan.outputs.run-python == 'true'
+        run: >-
           uv run --frozen python -c
           "import json, pathlib;
           data = json.loads(pathlib.Path('.test_durations').read_text());
           assert data, '.test_durations must contain measured test timings'"
-      - if: matrix.python-version == '3.12'
+      - if: >-
+          needs.plan.outputs.run-python == 'true' &&
+          matrix.python-version == '3.12'
         run: >-
           uv run --frozen pytest
           -m "not lean_runtime"
@@ -176,7 +211,9 @@ jobs:
           --durations-path .test_durations
           --cov --cov-report= --cov-fail-under=0
           --durations=10
-      - if: matrix.python-version != '3.12'
+      - if: >-
+          needs.plan.outputs.run-python == 'true' &&
+          matrix.python-version != '3.12'
         run: >-
           uv run --frozen pytest
           -m "not lean_runtime"
@@ -184,10 +221,18 @@ jobs:
           --splitting-algorithm least_duration
           --durations-path .test_durations
           --durations=10
-      - if: matrix.python-version == '3.12'
+      - if: >-
+          needs.plan.outputs.run-python == 'true' &&
+          matrix.python-version == '3.12'
         run: mv .coverage .coverage.shard-${{ matrix.shard }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ always() && matrix.python-version == '3.12' }}
+        if: >-
+          ${{
+            !cancelled() &&
+            needs.plan.result == 'success' &&
+            needs.plan.outputs.run-python == 'true' &&
+            matrix.python-version == '3.12'
+          }}
         with:
           name: coverage-data-${{ matrix.shard }}
           path: .coverage.shard-${{ matrix.shard }}
@@ -207,11 +252,11 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
         run: |
           test "$PLAN_RESULT" = "success"
-          if [ "$RUN_PYTHON" = "true" ]; then
-            test "$TEST_RESULT" = "success"
-          else
-            test "$TEST_RESULT" = "skipped"
-          fi
+          case "$RUN_PYTHON" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+          test "$TEST_RESULT" = "success"
 
   lean-test-shards:
     name: Lean Tests (${{ matrix.lane }})
@@ -257,15 +302,15 @@ jobs:
           SHARD_RESULT: ${{ needs.lean-test-shards.result }}
         run: |
           test "$PLAN_RESULT" = "success"
-          if [ "$RUN_LEAN" = "true" ]; then
-            test "$SHARD_RESULT" = "success"
-          else
-            test "$SHARD_RESULT" = "skipped"
-          fi
+          case "$RUN_LEAN" in
+            true) test "$SHARD_RESULT" = "success" ;;
+            false) test "$SHARD_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
 
   coverage:
     name: Coverage
-    if: always() && needs.plan.outputs.run-python == 'true' && needs.test.result == 'success'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [plan, test]
@@ -273,28 +318,49 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Require successful Python validation
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          case "$RUN_PYTHON" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+          test "$TEST_RESULT" = "success"
+      - if: needs.plan.outputs.run-python == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: needs.plan.outputs.run-python == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - if: needs.plan.outputs.run-python == 'true'
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv sync --frozen --dev
+      - if: needs.plan.outputs.run-python == 'true'
+        run: uv sync --frozen --dev
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        if: needs.plan.outputs.run-python == 'true'
         with:
           pattern: coverage-data-*
           path: coverage-data
           merge-multiple: true
-      - run: uv run --frozen coverage combine coverage-data
-      - run: uv run --frozen coverage report | tee coverage-report.txt
+      - if: needs.plan.outputs.run-python == 'true'
+        run: uv run --frozen coverage combine coverage-data
+      - if: needs.plan.outputs.run-python == 'true'
+        run: uv run --frozen coverage report | tee coverage-report.txt
         shell: bash -o pipefail {0}
-      - run: uv run --frozen coverage xml
+      - if: needs.plan.outputs.run-python == 'true'
+        run: uv run --frozen coverage xml
       - name: Post coverage summary to PR
         if: >-
+          needs.plan.outputs.run-python == 'true' &&
           github.event_name == 'pull_request' &&
           github.event.pull_request.user.type != 'Bot' &&
           github.event.pull_request.head.repo.full_name == github.repository
@@ -336,6 +402,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.plan.outputs.run-python == 'true'
         with:
           name: coverage-3.12
           path: coverage.xml
@@ -343,56 +410,102 @@ jobs:
   duplicate-code:
     name: Duplicate Code Detection
     needs: plan
-    if: needs.plan.outputs.run-duplicate == 'true'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Require a valid duplicate-code plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_DUPLICATE: ${{ needs.plan.outputs.run-duplicate }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          case "$RUN_DUPLICATE" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+      - if: needs.plan.outputs.run-duplicate == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: needs.plan.outputs.run-duplicate == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
-      - run: npx --yes jscpd@5.0.12 --config .jscpd.json .
+      - if: needs.plan.outputs.run-duplicate == 'true'
+        run: npx --yes jscpd@5.0.12 --config .jscpd.json .
 
   npm-package:
     name: npm Package
     needs: plan
-    if: needs.plan.outputs.run-npm == 'true'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Require a valid npm plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_NPM: ${{ needs.plan.outputs.run-npm }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          case "$RUN_NPM" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+      - if: needs.plan.outputs.run-npm == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: needs.plan.outputs.run-npm == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           package-manager-cache: false
-      - run: npm test
+      - if: needs.plan.outputs.run-npm == 'true'
+        run: npm test
         working-directory: npm
-      - run: npm pack --dry-run
+      - if: needs.plan.outputs.run-npm == 'true'
+        run: npm pack --dry-run
         working-directory: npm
 
   build:
     name: Build
     needs: plan
-    if: needs.plan.outputs.run-build == 'true'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Require a valid build plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_BUILD: ${{ needs.plan.outputs.run-build }}
+        run: |
+          test "$PLAN_RESULT" = "success"
+          case "$RUN_BUILD" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+      - if: needs.plan.outputs.run-build == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: needs.plan.outputs.run-build == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - if: needs.plan.outputs.run-build == 'true'
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: |
+      - if: needs.plan.outputs.run-build == 'true'
+        run: |
           echo "::group::Build timing"
           /usr/bin/time -v make build 2>&1 | tee build-timing.log
           echo "::endgroup::"
       - name: Extract build metrics
-        if: always()
+        if: >-
+          ${{
+            !cancelled() &&
+            needs.plan.result == 'success' &&
+            needs.plan.outputs.run-build == 'true'
+          }}
         run: |
           {
             echo "## Build Performance"
@@ -406,11 +519,17 @@ jobs:
             echo "Build cache: setup-uv (enabled), dependency cache keyed on pyproject.toml + uv.lock"
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.plan.outputs.run-build == 'true'
         with:
           name: dist
           path: dist/
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
+        if: >-
+          ${{
+            !cancelled() &&
+            needs.plan.result == 'success' &&
+            needs.plan.outputs.run-build == 'true'
+          }}
         with:
           name: build-timing
           path: build-timing.log
