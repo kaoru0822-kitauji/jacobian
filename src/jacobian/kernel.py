@@ -10,6 +10,8 @@ from jacobian.atomic_capabilities import install_atomic_capabilities
 from jacobian.builtin_capabilities import (
     KnowledgeSearchAdapter,
     LeanCheckAdapter,
+    LeanDeclarationInspectAdapter,
+    LeanDeclarationSearchAdapter,
 )
 from jacobian.capabilities import (
     CapabilityAdapter,
@@ -29,6 +31,10 @@ from jacobian.finite_partition import (
 )
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.lean import LeanService
+from jacobian.lean_declarations import (
+    LeanDeclarationService,
+    installed_lean_declaration_service,
+)
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
@@ -167,6 +173,7 @@ class JacobianKernel:
         self.polytope_checkers: PolytopeCheckerInstallation | None = None
         self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
         self.lean: LeanService | None = None
+        self.lean_declarations: LeanDeclarationService | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         for atomic_adapter in install_atomic_capabilities(self):
             self.capabilities.register(atomic_adapter)
@@ -245,6 +252,26 @@ class JacobianKernel:
                 ),
             )
             if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+                try:
+                    self.lean_declarations = installed_lean_declaration_service(runtime)
+                except (OSError, RuntimeError) as exc:
+                    _LOGGER.warning(
+                        "Lean declaration discovery is not installed: %s",
+                        exc,
+                    )
+                if self.lean_declarations is not None:
+                    self.capabilities.register(
+                        LeanDeclarationSearchAdapter(
+                            self.lean_declarations,
+                            runtime,
+                        )
+                    )
+                    self.capabilities.register(
+                        LeanDeclarationInspectAdapter(
+                            self.lean_declarations,
+                            runtime,
+                        )
+                    )
                 self.lean = LeanService(
                     self.store,
                     self.artifacts,

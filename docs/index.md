@@ -41,6 +41,8 @@ and build toward a complete result.
 - [Find and verify a counterexample](tutorials/first-verified-result.md) shows
   the boundary between an unverified evaluator result and independently
   verified evidence.
+- [Retrieve a Lean theorem and check a proof](tutorials/lean-declaration-discovery.md)
+  composes computed declaration retrieval with independent Lean replay.
 
 ## How-to guides
 
@@ -56,6 +58,7 @@ expectations.
 
 - [Tool surface](reference/tools.md)
 - [Provider runtime contract](reference/provider-runtime.md)
+- [Lean declaration discovery](reference/lean-declaration-discovery.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
 - [v0.2 conformance specification](reference/conformance-v0.2.md)
 - [Plugin conformance contract](reference/plugin-conformance.md)

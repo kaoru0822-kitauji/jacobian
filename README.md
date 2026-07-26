@@ -202,9 +202,12 @@ lake build
 ```
 
 The operation and trust boundary are documented under
-[`lean.check`](docs/reference/tools.md). This is a trusted local integration,
-not a broker sandbox; the pinned Lake environment still has host-local runtime
-access.
+[`lean.check`](docs/reference/tools.md). Read-only
+[Lean declaration discovery](docs/reference/lean-declaration-discovery.md)
+can retrieve and inspect premises before completed source crosses that checker
+boundary; the [guided reproduction](docs/tutorials/lean-declaration-discovery.md)
+shows the composition. This is a trusted local integration, not a broker
+sandbox; the pinned Lake environment still has host-local runtime access.
 
 ## Distribution
 
