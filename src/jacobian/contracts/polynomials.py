@@ -132,6 +132,47 @@ class PolynomialJacobianRequest(ContractModel):
         return self
 
 
+class PolynomialFactorRequest(ContractModel):
+    variable: PolynomialVariable
+    polynomial: SparseRationalPolynomial
+
+    @model_validator(mode="after")
+    def require_univariate_terms(self) -> Self:
+        if any(len(term.exponents) != 1 for term in self.polynomial.terms):
+            raise ValueError("factorization currently supports univariate polynomials")
+        return self
+
+
+class PolynomialFactorRecord(ContractModel):
+    factor: SparseRationalPolynomial
+    multiplicity: int = Field(ge=1, le=127)
+
+
+class PolynomialFactorizationArtifact(ContractModel):
+    factorization_schema_version: Literal["1"] = "1"
+    variable: PolynomialVariable
+    source_polynomial_uri: ArtifactUri
+    coefficient: CanonicalRational
+    factors: tuple[PolynomialFactorRecord, ...] = Field(max_length=1024)
+    reconstructed: SparseRationalPolynomial
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str = Field(min_length=1, max_length=64)
+
+
+class PolynomialFactorOutput(ContractModel):
+    source_polynomial_uri: ArtifactUri
+    factorization_uri: ArtifactUri
+    variable: PolynomialVariable
+    coefficient: CanonicalRational
+    factors: tuple[PolynomialFactorRecord, ...]
+    reconstructed: SparseRationalPolynomial
+    exactness: Literal["EXACT"] = "EXACT"
+    product_reconstruction: Literal["EXACT"] = "EXACT"
+    irreducibility_verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str
+
+
 class PolynomialCollisionRequest(ContractModel):
     first_evaluation_uri: ArtifactUri
     second_evaluation_uri: ArtifactUri

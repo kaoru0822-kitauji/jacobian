@@ -41,6 +41,10 @@ from jacobian.contracts.polynomials import (
     PolynomialCollisionRequest,
     PolynomialEvaluationOutput,
     PolynomialEvaluationRequest,
+    PolynomialFactorizationArtifact,
+    PolynomialFactorOutput,
+    PolynomialFactorRecord,
+    PolynomialFactorRequest,
     PolynomialInjectivityClaim,
     PolynomialJacobian,
     PolynomialJacobianClaim,
@@ -63,6 +67,8 @@ from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 @dataclass(frozen=True, slots=True)
 class PolynomialInstallation:
     semantics_uri: str
+    polynomial_semantics_uri: str
+    factorization_semantics_uri: str
     map_schema_uri: str
     evaluation_schema_uri: str
     jacobian_schema_uri: str
@@ -70,6 +76,8 @@ class PolynomialInstallation:
     jacobian_claim_schema_uri: str
     witness_schema_uri: str
     certificate_schema_uri: str
+    polynomial_schema_uri: str
+    factorization_schema_uri: str
     collision_checker_id: str | None
     jacobian_checker_id: str | None
 
@@ -93,6 +101,7 @@ def install_polynomial_capabilities(
         PolynomialMapEvaluationAdapter,
         PolynomialJacobianAdapter,
         PolynomialCollisionAdapter,
+        PolynomialFactorAdapter,
     ],
     PolynomialInstallation,
 ]:
@@ -114,6 +123,36 @@ def install_polynomial_capabilities(
             "maximum_exponent": 32,
             "maximum_derived_exponent": 127,
             "maximum_jacobian_product_term_estimate": 1024,
+        },
+    )
+    polynomial_semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.univariate-rational-polynomial",
+        version="1",
+        definition={
+            "description": (
+                "univariate sparse polynomials over QQ with canonical reduced "
+                "rational coefficients"
+            ),
+            "domain": "QQ",
+            "maximum_terms": 1024,
+        },
+    )
+    factorization_semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.univariate-rational-polynomial-factorization",
+        version="1",
+        definition={
+            "description": (
+                "a rational coefficient and multiplicity-bearing irreducible "
+                "factors over QQ whose product reconstructs one source polynomial"
+            ),
+            "domain": "QQ",
+            "zero_representation": {
+                "coefficient": {"num": "0", "den": "1"},
+                "factors": [],
+            },
+            "irreducibility_assurance": "unverified",
         },
     )
     map_schema_uri = schemas.register(
@@ -151,6 +190,16 @@ def install_polynomial_capabilities(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
+    polynomial_schema_uri = schemas.register(
+        name="jacobian.sparse-rational-polynomial",
+        version="1",
+        schema=model_schema(SparseRationalPolynomial),
+    )
+    factorization_schema_uri = schemas.register(
+        name="jacobian.polynomial-factorization",
+        version="1",
+        schema=model_schema(PolynomialFactorizationArtifact),
+    )
     collision_checker_id = None
     jacobian_checker_id = None
     if authorize_checker:
@@ -178,6 +227,8 @@ def install_polynomial_capabilities(
         ).checker_id
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
+        polynomial_semantics_uri=polynomial_semantics_uri,
+        factorization_semantics_uri=factorization_semantics_uri,
         map_schema_uri=map_schema_uri,
         evaluation_schema_uri=evaluation_schema_uri,
         jacobian_schema_uri=jacobian_schema_uri,
@@ -185,6 +236,8 @@ def install_polynomial_capabilities(
         jacobian_claim_schema_uri=jacobian_claim_schema_uri,
         witness_schema_uri=witness_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
+        polynomial_schema_uri=polynomial_schema_uri,
+        factorization_schema_uri=factorization_schema_uri,
         collision_checker_id=collision_checker_id,
         jacobian_checker_id=jacobian_checker_id,
     )
@@ -198,6 +251,7 @@ def install_polynomial_capabilities(
             PolynomialMapEvaluationAdapter(resources),
             PolynomialJacobianAdapter(resources),
             PolynomialCollisionAdapter(resources),
+            PolynomialFactorAdapter(resources),
         ),
         installation,
     )
@@ -638,6 +692,120 @@ class PolynomialCollisionAdapter:
                 "deterministic structural comparison of canonical rational payloads; "
                 "the source evaluations were not replayed and any candidate witness "
                 "remains unverified"
+            ),
+        )
+
+
+class PolynomialFactorAdapter:
+    """Factor one univariate sparse polynomial over QQ."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.factor.compute",
+            version="1",
+            title="Factor a univariate rational polynomial",
+            description=(
+                "Compute a coefficient and multiplicity-bearing factor list over QQ, "
+                "together with an exact reconstructed product."
+            ),
+            provider="jacobian.sympy",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sympy",
+                features=("univariate-polynomial-factorization",),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(PolynomialFactorRequest),
+            output_schema=model_schema(PolynomialFactorOutput),
+            tags=("polynomial", "factorization", "exact-computation"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialFactorRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_FACTOR_REQUEST",
+            operation="factorization",
+        )
+        started = time.monotonic()
+        source = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.polynomial_schema_uri,
+            semantics_uri=self.resources.installation.polynomial_semantics_uri,
+            payload=validated.polynomial.model_dump(mode="json"),
+            summary="univariate sparse rational polynomial",
+        )
+        generator = cast(tuple[Any, ...], symbols(validated.variable, seq=True))
+        polynomial = _sympy_polynomial(validated.polynomial, generator)
+        coefficient_value, raw_factors = polynomial.factor_list()
+        factors = tuple(
+            PolynomialFactorRecord(
+                factor=_wire_polynomial(factor),
+                multiplicity=multiplicity,
+            )
+            for factor, multiplicity in raw_factors
+        )
+        reconstructed_expression = sympy.Rational(coefficient_value)
+        for factor, multiplicity in raw_factors:
+            reconstructed_expression *= factor.as_expr() ** multiplicity
+        reconstructed = _wire_polynomial(
+            Poly(
+                sympy.expand(reconstructed_expression),
+                *generator,
+                domain=QQ,
+            )
+        )
+        artifact_payload = PolynomialFactorizationArtifact(
+            variable=validated.variable,
+            source_polynomial_uri=source.artifact_uri,
+            coefficient=_wire_rational(coefficient_value),
+            factors=factors,
+            reconstructed=reconstructed,
+            backend_version=sympy.__version__,
+        )
+        factorization = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.factorization_schema_uri,
+            semantics_uri=self.resources.installation.factorization_semantics_uri,
+            payload=artifact_payload.model_dump(mode="json"),
+            parents=(source.artifact_uri,),
+            summary="computed univariate rational polynomial factorization",
+        )
+        output = PolynomialFactorOutput(
+            source_polynomial_uri=source.artifact_uri,
+            factorization_uri=factorization.artifact_uri,
+            variable=validated.variable,
+            coefficient=artifact_payload.coefficient,
+            factors=factors,
+            reconstructed=reconstructed,
+            backend_version=sympy.__version__,
+        )
+        return _computed_result(
+            descriptor=self.descriptor,
+            request=request,
+            started=started,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="one univariate polynomial over QQ",
+                parameters={"variable": validated.variable},
+                artifact_uri=source.artifact_uri,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="polynomial.relation.factorization-of",
+                    source_artifact_uris=(source.artifact_uri,),
+                    target_artifact_uris=(factorization.artifact_uri,),
+                ),
+            ),
+            artifact_uris=(source.artifact_uri, factorization.artifact_uri),
+            completeness_basis=(
+                "SymPy returned a factor list and its product was reconstructed exactly"
+            ),
+            assurance_basis=(
+                "exact SymPy factorization and product reconstruction over QQ; "
+                "factor irreducibility was not independently verified"
             ),
         )
 
