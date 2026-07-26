@@ -145,6 +145,25 @@ class PolynomialCollisionRequest(ContractModel):
         return self
 
 
+class PolynomialIdentityRequest(ContractModel):
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    left: SparseRationalPolynomial
+    right: SparseRationalPolynomial
+
+    @model_validator(mode="after")
+    def require_matching_ring(self) -> Self:
+        if len(set(self.variables)) != len(self.variables):
+            raise ValueError("polynomial variables must be unique")
+        dimension = len(self.variables)
+        if any(
+            len(term.exponents) != dimension
+            for polynomial in (self.left, self.right)
+            for term in polynomial.terms
+        ):
+            raise ValueError("every monomial must match the declared variable order")
+        return self
+
+
 class PolynomialMapEvaluation(ContractModel):
     evaluation_schema_version: Literal["1"] = "1"
     map_uri: ArtifactUri
@@ -203,6 +222,22 @@ class PolynomialJacobianClaim(ContractModel):
     claim_schema_version: Literal["1"] = "1"
     predicate: Literal["EXACT_POLYNOMIAL_JACOBIAN"] = "EXACT_POLYNOMIAL_JACOBIAN"
     source_map_uri: ArtifactUri
+
+
+class PolynomialIdentityClaim(ContractModel):
+    claim_schema_version: Literal["1"] = "1"
+    predicate: Literal["POLYNOMIAL_IDENTITY"] = "POLYNOMIAL_IDENTITY"
+    domain: Literal["QQ"] = "QQ"
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    left_uri: ArtifactUri
+    right_uri: ArtifactUri
+
+
+class PolynomialIdentityReplayPayload(ContractModel):
+    method: Literal["DIRECT_SPARSE_REPLAY"] = "DIRECT_SPARSE_REPLAY"
+    variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    left_uri: ArtifactUri
+    right_uri: ArtifactUri
 
 
 class PolynomialJacobianReplayPayload(ContractModel):
@@ -317,3 +352,16 @@ class PolynomialCollisionOutput(ContractModel):
         ):
             raise ValueError("certificate availability requires witness and checker")
         return self
+
+
+class PolynomialIdentityOutput(ContractModel):
+    identical: bool
+    conclusion: Literal["TRUE", "FALSE", "UNKNOWN"]
+    left_uri: ArtifactUri
+    right_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri | None = None
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+    determinism: PolynomialDeterminism = PolynomialDeterminism.DETERMINISTIC
