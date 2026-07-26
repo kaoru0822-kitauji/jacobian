@@ -128,7 +128,7 @@ jobs:
           path: .coverage.shard-${{ matrix.shard }}
           include-hidden-files: true
 
-  lean-test:
+  lean-test-shards:
     name: Lean Tests (${{ matrix.lane }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -163,6 +163,18 @@ jobs:
             --splitting-algorithm least_duration
             --durations-path .lean_test_durations
             --durations=10
+
+  lean-test:
+    name: Lean Tests
+    if: always()
+    needs: lean-test-shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every Lean shard
+        env:
+          SHARD_RESULT: ${{ needs.lean-test-shards.result }}
+        run: test "$SHARD_RESULT" = "success"
 
   coverage:
     name: Coverage
