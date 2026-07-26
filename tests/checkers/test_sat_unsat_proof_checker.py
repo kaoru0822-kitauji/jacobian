@@ -177,6 +177,23 @@ def test_checker_reconstructs_exact_dimacs_and_forces_ascii_drat(
     assert decision["coverage"] == "NOT_APPLICABLE"
 
 
+def test_checker_accepts_cleanup_deletions_after_the_empty_clause(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
+) -> None:
+    executable, _marker = _fake_checker(
+        tmp_path,
+        "print('s VERIFIED')\nraise SystemExit(0)",
+    )
+    _install_runtime_environment(monkeypatch, executable)
+
+    decision = check_unsat_proof(proof_request_factory(b"0\nd 1 0\nd -1 2 0\n"))
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
 def test_binding_and_lineage_attacks_are_rejected_before_drat_trim(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
