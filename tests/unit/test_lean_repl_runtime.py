@@ -90,3 +90,30 @@ def test_persistent_repl_kills_a_timed_out_process(tmp_path: Path) -> None:
         repl.execute(command="example : True := by sorry", tactic="trivial")
 
     assert time.monotonic() - started < 2
+
+
+def test_persistent_repl_kills_a_process_that_exceeds_rss_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "jacobian.lean_exploration._process_rss_kb",
+        lambda _pid: 2,
+    )
+    repl = PersistentLeanRepl(
+        command=(sys.executable, "-u", "-c", "import time; time.sleep(10)"),
+        cwd=tmp_path,
+        base_command=None,
+        policy=LeanReplPolicy(
+            max_requests=2,
+            max_age_seconds=60,
+            max_rss_kb=1,
+            timeout_seconds=5,
+        ),
+    )
+
+    started = time.monotonic()
+    with pytest.raises(RuntimeError, match="exceeded its memory limit"):
+        repl.execute(command="example : True := by sorry", tactic="trivial")
+
+    assert time.monotonic() - started < 2

@@ -29,7 +29,7 @@ typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
 
 test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
-	$(UV_RUN) pytest $(TESTS) $(PYTEST_ARGS)
+	$(UV_RUN) pytest -m "not lean_runtime" $(TESTS) $(PYTEST_ARGS)
 
 test-fast: ## Run the sequential non-integration feedback loop.
 	$(UV_RUN) pytest -n 0 -m "not integration and not end_to_end" $(PYTEST_ARGS)
@@ -43,7 +43,7 @@ test-failed: ## Re-run failures from the previous pytest invocation.
 build: ## Build Python source and wheel distributions.
 	uv build
 
-validate: lint typecheck test build ## Run complete local Python validation.
+validate: lint typecheck test test-lean build ## Run complete local validation.
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

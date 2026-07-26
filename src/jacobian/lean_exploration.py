@@ -59,6 +59,7 @@ _SUGGESTION = re.compile(
     r"Try this:\s*\n\s*\[apply\]\s*(?P<tactic>[^\r\n]+)",
 )
 _DECLARATION = re.compile(r"\b[A-Z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_']+)+\b")
+_RESOURCE_POLL_SECONDS = 0.1
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,11 +184,22 @@ class PersistentLeanRepl:
         except (BrokenPipeError, OSError) as exc:
             self._stop_process()
             raise RuntimeError("Lean REPL stopped before receiving a request") from exc
-        try:
-            response = self._responses.get(timeout=self._policy.timeout_seconds)
-        except queue.Empty as exc:
-            self._stop_process()
-            raise RuntimeError("Lean REPL timed out") from exc
+        deadline = time.monotonic() + self._policy.timeout_seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                self._stop_process()
+                raise RuntimeError("Lean REPL timed out")
+            try:
+                response = self._responses.get(
+                    timeout=min(_RESOURCE_POLL_SECONDS, remaining)
+                )
+                break
+            except queue.Empty:
+                rss_kb = _process_rss_kb(process.pid)
+                if self._policy.max_rss_kb > 0 and rss_kb > self._policy.max_rss_kb:
+                    self._stop_process()
+                    raise RuntimeError("Lean REPL exceeded its memory limit") from None
         if isinstance(response, BaseException):
             self._stop_process()
             raise RuntimeError(
