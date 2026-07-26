@@ -36,6 +36,7 @@ from jacobian.finite_partition import (
 )
 from jacobian.flint_hnf import install_python_flint_hnf_capability
 from jacobian.flint_linear import install_python_flint_linear_capability
+from jacobian.geometry_capabilities import install_geometry_capabilities
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.graph_isomorphism import (
     GraphIsomorphismInstallation,
@@ -87,6 +88,7 @@ from jacobian.polynomial_system_capabilities import (
     install_polynomial_system_capabilities,
 )
 from jacobian.polytope import PolytopeService
+from jacobian.primitive_math_capabilities import install_primitive_math_capabilities
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
     carcara_provider_runtime,
@@ -415,6 +417,7 @@ class JacobianKernel:
         )
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
+        self._install_geometry_capabilities()
         self.graph_isomorphism: GraphIsomorphismInstallation
         graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
             self.store,
@@ -446,6 +449,7 @@ class JacobianKernel:
         )
         for matrix_adapter in matrix_adapters:
             self.register_capability(matrix_adapter)
+        self._install_primitive_math_capabilities()
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
@@ -588,6 +592,22 @@ class JacobianKernel:
                 exc,
             )
         else:
+            self.register_capability(adapter)
+
+    def _install_primitive_math_capabilities(self) -> None:
+        for adapter in install_primitive_math_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        ):
+            self.register_capability(adapter)
+
+    def _install_geometry_capabilities(self) -> None:
+        for adapter in install_geometry_capabilities(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        ):
             self.register_capability(adapter)
 
     def _install_polynomial_expression_capabilities(
