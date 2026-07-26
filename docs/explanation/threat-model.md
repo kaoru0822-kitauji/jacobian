@@ -258,6 +258,21 @@ Controls:
   equality and inequality;
 - changed coefficients, margins, bindings, or scopes are rejected.
 
+### Polynomial identity substitution
+
+An identity request may replace either polynomial, change the declared variable
+order, or reuse a certificate under another ring binding.
+
+Controls:
+
+- the certificate binds the claim, right-hand candidate, left-hand scope, and
+  exact polynomial semantics;
+- the independent checker reparses canonical rational coefficients without
+  importing the capability adapter;
+- changed artifact URIs, variables, coefficients, exponents, or evidence
+  bindings reject or produce the independently checked false conclusion; and
+- only the authorized checker record promotes the identity relationship.
+
 ### Remote client or tenant
 
 A remote caller may omit authentication, present an invalid token, choose a
