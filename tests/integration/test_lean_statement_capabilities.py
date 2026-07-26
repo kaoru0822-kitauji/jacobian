@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import jacobian.lean_statement_capabilities as lean_statements
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
@@ -14,6 +15,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityRequest,
 )
+from jacobian.contracts.lean_statement import LeanElaborationOption
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.lean_statement_capabilities import (
     LeanProofRepairAdapter,
@@ -155,6 +157,90 @@ def test_propose_returns_diagnostic_when_lean_unavailable(
         )
 
     assert exc_info.value.diagnostic.code == "LEAN_BACKEND_UNAVAILABLE"
+
+
+def test_propose_directly_elaborates_environment_bound_proposition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        lean_statements,
+        "_elaborate_proposition",
+        lambda _statement: lean_statements._ElaborationResult(
+            elaborates=True,
+            sorry_count=0,
+            messages=(
+                "fixture.lean:4:0: info: "
+                "@Eq.{1} Nat (@OfNat.ofNat Nat 1 instOfNatNat) "
+                "(@OfNat.ofNat Nat 1 instOfNatNat) : Prop",
+            ),
+            errors=(),
+            elaborated_expression=(
+                "@Eq.{1} Nat (@OfNat.ofNat Nat 1 instOfNatNat) "
+                "(@OfNat.ofNat Nat 1 instOfNatNat)"
+            ),
+            used_imports=("Init.Prelude",),
+            used_declarations=("Eq", "Nat", "OfNat.ofNat", "instOfNatNat"),
+            options=(
+                LeanElaborationOption(name="pp.all", value="true"),
+                LeanElaborationOption(name="pp.explicit", value="true"),
+                LeanElaborationOption(name="pp.universes", value="true"),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        lean_statements,
+        "_lean_version_info",
+        lambda: ("4.31.0", "lean-commit"),
+    )
+    propose, _, _ = _build_adapters(tmp_path)
+
+    result = propose.invoke(
+        CapabilityRequest(
+            capability_id="lean.statement.propose",
+            input={
+                "operation": "ELABORATE_PROPOSITION",
+                "environment": "CORE",
+                "proposed_statement": "1 = 1",
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["operation"] == "ELABORATE_PROPOSITION"
+    assert result.output["informal_claim"] is None
+    assert result.output["elaborates"] is True
+    assert result.output["sorry_count"] == 0
+    assert result.output["elaborated_expression"].startswith("@Eq")
+    assert result.output["used_imports"] == ["Init.Prelude"]
+    assert "Eq" in result.output["used_declarations"]
+    assert result.output["options"][0] == {"name": "pp.all", "value": "true"}
+    assert result.output["semantic_scope"] == "ELABORATION_ONLY"
+    assert result.output["truth_status"] == "NOT_ASSESSED"
+    assert result.output["verification"] == "UNVERIFIED"
+    assert result.output["environment_digest"].startswith("sha256:")
+
+    artifact = propose.resources.store.get(result.output["proposal_uri"])
+    assert artifact.payload["environment_digest"] == result.output["environment_digest"]
+    assert (
+        artifact.payload["elaborated_expression"]
+        == result.output["elaborated_expression"]
+    )
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert "does not establish truth" in result.assurance.basis
+
+
+def test_direct_elaboration_parser_preserves_multiline_core_expression() -> None:
+    output = (
+        "fixture.lean:4:0: info: @Eq.{1} Nat\n"
+        "  (@OfNat.ofNat Nat 1 instOfNatNat)\n"
+        "  (@OfNat.ofNat Nat 1 instOfNatNat) : Prop\n"
+    )
+
+    assert lean_statements._parse_elaborated_expression(output) == (
+        "@Eq.{1} Nat (@OfNat.ofNat Nat 1 instOfNatNat) "
+        "(@OfNat.ofNat Nat 1 instOfNatNat)"
+    )
 
 
 # ---------------------------------------------------------------------------
