@@ -193,8 +193,10 @@ class OmittedRelationshipArtifactAdapter:
 class ForgedRelationshipVerificationAdapter:
     verification_record_uri: str
     artifact_uris: tuple[str, ...]
+    relation_id: str
     source_uri: str
     target_uri: str
+    obligation_uris: tuple[str, ...] = ()
     descriptor = CapabilityDescriptor(
         capability_id="example.forged-relationship",
         version="1",
@@ -215,9 +217,10 @@ class ForgedRelationshipVerificationAdapter:
             execution=Execution(status=ExecutionStatus.COMPLETED),
             relationships=(
                 CapabilityRelationship(
-                    relation_id="claim.relation.specialization",
+                    relation_id=self.relation_id,
                     source_artifact_uris=(self.source_uri,),
                     target_artifact_uris=(self.target_uri,),
+                    obligation_uris=self.obligation_uris,
                     status=CapabilityRelationshipStatus.VERIFIED,
                     verification_record_uri=self.verification_record_uri,
                 ),
@@ -443,6 +446,86 @@ def test_first_class_relationship_endpoints_must_be_exposed(
         kernel.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.relationship",
+                input={},
+            )
+        )
+
+
+@pytest.mark.integration
+def test_verified_relationship_must_match_checker_selected_endpoints(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="case.partition.finite",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "universe": ["a", "b"],
+                "cases": [
+                    {"case_id": "left", "members": ["a"]},
+                    {"case_id": "right", "members": ["b"]},
+                ],
+                "require_disjoint": True,
+            },
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+    record = kernel.store.get(record_uri)
+    forged = ForgedRelationshipVerificationAdapter(
+        verification_record_uri=record_uri,
+        artifact_uris=(*record.manifest.parents, record_uri),
+        relation_id="case.relation.partitions",
+        source_uri=verified.output["claim_uri"],
+        target_uri=verified.output["partition_uri"],
+    )
+    kernel.register_capability(forged)
+
+    with pytest.raises(CapabilityError, match="endpoints differ"):
+        kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id=forged.descriptor.capability_id,
+                mode=CapabilityMode.VERIFY,
+                input={},
+            )
+        )
+
+
+@pytest.mark.integration
+def test_verified_relationship_must_match_checker_selected_obligation(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="case.partition.finite",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "universe": ["a"],
+                "cases": [{"case_id": "only", "members": ["a"]}],
+                "require_disjoint": True,
+            },
+        )
+    )
+    record_uri = verified.assurance.verification_record_uri
+    assert record_uri is not None
+    record = kernel.store.get(record_uri)
+    forged = ForgedRelationshipVerificationAdapter(
+        verification_record_uri=record_uri,
+        artifact_uris=(*record.manifest.parents, record_uri),
+        relation_id="case.relation.partitions",
+        source_uri=verified.output["scope_uri"],
+        target_uri=verified.output["partition_uri"],
+        obligation_uris=(verified.output["certificate_uri"],),
+    )
+    kernel.register_capability(forged)
+
+    with pytest.raises(CapabilityError, match="obligations differ"):
+        kernel.capabilities.invoke(
+            CapabilityRequest(
+                capability_id=forged.descriptor.capability_id,
+                mode=CapabilityMode.VERIFY,
                 input={},
             )
         )

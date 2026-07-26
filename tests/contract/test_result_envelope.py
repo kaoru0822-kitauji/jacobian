@@ -146,6 +146,33 @@ def test_trust_boundary_revalidates_model_construct_instances() -> None:
         validate_result_envelope(malformed)
 
 
+@pytest.mark.contract
+def test_checker_relationship_requires_exact_artifact_endpoints() -> None:
+    decision = {
+        "accepted": True,
+        "conclusion": "TRUE",
+        "arithmetic": "EXACT_INTEGER",
+        "method": "CHECKED_CERTIFICATE",
+        "coverage": "EXHAUSTIVE",
+        "relation_id": "example.relation.checked",
+    }
+
+    with pytest.raises(ValidationError):
+        CheckerDecision.model_validate(decision)
+
+    accepted = CheckerDecision.model_validate(
+        {
+            **decision,
+            "relationship_source_artifact_uris": ["artifact://sha256/" + "1" * 64],
+            "relationship_target_artifact_uris": ["artifact://sha256/" + "2" * 64],
+        }
+    )
+
+    assert accepted.relationship_source_artifact_uris == (
+        "artifact://sha256/" + "1" * 64,
+    )
+
+
 def _verified_result(
     *,
     conclusion: str = "TRUE",
