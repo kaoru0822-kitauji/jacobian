@@ -1,0 +1,316 @@
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+from collections.abc import Callable
+from typing import Any
+
+import pytest
+
+import jacobian_checkers.exact_domain_operations as checker_module
+from jacobian_checkers.exact_domain_operations import (
+    check_matrix_characteristic_polynomial,
+    check_matrix_nullspace,
+    check_matrix_rref,
+    check_matrix_smith_normal_form,
+    check_polynomial_discriminant,
+    check_polynomial_gcd,
+    check_polynomial_resultant,
+    check_polynomial_square_free,
+)
+
+
+def _uri(character: str) -> str:
+    return "artifact://sha256/" + character * 64
+
+
+def _digest(value: object) -> str:
+    return "sha256:" + hashlib.sha256(
+        json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+
+
+def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
+    return {"num": str(numerator), "den": str(denominator)}
+
+
+def _poly(*coefficients_ascending: int) -> dict[str, Any]:
+    return {
+        "variables": ["x"],
+        "polynomial": {
+            "terms": [
+                {"coefficient": _q(coefficient), "exponents": [exponent]}
+                for exponent, coefficient in reversed(
+                    tuple(enumerate(coefficients_ascending))
+                )
+                if coefficient
+            ]
+        },
+    }
+
+
+def _qq(entries: list[list[int]]) -> dict[str, Any]:
+    return {"domain": "QQ", "entries": [[_q(item) for item in row] for row in entries]}
+
+
+def _zz(entries: list[list[int]]) -> dict[str, Any]:
+    return {"domain": "ZZ", "entries": [[str(item) for item in row] for row in entries]}
+
+
+def _artifact(
+    character: str,
+    payload: dict[str, Any],
+    *,
+    semantics: str,
+    parents: list[str],
+) -> dict[str, Any]:
+    return {
+        "artifact_uri": _uri(character),
+        "object_digest": "sha256:" + character * 64,
+        "payload_digest": _digest(payload),
+        "schema_uri": _uri(chr(ord(character) + 1)),
+        "semantics_uri": semantics,
+        "parents": parents,
+        "payload": payload,
+    }
+
+
+def _request(
+    operation_id: str,
+    witness_format: str,
+    source: dict[str, Any],
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    semantics = _uri("e")
+    claim = _artifact("1", source, semantics=semantics, parents=[])
+    candidate = _artifact(
+        "3", result, semantics=semantics, parents=[claim["artifact_uri"]]
+    )
+    bindings = {
+        "claim_digest": claim["object_digest"],
+        "semantics_digest": "sha256:" + "8" * 64,
+        "candidate_digest": candidate["object_digest"],
+        "scope_digest": None,
+        "encoding_digest": None,
+    }
+    witness_payload = {
+        "evidence_schema_version": "1",
+        "witness_format": witness_format,
+        "format_version": "1",
+        "role": "SUPPORTS_CLAIM",
+        "bindings": bindings,
+        "payload": {
+            "operation_id": operation_id,
+            "input_uri": claim["artifact_uri"],
+            "result_uri": candidate["artifact_uri"],
+        },
+    }
+    witness = _artifact(
+        "5",
+        witness_payload,
+        semantics=semantics,
+        parents=[claim["artifact_uri"], candidate["artifact_uri"]],
+    )
+    return {
+        "request_version": "1",
+        "claim": claim,
+        "candidate": candidate,
+        "scope": None,
+        "witness": witness,
+        "expected_bindings": bindings,
+    }
+
+
+_CASES: tuple[
+    tuple[Callable[[dict[str, Any]], dict[str, Any]], dict[str, Any]], ...
+] = (
+    (
+        check_polynomial_gcd,
+        _request(
+            "polynomial.compute.gcd",
+            "polynomial.gcd.flint-replay",
+            {"left": _poly(-1, 0, 1), "right": _poly(-1, 1)},
+            {
+                "gcd": _poly(-1, 1),
+                "bezout": {
+                    "left_multiplier": _poly(),
+                    "right_multiplier": _poly(1),
+                },
+                "normalization": "MONIC",
+            },
+        ),
+    ),
+    (
+        check_polynomial_resultant,
+        _request(
+            "polynomial.compute.resultant",
+            "polynomial.resultant.flint-replay",
+            {
+                "left": _poly(1, 0, 1),
+                "right": _poly(-1, 1),
+                "elimination_variable": "x",
+            },
+            {
+                "elimination_variable": "x",
+                "resultant": {"kind": "SCALAR", "value": _q(2)},
+                "convention": "SYLVESTER_DETERMINANT",
+            },
+        ),
+    ),
+    (
+        check_polynomial_discriminant,
+        _request(
+            "polynomial.compute.discriminant",
+            "polynomial.discriminant.flint-replay",
+            {"polynomial": _poly(-1, 0, 1), "variable": "x"},
+            {
+                "variable": "x",
+                "discriminant": {"kind": "SCALAR", "value": _q(4)},
+                "convention": "STANDARD_UNIVARIATE",
+            },
+        ),
+    ),
+    (
+        check_polynomial_square_free,
+        _request(
+            "polynomial.compute.square_free_decomposition",
+            "polynomial.square-free.flint-replay",
+            {"polynomial": _poly(-1, 1, 1, -1)},
+            {
+                "coefficient": _q(-1),
+                "factors": [
+                    {"factor": _poly(1, 1), "multiplicity": 1},
+                    {"factor": _poly(-1, 1), "multiplicity": 2},
+                ],
+                "reconstructed": _poly(-1, 1, 1, -1),
+                "normalization": "MONIC_FACTORS",
+            },
+        ),
+    ),
+    (
+        check_matrix_rref,
+        _request(
+            "matrix.normal_form.rref.compute",
+            "matrix.rref.flint-replay",
+            {"matrix": _qq([[1, 2, 3], [2, 4, 6]])},
+            {
+                "reduced_matrix": _qq([[1, 2, 3], [0, 0, 0]]),
+                "rank": 1,
+                "pivot_columns": [0],
+                "free_columns": [1, 2],
+                "convention": "UNIQUE_RREF_OVER_QQ",
+            },
+        ),
+    ),
+    (
+        check_matrix_nullspace,
+        _request(
+            "matrix.nullspace.compute",
+            "matrix.nullspace.flint-replay",
+            {"matrix": _qq([[1, 2, 3], [2, 4, 6]])},
+            {
+                "ambient_dimension": 3,
+                "nullity": 2,
+                "basis_vectors": [[_q(-2), _q(1), _q(0)], [_q(-3), _q(0), _q(1)]],
+                "free_columns": [1, 2],
+                "convention": "RREF_FUNDAMENTAL_BASIS",
+            },
+        ),
+    ),
+    (
+        check_matrix_characteristic_polynomial,
+        _request(
+            "matrix.characteristic_polynomial.compute",
+            "matrix.characteristic-polynomial.flint-replay",
+            {"matrix": _qq([[1, 2], [3, 4]])},
+            {
+                "variable": "lambda",
+                "degree": 2,
+                "coefficients_descending": [_q(1), _q(-5), _q(-2)],
+                "monic": True,
+                "convention": "DET_LAMBDA_I_MINUS_A",
+            },
+        ),
+    ),
+    (
+        check_matrix_smith_normal_form,
+        _request(
+            "matrix.normal_form.smith.compute",
+            "matrix.smith-normal-form.flint-replay",
+            {"matrix": _zz([[2, 4], [6, 8]])},
+            {
+                "normal_form": _zz([[2, 0], [0, 4]]),
+                "rank": 2,
+                "invariant_factors": ["2", "4"],
+                "transformation_available": False,
+                "convention": "POSITIVE_DIVISIBILITY_DIAGONAL",
+            },
+        ),
+    ),
+)
+
+
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES)
+def test_exact_domain_checker_accepts_independent_replay(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    checker_request: dict[str, Any],
+) -> None:
+    assert checker(checker_request)["accepted"] is True
+
+
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES)
+def test_exact_domain_checker_rejects_candidate_mutation(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    checker_request: dict[str, Any],
+) -> None:
+    mutated = copy.deepcopy(checker_request)
+    mutated["candidate"]["payload"]["unexpected"] = True
+    mutated["candidate"]["payload_digest"] = _digest(mutated["candidate"]["payload"])
+
+    decision = checker(mutated)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES[:1])
+def test_exact_domain_checker_rejects_semantics_substitution(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    checker_request: dict[str, Any],
+) -> None:
+    mutated = copy.deepcopy(checker_request)
+    mutated["candidate"]["semantics_uri"] = _uri("9")
+
+    assert checker(mutated)["accepted"] is False
+
+
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES[:1])
+def test_exact_domain_checker_rejects_source_substitution(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    checker_request: dict[str, Any],
+) -> None:
+    mutated = copy.deepcopy(checker_request)
+    mutated["claim"]["payload"]["left"] = _poly(1, 1)
+    mutated["claim"]["payload_digest"] = _digest(mutated["claim"]["payload"])
+
+    assert checker(mutated)["accepted"] is False
+
+
+def test_exact_domain_checker_rejects_changed_flint_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checker, checker_request = _CASES[0]
+    monkeypatch.setattr(checker_module.flint, "__version__", "unexpected")
+
+    decision = checker(checker_request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+    assert "runtime is unavailable" in decision["detail"]
