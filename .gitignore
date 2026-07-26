@@ -26,6 +26,7 @@ coverage.xml
 .jacobian/
 .mypy_cache/
 .pytest_cache/
+.test_durations
 .ruff_cache/
 .venv/
 __pycache__/
