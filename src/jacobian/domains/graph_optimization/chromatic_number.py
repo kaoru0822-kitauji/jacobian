@@ -9,17 +9,18 @@ from jacobian.contracts.graph_coloring import (
     GraphChromaticNumberOutput,
     GraphChromaticNumberRequest,
 )
-from jacobian.contracts.results import ContractModel
+from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.domains.graph_optimization.operations import (
     build_simple_graph,
     solve_chromatic_number,
 )
 from jacobian.operations import (
-    BoundedSearchIncomplete,
+    BoundedSearchInterrupted,
     BoundedSearchNotApplicable,
     BoundedSearchOperation,
     BoundedSearchOutcome,
     BoundedSearchWitness,
+    OperationExecutionFailure,
 )
 
 
@@ -47,9 +48,42 @@ def _search_chromatic_number(
         wall_seconds=request.resource_budget.wall_seconds,
     )
 
+    if (
+        output.vertices != request.graph.vertices
+        or output.order != len(request.graph.vertices)
+        or (
+            output.coloring is not None
+            and (
+                set(output.coloring) != set(request.graph.vertices)
+                or any(
+                    output.coloring[left] == output.coloring[right]
+                    for left, right in request.graph.edges
+                )
+            )
+        )
+    ):
+        return OperationExecutionFailure(
+            status=ExecutionStatus.ERROR,
+            diagnostic=CapabilityDiagnostic(
+                code="CHROMATIC_NUMBER_COLORING_INVALID",
+                stage="graph_optimization_postcondition",
+                message="The solver returned a coloring that does not separate an edge.",
+            ),
+        )
     if output.status == "EXACT":
         return BoundedSearchWitness(value=output)
-    return BoundedSearchIncomplete(value=output)
+    return BoundedSearchInterrupted(
+        value=output,
+        status=ExecutionStatus.TIMEOUT,
+        diagnostic=CapabilityDiagnostic(
+            code="CHROMATIC_NUMBER_TIMEOUT",
+            stage="graph_optimization_search",
+            message=(
+                "The chromatic-number search exhausted its wall-clock budget "
+                "before establishing exactness."
+            ),
+        ),
+    )
 
 
 def _chromatic_number_scope_parameters(

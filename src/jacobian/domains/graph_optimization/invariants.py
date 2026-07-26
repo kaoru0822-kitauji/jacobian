@@ -15,6 +15,8 @@ from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.graph_invariant_operations import (
     GraphCardinalityMaximumObligation,
     GraphCliqueNumberResult,
+    GraphCoreRequest,
+    GraphCoreResult,
     GraphDiameterResult,
     GraphEdgeConnectivityResult,
     GraphEulerianResult,
@@ -22,7 +24,9 @@ from jacobian.contracts.graph_invariant_operations import (
     GraphIndependenceNumberResult,
     GraphInvariantRequest,
     GraphMaximumMatchingResult,
+    GraphRadiusResult,
     GraphSpanningTreeCountResult,
+    GraphTriangleCountResult,
     GraphVertexConnectivityResult,
 )
 from jacobian.contracts.graph_optimization import (
@@ -152,7 +156,9 @@ def _maximum_matching(graph: nx.Graph[str]) -> GraphMaximumMatchingResult:
     raw = nx.max_weight_matching(graph, maxcardinality=True)
     edges = tuple(
         sorted(
-            (str(left), str(right)) if str(left) < str(right) else (str(right), str(left))
+            (str(left), str(right))
+            if str(left) < str(right)
+            else (str(right), str(left))
             for left, right in raw
         )
     )
@@ -160,6 +166,42 @@ def _maximum_matching(graph: nx.Graph[str]) -> GraphMaximumMatchingResult:
         maximum_matching_cardinality=len(edges),
         witness_edges=edges,
     )
+
+
+def _triangle_count(graph: nx.Graph[str]) -> GraphTriangleCountResult:
+    triangle_counts = cast(dict[str, int], nx.triangles(graph))
+    return GraphTriangleCountResult(triangle_count=sum(triangle_counts.values()) // 3)
+
+
+def _radius(graph: nx.Graph[str]) -> GraphRadiusResult:
+    if not graph:
+        return GraphRadiusResult(radius=0)
+    if not nx.is_connected(graph):
+        raise ValueError("radius requires a connected graph")
+    return GraphRadiusResult(radius=int(nx.radius(graph)))
+
+
+def _k_core_execute(
+    request: GraphCoreRequest,
+) -> ComputedOutcome[GraphCoreResult]:
+    try:
+        graph = cast("nx.Graph[str]", build_simple_graph(request.graph))
+        core = nx.k_core(graph, k=request.k)
+        return ComputedSuccess(
+            GraphCoreResult(
+                k=request.k,
+                vertices=tuple(sorted(str(vertex) for vertex in core.nodes)),
+            )
+        )
+    except (nx.NetworkXError, TypeError, ValueError) as exc:
+        return ComputedNotApplicable(
+            CapabilityDiagnostic(
+                code="GRAPH_INVARIANT_NOT_APPLICABLE",
+                stage="graph_invariant_computation",
+                message=str(exc),
+                hint="Check the invariant's graph preconditions.",
+            )
+        )
 
 
 def _maximum_cardinality(
@@ -198,11 +240,7 @@ def _maximum_cardinality(
             termination = "SOLVER_CALL_LIMIT"
             break
         remaining_ms = int(
-            (
-                request.resource_budget.wall_seconds
-                - (time.monotonic() - started)
-            )
-            * 1000
+            (request.resource_budget.wall_seconds - (time.monotonic() - started)) * 1000
         )
         if remaining_ms <= 0:
             termination = "WALL_TIME"
@@ -348,9 +386,7 @@ CLIQUE_NUMBER_CAPABILITY = BoundedSearchOperation(
     scope_parameters=_scope,
     is_complete=lambda result: result.status == "EXACT",
     obligation_model=GraphCardinalityMaximumObligation,
-    obligation=lambda request, result: _obligation(
-        request, result, independent=False
-    ),
+    obligation=lambda request, result: _obligation(request, result, independent=False),
     incomplete_basis="the bounded threshold search did not establish optimality",
     tags=("graph", "invariant", "clique", "maximum", "bounded", "z3"),
     invalid_request=_INVALID_REQUEST,
@@ -369,9 +405,7 @@ INDEPENDENCE_NUMBER_CAPABILITY = BoundedSearchOperation(
     scope_parameters=_scope,
     is_complete=lambda result: result.status == "EXACT",
     obligation_model=GraphCardinalityMaximumObligation,
-    obligation=lambda request, result: _obligation(
-        request, result, independent=True
-    ),
+    obligation=lambda request, result: _obligation(request, result, independent=True),
     incomplete_basis="the bounded threshold search did not establish optimality",
     tags=("graph", "invariant", "independent-set", "maximum", "bounded", "z3"),
     invalid_request=_INVALID_REQUEST,
@@ -383,6 +417,35 @@ BOUNDED_GRAPH_INVARIANT_CAPABILITIES = (
 )
 
 EXACT_GRAPH_INVARIANT_CAPABILITIES = (
+    _computed(
+        "graph.invariant.triangle_count.compute",
+        "Triangle count",
+        "Count the three-vertex cycles in a finite simple graph.",
+        GraphTriangleCountResult,
+        _triangle_count,
+        "triangle",
+        "exact",
+    ),
+    _computed(
+        "graph.invariant.radius.compute",
+        "Graph radius",
+        "Compute the minimum eccentricity of a connected graph.",
+        GraphRadiusResult,
+        _radius,
+        "radius",
+        "exact",
+    ),
+    ComputedOperation(
+        capability_id="graph.k_core.compute",
+        title="Compute a graph k-core",
+        description="Return the unique maximal induced subgraph of minimum degree k.",
+        request_model=GraphCoreRequest,
+        result_model=GraphCoreResult,
+        implementation=_k_core_execute,
+        relation_id="graph.relation.k-core-of",
+        tags=("graph", "invariant", "k-core", "exact"),
+        invalid_request=_INVALID_REQUEST,
+    ),
     _computed(
         "graph.invariant.girth.compute",
         "Girth",

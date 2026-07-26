@@ -2,19 +2,27 @@
 
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 
 import networkx as nx
 import pytest
+import z3
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
     CapabilityRequest,
 )
+from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(scope="module")
+def oracle_kernel(tmp_path_factory: pytest.TempPathFactory) -> JacobianKernel:
+    return JacobianKernel(tmp_path_factory.mktemp("finite-graph-oracles"))
 
 
 def _payload(graph: nx.Graph[str], **budget: int) -> dict[str, object]:
@@ -43,6 +51,89 @@ def _invoke(
             capability_id=capability_id,
             input=_payload(graph, **budget),
         )
+    )
+
+
+def _vertex_subsets(graph: nx.Graph[str]):
+    vertices = tuple(graph.nodes)
+    return (
+        subset
+        for size in range(len(vertices) + 1)
+        for subset in itertools.combinations(vertices, size)
+    )
+
+
+def _edge_subsets(graph: nx.Graph[str]):
+    edges = tuple(graph.edges)
+    return (
+        subset
+        for size in range(len(edges) + 1)
+        for subset in itertools.combinations(edges, size)
+    )
+
+
+def _brute_force_optimum(capability_id: str, graph: nx.Graph[str]) -> int:
+    if capability_id == "graph.domination.minimum.compute":
+        return min(
+            len(subset)
+            for subset in _vertex_subsets(graph)
+            if nx.is_dominating_set(graph, subset)
+        )
+    if capability_id == "graph.matching.maximal.minimum.compute":
+        return min(
+            len(subset)
+            for subset in _edge_subsets(graph)
+            if nx.is_matching(graph, subset) and nx.is_maximal_matching(graph, subset)
+        )
+
+    if capability_id == "graph.induced_forest.maximum.compute":
+        predicate = nx.is_forest
+    elif capability_id == "graph.induced_tree.maximum.compute":
+        predicate = nx.is_tree
+    elif capability_id == "graph.induced_bipartite.maximum.compute":
+        predicate = nx.is_bipartite
+    else:  # pragma: no cover - protects the test helper from silent extension
+        raise AssertionError(f"unsupported capability: {capability_id}")
+    return max(
+        len(subset)
+        for subset in _vertex_subsets(graph)
+        if subset and predicate(graph.subgraph(subset))
+    )
+
+
+_ORACLE_CAPABILITIES = (
+    "graph.domination.minimum.compute",
+    "graph.matching.maximal.minimum.compute",
+    "graph.induced_forest.maximum.compute",
+    "graph.induced_tree.maximum.compute",
+    "graph.induced_bipartite.maximum.compute",
+)
+
+
+@pytest.mark.parametrize("capability_id", _ORACLE_CAPABILITIES)
+@pytest.mark.parametrize(
+    "graph",
+    (
+        nx.path_graph(4),
+        nx.cycle_graph(5),
+        nx.complete_graph(4),
+        nx.disjoint_union(nx.path_graph(3), nx.path_graph(2)),
+    ),
+    ids=("path", "odd-cycle", "complete", "disconnected"),
+)
+def test_graph_optimizer_matches_independent_small_brute_force_oracle(
+    oracle_kernel: JacobianKernel,
+    capability_id: str,
+    graph: nx.Graph[int],
+) -> None:
+    relabeled: nx.Graph[str] = nx.relabel_nodes(graph, lambda vertex: f"v{vertex}")
+
+    result = _invoke(oracle_kernel, capability_id, relabeled)
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["status"] == "EXACT"
+    assert result.output["optimum_value"] == _brute_force_optimum(
+        capability_id, relabeled
     )
 
 
@@ -151,6 +242,82 @@ def test_solver_call_budget_preserves_incumbent_without_claiming_optimum(
     assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
     obligation = kernel.store.get(result.artifact_uris[2])
     assert obligation.payload["claimed_value"] is None
+
+
+def test_solver_timeout_preserves_partial_witness_as_non_conclusion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    graph = nx.path_graph(["a", "b", "c", "d"])
+    monkeypatch.setattr(z3.Solver, "check", lambda _solver: z3.unknown)
+
+    result = _invoke(kernel, "graph.domination.minimum.compute", graph)
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.output["status"] == "UNKNOWN"
+    assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.diagnostics[0].code == "GRAPH_OPTIMIZATION_TIMEOUT"
+    assert len(result.artifact_uris) == 3
+
+
+@pytest.mark.parametrize(
+    ("solver_name", "capability_id", "update"),
+    (
+        (
+            "solve_domination",
+            "graph.domination.minimum.compute",
+            {"witness_vertices": ("missing",)},
+        ),
+        (
+            "solve_minimum_maximal_matching",
+            "graph.matching.maximal.minimum.compute",
+            {"witness_edges": (("a", "missing"),)},
+        ),
+        (
+            "solve_induced_forest",
+            "graph.induced_forest.maximum.compute",
+            {"witness_vertices": ("missing",)},
+        ),
+        (
+            "solve_induced_tree",
+            "graph.induced_tree.maximum.compute",
+            {"witness_vertices": ("missing",)},
+        ),
+        (
+            "solve_induced_bipartite",
+            "graph.induced_bipartite.maximum.compute",
+            {"witness_vertices": ("missing",)},
+        ),
+    ),
+)
+def test_invalid_solver_witness_fails_closed_before_artifact_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    solver_name: str,
+    capability_id: str,
+    update: dict[str, object],
+) -> None:
+    from jacobian.domains.graph_optimization import finite_optimization
+
+    original = getattr(finite_optimization, solver_name)
+
+    def invalid_witness(*args, **kwargs):
+        result = original(*args, **kwargs)
+        return result.model_copy(update=update)
+
+    monkeypatch.setattr(finite_optimization, solver_name, invalid_witness)
+    kernel = JacobianKernel(tmp_path)
+    result = _invoke(
+        kernel,
+        capability_id,
+        nx.path_graph(["a", "b", "c"]),
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "GRAPH_OPTIMIZATION_WITNESS_INVALID"
+    assert result.artifact_uris == ()
 
 
 @pytest.mark.parametrize(

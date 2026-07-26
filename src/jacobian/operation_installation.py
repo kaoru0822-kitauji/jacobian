@@ -236,7 +236,9 @@ class ComputedOperationAdapter:
                 outcome=outcome,
                 started=started,
             )
-        validated_result = self.operation.result_model.model_validate(outcome.value)
+        validated_result = self.operation.result_model.model_validate(
+            outcome.value.model_dump(mode="python")
+        )
         request_payload = validated_request.model_dump(mode="json")
         result_payload = validated_result.model_dump(mode="json")
 
@@ -345,7 +347,9 @@ class BoundedSearchOperationAdapter:
                 outcome=outcome,
                 started=started,
             )
-        validated_result = self.operation.result_model.model_validate(outcome.value)
+        validated_result = self.operation.result_model.model_validate(
+            outcome.value.model_dump(mode="python")
+        )
         validated_obligation = self.operation.obligation_model.model_validate(
             self.operation.obligation(validated_request, validated_result)
         )
@@ -360,6 +364,10 @@ class BoundedSearchOperationAdapter:
             )
         request_payload = validated_request.model_dump(mode="json")
         result_payload = validated_result.model_dump(mode="json")
+        scope_parameters = self.operation.scope_parameters(
+            validated_request,
+            validated_result,
+        )
         input_uri = self.resources.artifacts.put(
             schema_uri=self.resources.input_schema_uris[self.operation.request_model],
             semantics_uri=self.resources.semantics_uri,
@@ -402,10 +410,7 @@ class BoundedSearchOperationAdapter:
             output=result_payload,
             scope=CapabilityScope(
                 description=self.bundle.scope_description,
-                parameters=self.operation.scope_parameters(
-                    validated_request,
-                    validated_result,
-                ),
+                parameters=scope_parameters,
                 artifact_uri=input_uri,
             ),
             completeness=CapabilityCompleteness(

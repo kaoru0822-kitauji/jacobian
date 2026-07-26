@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import z3  # type: ignore[import-untyped]
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.graph_optimization.chromatic_number import (
     CHROMATIC_NUMBER_CAPABILITY,
@@ -19,7 +17,13 @@ from jacobian.operations import (
     DomainDiagnostics,
     DomainSemantics,
 )
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import (
+    NETWORKX_VERSION,
+    SYMPY_VERSION,
+    Z3_SOLVER_VERSION,
+    composite_provider_runtime,
+    known_provider_runtime,
+)
 
 GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
     domain_id="graph_optimization",
@@ -56,15 +60,32 @@ GRAPH_OPTIMIZATION_BUNDLE = DomainBundle(
             "assurance": "computed; incomplete search is never a conclusion",
         },
     ),
-    provider_runtime=known_provider_runtime(
-        "jacobian.z3",
+    provider_runtime=composite_provider_runtime(
+        "jacobian.graph-optimization",
+        components=(
+            known_provider_runtime(
+                "jacobian.z3",
+                features=("bounded-finite-search",),
+            ),
+            known_provider_runtime(
+                "jacobian.networkx",
+                features=("graph-witness-validation", "graph-approximations"),
+            ),
+            known_provider_runtime(
+                "jacobian.sympy",
+                features=("exact-spanning-tree-determinant",),
+            ),
+        ),
         features=(
             "bounded-k-colorability",
             "finite-graph-optimization",
             "timeout-aware",
         ),
     ),
-    backend_version=z3.get_version_string(),
+    backend_version=(
+        f"z3-solver-{Z3_SOLVER_VERSION};networkx-{NETWORKX_VERSION};"
+        f"sympy-{SYMPY_VERSION}"
+    ),
     capabilities=(
         CHROMATIC_NUMBER_CAPABILITY,
         *FINITE_GRAPH_OPTIMIZATION_CAPABILITIES,

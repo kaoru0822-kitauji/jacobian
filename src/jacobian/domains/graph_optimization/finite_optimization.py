@@ -23,7 +23,7 @@ from jacobian.contracts.graph_optimization import (
     GraphOptimizationBudget,
     GraphOptimizationRequest,
 )
-from jacobian.contracts.results import ContractModel
+from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.domains.graph_optimization.exact_search import (
     solve_domination,
     solve_induced_bipartite,
@@ -34,14 +34,55 @@ from jacobian.domains.graph_optimization.exact_search import (
 from jacobian.domains.graph_optimization.operations import build_simple_graph
 from jacobian.operations import (
     BoundedSearchIncomplete,
+    BoundedSearchInterrupted,
     BoundedSearchOperation,
     BoundedSearchOutcome,
     BoundedSearchWitness,
+    OperationExecutionFailure,
 )
 
 
 class _HasStatus(Protocol):
     status: str
+    termination_reason: str
+
+
+def _valid_witness(graph: nx.Graph[str], result: ContractModel) -> bool:
+    graph_vertices = set(graph)
+    if isinstance(result, GraphDominationMinimumOutput):
+        return set(result.witness_vertices) <= graph_vertices and nx.is_dominating_set(
+            graph,
+            result.witness_vertices,
+        )
+    if isinstance(result, GraphMinimumMaximalMatchingOutput):
+        edges = set(result.witness_edges)
+        return (
+            all(
+                left in graph_vertices and right in graph_vertices
+                for left, right in edges
+            )
+            and nx.is_matching(graph, edges)
+            and nx.is_maximal_matching(graph, edges)
+        )
+    if isinstance(result, GraphInducedForestMaximumOutput):
+        if not set(result.witness_vertices) <= graph_vertices:
+            return False
+        induced = graph.subgraph(result.witness_vertices)
+        return induced.number_of_nodes() == 0 or nx.is_forest(induced)
+    if isinstance(result, GraphInducedTreeMaximumOutput):
+        if not set(result.witness_vertices) <= graph_vertices:
+            return False
+        induced = graph.subgraph(result.witness_vertices)
+        return (graph.number_of_nodes() == 0 and induced.number_of_nodes() == 0) or (
+            induced.number_of_nodes() > 0
+            and nx.is_connected(induced)
+            and nx.is_forest(induced)
+        )
+    if isinstance(result, GraphInducedBipartiteMaximumOutput):
+        return set(result.witness_vertices) <= graph_vertices and nx.is_bipartite(
+            graph.subgraph(result.witness_vertices)
+        )
+    return False
 
 
 _INVALID_GRAPH_OPTIMIZATION_REQUEST = CapabilityDiagnostic(
@@ -64,8 +105,34 @@ def _execute[ResultT: ContractModel](
 ) -> BoundedSearchOutcome[ResultT]:
     graph = cast(Any, build_simple_graph(request.graph))
     result = solve(graph, request.graph, request.resource_budget)
-    if cast(_HasStatus, result).status == "EXACT":
+    state = cast(_HasStatus, result)
+    if not _valid_witness(graph, result):
+        return OperationExecutionFailure(
+            status=ExecutionStatus.ERROR,
+            diagnostic=CapabilityDiagnostic(
+                code="GRAPH_OPTIMIZATION_WITNESS_INVALID",
+                stage="graph_optimization_postcondition",
+                message=(
+                    "The solver returned an incumbent that does not satisfy "
+                    "the declared graph predicate."
+                ),
+            ),
+        )
+    if state.status == "EXACT":
         return BoundedSearchWitness(result)
+    if state.termination_reason in {"WALL_TIME", "SOLVER_UNKNOWN"}:
+        return BoundedSearchInterrupted(
+            value=result,
+            status=ExecutionStatus.TIMEOUT,
+            diagnostic=CapabilityDiagnostic(
+                code="GRAPH_OPTIMIZATION_TIMEOUT",
+                stage="graph_optimization_search",
+                message=(
+                    "The graph optimization search exhausted its wall-clock "
+                    "budget before establishing optimality."
+                ),
+            ),
+        )
     return BoundedSearchIncomplete(result)
 
 

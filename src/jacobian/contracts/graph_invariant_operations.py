@@ -76,6 +76,31 @@ class GraphMaximumMatchingResult(ContractModel):
         return self
 
 
+class GraphTriangleCountResult(ContractModel):
+    triangle_count: StrictInt = Field(ge=0, le=4_960)
+
+
+class GraphCoreRequest(GraphInvariantRequest):
+    k: StrictInt = Field(ge=0, le=32)
+
+
+class GraphCoreResult(ContractModel):
+    k: StrictInt = Field(ge=0, le=32)
+    vertices: tuple[GraphVertex, ...]
+
+    @model_validator(mode="after")
+    def require_canonical_vertices(self) -> Self:
+        if tuple(sorted(self.vertices)) != self.vertices:
+            raise ValueError("k-core vertices must be canonically sorted")
+        if len(set(self.vertices)) != len(self.vertices):
+            raise ValueError("k-core vertices must be unique")
+        return self
+
+
+class GraphRadiusResult(ContractModel):
+    radius: StrictInt = Field(ge=0, le=31)
+
+
 class GraphCardinalityMaximumResult(ContractModel):
     status: OptimizationStatus
     order: StrictInt = Field(ge=0, le=32)

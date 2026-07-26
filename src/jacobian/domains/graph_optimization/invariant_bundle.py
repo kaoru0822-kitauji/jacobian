@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import networkx as nx
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.graph_optimization.invariants import (
     EXACT_GRAPH_INVARIANT_CAPABILITIES,
 )
 from jacobian.operations import DomainBundle, DomainDiagnostics, DomainSemantics
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import (
+    NETWORKX_VERSION,
+    SYMPY_VERSION,
+    composite_provider_runtime,
+    known_provider_runtime,
+)
 
 GRAPH_INVARIANT_BUNDLE = DomainBundle(
     domain_id="graph_invariants",
@@ -34,15 +37,29 @@ GRAPH_INVARIANT_BUNDLE = DomainBundle(
             "assurance": "computed; no producer result is independently verified",
         },
     ),
-    provider_runtime=known_provider_runtime(
-        "jacobian.networkx",
+    provider_runtime=composite_provider_runtime(
+        "jacobian.graph-invariants",
+        components=(
+            known_provider_runtime(
+                "jacobian.networkx",
+                features=(
+                    "finite-simple-graph",
+                    "exact-invariants",
+                    "matching-witnesses",
+                ),
+            ),
+            known_provider_runtime(
+                "jacobian.sympy",
+                features=("exact-spanning-tree-determinant",),
+            ),
+        ),
         features=(
             "finite-simple-graph",
             "exact-invariants",
             "matching-witnesses",
         ),
     ),
-    backend_version=nx.__version__,
+    backend_version=f"networkx-{NETWORKX_VERSION};sympy-{SYMPY_VERSION}",
     capabilities=EXACT_GRAPH_INVARIANT_CAPABILITIES,
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(
@@ -56,7 +73,5 @@ GRAPH_INVARIANT_BUNDLE = DomainBundle(
     completeness_basis=(
         "maintained exact algorithms covered the complete finite graph"
     ),
-    assurance_basis=(
-        "NetworkX/SymPy/Z3 computation; no independent checker invoked"
-    ),
+    assurance_basis=("NetworkX/SymPy/Z3 computation; no independent checker invoked"),
 )

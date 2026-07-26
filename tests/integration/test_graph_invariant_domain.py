@@ -21,7 +21,11 @@ def test_graph_invariant_family_boundaries_and_witnesses(tmp_path: Path) -> None
         [["a", "b"], ["b", "c"], ["a", "c"], ["c", "d"]],
     )
     cases = (
-        ("graph.invariant.girth.compute", triangle_tail, {"girth": 3, "has_cycle": True}),
+        (
+            "graph.invariant.girth.compute",
+            triangle_tail,
+            {"girth": 3, "has_cycle": True},
+        ),
         (
             "graph.invariant.diameter.compute",
             triangle_tail,
