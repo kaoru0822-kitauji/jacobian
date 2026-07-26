@@ -76,6 +76,10 @@ from jacobian.matrix_normal_forms import (
     MatrixNormalFormArtifactService,
     install_matrix_normal_form_artifacts,
 )
+from jacobian.matrix_rank_capabilities import (
+    MatrixRankCheckerInstallation,
+    install_matrix_rank_checker,
+)
 from jacobian.memory import ResearchMemory
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
@@ -468,6 +472,18 @@ class JacobianKernel:
         )
         if determinant_verification is not None:
             self.register_capability(determinant_verification)
+        self.matrix_rank_checker: MatrixRankCheckerInstallation
+        rank_verification, self.matrix_rank_checker = install_matrix_rank_checker(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.matrix,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if rank_verification is not None:
+            self.register_capability(rank_verification)
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
