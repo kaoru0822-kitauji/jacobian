@@ -30,7 +30,6 @@ still pre-stable:
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current implementation and trust boundaries |
 | What direction is the project taking? | [Product goals](explanation/goals.md) | Rolling goals pursued in parallel |
 | Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
-| Which properties and trust boundaries must hold? | [Threat model](explanation/threat-model.md) | Current protected properties and exclusions |
 | What is the supported release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative for `0.2.0a0` |
 
 ## Tutorials
@@ -77,7 +76,6 @@ how its major parts fit together.
 
 - [Architecture](explanation/architecture.md)
 - [Product model](explanation/product-blueprint.md)
-- [Threat model](explanation/threat-model.md)
 - [Product goals](explanation/goals.md)
 - [Durable search runtime](explanation/search-runtime.md)
 - [Architecture decision log](explanation/adr/index.md)

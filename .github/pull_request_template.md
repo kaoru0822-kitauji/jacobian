@@ -13,7 +13,7 @@ make validate
 ```
 
 ## Trust & Compatibility Impact
-<!-- Does this change affect the verification kernel, checker registry, artifact format, or public API? Reference docs/explanation/threat-model.md if relevant. -->
+<!-- Does this change affect the verification kernel, checker registry, artifact format, or public API? -->
 
 ## Checklist
 - [ ] Python validation passes locally (`make validate`)

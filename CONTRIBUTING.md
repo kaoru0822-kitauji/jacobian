@@ -12,9 +12,6 @@ Read the [documentation home](docs/index.md), the
 [product goals](docs/explanation/goals.md), the
 [v0.2 specification](docs/reference/specifications/v0.2.md), and the
 [v0.2 conformance specification](docs/reference/conformance-v0.2.md).
-Changes to checker authorization, plugin isolation, durable state, or evidence
-promotion also require reviewing the
-[threat model](docs/explanation/threat-model.md).
 
 ## Development environment
 
@@ -35,6 +32,7 @@ Tests can be narrowed without learning another wrapper:
 make test TESTS=tests/integration/test_mcp_adapter.py
 make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-lean
+make refresh-test-durations
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,
@@ -59,9 +57,14 @@ integration tests join the right loop without repeated file-level boilerplate.
 Tests marked `lean_runtime` run serially through `make test-lean`; keep them out
 of the normal xdist pool because Mathlib processes can retain several
 gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
-dedicated job.
+dedicated pair of serial lanes on separate runners.
 Use `uv run pytest --lf` after a failure, `uv run pytest -n 0` while debugging,
-and unfiltered `uv run pytest` before handoff.
+and `make validate` before handoff. Use
+`make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
+Refresh `.test_durations` after major suite changes; the target replaces the
+committed timings only after a successful non-Lean run on Linux with Python
+3.12. Also refresh when the slower CI shard exceeds the faster shard by more
+than 10% in two representative runs. Do not refresh for routine test edits.
 
 ## Verification rules
 

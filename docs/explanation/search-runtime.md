@@ -140,5 +140,4 @@ stronger isolation.
 
 - [Durable invocation ADR](adr/0003-durable-search-invocations.md)
 - [Plugin conformance kit](../reference/plugin-conformance.md)
-- [Threat model](threat-model.md)
 - [Testing strategy](../reference/testing-strategy.md)

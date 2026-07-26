@@ -101,4 +101,3 @@ resolution.
 
 - [Sealed package ADR](../explanation/adr/0002-sealed-plugin-packages.md)
 - [Testing strategy](testing-strategy.md)
-- [Threat model](../explanation/threat-model.md)
