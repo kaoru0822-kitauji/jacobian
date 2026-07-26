@@ -145,6 +145,27 @@ class PolynomialCollisionRequest(ContractModel):
         return self
 
 
+class PolynomialCollisionVerifyRequest(ContractModel):
+    map: RationalPolynomialMap
+    first_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    second_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    claimed_image: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def require_collision_dimensions_and_distinct_points(self) -> Self:
+        dimension = len(self.map.variables)
+        if not (
+            len(self.first_point)
+            == len(self.second_point)
+            == len(self.claimed_image)
+            == dimension
+        ):
+            raise ValueError("collision points and image must match the map dimension")
+        if self.first_point == self.second_point:
+            raise ValueError("collision verification requires distinct points")
+        return self
+
+
 class PolynomialMapEvaluation(ContractModel):
     evaluation_schema_version: Literal["1"] = "1"
     map_uri: ArtifactUri
@@ -317,3 +338,18 @@ class PolynomialCollisionOutput(ContractModel):
         ):
             raise ValueError("certificate availability requires witness and checker")
         return self
+
+
+class PolynomialCollisionVerifyOutput(ContractModel):
+    collision_verified: bool
+    conclusion: Literal["FALSE", "UNKNOWN"]
+    map_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri
+    first_point: tuple[CanonicalRational, ...]
+    second_point: tuple[CanonicalRational, ...]
+    claimed_image: tuple[CanonicalRational, ...]
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+    coverage: Literal["NOT_APPLICABLE"] = "NOT_APPLICABLE"
