@@ -11,7 +11,9 @@ from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
+    CapabilityDiscoveryRequest,
     CapabilityInstallTier,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
@@ -76,6 +78,24 @@ class ComputedAdapter:
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis="deterministic integer arithmetic",
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class DiscoveryAdapter:
+    descriptor: CapabilityDescriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            output={"value": request.input["value"]},
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis="deterministic discovery fixture",
             ),
         )
 
@@ -291,6 +311,115 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert episode.payload["result"]["completeness"]["status"] == "NOT_APPLICABLE"
     hits = kernel.memory.search(query="double computed").hits
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
+
+
+@pytest.mark.integration
+def test_installed_capability_discovery_is_compact_deterministic_and_transparent(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    schema = {
+        "type": "object",
+        "properties": {"value": {"type": "integer"}},
+        "required": ["value"],
+        "additionalProperties": False,
+    }
+    kernel.register_capability(
+        DiscoveryAdapter(
+            CapabilityDescriptor(
+                capability_id="fixture_algebra.search.countermodel",
+                version="1",
+                title="Search finite countermodels",
+                description="Find a finite algebra that falsifies a target law.",
+                provider="tests",
+                provider_runtime=TEST_RUNTIME,
+                modes=(CapabilityMode.EXPLORE,),
+                input_schema=schema,
+                output_schema=schema,
+                tags=("counterexample", "bounded-search"),
+                invocation_examples=(
+                    CapabilityInvocationExample(
+                        name="small",
+                        description="Use a small integer fixture.",
+                        mode=CapabilityMode.EXPLORE,
+                        input={"value": 2},
+                    ),
+                ),
+            )
+        )
+    )
+    kernel.register_capability(
+        DiscoveryAdapter(
+            CapabilityDescriptor(
+                capability_id="fixture_graph.verify.coloring",
+                version="1",
+                title="Verify a graph coloring",
+                description="Independently check a proposed graph coloring.",
+                provider="tests",
+                provider_runtime=TEST_RUNTIME,
+                modes=(CapabilityMode.VERIFY,),
+                input_schema=schema,
+                output_schema=schema,
+                tags=("graph", "checker"),
+            )
+        )
+    )
+
+    request = CapabilityDiscoveryRequest(
+        query="find a counterexample to associativity",
+        domain="fixture-algebra",
+        mode=CapabilityMode.EXPLORE,
+        limit=10,
+    )
+    first = kernel.capabilities.discover(request)
+    second = kernel.capabilities.discover(request)
+
+    assert first == second
+    assert [match.capability_id for match in first.matches] == [
+        "fixture_algebra.search.countermodel"
+    ]
+    assert first.matches[0].matched_on == ("tags",)
+    assert first.matches[0].matched_terms == ("counterexample",)
+    assert first.matches[0].has_invocation_examples is True
+    assert first.domain == "fixture_algebra"
+    assert "fixture_algebra" in first.available_domains
+    assert "fixture_graph" in first.available_domains
+
+
+@pytest.mark.integration
+def test_capability_registration_rejects_an_invalid_invocation_example(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    adapter = DiscoveryAdapter(
+        CapabilityDescriptor(
+            capability_id="example.invalid-example",
+            version="1",
+            title="Invalid example fixture",
+            description="Advertises an example that violates its input schema.",
+            provider="tests",
+            provider_runtime=TEST_RUNTIME,
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema={
+                "type": "object",
+                "properties": {"value": {"type": "integer"}},
+                "required": ["value"],
+                "additionalProperties": False,
+            },
+            output_schema={"type": "object"},
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="invalid",
+                    description="This value has the wrong type.",
+                    mode=CapabilityMode.EXPLORE,
+                    input={"value": "not-an-integer"},
+                ),
+            ),
+        )
+    )
+
+    with pytest.raises(CapabilityError, match="invocation example"):
+        kernel.register_capability(adapter)
 
 
 @pytest.mark.integration

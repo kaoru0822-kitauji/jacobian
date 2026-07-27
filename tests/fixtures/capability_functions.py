@@ -8,6 +8,7 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityInstallTier,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -40,6 +41,14 @@ class FixtureAdapter:
             "additionalProperties": False,
         },
         output_schema={"type": "object"},
+        invocation_examples=(
+            CapabilityInvocationExample(
+                name="increment_41",
+                description="Increment 41 to obtain 42.",
+                mode=CapabilityMode.EXPLORE,
+                input={"value": 41},
+            ),
+        ),
     )
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
