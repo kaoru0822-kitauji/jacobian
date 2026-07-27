@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
+    CapabilityCompletenessStatus,
     CapabilityMode,
     CapabilityRequest,
 )
@@ -44,6 +44,8 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(tmp_path: Path) -> N
         result.assurance.verification_record_uri
         == (result.output["verification_record_uri"])
     )
+    assert result.output["verification_record_uri"] in result.artifact_uris
+    assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
     assert result.output["proof_edit_uri"] in result.artifact_uris
     edit = kernel.store.get(result.output["proof_edit_uri"])
     assert edit.payload["edited_proof"] == "by\n  trivial"
@@ -57,18 +59,43 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(tmp_path: Path) -> N
 def test_proof_edit_rejects_holes_before_checker_invocation(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
-    with pytest.raises(CapabilityInvocationError) as raised:
-        kernel.capabilities.invoke(
-            CapabilityRequest(
-                capability_id="lean.proof_edit.validate",
-                mode=CapabilityMode.VERIFY,
-                input={
-                    "environment": "CORE",
-                    "statement": "True",
-                    "original_proof": "by\n  trivial",
-                    "edited_proof": "by\n  sorry",
-                },
-            )
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.proof_edit.validate",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "environment": "CORE",
+                "statement": "True",
+                "original_proof": "by\n  trivial",
+                "edited_proof": "by\n  sorry",
+            },
         )
+    )
 
-    assert raised.value.diagnostic.code == "INVALID_LEAN_PROOF_EDIT_REQUEST"
+    assert result.execution.status.value == "ERROR"
+    assert result.output["error"]["code"] == "INVALID_LEAN_PROOF_EDIT_REQUEST"
+
+
+def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="lean.proof_edit.validate",
+            mode=CapabilityMode.VERIFY,
+            input={
+                "environment": "CORE",
+                "statement": "True",
+                "original_proof": "by\n  trivial",
+                "edited_proof": "by\n  exact False.elim (by trivial)",
+            },
+        )
+    )
+
+    assert result.output["accepted"] is False
+    assert result.output["verification_record_uri"] is None
+    assert result.output["certificate_uri"] in result.artifact_uris
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.assurance.verification_record_uri is None

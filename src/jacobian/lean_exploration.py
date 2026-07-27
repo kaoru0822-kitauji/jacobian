@@ -729,7 +729,7 @@ class LeanPremiseRetrievalAdapter:
                         {
                             "environment": "MATHLIB",
                             "statement": validated.statement,
-                            "proof_prefix": validated.proof_prefix,
+                            "proof_prefix": list(validated.proof_prefix),
                         }
                     )
                 ).hexdigest()

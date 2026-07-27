@@ -29,7 +29,7 @@ from jacobian.contracts.lean_proof_edit import (
     LeanProofEditOutput,
     LeanProofEditRequest,
 )
-from jacobian.contracts.results import ExecutionStatus, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
 from jacobian.lean import LeanService
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -140,6 +140,7 @@ class LeanProofEditAdapter:
         )
         verified = (
             checked.result.execution.status is ExecutionStatus.COMPLETED
+            and checked.result.conclusion is Conclusion.TRUE
             and checked.result.assurance.verification is Verification.VERIFIED
             and checked.result.verification_record_uri is not None
         )
@@ -196,23 +197,16 @@ class LeanProofEditAdapter:
                 artifact_uri=artifact.artifact_uri,
             ),
             completeness=CapabilityCompleteness(
-                status=(
-                    CapabilityCompletenessStatus.COMPLETE
-                    if checked.result.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityCompletenessStatus.PARTIAL
-                ),
+                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
                 basis=(
-                    "the authorized Lean checker completed on the exact edited source"
+                    "direct proof replay makes no search-completeness claim"
                     if checked.result.execution.status is ExecutionStatus.COMPLETED
-                    else "the Lean checker did not complete; no acceptance conclusion"
+                    else "the Lean checker did not complete; completeness is not applicable"
                 ),
                 assurance_level=(
-                    CapabilityAssuranceLevel.VERIFIED
-                    if verified
+                    CapabilityAssuranceLevel.COMPUTED
+                    if checked.result.execution.status is ExecutionStatus.COMPLETED
                     else CapabilityAssuranceLevel.HEURISTIC
-                ),
-                verification_record_uri=(
-                    checked.result.verification_record_uri if verified else None
                 ),
             ),
             assurance=CapabilityAssurance(
@@ -235,6 +229,11 @@ class LeanProofEditAdapter:
                 checked.claim_uri,
                 checked.candidate_uri,
                 checked.certificate_uri,
+                *(
+                    (checked.result.verification_record_uri,)
+                    if checked.result.verification_record_uri is not None
+                    else ()
+                ),
                 artifact.artifact_uri,
             ),
         )
