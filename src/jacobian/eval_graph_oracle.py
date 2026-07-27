@@ -12,6 +12,9 @@ class GraphOracleError(ValueError):
     """A reported graph or property vector is invalid."""
 
 
+MAX_INDEPENDENCE_NUMBER_ORDER = 18
+
+
 def normalize_graph(
     value: object,
 ) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
@@ -174,6 +177,11 @@ def _independence_number(
     vertices: tuple[str, ...],
     adjacency: Mapping[str, set[str]],
 ) -> int:
+    if len(vertices) > MAX_INDEPENDENCE_NUMBER_ORDER:
+        raise GraphOracleError(
+            "independence-number oracle supports at most "
+            f"{MAX_INDEPENDENCE_NUMBER_ORDER} vertices"
+        )
     for size in range(len(vertices), -1, -1):
         for candidate in combinations(vertices, size):
             if all(

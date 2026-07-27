@@ -50,3 +50,10 @@ def test_graph_oracle_rejects_wrong_exact_property() -> None:
             {"order": {"value": 3, "exactness": "EXACT"}},
             ["order"],
         )
+
+
+def test_graph_oracle_rejects_exponential_independence_scope() -> None:
+    graph = {"vertices": [str(index) for index in range(19)], "edges": []}
+
+    with pytest.raises(GraphOracleError, match="at most 18 vertices"):
+        compute_properties(graph)
