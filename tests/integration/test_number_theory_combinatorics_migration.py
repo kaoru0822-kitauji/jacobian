@@ -6,7 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.bounded_process import BoundedProcessResult
+from jacobian.bounded_process import BoundedProcessResult, ProcessResourceLimits
+from jacobian.canonical import loads_strict_json
 from jacobian.capabilities import CapabilityService
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -93,7 +94,12 @@ def test_discrete_logarithm_materializes_bound_result_and_obligation(
     result = service.invoke(
         CapabilityRequest(
             capability_id="modular.compute.discrete_logarithm",
-            input={"base": 7, "target": 15, "modulus": 41},
+            input={
+                "base": 7,
+                "target": 15,
+                "modulus": 41,
+                "resource_budget": {"wall_seconds": 30},
+            },
         )
     )
 
@@ -119,7 +125,12 @@ def test_discrete_logarithm_reports_unsolvable_without_false_witness(
     result = _service(tmp_path).invoke(
         CapabilityRequest(
             capability_id="modular.compute.discrete_logarithm",
-            input={"base": 2, "target": 3, "modulus": 8},
+            input={
+                "base": 2,
+                "target": 3,
+                "modulus": 8,
+                "resource_budget": {"wall_seconds": 30},
+            },
         )
     )
 
@@ -133,16 +144,22 @@ def test_discrete_logarithm_timeout_is_an_artifact_free_non_conclusion(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(
-        "jacobian.domains.number_theory.discrete_logarithm.run_bounded_process",
-        lambda *args, **kwargs: BoundedProcessResult(
+    observed: dict[str, object] = {}
+
+    def timeout_worker(*args, **kwargs):
+        observed.update(kwargs)
+        return BoundedProcessResult(
             returncode=None,
             stdout=b"",
             stderr=b"",
             stdout_exceeded=False,
             stderr_exceeded=False,
             timed_out=True,
-        ),
+        )
+
+    monkeypatch.setattr(
+        "jacobian.domains.number_theory.discrete_logarithm.run_bounded_process",
+        timeout_worker,
     )
     result = _service(tmp_path).invoke(
         CapabilityRequest(
@@ -160,6 +177,15 @@ def test_discrete_logarithm_timeout_is_an_artifact_free_non_conclusion(
     assert result.diagnostics[0].code == "DISCRETE_LOGARITHM_TIMEOUT"
     assert result.artifact_uris == ()
     assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
+    assert observed["timeout_seconds"] == 1.0
+    assert observed["resource_limits"] == ProcessResourceLimits(
+        cpu_seconds=2,
+        address_space_bytes=1024 * 1024 * 1024,
+    )
+    input_bytes = observed["input_bytes"]
+    assert isinstance(input_bytes, bytes)
+    worker_payload = loads_strict_json(input_bytes)
+    assert worker_payload["request"]["resource_budget"] == {"wall_seconds": 1}
 
 
 def test_factorization_is_complete_in_an_isolated_bounded_worker(

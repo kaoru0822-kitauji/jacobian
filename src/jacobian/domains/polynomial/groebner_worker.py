@@ -8,7 +8,10 @@ from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.polynomial_operations import PolynomialGroebnerBasisRequest
-from jacobian.domains.polynomial.operations import polynomial_groebner_basis
+from jacobian.domains.polynomial.operations import (
+    PolynomialOutputBudgetError,
+    polynomial_groebner_basis,
+)
 
 PROTOCOL = "jacobian.polynomial.groebner.sympy.v1"
 
@@ -21,7 +24,21 @@ def main() -> int:
         if payload["protocol"] != PROTOCOL:
             raise ValueError("unsupported worker protocol")
         request = PolynomialGroebnerBasisRequest.model_validate(payload["request"])
-        result = polynomial_groebner_basis(request)
+        try:
+            result = polynomial_groebner_basis(request)
+        except PolynomialOutputBudgetError as error:
+            sys.stdout.buffer.write(
+                canonicalize_json(
+                    {
+                        "protocol": PROTOCOL,
+                        "error": {
+                            "code": "POLYNOMIAL_GROEBNER_RESULT_LIMIT_EXCEEDED",
+                            "message": str(error),
+                        },
+                    }
+                )
+            )
+            return 0
         sys.stdout.buffer.write(
             canonicalize_json(
                 {

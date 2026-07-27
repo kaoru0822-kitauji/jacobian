@@ -58,10 +58,7 @@ def _compute(
             input_bytes=canonicalize_json(
                 {
                     "protocol": _PROTOCOL,
-                    "request": request.model_dump(
-                        mode="json",
-                        exclude={"resource_budget"},
-                    ),
+                    "request": request.model_dump(mode="json"),
                 }
             ),
             timeout_seconds=float(request.resource_budget.wall_seconds),

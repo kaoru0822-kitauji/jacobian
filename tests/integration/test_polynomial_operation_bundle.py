@@ -327,3 +327,32 @@ def test_polynomial_output_budget_failure_is_explicit_and_writes_no_artifacts(
     assert result.artifact_uris == ()
     assert result.episode_uri is None
     assert artifact_writes == []
+
+
+def test_groebner_result_budget_failure_crosses_worker_protocol(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = _invoke(
+        kernel,
+        "polynomial.groebner_basis.compute",
+        {
+            "generators": [
+                _polynomial(["x"], [(1, 1, 1), (0, 1, 1)]),
+            ],
+            "resource_budget": {
+                "wall_seconds": 10,
+                "maximum_basis_polynomials": 64,
+                "maximum_output_terms": 1,
+            },
+        },
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert (
+        result.diagnostics[0].code
+        == "POLYNOMIAL_GROEBNER_RESULT_LIMIT_EXCEEDED"
+    )
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None

@@ -100,10 +100,24 @@ def _compute(
         )
     try:
         payload = loads_strict_json(completed.stdout)
-        if not isinstance(payload, dict) or set(payload) != {"protocol", "result"}:
-            raise ValueError("unexpected worker response fields")
-        if payload["protocol"] != _PROTOCOL:
+        if not isinstance(payload, dict) or payload.get("protocol") != _PROTOCOL:
             raise ValueError("worker protocol does not match")
+        if set(payload) == {"protocol", "error"}:
+            error = payload["error"]
+            if (
+                not isinstance(error, dict)
+                or set(error) != {"code", "message"}
+                or error["code"] != "POLYNOMIAL_GROEBNER_RESULT_LIMIT_EXCEEDED"
+                or not isinstance(error["message"], str)
+            ):
+                raise ValueError("unexpected worker error response")
+            return _failure(
+                ExecutionStatus.ERROR,
+                "POLYNOMIAL_GROEBNER_RESULT_LIMIT_EXCEEDED",
+                error["message"],
+            )
+        if set(payload) != {"protocol", "result"}:
+            raise ValueError("unexpected worker response fields")
         result = PolynomialGroebnerBasisResult.model_validate(payload["result"])
     except (TypeError, ValueError, ValidationError):
         return _failure(

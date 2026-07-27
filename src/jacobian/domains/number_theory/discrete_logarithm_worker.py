@@ -23,12 +23,7 @@ def main() -> int:
             raise ValueError("unexpected worker request fields")
         if payload["protocol"] != PROTOCOL:
             raise ValueError("unsupported worker protocol")
-        request = DiscreteLogarithmRequest.model_validate(
-            {
-                **payload["request"],
-                "resource_budget": {"wall_seconds": 1},
-            }
-        )
+        request = DiscreteLogarithmRequest.model_validate(payload["request"])
         try:
             exponent = int(
                 discrete_log(
