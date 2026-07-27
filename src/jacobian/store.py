@@ -186,7 +186,7 @@ class ArtifactStore:
             connection.close()
 
     def _initialize_database(self) -> None:
-        with self._connection() as connection:
+        with self._exclusive_blob_lock(), self._connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.executescript(
                 """
@@ -220,7 +220,6 @@ class ArtifactStore:
                 );
                 """
             )
-        with self._exclusive_blob_lock(), self._connection() as connection:
             quota_columns = {
                 str(row["name"])
                 for row in connection.execute("PRAGMA table_info(blob_quota)")
