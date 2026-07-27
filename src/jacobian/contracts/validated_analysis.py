@@ -312,3 +312,29 @@ class RationalLinearProgramObligation(ContractModel):
     required_checker: Literal["AUTHORIZED_INDEPENDENT_EXACT_RATIONAL"] = (
         "AUTHORIZED_INDEPENDENT_EXACT_RATIONAL"
     )
+
+    @model_validator(mode="after")
+    def bind_candidate_dimensions_to_program(self) -> Self:
+        if self.primal_candidate is not None and len(self.primal_candidate) != len(
+            self.program.variables
+        ):
+            raise ValueError("LP primal candidate length must equal the variable count")
+        if self.dual_candidate is not None and len(self.dual_candidate) != len(
+            self.program.coefficients
+        ):
+            raise ValueError(
+                "LP dual candidate length must equal the equality-constraint count"
+            )
+        if self.status == "CERTIFICATE_PRODUCED" and (
+            self.primal_candidate is None or self.dual_candidate is None
+        ):
+            raise ValueError(
+                "a produced LP certificate obligation requires both candidates"
+            )
+        if self.status not in {"CERTIFICATE_PRODUCED", "PRIMAL_ONLY"} and (
+            self.primal_candidate is not None or self.dual_candidate is not None
+        ):
+            raise ValueError(
+                "an LP non-candidate outcome cannot create candidate obligations"
+            )
+        return self

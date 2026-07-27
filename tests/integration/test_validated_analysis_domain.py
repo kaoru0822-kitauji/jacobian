@@ -4,6 +4,7 @@ import subprocess
 from dataclasses import dataclass
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityService
@@ -14,6 +15,9 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.contracts.validated_analysis import (
+    RationalLinearProgramObligation,
+)
 from jacobian.domains.analysis import REAL_ANALYSIS_BUNDLE
 from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
 from jacobian.domains.probability import FINITE_PROBABILITY_BUNDLE
@@ -262,3 +266,66 @@ def test_rational_lp_produces_inspectable_primal_dual_certificate(
         "DUAL_FEASIBILITY",
         "OBJECTIVE_EQUALITY",
     ]
+
+
+def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(
+    analysis_runtime: _Runtime,
+) -> None:
+    result = analysis_runtime.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="optimization.linear.rational_optimum.compute",
+            input={
+                "program": {
+                    "variables": ["x", "y"],
+                    "objective": [_rational(-1), _rational(3)],
+                    "coefficients": [
+                        [_rational(1), _rational(0)],
+                        [_rational(0), _rational(1)],
+                    ],
+                    "rhs": [_rational(1), _rational(2)],
+                },
+                "wall_seconds": 10,
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["status"] == "CERTIFICATE_PRODUCED"
+    assert result.output["primal_candidate"] == [_rational(1), _rational(2)]
+    assert result.output["dual_candidate"] == [_rational(-1), _rational(3)]
+    assert result.output["primal_objective"] == _rational(5)
+    assert result.output["dual_objective"] == _rational(5)
+    assert result.output["dual_slacks"] == [_rational(0), _rational(0)]
+
+    obligation = analysis_runtime.store.get(result.obligations[0].obligation_uri)
+    assert len(obligation.payload["dual_candidate"]) == len(
+        obligation.payload["program"]["coefficients"]
+    )
+
+
+def test_rational_lp_obligation_rejects_wrong_candidate_dimensions() -> None:
+    program = {
+        "variables": ["x", "y"],
+        "objective": [_rational(1), _rational(1)],
+        "coefficients": [[_rational(1), _rational(1)]],
+        "rhs": [_rational(1)],
+    }
+
+    with pytest.raises(ValidationError, match="primal candidate length"):
+        RationalLinearProgramObligation.model_validate(
+            {
+                "program": program,
+                "status": "CERTIFICATE_PRODUCED",
+                "primal_candidate": [_rational(1)],
+                "dual_candidate": [_rational(1)],
+            }
+        )
+    with pytest.raises(ValidationError, match="dual candidate length"):
+        RationalLinearProgramObligation.model_validate(
+            {
+                "program": program,
+                "status": "CERTIFICATE_PRODUCED",
+                "primal_candidate": [_rational(1), _rational(0)],
+                "dual_candidate": [_rational(1), _rational(0)],
+            }
+        )

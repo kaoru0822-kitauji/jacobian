@@ -1,6 +1,6 @@
 """Exact finite probability operations backed by Python-FLINT."""
 
-from flint import fmpq
+from typing import Any
 
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.validated_analysis import (
@@ -15,22 +15,25 @@ from jacobian.operations import (
 )
 
 
-def _fmpq(value: CanonicalRational) -> fmpq:
-    return fmpq(int(value.num), int(value.den))
-
-
-def _wire(value: fmpq) -> CanonicalRational:
+def _wire(value: Any) -> CanonicalRational:
     return CanonicalRational(num=str(value.p), den=str(value.q))
 
 
 def _raw_moment(
     request: FiniteRawMomentRequest,
 ) -> ComputedOutcome[FiniteRawMomentResult]:
+    from flint import fmpq
+
     contributions: list[FiniteRawMomentContribution] = []
     total = fmpq(0)
     for atom in request.atoms:
-        powered = _fmpq(atom.value) ** request.order
-        contribution = _fmpq(atom.probability) * powered
+        value = fmpq(int(atom.value.num), int(atom.value.den))
+        probability = fmpq(
+            int(atom.probability.num),
+            int(atom.probability.den),
+        )
+        powered = value**request.order
+        contribution = probability * powered
         total += contribution
         contributions.append(
             FiniteRawMomentContribution(

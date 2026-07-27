@@ -26,6 +26,7 @@ def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
         InfeasibleLPError,
         UnboundedLPError,
         linprog,
+        lpmax,
     )
 
     program = payload["program"]
@@ -49,6 +50,8 @@ def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         }
 
+    if len(primal_values) != objective.cols:
+        raise RuntimeError("SymPy returned a primal candidate with the wrong dimension")
     primal = sympy.Matrix(primal_values)
     residuals = coefficients * primal - rhs
     primal_payload = {
@@ -57,11 +60,18 @@ def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
         "primal_residuals": [_wire(value) for value in residuals],
     }
     try:
-        negated_dual_value, dual_values = linprog(
-            (-rhs).transpose(),
-            A=coefficients.transpose(),
-            b=objective.transpose(),
-            bounds=(None, None),
+        dual_symbols = sympy.symbols(f"_dual0:{rhs.rows}")
+        dual_column = sympy.Matrix(dual_symbols)
+        dual_value, dual_solution = lpmax(
+            (rhs.transpose() * dual_column)[0],
+            [
+                sympy.Le(left, right, evaluate=False)
+                for left, right in zip(
+                    coefficients.transpose() * dual_column,
+                    objective.transpose(),
+                    strict=True,
+                )
+            ],
         )
     except (InfeasibleLPError, UnboundedLPError) as exc:
         return {
@@ -73,8 +83,10 @@ def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         }
 
+    dual_values = [dual_solution.get(symbol, sympy.S.Zero) for symbol in dual_symbols]
+    if len(dual_values) != rhs.rows:
+        raise RuntimeError("SymPy returned a dual candidate with the wrong dimension")
     dual = sympy.Matrix(dual_values)
-    dual_value = -negated_dual_value
     slacks = objective.transpose() - coefficients.transpose() * dual
     if (
         any(value < 0 for value in primal)
