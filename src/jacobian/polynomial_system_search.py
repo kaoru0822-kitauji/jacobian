@@ -89,7 +89,7 @@ class PolynomialSystemRationalSearchAdapter:
                 }
             )
         )
-        grid = tuple(product(values, repeat=len(validated.system.variables)))
+        grid_assignment_count = len(values) ** len(validated.system.variables)
         system = self.artifacts.put(
             schema_uri=self.installation.system_schema_uri,
             semantics_uri=self.installation.semantics_uri,
@@ -99,7 +99,7 @@ class PolynomialSystemRationalSearchAdapter:
         assignment_uri = None
         assignment = None
         examined = 0
-        for candidate in grid:
+        for candidate in product(values, repeat=len(validated.system.variables)):
             examined += 1
             residuals, inequations = _evaluate_request(
                 PolynomialSystemSolutionRequest(
@@ -126,7 +126,7 @@ class PolynomialSystemRationalSearchAdapter:
             assignment_uri=assignment_uri,
             assignment=assignment,
             examined_assignment_count=examined,
-            grid_assignment_count=len(grid),
+            grid_assignment_count=grid_assignment_count,
             checker_id=self.installation.checker_id,
         )
         uris = (system.artifact_uri,) + (
@@ -143,7 +143,10 @@ class PolynomialSystemRationalSearchAdapter:
             output=output.model_dump(mode="json"),
             scope=CapabilityScope(
                 description="one complete declared finite rational grid",
-                parameters={"grid_assignment_count": len(grid), "examined": examined},
+                parameters={
+                    "grid_assignment_count": grid_assignment_count,
+                    "examined": examined,
+                },
                 artifact_uri=system.artifact_uri,
             ),
             completeness=CapabilityCompleteness(
