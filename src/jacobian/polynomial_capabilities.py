@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import multiprocessing
 import time
 from dataclasses import dataclass
 from fractions import Fraction
 from itertools import product
+from math import prod as multiply
+from queue import Empty
 from typing import Any, cast
 
 import sympy
 from pydantic import ValidationError
-from sympy import QQ, Matrix, Poly, expand, symbols
+from sympy import QQ, Matrix, Poly, expand, solve, symbols, sympify
 from sympy.polys.polyerrors import PolynomialError
 
 from jacobian.artifacts import ArtifactService
@@ -62,6 +65,11 @@ from jacobian.contracts.polynomials import (
     PolynomialIdentityReplayPayload,
     PolynomialIdentityRequest,
     PolynomialInjectivityClaim,
+    PolynomialInverseAnsatzSpecification,
+    PolynomialInverseCoefficientEquation,
+    PolynomialInverseSolverProvenance,
+    PolynomialInverseSupportMode,
+    PolynomialInverseSynthesisStatus,
     PolynomialJacobian,
     PolynomialJacobianClaim,
     PolynomialJacobianOutput,
@@ -71,6 +79,9 @@ from jacobian.contracts.polynomials import (
     PolynomialMapEvaluation,
     PolynomialMapInverseClaim,
     PolynomialMapInverseReplayPayload,
+    PolynomialMapInverseSynthesisArtifact,
+    PolynomialMapInverseSynthesisOutput,
+    PolynomialMapInverseSynthesisRequest,
     PolynomialMapInverseVerifyOutput,
     PolynomialMapInverseVerifyRequest,
     RationalPolynomial,
@@ -110,6 +121,7 @@ class PolynomialInstallation:
     identity_claim_schema_uri: str
     inverse_claim_schema_uri: str
     inverse_residual_schema_uri: str
+    inverse_synthesis_schema_uri: str
     witness_schema_uri: str
     certificate_schema_uri: str
     polynomial_schema_uri: str
@@ -145,6 +157,7 @@ def install_polynomial_capabilities(
         PolynomialCollisionSearchAdapter,
         PolynomialCollisionVerifyAdapter,
         PolynomialFactorAdapter,
+        PolynomialMapInverseSynthesizeAdapter,
         PolynomialMapInverseVerifyAdapter,
     ],
     PolynomialInstallation,
@@ -198,6 +211,9 @@ def install_polynomial_capabilities(
             "coefficient_field": "QQ",
             "directions": ["inverse_after_forward", "forward_after_inverse"],
             "one_sided_identity": "insufficient",
+            "synthesis_scope": "bounded polynomial coefficient ansatz only",
+            "bounded_no_candidate": "does not prove noninvertibility",
+            "rational_map_inverses": "unsupported",
         },
     )
     polynomial_semantics_uri = store.register_descriptor(
@@ -279,6 +295,11 @@ def install_polynomial_capabilities(
         name="jacobian.polynomial-map-composition-residuals",
         version="1",
         schema=model_schema(PolynomialMapCompositionResiduals),
+    )
+    inverse_synthesis_schema_uri = schemas.register(
+        name="jacobian.polynomial-map-inverse-synthesis",
+        version="1",
+        schema=model_schema(PolynomialMapInverseSynthesisArtifact),
     )
     witness_schema_uri = schemas.register(
         name="jacobian.witness-envelope",
@@ -395,6 +416,7 @@ def install_polynomial_capabilities(
         identity_claim_schema_uri=identity_claim_schema_uri,
         inverse_claim_schema_uri=inverse_claim_schema_uri,
         inverse_residual_schema_uri=inverse_residual_schema_uri,
+        inverse_synthesis_schema_uri=inverse_synthesis_schema_uri,
         witness_schema_uri=witness_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
         polynomial_schema_uri=polynomial_schema_uri,
@@ -423,6 +445,7 @@ def install_polynomial_capabilities(
                 else ()
             ),
             PolynomialFactorAdapter(resources),
+            PolynomialMapInverseSynthesizeAdapter(resources),
             *(
                 (PolynomialMapInverseVerifyAdapter(resources),)
                 if inverse_checker_id is not None and identity_checker_id is not None
@@ -1721,6 +1744,550 @@ class PolynomialIdentityAdapter:
                 ),
             ),
         )
+
+
+def _inverse_solver_worker(
+    equation_texts: tuple[str, ...],
+    unknown_names: tuple[str, ...],
+    result_queue: Any,
+) -> None:
+    """Solve one exact coefficient system in an isolated process."""
+
+    try:
+        unknowns = symbols(" ".join(unknown_names), seq=True)
+        locals_by_name = dict(zip(unknown_names, unknowns, strict=True))
+        equations = tuple(
+            sympify(expression, locals=locals_by_name) for expression in equation_texts
+        )
+        solutions = solve(equations, unknowns, dict=True, simplify=False)
+        serialized = tuple(
+            tuple(
+                (name, str(solution.get(symbol, symbol)))
+                for name, symbol in zip(
+                    unknown_names,
+                    unknowns,
+                    strict=True,
+                )
+            )
+            for solution in solutions
+        )
+        result_queue.put(("OK", tuple(sorted(serialized))))
+    except Exception as exc:  # pragma: no cover - defensive child boundary
+        result_queue.put(("ERROR", type(exc).__name__))
+
+
+class PolynomialMapInverseSynthesizeAdapter:
+    """Solve one bounded exact polynomial inverse ansatz over QQ."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.map.inverse.candidate_synthesize",
+            version="1",
+            title="Synthesize a bounded polynomial-map inverse candidate",
+            description=(
+                "Solve an explicit finite polynomial inverse ansatz over QQ, "
+                "then submit every found candidate to the independent two-sided "
+                "inverse verifier."
+            ),
+            provider="jacobian.sympy",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sympy",
+                features=("polynomial-map-inverse-ansatz", "exact-equation-solving"),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(PolynomialMapInverseSynthesisRequest),
+            output_schema=model_schema(PolynomialMapInverseSynthesisOutput),
+            tags=("polynomial", "map", "inverse", "synthesis", "exact-rational"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        started = time.monotonic()
+        validated = _validate_request(
+            PolynomialMapInverseSynthesisRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_MAP_INVERSE_SYNTHESIS_REQUEST",
+            operation="map inverse candidate synthesis",
+        )
+        forward_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.map_schema_uri,
+            semantics_uri=self.resources.installation.inverse_semantics_uri,
+            payload=validated.forward_map.model_dump(mode="json"),
+            summary="forward map for bounded inverse synthesis",
+        )
+        supports = _inverse_supports(validated)
+        coefficient_names = tuple(
+            tuple(f"c_{coordinate}_{index}" for index in range(len(support)))
+            for coordinate, support in enumerate(supports)
+        )
+        ansatz = PolynomialInverseAnsatzSpecification(
+            support_mode=validated.support_mode,
+            inverse_degree_bound=validated.inverse_degree_bound,
+            source_variables=validated.source_variables,
+            target_variables=validated.target_variables,
+            coordinate_supports=supports,
+            coefficient_symbols=coefficient_names,
+        )
+        unknown_names = tuple(name for row in coefficient_names for name in row)
+
+        status: PolynomialInverseSynthesisStatus
+        equations: tuple[PolynomialInverseCoefficientEquation, ...] = ()
+        candidate: RationalPolynomialMap | None = None
+        left_residuals: tuple[SparseRationalPolynomial, ...] = ()
+        right_residuals: tuple[SparseRationalPolynomial, ...] = ()
+        verification_output: dict[str, Any] | None = None
+        verification_artifact_uri: str | None = None
+        verification_failure: str | None = None
+        residual_term_count = 0
+
+        if validated.solver != "sympy.solve":
+            status = PolynomialInverseSynthesisStatus.UNSUPPORTED
+            verification_failure = (
+                f"solver {validated.solver!r} is unsupported; use 'sympy.solve'"
+            )
+        elif validated.limits.timeout_ms == 0:
+            status = PolynomialInverseSynthesisStatus.TIMEOUT
+        elif len(unknown_names) > validated.limits.max_unknown_coefficients:
+            status = PolynomialInverseSynthesisStatus.BUDGET_EXHAUSTED
+            verification_failure = "ansatz unknown count exceeds the declared limit"
+        else:
+            forward_degree = max(
+                (
+                    sum(term.exponents)
+                    for coordinate in validated.forward_map.coordinates
+                    for term in coordinate.terms
+                ),
+                default=0,
+            )
+            residual_term_bound = _inverse_residual_term_bound(validated, supports)
+            precheck_exhausted = (
+                forward_degree * validated.inverse_degree_bound
+                > validated.limits.max_composition_degree
+                or residual_term_bound > validated.limits.max_residual_terms
+            )
+            if precheck_exhausted:
+                status = PolynomialInverseSynthesisStatus.BUDGET_EXHAUSTED
+                verification_failure = (
+                    "conservative composition degree or residual-term bound "
+                    "exceeds a declared limit"
+                )
+                ansatz_expressions = ()
+                unknown_symbols = ()
+            else:
+                (
+                    ansatz_expressions,
+                    unknown_symbols,
+                    equations,
+                    residual_term_count,
+                ) = _inverse_coefficient_system(
+                    validated,
+                    supports,
+                    coefficient_names,
+                )
+            if precheck_exhausted:
+                pass
+            elif (
+                residual_term_count > validated.limits.max_residual_terms
+                or len(equations) > validated.limits.max_coefficient_equations
+            ):
+                status = PolynomialInverseSynthesisStatus.BUDGET_EXHAUSTED
+                verification_failure = (
+                    "derived coefficient system exceeds a declared residual "
+                    "or equation limit"
+                )
+            elif not equations:
+                status = PolynomialInverseSynthesisStatus.UNDERDETERMINED
+                verification_failure = "the ansatz produced no coefficient equations"
+            else:
+                remaining_ms = validated.limits.timeout_ms - int(
+                    (time.monotonic() - started) * 1000
+                )
+                if remaining_ms <= 0:
+                    solve_status, solution = "TIMEOUT", None
+                else:
+                    solve_status, solution = _solve_inverse_system(
+                        equations,
+                        unknown_names,
+                        timeout_ms=remaining_ms,
+                    )
+                if solve_status == "TIMEOUT":
+                    status = PolynomialInverseSynthesisStatus.TIMEOUT
+                elif solve_status == "ERROR":
+                    status = PolynomialInverseSynthesisStatus.UNSUPPORTED
+                    verification_failure = "the configured exact solver failed"
+                elif solution is None:
+                    status = PolynomialInverseSynthesisStatus.NO_CANDIDATE_WITHIN_ANSATZ
+                elif any(value.free_symbols for value in solution.values()) or set(
+                    solution
+                ) != set(unknown_symbols):
+                    status = PolynomialInverseSynthesisStatus.UNDERDETERMINED
+                    verification_failure = (
+                        "the coefficient equations have free parameters"
+                    )
+                elif not all(value.is_Rational for value in solution.values()):
+                    status = PolynomialInverseSynthesisStatus.UNSUPPORTED
+                    verification_failure = (
+                        "the selected solution is not rational over QQ"
+                    )
+                else:
+                    candidate = _inverse_candidate_map(
+                        validated,
+                        ansatz_expressions,
+                        solution,
+                    )
+                    verify_request = PolynomialMapInverseVerifyRequest(
+                        forward_map=validated.forward_map,
+                        inverse_map=candidate,
+                        source_variables=validated.source_variables,
+                        target_variables=validated.target_variables,
+                    )
+                    left_residuals, right_residuals = _map_inverse_residuals(
+                        verify_request
+                    )
+                    status = PolynomialInverseSynthesisStatus.FOUND
+                    try:
+                        verified = PolynomialMapInverseVerifyAdapter(
+                            self.resources
+                        ).invoke(
+                            CapabilityRequest(
+                                capability_id="polynomial.map.inverse.verify",
+                                mode=CapabilityMode.VERIFY,
+                                input=verify_request.model_dump(mode="json"),
+                            )
+                        )
+                        verification_output = verified.output
+                        artifact = (
+                            verified.output.get("verification_record_uri")
+                            or verified.output.get("certificate_uri")
+                        )
+                        verification_artifact_uri = (
+                            artifact if isinstance(artifact, str) else None
+                        )
+                        if verified.output.get("inverse_verified") is not True:
+                            verification_failure = (
+                                "the independent two-sided verifier rejected "
+                                "the synthesized candidate"
+                            )
+                    except CapabilityInvocationError as exc:
+                        verification_failure = exc.diagnostic.message
+
+        elapsed_ms = max(0, int((time.monotonic() - started) * 1000))
+        provenance = PolynomialInverseSolverProvenance(
+            solver=validated.solver,
+            backend_version=sympy.__version__,
+            timeout_ms=validated.limits.timeout_ms,
+            unknown_count=len(unknown_names),
+            equation_count=len(equations),
+            residual_term_count=residual_term_count,
+            elapsed_ms=elapsed_ms,
+        )
+        payload = PolynomialMapInverseSynthesisArtifact(
+            status=status,
+            forward_map=validated.forward_map,
+            ansatz=ansatz,
+            coefficient_equations=equations,
+            solver_provenance=provenance,
+            candidate_inverse_map=candidate,
+            inverse_after_forward=left_residuals,
+            forward_after_inverse=right_residuals,
+            verification_output=verification_output,
+            verification_artifact_uri=verification_artifact_uri,
+            verification_failure=verification_failure,
+        )
+        parents = tuple(
+            dict.fromkeys(
+                (
+                    forward_artifact.artifact_uri,
+                    *(
+                        (verification_artifact_uri,)
+                        if verification_artifact_uri
+                        else ()
+                    ),
+                )
+            )
+        )
+        synthesis = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.inverse_synthesis_schema_uri,
+            semantics_uri=self.resources.installation.inverse_semantics_uri,
+            payload=payload.model_dump(mode="json"),
+            parents=parents,
+            summary=f"bounded polynomial inverse synthesis: {status.value}",
+        )
+        output = PolynomialMapInverseSynthesisOutput(
+            **payload.model_dump(mode="python"),
+            synthesis_uri=synthesis.artifact_uri,
+            forward_map_uri=forward_artifact.artifact_uri,
+        )
+        artifact_uris = tuple(
+            dict.fromkeys(
+                (
+                    forward_artifact.artifact_uri,
+                    synthesis.artifact_uri,
+                    *(
+                        (verification_artifact_uri,)
+                        if verification_artifact_uri
+                        else ()
+                    ),
+                )
+            )
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=(
+                    ExecutionStatus.TIMEOUT
+                    if status is PolynomialInverseSynthesisStatus.TIMEOUT
+                    else ExecutionStatus.COMPLETED
+                ),
+                runtime_ms=elapsed_ms,
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="one finite polynomial inverse coefficient ansatz over QQ",
+                parameters={
+                    "inverse_degree_bound": validated.inverse_degree_bound,
+                    "support_mode": validated.support_mode.value,
+                    "unknown_count": len(unknown_names),
+                },
+                artifact_uri=synthesis.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if status
+                    in {
+                        PolynomialInverseSynthesisStatus.FOUND,
+                        PolynomialInverseSynthesisStatus.NO_CANDIDATE_WITHIN_ANSATZ,
+                        PolynomialInverseSynthesisStatus.UNDERDETERMINED,
+                    }
+                    else CapabilityCompletenessStatus.PARTIAL
+                ),
+                basis=(
+                    "the declared finite ansatz and exact coefficient system were solved"
+                    if status
+                    in {
+                        PolynomialInverseSynthesisStatus.FOUND,
+                        PolynomialInverseSynthesisStatus.NO_CANDIDATE_WITHIN_ANSATZ,
+                        PolynomialInverseSynthesisStatus.UNDERDETERMINED,
+                    }
+                    else "the declared synthesis operation did not complete"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "bounded exact symbolic synthesis; no failure status proves "
+                    "noninvertibility and only the separate verifier may certify "
+                    "a found candidate"
+                ),
+            ),
+            artifact_uris=artifact_uris,
+        )
+
+
+def _inverse_supports(
+    request: PolynomialMapInverseSynthesisRequest,
+) -> tuple[tuple[tuple[int, ...], ...], ...]:
+    if request.support_mode is PolynomialInverseSupportMode.EXPLICIT:
+        assert request.explicit_support is not None
+        return request.explicit_support
+    dimension = len(request.target_variables)
+    support = tuple(
+        sorted(
+            (
+                exponents
+                for exponents in product(
+                    range(request.inverse_degree_bound + 1),
+                    repeat=dimension,
+                )
+                if sum(exponents) <= request.inverse_degree_bound
+            ),
+            reverse=True,
+        )
+    )
+    return tuple(support for _ in range(dimension))
+
+
+def _inverse_residual_term_bound(
+    request: PolynomialMapInverseSynthesisRequest,
+    supports: tuple[tuple[tuple[int, ...], ...], ...],
+) -> int:
+    forward_counts = tuple(
+        len(coordinate.terms) for coordinate in request.forward_map.coordinates
+    )
+    support_counts = tuple(len(support) for support in supports)
+    left = sum(
+        multiply(
+            count**exponent
+            for count, exponent in zip(
+                forward_counts,
+                monomial,
+                strict=True,
+            )
+        )
+        for support in supports
+        for monomial in support
+    )
+    right = sum(
+        multiply(
+            count**exponent
+            for count, exponent in zip(
+                support_counts,
+                term.exponents,
+                strict=True,
+            )
+        )
+        for coordinate in request.forward_map.coordinates
+        for term in coordinate.terms
+    )
+    return int(left + right + 2 * len(request.source_variables))
+
+
+def _inverse_coefficient_system(
+    request: PolynomialMapInverseSynthesisRequest,
+    supports: tuple[tuple[tuple[int, ...], ...], ...],
+    coefficient_names: tuple[tuple[str, ...], ...],
+) -> tuple[
+    tuple[Any, ...],
+    tuple[Any, ...],
+    tuple[PolynomialInverseCoefficientEquation, ...],
+    int,
+]:
+    source_generators, forward = _sympy_map(request.forward_map)
+    target_generators = tuple(symbols(request.target_variables))
+    flat_names = tuple(name for row in coefficient_names for name in row)
+    unknowns = tuple(symbols(" ".join(flat_names), seq=True))
+    unknown_by_name = dict(zip(flat_names, unknowns, strict=True))
+    ansatz = tuple(
+        expand(
+            sum(
+                unknown_by_name[name]
+                * multiply(
+                    generator**exponent
+                    for generator, exponent in zip(
+                        target_generators,
+                        exponents,
+                        strict=True,
+                    )
+                )
+                for name, exponents in zip(names, support, strict=True)
+            )
+        )
+        for names, support in zip(coefficient_names, supports, strict=True)
+    )
+    left_substitutions = {
+        generator: polynomial.as_expr()
+        for generator, polynomial in zip(
+            target_generators,
+            forward,
+            strict=True,
+        )
+    }
+    left = tuple(
+        expand(
+            expression.subs(left_substitutions, simultaneous=True)
+            - source_generators[index]
+        )
+        for index, expression in enumerate(ansatz)
+    )
+    right_substitutions = dict(zip(source_generators, ansatz, strict=True))
+    right = tuple(
+        expand(
+            polynomial.as_expr().subs(right_substitutions, simultaneous=True)
+            - target_generators[index]
+        )
+        for index, polynomial in enumerate(forward)
+    )
+    records: list[PolynomialInverseCoefficientEquation] = []
+    residual_term_count = 0
+    for direction, generators, residuals in (
+        ("INVERSE_AFTER_FORWARD", source_generators, left),
+        ("FORWARD_AFTER_INVERSE", target_generators, right),
+    ):
+        for coordinate, residual in enumerate(residuals):
+            polynomial = Poly(residual, *generators)
+            terms = polynomial.terms()
+            residual_term_count += len(terms)
+            records.extend(
+                PolynomialInverseCoefficientEquation(
+                    direction=cast(Any, direction),
+                    coordinate=coordinate,
+                    monomial_exponents=monomial,
+                    expression=str(coefficient),
+                )
+                for monomial, coefficient in terms
+                if coefficient != 0
+            )
+    return ansatz, unknowns, tuple(records), residual_term_count
+
+
+def _solve_inverse_system(
+    equations: tuple[PolynomialInverseCoefficientEquation, ...],
+    unknown_names: tuple[str, ...],
+    *,
+    timeout_ms: int,
+) -> tuple[str, dict[Any, Any] | None]:
+    context = multiprocessing.get_context("spawn")
+    result_queue = context.Queue(maxsize=1)
+    process = context.Process(
+        target=_inverse_solver_worker,
+        args=(
+            tuple(item.expression for item in equations),
+            unknown_names,
+            result_queue,
+        ),
+    )
+    process.start()
+    process.join(timeout_ms / 1000)
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        return "TIMEOUT", None
+    try:
+        status, raw = result_queue.get_nowait()
+    except Empty:
+        return "ERROR", None
+    if status != "OK":
+        return "ERROR", None
+    if not raw:
+        return "OK", None
+    symbols_by_name = dict(
+        zip(unknown_names, symbols(" ".join(unknown_names), seq=True), strict=True)
+    )
+    first = raw[0]
+    solution = {
+        symbols_by_name[name]: sympify(value, locals=symbols_by_name)
+        for name, value in first
+    }
+    return "OK", solution
+
+
+def _inverse_candidate_map(
+    request: PolynomialMapInverseSynthesisRequest,
+    ansatz: tuple[Any, ...],
+    solution: dict[Any, Any],
+) -> RationalPolynomialMap:
+    target_generators = tuple(symbols(request.target_variables))
+    return RationalPolynomialMap(
+        variables=request.target_variables,
+        coordinates=tuple(
+            _wire_polynomial(
+                Poly(
+                    expand(expression.subs(solution, simultaneous=True)),
+                    *target_generators,
+                    domain=QQ,
+                )
+            )
+            for expression in ansatz
+        ),
+    )
 
 
 class PolynomialMapInverseVerifyAdapter:
