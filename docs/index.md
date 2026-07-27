@@ -48,6 +48,7 @@ and build toward a complete result.
 How-to guides assume you already understand Jacobian's basic model and need to
 complete a specific task.
 
+- [Discover, invoke, and verify domain capabilities](how-to/invoke-domain-capabilities.md)
 - [Deploy the remote MCP server](how-to/deploy-remote-mcp.md)
 
 ## Reference
@@ -56,8 +57,10 @@ Reference documents define exact interfaces, records, gates, and test
 expectations.
 
 - [Tool surface](reference/tools.md)
+- [Domain operation library](reference/domain-operation-library.md)
 - [Provider runtime contract](reference/provider-runtime.md)
 - [Lean declaration discovery](reference/lean-declaration-discovery.md)
+- [Lean formal intermediates](reference/lean-formal-intermediates.md)
 - [SAT artifact contracts](reference/sat-artifacts.md)
 - [SMT Alethe artifact contracts](reference/smt-artifacts.md)
 - [Exact rational linear-system evidence](reference/linear-rational-solutions.md)
@@ -88,6 +91,7 @@ how its major parts fit together.
 - [ADR 0002: Sealed plugin packages](explanation/adr/0002-sealed-plugin-packages.md)
 - [ADR 0003: Durable search invocations](explanation/adr/0003-durable-search-invocations.md)
 - [ADR 0004: Verified parameter regions](explanation/adr/0004-verified-parameter-regions.md)
+- [ADR 0005: Direct epistemic workspaces](explanation/adr/0005-direct-epistemic-workspaces.md)
 
 ## Contributing
 

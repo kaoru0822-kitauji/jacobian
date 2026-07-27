@@ -7,6 +7,8 @@ from typing import Literal
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -19,6 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
     EvidenceBindings,
     WitnessEnvelope,
@@ -65,21 +68,30 @@ def install_matrix_normal_form_checker(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="integer row Hermite-normal-form replay checker",
-            entrypoint=(
-                "jacobian_checkers.matrix_normal_forms:check_hermite_normal_form"
-            ),
-            evidence_kind="WITNESS",
-            format_id="matrix.normal_form.hermite",
-            format_version="1",
-            claim_schema_uris=(matrices.installation.matrix_schema_uri,),
-            semantics_uris=(matrices.installation.semantics_uri,),
-            candidate_schema_uris=(matrices.installation.normal_form_schema_uri,),
-            reason=(
-                "bundled independent exact H=U*A, unimodularity, and row-HNF checker"
-            ),
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="integer row Hermite-normal-form replay checker",
+                    entrypoint=(
+                        "jacobian_checkers.matrix_normal_forms:check_hermite_normal_form"
+                    ),
+                    evidence_kind=EvidenceKind.WITNESS,
+                    format_id="matrix.normal_form.hermite",
+                    format_version="1",
+                    claim_schema_uris=(matrices.installation.matrix_schema_uri,),
+                    semantics_uris=(matrices.installation.semantics_uri,),
+                    candidate_schema_uris=(
+                        matrices.installation.normal_form_schema_uri,
+                    ),
+                    reason=(
+                        "bundled independent exact H=U*A, unimodularity, and row-HNF checker"
+                    ),
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = MatrixNormalFormCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,

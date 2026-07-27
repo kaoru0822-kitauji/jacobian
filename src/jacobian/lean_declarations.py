@@ -24,6 +24,8 @@ from jacobian.contracts.lean import (
     LeanDeclarationSearchOutput,
     LeanDeclarationSearchRequest,
     LeanDeclarationSearchStopReason,
+    LeanDependencyGraphArtifact,
+    LeanDependencyGraphRequest,
     LeanEnvironment,
 )
 
@@ -539,6 +541,8 @@ class LeanDeclarationService:
                 ),
                 "kinds": [kind.value for kind in query.kinds],
                 "limit": query.result_limit,
+                "max_depth": 0,
+                "max_nodes": 1,
             },
         )
         _require_operation(raw, "search")
@@ -579,6 +583,8 @@ class LeanDeclarationService:
                 ),
                 "kinds": [],
                 "limit": 1,
+                "max_depth": 0,
+                "max_nodes": 1,
             },
         )
         _require_operation(raw, "inspect")
@@ -593,6 +599,47 @@ class LeanDeclarationService:
                 environment_digest=environment_digest,
                 query=query,
                 declaration=LeanDeclarationRecord.model_validate(raw["declaration"]),
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise _protocol_error() from exc
+
+    def dependencies(
+        self,
+        query: LeanDependencyGraphRequest,
+    ) -> LeanDependencyGraphArtifact:
+        raw = self.backend.query(
+            query.environment,
+            {
+                "operation": "dependencies",
+                "declaration_name": query.root_declaration,
+                "name_contains": None,
+                "type_constants": [],
+                "namespace_prefixes": [],
+                "target_module_prefixes": (
+                    ["Init"] if query.environment is LeanEnvironment.CORE else []
+                ),
+                "kinds": [],
+                "limit": 1,
+                "max_depth": query.max_depth,
+                "max_nodes": query.max_nodes,
+            },
+        )
+        _require_operation(raw, "dependencies")
+        environment_digest = (
+            raw["_environment_digest"]
+            if "_environment_digest" in raw
+            else self.backend.environment_digest(query.environment)
+        )
+        try:
+            return LeanDependencyGraphArtifact(
+                environment=query.environment,
+                environment_digest=environment_digest,
+                query=query,
+                nodes=raw["nodes"],
+                edges=raw["edges"],
+                frontier=raw["frontier"],
+                node_budget_exhausted=raw["node_budget_exhausted"],
+                closure_complete=raw["closure_complete"],
             )
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise _protocol_error() from exc

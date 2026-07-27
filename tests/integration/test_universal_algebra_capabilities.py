@@ -11,6 +11,9 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion
+from jacobian.contracts.universal_algebra import (
+    UniversalAlgebraCountermodelSearchRequest,
+)
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
@@ -54,6 +57,25 @@ def _left_projection_problem() -> dict[str, object]:
             },
         ],
     }
+
+
+@pytest.mark.integration
+def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    descriptors = {
+        descriptor.capability_id: descriptor
+        for descriptor in kernel.capabilities.catalog().capabilities
+    }
+    descriptor = descriptors["universal_algebra.search.countermodel"]
+
+    assert len(descriptor.invocation_examples) == 1
+    example = descriptor.invocation_examples[0]
+    assert example.mode is CapabilityMode.EXPLORE
+    validated = UniversalAlgebraCountermodelSearchRequest.model_validate(example.input)
+    assert validated.order == 2
+    assert validated.target_law.law_id == "associative"
 
 
 @pytest.mark.integration

@@ -9,6 +9,9 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_artifacts import put_witness_envelope
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -21,11 +24,8 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
-from jacobian.contracts.evidence import (
-    EvidenceBindings,
-    WitnessEnvelope,
-    WitnessRole,
-)
+from jacobian.contracts.checkers import EvidenceKind
+from jacobian.contracts.evidence import WitnessEnvelope
 from jacobian.contracts.matrices import (
     ExactRationalMatrix,
     MatrixDeterminantArtifact,
@@ -80,24 +80,29 @@ def install_matrix_determinant_checker(
         version="1",
         model=WitnessEnvelope,
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact rational determinant recomputation checker",
-            entrypoint=(
-                "jacobian_checkers.rational_determinants:check_rational_determinant"
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational determinant recomputation checker",
+                entrypoint=(
+                    "jacobian_checkers.rational_determinants:check_rational_determinant"
+                ),
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="matrix.rational_determinant",
+                format_version="1",
+                claim_schema_uris=(matrices.matrix_schema_uri,),
+                semantics_uris=(matrices.semantics_uri,),
+                candidate_schema_uris=(matrices.determinant_schema_uri,),
+                reason=(
+                    "bundled independent standard-library exact rational "
+                    "determinant recomputation"
+                ),
             ),
-            evidence_kind="WITNESS",
-            format_id="matrix.rational_determinant",
-            format_version="1",
-            claim_schema_uris=(matrices.matrix_schema_uri,),
-            semantics_uris=(matrices.semantics_uri,),
-            candidate_schema_uris=(matrices.determinant_schema_uri,),
-            reason=(
-                "bundled independent standard-library exact rational "
-                "determinant recomputation"
-            ),
-        ).checker_id
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = MatrixDeterminantCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,
@@ -197,29 +202,17 @@ class MatrixDeterminantVerificationAdapter:
 
         checker_id = self.installation.checker_id
         assert checker_id is not None
-        bindings = EvidenceBindings(
-            claim_digest=resolved.matrix_artifact.manifest.object_digest,
-            semantics_digest=semantics.manifest.object_digest,
-            candidate_digest=resolved.artifact.manifest.object_digest,
-        )
-        witness = WitnessEnvelope(
+        witness_artifact = put_witness_envelope(
+            self.artifacts,
+            witness_schema_uri=self.installation.witness_schema_uri,
             witness_format="matrix.rational_determinant",
-            format_version="1",
-            role=WitnessRole.SUPPORTS_CLAIM,
-            bindings=bindings,
+            claim_artifact=resolved.matrix_artifact,
+            semantics_artifact=semantics,
+            candidate_artifact=resolved.artifact,
             payload={
                 "matrix_uri": resolved.matrix_artifact.artifact_uri,
                 "determinant_uri": resolved.artifact.artifact_uri,
             },
-        )
-        witness_artifact = self.artifacts.put(
-            schema_uri=self.installation.witness_schema_uri,
-            semantics_uri=self.matrices.semantics_uri,
-            payload=witness.model_dump(mode="json"),
-            parents=(
-                resolved.matrix_artifact.artifact_uri,
-                resolved.artifact.artifact_uri,
-            ),
             summary="exact rational determinant verification witness",
         )
         checked = self.verification.verify_witness(

@@ -44,8 +44,6 @@ make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
-make refresh-test-durations
-make refresh-lean-test-durations
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,
@@ -94,14 +92,6 @@ debug workflow from GitHub Actions when local Lean is impractical. Use
 `make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
 Do not use unfiltered `uv run pytest` as the normal complete-suite command
 because it mixes Lean into the general xdist pool.
-Refresh `.test_durations` after major suite changes; the target replaces the
-committed timings only after a successful non-Lean run on Linux with Python
-3.12. Also refresh when the slower CI shard exceeds the faster shard by more
-than 10% in two representative runs. Do not refresh for routine test edits.
-Refresh `.lean_test_durations` after adding or materially changing
-`lean_runtime` tests; its target runs all Lean tests serially before replacing
-the committed file.
-
 ## Verification rules
 
 - Do not turn a timeout, cancellation, error, incomplete enumeration, or

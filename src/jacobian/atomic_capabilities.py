@@ -21,6 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityMode,
+    CapabilityProviderAvailability,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -56,6 +57,10 @@ _EXPERIMENT_URI = {"type": "string", "pattern": _EXPERIMENT_URI_PATTERN}
 
 class AtomicServiceAdapter:
     """Project one service operation into the capability protocol.
+
+    This adapter is reserved for existing stateful services that already
+    return rich result envelopes. Domain-owned mathematical producers use
+    ``DomainBundle`` and ``OperationInstaller`` instead.
 
     A service result may carry a nested :class:`ResultEnvelope`; only that
     envelope (or an explicitly promoted parameter region) can elevate the
@@ -399,7 +404,12 @@ def install_atomic_capabilities(
             artifact_uri=_ARTIFACT_URI,
         ),
     )
-    return adapters
+    return tuple(
+        adapter
+        for adapter in adapters
+        if (runtime := adapter.descriptor.provider_runtime) is None
+        or runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    )
 
 
 def _schema(properties: dict[str, Any], *, required: Iterable[str]) -> dict[str, Any]:

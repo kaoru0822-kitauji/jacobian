@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import queue
@@ -9,8 +10,10 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
+import uuid
 import weakref
 from collections.abc import Mapping
 from contextlib import suppress
@@ -21,6 +24,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -44,6 +48,7 @@ from jacobian.contracts.lean_exploration import (
     LeanProofStateOutput,
     LeanProofStateRequest,
     LeanProofStateTransitionArtifact,
+    LeanTypedGoal,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.references import LeanCheckerInstallation
@@ -107,6 +112,7 @@ class PersistentLeanRepl:
         *,
         command: str,
         tactic: str,
+        pickle_path: Path | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Run one independent command and tactic from the immutable base env."""
 
@@ -120,6 +126,17 @@ class PersistentLeanRepl:
             tactic_response = self._exchange(
                 {"tactic": tactic, "proofState": proof_state}
             )
+            if pickle_path is not None and not _response_errors(tactic_response):
+                successor = tactic_response.get("proofState")
+                if not isinstance(successor, int):
+                    raise RuntimeError(
+                        "Lean REPL did not return a successor proof state"
+                    )
+                pickled = self._exchange(
+                    {"proofState": successor, "pickleTo": str(pickle_path)}
+                )
+                if _response_errors(pickled):
+                    raise RuntimeError("Lean REPL could not pickle the proof state")
             self._requests += 1
             return command_response, tactic_response
 
@@ -312,6 +329,7 @@ class LeanExplorationReplRuntime:
         command: str,
         tactic: str,
         environment: LeanEnvironment,
+        pickle_path: Path | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Serialize exploration and reuse only an environment's base snapshot."""
 
@@ -320,7 +338,11 @@ class LeanExplorationReplRuntime:
             if session is None:
                 session = self._create_session(environment)
                 self._sessions[environment] = session
-            return session.execute(command=command, tactic=tactic)
+            return session.execute(
+                command=command,
+                tactic=tactic,
+                pickle_path=pickle_path,
+            )
 
     def close(self) -> None:
         """Stop every exploration process without affecting independent checkers."""
@@ -423,12 +445,12 @@ def install_lean_exploration_capabilities(
     )
     transition_schema_uri = schemas.register(
         name="jacobian.lean4-proof-state-transition",
-        version="1",
+        version="2",
         schema=LeanProofStateTransitionArtifact.model_json_schema(),
     )
     retrieval_schema_uri = schemas.register(
         name="jacobian.lean4-premise-retrieval",
-        version="1",
+        version="2",
         schema=LeanPremiseRetrievalArtifact.model_json_schema(),
     )
     runtime = Path(__file__).resolve().parents[2] / "lean"
@@ -462,7 +484,7 @@ class LeanProofStateAdapter:
         self.resources = resources
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.proof_state.apply_tactic",
-            version="1",
+            version="2",
             title="Apply one Lean tactic",
             description=(
                 "Replay an explicit proof prefix, apply one tactic, and expose the "
@@ -505,29 +527,55 @@ class LeanProofStateAdapter:
             statement=validated.statement,
             proof_prefix=validated.proof_prefix,
         )
-        responses = _run_repl(
-            self.resources,
-            command=command,
-            tactic=validated.tactic,
-            environment=validated.environment,
-        )
-        command_response, tactic_response = responses
-        errors = (
-            *_response_errors(command_response),
-            *_response_errors(tactic_response),
-        )
-        if errors:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="LEAN_TACTIC_REJECTED",
-                    stage="tactic_application",
-                    message=f"Lean rejected the tactic transition: {errors[0][:500]}",
-                    hint=(
-                        "Inspect the current goals, revise the tactic or prefix, "
-                        "and retry. A rejection is not a mathematical conclusion."
-                    ),
-                )
+        with tempfile.TemporaryDirectory(prefix="jacobian-lean-proof-state-") as root:
+            pickle_path = Path(root) / "proof-state.pickle"
+            responses = _run_repl(
+                self.resources,
+                command=command,
+                tactic=validated.tactic,
+                environment=validated.environment,
+                pickle_path=pickle_path,
             )
+            command_response, tactic_response = responses
+            errors = (
+                *_response_errors(command_response),
+                *_response_errors(tactic_response),
+            )
+            if errors:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="LEAN_TACTIC_REJECTED",
+                        stage="tactic_application",
+                        message=(
+                            f"Lean rejected the tactic transition: {errors[0][:500]}"
+                        ),
+                        hint=(
+                            "Inspect the current goals, revise the tactic or prefix, "
+                            "and retry. A rejection is not a mathematical conclusion."
+                        ),
+                    )
+                )
+            try:
+                typed_goals = _extract_typed_goals(
+                    self.resources,
+                    pickle_path=pickle_path,
+                    request=validated,
+                )
+            except RuntimeError as exc:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="LEAN_PROOF_STATE_EXTRACTION_FAILED",
+                        stage="proof_state_extraction",
+                        message=(
+                            "Lean could not produce the bounded typed successor "
+                            "proof state."
+                        ),
+                        hint=(
+                            "Retry with smaller goal/context bounds or verify that "
+                            "the pinned proof-state helper is installed."
+                        ),
+                    )
+                ) from exc
         goals_value = tactic_response.get("goals", [])
         if not isinstance(goals_value, list) or any(
             not isinstance(goal, str) for goal in goals_value
@@ -547,6 +595,7 @@ class LeanProofStateAdapter:
             tactic=validated.tactic,
             replay_source=replay_source,
             goals=goals,
+            typed_goals=typed_goals,
             goal_count=len(goals),
             completed=(tactic_response.get("proofStatus") == "Completed" and not goals),
             messages=messages,
@@ -602,7 +651,7 @@ class LeanPremiseRetrievalAdapter:
         self.resources = resources
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.retrieve.premises",
-            version="1",
+            version="2",
             title="Retrieve Lean premises",
             description=(
                 "Ask pinned Mathlib exact? for bounded candidate tactics at one "
@@ -679,6 +728,9 @@ class LeanPremiseRetrievalAdapter:
                 rank=index,
                 tactic=suggestion,
                 declaration_names=tuple(sorted(set(_DECLARATION.findall(suggestion)))),
+                tactic_replayed=(
+                    index == 1 and tactic_response.get("proofStatus") == "Completed"
+                ),
             )
             for index, suggestion in enumerate(suggestions, start=1)
         )
@@ -686,6 +738,18 @@ class LeanPremiseRetrievalAdapter:
             statement=validated.statement,
             proof_prefix=validated.proof_prefix,
             candidates=candidates,
+            goal_context_digest=(
+                "sha256:"
+                + hashlib.sha256(
+                    canonicalize_json(
+                        {
+                            "environment": "MATHLIB",
+                            "statement": validated.statement,
+                            "proof_prefix": list(validated.proof_prefix),
+                        }
+                    )
+                ).hexdigest()
+            ),
             lean_version=installation.lean_version,
             lean_commit=installation.lean_commit,
             mathlib_commit=installation.mathlib_commit or "",
@@ -758,12 +822,88 @@ def _run_repl(
     command: str,
     tactic: str,
     environment: LeanEnvironment,
+    pickle_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     return resources.repl.execute(
         command=command,
         tactic=tactic,
         environment=environment,
+        pickle_path=pickle_path,
     )
+
+
+def _extract_typed_goals(
+    resources: _Resources,
+    *,
+    pickle_path: Path,
+    request: LeanProofStateRequest,
+) -> tuple[LeanTypedGoal, ...]:
+    query_path = pickle_path.with_name("typed-goal-query.json")
+    request_id = uuid.uuid4().hex
+    query_path.write_bytes(
+        canonicalize_json(
+            {
+                "pickle_path": str(pickle_path),
+                "request_id": request_id,
+                "max_goals": request.max_goals,
+                "max_local_declarations": request.max_local_declarations,
+                "max_rendered_bytes": request.max_rendered_bytes,
+            }
+        )
+    )
+    environment = dict(os.environ)
+    environment["JACOBIAN_LEAN_PROOF_STATE_QUERY"] = str(query_path)
+    helper = resources.runtime / ".lake" / "build" / "bin" / "jacobian_lean_proof_state"
+    if not helper.is_file():
+        raise RuntimeError(
+            "the pinned typed proof-state helper is unavailable; "
+            "run `lake build jacobian_lean_proof_state` in lean/"
+        )
+    elan = shutil.which("elan")
+    if elan is None:
+        raise RuntimeError("elan is unavailable")
+    installation = resources.installations[request.environment]
+    try:
+        completed = subprocess.run(
+            [
+                elan,
+                "run",
+                f"leanprover/lean4:v{installation.lean_version}",
+                "lake",
+                "env",
+                helper,
+            ],
+            cwd=resources.runtime,
+            env=environment,
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("Lean typed proof-state extraction failed") from exc
+    marker = "JACOBIAN_PROOF_STATE_RESULT "
+    lines = completed.stdout.decode("utf-8", errors="strict").splitlines()
+    responses = [line for line in lines if line.startswith(marker)]
+    if completed.returncode != 0 or len(responses) != 1:
+        raise RuntimeError("Lean typed proof-state extraction failed")
+    envelope = loads_strict_json(responses[0].removeprefix(marker))
+    if (
+        not isinstance(envelope, dict)
+        or envelope.get("request_id") != request_id
+        or not isinstance(envelope.get("payload"), dict)
+    ):
+        raise RuntimeError("Lean typed proof-state extraction returned invalid JSON")
+    payload = envelope["payload"]
+    if payload.get("expression_serialization") != "LEAN_PRETTY_PRINTED_EXPR":
+        raise RuntimeError("Lean typed proof-state serialization is unsupported")
+    try:
+        return tuple(
+            LeanTypedGoal.model_validate(goal) for goal in payload["typed_goals"]
+        )
+    except (KeyError, TypeError, ValidationError) as exc:
+        raise RuntimeError(
+            "Lean typed proof-state extraction returned invalid goals"
+        ) from exc
 
 
 def _response_messages(response: Mapping[str, Any]) -> tuple[str, ...]:

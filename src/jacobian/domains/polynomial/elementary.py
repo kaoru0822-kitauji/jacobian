@@ -1,0 +1,185 @@
+"""Domain-owned elementary integer and rational polynomial capabilities."""
+
+from jacobian.contracts.polynomial_operations import (
+    IntegerPolynomialCompositionRequest,
+    IntegerPolynomialCompositionResult,
+    IntegerPolynomialContentResult,
+    IntegerPolynomialEvaluationRequest,
+    IntegerPolynomialEvaluationResult,
+    IntegerPolynomialGcdResult,
+    IntegerPolynomialPairRequest,
+    IntegerPolynomialPrimitivePartResult,
+    IntegerPolynomialRequest,
+    IntegerPolynomialShiftRequest,
+    IntegerPolynomialShiftResult,
+    RationalFunctionRequest,
+    RationalPartialFractionResult,
+    RationalPolynomialDerivativeResult,
+    RationalPolynomialDivisionRequest,
+    RationalPolynomialDivisionResult,
+    RationalPolynomialEvaluationRequest,
+    RationalPolynomialEvaluationResult,
+    RationalPolynomialIntegralResult,
+    RationalPolynomialRequest,
+)
+from jacobian.domains.polynomial._support import polynomial_operation
+from jacobian.domains.polynomial.elementary_operations import (
+    integer_polynomial_compose,
+    integer_polynomial_content,
+    integer_polynomial_evaluate,
+    integer_polynomial_gcd,
+    integer_polynomial_primitive_part,
+    integer_polynomial_shift,
+    rational_partial_fraction_decomposition,
+    rational_polynomial_derivative,
+    rational_polynomial_division,
+    rational_polynomial_evaluate,
+    rational_polynomial_integral,
+)
+
+INTEGER_POLYNOMIAL_CAPABILITIES = (
+    polynomial_operation(
+        "polynomial.integer.compute.gcd",
+        "Compute an integer-polynomial GCD",
+        (
+            "Compute the nonnegative-leading GCD in ZZ[x], including the content "
+            "of both inputs and the result."
+        ),
+        IntegerPolynomialPairRequest,
+        IntegerPolynomialGcdResult,
+        integer_polynomial_gcd,
+        "polynomial",
+        "integer",
+        "gcd",
+    ),
+    polynomial_operation(
+        "polynomial.integer.compute.content",
+        "Compute integer-polynomial content",
+        "Compute the nonnegative coefficient GCD of one polynomial in ZZ[x].",
+        IntegerPolynomialRequest,
+        IntegerPolynomialContentResult,
+        integer_polynomial_content,
+        "polynomial",
+        "integer",
+        "content",
+    ),
+    polynomial_operation(
+        "polynomial.integer.compute.primitive_part",
+        "Compute an integer-polynomial primitive part",
+        (
+            "Separate one polynomial in ZZ[x] into nonnegative content and a "
+            "primitive part, retaining an exact reconstruction."
+        ),
+        IntegerPolynomialRequest,
+        IntegerPolynomialPrimitivePartResult,
+        integer_polynomial_primitive_part,
+        "polynomial",
+        "integer",
+        "primitive",
+    ),
+    polynomial_operation(
+        "polynomial.integer.compute.evaluate",
+        "Evaluate an integer polynomial",
+        "Evaluate one bounded polynomial in ZZ[x] at an exact integer point.",
+        IntegerPolynomialEvaluationRequest,
+        IntegerPolynomialEvaluationResult,
+        integer_polynomial_evaluate,
+        "polynomial",
+        "integer",
+        "evaluation",
+    ),
+    polynomial_operation(
+        "polynomial.integer.compute.compose",
+        "Compose integer polynomials",
+        "Compute outer(inner(x)) exactly in ZZ[x] under a result-degree budget.",
+        IntegerPolynomialCompositionRequest,
+        IntegerPolynomialCompositionResult,
+        integer_polynomial_compose,
+        "polynomial",
+        "integer",
+        "composition",
+    ),
+    polynomial_operation(
+        "polynomial.integer.compute.shift",
+        "Shift an integer polynomial",
+        "Compute p(x + a) exactly in ZZ[x].",
+        IntegerPolynomialShiftRequest,
+        IntegerPolynomialShiftResult,
+        integer_polynomial_shift,
+        "polynomial",
+        "integer",
+        "shift",
+    ),
+)
+
+RATIONAL_POLYNOMIAL_CAPABILITIES = (
+    polynomial_operation(
+        "polynomial.rational.compute.quotient_remainder",
+        "Divide rational polynomials",
+        (
+            "Compute quotient and remainder in QQ[x], retaining the exact "
+            "dividend reconstruction."
+        ),
+        RationalPolynomialDivisionRequest,
+        RationalPolynomialDivisionResult,
+        rational_polynomial_division,
+        "polynomial",
+        "rational",
+        "division",
+    ),
+    polynomial_operation(
+        "polynomial.rational.compute.evaluate",
+        "Evaluate a rational polynomial",
+        "Evaluate one bounded polynomial in QQ[x] at an exact rational point.",
+        RationalPolynomialEvaluationRequest,
+        RationalPolynomialEvaluationResult,
+        rational_polynomial_evaluate,
+        "polynomial",
+        "rational",
+        "evaluation",
+    ),
+    polynomial_operation(
+        "polynomial.rational.compute.derivative",
+        "Differentiate a rational polynomial",
+        "Compute the formal derivative of one bounded polynomial in QQ[x].",
+        RationalPolynomialRequest,
+        RationalPolynomialDerivativeResult,
+        rational_polynomial_derivative,
+        "polynomial",
+        "rational",
+        "derivative",
+    ),
+    polynomial_operation(
+        "polynomial.rational.compute.integral",
+        "Integrate a rational polynomial",
+        (
+            "Compute the unique formal antiderivative in QQ[x] whose "
+            "integration constant is zero."
+        ),
+        RationalPolynomialRequest,
+        RationalPolynomialIntegralResult,
+        rational_polynomial_integral,
+        "polynomial",
+        "rational",
+        "integration",
+    ),
+    polynomial_operation(
+        "polynomial.rational.compute.partial_fraction_decomposition",
+        "Decompose a rational function over QQ",
+        (
+            "Compute a structured partial-fraction decomposition over QQ with "
+            "monic denominator factors and an exact reduced reconstruction."
+        ),
+        RationalFunctionRequest,
+        RationalPartialFractionResult,
+        rational_partial_fraction_decomposition,
+        "polynomial",
+        "rational-function",
+        "partial-fraction",
+    ),
+)
+
+__all__ = [
+    "INTEGER_POLYNOMIAL_CAPABILITIES",
+    "RATIONAL_POLYNOMIAL_CAPABILITIES",
+]

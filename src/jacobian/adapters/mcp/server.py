@@ -21,9 +21,20 @@ from mcp_types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field, StrictInt
 
 from jacobian import __version__
+from jacobian.adapters.mcp.guidance import (
+    CAPABILITY_DESCRIBE_DESCRIPTION,
+    CAPABILITY_INVOKE_DESCRIPTION,
+    OPERATING_GUIDE,
+    SERVER_DESCRIPTION,
+    SERVER_INSTRUCTIONS,
+    discovery_prompt,
+    evidence_check_prompt,
+)
 from jacobian.canonical import canonicalize_json
+from jacobian.capabilities import CapabilityDiscoveryCursorError
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
+    CapabilityDiscoveryRequest,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -59,21 +70,9 @@ if TYPE_CHECKING:
     from jacobian.kernel import JacobianKernel
 
 
-SERVER_INSTRUCTIONS = (
-    "Call capability.describe before invoking an unfamiliar capability; do not guess "
-    "payload fields. Direct workspace.* tools publish their input shape and need no "
-    "capability discovery. Use EXPLORE for search and VERIFY for durable checked "
-    "conclusions. Only assurance level VERIFIED with a local verification record is "
-    "proof; retrieved, generated, or workspace evidence is not. A workspace entry "
-    "never promotes mathematical assurance. Operational completion, failure to find a "
-    "witness, and bounded search are not mathematical conclusions. Follow artifact:// "
-    "and experiment:// resources instead of requesting large payloads inline."
-)
-
 WORKSPACE_TOOL_NAMES = frozenset(
     {"workspace.open", "workspace.write", "workspace.query"}
 )
-_CAPABILITY_INDEX_PAGE_SIZE = 50
 
 
 class AgentRecoveryError(RuntimeError):
@@ -137,45 +136,52 @@ def _catalog_digest(
     return f"sha256:{hashlib.sha256(canonicalize_json(payload)).hexdigest()}"
 
 
-def _compact_descriptor(descriptor: CapabilityDescriptor) -> dict[str, Any]:
-    runtime = descriptor.provider_runtime
-    return {
-        "capability_id": descriptor.capability_id,
-        "version": descriptor.version,
-        "title": descriptor.title,
-        "description": descriptor.description,
-        "provider": descriptor.provider,
-        "availability": (
-            runtime.availability.value if runtime is not None else "UNKNOWN"
-        ),
-        "modes": [mode.value for mode in descriptor.modes],
-        "tags": list(descriptor.tags),
-    }
-
-
-def _search_capabilities(
-    descriptors: tuple[CapabilityDescriptor, ...],
+def _capability_discovery_response(
+    kernel: JacobianKernel,
     *,
     query: str | None,
-) -> list[CapabilityDescriptor]:
-    query_tokens = tuple(query.casefold().split()) if query else ()
-    matches: list[tuple[int, CapabilityDescriptor]] = []
-    for descriptor in descriptors:
-        searchable = " ".join(
-            (
-                descriptor.capability_id,
-                descriptor.title,
-                descriptor.description,
-                descriptor.provider,
-                *descriptor.tags,
+    domain: str | None,
+    mode: CapabilityMode | None,
+    limit: int | None,
+    cursor: str | None,
+) -> dict[str, Any]:
+    catalog = kernel.capabilities.catalog()
+    try:
+        discovered = kernel.capabilities.discover(
+            CapabilityDiscoveryRequest(
+                query=query,
+                domain=domain,
+                mode=mode,
+                limit=limit if limit is not None else 10,
+                cursor=cursor,
             )
-        ).casefold()
-        score = sum(token in searchable for token in query_tokens)
-        if query_tokens and score == 0:
-            continue
-        matches.append((score, descriptor))
-    matches.sort(key=lambda item: (-item[0], item[1].capability_id))
-    return [descriptor for _score, descriptor in matches]
+        )
+    except CapabilityDiscoveryCursorError:
+        return {
+            "error": {
+                "code": "INVALID_CURSOR",
+                "stage": "capability_discovery",
+                "message": "The capability discovery cursor is not in this result set.",
+                "hint": (
+                    "Restart discovery without a cursor, or reuse the same query, "
+                    "domain, mode, and limit that produced next_cursor."
+                ),
+            }
+        }
+    return {
+        "kind": "discovery",
+        "catalog_version": catalog.catalog_version,
+        "catalog_digest": _catalog_digest(
+            catalog.catalog_version,
+            catalog.capabilities,
+        ),
+        **discovered.model_dump(mode="json"),
+        "next_step": {
+            "tool": "capability.describe",
+            "argument": "capability_id",
+            "choose_from": "matches[].capability_id",
+        },
+    }
 
 
 def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
@@ -188,7 +194,7 @@ def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
     for tool_name in tool_names:
         tool = manager.get_tool(tool_name)
         if tool is None:  # pragma: no cover - registration invariant
-            raise RuntimeError(f"workspace tool was not registered: {tool_name}")
+            raise RuntimeError(f"MCP tool was not registered: {tool_name}")
         argument_model = tool.fn_metadata.arg_model
         argument_model.model_config["extra"] = "forbid"
         argument_model.model_rebuild(force=True)
@@ -342,10 +348,7 @@ def create_server(
     server: MCPServer[AppState] = JacobianMCPServer(
         name="jacobian",
         title="Jacobian Mathematical Workbench",
-        description=(
-            "Capability-first mathematical tools, research memory, and optional "
-            "verification"
-        ),
+        description=SERVER_DESCRIPTION,
         instructions=SERVER_INSTRUCTIONS,
         version=__version__,
         lifespan=lifespan,
@@ -355,69 +358,90 @@ def create_server(
 
     @server.tool(
         name="capability.describe",
-        description=(
-            "Search a compact installed-capability index, or pass capability_id to "
-            "read its exact schemas. Use query and cursor for discovery."
-        ),
+        title="Discover mathematical capabilities",
+        description=CAPABILITY_DESCRIBE_DESCRIPTION,
         annotations=_tool_annotations(read_only=True, idempotent=True),
         structured_output=True,
     )
     async def capability_describe(
-        capability_id: str | None = None,
-        query: Annotated[str | None, Field(max_length=512)] = None,
-        cursor: Annotated[str | None, Field(max_length=128)] = None,
+        capability_id: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "Exact installed capability ID. When supplied, omit query, "
+                    "domain, mode, limit, and cursor."
+                )
+            ),
+        ] = None,
+        query: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                max_length=512,
+                description=(
+                    "Natural-language mathematical outcome to find; no capability "
+                    "ID is required."
+                ),
+            ),
+        ] = None,
+        domain: Annotated[
+            str | None,
+            Field(
+                pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
+                description=(
+                    "Optional domain tag filter, such as universal_algebra, graph, "
+                    "polynomial, or lean."
+                ),
+            ),
+        ] = None,
+        mode: Annotated[
+            CapabilityMode | None,
+            Field(description="Optional EXPLORE or VERIFY capability filter."),
+        ] = None,
+        limit: Annotated[
+            StrictInt | None,
+            Field(
+                ge=1,
+                le=50,
+                description="Maximum compact discovery matches; defaults to 10.",
+            ),
+        ] = None,
+        cursor: Annotated[
+            str | None,
+            Field(
+                max_length=128,
+                pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
+                description=(
+                    "Opaque continuation ID from next_cursor. Reuse the same query, "
+                    "domain, mode, and limit when continuing discovery."
+                ),
+            ),
+        ] = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_kernel = _kernel(ctx)
+        search_arguments = (query, domain, mode, limit, cursor)
+        if capability_id is not None and any(
+            argument is not None for argument in search_arguments
+        ):
+            raise AgentRecoveryError(
+                "capability_id is an exact lookup and cannot be combined with query, "
+                "domain, mode, limit, or cursor. Use one discovery call followed by "
+                "one exact description call."
+            )
+        if capability_id is None:
+            return _capability_discovery_response(
+                active_kernel,
+                query=query,
+                domain=domain,
+                mode=mode,
+                limit=limit,
+                cursor=cursor,
+            )
         capability_catalog = active_kernel.capabilities.catalog()
         descriptors = {
             item.capability_id: item for item in capability_catalog.capabilities
         }
-        if capability_id is None:
-            filtered = _search_capabilities(
-                capability_catalog.capabilities,
-                query=query,
-            )
-            start = 0
-            if cursor is not None:
-                for index, descriptor in enumerate(filtered):
-                    if descriptor.capability_id == cursor:
-                        start = index + 1
-                        break
-                else:
-                    return {
-                        "error": {
-                            "code": "INVALID_CURSOR",
-                            "stage": "capability_discovery",
-                            "message": "The capability index cursor is not in this result set.",
-                            "hint": "Restart this filtered query without a cursor.",
-                        }
-                    }
-            page = filtered[start : start + _CAPABILITY_INDEX_PAGE_SIZE]
-            next_cursor = (
-                page[-1].capability_id
-                if page and start + len(page) < len(filtered)
-                else None
-            )
-            return {
-                "index_version": "1",
-                "catalog_version": capability_catalog.catalog_version,
-                "catalog_digest": _catalog_digest(
-                    capability_catalog.catalog_version,
-                    capability_catalog.capabilities,
-                ),
-                "total_count": len(filtered),
-                "returned_count": len(page),
-                "capabilities": [
-                    _compact_descriptor(descriptor) for descriptor in page
-                ],
-                "next_cursor": next_cursor,
-                "exact_descriptor_hint": (
-                    "Call capability.describe with one capability_id for exact input "
-                    "and output schemas. The complete catalog remains available at "
-                    "capability://catalog."
-                ),
-            }
         try:
             descriptor = descriptors[capability_id]
         except KeyError:
@@ -426,8 +450,8 @@ def create_server(
                 "workspace tool directly using its published input schema."
                 if capability_id.startswith("workspace.")
                 else (
-                    "Call capability.describe without a capability_id to list installed "
-                    "capabilities."
+                    "Call capability.describe with a mathematical query to search "
+                    "installed capabilities."
                 )
             )
             return {
@@ -439,7 +463,23 @@ def create_server(
                     "available_capability_ids": sorted(descriptors),
                 }
             }
-        response: dict[str, Any] = {"capability": descriptor.model_dump(mode="json")}
+        response: dict[str, Any] = {
+            "kind": "capability",
+            "capability": descriptor.model_dump(mode="json"),
+            "invocations": [
+                {
+                    "name": example.name,
+                    "description": example.description,
+                    "tool": "capability.invoke",
+                    "arguments": {
+                        "capability_id": descriptor.capability_id,
+                        "mode": example.mode.value,
+                        "payload": example.input,
+                    },
+                }
+                for example in descriptor.invocation_examples
+            ],
+        }
         if capability_id == "lean.check" and active_kernel.lean_checkers:
             response["cache"] = {
                 "key": "exact content-addressed certificate and active checker digest",
@@ -450,11 +490,8 @@ def create_server(
 
     @server.tool(
         name="capability.invoke",
-        description=(
-            "Invoke an installed mathematical capability in the fast EXPLORE or "
-            "checker-backed VERIFY lane. Call capability.describe first for exact "
-            "payload fields; do not guess aliases."
-        ),
+        title="Execute a mathematical capability",
+        description=CAPABILITY_INVOKE_DESCRIPTION,
         annotations=_tool_annotations(),
         structured_output=True,
     )
@@ -693,8 +730,26 @@ def create_server(
             ),
         )
 
-    _forbid_extra_tool_arguments(server, *WORKSPACE_TOOL_NAMES)
+    _forbid_extra_tool_arguments(
+        server,
+        "capability.describe",
+        "capability.invoke",
+        *WORKSPACE_TOOL_NAMES,
+    )
     _publish_workspace_normalization_aliases(server)
+
+    @server.resource(
+        "jacobian://instructions",
+        name="jacobian-instructions",
+        title="Jacobian operating guide",
+        description=(
+            "Complete guidance for discovering, invoking, and independently checking "
+            "Jacobian mathematical capabilities."
+        ),
+        mime_type="text/markdown",
+    )
+    async def jacobian_instructions_resource() -> str:
+        return OPERATING_GUIDE
 
     @server.resource(
         "artifact://sha256/{digest}",
@@ -867,6 +922,42 @@ def create_server(
             ensure_ascii=False,
             sort_keys=True,
         )
+
+    @server.prompt(
+        name="jacobian-discover",
+        title="Discover Jacobian capabilities",
+        description=(
+            "Guide capability discovery without choosing the agent's mathematical "
+            "research strategy."
+        ),
+    )
+    def jacobian_discover_prompt(
+        task: Annotated[
+            str,
+            Field(description="The mathematical task or desired outcome."),
+        ],
+    ) -> str:
+        return discovery_prompt(task)
+
+    @server.prompt(
+        name="jacobian-check-evidence",
+        title="Check mathematical evidence with Jacobian",
+        description=(
+            "Guide selection and use of an installed independent checker without "
+            "promoting unverified evidence."
+        ),
+    )
+    def jacobian_check_evidence_prompt(
+        claim: Annotated[
+            str,
+            Field(description="The exact mathematical claim to check."),
+        ],
+        artifact_uri: Annotated[
+            str | None,
+            Field(description="Optional artifact:// URI carrying candidate evidence."),
+        ] = None,
+    ) -> str:
+        return evidence_check_prompt(claim, artifact_uri)
 
     return server
 

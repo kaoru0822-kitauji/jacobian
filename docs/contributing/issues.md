@@ -34,7 +34,12 @@ The repository implements the verification kernel together with:
 - transformation proposal and independent verification;
 - exact finite rational convex-hull membership and separation;
 - CLI and MCP adapters;
-- graph/path and integer-matrix reference domains.
+- explicit domain bundles for arithmetic, number theory, combinatorics, finite
+  sets, sequences, geometry, graph optimization and invariants, matrices,
+  lattices, polynomials, validated analysis, finite probability, and rational
+  optimization; and
+- typed Lean proof states, premise retrieval, dependency subgraphs, proof-edit
+  validation, and independent proof replay.
 
 Do not open umbrella issues that merely restate the product goals.
 

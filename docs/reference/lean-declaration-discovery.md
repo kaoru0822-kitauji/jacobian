@@ -85,3 +85,7 @@ execution failures without a mathematical conclusion.
 
 See [Retrieve a Lean theorem and check a proof](../tutorials/lean-declaration-discovery.md)
 for the public composition.
+
+For dependency subgraphs, proof states, premise retrieval, statement
+operations, and checker-bound proof edits, see the
+[Lean formal intermediates reference](lean-formal-intermediates.md).

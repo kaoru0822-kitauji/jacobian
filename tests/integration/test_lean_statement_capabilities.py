@@ -1,4 +1,4 @@
-"""Integration tests for Lean statement proposal, repair, and comparison."""
+"""Integration tests for Lean statement proposal and comparison."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.lean_statement_capabilities import (
-    LeanProofRepairAdapter,
     LeanStatementCompareAdapter,
     LeanStatementProposalAdapter,
     install_lean_statement_capabilities,
@@ -38,7 +37,6 @@ def _build_adapters(
     tmp_path: Path,
 ) -> tuple[
     LeanStatementProposalAdapter,
-    LeanProofRepairAdapter,
     LeanStatementCompareAdapter,
 ]:
     store = ArtifactStore(tmp_path)
@@ -57,7 +55,7 @@ def _build_adapters(
 
 @pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
 def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
-    propose, _, _ = _build_adapters(tmp_path)
+    propose, _ = _build_adapters(tmp_path)
 
     result = propose.invoke(
         CapabilityRequest(
@@ -81,7 +79,7 @@ def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
 def test_propose_reports_elaboration_failure(tmp_path: Path) -> None:
-    propose, _, _ = _build_adapters(tmp_path)
+    propose, _ = _build_adapters(tmp_path)
 
     result = propose.invoke(
         CapabilityRequest(
@@ -101,7 +99,7 @@ def test_propose_reports_elaboration_failure(tmp_path: Path) -> None:
 
 
 def test_propose_rejects_forbidden_statement(tmp_path: Path) -> None:
-    propose, _, _ = _build_adapters(tmp_path)
+    propose, _ = _build_adapters(tmp_path)
 
     with pytest.raises(CapabilityInvocationError) as exc_info:
         propose.invoke(
@@ -119,7 +117,7 @@ def test_propose_rejects_forbidden_statement(tmp_path: Path) -> None:
 
 
 def test_propose_rejects_mathlib_environment(tmp_path: Path) -> None:
-    propose, _, _ = _build_adapters(tmp_path)
+    propose, _ = _build_adapters(tmp_path)
 
     with pytest.raises(CapabilityInvocationError) as exc_info:
         propose.invoke(
@@ -140,7 +138,7 @@ def test_propose_returns_diagnostic_when_lean_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(shutil, "which", lambda _: None)
-    propose, _, _ = _build_adapters(tmp_path)
+    propose, _ = _build_adapters(tmp_path)
 
     with pytest.raises(CapabilityInvocationError) as exc_info:
         propose.invoke(
@@ -158,129 +156,13 @@ def test_propose_returns_diagnostic_when_lean_unavailable(
 
 
 # ---------------------------------------------------------------------------
-# lean.proof.repair_once
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
-def test_repair_appends_sorry_for_unsolved_goals(tmp_path: Path) -> None:
-    _, repair, _ = _build_adapters(tmp_path)
-
-    result = repair.invoke(
-        CapabilityRequest(
-            capability_id="lean.proof.repair_once",
-            input={
-                "environment": "CORE",
-                "statement": "True ∧ True",
-                "failing_proof": "constructor",
-                "compiler_errors": ["unsolved goals"],
-            },
-        )
-    )
-
-    assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["repair_strategy"] == "append_sorry"
-    assert result.output["diff"] != ""
-    assert result.output["repaired_proof"] != result.output["failing_proof"]
-    assert result.output["compile_checked"] is True
-    assert result.output["verification"] == "UNVERIFIED"
-    assert result.output["repair_uri"] in result.artifact_uris
-
-
-@pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
-def test_repair_adds_by_when_missing(tmp_path: Path) -> None:
-    _, repair, _ = _build_adapters(tmp_path)
-
-    result = repair.invoke(
-        CapabilityRequest(
-            capability_id="lean.proof.repair_once",
-            input={
-                "environment": "CORE",
-                "statement": "True",
-                "failing_proof": "trivial",
-                "compiler_errors": ["expected tactic"],
-            },
-        )
-    )
-
-    assert result.output["repair_strategy"] == "add_by"
-    assert result.output["repaired_proof"].startswith("by")
-
-
-def test_repair_returns_none_strategy_when_no_errors(tmp_path: Path) -> None:
-    _, repair, _ = _build_adapters(tmp_path)
-
-    result = repair.invoke(
-        CapabilityRequest(
-            capability_id="lean.proof.repair_once",
-            input={
-                "environment": "CORE",
-                "statement": "True",
-                "failing_proof": "trivial",
-                "compiler_errors": [],
-            },
-        )
-    )
-
-    assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["repair_strategy"] == "none"
-    assert result.output["diff"] == ""
-    assert result.output["repaired_proof"] == result.output["failing_proof"]
-
-
-def test_repair_produces_diff_without_compile_check_when_lean_unavailable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(shutil, "which", lambda _: None)
-    _, repair, _ = _build_adapters(tmp_path)
-
-    result = repair.invoke(
-        CapabilityRequest(
-            capability_id="lean.proof.repair_once",
-            input={
-                "environment": "CORE",
-                "statement": "True",
-                "failing_proof": "trivial",
-                "compiler_errors": ["expected tactic"],
-            },
-        )
-    )
-
-    assert result.execution.status is ExecutionStatus.COMPLETED
-    assert result.output["repair_strategy"] == "add_by"
-    assert result.output["diff"] != ""
-    assert result.output["compile_checked"] is False
-    assert result.output["compiles"] is False
-    assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
-
-
-def test_repair_rejects_dangerous_proof(tmp_path: Path) -> None:
-    _, repair, _ = _build_adapters(tmp_path)
-
-    with pytest.raises(CapabilityInvocationError) as exc_info:
-        repair.invoke(
-            CapabilityRequest(
-                capability_id="lean.proof.repair_once",
-                input={
-                    "environment": "CORE",
-                    "statement": "True",
-                    "failing_proof": "import Mathlib",
-                    "compiler_errors": [],
-                },
-            )
-        )
-
-    assert exc_info.value.diagnostic.code == "INVALID_LEAN_PROOF_REPAIR_REQUEST"
-
-
-# ---------------------------------------------------------------------------
 # lean.statement.compare
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
 def test_compare_identical_statements(tmp_path: Path) -> None:
-    _, _, compare = _build_adapters(tmp_path)
+    _, compare = _build_adapters(tmp_path)
 
     result = compare.invoke(
         CapabilityRequest(
@@ -306,7 +188,7 @@ def test_compare_identical_statements(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
 def test_compare_different_statements(tmp_path: Path) -> None:
-    _, _, compare = _build_adapters(tmp_path)
+    _, compare = _build_adapters(tmp_path)
 
     result = compare.invoke(
         CapabilityRequest(
@@ -329,7 +211,7 @@ def test_compare_works_without_lean_for_syntactic_comparison(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(shutil, "which", lambda _: None)
-    _, _, compare = _build_adapters(tmp_path)
+    _, compare = _build_adapters(tmp_path)
 
     result = compare.invoke(
         CapabilityRequest(
@@ -350,7 +232,7 @@ def test_compare_works_without_lean_for_syntactic_comparison(
 
 
 def test_compare_normalizes_whitespace(tmp_path: Path) -> None:
-    _, _, compare = _build_adapters(tmp_path)
+    _, compare = _build_adapters(tmp_path)
 
     result = compare.invoke(
         CapabilityRequest(
@@ -367,7 +249,7 @@ def test_compare_normalizes_whitespace(tmp_path: Path) -> None:
 
 
 def test_compare_rejects_forbidden_statement(tmp_path: Path) -> None:
-    _, _, compare = _build_adapters(tmp_path)
+    _, compare = _build_adapters(tmp_path)
 
     with pytest.raises(CapabilityInvocationError) as exc_info:
         compare.invoke(
@@ -390,12 +272,11 @@ def test_compare_rejects_forbidden_statement(tmp_path: Path) -> None:
 
 
 def test_descriptors_have_correct_ids_and_modes(tmp_path: Path) -> None:
-    propose, repair, compare = _build_adapters(tmp_path)
+    propose, compare = _build_adapters(tmp_path)
 
     assert propose.descriptor.capability_id == "lean.statement.propose"
-    assert repair.descriptor.capability_id == "lean.proof.repair_once"
     assert compare.descriptor.capability_id == "lean.statement.compare"
-    for adapter in (propose, repair, compare):
+    for adapter in (propose, compare):
         assert adapter.descriptor.modes == (
             __import__(
                 "jacobian.contracts.capabilities", fromlist=["CapabilityMode"]

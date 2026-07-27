@@ -26,6 +26,9 @@ done
 
 classification=docs
 run_python=false
+run_core=false
+run_integration=false
+run_coverage=false
 run_lean=false
 run_npm=false
 run_static=false
@@ -36,13 +39,30 @@ run_duplicate=false
 if [ "$force_full" = "true" ] || (( $# == 0 )); then
   classification=full
 else
+  saw_core=false
+  saw_integration=false
+  saw_lean=false
+  saw_npm=false
   for path in "$@"; do
     case "$path" in
-      docs/*|*.md|.github/ISSUE_TEMPLATE/*|.github/CODEOWNERS|npm/*)
-        if [[ "$path" == npm/* ]]; then
-          run_npm=true
-          classification=npm
-        fi
+      docs/*|*.md|.github/ISSUE_TEMPLATE/*|.github/CODEOWNERS)
+        ;;
+      npm/*)
+        saw_npm=true
+        ;;
+      lean/*)
+        saw_lean=true
+        ;;
+      tests/unit/*|tests/contract/*|tests/checkers/*|tests/reference/*)
+        saw_core=true
+        ;;
+      tests/integration/*)
+        saw_integration=true
+        saw_lean=true
+        ;;
+      tests/end_to_end/*)
+        saw_integration=true
+        saw_lean=true
         ;;
       *)
         classification=full
@@ -50,10 +70,42 @@ else
         ;;
     esac
   done
+  if [ "$classification" != "full" ]; then
+    run_core=$saw_core
+    run_integration=$saw_integration
+    run_lean=$saw_lean
+    run_npm=$saw_npm
+    if [ "$run_core" = "true" ] || [ "$run_integration" = "true" ]; then
+      run_python=true
+      run_static=true
+    fi
+    if [ "$run_core" = "true" ] && [ "$run_integration" = "true" ]; then
+      run_coverage=true
+    fi
+
+    enabled=0
+    for value in "$run_core" "$run_integration" "$run_lean" "$run_npm"; do
+      if [ "$value" = "true" ]; then
+        enabled=$((enabled + 1))
+      fi
+    done
+    if (( enabled > 1 )); then
+      classification=selective
+    elif [ "$run_core" = "true" ]; then
+      classification=python-core
+    elif [ "$run_lean" = "true" ]; then
+      classification=lean
+    elif [ "$run_npm" = "true" ]; then
+      classification=npm
+    fi
+  fi
 fi
 
 if [ "$classification" = "full" ]; then
   run_python=true
+  run_core=true
+  run_integration=true
+  run_coverage=true
   run_lean=true
   run_npm=true
   run_static=true
@@ -64,11 +116,27 @@ fi
 
 if [ "$force_lean" = "true" ]; then
   run_lean=true
+  if [ "$classification" != "full" ]; then
+    enabled=0
+    for value in "$run_core" "$run_integration" "$run_lean" "$run_npm"; do
+      if [ "$value" = "true" ]; then
+        enabled=$((enabled + 1))
+      fi
+    done
+    if (( enabled > 1 )); then
+      classification=selective
+    else
+      classification=lean
+    fi
+  fi
 fi
 
 printf '%s\n' \
   "classification=$classification" \
   "run-python=$run_python" \
+  "run-core=$run_core" \
+  "run-integration=$run_integration" \
+  "run-coverage=$run_coverage" \
   "run-lean=$run_lean" \
   "run-npm=$run_npm" \
   "run-static=$run_static" \

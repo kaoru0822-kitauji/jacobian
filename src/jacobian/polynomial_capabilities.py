@@ -17,6 +17,8 @@ from sympy.polys.polyerrors import PolynomialError
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -24,6 +26,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
@@ -31,6 +34,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
     EvidenceBindings,
@@ -266,39 +270,60 @@ def install_polynomial_capabilities(
     jacobian_checker_id = None
     identity_checker_id = None
     if authorize_checker:
-        collision_checker_id = checkers.authorize(
-            name="exact rational polynomial-map collision checker",
-            entrypoint="jacobian_checkers.polynomial_maps:check_collision",
-            evidence_kind="WITNESS",
-            format_id="polynomial.map_collision",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(map_schema_uri,),
-            reason="bundled polynomial-map reference checker",
-        ).checker_id
-        jacobian_checker_id = checkers.authorize(
-            name="exact sparse polynomial Jacobian replay checker",
-            entrypoint="jacobian_checkers.polynomial_maps:check_jacobian",
-            evidence_kind="CERTIFICATE",
-            format_id="polynomial.jacobian_replay",
-            format_version="1",
-            claim_schema_uris=(jacobian_claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(jacobian_schema_uri,),
-            reason="bundled independent sparse-polynomial Jacobian checker",
-        ).checker_id
-        identity_checker_id = checkers.authorize(
-            name="exact sparse rational polynomial identity checker",
-            entrypoint="jacobian_checkers.polynomial_maps:check_identity",
-            evidence_kind="CERTIFICATE",
-            format_id="polynomial.identity_replay",
-            format_version="1",
-            claim_schema_uris=(identity_claim_schema_uri,),
-            semantics_uris=(identity_semantics_uri,),
-            candidate_schema_uris=(right_polynomial_schema_uri,),
-            reason="bundled independent sparse-polynomial identity checker",
-        ).checker_id
+        collision_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact rational polynomial-map collision checker",
+                    entrypoint="jacobian_checkers.polynomial_maps:check_collision",
+                    evidence_kind=EvidenceKind.WITNESS,
+                    format_id="polynomial.map_collision",
+                    format_version="1",
+                    claim_schema_uris=(claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(map_schema_uri,),
+                    reason="bundled polynomial-map reference checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
+        jacobian_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact sparse polynomial Jacobian replay checker",
+                    entrypoint="jacobian_checkers.polynomial_maps:check_jacobian",
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="polynomial.jacobian_replay",
+                    format_version="1",
+                    claim_schema_uris=(jacobian_claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(jacobian_schema_uri,),
+                    reason="bundled independent sparse-polynomial Jacobian checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
+        identity_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact sparse rational polynomial identity checker",
+                    entrypoint="jacobian_checkers.polynomial_maps:check_identity",
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="polynomial.identity_replay",
+                    format_version="1",
+                    claim_schema_uris=(identity_claim_schema_uri,),
+                    semantics_uris=(identity_semantics_uri,),
+                    candidate_schema_uris=(right_polynomial_schema_uri,),
+                    reason="bundled independent sparse-polynomial identity checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,
@@ -1453,6 +1478,23 @@ class PolynomialIdentityAdapter:
             input_schema=model_schema(PolynomialIdentityRequest),
             output_schema=model_schema(PolynomialIdentityOutput),
             tags=("polynomial", "identity", "verification", "exact-rational"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="zero_identity",
+                    description=(
+                        "Independently verify that two zero polynomials are equal "
+                        "in QQ[x]."
+                    ),
+                    mode=CapabilityMode.VERIFY,
+                    input=PolynomialIdentityRequest.model_validate(
+                        {
+                            "variables": ["x"],
+                            "left": {"terms": []},
+                            "right": {"terms": []},
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property

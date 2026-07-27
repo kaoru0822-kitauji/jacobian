@@ -111,3 +111,24 @@ class GeometryOperationOutput(ContractModel):
     result_uri: ArtifactUri
     result: dict[str, object]
     backend_version: str
+
+
+class GeometryVerificationRequest(ContractModel):
+    result_uri: ArtifactUri
+
+
+class GeometryVerificationOutput(ContractModel):
+    status: Literal["VERIFIED_RESULT", "REJECTED", "TIMEOUT", "CANCELLED", "ERROR"]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    operation_id: Literal[
+        "geometry.points.compute.squared_distance",
+        "geometry.segment.compute.midpoint",
+        "geometry.triangle.compute.orientation",
+        "geometry.triangle.compute.centroid",
+    ]
+    input_uri: ArtifactUri
+    result_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    checker_id: str
+    verification_record_uri: ArtifactUri | None = None
+    detail: str

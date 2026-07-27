@@ -18,6 +18,11 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLES
+from jacobian.domains.graph_optimization.bundle import GRAPH_OPTIMIZATION_BUNDLE
+from jacobian.domains.graph_optimization.invariant_bundle import (
+    GRAPH_INVARIANT_BUNDLE,
+)
 from jacobian.kernel import JacobianKernel
 from jacobian.provider_measurements import _cold_install_spec
 
@@ -73,6 +78,21 @@ def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
         descriptors["universal_algebra.search.countermodel"].provider_runtime.provider
         == "jacobian.z3"
     )
+    built_in_ids = {
+        operation.capability_id
+        for bundle in BUILTIN_DOMAIN_BUNDLES
+        for operation in bundle.capabilities
+    }
+    assert built_in_ids <= descriptors.keys()
+    assert set(kernel.domain_bundles) == {
+        bundle.domain_id for bundle in BUILTIN_DOMAIN_BUNDLES
+    }
+    assert {
+        "matrix.integer.row_hermite_normal_form",
+        "matrix.integer.smith_normal_form",
+        "polynomial.rational.gcd.compute",
+        "lean.proof.repair_once",
+    }.isdisjoint(descriptors)
 
 
 def test_unavailable_adapter_is_rejected_before_catalog_advertisement(
@@ -86,6 +106,33 @@ def test_unavailable_adapter_is_rejected_before_catalog_advertisement(
     assert "fixture.unavailable" not in {
         item.capability_id for item in kernel.capabilities.catalog().capabilities
     }
+
+
+def test_graph_domain_runtime_identities_bind_every_executed_backend() -> None:
+    optimization_components = GRAPH_OPTIMIZATION_BUNDLE.provider_runtime.configuration[
+        "components"
+    ]
+    invariant_components = GRAPH_INVARIANT_BUNDLE.provider_runtime.configuration[
+        "components"
+    ]
+
+    assert {component["provider"] for component in optimization_components} == {
+        "jacobian.networkx",
+        "jacobian.sympy",
+        "jacobian.z3",
+    }
+    assert {component["provider"] for component in invariant_components} == {
+        "jacobian.networkx",
+        "jacobian.sympy",
+    }
+    assert (
+        GRAPH_OPTIMIZATION_BUNDLE.provider_runtime.digest_kind
+        is CapabilityProviderDigestKind.COMPOSITE
+    )
+    assert (
+        GRAPH_INVARIANT_BUNDLE.provider_runtime.digest_kind
+        is CapabilityProviderDigestKind.COMPOSITE
+    )
 
 
 def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
@@ -108,13 +155,16 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
     kernel = JacobianKernel(tmp_path, install_references=True)
 
     assert kernel.lean is None
+    assert kernel.lean_proof_edit is None
     capability_ids = {
         item.capability_id for item in kernel.capabilities.catalog().capabilities
     }
     assert {
         "lean.check",
+        "lean.declaration.dependencies",
         "lean.declaration.inspect",
         "lean.declaration.search",
+        "lean.proof_edit.validate",
     }.isdisjoint(capability_ids)
 
 

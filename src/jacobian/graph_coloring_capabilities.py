@@ -11,6 +11,8 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -24,6 +26,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.graph_coloring import (
     GraphColoringEncodingCandidate,
@@ -101,17 +104,26 @@ def install_graph_coloring_capabilities(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="independent graph-coloring CNF encoding checker",
-            entrypoint="jacobian_checkers.graph_coloring:check_encoding",
-            evidence_kind="CERTIFICATE",
-            format_id="graph.coloring.encoding",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(candidate_schema_uri,),
-            reason=("bundled standard-library replay of graph-to-CNF semantics"),
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="independent graph-coloring CNF encoding checker",
+                    entrypoint="jacobian_checkers.graph_coloring:check_encoding",
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="graph.coloring.encoding",
+                    format_version="1",
+                    claim_schema_uris=(claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(candidate_schema_uri,),
+                    reason=(
+                        "bundled standard-library replay of graph-to-CNF semantics"
+                    ),
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = GraphColoringInstallation(
         semantics_uri=semantics_uri,
         claim_schema_uri=claim_schema_uri,

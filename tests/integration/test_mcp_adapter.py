@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from jacobian.adapters.mcp.guidance import OPERATING_GUIDE
 from jacobian.adapters.mcp.server import (
     WORKSPACE_TOOL_NAMES,
     _public_tool_error,
@@ -34,6 +35,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
         from mcp import Client
 
         async with Client(server, raise_exceptions=True) as client:
+            assert client.instructions == server.instructions
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
             assert set(tools) == MCP_TOOL_NAMES
@@ -45,7 +47,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 sort_keys=True,
                 separators=(",", ":"),
             )
-            assert len(descriptor) < 25_000
+            assert len(descriptor) < 32_000
             assert all(
                 tool.annotations is not None
                 and tool.annotations.open_world_hint is False
@@ -53,6 +55,23 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             )
             assert tools["capability.describe"].annotations is not None
             assert tools["capability.describe"].annotations.read_only_hint is True
+            assert (
+                "ranking is deterministic retrieval"
+                in (tools["capability.describe"].description or "").lower()
+            )
+            describe_schema = tools["capability.describe"].input_schema
+            assert set(describe_schema["properties"]) == {
+                "capability_id",
+                "query",
+                "domain",
+                "mode",
+                "limit",
+                "cursor",
+            }
+            assert describe_schema["additionalProperties"] is False
+            assert (
+                tools["capability.invoke"].input_schema["additionalProperties"] is False
+            )
             assert tools["workspace.open"].annotations is not None
             assert tools["workspace.open"].annotations.idempotent_hint is True
             assert tools["workspace.write"].annotations is not None
@@ -62,6 +81,40 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             assert all(
                 tools[name].output_schema is None for name in WORKSPACE_TOOL_NAMES
             )
+
+            resources = await client.list_resources()
+            resource_uris = {str(resource.uri) for resource in resources.resources}
+            assert "jacobian://instructions" in resource_uris
+            instructions = await client.read_resource("jacobian://instructions")
+            assert instructions.contents[0].text == OPERATING_GUIDE
+
+            prompts = await client.list_prompts()
+            prompt_names = {prompt.name for prompt in prompts.prompts}
+            assert prompt_names == {
+                "jacobian-check-evidence",
+                "jacobian-discover",
+            }
+            discovery_prompt = await client.get_prompt(
+                "jacobian-discover",
+                {"task": "Explore structures related to a conjecture."},
+            )
+            rendered_prompt = discovery_prompt.messages[0].content.text
+            assert "research strategy" in rendered_prompt
+            assert "Search any outcomes or concepts" in rendered_prompt
+
+            discovery_result = await client.call_tool(
+                "capability.describe",
+                {"query": "search mathematical knowledge", "limit": 3},
+            )
+            discovery = json.loads(discovery_result.content[0].text)
+            assert discovery["kind"] == "discovery"
+            assert 0 < len(discovery["matches"]) <= 3
+            assert "input_schema" not in discovery["matches"][0]
+            assert discovery["next_step"] == {
+                "tool": "capability.describe",
+                "argument": "capability_id",
+                "choose_from": "matches[].capability_id",
+            }
 
             catalog_result = await client.read_resource("capability://catalog")
             catalog = json.loads(catalog_result.contents[0].text)
@@ -452,27 +505,31 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
                 for descriptor in full_catalog["capabilities"]
             }
 
-            listed = await client.call_tool("capability.describe", {})
+            listed = await client.call_tool(
+                "capability.describe",
+                {"limit": 50},
+            )
             index = json.loads(listed.content[0].text)
             assert len(listed.content[0].text.encode("utf-8")) < 128 * 1024
             assert index["catalog_digest"].startswith("sha256:")
-            assert index["returned_count"] == len(index["capabilities"])
+            assert len(index["matches"]) <= 50
             indexed_ids = {
-                descriptor["capability_id"] for descriptor in index["capabilities"]
+                descriptor["capability_id"] for descriptor in index["matches"]
             }
             assert all(
-                "input_schema" not in descriptor for descriptor in index["capabilities"]
+                "input_schema" not in descriptor for descriptor in index["matches"]
             )
             cursor = index["next_cursor"]
             while cursor is not None:
                 next_page = await client.call_tool(
                     "capability.describe",
-                    {"cursor": cursor},
+                    {"cursor": cursor, "limit": 50},
                 )
                 page = json.loads(next_page.content[0].text)
                 assert len(next_page.content[0].text.encode("utf-8")) < 128 * 1024
+                assert page["catalog_digest"] == index["catalog_digest"]
                 indexed_ids.update(
-                    descriptor["capability_id"] for descriptor in page["capabilities"]
+                    descriptor["capability_id"] for descriptor in page["matches"]
                 )
                 cursor = page["next_cursor"]
             assert indexed_ids == all_ids
@@ -483,8 +540,7 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             )
             search_index = json.loads(searched.content[0].text)
             search_ids = {
-                descriptor["capability_id"]
-                for descriptor in search_index["capabilities"]
+                descriptor["capability_id"] for descriptor in search_index["matches"]
             }
             expected_sat_ids = {
                 "sat.cnf.materialize",
@@ -495,21 +551,32 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             first_page = await client.call_tool(
                 "capability.describe",
-                {},
+                {"limit": 50},
             )
             first = json.loads(first_page.content[0].text)
-            assert first["returned_count"] == 50
+            assert len(first["matches"]) == 50
             assert first["next_cursor"] is not None
             second_page = await client.call_tool(
                 "capability.describe",
-                {"cursor": first["next_cursor"]},
+                {"cursor": first["next_cursor"], "limit": 50},
             )
             second = json.loads(second_page.content[0].text)
             assert {
-                descriptor["capability_id"] for descriptor in first["capabilities"]
+                descriptor["capability_id"] for descriptor in first["matches"]
             }.isdisjoint(
-                descriptor["capability_id"] for descriptor in second["capabilities"]
+                descriptor["capability_id"] for descriptor in second["matches"]
             )
+
+            invalid_cursor = await client.call_tool(
+                "capability.describe",
+                {
+                    "query": "definitely-no-matching-capability",
+                    "cursor": first["next_cursor"],
+                    "limit": 50,
+                },
+            )
+            invalid = json.loads(invalid_cursor.content[0].text)
+            assert invalid["error"]["code"] == "INVALID_CURSOR"
 
     asyncio.run(scenario())
 
@@ -555,7 +622,7 @@ def test_mcp_tool_failures_return_safe_actionable_errors(tmp_path: Path) -> None
             )
             response = json.loads(unknown_capability.content[0].text)
             assert response["error"]["code"] == "UNKNOWN_CAPABILITY"
-            assert "list installed capabilities" in response["error"]["hint"]
+            assert "search installed capabilities" in response["error"]["hint"]
 
     asyncio.run(scenario())
 

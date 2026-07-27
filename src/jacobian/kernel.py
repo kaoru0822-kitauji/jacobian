@@ -12,6 +12,7 @@ from jacobian.builtin_capabilities import (
     LeanCheckAdapter,
     LeanDeclarationInspectAdapter,
     LeanDeclarationSearchAdapter,
+    LeanDependencyGraphAdapter,
 )
 from jacobian.cadical import install_cadical_capabilities
 from jacobian.capabilities import (
@@ -25,10 +26,14 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
 )
-from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean import LeanDependencyGraphArtifact, LeanEnvironment
 from jacobian.cvc5 import install_cvc5_capability
-from jacobian.domain_atomic_extras import install_domain_atomic_extras
+from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLES
 from jacobian.evaluation import EvaluationService
+from jacobian.exact_domain_checkers import (
+    ExactDomainCheckerInstallation,
+    install_exact_domain_verification,
+)
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
 from jacobian.finite_partition import (
@@ -40,7 +45,10 @@ from jacobian.flint_linear import (
     install_python_flint_inconsistency_capability,
     install_python_flint_linear_capability,
 )
-from jacobian.geometry_capabilities import install_geometry_capabilities
+from jacobian.geometry_verification import (
+    GeometryCheckerInstallation,
+    install_geometry_checker,
+)
 from jacobian.graph_capabilities import GraphInstallation, install_graph_capabilities
 from jacobian.graph_coloring_capabilities import (
     GraphColoringInstallation,
@@ -62,6 +70,10 @@ from jacobian.lean_declarations import (
 from jacobian.lean_exploration import (
     LeanExplorationInstallation,
     install_lean_exploration_capabilities,
+)
+from jacobian.lean_proof_edit import (
+    LeanProofEditInstallation,
+    install_lean_proof_edit_capability,
 )
 from jacobian.lean_statement_capabilities import (
     LeanStatementInstallation,
@@ -91,6 +103,11 @@ from jacobian.matrix_normal_forms import (
     install_matrix_normal_form_artifacts,
 )
 from jacobian.memory import ResearchMemory
+from jacobian.operation_installation import (
+    InstalledDomainBundle,
+    OperationInstaller,
+)
+from jacobian.operations import DomainBundle
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.polynomial_capabilities import (
@@ -118,8 +135,6 @@ from jacobian.polynomial_system_capabilities import (
     install_polynomial_system_capabilities,
 )
 from jacobian.polytope import PolytopeService
-from jacobian.primitive_adapters import factory as install_primitive_adapters
-from jacobian.primitive_math_capabilities import install_primitive_math_capabilities
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
     carcara_provider_runtime,
@@ -187,6 +202,12 @@ class JacobianKernel:
         self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
+        self.operation_installer = OperationInstaller(
+            self.store,
+            self.schemas,
+            self.artifacts,
+        )
+        self.domain_bundles: dict[str, InstalledDomainBundle] = {}
         self.sat: SatArtifactService = install_sat_artifacts(
             self.store,
             self.schemas,
@@ -308,8 +329,12 @@ class JacobianKernel:
         self.polytope_checkers: PolytopeCheckerInstallation | None = None
         self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
         self.lean: LeanService | None = None
+        self.lean_runtime: CapabilityProviderRuntime | None = None
+        self.lean_proof_edit: LeanProofEditInstallation | None = None
         self.lean_declarations: LeanDeclarationService | None = None
         self.lean_exploration: LeanExplorationInstallation | None = None
+        self.geometry_checker: GeometryCheckerInstallation | None = None
+        self.exact_domain_checkers: ExactDomainCheckerInstallation | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         self.register_capability(SatCnfMaterializationAdapter(self.sat))
         self.sat_assignment_checker: SatAssignmentCheckerInstallation
@@ -450,7 +475,8 @@ class JacobianKernel:
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
         self._install_graph_coloring_capabilities(install_references)
-        self._install_geometry_capabilities()
+        self._install_builtin_domain_bundles()
+        self._install_builtin_domain_verification(install_references)
         self.graph_isomorphism: GraphIsomorphismInstallation
         graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
             self.store,
@@ -496,7 +522,6 @@ class JacobianKernel:
         )
         if determinant_verification is not None:
             self.register_capability(determinant_verification)
-        self._install_primitive_math_capabilities()
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
@@ -554,6 +579,7 @@ class JacobianKernel:
                     )
                 ),
             )
+            self.lean_runtime = runtime
             if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
                 try:
                     self.lean_declarations = installed_lean_declaration_service(runtime)
@@ -562,19 +588,7 @@ class JacobianKernel:
                         "Lean declaration discovery is not installed: %s",
                         exc,
                     )
-                if self.lean_declarations is not None:
-                    self.register_capability(
-                        LeanDeclarationSearchAdapter(
-                            self.lean_declarations,
-                            runtime,
-                        )
-                    )
-                    self.register_capability(
-                        LeanDeclarationInspectAdapter(
-                            self.lean_declarations,
-                            runtime,
-                        )
-                    )
+                self._install_lean_declaration_adapters(runtime)
                 self.lean = LeanService(
                     self.store,
                     self.artifacts,
@@ -593,6 +607,7 @@ class JacobianKernel:
                 )
                 for lean_exploration_adapter in lean_exploration_adapters:
                     self.register_capability(lean_exploration_adapter)
+                self._install_lean_proof_edit()
             else:
                 _LOGGER.warning(
                     "lean.check is not installed: %s",
@@ -652,10 +667,57 @@ class JacobianKernel:
         )
         for lean_statement_adapter in lean_adapters:
             self.register_capability(lean_statement_adapter)
-        for primitive_adapter in install_primitive_adapters(self):
-            self.register_capability(primitive_adapter)
-        for domain_atomic_adapter in install_domain_atomic_extras(self):
-            self.register_capability(domain_atomic_adapter)
+
+    def _install_lean_proof_edit(self) -> None:
+        if self.lean is None or self.lean_runtime is None:
+            return
+        adapter, self.lean_proof_edit = install_lean_proof_edit_capability(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.lean,
+            self.lean_runtime,
+        )
+        self.register_capability(adapter)
+
+    def _install_lean_declaration_adapters(
+        self,
+        runtime: CapabilityProviderRuntime,
+    ) -> None:
+        if self.lean_declarations is None:
+            return
+        self.register_capability(
+            LeanDeclarationSearchAdapter(self.lean_declarations, runtime)
+        )
+        self.register_capability(
+            LeanDependencyGraphAdapter(
+                self.lean_declarations,
+                runtime,
+                self.artifacts,
+                semantics_uri=self.store.register_descriptor(
+                    kind="semantics",
+                    name="jacobian.lean4-declaration-dependencies",
+                    version="1",
+                    definition={
+                        "description": (
+                            "bounded constant dependencies extracted from elaborated "
+                            "Lean declaration types and values"
+                        ),
+                        "provider_digest": runtime.digest,
+                        "dependency_api": "Lean.Expr.getUsedConstantsAsSet",
+                        "verification": "computed metadata; no theorem verification",
+                    },
+                ),
+                dependency_graph_schema_uri=self.schemas.register(
+                    name="jacobian.lean4-dependency-graph",
+                    version="1",
+                    schema=LeanDependencyGraphArtifact.model_json_schema(),
+                ),
+            )
+        )
+        self.register_capability(
+            LeanDeclarationInspectAdapter(self.lean_declarations, runtime)
+        )
 
     def _install_graph_coloring_capabilities(self, authorize_checker: bool) -> None:
         self.graph_coloring: GraphColoringInstallation
@@ -713,20 +775,53 @@ class JacobianKernel:
         else:
             self.register_capability(adapter)
 
-    def _install_primitive_math_capabilities(self) -> None:
-        for adapter in install_primitive_math_capabilities(
+    def _install_builtin_domain_bundles(self) -> None:
+        for bundle in BUILTIN_DOMAIN_BUNDLES:
+            self._install_capability_bundle(bundle)
+
+    def _install_builtin_domain_verification(self, authorize: bool) -> None:
+        geometry = self.domain_bundles.get("geometry")
+        if geometry is not None:
+            geometry_adapter, self.geometry_checker = install_geometry_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                geometry,
+                self.verification,
+                self.checkers,
+                authorize_checker=authorize,
+            )
+            if geometry_adapter is not None:
+                self.register_capability(geometry_adapter)
+
+        polynomial = self.domain_bundles.get("polynomial")
+        matrix = self.domain_bundles.get("matrix")
+        if polynomial is None or matrix is None:
+            return
+        adapters, self.exact_domain_checkers = install_exact_domain_verification(
             self.store,
             self.schemas,
             self.artifacts,
-        ):
+            self.verification,
+            self.checkers,
+            polynomial=polynomial,
+            matrix=matrix,
+            authorize=authorize,
+        )
+        for adapter in adapters:
             self.register_capability(adapter)
 
-    def _install_geometry_capabilities(self) -> None:
-        for adapter in install_geometry_capabilities(
-            self.store,
-            self.schemas,
-            self.artifacts,
+    def _install_capability_bundle(self, bundle: DomainBundle) -> None:
+        if (
+            bundle.provider_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
         ):
+            return
+        installation = self.operation_installer.install(bundle)
+        if bundle.domain_id in self.domain_bundles:
+            raise ValueError(f"duplicate capability bundle: {bundle.domain_id}")
+        self.domain_bundles[bundle.domain_id] = installation
+        for adapter in installation.adapters:
             self.register_capability(adapter)
 
     def _install_python_flint_capabilities(self) -> None:

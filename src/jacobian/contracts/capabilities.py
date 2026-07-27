@@ -29,6 +29,72 @@ class CapabilityMode(StrEnum):
     VERIFY = "VERIFY"
 
 
+class CapabilityInvocationExample(ContractModel):
+    """One operator-authored, schema-valid example for an advertised mode."""
+
+    name: str = Field(
+        pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+        min_length=1,
+        max_length=64,
+    )
+    description: str = Field(min_length=1, max_length=256)
+    mode: CapabilityMode
+    input: dict[str, Any]
+
+    @model_validator(mode="after")
+    def require_canonical_input(self) -> Self:
+        canonicalize_json(self.input)
+        return self
+
+
+class CapabilityDiscoveryRequest(ContractModel):
+    """Compact installed-portfolio search, independent of any transport."""
+
+    query: str | None = Field(default=None, min_length=1, max_length=512)
+    domain: str | None = Field(
+        default=None,
+        pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
+    )
+    mode: CapabilityMode | None = None
+    limit: int = Field(default=10, ge=1, le=50, strict=True)
+    cursor: CapabilityId | None = None
+
+    @model_validator(mode="after")
+    def reject_blank_filters(self) -> Self:
+        if self.query is not None and not self.query.strip():
+            raise ValueError("query must contain a non-whitespace character")
+        if self.domain is not None and not self.domain.strip():
+            raise ValueError("domain must contain a non-whitespace character")
+        return self
+
+
+class CapabilityDiscoveryMatch(ContractModel):
+    """One compact installed outcome returned by capability discovery."""
+
+    capability_id: CapabilityId
+    title: str = Field(min_length=1, max_length=128)
+    description: str = Field(min_length=1, max_length=512)
+    modes: tuple[CapabilityMode, ...]
+    tags: tuple[str, ...] = ()
+    matched_on: tuple[str, ...] = ()
+    matched_terms: tuple[str, ...] = ()
+    has_invocation_examples: bool = False
+
+
+class CapabilityDiscoveryResult(ContractModel):
+    """Deterministically ranked compact installed outcomes."""
+
+    discovery_version: Literal["1"] = "1"
+    query: str | None = None
+    domain: str | None = None
+    mode: CapabilityMode | None = None
+    matches: tuple[CapabilityDiscoveryMatch, ...]
+    total_matches: int = Field(ge=0, strict=True)
+    truncated: bool
+    next_cursor: CapabilityId | None = None
+    available_domains: tuple[str, ...] = ()
+
+
 class CapabilityInstallTier(StrEnum):
     """Operational cost and isolation required to install one provider."""
 
@@ -51,6 +117,7 @@ class CapabilityProviderDigestKind(StrEnum):
     SOURCE_TREE = "SOURCE_TREE"
     PYTHON_DISTRIBUTION_RECORD = "PYTHON_DISTRIBUTION_RECORD"
     EXECUTABLE = "EXECUTABLE"
+    COMPOSITE = "COMPOSITE"
 
 
 class CapabilityProviderRuntime(ContractModel):
@@ -160,6 +227,7 @@ class CapabilityDescriptor(ContractModel):
     read_only: bool = False
     records_episode: bool = True
     tags: tuple[str, ...] = ()
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
 
     @model_validator(mode="after")
     def require_modes_and_canonical_schemas(self) -> Self:
@@ -167,6 +235,20 @@ class CapabilityDescriptor(ContractModel):
             raise ValueError("a capability must support at least one mode")
         if len(set(self.modes)) != len(self.modes):
             raise ValueError("capability modes must be unique")
+        if len({example.name for example in self.invocation_examples}) != len(
+            self.invocation_examples
+        ):
+            raise ValueError("capability invocation example names must be unique")
+        unsupported_examples = [
+            example.name
+            for example in self.invocation_examples
+            if example.mode not in self.modes
+        ]
+        if unsupported_examples:
+            raise ValueError(
+                "capability invocation examples must use advertised modes: "
+                + ", ".join(unsupported_examples)
+            )
         canonicalize_json(self.input_schema)
         canonicalize_json(self.output_schema)
         if (

@@ -18,6 +18,8 @@ structure DeclarationQuery where
   candidate_names : Array String
   candidate_scan_positions : Array Nat
   scanned_declarations_total : Option Nat
+  max_depth : Nat
+  max_nodes : Nat
   deriving FromJson
 
 structure DeclarationIndexEntry where
@@ -89,6 +91,46 @@ def typeMatches (query : DeclarationQuery) (info : ConstantInfo) : Bool :=
   let used := info.type.getUsedConstantsAsSet
   query.type_constants.all fun constant => used.contains constant.toName
 
+def directDependencies (env : Environment) (info : ConstantInfo) :
+    Array (Name × Bool × Bool) :=
+  Id.run do
+    let typeRefs := info.type.getUsedConstantsAsSet
+    let valueRefs :=
+      match info.value? (allowOpaque := true) with
+      | some value => value.getUsedConstantsAsSet
+      | none => {}
+    let names := (typeRefs.toArray ++ valueRefs.toArray).qsort Name.lt
+    let mut dependencies := #[]
+    let mut previous : Option Name := none
+    for name in names do
+      if previous == some name then continue
+      previous := some name
+      if env.contains name then
+        dependencies := dependencies.push (
+          name,
+          typeRefs.contains name,
+          valueRefs.contains name
+        )
+    return dependencies
+
+def dependencyNodeJson (name : Name) (info : ConstantInfo) (depth : Nat) : Json :=
+  Json.mkObj [
+    ("name", toJson name.toString),
+    ("kind", toJson (declarationKind info)),
+    ("depth", toJson depth)
+  ]
+
+def dependencyEdgeJson (source target : Name) (inType inValue : Bool) : Json :=
+  Id.run do
+    let mut kinds : Array String := #[]
+    if inType then kinds := kinds.push "TYPE"
+    if inValue then kinds := kinds.push "VALUE"
+    return Json.mkObj [
+      ("source", toJson source.toString),
+      ("target", toJson target.toString),
+      ("kinds", toJson kinds)
+    ]
+
 def declarationJson (env : Environment) (name : Name) (info : ConstantInfo)
     (type : String) (matchReasons : Array String) (includeDetails : Bool) :
     Elab.Command.CommandElabM Json := do
@@ -136,7 +178,63 @@ def executeQuery (env : Environment) (names : Array Name)
     Elab.Command.CommandElabM (Except (String × String) Json) := do
   if query.limit == 0 || query.limit > 50 then
     return .error ("LEAN_QUERY_FAILED", "limit must be between 1 and 50")
-  if query.operation == "inspect" then
+  if query.max_depth > 8 || query.max_nodes == 0 || query.max_nodes > 500 then
+    return .error ("LEAN_QUERY_FAILED", "dependency budgets are invalid")
+  if query.operation == "dependencies" then
+      let some rawName := query.declaration_name
+        | return .error ("LEAN_QUERY_FAILED", "declaration_name is required")
+      let root := rawName.toName
+      let some rootInfo := env.find? root
+        | return .error (
+            "LEAN_DECLARATION_NOT_FOUND",
+            s!"declaration not found: {rawName}"
+          )
+      if root.toString != rawName || !targetModuleMatches query env root then
+        return .error (
+          "LEAN_DECLARATION_NOT_FOUND",
+          s!"declaration not found: {rawName}"
+        )
+      let mut queue : Array (Name × Nat) := #[(root, 0)]
+      let mut cursor := 0
+      let mut visited : Array Name := #[root]
+      let mut nodes : Array Json := #[dependencyNodeJson root rootInfo 0]
+      let mut edges : Array Json := #[]
+      let mut frontier : Array String := #[]
+      let mut nodeBudgetExhausted := false
+      while cursor < queue.size do
+        let (source, depth) := queue[cursor]!
+        cursor := cursor + 1
+        let some info := env.find? source | continue
+        let dependencies := directDependencies env info
+        if depth == query.max_depth then
+          if !dependencies.isEmpty then
+            frontier := frontier.push source.toString
+          continue
+        for (target, inType, inValue) in dependencies do
+          if target == source then continue
+          if !visited.contains target then
+            if visited.size == query.max_nodes then
+              nodeBudgetExhausted := true
+              if !frontier.contains source.toString then
+                frontier := frontier.push source.toString
+              continue
+            let some targetInfo := env.find? target | continue
+            visited := visited.push target
+            nodes := nodes.push (dependencyNodeJson target targetInfo (depth + 1))
+            queue := queue.push (target, depth + 1)
+          if visited.contains target then
+            edges := edges.push (
+              dependencyEdgeJson source target inType inValue
+            )
+      return .ok <| Json.mkObj [
+        ("operation", "dependencies"),
+        ("nodes", toJson nodes),
+        ("edges", toJson edges),
+        ("frontier", toJson frontier),
+        ("node_budget_exhausted", toJson nodeBudgetExhausted),
+        ("closure_complete", toJson frontier.isEmpty)
+      ]
+  else if query.operation == "inspect" then
       let some rawName := query.declaration_name
         | return .error ("LEAN_QUERY_FAILED", "declaration_name is required")
       let name := rawName.toName
@@ -237,7 +335,10 @@ def executeQuery (env : Environment) (names : Array Name)
           ("stop_reason", stopReason)
         ]
   else
-    return .error ("LEAN_QUERY_FAILED", "operation must be search or inspect")
+    return .error (
+      "LEAN_QUERY_FAILED",
+      "operation must be search, inspect, or dependencies"
+    )
 
 def readQuery : IO DeclarationQuery := do
   let some path ← IO.getEnv "JACOBIAN_LEAN_QUERY_FILE"

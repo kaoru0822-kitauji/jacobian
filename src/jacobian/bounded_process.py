@@ -8,6 +8,7 @@ also terminate descendants rather than only the immediate worker.
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -27,6 +28,69 @@ class BoundedProcessResult:
     stdout_exceeded: bool
     stderr_exceeded: bool
     timed_out: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessResourceLimits:
+    """Portable subset of operating-system worker resource limits.
+
+    Limits are applied on POSIX platforms that expose ``resource.prlimit``.
+    Other platforms retain the existing wall-time and output limits.
+    """
+
+    cpu_seconds: int | None = None
+    address_space_bytes: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.cpu_seconds is not None and self.cpu_seconds <= 0:
+            raise ValueError("CPU limit must be positive")
+        if self.address_space_bytes is not None and self.address_space_bytes <= 0:
+            raise ValueError("address-space limit must be positive")
+
+
+def _apply_resource_limits(
+    process: subprocess.Popen[bytes],
+    limits: ProcessResourceLimits,
+) -> None:
+    """Apply supported hard limits before accepting worker output."""
+
+    if os.name != "posix":
+        return
+    try:
+        import resource
+
+        prlimit = resource.prlimit
+    except (AttributeError, ImportError):  # pragma: no cover - platform dependent
+        return
+
+    def set_limit(kind: int, value: int) -> None:
+        # A very short-lived child may exit between Popen and prlimit. It can
+        # no longer consume resources, so there is nothing left to constrain.
+        with suppress(ProcessLookupError):
+            prlimit(process.pid, kind, (value, value))
+
+    if limits.cpu_seconds is not None:
+        set_limit(resource.RLIMIT_CPU, limits.cpu_seconds)
+    if limits.address_space_bytes is not None:
+        set_limit(resource.RLIMIT_AS, limits.address_space_bytes)
+
+
+def _resource_limited_command(
+    command: Sequence[str],
+    limits: ProcessResourceLimits,
+) -> tuple[list[str], bool]:
+    """Use util-linux prlimit so limits are installed before target execution."""
+
+    if os.name != "posix" or (prlimit := shutil.which("prlimit")) is None:
+        return list(command), False
+    options: list[str] = []
+    if limits.cpu_seconds is not None:
+        options.append(f"--cpu={limits.cpu_seconds}:{limits.cpu_seconds}")
+    if limits.address_space_bytes is not None:
+        options.append(
+            f"--as={limits.address_space_bytes}:{limits.address_space_bytes}"
+        )
+    return [prlimit, *options, "--", *command], True
 
 
 def _kill_process_tree(process: subprocess.Popen[bytes]) -> None:
@@ -81,8 +145,9 @@ def run_bounded_process(
     environment: Mapping[str, str],
     stdout_limit: int,
     stderr_limit: int,
+    resource_limits: ProcessResourceLimits | None = None,
 ) -> BoundedProcessResult:
-    """Run a child while bounding output, elapsed time, and process lifetime."""
+    """Run a child with bounded output, time, lifetime, and supported resources."""
 
     if stdout_limit < 0 or stderr_limit < 0:
         raise ValueError("subprocess output limits must be nonnegative")
@@ -105,8 +170,13 @@ def run_bounded_process(
     with tempfile.TemporaryFile() as stdin_file:
         stdin_file.write(input_bytes)
         stdin_file.seek(0)
+        bounded_command, limits_applied_before_exec = (
+            _resource_limited_command(command, resource_limits)
+            if resource_limits is not None
+            else (list(command), False)
+        )
         process = subprocess.Popen(
-            command,
+            bounded_command,
             stdin=stdin_file,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -114,6 +184,13 @@ def run_bounded_process(
             start_new_session=start_new_session,
             creationflags=creationflags,
         )
+        if resource_limits is not None and not limits_applied_before_exec:
+            try:
+                _apply_resource_limits(process, resource_limits)
+            except (OSError, ValueError):
+                _kill_process_tree(process)
+                process.wait()
+                raise
         assert process.stdout is not None
         assert process.stderr is not None
 

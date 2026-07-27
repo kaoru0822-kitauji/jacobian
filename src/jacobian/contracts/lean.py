@@ -159,6 +159,80 @@ class LeanDeclarationInspectOutput(ContractModel):
         return self
 
 
+class LeanDependencyEdgeKind(StrEnum):
+    TYPE = "TYPE"
+    VALUE = "VALUE"
+
+
+class LeanDependencyGraphRequest(ContractModel):
+    environment: LeanEnvironment = LeanEnvironment.CORE
+    root_declaration: str = Field(min_length=1, max_length=512)
+    max_depth: StrictInt = Field(default=2, ge=0, le=8)
+    max_nodes: StrictInt = Field(default=100, ge=1, le=500)
+
+    @model_validator(mode="after")
+    def require_exact_root_name(self) -> Self:
+        _require_lean_text(self.root_declaration, field_name="root declaration")
+        return self
+
+
+class LeanDependencyNode(ContractModel):
+    name: str = Field(min_length=1, max_length=512)
+    kind: LeanDeclarationKind
+    depth: StrictInt = Field(ge=0, le=8)
+
+
+class LeanDependencyEdge(ContractModel):
+    source: str = Field(min_length=1, max_length=512)
+    target: str = Field(min_length=1, max_length=512)
+    kinds: tuple[LeanDependencyEdgeKind, ...] = Field(min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def require_canonical_distinct_kinds(self) -> Self:
+        if tuple(sorted(set(self.kinds), key=str)) != self.kinds:
+            raise ValueError("dependency edge kinds must be unique and sorted")
+        return self
+
+
+class LeanDependencyGraphArtifact(ContractModel):
+    dependency_graph_schema_version: Literal["1"] = "1"
+    environment: LeanEnvironment
+    environment_digest: Sha256Digest
+    query: LeanDependencyGraphRequest
+    nodes: tuple[LeanDependencyNode, ...]
+    edges: tuple[LeanDependencyEdge, ...]
+    frontier: tuple[str, ...]
+    node_budget_exhausted: bool
+    closure_complete: bool
+
+    @model_validator(mode="after")
+    def require_consistent_bounded_graph(self) -> Self:
+        if not self.nodes or self.nodes[0].name != self.query.root_declaration:
+            raise ValueError("dependency graph must begin with its requested root")
+        if len(self.nodes) > self.query.max_nodes:
+            raise ValueError("dependency graph exceeds its node budget")
+        names = tuple(node.name for node in self.nodes)
+        if len(set(names)) != len(names):
+            raise ValueError("dependency graph node names must be unique")
+        depths = {node.name: node.depth for node in self.nodes}
+        for edge in self.edges:
+            if edge.source not in depths or edge.target not in depths:
+                raise ValueError("dependency edge endpoint is absent from nodes")
+            if depths[edge.target] > depths[edge.source] + 1:
+                raise ValueError("dependency edge skips a traversal depth")
+        if len(set(self.frontier)) != len(self.frontier):
+            raise ValueError("dependency frontier names must be unique")
+        if any(name not in depths for name in self.frontier):
+            raise ValueError("dependency frontier must refer to returned nodes")
+        if self.closure_complete and (self.node_budget_exhausted or self.frontier):
+            raise ValueError("a complete dependency closure cannot have a frontier")
+        return self
+
+
+class LeanDependencyGraphOutput(LeanDependencyGraphArtifact):
+    dependency_graph_uri: ArtifactUri
+
+
 def _require_lean_text(value: str, *, field_name: str) -> None:
     if not value.strip() or "\x00" in value or any(char in "\r\n" for char in value):
         raise ValueError(f"{field_name} must be one non-empty Lean name fragment")

@@ -56,13 +56,34 @@ class CheckerRegistration(ContractModel):
             return self
         if (
             runtime.availability is not CapabilityProviderAvailability.AVAILABLE
-            or runtime.digest_kind is not CapabilityProviderDigestKind.EXECUTABLE
+            or runtime.digest_kind
+            not in {
+                CapabilityProviderDigestKind.EXECUTABLE,
+                CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD,
+                CapabilityProviderDigestKind.COMPOSITE,
+            }
             or runtime.digest is None
-            or not isinstance(runtime.configuration.get("executable"), str)
         ):
             raise ValueError(
-                "checker provider runtime must identify an available executable"
+                "checker provider runtime must identify an available executable, "
+                "Python distribution, or fully bound composite"
             )
+        if (
+            runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE
+            and not isinstance(runtime.configuration.get("executable"), str)
+        ):
+            raise ValueError("checker executable runtime must name its executable")
+        if (
+            runtime.digest_kind
+            is CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD
+        ):
+            distribution = runtime.configuration.get("distribution")
+            import_name = runtime.configuration.get("import_name")
+            if not isinstance(distribution, str) or not isinstance(import_name, str):
+                raise ValueError(
+                    "checker Python distribution runtime must name its "
+                    "distribution and import"
+                )
         if runtime.checker_ids:
             raise ValueError(
                 "checker provider runtime cannot recursively contain checker IDs"
