@@ -56,6 +56,7 @@ from jacobian.contracts.graph_invariants import (
     GraphNeighborhoodIndependenceRequest,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.graph_atlas import graph_atlas_order
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -417,9 +418,7 @@ class GraphAtlasSearchAdapter:
         constraints = dict(request.input["constraints"])
         _validate_constraint_ranges(constraints)
         limit = int(request.input.get("limit", 10))
-        atlas_graphs = [
-            graph for graph in nx.graph_atlas_g() if graph.number_of_nodes() == order
-        ]
+        atlas_graphs = graph_atlas_order(order)
         scope = self.resources.artifacts.put(
             schema_uri=self.resources.scope_schema_uri,
             semantics_uri=self.resources.semantics_uri,

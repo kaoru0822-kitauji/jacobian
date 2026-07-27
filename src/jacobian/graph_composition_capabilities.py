@@ -51,6 +51,7 @@ from jacobian.contracts.graph_composition import (
     GraphEnumerationScopeArtifact,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.graph_atlas import graph_atlas_order
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
@@ -451,9 +452,7 @@ class GraphEnumerateNonisomorphicAdapter:
         limit = validated.limit
         offset = validated.offset
 
-        atlas_graphs = [
-            graph for graph in nx.graph_atlas_g() if graph.number_of_nodes() == order
-        ]
+        atlas_graphs = graph_atlas_order(order)
         total_count = len(atlas_graphs)
         window = atlas_graphs[offset : offset + limit]
         truncated = (offset + limit) < total_count
