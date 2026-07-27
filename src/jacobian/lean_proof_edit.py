@@ -29,7 +29,12 @@ from jacobian.contracts.lean_proof_edit import (
     LeanProofEditOutput,
     LeanProofEditRequest,
 )
-from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
+from jacobian.contracts.results import (
+    Conclusion,
+    ExecutionStatus,
+    ResultEnvelope,
+    Verification,
+)
 from jacobian.lean import LeanService
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -53,7 +58,7 @@ def install_lean_proof_edit_capability(
     semantics_uri = store.register_descriptor(
         kind="semantics",
         name="jacobian.lean4-proof-edit-validation",
-        version="1",
+        version="2",
         definition={
             "description": (
                 "an exact Lean proof edit checked against the unchanged statement "
@@ -65,7 +70,7 @@ def install_lean_proof_edit_capability(
     )
     schema_uri = schemas.register(
         name="jacobian.lean4-proof-edit",
-        version="1",
+        version="2",
         schema=LeanProofEditArtifact.model_json_schema(),
     )
     installation = LeanProofEditInstallation(
@@ -96,7 +101,7 @@ class LeanProofEditAdapter:
         self.installation = installation
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.proof_edit.validate",
-            version="1",
+            version="2",
             title="Validate an exact Lean proof edit",
             description=(
                 "Bind an original and edited proof to one unchanged statement, then "
@@ -118,8 +123,10 @@ class LeanProofEditAdapter:
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         try:
             validated = LeanProofEditRequest.model_validate(request.input)
-            if _FORBIDDEN_PROOF_HOLE.search(validated.edited_proof):
-                raise ValueError("edited proof contains a proof hole")
+            if _FORBIDDEN_PROOF_HOLE.search(
+                validated.original_proof
+            ) or _FORBIDDEN_PROOF_HOLE.search(validated.edited_proof):
+                raise ValueError("proof edit contains a proof hole")
         except (ValidationError, ValueError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
@@ -133,17 +140,18 @@ class LeanProofEditAdapter:
                 )
             ) from exc
         started = time.monotonic()
+        baseline = self.lean.verify(
+            environment=validated.environment,
+            statement=validated.statement,
+            proof=validated.original_proof,
+        )
         checked = self.lean.verify(
             environment=validated.environment,
             statement=validated.statement,
             proof=validated.edited_proof,
         )
-        verified = (
-            checked.result.execution.status is ExecutionStatus.COMPLETED
-            and checked.result.conclusion is Conclusion.TRUE
-            and checked.result.assurance.verification is Verification.VERIFIED
-            and checked.result.verification_record_uri is not None
-        )
+        baseline_verified = _is_verified(baseline.result)
+        verified = baseline_verified and _is_verified(checked.result)
         diff = "".join(
             difflib.unified_diff(
                 validated.original_proof.splitlines(keepends=True),
@@ -158,6 +166,13 @@ class LeanProofEditAdapter:
             original_proof=validated.original_proof,
             edited_proof=validated.edited_proof,
             unified_diff=diff,
+            baseline_checker_execution_status=baseline.result.execution.status,
+            baseline_accepted=baseline_verified,
+            baseline_candidate_uri=baseline.candidate_uri,
+            baseline_certificate_uri=baseline.certificate_uri,
+            baseline_verification_record_uri=(
+                baseline.result.verification_record_uri
+            ),
             checker_execution_status=checked.result.execution.status,
             accepted=verified,
             claim_uri=checked.claim_uri,
@@ -171,6 +186,8 @@ class LeanProofEditAdapter:
             payload=payload.model_dump(mode="json"),
             parents=(
                 checked.claim_uri,
+                baseline.candidate_uri,
+                baseline.certificate_uri,
                 checked.candidate_uri,
                 checked.certificate_uri,
             ),
@@ -227,6 +244,13 @@ class LeanProofEditAdapter:
             ),
             artifact_uris=(
                 checked.claim_uri,
+                baseline.candidate_uri,
+                baseline.certificate_uri,
+                *(
+                    (baseline.result.verification_record_uri,)
+                    if baseline.result.verification_record_uri is not None
+                    else ()
+                ),
                 checked.candidate_uri,
                 checked.certificate_uri,
                 *(
@@ -237,3 +261,12 @@ class LeanProofEditAdapter:
                 artifact.artifact_uri,
             ),
         )
+
+
+def _is_verified(result: ResultEnvelope) -> bool:
+    return (
+        result.execution.status is ExecutionStatus.COMPLETED
+        and result.conclusion is Conclusion.TRUE
+        and result.assurance.verification is Verification.VERIFIED
+        and result.verification_record_uri is not None
+    )

@@ -27,12 +27,17 @@ class LeanProofEditRequest(ContractModel):
 
 
 class LeanProofEditArtifact(ContractModel):
-    proof_edit_schema_version: Literal["1"] = "1"
+    proof_edit_schema_version: Literal["2"] = "2"
     environment: LeanEnvironment
     statement: str
     original_proof: str
     edited_proof: str
     unified_diff: str = Field(min_length=1, max_length=50_000)
+    baseline_checker_execution_status: ExecutionStatus
+    baseline_accepted: bool
+    baseline_candidate_uri: ArtifactUri
+    baseline_certificate_uri: ArtifactUri
+    baseline_verification_record_uri: ArtifactUri | None = None
     checker_execution_status: ExecutionStatus
     accepted: bool
     claim_uri: ArtifactUri
@@ -42,7 +47,11 @@ class LeanProofEditArtifact(ContractModel):
 
     @model_validator(mode="after")
     def bind_acceptance_to_verification(self) -> Self:
-        if self.accepted != (self.verification_record_uri is not None):
+        if self.baseline_accepted and self.baseline_verification_record_uri is None:
+            raise ValueError("accepted proof baselines require a verification record")
+        if self.accepted and not self.baseline_accepted:
+            raise ValueError("an accepted proof edit requires an accepted baseline")
+        if self.accepted and self.verification_record_uri is None:
             raise ValueError("accepted proof edits require a verification record")
         return self
 

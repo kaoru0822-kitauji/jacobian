@@ -555,11 +555,27 @@ class LeanProofStateAdapter:
                         ),
                     )
                 )
-            typed_goals = _extract_typed_goals(
-                self.resources,
-                pickle_path=pickle_path,
-                request=validated,
-            )
+            try:
+                typed_goals = _extract_typed_goals(
+                    self.resources,
+                    pickle_path=pickle_path,
+                    request=validated,
+                )
+            except RuntimeError as exc:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="LEAN_PROOF_STATE_EXTRACTION_FAILED",
+                        stage="proof_state_extraction",
+                        message=(
+                            "Lean could not produce the bounded typed successor "
+                            "proof state."
+                        ),
+                        hint=(
+                            "Retry with smaller goal/context bounds or verify that "
+                            "the pinned proof-state helper is installed."
+                        ),
+                    )
+                ) from exc
         goals_value = tactic_response.get("goals", [])
         if not isinstance(goals_value, list) or any(
             not isinstance(goal, str) for goal in goals_value
