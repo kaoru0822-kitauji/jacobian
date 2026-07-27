@@ -224,6 +224,61 @@ class PolynomialIdentityRequest(ContractModel):
         return self
 
 
+class PolynomialMapInverseVerifyRequest(ContractModel):
+    forward_map: RationalPolynomialMap
+    inverse_map: RationalPolynomialMap
+    source_variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    target_variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def require_compatible_ordered_rings(self) -> Self:
+        if self.forward_map.variables != self.source_variables:
+            raise ValueError("forward map variables must equal source_variables")
+        if self.inverse_map.variables != self.target_variables:
+            raise ValueError("inverse map variables must equal target_variables")
+        if len(self.source_variables) != len(self.target_variables):
+            raise ValueError("source and target dimensions must agree")
+        if len(set(self.source_variables)) != len(self.source_variables):
+            raise ValueError("source variables must be unique")
+        if len(set(self.target_variables)) != len(self.target_variables):
+            raise ValueError("target variables must be unique")
+        for outer, inner in (
+            (self.inverse_map, self.forward_map),
+            (self.forward_map, self.inverse_map),
+        ):
+            inner_term_counts = tuple(
+                len(coordinate.terms) for coordinate in inner.coordinates
+            )
+            for coordinate in outer.coordinates:
+                term_bound = 0
+                for term in coordinate.terms:
+                    term_bound += prod(
+                        count**exponent
+                        for count, exponent in zip(
+                            inner_term_counts,
+                            term.exponents,
+                            strict=True,
+                        )
+                    )
+                    if term_bound > 1024:
+                        raise ValueError("composition residual term bound exceeds 1024")
+                outer_degree = max(
+                    (sum(term.exponents) for term in coordinate.terms),
+                    default=0,
+                )
+                inner_degree = max(
+                    (
+                        sum(term.exponents)
+                        for inner_coordinate in inner.coordinates
+                        for term in inner_coordinate.terms
+                    ),
+                    default=0,
+                )
+                if outer_degree * inner_degree > _MAX_DERIVED_EXPONENT:
+                    raise ValueError("composition residual degree bound exceeds 127")
+        return self
+
+
 class PolynomialCollisionSearchRequest(ContractModel):
     map: RationalPolynomialMap
     max_abs_numerator: int = Field(ge=0, le=8)
@@ -337,6 +392,58 @@ class PolynomialIdentityReplayPayload(ContractModel):
     variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
     left_uri: ArtifactUri
     right_uri: ArtifactUri
+
+
+class PolynomialMapInverseClaim(ContractModel):
+    claim_schema_version: Literal["1"] = "1"
+    predicate: Literal["POLYNOMIAL_MAP_TWO_SIDED_INVERSE"] = (
+        "POLYNOMIAL_MAP_TWO_SIDED_INVERSE"
+    )
+    domain: Literal["QQ"] = "QQ"
+    forward_map_uri: ArtifactUri
+    inverse_map_uri: ArtifactUri
+    source_variables: tuple[PolynomialVariable, ...]
+    target_variables: tuple[PolynomialVariable, ...]
+
+
+class PolynomialMapCompositionResiduals(ContractModel):
+    residual_schema_version: Literal["1"] = "1"
+    domain: Literal["QQ"] = "QQ"
+    forward_map_uri: ArtifactUri
+    inverse_map_uri: ArtifactUri
+    source_variables: tuple[PolynomialVariable, ...]
+    target_variables: tuple[PolynomialVariable, ...]
+    inverse_after_forward: tuple[SparseRationalPolynomial, ...]
+    forward_after_inverse: tuple[SparseRationalPolynomial, ...]
+    inverse_after_forward_checker_records: tuple[ArtifactUri, ...]
+    forward_after_inverse_checker_records: tuple[ArtifactUri, ...]
+
+    @model_validator(mode="after")
+    def require_complete_two_sided_bundle(self) -> Self:
+        dimension = len(self.source_variables)
+        if not (
+            dimension
+            == len(self.target_variables)
+            == len(self.inverse_after_forward)
+            == len(self.forward_after_inverse)
+            == len(self.inverse_after_forward_checker_records)
+            == len(self.forward_after_inverse_checker_records)
+        ):
+            raise ValueError(
+                "both residual and checker-record families must be complete"
+            )
+        return self
+
+
+class PolynomialMapInverseReplayPayload(ContractModel):
+    method: Literal["DIRECT_TWO_SIDED_SPARSE_REPLAY"] = "DIRECT_TWO_SIDED_SPARSE_REPLAY"
+    forward_map_uri: ArtifactUri
+    inverse_map_uri: ArtifactUri
+    residuals_uri: ArtifactUri
+    source_variables: tuple[PolynomialVariable, ...]
+    target_variables: tuple[PolynomialVariable, ...]
+    inverse_after_forward_checker_records: tuple[ArtifactUri, ...]
+    forward_after_inverse_checker_records: tuple[ArtifactUri, ...]
 
 
 class PolynomialJacobianReplayPayload(ContractModel):
@@ -478,6 +585,37 @@ class PolynomialIdentityOutput(ContractModel):
             )
         if self.identical is not expected[self.conclusion]:
             raise ValueError("identical must preserve an unknown checker conclusion")
+        return self
+
+
+class PolynomialMapInverseVerifyOutput(ContractModel):
+    inverse_verified: bool | None
+    conclusion: Conclusion
+    forward_map_uri: ArtifactUri
+    inverse_map_uri: ArtifactUri
+    residuals_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    inverse_after_forward_checker_records: tuple[ArtifactUri, ...]
+    forward_after_inverse_checker_records: tuple[ArtifactUri, ...]
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri
+    domain: Literal["QQ"] = "QQ"
+    source_variables: tuple[PolynomialVariable, ...]
+    target_variables: tuple[PolynomialVariable, ...]
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+
+    @model_validator(mode="after")
+    def inverse_matches_conclusion(self) -> Self:
+        expected = {
+            Conclusion.TRUE: True,
+            Conclusion.FALSE: False,
+            Conclusion.UNKNOWN: None,
+        }
+        if self.conclusion not in expected:
+            raise ValueError("inverse conclusion must be TRUE, FALSE, or UNKNOWN")
+        if self.inverse_verified is not expected[self.conclusion]:
+            raise ValueError("inverse_verified must preserve checker conclusion")
         return self
 
 

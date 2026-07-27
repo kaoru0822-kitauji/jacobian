@@ -63,7 +63,12 @@ from jacobian.contracts.polynomials import (
     PolynomialJacobianOutput,
     PolynomialJacobianReplayPayload,
     PolynomialJacobianRequest,
+    PolynomialMapCompositionResiduals,
     PolynomialMapEvaluation,
+    PolynomialMapInverseClaim,
+    PolynomialMapInverseReplayPayload,
+    PolynomialMapInverseVerifyOutput,
+    PolynomialMapInverseVerifyRequest,
     RationalPolynomial,
     RationalPolynomialMap,
     RationalPolynomialPoint,
@@ -90,6 +95,7 @@ class PolynomialInstallation:
     polynomial_semantics_uri: str
     factorization_semantics_uri: str
     identity_semantics_uri: str
+    inverse_semantics_uri: str
     map_schema_uri: str
     evaluation_schema_uri: str
     jacobian_schema_uri: str
@@ -98,6 +104,8 @@ class PolynomialInstallation:
     right_polynomial_schema_uri: str
     left_polynomial_schema_uri: str
     identity_claim_schema_uri: str
+    inverse_claim_schema_uri: str
+    inverse_residual_schema_uri: str
     witness_schema_uri: str
     certificate_schema_uri: str
     polynomial_schema_uri: str
@@ -105,6 +113,7 @@ class PolynomialInstallation:
     collision_checker_id: str | None
     jacobian_checker_id: str | None
     identity_checker_id: str | None
+    inverse_checker_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +141,7 @@ def install_polynomial_capabilities(
         PolynomialCollisionSearchAdapter,
         PolynomialCollisionVerifyAdapter,
         PolynomialFactorAdapter,
+        PolynomialMapInverseVerifyAdapter,
     ],
     PolynomialInstallation,
 ]:
@@ -170,6 +180,20 @@ def install_polynomial_capabilities(
             "maximum_exponent": 127,
             "monomial_order": "descending lexicographic",
             "zero_terms": "omitted",
+        },
+    )
+    inverse_semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.rational-polynomial-map-two-sided-inverse",
+        version="1",
+        definition={
+            "description": (
+                "two square sparse polynomial maps over QQ are inverse only when "
+                "both ordered exact compositions are identity"
+            ),
+            "coefficient_field": "QQ",
+            "directions": ["inverse_after_forward", "forward_after_inverse"],
+            "one_sided_identity": "insufficient",
         },
     )
     polynomial_semantics_uri = store.register_descriptor(
@@ -242,6 +266,16 @@ def install_polynomial_capabilities(
         version="1",
         schema=model_schema(PolynomialIdentityClaim),
     )
+    inverse_claim_schema_uri = schemas.register(
+        name="jacobian.polynomial-map-inverse-claim",
+        version="1",
+        schema=model_schema(PolynomialMapInverseClaim),
+    )
+    inverse_residual_schema_uri = schemas.register(
+        name="jacobian.polynomial-map-composition-residuals",
+        version="1",
+        schema=model_schema(PolynomialMapCompositionResiduals),
+    )
     witness_schema_uri = schemas.register(
         name="jacobian.witness-envelope",
         version="1",
@@ -265,6 +299,7 @@ def install_polynomial_capabilities(
     collision_checker_id = None
     jacobian_checker_id = None
     identity_checker_id = None
+    inverse_checker_id = None
     if authorize_checker:
         collision_checker_id = checkers.authorize(
             name="exact rational polynomial-map collision checker",
@@ -299,11 +334,23 @@ def install_polynomial_capabilities(
             candidate_schema_uris=(right_polynomial_schema_uri,),
             reason="bundled independent sparse-polynomial identity checker",
         ).checker_id
+        inverse_checker_id = checkers.authorize(
+            name="exact two-sided polynomial-map inverse checker",
+            entrypoint="jacobian_checkers.polynomial_maps:check_map_inverse",
+            evidence_kind="CERTIFICATE",
+            format_id="polynomial.map.inverse.two_sided_replay",
+            format_version="1",
+            claim_schema_uris=(inverse_claim_schema_uri,),
+            semantics_uris=(inverse_semantics_uri,),
+            candidate_schema_uris=(inverse_residual_schema_uri,),
+            reason="bundled independent two-sided sparse-polynomial map checker",
+        ).checker_id
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,
         factorization_semantics_uri=factorization_semantics_uri,
         identity_semantics_uri=identity_semantics_uri,
+        inverse_semantics_uri=inverse_semantics_uri,
         map_schema_uri=map_schema_uri,
         evaluation_schema_uri=evaluation_schema_uri,
         jacobian_schema_uri=jacobian_schema_uri,
@@ -312,6 +359,8 @@ def install_polynomial_capabilities(
         right_polynomial_schema_uri=right_polynomial_schema_uri,
         left_polynomial_schema_uri=left_polynomial_schema_uri,
         identity_claim_schema_uri=identity_claim_schema_uri,
+        inverse_claim_schema_uri=inverse_claim_schema_uri,
+        inverse_residual_schema_uri=inverse_residual_schema_uri,
         witness_schema_uri=witness_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
         polynomial_schema_uri=polynomial_schema_uri,
@@ -319,6 +368,7 @@ def install_polynomial_capabilities(
         collision_checker_id=collision_checker_id,
         jacobian_checker_id=jacobian_checker_id,
         identity_checker_id=identity_checker_id,
+        inverse_checker_id=inverse_checker_id,
     )
     resources = PolynomialResources(
         store=store,
@@ -339,6 +389,11 @@ def install_polynomial_capabilities(
                 else ()
             ),
             PolynomialFactorAdapter(resources),
+            *(
+                (PolynomialMapInverseVerifyAdapter(resources),)
+                if inverse_checker_id is not None and identity_checker_id is not None
+                else ()
+            ),
         ),
         installation,
     )
@@ -1615,6 +1670,311 @@ class PolynomialIdentityAdapter:
                 ),
             ),
         )
+
+
+class PolynomialMapInverseVerifyAdapter:
+    """Verify both exact compositions of two square polynomial maps."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        checker_id = resources.installation.inverse_checker_id
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.map.inverse.verify",
+            version="1",
+            title="Verify a two-sided polynomial-map inverse",
+            description=(
+                "Independently replay both ordered polynomial-map compositions "
+                "over QQ and accept an inverse only when both are identity."
+            ),
+            provider="jacobian.sparse-polynomial-checker",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sparse-polynomial-checker",
+                features=("polynomial-map-composition", "two-sided-inverse"),
+                checker_ids=((checker_id,) if checker_id is not None else ()),
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=model_schema(PolynomialMapInverseVerifyRequest),
+            output_schema=model_schema(PolynomialMapInverseVerifyOutput),
+            tags=("polynomial", "map", "inverse", "verification", "exact-rational"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialMapInverseVerifyRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_MAP_INVERSE_REQUEST",
+            operation="map inverse verification",
+        )
+        checker_id = self.resources.installation.inverse_checker_id
+        if checker_id is None:
+            raise _polynomial_error(
+                "POLYNOMIAL_MAP_INVERSE_CHECKER_UNAVAILABLE",
+                "inverse_verification",
+                "No authorized polynomial-map inverse checker is installed.",
+            )
+        semantics_uri = self.resources.installation.inverse_semantics_uri
+        forward = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.map_schema_uri,
+            semantics_uri=semantics_uri,
+            payload=validated.forward_map.model_dump(mode="json"),
+            summary="forward sparse rational polynomial map",
+        )
+        inverse = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.map_schema_uri,
+            semantics_uri=semantics_uri,
+            payload=validated.inverse_map.model_dump(mode="json"),
+            summary="candidate inverse sparse rational polynomial map",
+        )
+        left_residuals, right_residuals = _map_inverse_residuals(validated)
+        identity_adapter = PolynomialIdentityAdapter(self.resources)
+        zero = SparseRationalPolynomial()
+        left_records: list[str] = []
+        right_records: list[str] = []
+        identity_artifacts: list[str] = []
+        for variables, residuals, records in (
+            (validated.source_variables, left_residuals, left_records),
+            (validated.target_variables, right_residuals, right_records),
+        ):
+            for residual in residuals:
+                checked = identity_adapter.invoke(
+                    CapabilityRequest(
+                        capability_id="polynomial.identity.verify",
+                        mode=CapabilityMode.VERIFY,
+                        input=PolynomialIdentityRequest(
+                            variables=variables,
+                            left=residual,
+                            right=zero,
+                        ).model_dump(mode="json"),
+                    )
+                )
+                record_uri = checked.output.get("verification_record_uri")
+                if not isinstance(record_uri, str):
+                    raise _polynomial_error(
+                        "POLYNOMIAL_IDENTITY_REPLAY_UNAVAILABLE",
+                        "composition_identity_replay",
+                        "A composition residual could not obtain a checker record.",
+                    )
+                records.append(record_uri)
+                identity_artifacts.extend(checked.artifact_uris)
+        residual_payload = PolynomialMapCompositionResiduals(
+            forward_map_uri=forward.artifact_uri,
+            inverse_map_uri=inverse.artifact_uri,
+            source_variables=validated.source_variables,
+            target_variables=validated.target_variables,
+            inverse_after_forward=left_residuals,
+            forward_after_inverse=right_residuals,
+            inverse_after_forward_checker_records=tuple(left_records),
+            forward_after_inverse_checker_records=tuple(right_records),
+        )
+        residual_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.inverse_residual_schema_uri,
+            semantics_uri=semantics_uri,
+            payload=residual_payload.model_dump(mode="json"),
+            parents=tuple(
+                dict.fromkeys(
+                    (
+                        forward.artifact_uri,
+                        inverse.artifact_uri,
+                        *left_records,
+                        *right_records,
+                    )
+                )
+            ),
+            summary="both exact polynomial-map composition residual families",
+        )
+        claim = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.inverse_claim_schema_uri,
+            semantics_uri=semantics_uri,
+            payload=PolynomialMapInverseClaim(
+                forward_map_uri=forward.artifact_uri,
+                inverse_map_uri=inverse.artifact_uri,
+                source_variables=validated.source_variables,
+                target_variables=validated.target_variables,
+            ).model_dump(mode="json"),
+            parents=(forward.artifact_uri, inverse.artifact_uri),
+            summary="two-sided polynomial-map inverse claim",
+        )
+        semantics = self.resources.store.get(semantics_uri)
+        replay = PolynomialMapInverseReplayPayload(
+            forward_map_uri=forward.artifact_uri,
+            inverse_map_uri=inverse.artifact_uri,
+            residuals_uri=residual_artifact.artifact_uri,
+            source_variables=validated.source_variables,
+            target_variables=validated.target_variables,
+            inverse_after_forward_checker_records=tuple(left_records),
+            forward_after_inverse_checker_records=tuple(right_records),
+        )
+        replay_payload = replay.model_dump(mode="json")
+        certificate = CertificateEnvelope(
+            certificate_type="polynomial.map.inverse.two_sided_replay",
+            format_version="1",
+            bindings=EvidenceBindings(
+                claim_digest=claim.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=residual_artifact.object_digest,
+                scope_digest=forward.object_digest,
+            ),
+            payload_digest=(
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(replay_payload)).hexdigest()
+            ),
+            payload=replay_payload,
+        )
+        certificate_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.certificate_schema_uri,
+            semantics_uri=semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=tuple(
+                dict.fromkeys(
+                    (
+                        claim.artifact_uri,
+                        residual_artifact.artifact_uri,
+                        forward.artifact_uri,
+                        inverse.artifact_uri,
+                        *left_records,
+                        *right_records,
+                    )
+                )
+            ),
+            summary="two-sided exact polynomial-map inverse replay certificate",
+        )
+        supporting = (inverse.artifact_uri, *left_records, *right_records)
+        aggregate_checked = self.resources.verification.verify_certificate(
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=checker_id,
+            supporting_artifact_uris=supporting,
+        )
+        verified = aggregate_checked.verification_record_uri is not None
+        conclusion = aggregate_checked.conclusion
+        output = PolynomialMapInverseVerifyOutput(
+            inverse_verified={
+                Conclusion.TRUE: True,
+                Conclusion.FALSE: False,
+                Conclusion.UNKNOWN: None,
+            }[conclusion],
+            conclusion=conclusion,
+            forward_map_uri=forward.artifact_uri,
+            inverse_map_uri=inverse.artifact_uri,
+            residuals_uri=residual_artifact.artifact_uri,
+            claim_uri=claim.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            inverse_after_forward_checker_records=tuple(left_records),
+            forward_after_inverse_checker_records=tuple(right_records),
+            verification_record_uri=aggregate_checked.verification_record_uri,
+            checker_id=checker_id,
+            source_variables=validated.source_variables,
+            target_variables=validated.target_variables,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=aggregate_checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="both ordered polynomial compositions over QQ",
+                parameters={
+                    "source_variables": list(validated.source_variables),
+                    "target_variables": list(validated.target_variables),
+                },
+                artifact_uri=forward.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if verified
+                    else CapabilityCompletenessStatus.UNKNOWN
+                ),
+                basis=(
+                    "both complete composition residual families were independently replayed"
+                    if verified
+                    else "the aggregate independent checker did not accept the replay"
+                ),
+                assurance_level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.COMPUTED
+                ),
+                verification_record_uri=aggregate_checked.verification_record_uri,
+            ),
+            relationships=(),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+                basis=(
+                    "accepted by the authorized independent two-sided map checker"
+                    if verified
+                    else "the independent checker did not accept the inverse request"
+                ),
+                verification_record_uri=aggregate_checked.verification_record_uri,
+            ),
+            artifact_uris=tuple(
+                dict.fromkeys(
+                    (
+                        forward.artifact_uri,
+                        inverse.artifact_uri,
+                        residual_artifact.artifact_uri,
+                        claim.artifact_uri,
+                        certificate_artifact.artifact_uri,
+                        *identity_artifacts,
+                        *(
+                            (aggregate_checked.verification_record_uri,)
+                            if aggregate_checked.verification_record_uri is not None
+                            else ()
+                        ),
+                    )
+                )
+            ),
+        )
+
+
+def _map_inverse_residuals(
+    request: PolynomialMapInverseVerifyRequest,
+) -> tuple[
+    tuple[SparseRationalPolynomial, ...],
+    tuple[SparseRationalPolynomial, ...],
+]:
+    source_generators, forward = _sympy_map(request.forward_map)
+    target_generators, inverse = _sympy_map(request.inverse_map)
+
+    def compose_residuals(
+        outer: tuple[Poly, ...],
+        outer_generators: tuple[Any, ...],
+        inner: tuple[Poly, ...],
+        result_generators: tuple[Any, ...],
+    ) -> tuple[SparseRationalPolynomial, ...]:
+        substitutions = {
+            generator: polynomial.as_expr()
+            for generator, polynomial in zip(outer_generators, inner, strict=True)
+        }
+        return tuple(
+            _wire_polynomial(
+                Poly(
+                    expand(
+                        polynomial.as_expr().subs(
+                            substitutions,
+                            simultaneous=True,
+                        )
+                    )
+                    - result_generators[index],
+                    *result_generators,
+                    domain=QQ,
+                )
+            )
+            for index, polynomial in enumerate(outer)
+        )
+
+    return (
+        compose_residuals(inverse, target_generators, forward, source_generators),
+        compose_residuals(forward, source_generators, inverse, target_generators),
+    )
 
 
 def _validate_request[RequestModel: ContractModel](
