@@ -29,10 +29,11 @@ after that check and let CI own dependency and dead-code analysis, strict
 typing, package builds, the full Python matrix, integration, end-to-end,
 coverage, and real-Lean validation. `make check-static` reproduces the
 CI-owned static and package checks when a focused change needs them.
-`make validate-full` is only for reproducing exhaustive CI validation locally
-when CI is unavailable or an environment-specific failure requires it. Run
-`make help` for focused commands. The measured costs and reasoning behind
-these lanes are recorded in the
+`make validate-full` is the broadest local Python, Lean, static, and package
+validation target. It does not reproduce CI's Python 3.13 compatibility,
+combined coverage, security, duplicate-code, or npm lanes. Run `make help` for
+focused commands. The measured costs and reasoning behind these lanes are
+recorded in the
 [test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
 Tests can be narrowed without learning another wrapper:
 
@@ -55,12 +56,13 @@ On macOS, read the
 source-build failure from `uv sync --dev`.
 
 Use focused tests while implementing. Run `make check` before pushing and wait
-for green CI checks before merge. Run complete local validation only
-when changing CI itself, debugging an environment-specific failure, or when CI
-is unavailable; use `make validate-full` for that exceptional path. Report only
-checks that actually ran. The manually dispatched Python Debug and Lean Debug
-workflows reproduce one pytest file or node in a prepared remote environment
-when the relevant local runtime is impractical.
+for green CI checks before merge. Run broad local validation only when changing
+CI itself, debugging an environment-specific failure, or when CI is
+unavailable; use `make validate-full` for that exceptional path and rely on CI
+for its additional lanes. Report only checks that actually ran. The manually
+dispatched Python Debug and Lean Debug workflows reproduce one pytest file or
+node in a prepared remote environment when the relevant local runtime is
+impractical.
 
 CI classifies pull requests through the tested source-to-suite ownership
 manifest in `.github/ci-ownership.json`. Documentation-only changes skip

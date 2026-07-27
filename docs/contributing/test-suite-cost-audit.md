@@ -70,10 +70,12 @@ dead-code analysis, strict typing, and package builds remain available through
 `make test` runs the complete non-Lean suite, and `make test-lean` keeps the
 memory-heavy backend serial. Neither is a routine pre-push requirement; CI
 owns exhaustive validation.
-`make validate-full` exists only to reproduce that exhaustive validation when
-CI is unavailable or an environment-specific failure requires it. Do not use
-unfiltered `uv run pytest` as the default handoff command because it mixes Lean
-into the general parallel pool.
+`make validate-full` combines the broad local Python, Lean, static, and package
+checks when CI is unavailable or an environment-specific failure requires it.
+Python 3.13 compatibility, combined coverage, security, duplicate-code, and npm
+validation remain separate CI lanes. Do not use unfiltered `uv run pytest` as
+the default handoff command because it mixes Lean into the general parallel
+pool.
 
 The Lean suite runs serially on one prepared runner. This avoids concurrent
 multi-gigabyte Mathlib processes, collects every `lean_runtime` test without a
