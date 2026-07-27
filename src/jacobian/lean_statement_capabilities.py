@@ -448,7 +448,7 @@ class LeanStatementProposalAdapter:
         self.resources = resources
         self._descriptor = CapabilityDescriptor(
             capability_id="lean.statement.propose",
-            version="1",
+            version="2",
             title="Propose one Lean statement with type-check status",
             description=(
                 "Validate either a proposed statement against an informal "
