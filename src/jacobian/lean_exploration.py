@@ -49,9 +49,9 @@ from jacobian.contracts.lean_exploration import (
     LeanProofStateOutput,
     LeanProofStateRequest,
     LeanProofStateTransitionArtifact,
-    LeanTypedGoal,
     LeanProofSuccessorState,
     LeanTacticDiagnostic,
+    LeanTypedGoal,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.references import LeanCheckerInstallation
