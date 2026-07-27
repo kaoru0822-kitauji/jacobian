@@ -70,7 +70,9 @@ def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path, template=kernel_store_template_with_references)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
 
     result = _shrink(kernel, graph_uri, evaluation_budget=2)
 
@@ -87,7 +89,9 @@ def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimalit
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path, template=kernel_store_template_with_references)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     kernel.shrinking.executor = _TimeoutExecutor()  # type: ignore[assignment]
 
     result = _shrink(kernel, graph_uri)
@@ -105,7 +109,9 @@ def test_graph_counterexample_shrink_requires_compatible_registered_checker(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path, template=kernel_store_template_with_references)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     incompatible = kernel.graph.degree_sequence_checker_id
     assert incompatible is not None
 
@@ -132,7 +138,9 @@ def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path, template=kernel_store_template_with_references)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     graph = kernel.store.get(graph_uri)
     kernel.store._blob_path(graph.manifest.payload_digest).write_bytes(b"tampered")
 
@@ -149,7 +157,9 @@ def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path, template=kernel_store_template_with_references)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     kernel.shrinking.executor = _UnrelatedEditExecutor()  # type: ignore[assignment]
 
     result = _shrink(kernel, graph_uri)
@@ -164,11 +174,17 @@ def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
 @pytest.mark.integration
 @pytest.mark.contract
 @pytest.mark.slow
-def test_graph_counterexample_shrink_order_is_deterministic(tmp_path: Path, kernel_store_template_with_references: Path) -> None:
+def test_graph_counterexample_shrink_order_is_deterministic(
+    tmp_path: Path, kernel_store_template_with_references: Path
+) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
-    first, first_graph = _kernel_with_redundant_odd_cycle(first_root, template=kernel_store_template_with_references)
-    second, second_graph = _kernel_with_redundant_odd_cycle(second_root, template=kernel_store_template_with_references)
+    first, first_graph = _kernel_with_redundant_odd_cycle(
+        first_root, template=kernel_store_template_with_references
+    )
+    second, second_graph = _kernel_with_redundant_odd_cycle(
+        second_root, template=kernel_store_template_with_references
+    )
 
     first_result = _shrink(first, first_graph)
     second_result = _shrink(second, second_graph)

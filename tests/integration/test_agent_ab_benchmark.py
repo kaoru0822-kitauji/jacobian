@@ -436,7 +436,8 @@ def test_autonomous_discovery_case_is_visible_in_the_bounded_dispatch_plan() -> 
 
 
 def test_ab_smt_scorer_preserves_rejected_holey_proof(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_fake_carcara(tmp_path, monkeypatch)
@@ -672,7 +673,9 @@ def test_ab_transcript_parser_counts_structured_mcp_errors(tmp_path: Path) -> No
     assert telemetry["successful_tool_calls"] == []
 
 
-def test_ab_scorer_accepts_control_and_durable_treatment(tmp_path: Path, kernel_store_template_with_references: Path) -> None:
+def test_ab_scorer_accepts_control_and_durable_treatment(
+    tmp_path: Path, kernel_store_template_with_references: Path
+) -> None:
     load_cases = cast(Any, BENCHMARK["load_cases"])
     score_report = cast(Any, BENCHMARK["score_report"])
     case = load_cases(["ERDOS-STRAUS-AB-001"])[0]
@@ -879,7 +882,8 @@ def test_agent_eval_plan_counts_each_lean_capability_condition(
 
 @pytest.mark.lean_runtime
 def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
     monkeypatch: Any,
 ) -> None:
     score_report = cast(Any, BENCHMARK["score_report"])
@@ -1036,7 +1040,8 @@ def test_lean_ab_summary_compares_each_ablation_to_baseline() -> None:
 
 
 def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
     load_cases = cast(Any, BENCHMARK["load_cases"])
     score_report = cast(Any, BENCHMARK["score_report"])
@@ -1203,7 +1208,9 @@ def test_ab_graph_scorer_enforces_exact_vertex_order(tmp_path: Path) -> None:
         raise AssertionError("wrong-order graph was accepted")
 
 
-def test_ab_partition_scorer_requires_checker_backed_coverage(tmp_path: Path, kernel_store_template_with_references: Path) -> None:
+def test_ab_partition_scorer_requires_checker_backed_coverage(
+    tmp_path: Path, kernel_store_template_with_references: Path
+) -> None:
     load_cases = cast(Any, BENCHMARK["load_cases"])
     score_report = cast(Any, BENCHMARK["score_report"])
     case = load_cases(["FINITE-PARTITION-AB-001"])[0]
@@ -1336,7 +1343,9 @@ def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
 
 
 @pytest.mark.lean_runtime
-def test_ab_lean_scorer_requires_exact_checker_bound_trace(tmp_path: Path, kernel_store_template_with_references: Path) -> None:
+def test_ab_lean_scorer_requires_exact_checker_bound_trace(
+    tmp_path: Path, kernel_store_template_with_references: Path
+) -> None:
     load_cases = cast(Any, BENCHMARK["load_cases"])
     score_report = cast(Any, BENCHMARK["score_report"])
     case = load_cases(["LEAN-DECLARATION-AB-001"])[0]
@@ -1627,7 +1636,8 @@ def test_ab_lean_codex_command_uses_same_mcp_with_control_ablation(
 
 
 def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
     score_report = cast(Any, BENCHMARK["score_report"])
     case = {
@@ -1721,7 +1731,8 @@ def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
 
 
 def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
     score_report = cast(Any, BENCHMARK["score_report"])
     case = _linear_case()
@@ -1819,7 +1830,8 @@ def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
 
 
 def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
     score_report = cast(Any, BENCHMARK["score_report"])
     case = _hnf_case()
@@ -1917,7 +1929,8 @@ def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
 
 
 def test_ab_polynomial_normalization_scorer_requires_bound_replay(
-    tmp_path: Path, kernel_store_template_with_references: Path,
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
     score_report = cast(Any, BENCHMARK["score_report"])
     case = _polynomial_normalization_case()
@@ -2014,7 +2027,9 @@ def test_ab_polynomial_normalization_scorer_requires_bound_replay(
         )
 
 
-def test_ab_sat_scorer_rejects_unbound_verified_claim(tmp_path: Path, kernel_store_template_with_references: Path) -> None:
+def test_ab_sat_scorer_rejects_unbound_verified_claim(
+    tmp_path: Path, kernel_store_template_with_references: Path
+) -> None:
     score_report = cast(Any, BENCHMARK["score_report"])
     benchmark_error = cast(type[Exception], BENCHMARK["BenchmarkError"])
     case = {
