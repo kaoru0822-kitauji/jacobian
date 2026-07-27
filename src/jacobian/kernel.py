@@ -627,72 +627,75 @@ class JacobianKernel:
             self.register_capability(universal_algebra_adapter)
         self._install_resource_capabilities(install_references)
         if install_references:
-            self.references = self.reference_installer.install_all()
-            self.polytope_checkers = self.reference_installer.install_polytope_checkers(
-                claim_schema_uri=self.polytope.claim_schema_uri,
-                semantics_uri=self.polytope.semantics_uri,
-                point_schema_uri=self.polytope.point_schema_uri,
+            self._install_authorized_references()
+        for entrypoint in capability_adapter_entrypoints:
+            self.register_capability(load_capability_adapter(entrypoint, self))
+
+    def _install_authorized_references(self) -> None:
+        self.references = self.reference_installer.install_all()
+        self.polytope_checkers = self.reference_installer.install_polytope_checkers(
+            claim_schema_uri=self.polytope.claim_schema_uri,
+            semantics_uri=self.polytope.semantics_uri,
+            point_schema_uri=self.polytope.point_schema_uri,
+        )
+        self.lean_checkers = self.reference_installer.install_lean_checkers()
+        profiles = {
+            environment.value: {
+                "semantics_uri": installation.semantics_uri,
+                "import_name": installation.import_name,
+                "mathlib_commit": installation.mathlib_commit,
+                "allowed_axioms": list(installation.allowed_axioms),
+                "checker_timeout_seconds": installation.checker_timeout_seconds,
+            }
+            for environment, installation in sorted(
+                self.lean_checkers.items(),
+                key=lambda item: item[0].value,
             )
-            self.lean_checkers = self.reference_installer.install_lean_checkers()
-            profiles = {
-                environment.value: {
-                    "semantics_uri": installation.semantics_uri,
-                    "import_name": installation.import_name,
-                    "mathlib_commit": installation.mathlib_commit,
-                    "allowed_axioms": list(installation.allowed_axioms),
-                    "checker_timeout_seconds": (installation.checker_timeout_seconds),
-                }
-                for environment, installation in sorted(
+        }
+        runtime = lean_provider_runtime(
+            profiles=profiles,
+            checker_ids=tuple(
+                installation.checker_id
+                for _, installation in sorted(
                     self.lean_checkers.items(),
                     key=lambda item: item[0].value,
                 )
-            }
-            runtime = lean_provider_runtime(
-                profiles=profiles,
-                checker_ids=tuple(
-                    installation.checker_id
-                    for _, installation in sorted(
-                        self.lean_checkers.items(),
-                        key=lambda item: item[0].value,
-                    )
-                ),
+            ),
+        )
+        self.lean_runtime = runtime
+        if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
+            _LOGGER.warning(
+                "lean.check is not installed: %s",
+                runtime.diagnostic,
             )
-            self.lean_runtime = runtime
-            if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
-                try:
-                    self.lean_declarations = installed_lean_declaration_service(runtime)
-                except (OSError, RuntimeError) as exc:
-                    _LOGGER.warning(
-                        "Lean declaration discovery is not installed: %s",
-                        exc,
-                    )
-                self._install_lean_declaration_adapters(runtime)
-                self.lean = LeanService(
-                    self.store,
-                    self.artifacts,
-                    self.verification,
-                    self.lean_checkers,
-                )
-                self.register_capability(LeanCheckAdapter(self.lean, runtime))
-                lean_exploration_adapters, self.lean_exploration = (
-                    install_lean_exploration_capabilities(
-                        self.store,
-                        self.schemas,
-                        self.artifacts,
-                        self.lean_checkers,
-                        runtime,
-                    )
-                )
-                for lean_exploration_adapter in lean_exploration_adapters:
-                    self.register_capability(lean_exploration_adapter)
-                self._install_lean_proof_edit()
-            else:
-                _LOGGER.warning(
-                    "lean.check is not installed: %s",
-                    runtime.diagnostic,
-                )
-        for entrypoint in capability_adapter_entrypoints:
-            self.register_capability(load_capability_adapter(entrypoint, self))
+            return
+        try:
+            self.lean_declarations = installed_lean_declaration_service(runtime)
+        except (OSError, RuntimeError) as exc:
+            _LOGGER.warning(
+                "Lean declaration discovery is not installed: %s",
+                exc,
+            )
+        self._install_lean_declaration_adapters(runtime)
+        self.lean = LeanService(
+            self.store,
+            self.artifacts,
+            self.verification,
+            self.lean_checkers,
+        )
+        self.register_capability(LeanCheckAdapter(self.lean, runtime))
+        lean_exploration_adapters, self.lean_exploration = (
+            install_lean_exploration_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.lean_checkers,
+                runtime,
+            )
+        )
+        for lean_exploration_adapter in lean_exploration_adapters:
+            self.register_capability(lean_exploration_adapter)
+        self._install_lean_proof_edit()
 
     def _install_resource_capabilities(self, install_references: bool) -> None:
         """Install resource-mined domain atomics after core services exist."""
