@@ -15,7 +15,6 @@ from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import carcara_provider_runtime
 
-
 pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),

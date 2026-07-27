@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import shutil
 from pathlib import Path
 
 import networkx as nx
@@ -17,12 +18,26 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.usefixtures("initialized_kernel_store"),
+]
 
 
 @pytest.fixture(scope="module")
-def oracle_kernel(tmp_path_factory: pytest.TempPathFactory) -> JacobianKernel:
-    return JacobianKernel(tmp_path_factory.mktemp("finite-graph-oracles"))
+def oracle_kernel(
+    tmp_path_factory: pytest.TempPathFactory,
+    kernel_store_template: Path,
+) -> JacobianKernel:
+    """Reuse the immutable core store snapshot for shared oracle invokes."""
+
+    root = tmp_path_factory.mktemp("finite-graph-oracles")
+    shutil.copytree(kernel_store_template, root, dirs_exist_ok=True)
+    kernel = JacobianKernel(root)
+    # Pay Z3/solver startup once in fixture setup instead of on the first case.
+    warm = nx.relabel_nodes(nx.path_graph(3), lambda vertex: f"v{vertex}")
+    _invoke(kernel, "graph.domination.minimum.compute", warm)
+    return kernel
 
 
 def _payload(graph: nx.Graph[str], **budget: int) -> dict[str, object]:

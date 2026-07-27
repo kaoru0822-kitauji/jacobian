@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest
@@ -20,13 +19,12 @@ from jacobian.provider_runtime import (
     drat_trim_provider_runtime,
 )
 
-
-
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.external_backend,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
+
 
 def _invoke(
     kernel: JacobianKernel,

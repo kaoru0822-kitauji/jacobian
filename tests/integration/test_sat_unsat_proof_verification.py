@@ -25,12 +25,11 @@ from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import drat_trim_provider_runtime
 from jacobian.verification import CheckerExecutionError, _environment_digest
 
-
-
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
+
 
 def _sha256_file(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()

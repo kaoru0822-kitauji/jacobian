@@ -211,6 +211,7 @@ def test_cli_storage_limit_has_a_capacity_recovery_action() -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.usefixtures("initialized_kernel_store_with_references")
 def test_cli_enumeration_completes_before_the_local_process_exits(
     tmp_path: Path,
 ) -> None:

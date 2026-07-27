@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -14,15 +15,19 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian.plugin_execution import PluginExecutionResult
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.integration
 @pytest.mark.contract
 def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scope(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path,
+        template=kernel_store_template_with_references,
+    )
 
     result = _shrink(kernel, graph_uri)
 
@@ -63,8 +68,11 @@ def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scop
 @pytest.mark.contract
 def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
 
     result = _shrink(kernel, graph_uri, evaluation_budget=2)
 
@@ -79,8 +87,11 @@ def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
 @pytest.mark.contract
 def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimality(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     kernel.shrinking.executor = _TimeoutExecutor()  # type: ignore[assignment]
 
     result = _shrink(kernel, graph_uri)
@@ -96,8 +107,11 @@ def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimalit
 @pytest.mark.contract
 def test_graph_counterexample_shrink_requires_compatible_registered_checker(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     incompatible = kernel.graph.degree_sequence_checker_id
     assert incompatible is not None
 
@@ -122,8 +136,11 @@ def test_graph_counterexample_shrink_requires_compatible_registered_checker(
 @pytest.mark.contract
 def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     graph = kernel.store.get(graph_uri)
     kernel.store._blob_path(graph.manifest.payload_digest).write_bytes(b"tampered")
 
@@ -138,8 +155,11 @@ def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
 @pytest.mark.contract
 def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+        tmp_path, template=kernel_store_template_with_references
+    )
     kernel.shrinking.executor = _UnrelatedEditExecutor()  # type: ignore[assignment]
 
     result = _shrink(kernel, graph_uri)
@@ -153,11 +173,18 @@ def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
 
 @pytest.mark.integration
 @pytest.mark.contract
-def test_graph_counterexample_shrink_order_is_deterministic(tmp_path: Path) -> None:
+@pytest.mark.slow
+def test_graph_counterexample_shrink_order_is_deterministic(
+    tmp_path: Path, kernel_store_template_with_references: Path
+) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
-    first, first_graph = _kernel_with_redundant_odd_cycle(first_root)
-    second, second_graph = _kernel_with_redundant_odd_cycle(second_root)
+    first, first_graph = _kernel_with_redundant_odd_cycle(
+        first_root, template=kernel_store_template_with_references
+    )
+    second, second_graph = _kernel_with_redundant_odd_cycle(
+        second_root, template=kernel_store_template_with_references
+    )
 
     first_result = _shrink(first, first_graph)
     second_result = _shrink(second, second_graph)
@@ -219,8 +246,13 @@ class _UnrelatedEditExecutor:
         )
 
 
-def _kernel_with_redundant_odd_cycle(root: Path) -> tuple[JacobianKernel, str]:
+def _kernel_with_redundant_odd_cycle(
+    root: Path,
+    *,
+    template: Path,
+) -> tuple[JacobianKernel, str]:
     root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(template, root, dirs_exist_ok=True)
     kernel = JacobianKernel(root, install_references=True)
     graph = kernel.artifacts.put(
         schema_uri=kernel.graph.graph_schema_uri,
