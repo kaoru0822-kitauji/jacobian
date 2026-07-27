@@ -398,6 +398,11 @@ class LeanExplorationReplRuntime:
 
         session = self._create_session(environment)
         try:
+            if pickle_path is None:
+                return session.execute_validated(
+                    command=command,
+                    tactic=tactic,
+                )
             return session.execute_validated(
                 command=command,
                 tactic=tactic,
