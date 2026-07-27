@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +26,7 @@ jobs:
       run-core: ${{ steps.classify.outputs.run-core }}
       run-integration: ${{ steps.classify.outputs.run-integration }}
       run-coverage: ${{ steps.classify.outputs.run-coverage }}
+      run-compatibility: ${{ steps.classify.outputs.run-compatibility }}
       run-lean: ${{ steps.classify.outputs.run-lean }}
       run-npm: ${{ steps.classify.outputs.run-npm }}
       run-static: ${{ steps.classify.outputs.run-static }}
@@ -59,7 +62,7 @@ jobs:
                 "${planner_args[@]}" "${changed_paths[@]}"
             )
           else
-            plan_output=$(.github/scripts/classify-ci-paths --force-full)
+            plan_output=$(.github/scripts/classify-ci-paths --force-exhaustive)
           fi
 
           printf '%s\n' "$plan_output" | .github/scripts/validate-ci-plan
@@ -164,46 +167,35 @@ jobs:
           uvx --from "$wheel" jacobian-mcp --help
 
   core-test:
-    name: Tests (core, Python ${{ matrix.python-version }})
+    name: Tests (core, Python 3.12)
     needs: plan
     if: needs.plan.outputs.run-core == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-python-tests
         with:
-          python-version: ${{ matrix.python-version }}
-      - if: matrix.python-version == '3.12'
-        run: >-
+          python-version: "3.12"
+      - run: >-
           uv run --frozen pytest
           -m "not integration and not end_to_end and not lean_runtime"
           --junitxml=pytest.xml
-          --cov --cov-report= --cov-fail-under=0
-          --durations=10
-      - if: matrix.python-version != '3.12'
-        run: >-
-          uv run --frozen pytest
-          -m "not integration and not end_to_end and not lean_runtime"
-          --junitxml=pytest.xml
+          ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
           --durations=10
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() }}
         with:
-          name: junit-core-${{ matrix.python-version }}
+          name: junit-core-3.12
           path: pytest.xml
           if-no-files-found: ignore
           retention-days: 7
-      - if: matrix.python-version == '3.12'
+      - if: needs.plan.outputs.run-coverage == 'true'
         run: mv .coverage .coverage.core
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ !cancelled() && matrix.python-version == '3.12' }}
+        if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
         with:
           name: coverage-data-core
           path: .coverage.core
@@ -212,7 +204,7 @@ jobs:
   integration-test:
     name: >-
       Tests (integration ${{ matrix.shard }} of 3,
-      Python ${{ matrix.python-version }})
+      Python 3.12)
     needs: plan
     if: needs.plan.outputs.run-integration == 'true'
     runs-on: ubuntu-latest
@@ -220,46 +212,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python-version: "3.12"
-            shard: 1
-            shard-index: 0
-          - python-version: "3.12"
-            shard: 2
-            shard-index: 1
-          - python-version: "3.12"
-            shard: 3
-            shard-index: 2
-          - python-version: "3.13"
-            shard: 1
-            shard-index: 0
-          - python-version: "3.13"
-            shard: 2
-            shard-index: 1
-          - python-version: "3.13"
-            shard: 3
-            shard-index: 2
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-python-tests
         with:
-          python-version: ${{ matrix.python-version }}
-      - if: matrix.python-version == '3.12'
-        run: >-
+          python-version: "3.12"
+      - run: >-
           uv run --frozen pytest
           -m "(integration or end_to_end) and not lean_runtime"
-          --jacobian-shard-count 3
-          --jacobian-shard-index ${{ matrix.shard-index }}
+          --splits 3
+          --group ${{ matrix.shard }}
+          --splitting-algorithm least_duration
+          --durations-path .test_durations
           --junitxml=pytest.xml
-          --cov --cov-report= --cov-fail-under=0
-          --durations=10
-      - if: matrix.python-version != '3.12'
-        run: >-
-          uv run --frozen pytest
-          -m "(integration or end_to_end) and not lean_runtime"
-          --jacobian-shard-count 3
-          --jacobian-shard-index ${{ matrix.shard-index }}
-          --junitxml=pytest.xml
+          ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
           --durations=10
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
@@ -267,23 +234,49 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: >-
-            junit-integration-${{ matrix.shard }}-${{ matrix.python-version }}
+            junit-integration-${{ matrix.shard }}-3.12
           path: pytest.xml
           if-no-files-found: ignore
           retention-days: 7
-      - if: matrix.python-version == '3.12'
+      - if: needs.plan.outputs.run-coverage == 'true'
         run: mv .coverage .coverage.integration-${{ matrix.shard }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: ${{ !cancelled() && matrix.python-version == '3.12' }}
+        if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
         with:
           name: coverage-data-integration-${{ matrix.shard }}
           path: .coverage.integration-${{ matrix.shard }}
           include-hidden-files: true
 
+  compatibility-test:
+    name: Exhaustive compatibility (Python 3.13)
+    needs: plan
+    if: needs.plan.outputs.run-compatibility == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.13"
+      - run: >-
+          uv run --frozen pytest
+          -m "not lean_runtime"
+          --junitxml=pytest.xml
+          --durations=10
+      - if: ${{ !cancelled() }}
+        run: uv cache prune --ci
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ !cancelled() }}
+        with:
+          name: junit-compatibility-3.13
+          path: pytest.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
   python-test:
     name: Python Tests
     if: ${{ !cancelled() }}
-    needs: [plan, core-test, integration-test]
+    needs: [plan, core-test, integration-test, compatibility-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -293,8 +286,10 @@ jobs:
           RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
           RUN_CORE: ${{ needs.plan.outputs.run-core }}
           RUN_INTEGRATION: ${{ needs.plan.outputs.run-integration }}
+          RUN_COMPATIBILITY: ${{ needs.plan.outputs.run-compatibility }}
           CORE_RESULT: ${{ needs.core-test.result }}
           INTEGRATION_RESULT: ${{ needs.integration-test.result }}
+          COMPATIBILITY_RESULT: ${{ needs.compatibility-test.result }}
         run: |
           test "$PLAN_RESULT" = "success"
           case "$RUN_PYTHON" in
@@ -309,6 +304,11 @@ jobs:
           case "$RUN_INTEGRATION" in
             true) test "$INTEGRATION_RESULT" = "success" ;;
             false) test "$INTEGRATION_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
+          case "$RUN_COMPATIBILITY" in
+            true) test "$COMPATIBILITY_RESULT" = "success" ;;
+            false) test "$COMPATIBILITY_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
 
@@ -583,3 +583,47 @@ jobs:
         with:
           name: build-timing
           path: build-timing.log
+
+  ci-metrics:
+    name: CI Metrics
+    if: ${{ !cancelled() }}
+    needs:
+      - plan
+      - lint
+      - security-audit
+      - validate-agents-md
+      - core-test
+      - integration-test
+      - compatibility-test
+      - python-test
+      - lean-test-run
+      - lean-test
+      - coverage
+      - duplicate-code
+      - npm-package
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch completed job timings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api
+          "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100"
+          --paginate --slurp > ci-jobs.json
+      - name: Report critical path and runner time
+        run: |
+          .github/scripts/summarize-ci-timings ci-jobs.json | tee ci-timings.md
+          cat ci-timings.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-timings
+          path: ci-timings.md
+          retention-days: 30

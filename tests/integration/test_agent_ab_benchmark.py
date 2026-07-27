@@ -23,7 +23,7 @@ from jacobian.contracts.sat import SatResourceBudget
 from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "agent_ab.py"))

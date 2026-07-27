@@ -10,7 +10,7 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _q(numerator: int, denominator: int = 1) -> dict[str, str]:

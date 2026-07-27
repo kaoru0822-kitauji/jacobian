@@ -20,15 +20,13 @@ from jacobian.provider_runtime import (
     drat_trim_provider_runtime,
 )
 
+
+
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.external_backend,
-    pytest.mark.skipif(
-        shutil.which("cadical") is None or shutil.which("drat-trim") is None,
-        reason="pinned CaDiCaL and DRAT-trim runtimes are not installed",
-    ),
+    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
-
 
 def _invoke(
     kernel: JacobianKernel,

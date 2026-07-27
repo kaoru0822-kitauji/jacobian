@@ -11,6 +11,8 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
 
 def _matrix() -> dict[str, object]:
     def q(value: int) -> dict[str, str]:

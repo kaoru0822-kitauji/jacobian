@@ -16,6 +16,8 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
 
 def _term(coefficient: int, exponent: int) -> dict[str, Any]:
     return {

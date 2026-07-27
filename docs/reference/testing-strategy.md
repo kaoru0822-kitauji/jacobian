@@ -41,6 +41,7 @@ make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
+make test-durations
 make check
 make check-static
 make validate-full
@@ -71,58 +72,69 @@ Workflow tests that repeatedly construct the kernel may opt into
 `initialized_kernel_store`. Each xdist worker builds the core descriptor store
 once, then the fixture physically copies that snapshot into the test's own
 `tmp_path` before construction. SQLite metadata and blobs remain isolated per
-test; no kernel service, process, or mutable database is shared. Tests whose
-subject is fresh-store bootstrap, quota accounting, migration, or descriptor
-installation must not use this fixture.
+test; no kernel service, process, or mutable database is shared. Tests that need
+authorized reference plugins and checkers may instead opt into
+`initialized_kernel_store_with_references`, which copies a second immutable
+session snapshot that already includes those installs. Tests whose subject is
+fresh-store bootstrap, quota accounting, migration, or descriptor installation
+must not use either fixture.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
-CI divides the non-Lean suite into two stable semantic lanes on each supported
-Python version. The `core` lane contains unit, contract, checker, and reference
-tests. The `integration` lane contains integration and end-to-end tests, split
-into three deterministic SHA-256 partitions across runners. Each partition
-then uses xdist's live `worksteal` scheduler with at most four workers. The
-outer stable partition adds runner-level concurrency without a timing snapshot;
-the inner scheduler balances the cases available to each runner. Python 3.12
-records coverage in the core lane and all three integration partitions, and
-the dependent reporting job combines those four data artifacts. A shared test
-setup action selects uv's interpreter explicitly and asserts the active minor
-version, so the local `.python-version` development pin cannot silently
-collapse compatibility coverage onto Python 3.12. Each runner prunes uv's
-cache for CI before the cache is saved and uploads its JUnit report for
-failure and flake analysis.
+Pull-request CI divides the non-Lean suite into two semantic lanes on the
+canonical Python version. The `core` lane contains unit, contract, checker, and
+reference tests. The `integration` lane contains integration and end-to-end
+tests, split across three runners with committed `pytest-split` timings
+(`.test_durations`, algorithm `least_duration`). Refresh those timings with
+`make test-durations` after substantial suite-shape changes; unknown tests
+receive the recorded average duration. Each shard then uses xdist's live
+`worksteal` scheduler with at most four workers. Merge-queue groups and pushes
+to `main` additionally run the second supported Python version as an exhaustive
+compatibility lane and enable combined coverage. A shared test setup action
+selects uv's interpreter explicitly and asserts the active minor version, so
+the local `.python-version` development pin cannot silently collapse
+compatibility coverage onto Python 3.12. Each runner prunes uv's cache for CI
+before the cache is saved and uploads its JUnit report for failure and flake
+analysis.
 
 Tests marked `lean_runtime` are excluded from the Python lanes and run serially
-on one dedicated runner with pinned Lean and Mathlib caches. The marker-selected
-run automatically includes new Lean tests without a file allowlist or timing
-snapshot, while serial execution avoids concurrent multi-gigabyte Mathlib
-processes on one machine. A manually dispatched Lean debug workflow accepts
-one pytest node or file selector and provides the same pinned remote
+on one dedicated runner with pinned Lean and Mathlib caches. Selecting those
+tests under pytest-xdist fails closed with an actionable error that points to
+`make test` and `make test-lean`. Only modules that actually require the pinned
+toolchain belong in the Lean ownership lane; mocked Lean-adapter contract tests
+remain ordinary integration tests and must stub every Lean side channel they
+touch (REPL and typed-goal extraction), not only one entry point. The
+marker-selected Lean run automatically includes new Lean-runtime tests without
+a file allowlist, while serial execution avoids concurrent multi-gigabyte
+Mathlib processes on one machine. A manually dispatched Lean debug workflow
+accepts one pytest node or file selector and provides the same pinned remote
 environment for focused reproduction when local Lean is impractical.
 The Python Debug workflow provides the same focused remote reproduction for
 one ordinary pytest file or node on either supported Python version.
-The Python 3.12 core lane and three integration partitions write raw coverage
-data; a dependent job combines all four files before enforcing the repository
-threshold and producing the XML report. Python 3.13 runs the same selections
-without duplicate instrumentation.
-Coverage.py's subprocess patch includes plugin and checker workers so
+When coverage is enabled for an exhaustive plan, the Python 3.12 core lane and
+three integration partitions write raw coverage data; a dependent job combines
+all four files before enforcing the repository threshold and producing the XML
+report. Coverage.py's subprocess patch includes plugin and checker workers so
 clean-process execution is not misreported as uncovered.
 Measured costs and lane policy are recorded in the
 [test-suite cost audit](../contributing/test-suite-cost-audit.md).
 
-For pull requests, a tested path planner makes independent core Python,
-integration Python, Lean, and npm decisions. Changes confined to one test layer
-run that layer without unrelated build, security, or duplicate-code jobs; Lean
-source and npm package changes likewise stay in their own lanes. Integration
-and end-to-end test changes also run the Lean boundary because those
-directories contain marker-selected Lean tests that the ordinary integration
-lane excludes. Python source, shared fixtures and configuration, CI
-infrastructure, and unknown paths fail closed to full validation. Pushes to
-`main` always use the full plan. Coverage runs only when both Python layers
-run. Stable aggregate Python and Lean jobs preserve required status semantics
-when their underlying matrices are conditional. Maintainer-applied `ci:full`
-and `ci:lean` labels can force all lanes or add Lean respectively. Overrides
-are additive only and cannot weaken the plan selected from changed paths.
+For pull requests, a tested path planner reads
+[`.github/ci-ownership.json`](../../.github/ci-ownership.json) and makes
+independent core Python, integration Python, Lean, npm, static, build,
+security, and duplicate-code decisions. Documentation-only and npm-only changes
+stay narrow. Ordinary capability source stays on core + integration + static +
+build without Lean, security, or duplicate-code by default. Verification-kernel
+boundaries, packaging, CI, and unknown paths fail closed to all functional
+lanes. Merge-queue checks and pushes to `main` always use the exhaustive plan,
+which also enables coverage and the second Python version. Stable aggregate
+Python and Lean jobs preserve required status semantics when their underlying
+matrices are conditional. Maintainer-applied `ci:full` and `ci:lean` labels can
+force all lanes or add Lean respectively. Overrides are additive only and
+cannot weaken the plan selected from changed paths. A scheduled validation
+workflow separately exercises repeated property/stateful stress, alternate
+ordering seeds, optional providers, and the core performance benchmark outside
+the pull-request critical path.
 
 The build lane produces the source distribution and wheel once. Its dependent
 package-validation job downloads that artifact and exercises both installed

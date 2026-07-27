@@ -26,6 +26,8 @@ from jacobian.domains.graph_optimization.invariant_bundle import (
 from jacobian.kernel import JacobianKernel
 from jacobian.provider_measurements import _cold_install_spec
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
 
 class UnavailableAdapter:
     descriptor = CapabilityDescriptor(

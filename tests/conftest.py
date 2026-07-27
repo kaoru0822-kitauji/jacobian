@@ -7,30 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.sharding import partition_items, validate_shard
+from jacobian.kernel import JacobianKernel
 
 _LAYER_MARKERS = {
     "integration": pytest.mark.integration,
     "end_to_end": pytest.mark.end_to_end,
 }
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register CI's deterministic collection-partition options."""
-
-    group = parser.getgroup("jacobian")
-    group.addoption(
-        "--jacobian-shard-count",
-        type=int,
-        default=1,
-        help="Number of stable collection shards.",
-    )
-    group.addoption(
-        "--jacobian-shard-index",
-        type=int,
-        default=0,
-        help="Zero-based stable collection shard to run.",
-    )
 
 
 def _freeze_kernel_store(root: Path) -> None:
@@ -73,10 +55,21 @@ def _freeze_kernel_store(root: Path) -> None:
 def kernel_store_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Build immutable core descriptors once per pytest worker."""
 
-    from jacobian.kernel import JacobianKernel
-
     template = tmp_path_factory.mktemp("kernel-store-template")
     kernel = JacobianKernel(template)
+    del kernel
+    _freeze_kernel_store(template)
+    return template
+
+
+@pytest.fixture(scope="session")
+def kernel_store_template_with_references(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """Build an immutable store that already has authorized references installed."""
+
+    template = tmp_path_factory.mktemp("kernel-store-template-with-references")
+    kernel = JacobianKernel(template, install_references=True)
     del kernel
     _freeze_kernel_store(template)
     return template
@@ -92,11 +85,26 @@ def initialized_kernel_store(
     shutil.copytree(kernel_store_template, tmp_path, dirs_exist_ok=True)
 
 
+@pytest.fixture
+def initialized_kernel_store_with_references(
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
+) -> None:
+    """Seed an isolated test root that already includes authorized references."""
+
+    shutil.copytree(
+        kernel_store_template_with_references,
+        tmp_path,
+        dirs_exist_ok=True,
+    )
+
+
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    """Keep layer markers aligned with the suite's directory structure."""
+    """Keep layer markers aligned and reject unsafe parallel Lean execution."""
 
     tests_root = Path(__file__).parent
     for item in items:
@@ -108,16 +116,16 @@ def pytest_collection_modifyitems(
         if marker is not None:
             item.add_marker(marker)
 
-    shard_count = config.getoption("--jacobian-shard-count")
-    shard_index = config.getoption("--jacobian-shard-index")
-    validate_shard(shard_count, shard_index)
-    if shard_count == 1:
+    workers = config.getoption("numprocesses", default=None)
+    if workers in (None, 0, "0"):
         return
-
-    selected, deselected = partition_items(
-        items,
-        shard_count=shard_count,
-        shard_index=shard_index,
-    )
-    items[:] = selected
-    config.hook.pytest_deselected(items=deselected)
+    lean_items = [
+        item.nodeid for item in items if item.get_closest_marker("lean_runtime")
+    ]
+    if lean_items:
+        sample = ", ".join(lean_items[:3])
+        raise pytest.UsageError(
+            "Lean runtime tests cannot run under pytest-xdist. "
+            "Use `make test` for the non-Lean suite or `make test-lean` "
+            f"for serial Lean validation. Selected Lean tests include: {sample}"
+        )

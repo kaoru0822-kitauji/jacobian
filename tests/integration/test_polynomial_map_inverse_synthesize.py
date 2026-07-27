@@ -12,6 +12,8 @@ from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
 
 def _term(coefficient: int, exponents: list[int]) -> dict[str, Any]:
     return {

@@ -13,7 +13,7 @@ from jacobian.adapters.mcp.server import create_server
 
 pytestmark = [
     pytest.mark.end_to_end,
-    pytest.mark.usefixtures("initialized_kernel_store"),
+    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
 

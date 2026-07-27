@@ -14,7 +14,7 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian.plugin_execution import PluginExecutionResult
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 @pytest.mark.integration

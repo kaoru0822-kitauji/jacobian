@@ -43,10 +43,12 @@ store now reuses immutable content-addressed artifacts while constructing an
 isolated request value for each case. All attack cases remain. This reduced the
 fast lane by about 85 percent, from 43.92 to 6.55 seconds.
 
-The Python matrix uses two stable semantic lanes per supported version: core
-tests and integration/end-to-end tests. xdist's `worksteal` scheduler balances
-the live queue across each runner's four CPUs. This preserves four-way runner
-concurrency while keeping failures attributable to a documented test layer.
+Pull requests use stable core and integration/end-to-end lanes on the canonical
+Python version. The integration lane is divided with pinned `pytest-split`
+using committed test durations; xdist's `worksteal` scheduler balances each
+shard across its runner's four CPUs. The merge queue adds the second supported
+Python version and combined coverage, so exhaustive work remains a merge gate
+without multiplying every review run.
 
 ## Development policy
 
@@ -111,10 +113,19 @@ controlled repeated measurements on local and CI runners.
 The actionable redundancy was procedural. The routine `make check` lane now
 contains only fast Ruff and non-integration tests; named contract, checker, MCP,
 and storage targets expose common focused checks. CI skips heavy Python and
-Lean lanes for documentation-only and npm-only changes, while all other paths
-fail closed to full validation. Focused Python and Lean debug workflows provide
+Lean lanes for documentation-only and npm-only changes, uses explicit suite
+ownership for known paths, and fails closed for unknown ones. Focused Python
+and Lean debug workflows provide
 remote reproduction without rerunning unrelated matrices. On the measured
 host, the resulting `make check` completed 256 selected tests in 8.36 seconds.
+
+Source-to-suite ownership is declared in `.github/ci-ownership.json` and tested
+against tracked source files. Unknown paths still fail closed. Each CI run
+reports workflow elapsed time (the observable critical path), summed runner
+minutes, and its longest job, making both reviewer latency and compute growth
+visible. Scheduled lanes exercise repeated property/stateful tests, alternate
+orders, optional providers, and the core performance benchmark outside the
+pull-request critical path.
 
 Do not run the complete non-Lean and Lean suites repeatedly during
 implementation and then immediately repeat them in pull-request CI. Use
@@ -126,3 +137,21 @@ Some short CI jobs still overlap in setup or packaging work, but they run in
 parallel and were not on the measured critical path. Consolidating them would
 increase workflow coupling without materially shortening feedback, so this
 audit leaves them unchanged.
+
+Committed `.test_durations` feeds `pytest-split`'s least-duration algorithm for
+the three integration shards. Refresh with `make test-durations` after large
+suite-shape changes; CI metrics report max/min shard skew and remind
+maintainers when it exceeds 1.5x. Unknown tests receive the recorded average
+duration until the next refresh.
+
+Do not stack a local duration refresh, full integration profiling, and focused
+module debugging on the same host at once. That contention recreates the
+pull-request wall-time problem the lane split exists to avoid: routine
+`make check`, exhaustive merge-queue validation, and scheduled
+stress/performance work must remain separate executions.
+
+Portfolio smoke that constructs a full kernel lives under
+`tests/integration/` rather than `tests/unit/`, so `make test-fast` stays free
+of multi-second kernel startups. Modules that need authorized references opt
+into `initialized_kernel_store_with_references` instead of rebuilding that
+install on every case.

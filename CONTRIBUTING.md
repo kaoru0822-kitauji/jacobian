@@ -62,16 +62,22 @@ checks that actually ran. The manually dispatched Python Debug and Lean Debug
 workflows reproduce one pytest file or node in a prepared remote environment
 when the relevant local runtime is impractical.
 
-CI classifies pull requests conservatively. Documentation-only changes skip
+CI classifies pull requests through the tested source-to-suite ownership
+manifest in `.github/ci-ownership.json`. Documentation-only changes skip
 Python, npm, Lean, static, package, security, and duplicate-code lanes.
 Documentation plus npm or npm-only changes run npm packaging without the
-Python and Lean lanes. Source, dependency, workflow, mixed, empty, and unknown
-change sets run complete validation, as does every push to `main`.
+Python and Lean lanes. Unknown paths fail closed to all functional lanes.
 Required status contexts still complete after checking the plan when their
 expensive validation is intentionally omitted.
 Maintainers can add the `ci:full` label to force every lane or `ci:lean` to
 add real-Lean validation to an otherwise isolated plan. These overrides only
 add work; labels cannot reduce the fail-closed path classification.
+Pull requests run the canonical Python version. Merge-queue groups and pushes
+to `main` additionally run supported-version compatibility and combined
+coverage as exhaustive gates. Refresh committed integration shard timings with
+`make test-durations` after substantial suite-shape changes.
+When integration timings materially change, run `make test-durations` and
+commit the refreshed `.test_durations` file with the affected tests.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 
@@ -91,7 +97,8 @@ a deliberately focused local Lean reproduction, or dispatch the remote Lean
 debug workflow from GitHub Actions when local Lean is impractical. Use
 `make test-lean PYTEST_ARGS=--lf` to rerun a failed Lean-runtime test.
 Do not use unfiltered `uv run pytest` as the normal complete-suite command
-because it mixes Lean into the general xdist pool.
+because it mixes Lean into the general xdist pool; pytest rejects that unsafe
+combination with the corresponding `make` targets in its error message.
 ## Verification rules
 
 - Do not turn a timeout, cancellation, error, incomplete enumeration, or

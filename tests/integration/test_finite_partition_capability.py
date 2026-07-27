@@ -13,7 +13,7 @@ from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.results import Arithmetic, Conclusion, Coverage, Method
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _request(mode: CapabilityMode, *, missing_last: bool = False) -> CapabilityRequest:

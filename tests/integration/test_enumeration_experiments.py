@@ -25,7 +25,7 @@ from jacobian.experiments import ExperimentError, ExperimentNotFoundError
 from jacobian.kernel import JacobianKernel
 from jacobian.store import StoreError
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _claim(

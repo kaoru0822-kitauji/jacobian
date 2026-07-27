@@ -1,0 +1,82 @@
+name: Scheduled validation
+
+on:
+  schedule:
+    - cron: "17 3 * * 2,5"
+  workflow_dispatch:
+
+concurrency:
+  group: scheduled-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    name: Stress property and stateful tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - run: >-
+          uv run --frozen --with pytest-repeat==0.9.4 pytest
+          -m "(property or stateful) and not lean_runtime"
+          --count=3
+          --durations=20
+
+  ordering:
+    name: Ordering seed ${{ matrix.seed }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [17, 20260727]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - run: >-
+          uv run --frozen --with pytest-randomly==4.1.0 pytest
+          -m "not lean_runtime"
+          --randomly-seed=${{ matrix.seed }}
+          --durations=20
+
+  optional-providers:
+    name: Optional provider integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - run: >-
+          uv run --frozen pytest
+          -n 0
+          -m "external_backend and not lean_runtime"
+          --durations=20
+
+  performance:
+    name: Core performance benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - run: >-
+          uv run --frozen python benchmarks/benchmark_core.py
+          --fast
+          --output benchmark.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: core-performance-${{ github.run_id }}
+          path: benchmark.json
+          retention-days: 90

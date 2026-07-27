@@ -12,7 +12,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import Conclusion
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def test_degree_sequence_realization_materializes_replayable_graph(

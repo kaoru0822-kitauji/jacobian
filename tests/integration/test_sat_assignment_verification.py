@@ -23,6 +23,8 @@ from jacobian.contracts.verification import VerificationRecord
 from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
 
 def _producer() -> CapabilityProviderRuntime:
     return CapabilityProviderRuntime(

@@ -16,8 +16,12 @@ from jacobian.contracts.sat import SatAssignmentArtifact, SatProofArtifact
 from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import cadical_provider_runtime
 
-pytestmark = pytest.mark.integration
 
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
+]
 
 def _fake_cadical(tmp_path: Path, body: str) -> Path:
     executable = tmp_path / "fake-cadical"

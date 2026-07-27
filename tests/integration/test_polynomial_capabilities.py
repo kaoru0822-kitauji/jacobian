@@ -19,7 +19,7 @@ from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, Witne
 from jacobian.contracts.results import Conclusion, InputStatus, Verification
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _wire_fraction(value: Fraction | int) -> dict[str, str]:

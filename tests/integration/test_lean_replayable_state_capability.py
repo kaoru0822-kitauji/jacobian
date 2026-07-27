@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -8,8 +9,10 @@ from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean_exploration import LeanProofStateRequest, LeanTypedGoal
 from jacobian.lean_exploration import (
     LeanProofStateAdapter,
+    _Resources,
     install_lean_exploration_capabilities,
 )
 from jacobian.provider_runtime import jacobian_provider_runtime
@@ -18,6 +21,8 @@ from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
 pytestmark = pytest.mark.integration
+
+_ReplResponses = tuple[dict[str, object], dict[str, object], dict[str, object]]
 
 
 def _installation(environment: LeanEnvironment) -> LeanCheckerInstallation:
@@ -68,7 +73,7 @@ def _responses(
     after: list[str],
     completed: bool = False,
     error: str | None = None,
-) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+) -> _ReplResponses:
     tactic: dict[str, object] = {
         "proofState": 2,
         "proofStatus": "Completed" if completed else "Goals",
@@ -83,12 +88,61 @@ def _responses(
     )
 
 
+def _stub_lean_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+    adapter: LeanProofStateAdapter,
+    responses: Callable[[], _ReplResponses],
+) -> None:
+    """Stub every Lean side channel used by apply_tactic.
+
+    These tests intentionally stay off ``lean_runtime``: they validate adapter
+    contracts with fake REPL payloads. Patching only ``execute_clean`` is an
+    incomplete fixture — accepted tactics still call ``_extract_typed_goals``,
+    which otherwise requires the pinned Lean helper binary.
+    """
+
+    last_goals: list[str] = []
+
+    def _execute_clean(**kwargs: object) -> _ReplResponses:
+        del kwargs
+        payload = responses()
+        tactic_response = payload[2]
+        goals = tactic_response.get("goals", [])
+        if not isinstance(goals, list):
+            raise TypeError("stub tactic response goals must be a list")
+        last_goals.clear()
+        last_goals.extend(str(goal) for goal in goals)
+        return payload
+
+    def _fake_extract(
+        _resources: _Resources,
+        *,
+        pickle_path: Path,
+        request: LeanProofStateRequest,
+    ) -> tuple[LeanTypedGoal, ...]:
+        del _resources, pickle_path, request
+        return tuple(
+            LeanTypedGoal(
+                goal_index=index,
+                target_type=goal or "True",
+                local_declarations=(),
+            )
+            for index, goal in enumerate(last_goals)
+        )
+
+    monkeypatch.setattr(adapter.resources.repl, "execute_clean", _execute_clean)
+    monkeypatch.setattr(
+        "jacobian.lean_exploration._extract_typed_goals",
+        _fake_extract,
+    )
+
+
 def test_apply_tactic_materializes_and_reuses_replayable_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = _adapter(tmp_path)
-    calls = iter(
+    calls: Iterator[_ReplResponses] = iter(
         (
             _responses(
                 before=["P Q : Prop  \r\n⊢ P ∧ Q"],
@@ -101,11 +155,7 @@ def test_apply_tactic_materializes_and_reuses_replayable_state(
             ),
         )
     )
-    monkeypatch.setattr(
-        adapter.resources.repl,
-        "execute_clean",
-        lambda **_: next(calls),
-    )
+    _stub_lean_runtime(monkeypatch, adapter, lambda: next(calls))
 
     first = adapter.invoke(
         CapabilityRequest(
@@ -152,10 +202,10 @@ def test_apply_tactic_returns_rejection_without_successor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = _adapter(tmp_path)
-    monkeypatch.setattr(
-        adapter.resources.repl,
-        "execute_clean",
-        lambda **_: _responses(
+    _stub_lean_runtime(
+        monkeypatch,
+        adapter,
+        lambda: _responses(
             before=["P Q : Prop\nhP : P\n⊢ Q"],
             after=[],
             error="type mismatch: hP has type P",
@@ -186,10 +236,10 @@ def test_apply_tactic_rejects_environment_stale_state_before_replay(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = _adapter(tmp_path)
-    monkeypatch.setattr(
-        adapter.resources.repl,
-        "execute_clean",
-        lambda **_: _responses(before=["⊢ True"], after=[], completed=True),
+    _stub_lean_runtime(
+        monkeypatch,
+        adapter,
+        lambda: _responses(before=["⊢ True"], after=[], completed=True),
     )
     opened = adapter.invoke(
         CapabilityRequest(
