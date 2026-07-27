@@ -1,4 +1,4 @@
-"""Independent exact replay for sparse rational polynomial-map collisions."""
+"""Independent exact replay for sparse rational polynomial-map claims."""
 
 from __future__ import annotations
 
@@ -330,6 +330,188 @@ def check_identity(request: dict[str, Any]) -> dict[str, Any]:
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return _reject("malformed polynomial identity request")
+
+
+def check_map_inverse(request: dict[str, Any]) -> dict[str, Any]:
+    """Independently replay both polynomial-map compositions over QQ."""
+
+    try:
+        if request.get("request_version") != "1":
+            return _reject("unsupported request version")
+        claim_artifact = request["claim"]
+        claim = claim_artifact["payload"]
+        forward_artifact = request["scope"]
+        residual_artifact = request["candidate"]
+        certificate = request["certificate"]["payload"]
+        supporting = request.get("supporting_artifacts", [])
+        if (
+            not isinstance(claim, dict)
+            or claim.get("claim_schema_version") != "1"
+            or claim.get("predicate") != "POLYNOMIAL_MAP_TWO_SIDED_INVERSE"
+            or claim.get("domain") != "QQ"
+            or not isinstance(forward_artifact, dict)
+            or not isinstance(residual_artifact, dict)
+            or not isinstance(supporting, list)
+        ):
+            return _reject("unexpected polynomial-map inverse claim")
+        inverse_matches = [
+            artifact
+            for artifact in supporting
+            if artifact.get("artifact_uri") == claim.get("inverse_map_uri")
+        ]
+        if len(inverse_matches) != 1:
+            return _reject("inverse source artifact is missing or duplicated")
+        inverse_artifact = inverse_matches[0]
+        forward_uri = forward_artifact.get("artifact_uri")
+        inverse_uri = inverse_artifact.get("artifact_uri")
+        residual_uri = residual_artifact.get("artifact_uri")
+        if (
+            claim.get("forward_map_uri") != forward_uri
+            or claim.get("inverse_map_uri") != inverse_uri
+        ):
+            return _reject("source map artifact bindings do not match")
+        dimension, source_variables, forward = _parse_map(
+            forward_artifact.get("payload")
+        )
+        inverse_dimension, target_variables, inverse = _parse_map(
+            inverse_artifact.get("payload")
+        )
+        if (
+            dimension != inverse_dimension
+            or claim.get("source_variables") != list(source_variables)
+            or claim.get("target_variables") != list(target_variables)
+        ):
+            return _reject("coefficient domain, dimension, or variable order mismatch")
+        residual = residual_artifact.get("payload")
+        if (
+            not isinstance(residual, dict)
+            or residual.get("residual_schema_version") != "1"
+            or residual.get("domain") != "QQ"
+            or residual.get("forward_map_uri") != forward_uri
+            or residual.get("inverse_map_uri") != inverse_uri
+            or residual.get("source_variables") != list(source_variables)
+            or residual.get("target_variables") != list(target_variables)
+        ):
+            return _reject("composition residual artifact binding mismatch")
+        replay_payload = certificate.get("payload")
+        expected_records = residual.get(
+            "inverse_after_forward_checker_records", []
+        ) + residual.get("forward_after_inverse_checker_records", [])
+        supporting_uris = [artifact.get("artifact_uri") for artifact in supporting]
+        if (
+            certificate.get("certificate_type")
+            != "polynomial.map.inverse.two_sided_replay"
+            or certificate.get("format_version") != "1"
+            or certificate.get("bindings") != request.get("expected_bindings")
+            or not isinstance(replay_payload, dict)
+            or replay_payload.get("method") != "DIRECT_TWO_SIDED_SPARSE_REPLAY"
+            or replay_payload.get("forward_map_uri") != forward_uri
+            or replay_payload.get("inverse_map_uri") != inverse_uri
+            or replay_payload.get("residuals_uri") != residual_uri
+            or replay_payload.get("source_variables") != list(source_variables)
+            or replay_payload.get("target_variables") != list(target_variables)
+            or replay_payload.get("inverse_after_forward_checker_records")
+            != residual.get("inverse_after_forward_checker_records")
+            or replay_payload.get("forward_after_inverse_checker_records")
+            != residual.get("forward_after_inverse_checker_records")
+            or not isinstance(
+                residual.get("inverse_after_forward_checker_records"), list
+            )
+            or len(residual["inverse_after_forward_checker_records"]) != dimension
+            or not isinstance(
+                residual.get("forward_after_inverse_checker_records"), list
+            )
+            or len(residual["forward_after_inverse_checker_records"]) != dimension
+            or any(uri not in supporting_uris for uri in expected_records)
+        ):
+            return _reject("two-sided replay certificate or checker records mismatch")
+        expected_left = _composition_residuals(
+            outer=inverse, inner=forward, dimension=dimension
+        )
+        expected_right = _composition_residuals(
+            outer=forward, inner=inverse, dimension=dimension
+        )
+        declared_left = _parse_residual_family(
+            residual.get("inverse_after_forward"), dimension
+        )
+        declared_right = _parse_residual_family(
+            residual.get("forward_after_inverse"), dimension
+        )
+        if declared_left != expected_left or declared_right != expected_right:
+            return _reject("declared composition residuals do not replay exactly")
+        inverse_holds = all(not polynomial for polynomial in expected_left) and all(
+            not polynomial for polynomial in expected_right
+        )
+        return {
+            "accepted": True,
+            "conclusion": "TRUE" if inverse_holds else "FALSE",
+            "arithmetic": "EXACT_RATIONAL",
+            "method": "CHECKED_CERTIFICATE",
+            "coverage": "EXHAUSTIVE",
+            "detail": (
+                "both exact polynomial compositions are identity"
+                if inverse_holds
+                else "at least one exact polynomial composition is not identity"
+            ),
+            **(
+                {
+                    "relation_id": "polynomial.relation.two-sided-inverse",
+                    "relationship_source_artifact_uris": [forward_uri, inverse_uri],
+                    "relationship_target_artifact_uris": [
+                        claim_artifact["artifact_uri"]
+                    ],
+                }
+                if inverse_holds
+                else {}
+            ),
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return _reject("malformed polynomial-map inverse replay request")
+
+
+def _parse_residual_family(value: object, dimension: int) -> tuple[Polynomial, ...]:
+    if not isinstance(value, list) or len(value) != dimension:
+        raise ValueError("residual family dimension mismatch")
+    return tuple(
+        _as_polynomial(
+            _parse_polynomial(item, dimension, maximum_exponent=_MAX_DERIVED_EXPONENT)
+        )
+        for item in value
+    )
+
+
+def _composition_residuals(
+    *,
+    outer: tuple[ParsedPolynomial, ...],
+    inner: tuple[ParsedPolynomial, ...],
+    dimension: int,
+) -> tuple[Polynomial, ...]:
+    inner_polynomials = tuple(_as_polynomial(item) for item in inner)
+    result: list[Polynomial] = []
+    one = {(0,) * dimension: Fraction(1)}
+    for coordinate_index, coordinate in enumerate(outer):
+        composed: Polynomial = {}
+        for coefficient, exponents in coordinate:
+            term = one
+            for polynomial, exponent in zip(inner_polynomials, exponents, strict=True):
+                power = one
+                for _ in range(exponent):
+                    power = _multiply(power, polynomial)
+                term = _multiply(term, power)
+            for monomial, value in term.items():
+                composed[monomial] = (
+                    composed.get(monomial, Fraction(0)) + coefficient * value
+                )
+                if composed[monomial] == 0:
+                    del composed[monomial]
+        identity_exponent = tuple(
+            1 if index == coordinate_index else 0 for index in range(dimension)
+        )
+        composed[identity_exponent] = composed.get(identity_exponent, Fraction(0)) - 1
+        if composed[identity_exponent] == 0:
+            del composed[identity_exponent]
+        result.append(composed)
+    return tuple(result)
 
 
 def check_jacobian(request: dict[str, Any]) -> dict[str, Any]:

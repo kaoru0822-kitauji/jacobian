@@ -68,6 +68,7 @@ expectations.
 - [Graph counterexample shrinking](reference/graph-counterexample-shrinking.md)
 - [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
 - [Typed polynomial expression normalization](reference/polynomial-expression-normalization.md)
+- [Polynomial-map inverse verification](reference/polynomial-map-inverse-verification.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
 - [v0.2 conformance specification](reference/conformance-v0.2.md)
 - [Plugin conformance contract](reference/plugin-conformance.md)
