@@ -563,9 +563,10 @@ def _discovery_relevance(
             matched_on.append(label)
             matched_terms.update(overlap)
     normalized_query = _normalize_discovery_text(query)
-    if normalized_query and normalized_query in _normalize_discovery_text(
+    normalized_text = _normalize_discovery_text(
         f"{descriptor.capability_id} {descriptor.title} {descriptor.description}"
-    ):
+    )
+    if normalized_query and f"-{normalized_query}-" in f"-{normalized_text}-":
         score += 20
         matched_on.append("phrase")
     return score, tuple(matched_on), tuple(sorted(matched_terms))
