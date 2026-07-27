@@ -177,6 +177,11 @@ class ChineseRemainderRequest(ContractModel):
             raise ValueError("residues and moduli must have equal length")
         if any(modulus < 2 or modulus > _MAX_MODULUS for modulus in self.moduli):
             raise ValueError("every modulus must be between 2 and 10,000")
+        if any(
+            residue < 0 or residue >= modulus
+            for residue, modulus in zip(self.residues, self.moduli, strict=True)
+        ):
+            raise ValueError("every residue must be canonical for its modulus")
         return self
 
 

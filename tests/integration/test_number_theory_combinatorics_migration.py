@@ -15,6 +15,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.number_theory import (
+    ChineseRemainderRequest,
     FactorialValuationRequest,
     ModularValueRequest,
     NonnegativeIntegerRequest,
@@ -85,6 +86,56 @@ def test_even_jacobi_denominator_fails_before_artifact_writes(
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.artifact_uris == ()
+
+
+def test_chinese_remainder_returns_canonical_exact_solution(tmp_path: Path) -> None:
+    result = _service(tmp_path).invoke(
+        CapabilityRequest(
+            capability_id="modular.solve.chinese_remainder",
+            input={"residues": [2, 3, 2], "moduli": [3, 5, 7]},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == {"residue": "23", "modulus": "105"}
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+
+
+def test_chinese_remainder_reports_inconsistent_system_without_artifacts(
+    tmp_path: Path,
+) -> None:
+    result = _service(tmp_path).invoke(
+        CapabilityRequest(
+            capability_id="modular.solve.chinese_remainder",
+            input={"residues": [0, 1], "moduli": [2, 2]},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.artifact_uris == ()
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+
+
+@pytest.mark.parametrize("residue", [-1, 3])
+def test_chinese_remainder_rejects_noncanonical_residues(residue: int) -> None:
+    with pytest.raises(ValidationError, match="canonical"):
+        ChineseRemainderRequest(residues=(residue,), moduli=(3,))
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"residues": [1, 2], "moduli": [3]}, "equal length"),
+        ({"residues": [0], "moduli": [1]}, "between 2 and 10,000"),
+        ({"residues": [0], "moduli": [10_001]}, "between 2 and 10,000"),
+    ],
+)
+def test_chinese_remainder_rejects_invalid_system_bounds(
+    payload: dict[str, list[int]],
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        ChineseRemainderRequest.model_validate(payload)
 
 
 def test_discrete_logarithm_materializes_bound_result_and_obligation(
