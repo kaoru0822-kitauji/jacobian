@@ -201,6 +201,16 @@ def test_checker_rejects_forged_semantics_digest() -> None:
     assert check_exact_geometry(request)["accepted"] is False
 
 
+def test_checker_rejects_tampered_semantics_payload() -> None:
+    request = _request()
+    request["semantics"]["payload"]["kind"] = "tampered-semantics"
+
+    decision = check_exact_geometry(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

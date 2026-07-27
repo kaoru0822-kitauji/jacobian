@@ -238,7 +238,7 @@ def check_exact_geometry(request: dict[str, Any]) -> dict[str, Any]:
             or candidate["parents"] != [claim["artifact_uri"]]
         ):
             return _reject("candidate is not exactly bound to the geometry input")
-        for artifact in (claim, candidate, witness):
+        for artifact in (claim, candidate, semantics, witness):
             if artifact["payload_digest"] != _sha256(
                 _canonical_json(artifact["payload"])
             ):
