@@ -50,7 +50,9 @@ make validate-full
 `make test-fast` collects only unit, contract, checker, and reference
 directories, then excludes integration-marked cases. Avoiding collection of
 integration and end-to-end modules keeps the loop short without dropping
-independent checker tests. Named contract, checker, MCP, and storage targets
+independent checker tests. Suite fixture infrastructure that builds and freezes
+kernel store templates lives under `tests/integration/` for the same reason.
+Named contract, checker, MCP, and storage targets
 make common affected areas discoverable without adding another test runner.
 `make check` combines fast Ruff and non-integration test feedback as the
 routine local pre-push gate. Developers should push after it and let CI own

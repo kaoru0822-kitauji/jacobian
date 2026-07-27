@@ -155,3 +155,32 @@ Portfolio smoke that constructs a full kernel lives under
 of multi-second kernel startups. Modules that need authorized references opt
 into `initialized_kernel_store_with_references` instead of rebuilding that
 install on every case.
+
+Suite infrastructure checks for the store templates themselves also live under
+`tests/integration/`: building and freezing those snapshots is multi-second
+setup work and must not run in the routine fast lane.
+
+Measured fixture anti-patterns that were fixed after the ownership merge:
+
+- Plugin registry tests constructed `JacobianKernel(tmp_path / "state")` while
+  the module fixture seeded `tmp_path`, so the template copy was unused. They
+  now use a `plugin_kernel` fixture that copies the template into `state`.
+- Finite-graph oracle cases paid a ~40s first-call Z3/solver startup on one
+  parametrized node. Warmup now runs once inside the module-scoped
+  `oracle_kernel` fixture; remaining cases stay sub-second to low single digits.
+- SAT public reproductions and CLI enumeration that need authorized references
+  seed from `initialized_kernel_store_with_references` instead of an empty
+  root.
+- Agent A/B and graph-shrinking cases that need a sibling state directory (not
+  `tmp_path` itself) copy `kernel_store_template_with_references` into that
+  directory instead of building an empty store and reinstalling references.
+- Graph atlas search remains expensive (~90s measured) but already lives in
+  the integration lane; no decorative `slow` marker was added until a suite
+  actually excludes that marker.
+- Graph counterexample shrinking and agent A/B scorers built kernels under
+  `tmp_path / "state"` (or sibling roots) while the module fixture only seeded
+  `tmp_path`, so template reuse never applied. Helpers now copy the reference
+  template into those subdirectories before construction.
+- On a quiet host after these moves, `make test-fast` completed 519 selected
+  tests in about 19 seconds with no `JacobianKernel` constructions left under
+  `tests/unit`, `tests/contract`, or `tests/checkers`.
