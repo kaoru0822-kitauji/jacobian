@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from pydantic import ValidationError
 
+import jacobian.provider_runtime as provider_runtime
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityInstallTier,
@@ -153,6 +156,57 @@ def test_exact_checker_composite_runtime_is_remeasured_recursively() -> None:
 
     with pytest.raises(ProviderRuntimeError, match="identity changed"):
         require_provider_runtime_unchanged(changed)
+
+
+def test_exact_checker_runtime_requires_rational_polynomial_api(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    incomplete_flint = SimpleNamespace(
+        __FLINT_VERSION__=provider_runtime.PYTHON_FLINT_HNF_FLINT_VERSION,
+        fmpq=object(),
+        fmpq_mat=object(),
+        fmpz=object(),
+        fmpz_mat=object(),
+        fmpz_poly=object(),
+    )
+    monkeypatch.setattr(
+        provider_runtime.importlib,
+        "import_module",
+        lambda _name: incomplete_flint,
+    )
+
+    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(
+        refresh=True
+    )
+
+    assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
+    assert runtime.digest is None
+
+
+def test_exact_checker_runtime_rejects_different_linked_flint_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    available = provider_runtime.python_flint_exact_checker_provider_runtime()
+    assert available.availability is CapabilityProviderAvailability.AVAILABLE
+    monkeypatch.setattr(
+        provider_runtime,
+        "python_distribution_provider_runtime",
+        lambda *_args, **_kwargs: available,
+    )
+    monkeypatch.setattr(
+        provider_runtime.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(__FLINT_VERSION__="3.5.0"),
+    )
+
+    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(
+        refresh=True
+    )
+
+    assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
+    assert runtime.digest is None
+    assert runtime.diagnostic is not None
+    assert "linked FLINT library" in runtime.diagnostic
 
 
 def test_measurement_status_cannot_hide_missing_elapsed_time() -> None:

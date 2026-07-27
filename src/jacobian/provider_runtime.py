@@ -945,11 +945,21 @@ def python_flint_exact_checker_provider_runtime(
         "python-flint",
         distribution_name="python-flint",
         import_name="flint",
-        required_attributes=("fmpq", "fmpq_mat", "fmpz", "fmpz_mat", "fmpz_poly"),
+        required_attributes=(
+            "fmpq",
+            "fmpq_mat",
+            "fmpq_poly",
+            "fmpz",
+            "fmpz_mat",
+            "fmpz_poly",
+        ),
         install_tier=CapabilityInstallTier.T1,
         license_id="MIT AND LGPL-3.0-or-later",
         features=("exact-domain-independent-replay",),
-        configuration={"import_name": "flint"},
+        configuration={
+            "import_name": "flint",
+            "flint_library_version": PYTHON_FLINT_HNF_FLINT_VERSION,
+        },
         refresh=refresh,
     )
     if (
@@ -965,6 +975,30 @@ def python_flint_exact_checker_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} exact-checker profile."
             ),
         )
+    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+        try:
+            flint = importlib.import_module("flint")
+        except (ImportError, OSError):
+            return _unavailable_runtime(
+                provider="python-flint",
+                install_tier=CapabilityInstallTier.T1,
+                license_id="MIT AND LGPL-3.0-or-later",
+                diagnostic=(
+                    "The pinned Python-FLINT exact-checker runtime cannot be imported."
+                ),
+            )
+        if getattr(flint, "__FLINT_VERSION__", None) != (
+            PYTHON_FLINT_HNF_FLINT_VERSION
+        ):
+            return _unavailable_runtime(
+                provider="python-flint",
+                install_tier=CapabilityInstallTier.T1,
+                license_id="MIT AND LGPL-3.0-or-later",
+                diagnostic=(
+                    "Python-FLINT is installed but its linked FLINT library does "
+                    "not match the pinned exact-checker profile."
+                ),
+            )
     return runtime
 
 
