@@ -97,3 +97,61 @@ def test_cancellation_stops_worker_before_its_wall_time_budget() -> None:
     assert completed.cancelled
     assert not completed.timed_out
     assert time.monotonic() - started < 3
+
+
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="process-group descendant cleanup is exercised on POSIX",
+)
+def test_clean_worker_exit_drains_pipes_inherited_by_descendants() -> None:
+    completed = run_bounded_process(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import subprocess, sys; "
+                "subprocess.Popen("
+                "[sys.executable, '-c', 'import time; time.sleep(30)'], "
+                "stdout=sys.stdout, stderr=sys.stderr); "
+                "print('worker complete', flush=True)"
+            ),
+        ],
+        input_bytes=b"",
+        timeout_seconds=0.5,
+        environment=dict(os.environ),
+        stdout_limit=4096,
+        stderr_limit=4096,
+    )
+
+    assert completed.returncode == 0
+    assert not completed.timed_out
+    assert completed.stdout == b"worker complete\n"
+    assert completed.stderr == b""
+
+
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="detached process groups are exercised on POSIX",
+)
+def test_detached_descendant_with_inherited_pipe_fails_closed() -> None:
+    completed = run_bounded_process(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import subprocess, sys; "
+                "subprocess.Popen("
+                "[sys.executable, '-c', 'import time; time.sleep(1)'], "
+                "stdout=sys.stdout, stderr=sys.stderr, start_new_session=True); "
+                "print('worker complete', flush=True)"
+            ),
+        ],
+        input_bytes=b"",
+        timeout_seconds=0.2,
+        environment=dict(os.environ),
+        stdout_limit=4096,
+        stderr_limit=4096,
+    )
+
+    assert completed.returncode == 0
+    assert completed.timed_out

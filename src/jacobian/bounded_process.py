@@ -24,6 +24,7 @@ _CANCELLATION_EVENT: ContextVar[threading.Event | None] = ContextVar(
     "jacobian_bounded_process_cancellation_event",
     default=None,
 )
+_PIPE_DRAIN_GRACE_SECONDS = 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,14 +277,18 @@ def run_bounded_process(
                 except subprocess.TimeoutExpired:
                     continue
         finally:
-            for reader in readers:
-                reader.join(timeout=max(0.0, deadline - time.monotonic()))
-            if any(reader.is_alive() for reader in readers):
-                # The immediate worker may have exited after spawning a
-                # descendant that inherited stdout or stderr.  In that case
-                # process.wait() succeeds while the pipes never reach EOF.
-                timed_out = True
+            # A clean worker may leave descendants holding inherited pipe
+            # handles. Terminate the process group before draining so those
+            # handles cannot turn successful completion into a false timeout.
             _kill_process_tree(process)
+            drain_deadline = time.monotonic() + _PIPE_DRAIN_GRACE_SECONDS
+            for reader in readers:
+                reader.join(timeout=max(0.0, drain_deadline - time.monotonic()))
+            if any(reader.is_alive() for reader in readers):
+                # A descendant may have escaped the worker process group while
+                # retaining a pipe. Fail closed instead of returning partial
+                # output as a successful worker completion.
+                timed_out = True
             process.stdout.close()
             process.stderr.close()
             for reader in readers:

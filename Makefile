@@ -76,7 +76,7 @@ check: lint test-fast ## Run the fast routine local handoff checks.
 
 check-static: lint-full typecheck build ## Run CI-owned static and package checks locally.
 
-validate-full: lint-full typecheck test test-lean build ## Reproduce exhaustive CI validation locally (slow and exceptional).
+validate-full: lint-full typecheck test test-lean build ## Run broad local validation (slow and exceptional; not every CI lane).
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import multiprocessing
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from fractions import Fraction
 from itertools import product
@@ -2099,19 +2100,29 @@ def _inverse_supports(
         return request.explicit_support
     dimension = len(request.target_variables)
     support = tuple(
-        sorted(
-            (
-                exponents
-                for exponents in product(
-                    range(request.inverse_degree_bound + 1),
-                    repeat=dimension,
-                )
-                if sum(exponents) <= request.inverse_degree_bound
-            ),
-            reverse=True,
+        _reverse_lex_degree_bounded_exponents(
+            dimension=dimension,
+            degree_bound=request.inverse_degree_bound,
         )
     )
     return tuple(support for _ in range(dimension))
+
+
+def _reverse_lex_degree_bounded_exponents(
+    *,
+    dimension: int,
+    degree_bound: int,
+) -> Iterator[tuple[int, ...]]:
+    if dimension == 1:
+        for exponent in range(degree_bound, -1, -1):
+            yield (exponent,)
+        return
+    for exponent in range(degree_bound, -1, -1):
+        for suffix in _reverse_lex_degree_bounded_exponents(
+            dimension=dimension - 1,
+            degree_bound=degree_bound - exponent,
+        ):
+            yield (exponent, *suffix)
 
 
 def _inverse_residual_term_bound(

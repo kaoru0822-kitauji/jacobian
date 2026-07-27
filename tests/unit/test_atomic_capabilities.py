@@ -59,3 +59,43 @@ def test_failed_exhaustive_result_cannot_claim_complete_coverage(
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
+
+
+def test_exhaustive_result_without_scope_cannot_claim_complete_coverage(
+    tmp_path: Path,
+) -> None:
+    exhaustive = ResultEnvelope(
+        execution=Execution(status=ExecutionStatus.COMPLETED),
+        input=InputValidation(status=InputStatus.ACCEPTED),
+        conclusion=Conclusion.UNKNOWN,
+        assurance=Assurance(
+            arithmetic=Arithmetic.EXACT_INTEGER,
+            method=Method.EXHAUSTIVE_FINITE,
+            coverage=Coverage.EXHAUSTIVE,
+            verification=Verification.UNVERIFIED,
+        ),
+        claim_digest="sha256:" + "a" * 64,
+        semantics_digest="sha256:" + "b" * 64,
+        candidate_digest="sha256:" + "c" * 64,
+    )
+    adapter = AtomicServiceAdapter(
+        capability_id="test.explore.exhaustive",
+        title="Test exhaustive exploration",
+        description="Project one exhaustive result without a declared scope.",
+        modes=(CapabilityMode.EXPLORE,),
+        input_schema={"type": "object", "additionalProperties": False},
+        output_schema=ResultEnvelope.model_json_schema(),
+        invoke=lambda _payload: exhaustive,
+        store=ArtifactStore(tmp_path),
+    )
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="test.explore.exhaustive",
+            input={},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.scope is None
+    assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL

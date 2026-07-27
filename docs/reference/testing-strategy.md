@@ -59,9 +59,10 @@ routine local pre-push gate. Developers should push after it and let CI own
 dependency and dead-code analysis, strict typing, package builds, and
 exhaustive validation. `make check-static` reproduces those CI-owned static
 and package checks when relevant.
-`make validate-full` is the local full-suite escape hatch for CI reproduction,
-not a routine handoff requirement. The full
-suite uses `pytest-xdist` work stealing and
+`make validate-full` is the broad local Python, Lean, static, and package
+escape hatch, not a routine handoff requirement. It does not reproduce CI's
+Python 3.13 compatibility, combined coverage, security, duplicate-code, or npm
+lanes. The full Python suite uses `pytest-xdist` work stealing and
 at most four workers because test durations vary substantially and many tests
 wait on isolated subprocesses. `make test-failed` is the failure-recovery
 shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process

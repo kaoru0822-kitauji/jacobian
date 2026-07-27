@@ -136,7 +136,7 @@ def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
-def test_plugin_deadline_covers_descendant_held_output_pipes(tmp_path: Path) -> None:
+def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) -> None:
     marker = tmp_path / "pipe-holder-survived"
     start = time.monotonic()
 
@@ -149,8 +149,8 @@ def test_plugin_deadline_covers_descendant_held_output_pipes(tmp_path: Path) -> 
     time.sleep(1.2)
 
     assert elapsed < 3
-    assert result.status.value == "TIMEOUT"
-    assert result.output is None
+    assert result.status.value == "COMPLETED"
+    assert result.output == {"worker": "returned"}
     assert not marker.exists()
 
 
