@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import importlib
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
 import networkx as nx
-import z3  # type: ignore[import-untyped]
 
 from jacobian.contracts.graph_coloring import ChromaticGraph
 from jacobian.contracts.graph_optimization import (
@@ -25,6 +25,12 @@ from jacobian.contracts.graph_optimization import (
 ThresholdRelation = Literal["AT_MOST", "AT_LEAST"]
 type VertexWitness = tuple[str, ...]
 type EdgeWitness = tuple[tuple[str, str], ...]
+
+
+def _z3() -> Any:
+    """Load the optional solver only while executing a solver-backed operation."""
+
+    return importlib.import_module("z3")
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +66,7 @@ def _search_thresholds[WitnessT: (VertexWitness, EdgeWitness)](
     budget: GraphOptimizationBudget,
     solve: Callable[[int, int], tuple[object, WitnessT]],
 ) -> _SearchResult[WitnessT]:
+    z3 = _z3()
     incumbent_value = len(incumbent)
     relation: ThresholdRelation = "AT_MOST" if direction == "MINIMUM" else "AT_LEAST"
     thresholds = (
@@ -157,6 +164,7 @@ def _vertex_model(
     solver: Any,
     variables: dict[str, Any],
 ) -> tuple[str, ...]:
+    z3 = _z3()
     model = solver.model()
     return tuple(
         sorted(
@@ -189,6 +197,7 @@ def solve_domination(
     incumbent = tuple(sorted(nx.dominating_set(graph)))
 
     def solve(bound: int, timeout_ms: int) -> tuple[object, VertexWitness]:
+        z3 = _z3()
         solver = z3.Solver()
         solver.set(timeout=max(1, timeout_ms))
         selected = {
@@ -254,6 +263,7 @@ def solve_minimum_maximal_matching(
         )
 
     def solve(bound: int, timeout_ms: int) -> tuple[object, EdgeWitness]:
+        z3 = _z3()
         solver = z3.Solver()
         solver.set(timeout=max(1, timeout_ms))
         chosen = {edge: z3.Bool(f"match_{index}") for index, edge in enumerate(edges)}
@@ -337,6 +347,7 @@ def _maximum_vertex_search(
     edges = _canonical_edges(graph)
 
     def solve(bound: int, timeout_ms: int) -> tuple[object, VertexWitness]:
+        z3 = _z3()
         solver = z3.Solver()
         solver.set(timeout=max(1, timeout_ms))
         selected = {

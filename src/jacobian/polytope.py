@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import logging
 import math
 import time
@@ -10,7 +11,6 @@ from fractions import Fraction
 from functools import reduce
 from typing import Any
 
-import z3  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json
@@ -49,6 +49,12 @@ from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 _LOGGER = logging.getLogger(__name__)
 
 
+def _z3() -> Any:
+    """Load the optional discovery backend only for a polytope solve."""
+
+    return importlib.import_module("z3")
+
+
 def _wire_rational(value: Fraction) -> dict[str, str]:
     return {"num": str(value.numerator), "den": str(value.denominator)}
 
@@ -65,14 +71,16 @@ def _require_schema_version(
     return result
 
 
-def _z3_rational(value: Fraction) -> z3.RatNumRef:
+def _z3_rational(value: Fraction) -> Any:
+    z3 = _z3()
     return z3.Q(value.numerator, value.denominator)
 
 
 def _model_fraction(
-    model: z3.ModelRef,
-    expression: z3.ArithRef,
+    model: Any,
+    expression: Any,
 ) -> Fraction:
+    z3 = _z3()
     value = model.eval(expression, model_completion=True)
     if not isinstance(value, z3.RatNumRef):
         raise ValueError("exact rational model value required")
@@ -242,7 +250,15 @@ class PolytopeService:
                 started,
                 _polytope_input_failure_detail(exc),
             )
-        except z3.Z3Exception:
+        except ImportError:
+            _LOGGER.exception("exact polytope backend is unavailable")
+            return self._unknown(
+                request,
+                started,
+                ExecutionStatus.ERROR,
+                "The optional exact polytope backend is unavailable.",
+            )
+        except _z3().Z3Exception:
             _LOGGER.exception("exact polytope backend failed")
             return self._unknown(
                 request,
@@ -320,7 +336,8 @@ class PolytopeService:
         )
 
     @staticmethod
-    def _solver(deadline: float) -> z3.Solver:
+    def _solver(deadline: float) -> Any:
+        z3 = _z3()
         solver = z3.Solver()
         remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
         solver.set(timeout=remaining_ms)
@@ -333,6 +350,7 @@ class PolytopeService:
         *,
         deadline: float,
     ) -> tuple[Fraction, ...] | None:
+        z3 = _z3()
         solver = self._solver(deadline)
         weights = tuple(z3.Real(f"lambda_{index}") for index in range(len(generators)))
         solver.add(*(weight >= 0 for weight in weights))
@@ -366,6 +384,7 @@ class PolytopeService:
         *,
         deadline: float,
     ) -> tuple[tuple[int, ...], int] | None:
+        z3 = _z3()
         solver = self._solver(deadline)
         coefficients = tuple(
             z3.Real(f"separator_{index}") for index in range(len(point))

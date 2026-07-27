@@ -155,6 +155,7 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
     kernel = JacobianKernel(tmp_path, install_references=True)
 
     assert kernel.lean is None
+    assert kernel.lean_proof_edit is None
     capability_ids = {
         item.capability_id for item in kernel.capabilities.catalog().capabilities
     }

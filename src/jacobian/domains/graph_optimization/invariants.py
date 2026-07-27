@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import importlib
 import math
 import time
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 import networkx as nx
 import sympy
-import z3  # type: ignore[import-untyped]
 
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.graph_invariant_operations import (
@@ -209,6 +209,7 @@ def _maximum_cardinality(
     *,
     independent: bool,
 ) -> GraphCliqueNumberResult | GraphIndependenceNumberResult:
+    z3: Any = importlib.import_module("z3")
     source = cast("nx.Graph[str]", build_simple_graph(request.graph))
     graph = nx.complement(source) if independent else source
     vertices = tuple(request.graph.vertices)

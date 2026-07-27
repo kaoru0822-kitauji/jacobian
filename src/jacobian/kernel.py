@@ -329,8 +329,11 @@ class JacobianKernel:
         self.lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = {}
         self.lean: LeanService | None = None
         self.lean_runtime: CapabilityProviderRuntime | None = None
+        self.lean_proof_edit: LeanProofEditInstallation | None = None
         self.lean_declarations: LeanDeclarationService | None = None
         self.lean_exploration: LeanExplorationInstallation | None = None
+        self.geometry_checker: GeometryCheckerInstallation | None = None
+        self.exact_domain_checkers: ExactDomainCheckerInstallation | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
         self.sat_assignment_checker: SatAssignmentCheckerInstallation
         sat_assignment_adapter, self.sat_assignment_checker = (
@@ -471,33 +474,7 @@ class JacobianKernel:
             self.register_capability(graph_adapter)
         self._install_graph_coloring_capabilities(install_references)
         self._install_builtin_domain_bundles()
-        self.geometry_checker: GeometryCheckerInstallation
-        geometry_verification, self.geometry_checker = install_geometry_checker(
-            self.store,
-            self.schemas,
-            self.artifacts,
-            self.domain_bundles["geometry"],
-            self.verification,
-            self.checkers,
-            authorize_checker=install_references,
-        )
-        if geometry_verification is not None:
-            self.register_capability(geometry_verification)
-        self.exact_domain_checkers: ExactDomainCheckerInstallation
-        exact_domain_verification, self.exact_domain_checkers = (
-            install_exact_domain_verification(
-                self.store,
-                self.schemas,
-                self.artifacts,
-                self.verification,
-                self.checkers,
-                polynomial=self.domain_bundles["polynomial"],
-                matrix=self.domain_bundles["matrix"],
-                authorize=install_references,
-            )
-        )
-        for verification_adapter in exact_domain_verification:
-            self.register_capability(verification_adapter)
+        self._install_builtin_domain_verification(install_references)
         self.graph_isomorphism: GraphIsomorphismInstallation
         graph_isomorphism, self.graph_isomorphism = install_graph_isomorphism(
             self.store,
@@ -690,7 +667,6 @@ class JacobianKernel:
             self.register_capability(lean_statement_adapter)
 
     def _install_lean_proof_edit(self) -> None:
-        self.lean_proof_edit: LeanProofEditInstallation | None = None
         if self.lean is None or self.lean_runtime is None:
             return
         adapter, self.lean_proof_edit = install_lean_proof_edit_capability(
@@ -800,6 +776,38 @@ class JacobianKernel:
     def _install_builtin_domain_bundles(self) -> None:
         for bundle in BUILTIN_DOMAIN_BUNDLES:
             self._install_capability_bundle(bundle)
+
+    def _install_builtin_domain_verification(self, authorize: bool) -> None:
+        geometry = self.domain_bundles.get("geometry")
+        if geometry is not None:
+            geometry_adapter, self.geometry_checker = install_geometry_checker(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                geometry,
+                self.verification,
+                self.checkers,
+                authorize_checker=authorize,
+            )
+            if geometry_adapter is not None:
+                self.register_capability(geometry_adapter)
+
+        polynomial = self.domain_bundles.get("polynomial")
+        matrix = self.domain_bundles.get("matrix")
+        if polynomial is None or matrix is None:
+            return
+        adapters, self.exact_domain_checkers = install_exact_domain_verification(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.verification,
+            self.checkers,
+            polynomial=polynomial,
+            matrix=matrix,
+            authorize=authorize,
+        )
+        for adapter in adapters:
+            self.register_capability(adapter)
 
     def _install_capability_bundle(self, bundle: DomainBundle) -> None:
         if (

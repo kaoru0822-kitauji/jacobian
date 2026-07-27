@@ -21,6 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityMode,
+    CapabilityProviderAvailability,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
@@ -403,7 +404,12 @@ def install_atomic_capabilities(
             artifact_uri=_ARTIFACT_URI,
         ),
     )
-    return adapters
+    return tuple(
+        adapter
+        for adapter in adapters
+        if (runtime := adapter.descriptor.provider_runtime) is None
+        or runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    )
 
 
 def _schema(properties: dict[str, Any], *, required: Iterable[str]) -> dict[str, Any]:
