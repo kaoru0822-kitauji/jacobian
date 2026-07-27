@@ -1,0 +1,34 @@
+name: Set up Python tests
+description: Install the requested Python and the frozen development environment.
+inputs:
+  python-version:
+    description: Python minor version to install and select.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: ${{ inputs.python-version }}
+    - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      with:
+        enable-cache: true
+        cache-dependency-glob: |
+          pyproject.toml
+          uv.lock
+    - name: Sync the frozen environment
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-version }}
+      run: uv sync --frozen --dev
+    - name: Require the requested Python version
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-version }}
+      run: >-
+        uv run --frozen python -c
+        "import os, sys;
+        expected = tuple(map(int, os.environ['UV_PYTHON'].split('.')));
+        assert sys.version_info[:2] == expected,
+        f'expected Python {expected}, got {sys.version_info[:2]}'"

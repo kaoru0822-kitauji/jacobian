@@ -7,10 +7,30 @@ from pathlib import Path
 
 import pytest
 
+from tests.sharding import partition_items, validate_shard
+
 _LAYER_MARKERS = {
     "integration": pytest.mark.integration,
     "end_to_end": pytest.mark.end_to_end,
 }
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Register CI's deterministic collection-partition options."""
+
+    group = parser.getgroup("jacobian")
+    group.addoption(
+        "--jacobian-shard-count",
+        type=int,
+        default=1,
+        help="Number of stable collection shards.",
+    )
+    group.addoption(
+        "--jacobian-shard-index",
+        type=int,
+        default=0,
+        help="Zero-based stable collection shard to run.",
+    )
 
 
 def _freeze_kernel_store(root: Path) -> None:
@@ -72,7 +92,10 @@ def initialized_kernel_store(
     shutil.copytree(kernel_store_template, tmp_path, dirs_exist_ok=True)
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config,
+    items: list[pytest.Item],
+) -> None:
     """Keep layer markers aligned with the suite's directory structure."""
 
     tests_root = Path(__file__).parent
@@ -84,3 +107,17 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         marker = _LAYER_MARKERS.get(layer)
         if marker is not None:
             item.add_marker(marker)
+
+    shard_count = config.getoption("--jacobian-shard-count")
+    shard_index = config.getoption("--jacobian-shard-index")
+    validate_shard(shard_count, shard_index)
+    if shard_count == 1:
+        return
+
+    selected, deselected = partition_items(
+        items,
+        shard_count=shard_count,
+        shard_index=shard_index,
+    )
+    items[:] = selected
+    config.hook.pytest_deselected(items=deselected)
