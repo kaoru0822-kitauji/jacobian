@@ -125,9 +125,9 @@ class LeanProofStateTransitionArtifact(ContractModel):
             range(self.goal_count)
         ):
             raise ValueError("typed goal indices must be contiguous")
-        if self.completed != (self.goal_count == 0):
-            raise ValueError("completion differs from returned goals")
         if self.accepted:
+            if self.completed != (self.goal_count == 0):
+                raise ValueError("completion differs from returned goals")
             if len(self.successor_states) != 1:
                 raise ValueError("an accepted tactic must return one successor state")
             successor = self.successor_states[0]
