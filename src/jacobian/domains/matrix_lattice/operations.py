@@ -109,8 +109,14 @@ def compute_smith_normal_form(
     )
     raw = smith_normal_form(source, domain=sympy.ZZ)
     diagonal_count = min(raw.rows, raw.cols)
-    factors = tuple(abs(int(raw[index, index])) for index in range(diagonal_count))
-    invariant_factors = tuple(value for value in factors if value)
+    diagonal = tuple(int(raw[index, index]) for index in range(diagonal_count))
+    rank = next(
+        (index for index, value in enumerate(diagonal) if value == 0),
+        diagonal_count,
+    )
+    if any(diagonal[index] != 0 for index in range(rank, diagonal_count)):
+        raise RuntimeError("Smith backend returned a nonzero factor after a zero")
+    invariant_factors = tuple(abs(value) for value in diagonal[:rank])
     canonical = sympy.zeros(raw.rows, raw.cols)
     for index, value in enumerate(invariant_factors):
         canonical[index, index] = value
@@ -121,7 +127,7 @@ def compute_smith_normal_form(
                 for row in range(raw.rows)
             )
         ),
-        rank=len(invariant_factors),
+        rank=rank,
         invariant_factors=tuple(str(value) for value in invariant_factors),
     )
 

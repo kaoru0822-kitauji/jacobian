@@ -7,11 +7,12 @@ from jacobian.kernel import JacobianKernel
 
 def _polynomial(
     terms: list[tuple[int, int, int]],
+    variable: str = "x",
 ) -> dict[str, object]:
     return {
         "polynomial_schema_version": "1",
         "domain": "QQ",
-        "variables": ["x"],
+        "variables": [variable],
         "polynomial": {
             "terms": [
                 {
@@ -166,6 +167,35 @@ def test_partial_fraction_output_is_structured_and_reconstructs(
         {
             "numerator": _polynomial([(0, 3, 1)]),
             "denominator_factor": _polynomial([(1, 1, 1), (0, 2, 1)]),
+            "denominator_exponent": 1,
+        },
+    ]
+
+
+def test_partial_fraction_uses_the_declared_univariate_generator(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    numerator = _polynomial([(1, 1, 1), (0, 3, 1)], "t")
+    denominator = _polynomial([(2, 1, 1), (0, -1, 1)], "t")
+
+    result = _invoke(
+        kernel,
+        "polynomial.rational.compute.partial_fraction_decomposition",
+        {"numerator": numerator, "denominator": denominator},
+    )
+
+    assert result["reconstruction_numerator"] == numerator
+    assert result["reconstruction_denominator"] == denominator
+    assert result["terms"] == [
+        {
+            "numerator": _polynomial([(0, 2, 1)], "t"),
+            "denominator_factor": _polynomial([(1, 1, 1), (0, -1, 1)], "t"),
+            "denominator_exponent": 1,
+        },
+        {
+            "numerator": _polynomial([(0, -1, 1)], "t"),
+            "denominator_factor": _polynomial([(1, 1, 1), (0, 1, 1)], "t"),
             "denominator_exponent": 1,
         },
     ]

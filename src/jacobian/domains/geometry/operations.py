@@ -7,7 +7,7 @@ from fractions import Fraction
 from typing import Any, cast
 
 import sympy
-from sympy.geometry import Circle, Line2D, Point2D, Polygon
+from sympy.geometry import Circle, Line2D, Point2D, Polygon, Segment2D
 from sympy.geometry.util import convex_hull
 
 from jacobian.contracts.exact import CanonicalRational
@@ -188,7 +188,7 @@ def convex_hull_points(request: ContractModel) -> ContractModel:
     hull = convex_hull(*(_point(point) for point in point_set.points))
     if isinstance(hull, Point2D):
         points = (hull,)
-    elif isinstance(hull, Line2D):
+    elif isinstance(hull, (Line2D, Segment2D)):
         points = tuple(cast(tuple[Point2D, Point2D], hull.points))
     else:
         points = tuple(cast(Polygon, hull).vertices)

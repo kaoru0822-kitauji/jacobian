@@ -84,16 +84,17 @@ def base_digits(request: ContractModel) -> ContractModel:
 
     req = cast(IntegerBaseDigitsRequest, request)
     value = _int(req.value)
-    expanded = sympy_digits(abs(value), req.base)[1:]
-    if value < 0:
-        sign: Literal[-1, 0, 1] = -1
-    elif value > 0:
-        sign = 1
-    else:
+    signed_base, *expanded = sympy_digits(value, req.base)
+    sign: Literal[-1, 0, 1]
+    if value == 0:
         sign = 0
+    elif signed_base < 0:
+        sign = -1
+    else:
+        sign = 1
     return IntegerBaseDigitsResult(
         sign=sign,
-        base=req.base,
+        base=abs(signed_base),
         digits=tuple(str(digit) for digit in expanded),
     )
 

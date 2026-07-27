@@ -8,10 +8,14 @@ import re
 import sys
 from typing import Any
 
+from jacobian.contracts.matrix_operations import (
+    MAX_OUTPUT_SCALAR_DIGITS,
+    MAX_SCALAR_DIGITS,
+)
+
 PROTOCOL = "jacobian.flint-lll-worker/v1"
 INPUT_LIMIT = 1_000_000
 MAX_DIMENSION = 32
-MAX_DIGITS = 256
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 
 
@@ -23,7 +27,7 @@ def _integer(value: object) -> int:
     if (
         not isinstance(value, str)
         or _INTEGER.fullmatch(value) is None
-        or len(value.lstrip("-")) > MAX_DIGITS
+        or len(value.lstrip("-")) > MAX_SCALAR_DIGITS
     ):
         raise WorkerError("FLINT_LLL_MATRIX_INVALID")
     return int(value)
@@ -67,7 +71,8 @@ def _wire(matrix: Any) -> list[list[str]]:
         for row in range(matrix.nrows())
     ]
     if any(
-        _INTEGER.fullmatch(value) is None or len(value.lstrip("-")) > MAX_DIGITS
+        _INTEGER.fullmatch(value) is None
+        or len(value.lstrip("-")) > MAX_OUTPUT_SCALAR_DIGITS
         for row in entries
         for value in row
     ):

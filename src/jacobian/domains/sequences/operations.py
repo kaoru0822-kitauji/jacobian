@@ -106,15 +106,11 @@ def prefix_sums(request: ContractModel) -> ContractModel:
 
 def first_differences(request: ContractModel) -> ContractModel:
     values = _values(request)
-    if len(values) < 2:
-        raise ValueError("first differences require at least two terms")
     return _list_result([right - left for left, right in pairwise(values)])
 
 
 def second_differences(request: ContractModel) -> ContractModel:
     values = _values(request)
-    if len(values) < 3:
-        raise ValueError("second differences require at least three terms")
     first = [right - left for left, right in pairwise(values)]
     return _list_result([right - left for left, right in pairwise(first)])
 

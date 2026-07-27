@@ -221,11 +221,23 @@ class SmithNormalFormResult(ContractModel):
     def require_invariant_factor_chain(self) -> Self:
         if len(self.invariant_factors) != self.rank:
             raise ValueError("nonzero invariant factor count must equal rank")
+        rows = len(self.normal_form.entries)
+        columns = len(self.normal_form.entries[0])
+        if self.rank > min(rows, columns):
+            raise ValueError("Smith rank cannot exceed the matrix dimensions")
         factors = tuple(int(value) for value in self.invariant_factors)
         if any(value <= 0 for value in factors):
             raise ValueError("Smith invariant factors must be positive")
         if any(right % left != 0 for left, right in pairwise(factors)):
             raise ValueError("each Smith invariant factor must divide the next")
+        for row, entries in enumerate(self.normal_form.entries):
+            for column, value in enumerate(entries):
+                expected = factors[row] if row == column and row < self.rank else 0
+                if int(value) != expected:
+                    raise ValueError(
+                        "Smith normal form must contain its positive invariant "
+                        "factors on the leading diagonal and zero elsewhere"
+                    )
         return self
 
     @field_validator("invariant_factors")

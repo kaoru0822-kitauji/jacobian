@@ -243,6 +243,27 @@ def _polynomial(value: object) -> fmpq_poly:
     return fmpq_poly(dense)
 
 
+def _polynomial_variable(value: object) -> str:
+    if not isinstance(value, dict):
+        raise ValueError("polynomial is malformed")
+    variables = value.get("variables")
+    if (
+        not isinstance(variables, list)
+        or len(variables) != 1
+        or not isinstance(variables[0], str)
+        or not variables[0]
+    ):
+        raise ValueError("checker supports one named polynomial variable")
+    return variables[0]
+
+
+def _same_polynomial_variable(*values: object) -> str:
+    variables = tuple(_polynomial_variable(value) for value in values)
+    if len(set(variables)) != 1:
+        raise ValueError("polynomial artifacts use different variable names")
+    return variables[0]
+
+
 def _rational_matrix(value: object) -> fmpq_mat:
     if not isinstance(value, dict) or set(value) != {"domain", "entries"}:
         raise ValueError("rational matrix is malformed")
@@ -315,17 +336,24 @@ def _gcd(source: dict[str, Any], result: dict[str, Any]) -> bool:
         return False
     if result["normalization"] != "MONIC":
         return False
-    left, right, declared = (
-        _polynomial(source["left"]),
-        _polynomial(source["right"]),
-        _polynomial(result["gcd"]),
-    )
     bezout = result["bezout"]
     if not isinstance(bezout, dict) or set(bezout) != {
         "left_multiplier",
         "right_multiplier",
     }:
         return False
+    _same_polynomial_variable(
+        source["left"],
+        source["right"],
+        result["gcd"],
+        bezout["left_multiplier"],
+        bezout["right_multiplier"],
+    )
+    left, right, declared = (
+        _polynomial(source["left"]),
+        _polynomial(source["right"]),
+        _polynomial(result["gcd"]),
+    )
     left_multiplier = _polynomial(bezout["left_multiplier"])
     right_multiplier = _polynomial(bezout["right_multiplier"])
     return (
@@ -353,6 +381,9 @@ def _resultant(source: dict[str, Any], result: dict[str, Any]) -> bool:
         or source["elimination_variable"] != result["elimination_variable"]
     ):
         return False
+    variable = _same_polynomial_variable(source["left"], source["right"])
+    if source["elimination_variable"] != variable:
+        raise ValueError("elimination variable does not name the polynomial variable")
     declared = result["resultant"]
     if not isinstance(declared, dict) or set(declared) != {"kind", "value"}:
         return False
@@ -386,6 +417,8 @@ def _discriminant(source: dict[str, Any], result: dict[str, Any]) -> bool:
         or declared["kind"] != "SCALAR"
     ):
         return False
+    if source["variable"] != _polynomial_variable(source["polynomial"]):
+        raise ValueError("discriminant variable does not name the polynomial variable")
     return _q(declared["value"]) == _polynomial(source["polynomial"]).discriminant()
 
 
@@ -417,10 +450,18 @@ def _square_free(source: dict[str, Any], result: dict[str, Any]) -> bool:
     for item in factors:
         if not isinstance(item, dict) or set(item) != {"factor", "multiplicity"}:
             return False
+        _same_polynomial_variable(source["polynomial"], item["factor"])
         declared.append((_polynomial(item["factor"]), item["multiplicity"]))
+    _same_polynomial_variable(source["polynomial"], result["reconstructed"])
+    normalized_expected = []
+    normalized_coefficient = coefficient
+    for factor, multiplicity in expected:
+        leading = factor.leading_coefficient()
+        normalized_expected.append((factor / leading, multiplicity))
+        normalized_coefficient *= leading**multiplicity
     return (
-        _q(result["coefficient"]) == coefficient
-        and declared == expected
+        _q(result["coefficient"]) == normalized_coefficient
+        and declared == normalized_expected
         and _polynomial(result["reconstructed"]) == polynomial
     )
 

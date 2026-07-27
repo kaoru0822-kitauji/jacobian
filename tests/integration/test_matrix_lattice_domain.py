@@ -12,13 +12,17 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.matrix_operations import (
     MAX_OUTPUT_SCALAR_DIGITS,
     IntegerMatrix,
+    IntegerMatrixRequest,
+    LatticeReductionRequest,
     MatrixTraceResult,
     SquareIntegerMatrixRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.matrix_lattice.capabilities import matrix_operation
+from jacobian.domains.matrix_lattice.lattice import reduce_lattice_basis
+from jacobian.domains.matrix_lattice.operations import compute_smith_normal_form
 from jacobian.kernel import JacobianKernel
-from jacobian.operations import OperationExecutionFailure
+from jacobian.operations import ComputedSuccess, OperationExecutionFailure
 
 
 def _q(value: int, denominator: int = 1) -> dict[str, str]:
@@ -228,6 +232,56 @@ def test_matrix_output_contract_failure_is_operational_error() -> None:
     assert isinstance(outcome, OperationExecutionFailure)
     assert outcome.status is ExecutionStatus.ERROR
     assert outcome.diagnostic.code == "MATRIX_OUTPUT_LIMIT_EXCEEDED"
+
+
+def test_smith_normal_form_preserves_rectangular_shape_and_zero_tail() -> None:
+    cases = (
+        ((("2", "4", "6"),), (("2", "0", "0"),), ("2",)),
+        ((("2",), ("4",), ("6",)), (("2",), ("0",), ("0",)), ("2",)),
+        (
+            (("0", "0", "0"), ("0", "0", "0")),
+            (("0", "0", "0"), ("0", "0", "0")),
+            (),
+        ),
+        (
+            (("0", "0", "0"), ("0", "2", "0")),
+            (("2", "0", "0"), ("0", "0", "0")),
+            ("2",),
+        ),
+    )
+
+    for source, expected, factors in cases:
+        result = compute_smith_normal_form(
+            IntegerMatrixRequest(matrix=IntegerMatrix(entries=source))
+        )
+        assert result.normal_form.entries == expected
+        assert result.invariant_factors == factors
+        assert result.rank == len(factors)
+
+
+def test_lll_worker_allows_result_growth_beyond_input_digit_limit() -> None:
+    scalar = "9" * 256
+    outcome = reduce_lattice_basis(
+        LatticeReductionRequest(
+            basis=IntegerMatrix(
+                entries=(
+                    ("1", scalar, "0"),
+                    ("0", "1", scalar),
+                    ("0", "0", "1"),
+                )
+            )
+        )
+    )
+    assert isinstance(outcome, ComputedSuccess)
+    largest_output = max(
+        len(value.lstrip("-"))
+        for matrix in (outcome.value.reduced_basis, outcome.value.transformation)
+        for row in matrix.entries
+        for value in row
+    )
+
+    assert largest_output == 512
+    assert largest_output <= MAX_OUTPUT_SCALAR_DIGITS
 
 
 def test_lattice_lll_returns_exact_left_transformation(tmp_path: Path) -> None:

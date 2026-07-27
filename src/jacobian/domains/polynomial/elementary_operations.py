@@ -154,9 +154,10 @@ def rational_polynomial_integral(request: ContractModel) -> ContractModel:
 def _partial_fraction_term(
     numerator: Any,
     denominator: Any,
+    generator: Symbol,
     variables: tuple[str, ...],
 ) -> RationalPartialFractionTerm:
-    denominator_poly = Poly(denominator, _X, domain="QQ")
+    denominator_poly = Poly(denominator, generator, domain="QQ")
     denominator_coefficient, factors = denominator_poly.factor_list()
     if len(factors) != 1:
         raise ValueError("SymPy returned a non-atomic partial-fraction denominator")
@@ -164,7 +165,7 @@ def _partial_fraction_term(
     leading_coefficient = denominator_factor.LC()
     monic_factor = denominator_factor.monic()
     scale = denominator_coefficient * leading_coefficient**exponent
-    normalized_numerator = Poly(numerator / scale, _X, domain="QQ")
+    normalized_numerator = Poly(numerator / scale, generator, domain="QQ")
     return RationalPartialFractionTerm(
         numerator=_wire(normalized_numerator, variables),
         denominator_factor=_wire(monic_factor, variables),
@@ -191,28 +192,34 @@ def rational_partial_fraction_decomposition(
 ) -> ContractModel:
     request = cast(RationalFunctionRequest, request)
     variables = request.numerator.variables
+    generator = _poly(request.numerator).gens[0]
     source = cancel(
         _poly(request.numerator).as_expr() / _poly(request.denominator).as_expr()
     )
-    decomposition = apart(source, _X)
-    polynomial_part = Poly(0, _X, domain="QQ")
+    decomposition = apart(source, generator)
+    polynomial_part = Poly(0, generator, domain="QQ")
     proper_terms: list[RationalPartialFractionTerm] = []
     for summand in Add.make_args(decomposition):
         numerator, denominator = fraction(cancel(summand))
         if denominator == 1:
-            polynomial_part += Poly(numerator, _X, domain="QQ")
+            polynomial_part += Poly(numerator, generator, domain="QQ")
         else:
             proper_terms.append(
-                _partial_fraction_term(numerator, denominator, variables)
+                _partial_fraction_term(
+                    numerator,
+                    denominator,
+                    generator,
+                    variables,
+                )
             )
 
     reconstructed = cancel(together(decomposition))
     reconstructed_numerator, reconstructed_denominator = fraction(reconstructed)
-    denominator_poly = Poly(reconstructed_denominator, _X, domain="QQ")
+    denominator_poly = Poly(reconstructed_denominator, generator, domain="QQ")
     denominator_lead = denominator_poly.LC()
     normalized_numerator = Poly(
         reconstructed_numerator / denominator_lead,
-        _X,
+        generator,
         domain="QQ",
     )
     normalized_denominator = denominator_poly.monic()

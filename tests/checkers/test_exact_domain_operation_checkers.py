@@ -61,6 +61,29 @@ def _poly(*coefficients_ascending: int) -> dict[str, Any]:
     }
 
 
+def _rational_poly(
+    *coefficients_ascending: tuple[int, int],
+    variable: str = "x",
+) -> dict[str, Any]:
+    return {
+        "polynomial_schema_version": "1",
+        "domain": "QQ",
+        "variables": [variable],
+        "polynomial": {
+            "terms": [
+                {
+                    "coefficient": _q(numerator, denominator),
+                    "exponents": [exponent],
+                }
+                for exponent, (numerator, denominator) in reversed(
+                    tuple(enumerate(coefficients_ascending))
+                )
+                if numerator
+            ]
+        },
+    }
+
+
 def _qq(entries: list[list[int]]) -> dict[str, Any]:
     return {"domain": "QQ", "entries": [[_q(item) for item in row] for row in entries]}
 
@@ -334,3 +357,55 @@ def test_exact_domain_checker_rejects_changed_flint_runtime(
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
     assert "runtime is unavailable" in decision["detail"]
+
+
+def test_square_free_checker_normalizes_flint_factors_to_monic_contract() -> None:
+    checker_request = _request(
+        "polynomial.compute.square_free_decomposition",
+        "polynomial.square-free.flint-replay",
+        {"polynomial": _poly(2, 10, 16, 8)},
+        {
+            "coefficient": _q(8),
+            "factors": [
+                {"factor": _poly(1, 1), "multiplicity": 1},
+                {
+                    "factor": _rational_poly((1, 2), (1, 1)),
+                    "multiplicity": 2,
+                },
+            ],
+            "reconstructed": _poly(2, 10, 16, 8),
+            "normalization": "MONIC_FACTORS",
+        },
+    )
+
+    assert check_polynomial_square_free(checker_request)["accepted"] is True
+
+
+def test_polynomial_checker_rejects_variable_renaming() -> None:
+    checker, checker_request = _CASES[0]
+    mutated = copy.deepcopy(checker_request)
+    mutated["candidate"]["payload"]["gcd"]["variables"] = ["y"]
+    mutated["candidate"]["payload_digest"] = _digest(mutated["candidate"]["payload"])
+
+    decision = checker(mutated)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_polynomial_checker_accepts_consistent_nondefault_variable_name() -> None:
+    checker, checker_request = _CASES[0]
+    renamed = copy.deepcopy(checker_request)
+    payloads = (
+        renamed["claim"]["payload"]["left"],
+        renamed["claim"]["payload"]["right"],
+        renamed["candidate"]["payload"]["gcd"],
+        renamed["candidate"]["payload"]["bezout"]["left_multiplier"],
+        renamed["candidate"]["payload"]["bezout"]["right_multiplier"],
+    )
+    for polynomial in payloads:
+        polynomial["variables"] = ["t"]
+    renamed["claim"]["payload_digest"] = _digest(renamed["claim"]["payload"])
+    renamed["candidate"]["payload_digest"] = _digest(renamed["candidate"]["payload"])
+
+    assert checker(renamed)["accepted"] is True

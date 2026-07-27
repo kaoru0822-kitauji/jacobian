@@ -35,7 +35,7 @@ class IntegerSequenceListResult(ContractModel):
     """A finite list of canonical integers produced by a sequence transform."""
 
     values: tuple[CanonicalInteger, ...] = Field(
-        min_length=1,
+        min_length=0,
         max_length=_MAX_SEQUENCE_LENGTH,
     )
 

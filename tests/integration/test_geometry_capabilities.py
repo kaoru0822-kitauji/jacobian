@@ -92,6 +92,39 @@ def test_geometry_exact_outputs_are_inline_and_materialized(tmp_path: Path) -> N
     )
 
 
+def test_convex_hull_returns_segment_endpoints_for_two_points(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.points.compute.convex_hull",
+            input={"points": [PXY, P0]},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == {"points": [P0, PXY]}
+
+
+def test_convex_hull_returns_extreme_endpoints_for_collinear_points(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    middle = {"x": ONE, "y": ONE}
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="geometry.points.compute.convex_hull",
+            input={"points": [middle, PXY, P0]},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == {"points": [P0, PXY]}
+
+
 def test_degenerate_geometry_fails_before_artifact_writes(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
 
