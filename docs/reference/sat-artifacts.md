@@ -3,6 +3,7 @@
 [Documentation home](../index.md)
 
 - Status: Experimental pre-stable contract
+- Installed operation: `sat.cnf.materialize`
 - Optional operations: `sat.model.find` and `sat.unsat_proof.find` when exact
   CaDiCaL 3.0.1 is installed; `sat.unsat_proof.verify` when the operator
   installs bundled references and an exactly identified DRAT-trim runtime
@@ -12,8 +13,10 @@
   [Atomic capability portfolio](../contributing/atomic-capability-portfolio.md#wave-2-sat-certificate-vertical-slice)
 
 Jacobian always installs canonical CNF, total assignment, and raw DRAT proof
-artifact contracts. It conditionally exposes two exploration capabilities when
-the pinned CaDiCaL runtime is available, but does not install the solver.
+artifact contracts. It exposes `sat.cnf.materialize` to turn bounded
+named-variable clauses into that canonical CNF artifact. It conditionally
+exposes two exploration capabilities when the pinned CaDiCaL runtime is
+available, but does not install the solver.
 These artifacts begin as typed, unverified evidence. Storing an assignment does
 not establish SAT, and storing proof bytes does not establish UNSAT. An
 operator may separately authorize the bundled assignment checker and expose
@@ -86,6 +89,19 @@ It uses ASCII, one LF-terminated row per clause, and projection version
 Consequently, reordering equivalent source input before canonicalization gives
 one artifact identity. Presenting a stored payload with reordered canonical
 clauses is invalid rather than a second representation.
+
+### Model-facing CNF materialization
+
+`sat.cnf.materialize` accepts `variable_names` in the caller's literal-ID order
+and `clauses` as signed integer arrays. Its closed request model validates all
+cross-field constraints and the two-million-literal aggregate bound before the
+artifact service writes anything. It returns the canonical `cnf_uri`, schema
+and semantics URIs, counts, projection identity, and all exact binding digests.
+
+The result has `COMPUTED` assurance and makes no SAT or UNSAT conclusion.
+`sat.model.find` and `sat.unsat_proof.find` consume the returned `cnf_uri`;
+their evidence can subsequently be passed to the corresponding independent
+verification capability when that checker is installed.
 
 ## Exact CNF binding
 

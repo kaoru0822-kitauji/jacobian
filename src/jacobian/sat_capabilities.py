@@ -1,10 +1,12 @@
-"""Model-facing verification for exact SAT assignment artifacts."""
+"""Model-facing construction and verification for exact SAT artifacts."""
 
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
 from typing import Literal
+
+from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -34,12 +36,15 @@ from jacobian.contracts.evidence import (
 )
 from jacobian.contracts.results import (
     Conclusion,
+    Execution,
     ExecutionStatus,
     Verification,
 )
 from jacobian.contracts.sat import (
     SatAssignmentVerificationOutput,
     SatAssignmentVerificationRequest,
+    SatCnfMaterializationOutput,
+    SatCnfMaterializationRequest,
     SatUnsatProofVerificationOutput,
     SatUnsatProofVerificationRequest,
 )
@@ -61,6 +66,116 @@ class SatAssignmentCheckerInstallation:
 class SatUnsatProofCheckerInstallation:
     certificate_schema_uri: str
     checker_id: str | None
+
+
+class SatCnfMaterializationAdapter:
+    """Create one canonical CNF artifact without making a SAT conclusion."""
+
+    def __init__(self, sat: SatArtifactService) -> None:
+        self.sat = sat
+        self._descriptor = CapabilityDescriptor(
+            capability_id="sat.cnf.materialize",
+            version="1",
+            title="Materialize a canonical SAT CNF",
+            description=(
+                "Validate named variables and integer clauses, canonicalize them, "
+                "and store the exact CNF artifact consumed by SAT model and UNSAT "
+                "proof search and verification capabilities."
+            ),
+            provider="jacobian.sat",
+            provider_runtime=known_provider_runtime(
+                "jacobian.sat",
+                features=("canonical-cnf", "cnf-materialization"),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(SatCnfMaterializationRequest),
+            output_schema=model_schema(SatCnfMaterializationOutput),
+            tags=(
+                "sat",
+                "cnf",
+                "canonical-cnf",
+                "materialization",
+                "model",
+                "unsat",
+                "proof",
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = SatCnfMaterializationRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_CNF",
+                    stage="cnf_validation",
+                    message="The named-variable CNF is not valid.",
+                    expected=(
+                        "unique valid variable names and bounded nonzero integer "
+                        "literals referring only to declared variables"
+                    ),
+                    hint=(
+                        "Call capability.describe for sat.cnf.materialize and correct "
+                        "the variable_names or clauses."
+                    ),
+                )
+            ) from exc
+
+        stored = self.sat.put_cnf(
+            variable_names=validated.variable_names,
+            clauses=validated.clauses,
+        )
+        resolved = self.sat.resolve_cnf(stored.artifact_uri)
+        binding = resolved.binding
+        output = SatCnfMaterializationOutput(
+            cnf_uri=binding.cnf_artifact_uri,
+            schema_uri=self.sat.installation.cnf_schema_uri,
+            semantics_uri=self.sat.installation.semantics_uri,
+            cnf_object_digest=binding.cnf_object_digest,
+            cnf_payload_digest=binding.cnf_payload_digest,
+            variable_map_digest=binding.variable_map_digest,
+            dimacs_digest=binding.dimacs_digest,
+            projection_format=binding.projection_format,
+            projection_version=binding.projection_version,
+            variable_count=binding.variable_count,
+            clause_count=binding.clause_count,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="the complete canonicalized CNF supplied in this request",
+                parameters={
+                    "declared_scope": "FULL_CNF",
+                    "variable_count": binding.variable_count,
+                    "clause_count": binding.clause_count,
+                },
+                artifact_uri=binding.cnf_artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                basis=(
+                    "materialization stores one complete input CNF and makes no "
+                    "satisfiability or enumeration claim"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "deterministic canonicalization and content-addressed artifact "
+                    "storage; no SAT or UNSAT conclusion is claimed"
+                ),
+            ),
+            artifact_uris=(binding.cnf_artifact_uri,),
+        )
 
 
 def install_sat_assignment_checker(

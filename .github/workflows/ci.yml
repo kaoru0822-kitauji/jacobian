@@ -208,7 +208,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.run-integration == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:

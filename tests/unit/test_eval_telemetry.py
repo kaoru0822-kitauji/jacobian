@@ -101,3 +101,43 @@ def test_agent_telemetry_preserves_discovery_to_invocation_dataflow(
     ]
     assert telemetry["capability_attempt_ids"] == ["graph.search.atlas"]
     assert telemetry["capability_ids"] == ["graph.search.atlas"]
+
+
+def test_agent_telemetry_counts_response_bytes_and_repeated_calls(
+    tmp_path: Path,
+) -> None:
+    events = [
+        _tool_event(
+            "capability.describe",
+            {},
+            {"matches": [{"capability_id": "sat.cnf.materialize"}]},
+        ),
+        _tool_event(
+            "capability.describe",
+            {},
+            {"matches": [{"capability_id": "sat.cnf.materialize"}]},
+        ),
+        _tool_event(
+            "capability.describe",
+            {"capability_id": "sat.cnf.materialize"},
+            {"capability": {"capability_id": "sat.cnf.materialize"}},
+        ),
+    ]
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        "\n".join(json.dumps(event) for event in events) + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["mcp_response_bytes"] > 0
+    assert (
+        telemetry["mcp_response_bytes_by_tool"]["capability.describe"]
+        == telemetry["mcp_response_bytes"]
+    )
+    assert telemetry["repeated_mcp_call_count"] == 1
+    assert telemetry["repeated_mcp_calls"][0]["tool"] == "capability.describe"
+    assert telemetry["repeated_mcp_calls"][0]["count"] == 2
+    assert telemetry["capability_describe_index_calls"] == 2
+    assert telemetry["capability_describe_exact_calls"] == 1

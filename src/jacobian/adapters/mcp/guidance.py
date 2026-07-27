@@ -35,6 +35,8 @@ Discovery:
 - Pass `query` to rank compact installed outcomes by mathematical intent.
 - Optionally filter with `domain` and `mode`; `limit` is between 1 and 50.
 - Omit all arguments to browse a compact installed catalog.
+- When `next_cursor` is present, pass it back with the same filters and limit to
+  continue without loading the complete catalog.
 - Ranking is deterministic retrieval over published IDs, titles, descriptions, and
   tags. Match fields and terms are returned; results are candidates, not
   recommendations.
@@ -90,7 +92,8 @@ installed capability ID.
 Search with `capability.describe(query=...)`, optionally filtered by `domain` and
 `mode`. Results are compact candidates ranked by deterministic matches against
 published descriptor metadata; `matched_on` and `matched_terms` make that retrieval
-visible. Ranking is not a recommendation.
+visible. Ranking is not a recommendation. Follow `next_cursor` with unchanged
+filters and limit when a discovery result is truncated.
 
 Search as many outcomes, concepts, or domains as useful. For any candidate, call
 `capability.describe(capability_id=...)` with only its exact ID, then follow the

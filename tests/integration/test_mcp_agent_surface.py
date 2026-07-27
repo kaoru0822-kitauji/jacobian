@@ -24,6 +24,12 @@ def _dump_models(models: list[Any], *, key: str) -> list[dict[str, Any]]:
     )
 
 
+def _normalize_discovery(payload: dict[str, Any]) -> dict[str, Any]:
+    digest = payload.get("catalog_digest")
+    assert isinstance(digest, str) and digest.startswith("sha256:")
+    return {**payload, "catalog_digest": "sha256:<catalog>"}
+
+
 async def _capture_surface(state_dir: Path) -> dict[str, Any]:
     server = create_server(
         state_dir,
@@ -74,8 +80,8 @@ async def _capture_surface(state_dir: Path) -> dict[str, Any]:
                 "text": instructions.contents[0].text,
             },
             "representative_discovery": {
-                "query": json.loads(discovered.content[0].text),
-                "browse": json.loads(browsed.content[0].text),
+                "query": _normalize_discovery(json.loads(discovered.content[0].text)),
+                "browse": _normalize_discovery(json.loads(browsed.content[0].text)),
                 "exact": {
                     "kind": exact_payload["kind"],
                     "capability_id": exact_payload["capability"]["capability_id"],

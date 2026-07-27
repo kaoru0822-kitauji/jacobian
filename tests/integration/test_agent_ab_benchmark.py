@@ -557,6 +557,12 @@ def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> N
         "capability_descriptions": [],
         "capability_ids": [],
         "capability_invocations": [],
+        "mcp_response_bytes": 0,
+        "mcp_response_bytes_by_tool": {},
+        "repeated_mcp_call_count": 0,
+        "repeated_mcp_calls": [],
+        "capability_describe_index_calls": 0,
+        "capability_describe_exact_calls": 0,
     }
 
 
