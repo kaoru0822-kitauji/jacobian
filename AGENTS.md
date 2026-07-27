@@ -4,7 +4,9 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, documentation,
 commits, and pull requests. This file lists only Jacobian-specific constraints.
 Load the [product model](docs/explanation/product-blueprint.md),
 [goals](docs/explanation/goals.md), or
-[tool reference](docs/reference/tools.md) when needed.
+[tool reference](docs/reference/tools.md) when needed. For built-in mathematical
+operations, also use the
+[domain operation library reference](docs/reference/domain-operation-library.md).
 
 ## Product Constraints
 
@@ -42,6 +44,12 @@ top-level MCP tools.
 Prefer thin adapters to maintained mathematical systems. Pin versions when
 reproducibility, certificates, or verification depend on them.
 
+Built-in mathematical producers belong in explicit domain bundles. Do not add
+global operation registries, recursive package discovery, import-time
+registration, or mechanical wrappers for backend functions. Producers remain
+capped at `COMPUTED`; domain-owned checker declarations do not authorize
+themselves.
+
 Keep availability, recommendations, compatibility, and verification authority
 separate. Experimental contracts may break between versions; compatibility
 applies only to supported versions. Only an operator-authorized checker
@@ -72,5 +80,12 @@ checker authorization out of plugins and search code.
 - Validate the complete Pydantic request model before computation or artifact
   writes. JSON Schema supports discovery; it does not replace cross-field
   validation.
+- `COMPLETED` bounded execution may still have `UNKNOWN` completeness and open
+  obligations. Execution completion does not establish optimality or a
+  mathematical conclusion.
+- Include every first-class artifact reference, including verification records,
+  in the result's `artifact_uris`.
+- An unavailable optional provider must remove only the affected capabilities;
+  unrelated kernel startup and catalog entries remain available.
 - Keep `deep_review.md` local; it is ignored and is not design source material.
 - Keep worked cases in reference scenarios and benchmarks.
