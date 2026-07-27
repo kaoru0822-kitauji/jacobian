@@ -158,15 +158,22 @@ jobs:
       - run: uv run --frozen jacobian-mcp --help
 
   test:
-    name: Tests (Python ${{ matrix.python-version }})
+    name: Tests (${{ matrix.lane.name }}, Python ${{ matrix.python-version }})
     needs: plan
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
+        lane:
+          - name: core
+            markers: >-
+              not integration and not end_to_end and not lean_runtime
+          - name: integration
+            markers: >-
+              (integration or end_to_end) and not lean_runtime
     steps:
       - name: Require a valid Python plan
         env:
@@ -198,7 +205,7 @@ jobs:
           matrix.python-version == '3.12'
         run: >-
           uv run --frozen pytest
-          -m "not lean_runtime"
+          -m "${{ matrix.lane.markers }}"
           --cov --cov-report= --cov-fail-under=0
           --durations=10
       - if: >-
@@ -206,8 +213,12 @@ jobs:
           matrix.python-version != '3.12'
         run: >-
           uv run --frozen pytest
-          -m "not lean_runtime"
+          -m "${{ matrix.lane.markers }}"
           --durations=10
+      - if: >-
+          needs.plan.outputs.run-python == 'true' &&
+          matrix.python-version == '3.12'
+        run: mv .coverage .coverage.${{ matrix.lane.name }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: >-
           ${{
@@ -217,8 +228,8 @@ jobs:
             matrix.python-version == '3.12'
           }}
         with:
-          name: coverage-data-python-3.12
-          path: .coverage
+          name: coverage-data-${{ matrix.lane.name }}
+          path: .coverage.${{ matrix.lane.name }}
           include-hidden-files: true
 
   python-test:
@@ -331,8 +342,11 @@ jobs:
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         if: needs.plan.outputs.run-python == 'true'
         with:
-          name: coverage-data-python-3.12
-          path: .
+          pattern: coverage-data-*
+          path: coverage-data
+          merge-multiple: true
+      - if: needs.plan.outputs.run-python == 'true'
+        run: uv run --frozen coverage combine coverage-data
       - if: needs.plan.outputs.run-python == 'true'
         run: uv run --frozen coverage report | tee coverage-report.txt
         shell: bash -o pipefail {0}

@@ -78,12 +78,15 @@ installation must not use this fixture.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
-CI runs the non-Lean suite once on each supported Python version. Each runner
-uses xdist's live `worksteal` scheduler with at most four workers, matching the
-four CPUs available on standard public Linux GitHub-hosted runners. This keeps
-load balancing responsive to the tests actually collected without a committed
-timing snapshot or static cross-runner partition. Python 3.12 also records
-coverage; the dependent reporting job consumes that single data artifact.
+CI divides the non-Lean suite into two stable semantic lanes on each supported
+Python version. The `core` lane contains unit, contract, checker, and reference
+tests; the `integration` lane contains integration and end-to-end tests. Each
+of the four runners uses xdist's live `worksteal` scheduler with at most four
+workers, matching the four CPUs available on standard public Linux
+GitHub-hosted runners. This keeps load balancing responsive within each
+meaningful layer without a committed timing snapshot or node-ID partition.
+Both Python 3.12 lanes record coverage, and the dependent reporting job
+combines those two data artifacts.
 
 Tests marked
 `lean_runtime` are excluded from those runs and divided by measured duration

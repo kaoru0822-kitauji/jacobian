@@ -50,11 +50,13 @@ which became stale as the suite expanded: only 582 of 1,042 selected tests
 still had measurements during the issue #109 investigation. The timeout had
 become the effective stale-data detector.
 
-The Python matrix now uses one runner per supported version and lets xdist's
-`worksteal` scheduler balance the live queue across the runner's four CPUs.
-This trades some cross-runner parallelism for fewer moving parts and removes
-the timing snapshot, refresh process, static partition, and multi-artifact
-coverage merge.
+The Python matrix now uses two stable semantic lanes per supported version:
+core tests and integration/end-to-end tests. xdist's `worksteal` scheduler
+balances the live queue across each runner's four CPUs. This preserves four-way
+runner concurrency without coupling partitioning to historical node-ID
+measurements. It removes the timing snapshot, refresh process, and opaque
+duration-based partition while keeping failures attributable to a documented
+test layer.
 
 ## Development policy
 
