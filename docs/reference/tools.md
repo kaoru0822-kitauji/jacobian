@@ -161,6 +161,7 @@ of catalog membership:
 - [SMT Alethe artifact contracts](smt-artifacts.md);
 - [exact rational linear-system evidence](linear-rational-solutions.md);
 - [exact rational matrix determinants](matrix-rational-determinant.md);
+- [graph counterexample shrinking](graph-counterexample-shrinking.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
 - [fixed-registry graph invariant batches](graph-invariant-batch.md);
 - [bounded finite exactly-once coverage](finite-coverage-verification.md);

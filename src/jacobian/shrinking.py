@@ -72,6 +72,7 @@ class ShrinkService:
         reducers: tuple[str, ...] | list[str],
         objectives: tuple[str, ...] | list[str],
         evaluation_budget: int,
+        reducer_timeout_seconds: int = 30,
     ) -> ShrinkResult:
         """Run bounded shrinking and report the achieved minimality level."""
 
@@ -182,7 +183,7 @@ class ShrinkService:
                         "semantics_digest": semantics_digest,
                     },
                 },
-                timeout_seconds=30,
+                timeout_seconds=reducer_timeout_seconds,
             )
             if execution.status != ExecutionStatus.COMPLETED:
                 operational_failure = (
@@ -236,6 +237,8 @@ class ShrinkService:
                             reducer=proposal.reducer,
                             from_uri=current.artifact_uri,
                             accepted=False,
+                            execution_status=ExecutionStatus.COMPLETED,
+                            input_status=InputStatus.REJECTED,
                             objectives=proposal.objectives,
                             detail="plugin used a reducer that was not requested",
                         )
@@ -279,6 +282,8 @@ class ShrinkService:
                             from_uri=current.artifact_uri,
                             proposed_uri=proposed.artifact_uri,
                             accepted=accepted,
+                            execution_status=decision.execution.status,
+                            input_status=decision.input.status,
                             verification_record_uri=(
                                 decision.verification_record_uri if accepted else None
                             ),
@@ -308,6 +313,8 @@ class ShrinkService:
                             reducer=proposal.reducer,
                             from_uri=current.artifact_uri,
                             accepted=False,
+                            execution_status=ExecutionStatus.ERROR,
+                            input_status=InputStatus.REJECTED,
                             objectives=proposal.objectives,
                             detail=_shrink_failure_detail(exc),
                         )
