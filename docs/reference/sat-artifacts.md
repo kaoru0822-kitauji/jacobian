@@ -7,8 +7,8 @@
 - Optional operations: `sat.model.find` and `sat.unsat_proof.find` when exact
   CaDiCaL 3.0.1 is installed; `sat.unsat_proof.verify` when the operator
   installs bundled references and an exactly identified DRAT-trim runtime
-- Installed operations: `sat.model.verify` when the operator installs the
-  bundled reference checkers
+- Installed operations: `sat.model.verify` and `sat.lrat.verify` when the
+  operator installs the bundled reference checkers
 - Related plan:
   [Atomic capability portfolio](../contributing/atomic-capability-portfolio.md#wave-2-sat-certificate-vertical-slice)
 
@@ -23,6 +23,13 @@ operator may separately authorize the bundled assignment checker and expose
 `sat.model.verify`. Proof verification additionally requires a pinned
 DRAT-trim executable with operator-supplied provenance.
 
+`sat.lrat.verify` is deliberately separate from the DRAT operation. Its
+bounded v1 accepts ASCII LRAT additions with ordered positive RUP hints and
+deletions. It binds the exact CNF object, variable map, DIMACS projection,
+proof bytes, limits, checker, and certificate. Negative RAT hints are
+`UNSUPPORTED`; malformed, truncated, timed-out, cancelled, or rejected proofs
+return `UNKNOWN` and never provide evidence that the formula is satisfiable.
+
 ## Registered descriptors
 
 `JacobianKernel.sat.installation` exposes the content-addressed descriptor URIs
@@ -34,6 +41,7 @@ registered by the current kernel:
 | Schema | `jacobian.canonical-cnf@1` | Canonical named-variable CNF and DIMACS binding |
 | Schema | `jacobian.sat-assignment@1` | Total assignment candidate bound to one CNF |
 | Schema | `jacobian.sat-proof@1` | Preserved raw DRAT bytes bound to one CNF |
+| Schema | `jacobian.sat-lrat-proof@1` | Preserved ASCII LRAT RUP-profile bytes and replay limits |
 | Schema | `jacobian.witness-envelope@1` | Exact assignment replay evidence |
 | Schema | `jacobian.certificate-envelope@1` | Exact UNSAT proof replay evidence |
 

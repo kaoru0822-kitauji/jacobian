@@ -100,3 +100,30 @@ def test_kernel_store_template_is_quiescent_and_copyable(
         for future in futures:
             future.result()
     gc.collect()
+
+
+def test_kernel_store_template_with_references_is_quiescent_and_copyable(
+    kernel_store_template_with_references: Path,
+    tmp_path: Path,
+) -> None:
+    database = kernel_store_template_with_references / "metadata.sqlite3"
+    assert not database.with_name(f"{database.name}-wal").exists()
+    assert not database.with_name(f"{database.name}-shm").exists()
+
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute("PRAGMA journal_mode").fetchone() == ("delete",)
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    finally:
+        connection.close()
+
+    descriptor_uri = _research_episode_schema_uri(kernel_store_template_with_references)
+    destination = tmp_path / "clone-with-references"
+    _copy_and_check_store(
+        kernel_store_template_with_references,
+        destination,
+        descriptor_uri=descriptor_uri,
+    )
+    kernel = JacobianKernel(destination, install_references=True)
+    assert "graph_paths" in kernel.references
+    assert "erdos_straus" in kernel.references

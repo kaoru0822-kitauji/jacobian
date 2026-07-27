@@ -43,6 +43,9 @@ from jacobian.contracts.universal_algebra import (
     FiniteMagmaLawEvaluationClaim,
     FiniteMagmaLawProblem,
     FiniteMagmaLawReplayPayload,
+    FiniteMagmaTableEnumerationArtifact,
+    FiniteMagmaTableEnumerationOutput,
+    FiniteMagmaTableEnumerationRequest,
     MagmaAssignmentValue,
     MagmaLaw,
     MagmaLawCounterexample,
@@ -65,9 +68,11 @@ _COUNTERMODEL_TIMEOUT_MS = 10_000
 @dataclass(frozen=True, slots=True)
 class UniversalAlgebraInstallation:
     semantics_uri: str
+    magma_schema_uri: str
     problem_schema_uri: str
     evaluation_schema_uri: str
     countermodel_schema_uri: str
+    table_enumeration_schema_uri: str
     claim_schema_uri: str
     certificate_schema_uri: str
     evaluation_checker_id: str | None
@@ -110,6 +115,11 @@ def install_universal_algebra_capabilities(
             "countermodel_timeout_ms": _COUNTERMODEL_TIMEOUT_MS,
         },
     )
+    magma_schema_uri = schemas.register(
+        name="jacobian.finite-magma",
+        version="1",
+        schema=model_schema(FiniteMagma),
+    )
     problem_schema_uri = schemas.register(
         name="jacobian.finite-magma-law-problem",
         version="1",
@@ -124,6 +134,11 @@ def install_universal_algebra_capabilities(
         name="jacobian.finite-magma-countermodel-search",
         version="1",
         schema=model_schema(FiniteMagmaCountermodelArtifact),
+    )
+    table_enumeration_schema_uri = schemas.register(
+        name="jacobian.finite-magma-table-enumeration",
+        version="1",
+        schema=model_schema(FiniteMagmaTableEnumerationArtifact),
     )
     claim_schema_uri = schemas.register(
         name="jacobian.finite-magma-law-evaluation-claim",
@@ -159,9 +174,11 @@ def install_universal_algebra_capabilities(
         )
     installation = UniversalAlgebraInstallation(
         semantics_uri=semantics_uri,
+        magma_schema_uri=magma_schema_uri,
         problem_schema_uri=problem_schema_uri,
         evaluation_schema_uri=evaluation_schema_uri,
         countermodel_schema_uri=countermodel_schema_uri,
+        table_enumeration_schema_uri=table_enumeration_schema_uri,
         claim_schema_uri=claim_schema_uri,
         certificate_schema_uri=certificate_schema_uri,
         evaluation_checker_id=evaluation_checker_id,
@@ -181,6 +198,7 @@ def install_universal_algebra_capabilities(
         adapters += (
             UniversalAlgebraSearchCountermodelAdapter(resources, search_runtime),
         )
+    adapters += (FiniteMagmaTableEnumerateAdapter(resources),)
     return adapters, installation
 
 
@@ -566,6 +584,135 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 ),
             ),
             artifact_uris=(search_artifact.artifact_uri,),
+        )
+
+
+class FiniteMagmaTableEnumerateAdapter:
+    """Enumerate every small finite-magma table in canonical order."""
+
+    def __init__(self, resources: UniversalAlgebraResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="finite_magma.table.enumerate",
+            version="1",
+            title="Enumerate finite magma tables",
+            description=(
+                "Enumerate every total binary-operation table of order one or two "
+                "in exact lexicographic row-major order."
+            ),
+            provider="jacobian.finite-table",
+            provider_runtime=known_provider_runtime(
+                "jacobian.finite-table",
+                features=("finite-magma-table-enumeration",),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(FiniteMagmaTableEnumerationRequest),
+            output_schema=model_schema(FiniteMagmaTableEnumerationOutput),
+            tags=("universal-algebra", "finite-model", "enumeration"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = FiniteMagmaTableEnumerationRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_FINITE_MAGMA_TABLE_ENUMERATION_REQUEST",
+                    stage="request_validation",
+                    message=(
+                        "Finite-magma table enumeration supports exact carrier "
+                        "orders one and two."
+                    ),
+                )
+            ) from exc
+        started = time.monotonic()
+        order = validated.order
+        table_uris: list[str] = []
+        for cells in product(range(order), repeat=order * order):
+            structure = FiniteMagma(
+                order=order,
+                table=tuple(
+                    tuple(cells[row * order : (row + 1) * order])
+                    for row in range(order)
+                ),
+            )
+            table = self.resources.artifacts.put(
+                schema_uri=self.resources.installation.magma_schema_uri,
+                semantics_uri=self.resources.installation.semantics_uri,
+                payload=structure.model_dump(mode="json"),
+                summary=f"finite magma table of order {order}",
+            )
+            table_uris.append(table.artifact_uri)
+        total_count = order ** (order * order)
+        enumeration = FiniteMagmaTableEnumerationArtifact(
+            order=order,
+            table_uris=tuple(table_uris),
+            enumerated_count=len(table_uris),
+            total_count=total_count,
+        )
+        enumeration_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.table_enumeration_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=enumeration.model_dump(mode="json"),
+            parents=tuple(table_uris),
+            summary=f"complete finite magma table enumeration of order {order}",
+        )
+        output = FiniteMagmaTableEnumerationOutput(
+            enumeration_uri=enumeration_artifact.artifact_uri,
+            order=order,
+            table_uris=tuple(table_uris),
+            enumerated_count=len(table_uris),
+            total_count=total_count,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=max(0, round((time.monotonic() - started) * 1000)),
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description=(
+                    "all total binary operations on the fixed carrier "
+                    f"0 through {order - 1}"
+                ),
+                parameters={
+                    "order": order,
+                    "table_count": total_count,
+                    "ordering": "LEXICOGRAPHIC_ROW_MAJOR",
+                },
+                artifact_uri=enumeration_artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.COMPLETE,
+                basis=(
+                    "the bounded Cartesian product of all row-major table cells "
+                    "was exhausted exactly once"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            relationships=tuple(
+                CapabilityRelationship(
+                    relation_id="universal_algebra.relation.enumeration-member",
+                    source_artifact_uris=(enumeration_artifact.artifact_uri,),
+                    target_artifact_uris=(table_uri,),
+                )
+                for table_uri in table_uris
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "deterministic exact standard-library enumeration; no "
+                    "independent coverage checker was invoked"
+                ),
+            ),
+            artifact_uris=(enumeration_artifact.artifact_uri, *table_uris),
         )
 
 

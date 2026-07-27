@@ -13,6 +13,8 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus, InputStatus
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
 
 def _rational(value: int) -> dict[str, str]:
     return {"num": str(value), "den": "1"}

@@ -26,7 +26,7 @@ from jacobian.kernel import JacobianKernel
 from jacobian.linear_capabilities import install_linear_rational_solution_checker
 from jacobian.provider_runtime import PYTHON_FLINT_VERSION
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _q(num: int, den: int = 1) -> dict[str, str]:

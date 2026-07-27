@@ -1,137 +1,73 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python3
+"""Validate the classifier's machine-readable CI plan."""
 
-declare -A plan=()
-expected_keys=(
-  classification
-  run-python
-  run-core
-  run-integration
-  run-coverage
-  run-lean
-  run-npm
-  run-static
-  run-build
-  run-security
-  run-duplicate
+from __future__ import annotations
+
+import sys
+
+BOOLEAN_KEYS = (
+    "run-python",
+    "run-core",
+    "run-integration",
+    "run-coverage",
+    "run-compatibility",
+    "run-lean",
+    "run-npm",
+    "run-static",
+    "run-build",
+    "run-security",
+    "run-duplicate",
 )
+CLASSIFICATIONS = {
+    "docs",
+    "npm",
+    "lean",
+    "python-core",
+    "python-integration",
+    "selective",
+    "full",
+    "exhaustive",
+}
 
-while IFS='=' read -r key value; do
-  case "$key" in
-    classification|run-python|run-core|run-integration|run-coverage|run-lean|run-npm|run-static|run-build|run-security|run-duplicate)
-      ;;
-    *)
-      echo "invalid CI plan key: $key" >&2
-      exit 1
-      ;;
-  esac
-  if [[ -v "plan[$key]" ]]; then
-    echo "duplicate CI plan key: $key" >&2
-    exit 1
-  fi
-  plan["$key"]=$value
-done
 
-for key in "${expected_keys[@]}"; do
-  if [[ ! -v "plan[$key]" ]]; then
-    echo "missing CI plan key: $key" >&2
-    exit 1
-  fi
-done
+def fail(message: str) -> None:
+    raise SystemExit(message)
 
-for key in "${expected_keys[@]:1}"; do
-  case "${plan[$key]}" in
-    true|false) ;;
-    *)
-      echo "invalid CI plan value for $key: ${plan[$key]}" >&2
-      exit 1
-      ;;
-  esac
-done
 
-case "${plan[classification]}" in
-  full)
-    for key in "${expected_keys[@]:1}"; do
-      if [[ "${plan[$key]}" != true ]]; then
-        echo "full CI plan must enable $key" >&2
-        exit 1
-      fi
-    done
-    exit 0
-    ;;
-  docs|npm|lean|python-core|selective)
-    ;;
-  *)
-    echo "invalid CI classification: ${plan[classification]}" >&2
-    exit 1
-    ;;
-esac
+def main() -> None:
+    plan: dict[str, str] = {}
+    for raw_line in sys.stdin:
+        line = raw_line.rstrip("\n")
+        if "=" not in line:
+            fail(f"invalid CI plan line: {line}")
+        key, value = line.split("=", 1)
+        if key in plan:
+            fail(f"duplicate CI plan key: {key}")
+        plan[key] = value
 
-expected_python=false
-if [[ "${plan[run-core]}" == true || "${plan[run-integration]}" == true ]]; then
-  expected_python=true
-fi
-if [[ "${plan[run-python]}" != "$expected_python" ]]; then
-  echo "run-python must equal the union of the Python test lanes" >&2
-  exit 1
-fi
-expected_coverage=false
-if [[ "${plan[run-core]}" == true && "${plan[run-integration]}" == true ]]; then
-  expected_coverage=true
-fi
-if [[ "${plan[run-coverage]}" != "$expected_coverage" ]]; then
-  echo "run-coverage requires both Python test lanes" >&2
-  exit 1
-fi
-if [[ "${plan[run-static]}" != "${plan[run-python]}" ]]; then
-  echo "selective Python validation must include static analysis" >&2
-  exit 1
-fi
-for key in run-build run-security run-duplicate; do
-  if [[ "${plan[$key]}" != false ]]; then
-    echo "selective CI plan must disable $key" >&2
-    exit 1
-  fi
-done
+    expected = {"classification", *BOOLEAN_KEYS}
+    if set(plan) != expected:
+        fail(f"CI plan keys differ: expected {sorted(expected)}, got {sorted(plan)}")
+    if plan["classification"] not in CLASSIFICATIONS:
+        fail(f"invalid CI classification: {plan['classification']}")
+    for key in BOOLEAN_KEYS:
+        if plan[key] not in {"true", "false"}:
+            fail(f"invalid CI plan value for {key}: {plan[key]}")
 
-case "${plan[classification]}" in
-  docs)
-    expected=(false false false false)
-    ;;
-  npm)
-    expected=(false false false true)
-    ;;
-  lean)
-    expected=(false false true false)
-    ;;
-  python-core)
-    expected=(true false false false)
-    ;;
-  selective)
-    lane_count=0
-    for value in \
-      "${plan[run-core]}" \
-      "${plan[run-integration]}" \
-      "${plan[run-lean]}" \
-      "${plan[run-npm]}"; do
-      if [[ "$value" == true ]]; then
-        lane_count=$((lane_count + 1))
-      fi
-    done
-    if (( lane_count < 2 )); then
-      echo "selective CI plan must enable at least two independent lanes" >&2
-      exit 1
-    fi
-    exit 0
-    ;;
-esac
-actual=(
-  "${plan[run-core]}"
-  "${plan[run-integration]}"
-  "${plan[run-lean]}"
-  "${plan[run-npm]}"
-)
-if [[ "${actual[*]}" != "${expected[*]}" ]]; then
-  echo "${plan[classification]} CI plan has incoherent lane outputs" >&2
-  exit 1
-fi
+    has_python = plan["run-core"] == "true" or plan["run-integration"] == "true"
+    if (plan["run-python"] == "true") != has_python:
+        fail("run-python must equal the union of the Python test lanes")
+    for key in ("run-coverage", "run-compatibility"):
+        if plan[key] == "true" and not (
+            plan["run-core"] == "true" and plan["run-integration"] == "true"
+        ):
+            fail(f"{key} requires both Python test lanes")
+    if plan["classification"] == "exhaustive":
+        if any(plan[key] != "true" for key in BOOLEAN_KEYS):
+            fail("exhaustive CI must enable every lane")
+    elif plan["run-coverage"] == "true" or plan["run-compatibility"] == "true":
+        fail("coverage and compatibility are exhaustive-only lanes")
+
+
+if __name__ == "__main__":
+    main()

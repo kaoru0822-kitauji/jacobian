@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, StringConstraints, model_validator
 
@@ -15,6 +15,116 @@ GraphVertex = Annotated[
     str,
     StringConstraints(min_length=1, max_length=128, strict=True),
 ]
+GraphInvariantName = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^[a-z][a-z0-9_]{0,63}$",
+        min_length=1,
+        max_length=64,
+        strict=True,
+    ),
+]
+
+
+class GraphInvariantBatchRequest(ContractModel):
+    graph_uri: ArtifactUri
+    properties: tuple[GraphInvariantName, ...] = Field(min_length=1, max_length=32)
+
+    @model_validator(mode="after")
+    def require_unique_properties(self) -> Self:
+        if len(set(self.properties)) != len(self.properties):
+            raise ValueError("requested graph invariants must be unique")
+        return self
+
+
+class GraphInvariantResult(ContractModel):
+    invariant: GraphInvariantName
+    status: Literal["COMPUTED", "NOT_APPLICABLE", "UNSUPPORTED"]
+    value: Any = None
+    exactness: Literal["EXACT", "NOT_APPLICABLE"]
+    backend: str | None = Field(default=None, min_length=1, max_length=128)
+    detail: str | None = Field(default=None, min_length=1, max_length=512)
+
+    @model_validator(mode="after")
+    def require_status_consistency(self) -> Self:
+        if self.status == "COMPUTED":
+            if self.exactness != "EXACT" or self.backend is None:
+                raise ValueError("computed invariants require an exact backend")
+            if self.detail is not None:
+                raise ValueError("computed invariants cannot carry failure detail")
+        else:
+            if self.exactness != "NOT_APPLICABLE" or self.detail is None:
+                raise ValueError(
+                    "unsupported or inapplicable invariants require explicit detail"
+                )
+            if self.value is not None:
+                raise ValueError(
+                    "unsupported or inapplicable invariants cannot carry a value"
+                )
+        if self.status == "UNSUPPORTED" and self.backend is not None:
+            raise ValueError("unsupported invariants cannot name a backend")
+        return self
+
+
+class GraphInvariantResultArtifact(ContractModel):
+    invariant_result_version: Literal["1"] = "1"
+    graph_uri: ArtifactUri
+    registry_version: Literal["1"] = "1"
+    backend_version: str = Field(min_length=1, max_length=64)
+    result: GraphInvariantResult
+
+
+class GraphInvariantBinding(ContractModel):
+    invariant: GraphInvariantName
+    artifact_uri: ArtifactUri
+    result: GraphInvariantResult
+
+    @model_validator(mode="after")
+    def bind_invariant_name(self) -> Self:
+        if self.invariant != self.result.invariant:
+            raise ValueError("invariant binding must match its result")
+        return self
+
+
+class GraphInvariantBatchArtifact(ContractModel):
+    invariant_batch_version: Literal["2"] = "2"
+    graph_uri: ArtifactUri
+    registry_version: Literal["1"] = "1"
+    supported_invariants: tuple[GraphInvariantName, ...]
+    requested_invariants: tuple[GraphInvariantName, ...]
+    backend_version: str = Field(min_length=1, max_length=64)
+    results: tuple[GraphInvariantBinding, ...]
+    properties: dict[str, Any]
+
+    @model_validator(mode="after")
+    def require_complete_ordered_bindings(self) -> Self:
+        if self.supported_invariants != tuple(sorted(set(self.supported_invariants))):
+            raise ValueError("supported invariant registry must be unique and sorted")
+        if self.requested_invariants != tuple(sorted(set(self.requested_invariants))):
+            raise ValueError("requested invariants must be unique and sorted")
+        if tuple(binding.invariant for binding in self.results) != (
+            self.requested_invariants
+        ):
+            raise ValueError("batch results must cover requested invariants in order")
+        expected_properties = {
+            binding.invariant: {
+                "value": binding.result.value,
+                "exactness": binding.result.exactness,
+                "backend": binding.result.backend,
+            }
+            for binding in self.results
+            if binding.result.status == "COMPUTED"
+        }
+        if self.properties != expected_properties:
+            raise ValueError(
+                "properties must be the exact compatibility projection of "
+                "computed results"
+            )
+        return self
+
+
+class GraphInvariantBatchOutput(GraphInvariantBatchArtifact):
+    property_artifact_uri: ArtifactUri
 
 
 class GraphNeighborhoodIndependenceRequest(ContractModel):

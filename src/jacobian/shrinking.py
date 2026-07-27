@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from fractions import Fraction
 from typing import Any
 
 from pydantic import ValidationError
 
 from jacobian.claims import ClaimValidationService
+from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.plugins import CapabilityName
 from jacobian.contracts.results import (
@@ -36,7 +38,7 @@ from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.registry import CheckerRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,6 +74,8 @@ class ShrinkService:
         reducers: tuple[str, ...] | list[str],
         objectives: tuple[str, ...] | list[str],
         evaluation_budget: int,
+        reducer_timeout_seconds: int = 30,
+        proposal_validator: Callable[[str, Any, Any], None] | None = None,
     ) -> ShrinkResult:
         """Run bounded shrinking and report the achieved minimality level."""
 
@@ -182,7 +186,7 @@ class ShrinkService:
                         "semantics_digest": semantics_digest,
                     },
                 },
-                timeout_seconds=30,
+                timeout_seconds=reducer_timeout_seconds,
             )
             if execution.status != ExecutionStatus.COMPLETED:
                 operational_failure = (
@@ -236,6 +240,8 @@ class ShrinkService:
                             reducer=proposal.reducer,
                             from_uri=current.artifact_uri,
                             accepted=False,
+                            execution_status=ExecutionStatus.COMPLETED,
+                            input_status=InputStatus.REJECTED,
                             objectives=proposal.objectives,
                             detail="plugin used a reducer that was not requested",
                         )
@@ -250,19 +256,14 @@ class ShrinkService:
                         raise ValueError(
                             "proposal does not strictly improve the ordered objectives"
                         )
-                    normalized = self.schemas.validate(
-                        expected_schema,
-                        proposal.payload,
-                    )
-                    proposed = self.store.put(
-                        schema_uri=expected_schema,
+                    proposed = self._materialize_proposal(
+                        reducer=proposal.reducer,
+                        payload=proposal.payload,
+                        current=current,
+                        expected_schema=expected_schema,
                         semantics_uri=manifest.semantics_uri,
-                        payload=normalized,
-                        parents=(current.artifact_uri,),
-                        summary=f"shrink proposal: {proposal.reducer}",
+                        proposal_validator=proposal_validator,
                     )
-                    if proposed.artifact_uri == current.artifact_uri:
-                        raise ValueError("proposal does not change the target")
                     decision = self.verification.verify_preservation(
                         claim_uri=claim_uri,
                         original_uri=current.artifact_uri,
@@ -279,6 +280,8 @@ class ShrinkService:
                             from_uri=current.artifact_uri,
                             proposed_uri=proposed.artifact_uri,
                             accepted=accepted,
+                            execution_status=decision.execution.status,
+                            input_status=decision.input.status,
                             verification_record_uri=(
                                 decision.verification_record_uri if accepted else None
                             ),
@@ -308,6 +311,8 @@ class ShrinkService:
                             reducer=proposal.reducer,
                             from_uri=current.artifact_uri,
                             accepted=False,
+                            execution_status=ExecutionStatus.ERROR,
+                            input_status=InputStatus.REJECTED,
                             objectives=proposal.objectives,
                             detail=_shrink_failure_detail(exc),
                         )
@@ -374,6 +379,30 @@ class ShrinkService:
             steps=tuple(steps),
             objectives=current_objectives,
         )
+
+    def _materialize_proposal(
+        self,
+        *,
+        reducer: str,
+        payload: Any,
+        current: StoredArtifact,
+        expected_schema: str,
+        semantics_uri: str,
+        proposal_validator: Callable[[str, Any, Any], None] | None,
+    ) -> ArtifactPutResult:
+        normalized = self.schemas.validate(expected_schema, payload)
+        if proposal_validator is not None:
+            proposal_validator(reducer, current.payload, normalized)
+        proposed = self.store.put(
+            schema_uri=expected_schema,
+            semantics_uri=semantics_uri,
+            payload=normalized,
+            parents=(current.artifact_uri,),
+            summary=f"shrink proposal: {reducer}",
+        )
+        if proposed.artifact_uri == current.artifact_uri:
+            raise ValueError("proposal does not change the target")
+        return proposed
 
     @staticmethod
     def _rejected(

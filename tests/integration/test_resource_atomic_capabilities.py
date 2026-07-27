@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import CapabilityAssuranceLevel, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def test_resource_portfolio_has_more_than_one_hundred_atomic_capabilities(

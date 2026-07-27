@@ -41,13 +41,17 @@ def test_typed_goal_extraction_failure_is_a_structured_non_conclusion(
         SimpleNamespace(
             installations={LeanEnvironment.CORE: installation},
             provider_runtime=runtime,
-        ),
-    )
-    monkeypatch.setattr(
-        "jacobian.lean_exploration._run_repl",
-        lambda *_args, **_kwargs: (
-            {"sorries": [{"proofState": 0}]},
-            {"proofState": 1, "goals": ["⊢ True"]},
+            repl=SimpleNamespace(
+                execute_clean=lambda **_: (
+                    {"sorries": [{"proofState": 0}]},
+                    {"proofState": 0, "goals": ["⊢ True"]},
+                    {
+                        "proofState": 1,
+                        "goals": ["⊢ True"],
+                        "proofStatus": "InProgress",
+                    },
+                )
+            ),
         ),
     )
 

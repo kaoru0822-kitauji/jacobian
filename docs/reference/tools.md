@@ -163,10 +163,15 @@ of catalog membership:
 - [SMT Alethe artifact contracts](smt-artifacts.md);
 - [exact rational linear-system evidence](linear-rational-solutions.md);
 - [exact rational matrix determinants](matrix-rational-determinant.md);
+- [graph counterexample shrinking](graph-counterexample-shrinking.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
+- [fixed-registry graph invariant batches](graph-invariant-batch.md);
+- [bounded finite exactly-once coverage](finite-coverage-verification.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
-- [Lean declaration discovery contract](lean-declaration-discovery.md); and
-- [Lean formal intermediates](lean-formal-intermediates.md).
+- [Lean declaration discovery contract](lean-declaration-discovery.md);
+- [Lean formal intermediates](lean-formal-intermediates.md);
+- [Lean statement proposal and direct elaboration](lean-statement-elaboration.md); and
+- [replayable Lean proof-state transitions](lean-replayable-proof-states.md).
 
 ## Mathematical operation portfolio
 
@@ -195,6 +200,13 @@ Useful low-level operations may retain descriptive IDs such as
 `claim.validate`, `witness.find`, `witness.verify`, or
 `certificate.verify`. Those names identify capabilities invoked through
 `capability.invoke`; they are not separate MCP tools.
+
+`claim.conjunction.split` and `claim.implication.obligations` operate on the
+registered v1 `PROPOSITIONAL_STRUCTURE` artifact. They return only immediate,
+ordered subtrees plus source-bound reconstruction data, preserve nested
+grouping, and report `COMPUTED` rather than proof verification. Raw natural
+language and printed Lean expressions are outside this contract; exact Lean
+decomposition requires a future typed elaborated-expression artifact.
 
 Opaque multi-stage commands are not part of the public surface. Agents should
 compose generation, evaluation, ranking, falsification,

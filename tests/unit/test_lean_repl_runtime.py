@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.lean_exploration import LeanReplPolicy, PersistentLeanRepl
+from jacobian.contracts.lean import LeanEnvironment
+from jacobian.lean_exploration import (
+    LeanExplorationReplRuntime,
+    LeanReplPolicy,
+    PersistentLeanRepl,
+)
 
 _FAKE_REPL = r"""
 import json
@@ -72,6 +77,29 @@ def test_persistent_repl_reuses_import_then_restarts_at_request_limit(
     assert starts.read_text() == "xx"
 
 
+def test_validated_execution_inspects_state_before_requested_tactic(
+    tmp_path: Path,
+) -> None:
+    starts = tmp_path / "starts"
+    repl = PersistentLeanRepl(
+        command=(sys.executable, "-u", "-c", _FAKE_REPL, str(starts)),
+        cwd=tmp_path,
+        base_command="import Mathlib",
+        policy=LeanReplPolicy(max_requests=1, max_age_seconds=60, max_rss_kb=0),
+    )
+
+    command, validation, transition = repl.execute_validated(
+        command="example : True := by sorry",
+        tactic="trivial",
+    )
+    repl.close()
+
+    assert command["sorries"]
+    assert validation["proofState"] == 1
+    assert transition["proofState"] == 2
+    assert starts.read_text() == "x"
+
+
 def test_persistent_repl_kills_a_timed_out_process(tmp_path: Path) -> None:
     repl = PersistentLeanRepl(
         command=(sys.executable, "-u", "-c", "import time; time.sleep(10)"),
@@ -117,3 +145,49 @@ def test_persistent_repl_kills_a_process_that_exceeds_rss_limit(
         repl.execute(command="example : True := by sorry", tactic="trivial")
 
     assert time.monotonic() - started < 2
+
+
+def test_clean_execution_discards_every_repl_instance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = LeanExplorationReplRuntime(tmp_path, {})
+
+    class FakeSession:
+        closed = False
+
+        def execute_validated(
+            self,
+            *,
+            command: str,
+            tactic: str,
+        ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+            assert command
+            assert tactic
+            return ({}, {}, {})
+
+        def close(self) -> None:
+            self.closed = True
+
+    sessions: list[FakeSession] = []
+
+    def create(_environment: LeanEnvironment) -> FakeSession:
+        session = FakeSession()
+        sessions.append(session)
+        return session
+
+    monkeypatch.setattr(runtime, "_create_session", create)
+
+    runtime.execute_clean(
+        command="example : True := by sorry",
+        tactic="trivial",
+        environment=LeanEnvironment.CORE,
+    )
+    runtime.execute_clean(
+        command="example : True := by sorry",
+        tactic="trivial",
+        environment=LeanEnvironment.CORE,
+    )
+
+    assert len(sessions) == 2
+    assert all(session.closed for session in sessions)

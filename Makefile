@@ -5,10 +5,10 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed build check check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed test-durations build check check-static validate-full agent-eval
 
 help: ## Show available developer commands.
-	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 setup: ## Install the locked development environment.
 	uv sync --locked --dev
@@ -62,6 +62,12 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
+
+test-durations: ## Refresh committed integration shard timings for pytest-split.
+	$(UV_RUN) pytest \
+		-m "(integration or end_to_end) and not lean_runtime" \
+		--store-durations --clean-durations --durations-path .test_durations \
+		$(PYTEST_ARGS)
 
 build: ## Build Python source and wheel distributions.
 	uv build

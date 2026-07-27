@@ -12,6 +12,8 @@ from jacobian.contracts.common import ArtifactUri
 from jacobian.contracts.results import (
     ContractModel,
     Execution,
+    ExecutionStatus,
+    InputStatus,
     InputValidation,
     ResultEnvelope,
 )
@@ -60,6 +62,8 @@ class ShrinkStep(ContractModel):
     from_uri: ArtifactUri
     proposed_uri: ArtifactUri | None = None
     accepted: StrictBool
+    execution_status: ExecutionStatus | None = None
+    input_status: InputStatus | None = None
     verification_record_uri: ArtifactUri | None = None
     objectives: dict[str, Any] = Field(default_factory=dict)
     detail: str = ""

@@ -12,6 +12,8 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _map(exponent: int) -> dict[str, object]:
     return {

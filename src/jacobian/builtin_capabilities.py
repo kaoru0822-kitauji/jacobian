@@ -29,6 +29,7 @@ from jacobian.contracts.lean import (
     LeanDependencyGraphRequest,
     LeanEnvironment,
 )
+from jacobian.contracts.memory import KnowledgeSearchRequest, MemorySearchResult
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
@@ -51,11 +52,11 @@ class KnowledgeSearchAdapter:
         self.memory = memory
         self._descriptor = CapabilityDescriptor(
             capability_id="knowledge.search",
-            version="1",
+            version="2",
             title="Search research memory",
             description=(
-                "Retrieve trust-labeled prior capability episodes; retrieval does "
-                "not promote their mathematical assurance."
+                "Retrieve trust-labeled prior capability episodes with exact domain, "
+                "tag, and failure filters; retrieval does not promote assurance."
             ),
             provider="jacobian.memory",
             provider_runtime=known_provider_runtime(
@@ -63,17 +64,8 @@ class KnowledgeSearchAdapter:
                 features=("memory", "retrieval"),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "maxLength": 512},
-                    "capability_id": {"type": "string"},
-                    "assurance_level": {"enum": ["HEURISTIC", "COMPUTED", "VERIFIED"]},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
-                },
-                "additionalProperties": False,
-            },
-            output_schema=_OBJECT_SCHEMA,
+            input_schema=model_schema(KnowledgeSearchRequest),
+            output_schema=model_schema(MemorySearchResult),
             read_only=True,
             records_episode=False,
             tags=("memory", "retrieval"),
@@ -84,21 +76,48 @@ class KnowledgeSearchAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        selected = request.input
+        selected = KnowledgeSearchRequest.model_validate(request.input)
         result = self.memory.search(
-            query=str(selected.get("query", "")),
-            capability_id=(
-                str(selected["capability_id"]) if "capability_id" in selected else None
-            ),
-            assurance_level=selected.get("assurance_level"),
-            limit=int(selected.get("limit", 10)),
+            query=selected.query,
+            capability_id=selected.capability_id,
+            domains=selected.domains,
+            tags_all=selected.tags_all,
+            tags_any=selected.tags_any,
+            failure_stages=selected.failure_stages,
+            failure_classifications=selected.failure_classifications,
+            assurance_level=selected.assurance_level,
+            cutoff=selected.cutoff,
+            limit=selected.limit,
         )
+        selected_scope = selected.model_dump(mode="json")
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             mode=request.mode,
             execution=Execution(status=ExecutionStatus.COMPLETED),
             output=result.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="exact filters evaluated against one immutable index snapshot",
+                parameters={
+                    "index_snapshot": result.index_snapshot,
+                    "indexed_episode_count": result.indexed_episode_count,
+                    **selected_scope,
+                },
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.PARTIAL
+                    if result.truncated
+                    else CapabilityCompletenessStatus.COMPLETE
+                ),
+                basis=(
+                    "all matching episodes in the bound index snapshot were returned"
+                    if not result.truncated
+                    else "the result limit omitted matching episodes from the bound "
+                    "index snapshot"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
             assurance=CapabilityAssurance(
                 level=CapabilityAssuranceLevel.COMPUTED,
                 basis=(

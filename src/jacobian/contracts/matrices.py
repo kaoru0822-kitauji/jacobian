@@ -168,6 +168,32 @@ class MatrixRankOutput(ContractModel):
     backend_version: str
 
 
+class MatrixRankVerificationRequest(ContractModel):
+    rank_uri: ArtifactUri
+
+
+class MatrixRankVerificationOutput(ContractModel):
+    status: Literal["VERIFIED_RANK", "REJECTED", "TIMEOUT", "CANCELLED", "ERROR"]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    matrix_uri: ArtifactUri
+    rank_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_projection(self) -> Self:
+        if self.status == "VERIFIED_RANK":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified rank requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError("non-verified rank cannot carry a conclusion or record")
+        return self
+
+
 class MatrixHermiteResourceBudget(ContractModel):
     """Wall-clock bound for one isolated Python-FLINT HNF attempt."""
 

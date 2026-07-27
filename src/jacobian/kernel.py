@@ -20,6 +20,9 @@ from jacobian.capabilities import (
     CapabilityService,
     load_capability_adapter,
 )
+from jacobian.claim_decomposition_capabilities import (
+    install_claim_decomposition_capabilities,
+)
 from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
 from jacobian.contracts.capabilities import (
@@ -36,6 +39,10 @@ from jacobian.exact_domain_checkers import (
 )
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
+from jacobian.finite_coverage import (
+    FiniteCoverageInstallation,
+    install_finite_coverage,
+)
 from jacobian.finite_partition import (
     FinitePartitionInstallation,
     install_finite_partition,
@@ -61,6 +68,10 @@ from jacobian.graph_composition_capabilities import (
 from jacobian.graph_isomorphism import (
     GraphIsomorphismInstallation,
     install_graph_isomorphism,
+)
+from jacobian.graph_shrinking import (
+    GraphShrinkingInstallation,
+    install_graph_shrinking,
 )
 from jacobian.lean import LeanService
 from jacobian.lean_declarations import (
@@ -102,6 +113,10 @@ from jacobian.matrix_normal_forms import (
     MatrixNormalFormArtifactService,
     install_matrix_normal_form_artifacts,
 )
+from jacobian.matrix_rank_capabilities import (
+    MatrixRankCheckerInstallation,
+    install_matrix_rank_checker,
+)
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import (
     InstalledDomainBundle,
@@ -134,6 +149,7 @@ from jacobian.polynomial_system_capabilities import (
     PolynomialSystemInstallation,
     install_polynomial_system_capabilities,
 )
+from jacobian.polynomial_system_search import PolynomialSystemRationalSearchAdapter
 from jacobian.polytope import PolytopeService
 from jacobian.provider_runtime import (
     cadical_provider_runtime,
@@ -159,6 +175,9 @@ from jacobian.sat_capabilities import (
     SatUnsatProofCheckerInstallation,
     install_sat_assignment_checker,
     install_sat_unsat_proof_checker,
+)
+from jacobian.sat_lrat_capabilities import (
+    install_sat_lrat_verifier,
 )
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
@@ -245,6 +264,13 @@ class JacobianKernel:
             self.store,
             self.schemas,
             self.plugins,
+        )
+        claim_decomposition_adapters, self.claim_decomposition = (
+            install_claim_decomposition_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+            )
         )
         self.plugin_executor = PluginExecutor()
         self.structures = StructureService(
@@ -365,6 +391,17 @@ class JacobianKernel:
         )
         if proof_adapter is not None:
             self.register_capability(proof_adapter)
+        lrat_adapter, self.sat_lrat = install_sat_lrat_verifier(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.sat,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if lrat_adapter is not None:
+            self.register_capability(lrat_adapter)
         self.carcara_runtime: CapabilityProviderRuntime = carcara_provider_runtime()
         self.smt_unsat_proof_checker: SmtUnsatProofCheckerInstallation
         smt_proof_adapter, self.smt_unsat_proof_checker = (
@@ -453,6 +490,8 @@ class JacobianKernel:
                 self.register_capability(cvc5_adapter)
         for atomic_adapter in install_atomic_capabilities(self):
             self.register_capability(atomic_adapter)
+        for claim_decomposition_adapter in claim_decomposition_adapters:
+            self.register_capability(claim_decomposition_adapter)
         self.register_capability(KnowledgeSearchAdapter(self.memory))
         self.finite_partition: FinitePartitionInstallation
         finite_partition, self.finite_partition = install_finite_partition(
@@ -464,6 +503,17 @@ class JacobianKernel:
             authorize_checker=install_references,
         )
         self.register_capability(finite_partition)
+        self.finite_coverage: FiniteCoverageInstallation
+        finite_coverage, self.finite_coverage = install_finite_coverage(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if finite_coverage is not None:
+            self.register_capability(finite_coverage)
         self.graph: GraphInstallation
         graph_adapters, self.graph = install_graph_capabilities(
             self.store,
@@ -474,6 +524,19 @@ class JacobianKernel:
         )
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
+        self.graph_shrinking: GraphShrinkingInstallation
+        graph_shrinking, self.graph_shrinking = install_graph_shrinking(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.plugins,
+            self.checkers,
+            self.shrinking,
+            self.graph,
+            self.reference_installer,
+            authorize_checker=install_references,
+        )
+        self.register_capability(graph_shrinking)
         self._install_graph_coloring_capabilities(install_references)
         self._install_builtin_domain_bundles()
         self._install_builtin_domain_verification(install_references)
@@ -522,6 +585,18 @@ class JacobianKernel:
         )
         if determinant_verification is not None:
             self.register_capability(determinant_verification)
+        self.matrix_rank_checker: MatrixRankCheckerInstallation
+        rank_verification, self.matrix_rank_checker = install_matrix_rank_checker(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.matrix,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if rank_verification is not None:
+            self.register_capability(rank_verification)
         self.polynomial_system: PolynomialSystemInstallation
         polynomial_system_adapter, self.polynomial_system = (
             install_polynomial_system_capabilities(
@@ -535,6 +610,11 @@ class JacobianKernel:
         )
         if polynomial_system_adapter is not None:
             self.register_capability(polynomial_system_adapter)
+        self.register_capability(
+            PolynomialSystemRationalSearchAdapter(
+                self.artifacts, self.polynomial_system
+            )
+        )
         self.universal_algebra: UniversalAlgebraInstallation
         universal_algebra_adapters, self.universal_algebra = (
             install_universal_algebra_capabilities(
@@ -549,72 +629,75 @@ class JacobianKernel:
             self.register_capability(universal_algebra_adapter)
         self._install_resource_capabilities(install_references)
         if install_references:
-            self.references = self.reference_installer.install_all()
-            self.polytope_checkers = self.reference_installer.install_polytope_checkers(
-                claim_schema_uri=self.polytope.claim_schema_uri,
-                semantics_uri=self.polytope.semantics_uri,
-                point_schema_uri=self.polytope.point_schema_uri,
+            self._install_authorized_references()
+        for entrypoint in capability_adapter_entrypoints:
+            self.register_capability(load_capability_adapter(entrypoint, self))
+
+    def _install_authorized_references(self) -> None:
+        self.references = self.reference_installer.install_all()
+        self.polytope_checkers = self.reference_installer.install_polytope_checkers(
+            claim_schema_uri=self.polytope.claim_schema_uri,
+            semantics_uri=self.polytope.semantics_uri,
+            point_schema_uri=self.polytope.point_schema_uri,
+        )
+        self.lean_checkers = self.reference_installer.install_lean_checkers()
+        profiles = {
+            environment.value: {
+                "semantics_uri": installation.semantics_uri,
+                "import_name": installation.import_name,
+                "mathlib_commit": installation.mathlib_commit,
+                "allowed_axioms": list(installation.allowed_axioms),
+                "checker_timeout_seconds": installation.checker_timeout_seconds,
+            }
+            for environment, installation in sorted(
+                self.lean_checkers.items(),
+                key=lambda item: item[0].value,
             )
-            self.lean_checkers = self.reference_installer.install_lean_checkers()
-            profiles = {
-                environment.value: {
-                    "semantics_uri": installation.semantics_uri,
-                    "import_name": installation.import_name,
-                    "mathlib_commit": installation.mathlib_commit,
-                    "allowed_axioms": list(installation.allowed_axioms),
-                    "checker_timeout_seconds": (installation.checker_timeout_seconds),
-                }
-                for environment, installation in sorted(
+        }
+        runtime = lean_provider_runtime(
+            profiles=profiles,
+            checker_ids=tuple(
+                installation.checker_id
+                for _, installation in sorted(
                     self.lean_checkers.items(),
                     key=lambda item: item[0].value,
                 )
-            }
-            runtime = lean_provider_runtime(
-                profiles=profiles,
-                checker_ids=tuple(
-                    installation.checker_id
-                    for _, installation in sorted(
-                        self.lean_checkers.items(),
-                        key=lambda item: item[0].value,
-                    )
-                ),
+            ),
+        )
+        self.lean_runtime = runtime
+        if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
+            _LOGGER.warning(
+                "lean.check is not installed: %s",
+                runtime.diagnostic,
             )
-            self.lean_runtime = runtime
-            if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
-                try:
-                    self.lean_declarations = installed_lean_declaration_service(runtime)
-                except (OSError, RuntimeError) as exc:
-                    _LOGGER.warning(
-                        "Lean declaration discovery is not installed: %s",
-                        exc,
-                    )
-                self._install_lean_declaration_adapters(runtime)
-                self.lean = LeanService(
-                    self.store,
-                    self.artifacts,
-                    self.verification,
-                    self.lean_checkers,
-                )
-                self.register_capability(LeanCheckAdapter(self.lean, runtime))
-                lean_exploration_adapters, self.lean_exploration = (
-                    install_lean_exploration_capabilities(
-                        self.store,
-                        self.schemas,
-                        self.artifacts,
-                        self.lean_checkers,
-                        runtime,
-                    )
-                )
-                for lean_exploration_adapter in lean_exploration_adapters:
-                    self.register_capability(lean_exploration_adapter)
-                self._install_lean_proof_edit()
-            else:
-                _LOGGER.warning(
-                    "lean.check is not installed: %s",
-                    runtime.diagnostic,
-                )
-        for entrypoint in capability_adapter_entrypoints:
-            self.register_capability(load_capability_adapter(entrypoint, self))
+            return
+        try:
+            self.lean_declarations = installed_lean_declaration_service(runtime)
+        except (OSError, RuntimeError) as exc:
+            _LOGGER.warning(
+                "Lean declaration discovery is not installed: %s",
+                exc,
+            )
+        self._install_lean_declaration_adapters(runtime)
+        self.lean = LeanService(
+            self.store,
+            self.artifacts,
+            self.verification,
+            self.lean_checkers,
+        )
+        self.register_capability(LeanCheckAdapter(self.lean, runtime))
+        lean_exploration_adapters, self.lean_exploration = (
+            install_lean_exploration_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+                self.lean_checkers,
+                runtime,
+            )
+        )
+        for lean_exploration_adapter in lean_exploration_adapters:
+            self.register_capability(lean_exploration_adapter)
+        self._install_lean_proof_edit()
 
     def _install_resource_capabilities(self, install_references: bool) -> None:
         """Install resource-mined domain atomics after core services exist."""

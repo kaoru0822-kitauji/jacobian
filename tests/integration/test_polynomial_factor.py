@@ -10,6 +10,8 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _term(coefficient: int, exponent: int) -> dict[str, object]:
     return {

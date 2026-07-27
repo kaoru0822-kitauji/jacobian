@@ -14,7 +14,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 @pytest.mark.integration
@@ -209,11 +209,31 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     relationship = result.relationships[0]
     assert relationship.status is CapabilityRelationshipStatus.PROPOSED
     assert relationship.source_artifact_uris == (graph_uri,)
-    assert relationship.target_artifact_uris == (
-        result.output["property_artifact_uri"],
+    assert (
+        relationship.target_artifact_uris[0] == (result.output["property_artifact_uri"])
     )
+    assert set(relationship.target_artifact_uris[1:]) == {
+        binding["artifact_uri"] for binding in result.output["results"]
+    }
     property_artifact = kernel.store.get(result.output["property_artifact_uri"])
-    assert property_artifact.manifest.parents == (graph_uri,)
+    assert set(property_artifact.manifest.parents) == {
+        graph_uri,
+        *(binding["artifact_uri"] for binding in result.output["results"]),
+    }
+    assert property_artifact.payload["registry_version"] == "1"
+    assert property_artifact.payload["requested_invariants"] == [
+        "bipartite",
+        "connected",
+        "degree_sequence",
+        "independence_number",
+        "order",
+        "size",
+        "triangle_count",
+    ]
+    for binding in result.output["results"]:
+        invariant_artifact = kernel.store.get(binding["artifact_uri"])
+        assert invariant_artifact.manifest.parents == (graph_uri,)
+        assert invariant_artifact.payload["result"] == binding["result"]
 
 
 @pytest.mark.integration
@@ -272,7 +292,9 @@ def test_graph_counterexample_invariant_batch_reproduces_path_five(
 
 
 @pytest.mark.integration
-def test_distance_property_on_disconnected_graph_fails_closed(tmp_path: Path) -> None:
+def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
+    tmp_path: Path,
+) -> None:
     kernel = JacobianKernel(tmp_path)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -290,11 +312,76 @@ def test_distance_property_on_disconnected_graph_fails_closed(tmp_path: Path) ->
             capability_id="graph.compute.properties",
             input={
                 "graph_uri": searched.output["candidates"][0]["graph_uri"],
-                "properties": ["diameter"],
+                "properties": ["order", "diameter", "made_up_invariant"],
             },
         )
     )
 
-    assert result.execution.status is ExecutionStatus.ERROR
-    assert result.diagnostics[0].code == "GRAPH_PROPERTY_NOT_APPLICABLE"
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    outcomes = {
+        binding["invariant"]: binding["result"] for binding in result.output["results"]
+    }
+    assert outcomes["order"] == {
+        "invariant": "order",
+        "status": "COMPUTED",
+        "value": 4,
+        "exactness": "EXACT",
+        "backend": "networkx",
+        "detail": None,
+    }
+    assert outcomes["diameter"]["status"] == "NOT_APPLICABLE"
+    assert outcomes["diameter"]["value"] is None
+    assert outcomes["diameter"]["exactness"] == "NOT_APPLICABLE"
+    assert outcomes["diameter"]["backend"] == "networkx"
+    assert outcomes["diameter"]["detail"]
+    assert outcomes["made_up_invariant"] == {
+        "invariant": "made_up_invariant",
+        "status": "UNSUPPORTED",
+        "value": None,
+        "exactness": "NOT_APPLICABLE",
+        "backend": None,
+        "detail": (
+            "the invariant is not present in graph.compute.properties "
+            "registry version 1"
+        ),
+    }
+    assert set(result.output["properties"]) == {"order"}
+    assert result.output["supported_invariants"] == sorted(
+        result.output["supported_invariants"]
+    )
+    assert "made_up_invariant" not in result.output["supported_invariants"]
+
+
+@pytest.mark.integration
+def test_graph_invariant_registry_is_fixed_and_discoverable(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    descriptor = next(
+        item
+        for item in kernel.capabilities.catalog().capabilities
+        if item.capability_id == "graph.compute.properties"
+    )
+
+    assert descriptor.version == "2"
+    assert descriptor.input_schema["x-supported-invariants"] == [
+        "average_eccentricity",
+        "bipartite",
+        "connected",
+        "degree_sequence",
+        "diameter",
+        "eccentricities",
+        "girth",
+        "harmonic_index",
+        "havel_hakimi_trace",
+        "independence_number",
+        "maximum_degree",
+        "minimum_degree",
+        "order",
+        "radius",
+        "residue",
+        "size",
+        "tree",
+        "triangle_count",
+        "triangle_frequencies",
+    ]

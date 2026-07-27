@@ -1,24 +1,31 @@
 from __future__ import annotations
 
+import json
 import subprocess
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 import pytest
 
 PLANNER = Path(__file__).parents[2] / ".github" / "scripts" / "classify-ci-paths"
 VALIDATOR = Path(__file__).parents[2] / ".github" / "scripts" / "validate-ci-plan"
+OWNERSHIP = Path(__file__).parents[2] / ".github" / "ci-ownership.json"
 
 BOOLEAN_KEYS = (
     "run-python",
     "run-core",
     "run-integration",
     "run-coverage",
+    "run-compatibility",
     "run-lean",
     "run-npm",
     "run-static",
     "run-build",
     "run-security",
     "run-duplicate",
+)
+FUNCTIONAL_KEYS = tuple(
+    key for key in BOOLEAN_KEYS if key not in {"run-coverage", "run-compatibility"}
 )
 
 
@@ -32,7 +39,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
 @pytest.mark.parametrize(
     ("paths", "expected"),
     [
-        ((), _expected_plan("full", *BOOLEAN_KEYS)),
+        ((), _expected_plan("exhaustive", *BOOLEAN_KEYS)),
         (
             ("README.md", "docs/how-to/contribute.md", ".github/CODEOWNERS"),
             _expected_plan("docs"),
@@ -57,10 +64,9 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         (
             ("tests/integration/test_kernel.py",),
             _expected_plan(
-                "selective",
+                "python-integration",
                 "run-python",
                 "run-integration",
-                "run-lean",
                 "run-static",
             ),
         ),
@@ -85,22 +91,92 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-python",
                 "run-core",
                 "run-integration",
-                "run-coverage",
-                "run-lean",
                 "run-static",
             ),
         ),
         (
             ("src/jacobian/kernel.py",),
-            _expected_plan("full", *BOOLEAN_KEYS),
+            _expected_plan("full", *FUNCTIONAL_KEYS),
+        ),
+        (
+            ("tests/integration/test_lean.py",),
+            _expected_plan(
+                "selective",
+                "run-lean",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/integration/test_lean_replayable_state_capability.py",),
+            _expected_plan(
+                "python-integration",
+                "run-python",
+                "run-integration",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/integration/test_agent_ab_benchmark.py",),
+            _expected_plan(
+                "python-integration",
+                "run-python",
+                "run-integration",
+                "run-static",
+            ),
+        ),
+        (
+            ("src/jacobian/graph_capabilities.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            ("src/jacobian_checkers/graph_invariants.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            ("src/jacobian/lean_proof_edit.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-lean",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            ("src/jacobian/adapters/mcp/server.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-npm",
+                "run-static",
+                "run-build",
+            ),
         ),
         (
             ("docs/index.md", "pyproject.toml"),
-            _expected_plan("full", *BOOLEAN_KEYS),
+            _expected_plan("full", *FUNCTIONAL_KEYS),
         ),
         (
             (".github/workflows/ci.yml",),
-            _expected_plan("full", *BOOLEAN_KEYS),
+            _expected_plan("full", *FUNCTIONAL_KEYS),
         ),
     ],
 )
@@ -129,7 +205,7 @@ def test_full_override_expands_an_isolated_plan() -> None:
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
-    assert plan["classification"] == "full"
+    assert plan["classification"] == "exhaustive"
     assert all(value == "true" for key, value in plan.items() if key.startswith("run-"))
 
 
@@ -211,3 +287,33 @@ def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> N
     )
 
     assert completed.returncode != 0
+
+
+def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:
+    manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
+    source_paths = subprocess.run(
+        ["git", "ls-files", "src"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+
+    unowned = []
+    for source_path in source_paths:
+        if not any(
+            fnmatchcase(source_path, pattern)
+            for rule in manifest["rules"]
+            for pattern in rule["patterns"]
+        ):
+            unowned.append(source_path)
+
+    assert unowned == []
+
+
+def test_ownership_manifest_names_only_supported_suites() -> None:
+    manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
+    suites = set(manifest["suites"])
+
+    assert len(suites) == len(manifest["suites"])
+    assert all(set(rule["suites"]) <= suites for rule in manifest["rules"])
+    assert set(manifest["fallback"]["suites"]) == suites

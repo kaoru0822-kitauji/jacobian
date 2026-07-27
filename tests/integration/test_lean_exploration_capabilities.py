@@ -16,7 +16,7 @@ pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),
-    pytest.mark.usefixtures("initialized_kernel_store"),
+    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
 
@@ -49,6 +49,10 @@ def test_apply_tactic_exposes_child_goals_and_replay_source(tmp_path: Path) -> N
         {"user_name": "hP", "binder_info": "DEFAULT", "type": "P", "value": None},
         {"user_name": "hQ", "binder_info": "DEFAULT", "type": "Q", "value": None},
     ]
+    assert result.output["accepted"] is True
+    assert len(result.output["successor_states"]) == 1
+    assert result.output["input_state_uri"] in result.artifact_uris
+    assert result.output["successor_states"][0]["state_uri"] in result.artifact_uris
     assert result.output["transition_uri"] in result.artifact_uris
     assert result.output["replay_source"].endswith("intro P Q hP hQ\n  constructor")
 
@@ -70,9 +74,13 @@ def test_apply_tactic_returns_structured_failure_without_conclusion(
         )
     )
 
-    assert result.execution.status.value == "ERROR"
-    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
-    assert result.diagnostics[0].code == "LEAN_TACTIC_REJECTED"
+    assert result.execution.status.value == "COMPLETED"
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert result.output["accepted"] is False
+    assert result.output["successor_states"] == []
+    assert any(
+        diagnostic["severity"] == "ERROR" for diagnostic in result.output["diagnostics"]
+    )
 
 
 def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> None:

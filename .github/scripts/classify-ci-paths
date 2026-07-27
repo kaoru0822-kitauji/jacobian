@@ -1,145 +1,101 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python3
+"""Map changed repository paths to CI suites using the ownership manifest."""
 
-force_full=false
-force_lean=false
+from __future__ import annotations
 
-while (( $# > 0 )); do
-  case "$1" in
-    --force-full)
-      force_full=true
-      shift
-      ;;
-    --force-lean)
-      force_lean=true
-      shift
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
+import argparse
+import json
+from fnmatch import fnmatchcase
+from pathlib import Path
+from typing import Any
 
-classification=docs
-run_python=false
-run_core=false
-run_integration=false
-run_coverage=false
-run_lean=false
-run_npm=false
-run_static=false
-run_build=false
-run_security=false
-run_duplicate=false
+ROOT = Path(__file__).resolve().parents[2]
+MANIFEST = ROOT / ".github" / "ci-ownership.json"
 
-if [ "$force_full" = "true" ] || (( $# == 0 )); then
-  classification=full
-else
-  saw_core=false
-  saw_integration=false
-  saw_lean=false
-  saw_npm=false
-  for path in "$@"; do
-    case "$path" in
-      docs/*|*.md|.github/ISSUE_TEMPLATE/*|.github/CODEOWNERS)
-        ;;
-      npm/*)
-        saw_npm=true
-        ;;
-      lean/*)
-        saw_lean=true
-        ;;
-      tests/unit/*|tests/contract/*|tests/checkers/*|tests/reference/*)
-        saw_core=true
-        ;;
-      tests/integration/*)
-        saw_integration=true
-        saw_lean=true
-        ;;
-      tests/end_to_end/*)
-        saw_integration=true
-        saw_lean=true
-        ;;
-      *)
-        classification=full
-        break
-        ;;
-    esac
-  done
-  if [ "$classification" != "full" ]; then
-    run_core=$saw_core
-    run_integration=$saw_integration
-    run_lean=$saw_lean
-    run_npm=$saw_npm
-    if [ "$run_core" = "true" ] || [ "$run_integration" = "true" ]; then
-      run_python=true
-      run_static=true
-    fi
-    if [ "$run_core" = "true" ] && [ "$run_integration" = "true" ]; then
-      run_coverage=true
-    fi
 
-    enabled=0
-    for value in "$run_core" "$run_integration" "$run_lean" "$run_npm"; do
-      if [ "$value" = "true" ]; then
-        enabled=$((enabled + 1))
-      fi
-    done
-    if (( enabled > 1 )); then
-      classification=selective
-    elif [ "$run_core" = "true" ]; then
-      classification=python-core
-    elif [ "$run_lean" = "true" ]; then
-      classification=lean
-    elif [ "$run_npm" = "true" ]; then
-      classification=npm
-    fi
-  fi
-fi
+def load_manifest() -> dict[str, Any]:
+    with MANIFEST.open(encoding="utf-8") as handle:
+        return json.load(handle)
 
-if [ "$classification" = "full" ]; then
-  run_python=true
-  run_core=true
-  run_integration=true
-  run_coverage=true
-  run_lean=true
-  run_npm=true
-  run_static=true
-  run_build=true
-  run_security=true
-  run_duplicate=true
-fi
 
-if [ "$force_lean" = "true" ]; then
-  run_lean=true
-  if [ "$classification" != "full" ]; then
-    enabled=0
-    for value in "$run_core" "$run_integration" "$run_lean" "$run_npm"; do
-      if [ "$value" = "true" ]; then
-        enabled=$((enabled + 1))
-      fi
-    done
-    if (( enabled > 1 )); then
-      classification=selective
-    else
-      classification=lean
-    fi
-  fi
-fi
+def suites_for_path(path: str, manifest: dict[str, Any]) -> tuple[str, set[str]]:
+    for rule in manifest["rules"]:
+        if any(fnmatchcase(path, pattern) for pattern in rule["patterns"]):
+            return rule["owner"], set(rule["suites"])
+    fallback = manifest["fallback"]
+    return fallback["owner"], set(fallback["suites"])
 
-printf '%s\n' \
-  "classification=$classification" \
-  "run-python=$run_python" \
-  "run-core=$run_core" \
-  "run-integration=$run_integration" \
-  "run-coverage=$run_coverage" \
-  "run-lean=$run_lean" \
-  "run-npm=$run_npm" \
-  "run-static=$run_static" \
-  "run-build=$run_build" \
-  "run-security=$run_security" \
-  "run-duplicate=$run_duplicate"
+
+def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[str, str]:
+    manifest = load_manifest()
+    exhaustive = exhaustive or not paths
+    all_suites = set(manifest["suites"])
+    suites: set[str] = set()
+    owners: set[str] = set()
+
+    if exhaustive or not paths:
+        suites = all_suites
+    else:
+        for path in paths:
+            owner, owned_suites = suites_for_path(path, manifest)
+            owners.add(owner)
+            suites.update(owned_suites)
+
+    if force_lean:
+        suites.add("lean")
+
+    if exhaustive:
+        classification = "exhaustive"
+    elif suites == all_suites:
+        classification = "full"
+    elif not suites:
+        classification = "docs"
+    elif suites == {"npm"}:
+        classification = "npm"
+    elif suites == {"lean"}:
+        classification = "lean"
+    elif suites <= {"core", "static"} and "core" in suites:
+        classification = "python-core"
+    elif suites <= {"integration", "static"} and "integration" in suites:
+        classification = "python-integration"
+    else:
+        classification = "selective"
+
+    run_core = "core" in suites
+    run_integration = "integration" in suites
+    plan: dict[str, str] = {
+        "classification": classification,
+        "run-python": str(run_core or run_integration).lower(),
+        "run-core": str(run_core).lower(),
+        "run-integration": str(run_integration).lower(),
+        "run-coverage": str(exhaustive and run_core and run_integration).lower(),
+        "run-compatibility": str(exhaustive and run_core and run_integration).lower(),
+    }
+    for suite in ("lean", "npm", "static", "build", "security", "duplicate"):
+        plan[f"run-{suite}"] = str(suite in suites).lower()
+    return plan
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--force-full",
+        "--force-exhaustive",
+        dest="exhaustive",
+        action="store_true",
+        help="Run every suite, including coverage and compatibility.",
+    )
+    parser.add_argument("--force-lean", action="store_true")
+    parser.add_argument("paths", nargs="*")
+    args = parser.parse_args()
+    paths = args.paths[1:] if args.paths[:1] == ["--"] else args.paths
+    for key, value in classify(
+        paths,
+        exhaustive=args.exhaustive,
+        force_lean=args.force_lean,
+    ).items():
+        print(f"{key}={value}")
+
+
+if __name__ == "__main__":
+    main()

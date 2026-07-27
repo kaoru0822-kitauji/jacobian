@@ -361,15 +361,16 @@ def _require_descriptor(
     *,
     kind: str,
     name: str,
+    version: str = "1",
 ) -> None:
     descriptor = _as_object(store.get(uri).payload, f"{name} descriptor")
     if (
         descriptor.get("descriptor_version") != "1"
         or descriptor.get("kind") != kind
         or descriptor.get("name") != name
-        or descriptor.get("version") != "1"
+        or descriptor.get("version") != version
     ):
-        raise BenchmarkError(f"artifact does not use {name}@1")
+        raise BenchmarkError(f"artifact does not use {name}@{version}")
 
 
 def _find_graph_invocations(
@@ -490,6 +491,7 @@ def _score_graph_capability_run(
             property_artifact.manifest.schema_uri,
             kind="schema",
             name="jacobian.graph-property-batch",
+            version="2",
         )
         if (
             property_artifact.manifest.semantics_uri

@@ -13,6 +13,7 @@ from jacobian.contracts.lean_statement import (
 )
 
 ARTIFACT_URI = "artifact://sha256/" + "a" * 64
+DIGEST = "sha256:" + "b" * 64
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +50,26 @@ def test_proposal_request_accepts_valid_input() -> None:
     assert req.source_locator == "https://example.com/claim"
 
 
+@pytest.mark.contract
+def test_direct_elaboration_does_not_require_informal_claim() -> None:
+    request = LeanStatementProposalRequest(
+        operation="ELABORATE_PROPOSITION",
+        proposed_statement="1 + 1 = 2",
+    )
+
+    assert request.informal_claim is None
+
+
+@pytest.mark.contract
+def test_direct_elaboration_rejects_informal_claim() -> None:
+    with pytest.raises(ValidationError, match="must be omitted"):
+        LeanStatementProposalRequest(
+            operation="ELABORATE_PROPOSITION",
+            informal_claim="one plus one equals two",
+            proposed_statement="1 + 1 = 2",
+        )
+
+
 # ---------------------------------------------------------------------------
 # LeanStatementProposalArtifact
 # ---------------------------------------------------------------------------
@@ -59,6 +80,7 @@ def test_proposal_artifact_requires_sorry_when_elaborates() -> None:
     with pytest.raises(ValidationError, match="at least one sorry"):
         LeanStatementProposalArtifact(
             environment="CORE",
+            environment_digest=DIGEST,
             informal_claim="trivial",
             proposed_statement="1 + 1 = 2",
             elaborates=True,
@@ -74,6 +96,7 @@ def test_proposal_artifact_requires_sorry_when_elaborates() -> None:
 def test_proposal_artifact_accepts_non_elaborating_with_zero_sorry() -> None:
     artifact = LeanStatementProposalArtifact(
         environment="CORE",
+        environment_digest=DIGEST,
         informal_claim="trivial",
         proposed_statement="bogus syntax",
         elaborates=False,
@@ -85,6 +108,23 @@ def test_proposal_artifact_accepts_non_elaborating_with_zero_sorry() -> None:
     )
     assert artifact.elaborates is False
     assert artifact.sorry_count == 0
+
+
+@pytest.mark.contract
+def test_direct_elaboration_artifact_requires_expression_on_success() -> None:
+    with pytest.raises(ValidationError, match="return an expression"):
+        LeanStatementProposalArtifact(
+            operation="ELABORATE_PROPOSITION",
+            environment="CORE",
+            environment_digest=DIGEST,
+            proposed_statement="True",
+            elaborates=True,
+            sorry_count=0,
+            goals=(),
+            messages=(),
+            lean_version="4.31.0",
+            lean_commit="abc",
+        )
 
 
 # ---------------------------------------------------------------------------

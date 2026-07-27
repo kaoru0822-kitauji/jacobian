@@ -15,7 +15,7 @@ from jacobian.contracts.evidence import (
 )
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 @pytest.mark.end_to_end

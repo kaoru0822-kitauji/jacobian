@@ -25,7 +25,11 @@ from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import carcara_provider_runtime
 from jacobian.verification import CheckerExecutionError, _environment_digest
 
-pytestmark = pytest.mark.integration
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
+]
 
 _FIXTURES = Path(__file__).parents[1] / "fixtures" / "smt"
 _PROBLEM = (_FIXTURES / "qf_uf_equality_unsat.smt2").read_text(encoding="ascii")

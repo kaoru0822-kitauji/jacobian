@@ -7,6 +7,7 @@ import pytest
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
+    CapabilityCompletenessStatus,
     CapabilityMode,
     CapabilityRequest,
 )
@@ -16,7 +17,7 @@ from jacobian.contracts.universal_algebra import (
 )
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _variable(name: str) -> dict[str, object]:
@@ -274,4 +275,77 @@ def test_countermodel_request_validation_precedes_artifact_writes(
 
     assert result.execution.status.value == "ERROR"
     assert result.diagnostics[0].code == "INVALID_FINITE_MAGMA_COUNTERMODEL_REQUEST"
+    assert artifact_put_calls == 0
+
+
+@pytest.mark.integration
+def test_finite_magma_table_enumeration_is_exact_and_canonical(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="finite_magma.table.enumerate",
+            input={"order": 2},
+        )
+    )
+
+    assert result.output["enumerated_count"] == 16
+    assert result.output["total_count"] == 16
+    assert result.output["ordering"] == "LEXICOGRAPHIC_ROW_MAJOR"
+    assert result.output["completeness"] == "COMPLETE"
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
+    table_payloads = [
+        kernel.store.get(uri).payload for uri in result.output["table_uris"]
+    ]
+    assert table_payloads[0]["table"] == [[0, 0], [0, 0]]
+    assert table_payloads[-1]["table"] == [[1, 1], [1, 1]]
+    assert len({str(payload["table"]) for payload in table_payloads}) == 16
+    enumeration = kernel.store.get(result.output["enumeration_uri"])
+    assert enumeration.payload["table_uris"] == result.output["table_uris"]
+    assert set(enumeration.manifest.parents) == set(result.output["table_uris"])
+
+
+@pytest.mark.integration
+def test_finite_magma_table_enumeration_handles_order_one(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="finite_magma.table.enumerate",
+            input={"order": 1},
+        )
+    )
+
+    assert result.output["enumerated_count"] == 1
+    table = kernel.store.get(result.output["table_uris"][0])
+    assert table.payload["table"] == [[0]]
+
+
+@pytest.mark.integration
+def test_finite_magma_table_enumeration_rejects_unsupported_order_before_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    artifact_put_calls = 0
+    original_put = kernel.artifacts.put
+
+    def recording_put(*args: Any, **kwargs: Any) -> Any:
+        nonlocal artifact_put_calls
+        artifact_put_calls += 1
+        return original_put(*args, **kwargs)
+
+    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="finite_magma.table.enumerate",
+            input={"order": 3},
+        )
+    )
+
+    assert result.execution.status.value == "ERROR"
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
     assert artifact_put_calls == 0
