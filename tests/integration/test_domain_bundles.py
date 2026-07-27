@@ -35,6 +35,7 @@ from jacobian.contracts.combinatorics import (
 )
 from jacobian.contracts.finite_sets import FiniteSetPairRequest
 from jacobian.contracts.number_theory import (
+    ArithmeticFunctionRequest,
     ChineseRemainderRequest,
     DiscreteLogarithmRequest,
     DivisibilityRequest,
@@ -218,6 +219,10 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (
         FactorizationRequest,
         {"value": "12", "resource_budget": {"wall_seconds": 5}},
+    ),
+    (
+        ArithmeticFunctionRequest,
+        {"n": 30, "resource_budget": {"wall_seconds": 5}},
     ),
     (ValuationRequest, {"value": "12", "prime": "2"}),
     (NTNonnegIntRequest, {"n": 10}),
