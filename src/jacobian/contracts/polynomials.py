@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from itertools import permutations
 from math import prod
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, StringConstraints, model_validator
 
@@ -277,6 +277,147 @@ class PolynomialMapInverseVerifyRequest(ContractModel):
                 if outer_degree * inner_degree > _MAX_DERIVED_EXPONENT:
                     raise ValueError("composition residual degree bound exceeds 127")
         return self
+
+
+class PolynomialInverseSynthesisStatus(StrEnum):
+    FOUND = "FOUND"
+    NO_CANDIDATE_WITHIN_ANSATZ = "NO_CANDIDATE_WITHIN_ANSATZ"
+    UNDERDETERMINED = "UNDERDETERMINED"
+    TIMEOUT = "TIMEOUT"
+    BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
+class PolynomialInverseSupportMode(StrEnum):
+    EXPLICIT = "EXPLICIT"
+    FULL_TOTAL_DEGREE = "FULL_TOTAL_DEGREE"
+
+
+class PolynomialInverseSynthesisLimits(ContractModel):
+    timeout_ms: int = Field(ge=0, le=120_000)
+    max_inverse_degree: int = Field(ge=0, le=8)
+    max_composition_degree: int = Field(ge=1, le=_MAX_DERIVED_EXPONENT)
+    max_unknown_coefficients: int = Field(ge=1, le=512)
+    max_coefficient_equations: int = Field(ge=1, le=4096)
+    max_residual_terms: int = Field(ge=1, le=8192)
+
+
+class PolynomialMapInverseSynthesisRequest(ContractModel):
+    forward_map: RationalPolynomialMap
+    source_variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    target_variables: tuple[PolynomialVariable, ...] = Field(min_length=1, max_length=4)
+    inverse_degree_bound: int = Field(ge=0, le=8)
+    support_mode: PolynomialInverseSupportMode
+    explicit_support: tuple[tuple[tuple[int, ...], ...], ...] | None = None
+    solver: str = Field(min_length=1, max_length=64)
+    limits: PolynomialInverseSynthesisLimits
+
+    @model_validator(mode="after")
+    def require_bounded_square_qq_ansatz(self) -> Self:
+        if self.forward_map.variables != self.source_variables:
+            raise ValueError("forward map variables must equal source_variables")
+        if len(self.source_variables) != len(self.target_variables):
+            raise ValueError("source and target dimensions must agree")
+        if len(set(self.source_variables)) != len(self.source_variables):
+            raise ValueError("source variables must be unique")
+        if len(set(self.target_variables)) != len(self.target_variables):
+            raise ValueError("target variables must be unique")
+        if self.inverse_degree_bound > self.limits.max_inverse_degree:
+            raise ValueError("inverse_degree_bound exceeds the declared degree limit")
+        if self.support_mode is PolynomialInverseSupportMode.EXPLICIT:
+            if self.explicit_support is None:
+                raise ValueError("EXPLICIT support_mode requires explicit_support")
+            if len(self.explicit_support) != len(self.target_variables):
+                raise ValueError(
+                    "explicit_support must contain one support per coordinate"
+                )
+            for coordinate in self.explicit_support:
+                if not coordinate:
+                    raise ValueError(
+                        "each explicit coordinate support must be nonempty"
+                    )
+                if coordinate != tuple(sorted(coordinate, reverse=True)):
+                    raise ValueError(
+                        "explicit support must use descending lexicographic order"
+                    )
+                for exponents in coordinate:
+                    if len(exponents) != len(self.target_variables):
+                        raise ValueError(
+                            "support monomials must match target variable order"
+                        )
+                    if any(exponent < 0 for exponent in exponents):
+                        raise ValueError("support exponents must be nonnegative")
+                    if sum(exponents) > self.inverse_degree_bound:
+                        raise ValueError(
+                            "explicit support exceeds inverse_degree_bound"
+                        )
+        elif self.explicit_support is not None:
+            raise ValueError(
+                "FULL_TOTAL_DEGREE support_mode must not carry explicit_support"
+            )
+        return self
+
+
+class PolynomialInverseAnsatzSpecification(ContractModel):
+    support_mode: PolynomialInverseSupportMode
+    inverse_degree_bound: int
+    source_variables: tuple[PolynomialVariable, ...]
+    target_variables: tuple[PolynomialVariable, ...]
+    coordinate_supports: tuple[tuple[tuple[int, ...], ...], ...]
+    coefficient_symbols: tuple[tuple[str, ...], ...]
+
+
+class PolynomialInverseCoefficientEquation(ContractModel):
+    direction: Literal["INVERSE_AFTER_FORWARD", "FORWARD_AFTER_INVERSE"]
+    coordinate: int = Field(ge=0, le=3)
+    monomial_exponents: tuple[int, ...]
+    expression: str = Field(min_length=1, max_length=100_000)
+
+
+class PolynomialInverseSolverProvenance(ContractModel):
+    solver: str
+    backend: Literal["sympy"] = "sympy"
+    backend_version: str
+    exact_domain: Literal["QQ"] = "QQ"
+    timeout_ms: int
+    unknown_count: int = Field(ge=0)
+    equation_count: int = Field(ge=0)
+    residual_term_count: int = Field(ge=0)
+    elapsed_ms: int = Field(ge=0)
+
+
+class PolynomialMapInverseSynthesisArtifact(ContractModel):
+    synthesis_schema_version: Literal["1"] = "1"
+    status: PolynomialInverseSynthesisStatus
+    forward_map: RationalPolynomialMap
+    ansatz: PolynomialInverseAnsatzSpecification
+    coefficient_equations: tuple[PolynomialInverseCoefficientEquation, ...]
+    solver_provenance: PolynomialInverseSolverProvenance
+    candidate_inverse_map: RationalPolynomialMap | None = None
+    inverse_after_forward: tuple[SparseRationalPolynomial, ...] = ()
+    forward_after_inverse: tuple[SparseRationalPolynomial, ...] = ()
+    verification_output: dict[str, Any] | None = None
+    verification_artifact_uri: ArtifactUri | None = None
+    verification_failure: str | None = None
+    noninvertibility_proved: Literal[False] = False
+
+    @model_validator(mode="after")
+    def require_status_consistent_candidate_bundle(self) -> Self:
+        found = self.status is PolynomialInverseSynthesisStatus.FOUND
+        if found != (self.candidate_inverse_map is not None):
+            raise ValueError("FOUND status must agree with candidate_inverse_map")
+        if found and (not self.inverse_after_forward or not self.forward_after_inverse):
+            raise ValueError("FOUND requires both composition residual families")
+        if not found and (self.inverse_after_forward or self.forward_after_inverse):
+            raise ValueError("only FOUND may carry composition residual families")
+        if self.verification_artifact_uri is not None and not found:
+            raise ValueError("only FOUND may carry a verification artifact")
+        return self
+
+
+class PolynomialMapInverseSynthesisOutput(PolynomialMapInverseSynthesisArtifact):
+    synthesis_uri: ArtifactUri
+    forward_map_uri: ArtifactUri
 
 
 class PolynomialCollisionSearchRequest(ContractModel):
