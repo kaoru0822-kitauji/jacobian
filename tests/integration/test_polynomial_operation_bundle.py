@@ -350,9 +350,6 @@ def test_groebner_result_budget_failure_crosses_worker_protocol(
     )
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert (
-        result.diagnostics[0].code
-        == "POLYNOMIAL_GROEBNER_RESULT_LIMIT_EXCEEDED"
-    )
+    assert result.diagnostics[0].code == "POLYNOMIAL_GROEBNER_RESULT_LIMIT_EXCEEDED"
     assert result.artifact_uris == ()
     assert result.episode_uri is None
