@@ -57,6 +57,7 @@ class CapabilityDiscoveryRequest(ContractModel):
     )
     mode: CapabilityMode | None = None
     limit: int = Field(default=10, ge=1, le=50, strict=True)
+    cursor: CapabilityId | None = None
 
     @model_validator(mode="after")
     def reject_blank_filters(self) -> Self:
@@ -90,6 +91,7 @@ class CapabilityDiscoveryResult(ContractModel):
     matches: tuple[CapabilityDiscoveryMatch, ...]
     total_matches: int = Field(ge=0, strict=True)
     truncated: bool
+    next_cursor: CapabilityId | None = None
     available_domains: tuple[str, ...] = ()
 
 

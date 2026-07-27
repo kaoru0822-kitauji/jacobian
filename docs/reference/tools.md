@@ -12,7 +12,7 @@ model-facing MCP surface contains five tools:
 
 | MCP tool | Purpose |
 | --- | --- |
-| `capability.describe` | Read an installed capability's descriptor and exact input and output schemas. |
+| `capability.describe` | Search the compact installed index, or read one capability's exact schemas by ID. |
 | `capability.invoke` | Invoke an installed capability in `EXPLORE` or `VERIFY` mode. |
 | `workspace.open` | Create one durable agent workspace, canonical problem card, pinned `main` branch, and immutable initial revision. |
 | `workspace.write` | Append scratch, findings, attempts, lifecycle marks, and focus against an exact base revision. |
@@ -130,10 +130,12 @@ installed outcomes without loading every schema:
 `query` searches published capability IDs, titles, descriptions, and tags.
 `domain` filters the domain-owned capability namespace, with exact tag matches
 also accepted. `mode` and `limit` are optional. Omit `query` to browse the
-installed inventory in stable ID order. Results report `matched_on` and
-`matched_terms`; their deterministic ranking is retrieval, not a recommendation
-or mathematical strategy. Agents may search repeatedly across concepts and
-domains and compose any number of capabilities.
+installed inventory in stable ID order. Each response includes a stable catalog
+digest; when `next_cursor` is present, pass it back with the same filters and
+limit to continue. Results report `matched_on` and `matched_terms`; their
+deterministic ranking is retrieval, not a recommendation or mathematical
+strategy. Agents may search repeatedly across concepts and domains and compose
+any number of capabilities.
 
 Call `capability.describe` again with only one returned `capability_id` to
 inspect its complete input and output schemas, supported modes, provider

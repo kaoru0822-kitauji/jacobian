@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -28,7 +30,10 @@ from jacobian.adapters.mcp.guidance import (
     discovery_prompt,
     evidence_check_prompt,
 )
+from jacobian.canonical import canonicalize_json
+from jacobian.capabilities import CapabilityDiscoveryCursorError
 from jacobian.contracts.capabilities import (
+    CapabilityDescriptor,
     CapabilityDiscoveryRequest,
     CapabilityMode,
     CapabilityRequest,
@@ -86,6 +91,97 @@ def _tool_annotations(
         idempotent_hint=idempotent,
         open_world_hint=False,
     )
+
+
+def _argument_digest(arguments: dict[str, Any]) -> str:
+    try:
+        encoded = canonicalize_json(arguments)
+    except (TypeError, ValueError):
+        encoded = json.dumps(
+            arguments,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _response_size(value: Any) -> int:
+    try:
+        if hasattr(value, "model_dump_json"):
+            return len(value.model_dump_json().encode("utf-8"))
+        return len(
+            json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ).encode("utf-8")
+        )
+    except (TypeError, ValueError):
+        return -1
+
+
+def _catalog_digest(
+    catalog_version: str,
+    capabilities: tuple[CapabilityDescriptor, ...],
+) -> str:
+    payload = {
+        "catalog_version": catalog_version,
+        "capabilities": [
+            descriptor.model_dump(mode="json") for descriptor in capabilities
+        ],
+    }
+    return f"sha256:{hashlib.sha256(canonicalize_json(payload)).hexdigest()}"
+
+
+def _capability_discovery_response(
+    kernel: JacobianKernel,
+    *,
+    query: str | None,
+    domain: str | None,
+    mode: CapabilityMode | None,
+    limit: int | None,
+    cursor: str | None,
+) -> dict[str, Any]:
+    catalog = kernel.capabilities.catalog()
+    try:
+        discovered = kernel.capabilities.discover(
+            CapabilityDiscoveryRequest(
+                query=query,
+                domain=domain,
+                mode=mode,
+                limit=limit if limit is not None else 10,
+                cursor=cursor,
+            )
+        )
+    except CapabilityDiscoveryCursorError:
+        return {
+            "error": {
+                "code": "INVALID_CURSOR",
+                "stage": "capability_discovery",
+                "message": "The capability discovery cursor is not in this result set.",
+                "hint": (
+                    "Restart discovery without a cursor, or reuse the same query, "
+                    "domain, mode, and limit that produced next_cursor."
+                ),
+            }
+        }
+    return {
+        "kind": "discovery",
+        "catalog_version": catalog.catalog_version,
+        "catalog_digest": _catalog_digest(
+            catalog.catalog_version,
+            catalog.capabilities,
+        ),
+        **discovered.model_dump(mode="json"),
+        "next_step": {
+            "tool": "capability.describe",
+            "argument": "capability_id",
+            "choose_from": "matches[].capability_id",
+        },
+    }
 
 
 def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
@@ -184,9 +280,18 @@ def create_server(
             arguments: dict[str, Any],
             context: Context[AppState, Any] | None = None,
         ) -> Any:
+            started = time.monotonic()
+            argument_digest = _argument_digest(arguments)
             try:
-                return await super().call_tool(name, arguments, context)
+                result = await super().call_tool(name, arguments, context)
             except MCPError:
+                _LOGGER.info(
+                    "MCP tool call tool=%s status=error duration_ms=%.3f "
+                    "response_bytes=0 argument_digest=%s",
+                    name,
+                    (time.monotonic() - started) * 1000,
+                    argument_digest,
+                )
                 raise
             except Exception as exc:
                 _LOGGER.warning(
@@ -194,7 +299,23 @@ def create_server(
                     name,
                     exc_info=exc,
                 )
+                _LOGGER.info(
+                    "MCP tool call tool=%s status=error duration_ms=%.3f "
+                    "response_bytes=0 argument_digest=%s",
+                    name,
+                    (time.monotonic() - started) * 1000,
+                    argument_digest,
+                )
                 raise ValueError(_public_tool_error(name, exc)) from None
+            _LOGGER.info(
+                "MCP tool call tool=%s status=success duration_ms=%.3f "
+                "response_bytes=%d argument_digest=%s",
+                name,
+                (time.monotonic() - started) * 1000,
+                _response_size(result),
+                argument_digest,
+            )
+            return result
 
     configured_root = _configured_root(state_dir)
     kernel = (
@@ -248,7 +369,7 @@ def create_server(
             Field(
                 description=(
                     "Exact installed capability ID. When supplied, omit query, "
-                    "domain, mode, and limit."
+                    "domain, mode, limit, and cursor."
                 )
             ),
         ] = None,
@@ -285,36 +406,38 @@ def create_server(
                 description="Maximum compact discovery matches; defaults to 10.",
             ),
         ] = None,
+        cursor: Annotated[
+            str | None,
+            Field(
+                max_length=128,
+                pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
+                description=(
+                    "Opaque continuation ID from next_cursor. Reuse the same query, "
+                    "domain, mode, and limit when continuing discovery."
+                ),
+            ),
+        ] = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_kernel = _kernel(ctx)
-        search_arguments = (query, domain, mode, limit)
+        search_arguments = (query, domain, mode, limit, cursor)
         if capability_id is not None and any(
             argument is not None for argument in search_arguments
         ):
             raise AgentRecoveryError(
                 "capability_id is an exact lookup and cannot be combined with query, "
-                "domain, mode, or limit. Use one discovery call followed by one exact "
-                "description call."
+                "domain, mode, limit, or cursor. Use one discovery call followed by "
+                "one exact description call."
             )
         if capability_id is None:
-            discovered = active_kernel.capabilities.discover(
-                CapabilityDiscoveryRequest(
-                    query=query,
-                    domain=domain,
-                    mode=mode,
-                    limit=limit if limit is not None else 10,
-                )
+            return _capability_discovery_response(
+                active_kernel,
+                query=query,
+                domain=domain,
+                mode=mode,
+                limit=limit,
+                cursor=cursor,
             )
-            return {
-                "kind": "discovery",
-                **discovered.model_dump(mode="json"),
-                "next_step": {
-                    "tool": "capability.describe",
-                    "argument": "capability_id",
-                    "choose_from": "matches[].capability_id",
-                },
-            }
         capability_catalog = active_kernel.capabilities.catalog()
         descriptors = {
             item.capability_id: item for item in capability_catalog.capabilities

@@ -63,6 +63,10 @@ class CapabilityError(RuntimeError):
     """A capability descriptor, request, or assurance boundary is invalid."""
 
 
+class CapabilityDiscoveryCursorError(ValueError):
+    """A continuation cursor does not belong to the filtered discovery result."""
+
+
 class CapabilityInvocationError(RuntimeError):
     """An expected adapter failure that is safe to return to a model."""
 
@@ -172,13 +176,35 @@ class CapabilityService:
             )
         ranked.sort(key=lambda item: (-item[0], item[1].capability_id))
         total_matches = len(ranked)
+        start = 0
+        if request.cursor is not None:
+            try:
+                start = (
+                    next(
+                        index
+                        for index, (_, match) in enumerate(ranked)
+                        if match.capability_id == request.cursor
+                    )
+                    + 1
+                )
+            except StopIteration:
+                raise CapabilityDiscoveryCursorError(
+                    "cursor is not present in the filtered discovery result"
+                ) from None
+        page = ranked[start : start + request.limit]
+        next_cursor = (
+            page[-1][1].capability_id
+            if page and start + len(page) < total_matches
+            else None
+        )
         return CapabilityDiscoveryResult(
             query=request.query,
             domain=normalized_domain,
             mode=request.mode,
-            matches=tuple(match for _, match in ranked[: request.limit]),
+            matches=tuple(match for _, match in page),
             total_matches=total_matches,
-            truncated=total_matches > request.limit,
+            truncated=next_cursor is not None,
+            next_cursor=next_cursor,
             available_domains=available_domains,
         )
 

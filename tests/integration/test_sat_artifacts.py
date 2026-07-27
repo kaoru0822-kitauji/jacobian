@@ -7,10 +7,13 @@ import pytest
 from jacobian.artifacts import ArtifactValidationError
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
+    CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
+    CapabilityRequest,
 )
+from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import (
     CanonicalCnf,
     SatAssignmentArtifact,
@@ -58,6 +61,67 @@ def test_sat_service_materializes_one_identity_for_equivalent_cnf_input(
     assert cnf.to_dimacs_bytes() == b"p cnf 2 2\n-1 2 0\n1 0\n"
     assert stored.manifest.schema_uri == kernel.sat.installation.cnf_schema_uri
     assert stored.manifest.semantics_uri == kernel.sat.installation.semantics_uri
+
+
+@pytest.mark.integration
+@pytest.mark.contract
+def test_sat_cnf_materialization_capability_exposes_reusable_identity(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.cnf.materialize",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "variable_names": ["b", "a"],
+                "clauses": [[1, -2, 1], [2], [1, -1]],
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.assurance.level.value == "COMPUTED"
+    assert result.completeness.status.value == "NOT_APPLICABLE"
+    assert result.output["cnf_uri"] in result.artifact_uris
+    resolved = kernel.sat.resolve_cnf(result.output["cnf_uri"])
+    assert resolved.cnf.to_dimacs_bytes() == b"p cnf 2 2\n-1 2 0\n1 0\n"
+    assert result.output["schema_uri"] == kernel.sat.installation.cnf_schema_uri
+    assert result.output["semantics_uri"] == kernel.sat.installation.semantics_uri
+    assert result.output["variable_map_digest"] == resolved.cnf.variable_map_digest
+    assert result.output["dimacs_digest"] == resolved.cnf.dimacs_digest
+
+
+@pytest.mark.integration
+@pytest.mark.contract
+def test_sat_cnf_materialization_validates_before_artifact_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    called = False
+
+    def unexpected_put_cnf(**_kwargs: object) -> None:
+        nonlocal called
+        called = True
+        raise AssertionError("invalid request reached artifact write")
+
+    monkeypatch.setattr(kernel.sat, "put_cnf", unexpected_put_cnf)
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.cnf.materialize",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "variable_names": ["a", "a"],
+                "clauses": [[1]],
+            },
+        )
+    )
+
+    assert called is False
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_CNF"
 
 
 @pytest.mark.integration

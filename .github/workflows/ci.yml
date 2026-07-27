@@ -191,10 +191,10 @@ jobs:
           -m "not integration and not end_to_end and not lean_runtime"
           --junitxml=pytest.xml
           --durations=10
-      - if: always()
+      - if: ${{ !cancelled() }}
         run: uv cache prune --ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
+        if: ${{ !cancelled() }}
         with:
           name: junit-core-${{ matrix.python-version }}
           path: pytest.xml
@@ -216,7 +216,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.run-integration == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -261,10 +261,10 @@ jobs:
           --jacobian-shard-index ${{ matrix.shard-index }}
           --junitxml=pytest.xml
           --durations=10
-      - if: always()
+      - if: ${{ !cancelled() }}
         run: uv cache prune --ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
+        if: ${{ !cancelled() }}
         with:
           name: >-
             junit-integration-${{ matrix.shard }}-${{ matrix.python-version }}
@@ -282,7 +282,7 @@ jobs:
 
   python-test:
     name: Python Tests
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [plan, core-test, integration-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -336,7 +336,7 @@ jobs:
 
   lean-test:
     name: Lean Tests
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [plan, lean-test-run]
     runs-on: ubuntu-latest
     timeout-minutes: 5
