@@ -5,6 +5,9 @@ declare -A plan=()
 expected_keys=(
   classification
   run-python
+  run-core
+  run-integration
+  run-coverage
   run-lean
   run-npm
   run-static
@@ -15,7 +18,7 @@ expected_keys=(
 
 while IFS='=' read -r key value; do
   case "$key" in
-    classification|run-python|run-lean|run-npm|run-static|run-build|run-security|run-duplicate)
+    classification|run-python|run-core|run-integration|run-coverage|run-lean|run-npm|run-static|run-build|run-security|run-duplicate)
       ;;
     *)
       echo "invalid CI plan key: $key" >&2
@@ -47,12 +50,6 @@ for key in "${expected_keys[@]:1}"; do
 done
 
 case "${plan[classification]}" in
-  docs)
-    expected_npm=false
-    ;;
-  npm)
-    expected_npm=true
-    ;;
   full)
     for key in "${expected_keys[@]:1}"; do
       if [[ "${plan[$key]}" != true ]]; then
@@ -62,19 +59,79 @@ case "${plan[classification]}" in
     done
     exit 0
     ;;
+  docs|npm|lean|python-core|selective)
+    ;;
   *)
     echo "invalid CI classification: ${plan[classification]}" >&2
     exit 1
     ;;
 esac
 
-for key in run-python run-static run-build run-security run-duplicate; do
+expected_python=false
+if [[ "${plan[run-core]}" == true || "${plan[run-integration]}" == true ]]; then
+  expected_python=true
+fi
+if [[ "${plan[run-python]}" != "$expected_python" ]]; then
+  echo "run-python must equal the union of the Python test lanes" >&2
+  exit 1
+fi
+expected_coverage=false
+if [[ "${plan[run-core]}" == true && "${plan[run-integration]}" == true ]]; then
+  expected_coverage=true
+fi
+if [[ "${plan[run-coverage]}" != "$expected_coverage" ]]; then
+  echo "run-coverage requires both Python test lanes" >&2
+  exit 1
+fi
+if [[ "${plan[run-static]}" != "${plan[run-python]}" ]]; then
+  echo "selective Python validation must include static analysis" >&2
+  exit 1
+fi
+for key in run-build run-security run-duplicate; do
   if [[ "${plan[$key]}" != false ]]; then
-    echo "${plan[classification]} CI plan must disable $key" >&2
+    echo "selective CI plan must disable $key" >&2
     exit 1
   fi
 done
-if [[ "${plan[run-npm]}" != "$expected_npm" ]]; then
-  echo "${plan[classification]} CI plan has an invalid run-npm value" >&2
+
+case "${plan[classification]}" in
+  docs)
+    expected=(false false false false)
+    ;;
+  npm)
+    expected=(false false false true)
+    ;;
+  lean)
+    expected=(false false true false)
+    ;;
+  python-core)
+    expected=(true false false false)
+    ;;
+  selective)
+    lane_count=0
+    for value in \
+      "${plan[run-core]}" \
+      "${plan[run-integration]}" \
+      "${plan[run-lean]}" \
+      "${plan[run-npm]}"; do
+      if [[ "$value" == true ]]; then
+        lane_count=$((lane_count + 1))
+      fi
+    done
+    if (( lane_count < 2 )); then
+      echo "selective CI plan must enable at least two independent lanes" >&2
+      exit 1
+    fi
+    exit 0
+    ;;
+esac
+actual=(
+  "${plan[run-core]}"
+  "${plan[run-integration]}"
+  "${plan[run-lean]}"
+  "${plan[run-npm]}"
+)
+if [[ "${actual[*]}" != "${expected[*]}" ]]; then
+  echo "${plan[classification]} CI plan has incoherent lane outputs" >&2
   exit 1
 fi
