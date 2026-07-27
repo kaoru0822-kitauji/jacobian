@@ -448,6 +448,9 @@ class SatLratVerificationRequest(ContractModel):
 
     @model_validator(mode="after")
     def validate_proof_encoding(self) -> Self:
+        max_encoded_length = 4 * ((self.limits.max_proof_bytes + 2) // 3)
+        if len(self.proof_base64) > max_encoded_length:
+            raise ValueError("LRAT proof exceeds max_proof_bytes")
         raw = _decode_base64(self.proof_base64)
         if self.proof_base64 != base64.b64encode(raw).decode("ascii"):
             raise ValueError("LRAT proof must use canonical base64")
