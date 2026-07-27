@@ -1960,10 +1960,9 @@ class PolynomialMapInverseSynthesizeAdapter:
                             )
                         )
                         verification_output = verified.output
-                        artifact = (
-                            verified.output.get("verification_record_uri")
-                            or verified.output.get("certificate_uri")
-                        )
+                        artifact = verified.output.get(
+                            "verification_record_uri"
+                        ) or verified.output.get("certificate_uri")
                         verification_artifact_uri = (
                             artifact if isinstance(artifact, str) else None
                         )
