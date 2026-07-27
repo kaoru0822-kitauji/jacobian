@@ -15,6 +15,8 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -28,6 +30,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.graph_degree_sequence import (
@@ -256,32 +259,46 @@ def install_graph_capabilities(
     degree_sequence_checker_id = None
     neighborhood_checker_id = None
     if authorize_checker:
-        degree_sequence_checker_id = checkers.authorize(
-            name="exact simple-graph degree-sequence replay checker",
-            entrypoint=(
-                "jacobian_checkers.graph_degree_sequence:check_degree_sequence"
-            ),
-            evidence_kind="CERTIFICATE",
-            format_id="graph.degree_sequence",
-            format_version="1",
-            claim_schema_uris=(degree_sequence_claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(degree_sequence_result_schema_uri,),
-            reason="bundled independent degree-sequence checker",
-        ).checker_id
-        neighborhood_checker_id = checkers.authorize(
-            name="exact graph neighborhood-independence replay checker",
-            entrypoint=(
-                "jacobian_checkers.graph_invariants:check_neighborhood_independence"
-            ),
-            evidence_kind="CERTIFICATE",
-            format_id="graph.neighborhood_independence",
-            format_version="1",
-            claim_schema_uris=(neighborhood_claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(neighborhood_schema_uri,),
-            reason="bundled independent finite-graph invariant checker",
-        ).checker_id
+        degree_sequence_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact simple-graph degree-sequence replay checker",
+                    entrypoint=(
+                        "jacobian_checkers.graph_degree_sequence:check_degree_sequence"
+                    ),
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="graph.degree_sequence",
+                    format_version="1",
+                    claim_schema_uris=(degree_sequence_claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(degree_sequence_result_schema_uri,),
+                    reason="bundled independent degree-sequence checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
+        neighborhood_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact graph neighborhood-independence replay checker",
+                    entrypoint=(
+                        "jacobian_checkers.graph_invariants:check_neighborhood_independence"
+                    ),
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="graph.neighborhood_independence",
+                    format_version="1",
+                    claim_schema_uris=(neighborhood_claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(neighborhood_schema_uri,),
+                    reason="bundled independent finite-graph invariant checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = GraphInstallation(
         semantics_uri=semantics_uri,
         graph_schema_uri=graph_schema_uri,

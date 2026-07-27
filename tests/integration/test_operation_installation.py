@@ -1,0 +1,387 @@
+from dataclasses import replace
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+from pydantic import Field
+
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityDiagnostic,
+    CapabilityRequest,
+)
+from jacobian.contracts.results import ContractModel, ExecutionStatus
+from jacobian.kernel import JacobianKernel
+from jacobian.operation_installation import OperationInstaller
+from jacobian.operations import (
+    BoundedSearchInterrupted,
+    BoundedSearchOperation,
+    BoundedSearchWitness,
+    ComputedNotApplicable,
+    ComputedOperation,
+    ComputedSuccess,
+    DomainBundle,
+    DomainDiagnostics,
+    DomainSemantics,
+    OperationExecutionFailure,
+)
+from jacobian.provider_runtime import known_provider_runtime
+
+
+class _SyntheticRequest(ContractModel):
+    value: int = Field(ge=0, le=100)
+
+
+class _SyntheticResult(ContractModel):
+    doubled: int
+
+
+class _BoundedResult(ContractModel):
+    complete: bool
+
+
+def _synthetic_bundle() -> DomainBundle:
+    not_applicable = CapabilityDiagnostic(
+        code="SYNTHETIC_NOT_APPLICABLE",
+        stage="synthetic_computation",
+        message="Thirteen is excluded from this synthetic operation.",
+    )
+
+    def compute(
+        request: _SyntheticRequest,
+    ) -> ComputedSuccess[_SyntheticResult] | ComputedNotApplicable:
+        if request.value == 13:
+            return ComputedNotApplicable(not_applicable)
+        return ComputedSuccess(_SyntheticResult(doubled=request.value * 2))
+
+    return DomainBundle(
+        domain_id="synthetic",
+        schema_namespace="jacobian.synthetic",
+        semantics=DomainSemantics(
+            name="jacobian.synthetic",
+            version="1",
+            definition={"description": "synthetic capability test semantics"},
+        ),
+        provider_runtime=known_provider_runtime(
+            "jacobian.synthetic",
+            features=("deterministic",),
+        ),
+        backend_version="synthetic-1",
+        capabilities=(
+            ComputedOperation(
+                capability_id="synthetic.compute.double",
+                title="Double a bounded integer",
+                description="Double one bounded nonnegative integer.",
+                request_model=_SyntheticRequest,
+                result_model=_SyntheticResult,
+                implementation=compute,
+                relation_id="synthetic.relation.double",
+                tags=("synthetic",),
+            ),
+        ),
+        diagnostics=DomainDiagnostics(
+            invalid_request=CapabilityDiagnostic(
+                code="INVALID_SYNTHETIC_REQUEST",
+                stage="synthetic_input_validation",
+                message="Input does not satisfy the synthetic contract.",
+            )
+        ),
+        scope_description="the complete supplied synthetic input",
+        completeness_basis="deterministic computation covered the supplied input",
+        assurance_basis="deterministic synthetic computation; no checker invoked",
+    )
+
+
+def _install(kernel: JacobianKernel, bundle: DomainBundle) -> None:
+    installation = OperationInstaller(
+        kernel.store,
+        kernel.schemas,
+        kernel.artifacts,
+    ).install(bundle)
+    for adapter in installation.adapters:
+        kernel.register_capability(adapter)
+
+
+def test_synthetic_bundle_installs_and_materializes_typed_result(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    _install(kernel, _synthetic_bundle())
+
+    descriptor = next(
+        descriptor
+        for descriptor in kernel.capabilities.catalog().capabilities
+        if descriptor.capability_id == "synthetic.compute.double"
+    )
+    assert descriptor.provider == "jacobian.synthetic"
+    assert descriptor.input_schema["additionalProperties"] is False
+    result_schema = descriptor.output_schema["properties"]["result"]
+    assert result_schema == {"$ref": "#/$defs/_SyntheticResult"}
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.compute.double",
+            input={"value": 6},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == {"doubled": 12}
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert len(result.artifact_uris) == 2
+    input_artifact = kernel.store.get(result.artifact_uris[0])
+    output_artifact = kernel.store.get(result.artifact_uris[1])
+    assert input_artifact.payload == {"value": 6}
+    assert output_artifact.payload == {"doubled": 12}
+    assert output_artifact.manifest.parents == (result.artifact_uris[0],)
+    assert result.relationships[0].source_artifact_uris == (result.artifact_uris[0],)
+    assert result.relationships[0].target_artifact_uris == (result.artifact_uris[1],)
+
+
+def test_synthetic_bundle_fails_closed_before_artifact_writes(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    _install(kernel, _synthetic_bundle())
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.compute.double",
+            input={"value": 13},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "SYNTHETIC_NOT_APPLICABLE"
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+
+
+@pytest.mark.parametrize(
+    "status",
+    (
+        ExecutionStatus.ERROR,
+        ExecutionStatus.TIMEOUT,
+        ExecutionStatus.CANCELLED,
+    ),
+)
+def test_computed_adapter_preserves_operational_failure_status(
+    tmp_path: Path,
+    status: ExecutionStatus,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_OPERATION_FAILED",
+        stage="synthetic_computation",
+        message="The synthetic operation did not complete.",
+    )
+    failed = replace(
+        bundle.capabilities[0],
+        implementation=lambda _request: OperationExecutionFailure(status, diagnostic),
+    )
+    _install(kernel, replace(bundle, capabilities=(failed,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.compute.double",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is status
+    assert result.diagnostics == (diagnostic,)
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+
+
+def test_computed_failure_rejects_conclusive_status() -> None:
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_OPERATION_FAILED",
+        stage="synthetic_computation",
+        message="The synthetic operation did not complete.",
+    )
+
+    with pytest.raises(ValueError, match="operational failure status"):
+        OperationExecutionFailure(ExecutionStatus.COMPLETED, diagnostic)
+
+
+def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_SEARCH_TIMEOUT",
+        stage="synthetic_search",
+        message="The synthetic search exceeded its wall budget.",
+    )
+    operation = BoundedSearchOperation(
+        capability_id="synthetic.search.timeout",
+        title="Timed out synthetic search",
+        description="Exercise bounded operational failure mapping.",
+        request_model=_SyntheticRequest,
+        result_model=_BoundedResult,
+        implementation=lambda _request: OperationExecutionFailure(
+            ExecutionStatus.TIMEOUT,
+            diagnostic,
+        ),
+        relation_id="synthetic.search.timeout.relation",
+        scope_parameters=lambda _request, _result: {},
+        is_complete=lambda result: result.complete,
+        obligation_model=_BoundedResult,
+        obligation=lambda _request, result: result,
+        incomplete_basis="the synthetic search did not complete",
+    )
+    _install(kernel, replace(bundle, capabilities=(operation,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.search.timeout",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.diagnostics == (diagnostic,)
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+
+
+def test_bounded_adapter_materializes_interrupted_partial_result(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    diagnostic = CapabilityDiagnostic(
+        code="SYNTHETIC_SEARCH_TIMEOUT",
+        stage="synthetic_search",
+        message="The synthetic search retained a partial result.",
+    )
+    operation = BoundedSearchOperation(
+        capability_id="synthetic.search.partial_timeout",
+        title="Interrupted synthetic search",
+        description="Exercise inspectable bounded interruption mapping.",
+        request_model=_SyntheticRequest,
+        result_model=_BoundedResult,
+        implementation=lambda _request: BoundedSearchInterrupted(
+            value=_BoundedResult(complete=False),
+            status=ExecutionStatus.TIMEOUT,
+            diagnostic=diagnostic,
+        ),
+        relation_id="synthetic.search.partial-timeout.relation",
+        scope_parameters=lambda _request, _result: {},
+        is_complete=lambda result: result.complete,
+        obligation_model=_BoundedResult,
+        obligation=lambda _request, result: result,
+        incomplete_basis="the synthetic search did not complete",
+    )
+    _install(kernel, replace(bundle, capabilities=(operation,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.search.partial_timeout",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.output == {"complete": False}
+    assert result.diagnostics == (diagnostic,)
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+    assert len(result.artifact_uris) == 3
+    assert len(result.obligations) == 1
+
+
+def test_computed_adapter_rejects_invalid_implementation_result(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    original = bundle.capabilities[0]
+    invalid = ComputedOperation(
+        capability_id="synthetic.compute.invalid",
+        title=original.title,
+        description=original.description,
+        request_model=_SyntheticRequest,
+        result_model=_SyntheticResult,
+        implementation=lambda _request: ComputedSuccess(
+            cast(Any, {"doubled": "not-an-integer"})
+        ),
+        relation_id="synthetic.relation.invalid",
+    )
+    _install(
+        kernel,
+        DomainBundle(
+            domain_id=bundle.domain_id,
+            schema_namespace=bundle.schema_namespace,
+            semantics=bundle.semantics,
+            provider_runtime=bundle.provider_runtime,
+            backend_version=bundle.backend_version,
+            capabilities=(invalid,),
+            diagnostics=bundle.diagnostics,
+            scope_description=bundle.scope_description,
+            completeness_basis=bundle.completeness_basis,
+            assurance_basis=bundle.assurance_basis,
+        ),
+    )
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="synthetic.compute.invalid",
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "ADAPTER_EXECUTION_FAILED"
+    assert result.artifact_uris == ()
+    assert result.episode_uri is None
+
+
+def test_installer_rejects_empty_and_duplicate_domain_bundles(tmp_path: Path) -> None:
+    kernel = JacobianKernel(tmp_path)
+    installer = OperationInstaller(
+        kernel.store,
+        kernel.schemas,
+        kernel.artifacts,
+    )
+    bundle = _synthetic_bundle()
+
+    with pytest.raises(ValueError, match="must not be empty"):
+        installer.install(replace(bundle, capabilities=()))
+    with pytest.raises(ValueError, match="duplicate capability ID"):
+        installer.install(replace(bundle, capabilities=(bundle.capabilities[0],) * 2))
+
+
+def test_bounded_outcome_cannot_contradict_completion_semantics(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    bundle = _synthetic_bundle()
+    contradictory = BoundedSearchOperation(
+        capability_id="synthetic.search.contradictory",
+        title="Contradictory bounded search",
+        description="Exercise fail-closed completion binding.",
+        request_model=_SyntheticRequest,
+        result_model=_BoundedResult,
+        implementation=lambda _request: BoundedSearchWitness(
+            _BoundedResult(complete=False)
+        ),
+        relation_id="synthetic.search.relation",
+        scope_parameters=lambda _request, _result: {},
+        is_complete=lambda result: result.complete,
+        obligation_model=_BoundedResult,
+        obligation=lambda _request, result: result,
+        incomplete_basis="the synthetic search did not complete",
+    )
+    _install(kernel, replace(bundle, capabilities=(contradictory,)))
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=contradictory.capability_id,
+            input={"value": 2},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "ADAPTER_EXECUTION_FAILED"
+    assert result.artifact_uris == ()

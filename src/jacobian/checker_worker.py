@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import importlib
 import os
 import sys
@@ -13,13 +12,16 @@ from typing import Any, cast
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.capabilities import (
-    CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
 )
 from jacobian.implementation import (
     install_source_only_importer,
     package_source_digest,
+)
+from jacobian.provider_runtime import (
+    ProviderRuntimeError,
+    require_provider_runtime_unchanged,
 )
 
 
@@ -42,27 +44,23 @@ def _measure_runtime(
     if encoded is None:
         return None, None
     runtime = CapabilityProviderRuntime.model_validate(loads_strict_json(encoded))
-    executable = runtime.configuration.get("executable")
-    if (
-        runtime.availability is not CapabilityProviderAvailability.AVAILABLE
-        or runtime.digest_kind is not CapabilityProviderDigestKind.EXECUTABLE
-        or runtime.digest is None
-        or not isinstance(executable, str)
-    ):
-        raise ValueError("checker runtime identity is incomplete")
-    path = Path(executable).resolve(strict=True)
-    if str(path) != executable:
-        raise ValueError("checker runtime path is not exact")
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    measured = "sha256:" + digest.hexdigest()
-    if measured != runtime.digest:
-        raise ValueError("checker runtime differs from its authorized digest")
-    os.environ["JACOBIAN_CHECKER_EXECUTABLE"] = str(path)
-    os.environ["JACOBIAN_CHECKER_RUNTIME_DIGEST"] = measured
-    return runtime, measured
+    try:
+        require_provider_runtime_unchanged(runtime)
+    except (OSError, ProviderRuntimeError, ValueError) as exc:
+        raise ValueError(
+            "checker runtime differs from its authorized identity"
+        ) from exc
+    if runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE:
+        executable = runtime.configuration.get("executable")
+        if not isinstance(executable, str):
+            raise ValueError("checker executable identity is incomplete")
+        path = Path(executable).resolve(strict=True)
+        if str(path) != executable:
+            raise ValueError("checker runtime path is not exact")
+        os.environ["JACOBIAN_CHECKER_EXECUTABLE"] = str(path)
+    assert runtime.digest is not None
+    os.environ["JACOBIAN_CHECKER_RUNTIME_DIGEST"] = runtime.digest
+    return runtime, runtime.digest
 
 
 def main() -> int:

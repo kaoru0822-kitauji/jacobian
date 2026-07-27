@@ -39,6 +39,16 @@ def test_apply_tactic_exposes_child_goals_and_replay_source(tmp_path: Path) -> N
     assert result.output["completed"] is False
     assert result.output["goal_count"] == 2
     assert all("⊢" in goal for goal in result.output["goals"])
+    assert [goal["target_type"] for goal in result.output["typed_goals"]] == [
+        "P",
+        "Q",
+    ]
+    assert result.output["typed_goals"][0]["local_declarations"] == [
+        {"user_name": "P", "binder_info": "DEFAULT", "type": "Prop", "value": None},
+        {"user_name": "Q", "binder_info": "DEFAULT", "type": "Prop", "value": None},
+        {"user_name": "hP", "binder_info": "DEFAULT", "type": "P", "value": None},
+        {"user_name": "hQ", "binder_info": "DEFAULT", "type": "Q", "value": None},
+    ]
     assert result.output["transition_uri"] in result.artifact_uris
     assert result.output["replay_source"].endswith("intro P Q hP hQ\n  constructor")
 
@@ -98,6 +108,13 @@ def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> N
     assert (
         "Nat.gcd_zero_right" in suggested.output["candidates"][0]["declaration_names"]
     )
+    assert suggested.output["candidates"][0]["tactic_replayed"] is True
+    assert (
+        suggested.output["candidates"][0]["declaration_name_extraction"]
+        == "DISPLAY_TEXT_HEURISTIC"
+    )
+    assert suggested.output["api_stability"] == "EXPERIMENTAL_TACTIC_DIAGNOSTIC"
+    assert suggested.output["goal_context_digest"].startswith("sha256:")
     assert suggested.output["retrieval_uri"] in suggested.artifact_uris
     assert empty.execution.status.value == "COMPLETED"
     assert empty.output["candidates"] == []

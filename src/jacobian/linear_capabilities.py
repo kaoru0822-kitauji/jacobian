@@ -7,6 +7,8 @@ from typing import Literal
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -21,6 +23,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
     EvidenceBindings,
     WitnessEnvelope,
@@ -75,17 +78,26 @@ def install_linear_rational_inconsistency_checker(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact rational linear-inconsistency replay checker",
-            entrypoint="jacobian_checkers.linear:check_rational_inconsistency",
-            evidence_kind="WITNESS",
-            format_id="linear.rational_inconsistency",
-            format_version="1",
-            claim_schema_uris=(linear.installation.system_schema_uri,),
-            semantics_uris=(linear.installation.semantics_uri,),
-            candidate_schema_uris=(linear.installation.inconsistency_schema_uri,),
-            reason="bundled independent exact rational left-witness checker",
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact rational linear-inconsistency replay checker",
+                    entrypoint="jacobian_checkers.linear:check_rational_inconsistency",
+                    evidence_kind=EvidenceKind.WITNESS,
+                    format_id="linear.rational_inconsistency",
+                    format_version="1",
+                    claim_schema_uris=(linear.installation.system_schema_uri,),
+                    semantics_uris=(linear.installation.semantics_uri,),
+                    candidate_schema_uris=(
+                        linear.installation.inconsistency_schema_uri,
+                    ),
+                    reason="bundled independent exact rational left-witness checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = LinearRationalInconsistencyCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,
@@ -124,17 +136,24 @@ def install_linear_rational_solution_checker(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact rational linear-solution replay checker",
-            entrypoint="jacobian_checkers.linear:check_rational_solution",
-            evidence_kind="WITNESS",
-            format_id="linear.rational_solution",
-            format_version="1",
-            claim_schema_uris=(linear.installation.system_schema_uri,),
-            semantics_uris=(linear.installation.semantics_uri,),
-            candidate_schema_uris=(linear.installation.solution_schema_uri,),
-            reason="bundled independent exact rational equation checker",
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact rational linear-solution replay checker",
+                    entrypoint="jacobian_checkers.linear:check_rational_solution",
+                    evidence_kind=EvidenceKind.WITNESS,
+                    format_id="linear.rational_solution",
+                    format_version="1",
+                    claim_schema_uris=(linear.installation.system_schema_uri,),
+                    semantics_uris=(linear.installation.semantics_uri,),
+                    candidate_schema_uris=(linear.installation.solution_schema_uri,),
+                    reason="bundled independent exact rational equation checker",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = LinearRationalSolutionCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,

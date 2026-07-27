@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import time
 from dataclasses import dataclass
 from itertools import product
 from typing import Any
 
-import z3  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -22,11 +24,14 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityMode,
+    CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
     CapabilityRelationship,
     CapabilityRequest,
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.contracts.universal_algebra import (
@@ -82,10 +87,7 @@ def install_universal_algebra_capabilities(
     *,
     authorize_checker: bool,
 ) -> tuple[
-    tuple[
-        UniversalAlgebraEvaluateLawsAdapter,
-        UniversalAlgebraSearchCountermodelAdapter,
-    ],
+    tuple[CapabilityAdapter, ...],
     UniversalAlgebraInstallation,
 ]:
     """Install exact bounded finite-magma law evaluation."""
@@ -134,17 +136,26 @@ def install_universal_algebra_capabilities(
     )
     evaluation_checker_id = None
     if authorize_checker:
-        evaluation_checker_id = checkers.authorize(
-            name="exact finite magma law evaluation replay checker",
-            entrypoint=("jacobian_checkers.universal_algebra:check_law_evaluation"),
-            evidence_kind="CERTIFICATE",
-            format_id="universal_algebra.law_evaluation",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(evaluation_schema_uri,),
-            reason="bundled independent finite table evaluator",
-        ).checker_id
+        evaluation_checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="exact finite magma law evaluation replay checker",
+                    entrypoint=(
+                        "jacobian_checkers.universal_algebra:check_law_evaluation"
+                    ),
+                    evidence_kind=EvidenceKind.CERTIFICATE,
+                    format_id="universal_algebra.law_evaluation",
+                    format_version="1",
+                    claim_schema_uris=(claim_schema_uri,),
+                    semantics_uris=(semantics_uri,),
+                    candidate_schema_uris=(evaluation_schema_uri,),
+                    reason="bundled independent finite table evaluator",
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = UniversalAlgebraInstallation(
         semantics_uri=semantics_uri,
         problem_schema_uri=problem_schema_uri,
@@ -159,10 +170,17 @@ def install_universal_algebra_capabilities(
         artifacts=artifacts,
         installation=installation,
     )
-    return (
-        UniversalAlgebraEvaluateLawsAdapter(resources),
-        UniversalAlgebraSearchCountermodelAdapter(resources),
-    ), installation
+    evaluation = UniversalAlgebraEvaluateLawsAdapter(resources)
+    search_runtime = known_provider_runtime(
+        "jacobian.z3",
+        features=("finite-magma-countermodel-search",),
+    )
+    adapters: tuple[CapabilityAdapter, ...] = (evaluation,)
+    if search_runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+        adapters += (
+            UniversalAlgebraSearchCountermodelAdapter(resources, search_runtime),
+        )
+    return adapters, installation
 
 
 class UniversalAlgebraEvaluateLawsAdapter:
@@ -342,7 +360,11 @@ class UniversalAlgebraEvaluateLawsAdapter:
 class UniversalAlgebraSearchCountermodelAdapter:
     """Search all fixed-order operation tables through a complete SMT encoding."""
 
-    def __init__(self, resources: UniversalAlgebraResources) -> None:
+    def __init__(
+        self,
+        resources: UniversalAlgebraResources,
+        provider_runtime: CapabilityProviderRuntime | None = None,
+    ) -> None:
         self.resources = resources
         self._descriptor = CapabilityDescriptor(
             capability_id="universal_algebra.search.countermodel",
@@ -353,7 +375,8 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 "magma satisfying every source law and falsifying one target law."
             ),
             provider="jacobian.z3",
-            provider_runtime=known_provider_runtime(
+            provider_runtime=provider_runtime
+            or known_provider_runtime(
                 "jacobian.z3",
                 features=("finite-magma-countermodel-search",),
             ),
@@ -386,7 +409,16 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 )
             ) from exc
         started = time.monotonic()
-        search = _search_countermodel(validated)
+        try:
+            search = _search_countermodel(validated)
+        except ImportError as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="FINITE_MAGMA_COUNTERMODEL_PROVIDER_UNAVAILABLE",
+                    stage="provider_runtime",
+                    message="The optional Z3 countermodel provider is unavailable.",
+                )
+            ) from exc
         search_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.installation.countermodel_schema_uri,
             semantics_uri=self.resources.installation.semantics_uri,
@@ -455,6 +487,7 @@ class UniversalAlgebraSearchCountermodelAdapter:
 def _search_countermodel(
     request: UniversalAlgebraCountermodelSearchRequest,
 ) -> FiniteMagmaCountermodelArtifact:
+    z3: Any = importlib.import_module("z3")
     order = request.order
     solver = z3.Solver()
     solver.set(random_seed=0, timeout=_COUNTERMODEL_TIMEOUT_MS)
@@ -469,8 +502,8 @@ def _search_countermodel(
         for values in product(range(order), repeat=len(law.variables)):
             assignment = dict(zip(law.variables, values, strict=True))
             solver.add(
-                _z3_evaluate_term(law.left, cells, assignment, order)
-                == _z3_evaluate_term(law.right, cells, assignment, order)
+                _z3_evaluate_term(law.left, cells, assignment, order, z3)
+                == _z3_evaluate_term(law.right, cells, assignment, order, z3)
             )
     target_assignment = {
         variable: z3.Int(f"target_{variable}")
@@ -484,12 +517,14 @@ def _search_countermodel(
             cells,
             target_assignment,
             order,
+            z3,
         )
         != _z3_evaluate_term(
             request.target_law.right,
             cells,
             target_assignment,
             order,
+            z3,
         )
     )
     result = solver.check()
@@ -536,13 +571,14 @@ def _z3_evaluate_term(
     cells: tuple[tuple[Any, ...], ...],
     assignment: dict[str, Any],
     order: int,
+    z3: Any,
 ) -> Any:
     if term.kind == "VARIABLE":
         assert term.variable is not None
         return assignment[term.variable]
     assert term.left is not None and term.right is not None
-    left = _z3_evaluate_term(term.left, cells, assignment, order)
-    right = _z3_evaluate_term(term.right, cells, assignment, order)
+    left = _z3_evaluate_term(term.left, cells, assignment, order, z3)
+    right = _z3_evaluate_term(term.right, cells, assignment, order, z3)
     selected: Any = cells[-1][-1]
     for left_index in reversed(range(order)):
         for right_index in reversed(range(order)):

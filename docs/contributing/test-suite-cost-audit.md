@@ -16,7 +16,6 @@ machine-local observations, not performance gates.
 | Integration, excluding end-to-end and Lean | 275 | 218.88 s | Real stores, subprocesses, adapters, and capability composition |
 | End-to-end | 5 | 33.84 s | Distinct complete mathematical workflows |
 | `make test-lean` | 20 | 218.26 s | Serial pinned Lean and Mathlib coverage |
-| Non-Lean duration calibration | 526 | 285.13 s | Refresh data for CI shard assignment |
 
 Static validation was not a material bottleneck: Ruff, formatting, mypy,
 dependency checks, build, and documentation checks completed in about 16
@@ -44,11 +43,10 @@ store now reuses immutable content-addressed artifacts while constructing an
 isolated request value for each case. All attack cases remain. This reduced the
 fast lane by about 85 percent, from 43.92 to 6.55 seconds.
 
-CI requested `pytest-split`'s `least_duration` algorithm, but
-`.test_durations` was ignored. A fresh checkout therefore had no timings and
-fell back to an even test-count split. The measured non-Lean durations are now
-committed. At capture time the two CI groups each contained 263 tests with the
-same 558-second estimated serial cost.
+The Python matrix uses two stable semantic lanes per supported version: core
+tests and integration/end-to-end tests. xdist's `worksteal` scheduler balances
+the live queue across each runner's four CPUs. This preserves four-way runner
+concurrency while keeping failures attributable to a documented test layer.
 
 ## Development policy
 
@@ -75,23 +73,10 @@ CI is unavailable or an environment-specific failure requires it. Do not use
 unfiltered `uv run pytest` as the default handoff command because it mixes Lean
 into the general parallel pool.
 
-Recent CI phase timing supports retaining two independent Lean shards. On both
-lanes, Lean toolchain and Mathlib cache setup took about 83 to 85 seconds,
-`lake build repl` took 11 to 12 seconds, and selected tests took 66 to 71
-seconds. Sharing Jacobian's build output would serialize both shards behind a
-new preparation job to avoid only the small build phase, so CI keeps the build
-local to each parallel lane. The workflow records these phases for future
-decisions.
-
-Refresh CI timings after a material suite expansion or when shard runtimes
-diverge:
-
-```sh
-make test-durations
-```
-
-Review and commit the resulting `.test_durations` change with the tests that
-caused it. Ordinary test edits do not need a refresh.
+The Lean suite runs serially on one prepared runner. This avoids concurrent
+multi-gigabyte Mathlib processes, collects every `lean_runtime` test without a
+file allowlist, and keeps the pinned toolchain setup attached to the tests that
+consume it.
 
 ## Follow-up opportunities
 

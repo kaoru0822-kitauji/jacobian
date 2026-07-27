@@ -7,6 +7,8 @@ from typing import Literal
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -21,6 +23,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import (
     EvidenceBindings,
     WitnessEnvelope,
@@ -67,22 +70,31 @@ def install_polynomial_expression_checker(
     )
     checker_id = None
     if authorize_checker:
-        checker_id = checkers.authorize(
-            name="typed rational polynomial normalization replay checker",
-            entrypoint=(
-                "jacobian_checkers.polynomial_expressions:"
-                "check_polynomial_expression_normalization"
-            ),
-            evidence_kind="WITNESS",
-            format_id="polynomial.expression_normalization",
-            format_version="1",
-            claim_schema_uris=(expressions.installation.expression_schema_uri,),
-            semantics_uris=(expressions.installation.semantics_uri,),
-            candidate_schema_uris=(expressions.installation.normalization_schema_uri,),
-            reason=(
-                "bundled independent exact typed-AST expansion and coefficient checker"
-            ),
-        ).checker_id
+        checker_id = (
+            CheckerInstaller(checkers)
+            .install(
+                CheckerOperation(
+                    name="typed rational polynomial normalization replay checker",
+                    entrypoint=(
+                        "jacobian_checkers.polynomial_expressions:"
+                        "check_polynomial_expression_normalization"
+                    ),
+                    evidence_kind=EvidenceKind.WITNESS,
+                    format_id="polynomial.expression_normalization",
+                    format_version="1",
+                    claim_schema_uris=(expressions.installation.expression_schema_uri,),
+                    semantics_uris=(expressions.installation.semantics_uri,),
+                    candidate_schema_uris=(
+                        expressions.installation.normalization_schema_uri,
+                    ),
+                    reason=(
+                        "bundled independent exact typed-AST expansion and coefficient checker"
+                    ),
+                ),
+                authorize=True,
+            )
+            .checker_id
+        )
     installation = PolynomialExpressionCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,

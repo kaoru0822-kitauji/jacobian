@@ -1,16 +1,11 @@
-"""Atomic Lean statement proposal, repair, and comparison adapters.
+"""Atomic Lean statement proposal and comparison adapters.
 
-Three domain-atomic capabilities, each producing exactly one inspectable
+Two domain-atomic capabilities, each producing exactly one inspectable
 artifact:
 
 * ``lean.statement.propose`` — type-check one proposed Lean statement
   against an informal claim. Returns elaboration status; does NOT certify
   that the formal statement matches the informal claim.
-
-* ``lean.proof.repair_once`` — apply one deterministic syntactic repair
-  to a failing Lean proof using compiler feedback. Returns a diff artifact
-  and compile status; does NOT certify the repaired proof proves the
-  theorem.
 
 * ``lean.statement.compare`` — compare two Lean statements syntactically
   and by axiom set. Fail-closed: never claims semantic equivalence; if
@@ -22,7 +17,6 @@ unavailable/diagnostic behavior rather than a silent success.
 
 from __future__ import annotations
 
-import difflib
 import os
 import re
 import shutil
@@ -51,9 +45,6 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_statement import (
-    LeanProofRepairArtifact,
-    LeanProofRepairOutput,
-    LeanProofRepairRequest,
     LeanStatementComparisonArtifact,
     LeanStatementComparisonOutput,
     LeanStatementComparisonRequest,
@@ -234,58 +225,6 @@ def _validate_proof(proof: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Deterministic repair strategies (exactly one attempt).
-# ---------------------------------------------------------------------------
-
-
-def _attempt_repair(
-    failing_proof: str,
-    compiler_errors: tuple[str, ...],
-) -> tuple[str, str]:
-    """Return ``(repaired_proof, strategy_name)``.
-
-    Picks exactly one deterministic strategy based on compiler feedback.
-    If no strategy applies, returns the unchanged proof with strategy
-    ``"none"``.
-    """
-
-    errors_text = " ".join(compiler_errors).lower()
-
-    # Strategy 1: missing `by` keyword.
-    if not failing_proof.strip().startswith("by") and (
-        "expected" in errors_text or "tactic" in errors_text or "term" in errors_text
-    ):
-        return (f"by\n{_indent_proof(failing_proof)}", "add_by")
-
-    # Strategy 2: unresolved goals — append sorry to close them.
-    if "unsolved" in errors_text or "goal" in errors_text:
-        indented = _indent_proof(failing_proof)
-        if not indented.rstrip().endswith("sorry"):
-            return (f"{indented}\n  sorry", "append_sorry")
-
-    # Strategy 3: deprecated `rw` → `rewrite`.
-    if re.search(r"\brw\b", failing_proof) and (
-        "deprecated" in errors_text or "rw" in errors_text
-    ):
-        return (
-            re.sub(r"\brw\b", "rewrite", failing_proof),
-            "fix_rw_to_rewrite",
-        )
-
-    return (failing_proof, "none")
-
-
-def _compute_diff(old: str, new: str) -> str:
-    diff = difflib.unified_diff(
-        old.splitlines(keepends=True),
-        new.splitlines(keepends=True),
-        fromfile="failing_proof",
-        tofile="repaired_proof",
-    )
-    return "".join(diff)
-
-
-# ---------------------------------------------------------------------------
 # Installation metadata.
 # ---------------------------------------------------------------------------
 
@@ -294,7 +233,6 @@ def _compute_diff(old: str, new: str) -> str:
 class LeanStatementInstallation:
     semantics_uri: str
     proposal_schema_uri: str
-    repair_schema_uri: str
     comparison_schema_uri: str
 
 
@@ -304,7 +242,6 @@ class _Resources:
     artifacts: ArtifactService
     semantics_uri: str
     proposal_schema_uri: str
-    repair_schema_uri: str
     comparison_schema_uri: str
     provider_runtime: CapabilityProviderRuntime
 
@@ -317,7 +254,6 @@ def install_lean_statement_capabilities(
 ) -> tuple[
     tuple[
         LeanStatementProposalAdapter,
-        LeanProofRepairAdapter,
         LeanStatementCompareAdapter,
     ],
     LeanStatementInstallation,
@@ -327,7 +263,7 @@ def install_lean_statement_capabilities(
     if provider_runtime is None:
         provider_runtime = jacobian_provider_runtime(
             "jacobian.lean4",
-            features=("lean-statement", "elaboration", "repair", "comparison"),
+            features=("lean-statement", "elaboration", "comparison"),
         )
     semantics_uri = store.register_descriptor(
         kind="semantics",
@@ -335,9 +271,8 @@ def install_lean_statement_capabilities(
         version="1",
         definition={
             "description": (
-                "atomic Lean statement proposal, proof repair, and "
-                "statement comparison; none certify theoremhood or "
-                "semantic intent"
+                "atomic Lean statement proposal and statement comparison; "
+                "neither certifies semantic intent"
             ),
             "verification": "none; type-checking does not certify intent",
         },
@@ -346,11 +281,6 @@ def install_lean_statement_capabilities(
         name="jacobian.lean4-statement-proposal",
         version="1",
         schema=LeanStatementProposalArtifact.model_json_schema(),
-    )
-    repair_schema_uri = schemas.register(
-        name="jacobian.lean4-proof-repair",
-        version="1",
-        schema=LeanProofRepairArtifact.model_json_schema(),
     )
     comparison_schema_uri = schemas.register(
         name="jacobian.lean4-statement-comparison",
@@ -362,19 +292,16 @@ def install_lean_statement_capabilities(
         artifacts=artifacts,
         semantics_uri=semantics_uri,
         proposal_schema_uri=proposal_schema_uri,
-        repair_schema_uri=repair_schema_uri,
         comparison_schema_uri=comparison_schema_uri,
         provider_runtime=provider_runtime,
     )
     adapters = (
         LeanStatementProposalAdapter(resources),
-        LeanProofRepairAdapter(resources),
         LeanStatementCompareAdapter(resources),
     )
     installation = LeanStatementInstallation(
         semantics_uri=semantics_uri,
         proposal_schema_uri=proposal_schema_uri,
-        repair_schema_uri=repair_schema_uri,
         comparison_schema_uri=comparison_schema_uri,
     )
     return adapters, installation
@@ -516,157 +443,7 @@ class LeanStatementProposalAdapter:
 
 
 # ---------------------------------------------------------------------------
-# Adapter 2: lean.proof.repair_once
-# ---------------------------------------------------------------------------
-
-
-class LeanProofRepairAdapter:
-    """Apply one deterministic repair to a failing Lean proof."""
-
-    def __init__(self, resources: _Resources) -> None:
-        self.resources = resources
-        self._descriptor = CapabilityDescriptor(
-            capability_id="lean.proof.repair_once",
-            version="1",
-            title="Attempt one Lean proof repair from compiler feedback",
-            description=(
-                "Apply exactly one deterministic syntactic repair strategy "
-                "based on compiler error messages. Returns a unified diff and "
-                "compile status. Does NOT certify that the repaired proof "
-                "proves the theorem."
-            ),
-            provider="jacobian.lean4",
-            provider_runtime=resources.provider_runtime,
-            modes=(CapabilityMode.EXPLORE,),
-            input_schema=LeanProofRepairRequest.model_json_schema(),
-            output_schema=LeanProofRepairOutput.model_json_schema(),
-            tags=("lean", "proof", "repair", "diff"),
-        )
-
-    @property
-    def descriptor(self) -> CapabilityDescriptor:
-        return self._descriptor
-
-    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        try:
-            validated = LeanProofRepairRequest.model_validate(request.input)
-            _validate_statement(validated.statement)
-            _validate_proof(validated.failing_proof)
-        except (ValidationError, ValueError) as exc:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="INVALID_LEAN_PROOF_REPAIR_REQUEST",
-                    stage="request_validation",
-                    message="The Lean proof repair request is invalid.",
-                    hint=(
-                        "Provide a single-line statement, a multi-line proof, "
-                        "and optional compiler error messages."
-                    ),
-                )
-            ) from exc
-        if validated.environment is not LeanEnvironment.CORE:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="LEAN_ENVIRONMENT_UNSUPPORTED",
-                    stage="environment_resolution",
-                    message=(
-                        f"Environment {validated.environment.value} is not "
-                        "supported by lean.proof.repair_once."
-                    ),
-                    hint="Set environment to CORE for proof repair.",
-                )
-            )
-        repaired_proof, strategy = _attempt_repair(
-            validated.failing_proof,
-            validated.compiler_errors,
-        )
-        diff = _compute_diff(validated.failing_proof, repaired_proof)
-        compiles = False
-        compile_checked = False
-        sorry_count = 0
-        messages: tuple[str, ...] = ()
-        if strategy != "none":
-            try:
-                result = _check_proof(validated.statement, repaired_proof)
-                compiles = result.elaborates
-                compile_checked = True
-                sorry_count = result.sorry_count
-                messages = result.messages
-            except _LeanUnavailableError:
-                pass
-        version, commit = _lean_version_info()
-        artifact_payload = LeanProofRepairArtifact(
-            environment=validated.environment,
-            statement=validated.statement,
-            failing_proof=validated.failing_proof,
-            repaired_proof=repaired_proof,
-            diff=diff,
-            repair_strategy=strategy,
-            compiles=compiles,
-            compile_checked=compile_checked,
-            sorry_count=sorry_count,
-            messages=messages,
-            lean_version=version,
-            lean_commit=commit,
-        )
-        artifact = self.resources.artifacts.put(
-            schema_uri=self.resources.repair_schema_uri,
-            semantics_uri=self.resources.semantics_uri,
-            payload=artifact_payload.model_dump(mode="json"),
-            summary=(
-                f"one Lean proof repair attempt (strategy={strategy}, "
-                f"compiles={compiles})"
-            ),
-        )
-        output = LeanProofRepairOutput(
-            **artifact_payload.model_dump(mode="python"),
-            repair_uri=artifact.artifact_uri,
-        )
-        completeness_status = (
-            CapabilityCompletenessStatus.COMPLETE
-            if compile_checked
-            else CapabilityCompletenessStatus.PARTIAL
-        )
-        completeness_basis = (
-            "the repaired proof was elaborated by the pinned Lean kernel"
-            if compile_checked
-            else "the repair diff was produced but compile status was not "
-            "checked because Lean is unavailable"
-        )
-        return CapabilityResult(
-            capability_id=self.descriptor.capability_id,
-            capability_version=self.descriptor.version,
-            mode=request.mode,
-            execution=Execution(status=ExecutionStatus.COMPLETED),
-            output=output.model_dump(mode="json"),
-            scope=CapabilityScope(
-                description="one deterministic repair attempt on one Lean proof",
-                parameters={
-                    "environment": validated.environment.value,
-                    "statement": validated.statement,
-                    "repair_strategy": strategy,
-                },
-                artifact_uri=artifact.artifact_uri,
-            ),
-            completeness=CapabilityCompleteness(
-                status=completeness_status,
-                basis=completeness_basis,
-                assurance_level=CapabilityAssuranceLevel.COMPUTED,
-            ),
-            assurance=CapabilityAssurance(
-                level=CapabilityAssuranceLevel.COMPUTED,
-                basis=(
-                    "deterministic syntactic repair with optional elaboration "
-                    "check; this does not certify that the proof proves the "
-                    "theorem"
-                ),
-            ),
-            artifact_uris=(artifact.artifact_uri,),
-        )
-
-
-# ---------------------------------------------------------------------------
-# Adapter 3: lean.statement.compare
+# Adapter 2: lean.statement.compare
 # ---------------------------------------------------------------------------
 
 

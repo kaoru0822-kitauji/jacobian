@@ -47,14 +47,14 @@ runs:
     - name: Install Python dependencies
       shell: bash
       run: uv sync --frozen --dev
-    - name: Build Lean REPL
+    - name: Build Lean exploration runtime
       shell: bash
       working-directory: lean
       run: |
         started=$SECONDS
         set +e
-        lake build repl
+        lake build repl jacobian_lean_proof_state
         status=$?
         set -e
-        echo "| Build Jacobian Lean REPL | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Build Jacobian Lean exploration runtime | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
         exit "$status"

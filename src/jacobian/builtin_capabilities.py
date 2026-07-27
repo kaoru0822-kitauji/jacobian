@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -24,6 +25,8 @@ from jacobian.contracts.lean import (
     LeanDeclarationSearchOutput,
     LeanDeclarationSearchRequest,
     LeanDeclarationSearchStopReason,
+    LeanDependencyGraphOutput,
+    LeanDependencyGraphRequest,
     LeanEnvironment,
 )
 from jacobian.contracts.results import (
@@ -332,6 +335,108 @@ class LeanDeclarationInspectAdapter:
                     "declaration does not verify a new theorem"
                 ),
             ),
+        )
+
+
+class LeanDependencyGraphAdapter:
+    def __init__(
+        self,
+        declarations: LeanDeclarationService,
+        provider_runtime: CapabilityProviderRuntime,
+        artifacts: ArtifactService,
+        *,
+        semantics_uri: str,
+        dependency_graph_schema_uri: str,
+    ) -> None:
+        self.declarations = declarations
+        self.artifacts = artifacts
+        self.semantics_uri = semantics_uri
+        self.dependency_graph_schema_uri = dependency_graph_schema_uri
+        self._descriptor = CapabilityDescriptor(
+            capability_id="lean.declaration.dependencies",
+            version="1",
+            title="Extract Lean declaration dependencies",
+            description=(
+                "Extract a bounded dependency subgraph from elaborated declaration "
+                "types and values in a pinned Lean environment."
+            ),
+            provider="jacobian.lean4",
+            provider_runtime=provider_runtime,
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(LeanDependencyGraphRequest),
+            output_schema=model_schema(LeanDependencyGraphOutput),
+            read_only=True,
+            tags=("lean", "declaration", "dependency-graph", "formal-artifact"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        query = LeanDependencyGraphRequest.model_validate(request.input)
+        try:
+            graph = self.declarations.dependencies(query)
+        except LeanDeclarationBackendError as exc:
+            raise _declaration_invocation_error(exc) from exc
+        graph_artifact = self.artifacts.put(
+            schema_uri=self.dependency_graph_schema_uri,
+            semantics_uri=self.semantics_uri,
+            payload=graph.model_dump(mode="json"),
+            summary=(
+                f"bounded Lean dependency subgraph rooted at {query.root_declaration}"
+            ),
+        )
+        output = LeanDependencyGraphOutput(
+            **graph.model_dump(mode="python"),
+            dependency_graph_uri=graph_artifact.artifact_uri,
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(status=ExecutionStatus.COMPLETED),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description=(
+                    "the bounded elaborated type/value dependency graph rooted at "
+                    "one declaration in the pinned Lean environment"
+                ),
+                parameters={
+                    "environment": graph.environment.value,
+                    "environment_digest": graph.environment_digest,
+                    "root_declaration": query.root_declaration,
+                    "max_depth": query.max_depth,
+                    "max_nodes": query.max_nodes,
+                },
+                artifact_uri=graph_artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if graph.closure_complete
+                    else CapabilityCompletenessStatus.PARTIAL
+                ),
+                basis=(
+                    "Lean's elaborated constant references exhausted the transitive "
+                    "dependency closure"
+                    if graph.closure_complete
+                    else (
+                        "the requested depth or node budget left the returned "
+                        "frontier unexpanded"
+                    )
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "dependency edges were extracted with Lean "
+                    "Expr.getUsedConstantsAsSet from the pinned environment; "
+                    "the graph does not verify a theorem"
+                ),
+            ),
+            artifact_uris=(graph_artifact.artifact_uri,),
         )
 
 

@@ -1,0 +1,74 @@
+"""Installation bundle for exact arithmetic.
+
+The arithmetic domain owns integer absolute value, sign, decimal digit
+sum/count, base expansion, integer nth root, and rational arithmetic/order.
+Number-theory capabilities (gcd, lcm, divisors, primes, modular arithmetic,
+integer predicates) are owned by the number-theory domain (p3) and are
+intentionally excluded from this bundle.
+"""
+
+from __future__ import annotations
+
+import platform
+
+import sympy
+
+from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.domains.arithmetic.integers import INTEGER_CAPABILITIES
+from jacobian.domains.arithmetic.rationals import RATIONAL_CAPABILITIES
+from jacobian.operations import (
+    DomainBundle,
+    DomainDiagnostics,
+    DomainSemantics,
+)
+from jacobian.provider_runtime import known_provider_runtime
+
+ARITHMETIC_BUNDLE = DomainBundle(
+    domain_id="arithmetic",
+    schema_namespace="jacobian.arithmetic",
+    semantics=DomainSemantics(
+        name="jacobian.exact-arithmetic",
+        version="1",
+        definition={
+            "description": (
+                "exact integer absolute value, sign, decimal digit sum/count, "
+                "base expansion, integer nth root, and rational arithmetic/order "
+                "over canonical integer and rational strings"
+            ),
+            "integer_encoding": "canonical decimal string",
+            "rational_encoding": "canonical reduced num/den with positive denominator",
+            "arithmetic": "exact via stdlib and maintained SymPy APIs",
+            "assurance": "computed; no independent checker",
+        },
+    ),
+    provider_runtime=known_provider_runtime(
+        "jacobian.sympy",
+        features=("exact-integer-arithmetic", "exact-rational-arithmetic"),
+        configuration={"sympy_version": sympy.__version__},
+    ),
+    backend_version=f"python-{platform.python_version()};sympy-{sympy.__version__}",
+    capabilities=(
+        *INTEGER_CAPABILITIES,
+        *RATIONAL_CAPABILITIES,
+    ),
+    diagnostics=DomainDiagnostics(
+        invalid_request=CapabilityDiagnostic(
+            code="INVALID_ARITHMETIC_REQUEST",
+            stage="arithmetic_input_validation",
+            message="Input does not satisfy the exact arithmetic contract.",
+            hint=(
+                "Use canonical integer/rational strings and bounded values; "
+                "inspect the operation's request schema."
+            ),
+        )
+    ),
+    scope_description="the complete supplied bounded exact arithmetic input",
+    completeness_basis=(
+        "deterministic exact computation covered the supplied input; "
+        "not independently verified"
+    ),
+    assurance_basis=(
+        "deterministic exact arithmetic from the pinned stdlib/SymPy runtime; "
+        "no independent checker invoked"
+    ),
+)

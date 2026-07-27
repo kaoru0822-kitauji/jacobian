@@ -71,28 +71,27 @@ files, and redistribution decision.
 
 ## Current baseline and observed gaps
 
-The source runtime currently advertises 21 capabilities when bundled
-references are installed:
+The source runtime now combines the original artifact, claim, transformation,
+evaluation, search, witness, certificate, shrinking, experiment,
+parameter-region, and memory operations with an explicit
+[domain operation library](../reference/domain-operation-library.md). Its
+built-in bundles cover arithmetic, number theory, combinatorics, finite sets,
+sequences, geometry, graph optimization and invariants, matrices, lattices,
+polynomials, validated analysis, finite probability, and rational
+optimization. Lean capabilities also expose declaration discovery, premise
+retrieval, typed proof states, proof-edit validation, and independent replay.
 
-- generic artifact, claim, transformation, evaluation, search, witness,
-  certificate, shrinking, experiment, parameter-region, and memory operations;
-- `case.partition.finite`;
-- `graph.search.atlas` and `graph.compute.properties`;
-- `polytope.separate`; and
-- the optional checker-backed `lean.check`.
+The installed count is intentionally not frozen here. Provider availability,
+configured exclusions, bundled references, and operator-authorized checkers
+change catalog membership; `capability://catalog` is the authoritative
+inventory. Backend names such as `reference.solve` remain intentionally absent.
 
-This is already enough to compose the existing reference workflows. In
-particular, backend names such as `reference.solve` are intentionally absent.
-The main reusable gaps are:
-
-- finding and inspecting declarations before constructing a Lean proof;
-- producing and independently checking SAT and SMT evidence;
-- exact rational, integer-matrix, polynomial, and validated-numerical
-  operations without importing an umbrella CAS;
-- canonicalization and certificates beyond the current small graph and
-  polytope references; and
-- domain-specific algebra, number theory, geometry, lattice, and optimization
-  operations once repeated workflows justify their contracts.
+The broad portfolio closes several discovery gaps recorded in the original
+baseline, but it does not remove the evaluation gates in this document.
+Remaining work is evidence-led: improve discovery and composition over the
+larger catalog, add independent checkers where exact relations justify them,
+and extend domains only when repeated workflows demonstrate a missing atomic
+outcome.
 
 The existing graph pilot also gives a warning for every new adapter. Returning
 only an artifact URI made a correct isomorphic graph impossible for the agent
@@ -498,12 +497,13 @@ Implement one vertical slice at a time:
    standard-library rational Gaussian elimination in an independent clean
    process; see the
    [exact rational determinant contract](../reference/matrix-rational-determinant.md).
-5. Add `polynomial.factor` with a product relation. Checking that the factors
-   multiply to the input does not by itself certify irreducibility or
-   completeness; keep those as open obligations until separately checked.
-6. Add rigorous Arb enclosures as computed evidence. The provider's rigorous
-   error tracking is valuable, but it is not Jacobian `VERIFIED` until an
-   authorized independent implementation checks the exact enclosure claim.
+5. `polynomial.factor.compute` is implemented with a product relation.
+   Checking that the factors multiply to the input does not by itself certify
+   irreducibility or completeness; those remain separate obligations.
+6. Rigorous Arb enclosure operations are implemented as computed evidence.
+   The provider's rigorous error tracking is valuable, but it is not Jacobian
+   `VERIFIED` until an authorized independent implementation checks the exact
+   enclosure claim.
 
 Python-FLINT wheels cover integers, rationals, modular arithmetic, polynomials,
 matrices, and real and complex ball arithmetic. This makes it a better first

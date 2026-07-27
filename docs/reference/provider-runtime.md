@@ -20,7 +20,7 @@ Every registered `CapabilityDescriptor` carries `provider_runtime`:
 | `availability` | `AVAILABLE` for catalog entries; `UNAVAILABLE` is load-time state only |
 | `version` | Exact installed provider version |
 | `digest` | SHA-256 identity with the coverage declared by `digest_kind` |
-| `digest_kind` | `SOURCE_TREE`, `PYTHON_DISTRIBUTION_RECORD`, or `EXECUTABLE` |
+| `digest_kind` | `SOURCE_TREE`, `PYTHON_DISTRIBUTION_RECORD`, `EXECUTABLE`, or `COMPOSITE` |
 | `platform` | Current Python platform tag |
 | `install_tier` | `T0`, `T1`, `T2`, or `T3` deployment rule |
 | `license_id` and `license_files` | Declared license and installed license-file paths |
@@ -33,6 +33,10 @@ distribution's RECORD paths, recorded hashes, and sizes. It identifies the
 installed manifest; the digest kind deliberately does not claim that Jacobian
 rehashes every package byte at startup. `SOURCE_TREE` covers the source package
 used by an entrypoint. `EXECUTABLE` covers the executable bytes.
+`COMPOSITE` binds an ordered set of individually measured component runtimes,
+for example Jacobian checker source plus the exact Python-FLINT distribution it
+executes. Its canonical configuration exposes the component identities, and
+resolution remeasures every component before accepting the aggregate digest.
 
 The result repeats the selected `provider` and `provider_digest`. This binds the
 invocation to the exact descriptor runtime without repeating all discovery
@@ -82,11 +86,12 @@ fail-closed if the source identity cannot be resolved.
 ### External checker runtimes
 
 An independently authorized checker may itself depend on an external
-executable. In that case its `CheckerRegistration` carries an available
-`EXECUTABLE` provider runtime. The runtime identity contributes to the checker
-ID, is persisted with the authorization record, and is rehashed when the
-checker is selected and before and after clean-process execution. The
-verification environment digest also includes that runtime identity.
+executable or Python distribution. Its `CheckerRegistration` carries the
+available `EXECUTABLE`, `PYTHON_DISTRIBUTION_RECORD`, or `COMPOSITE` provider
+runtime. The runtime identity contributes to the checker ID, is persisted with
+the authorization record, and is remeasured when the checker is selected and
+before and after clean-process execution. The verification environment digest
+also includes that runtime identity.
 
 Some executables do not provide a trustworthy machine-readable version. Their
 provider probe may require a strict operator-managed provenance sidecar that

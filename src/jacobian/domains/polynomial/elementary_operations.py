@@ -1,0 +1,250 @@
+"""Exact elementary polynomial operations backed by SymPy ``Poly`` APIs."""
+
+from __future__ import annotations
+
+from typing import Any, cast
+
+from sympy import Add, Poly, Rational, Symbol, apart, cancel, fraction, together
+
+from jacobian.contracts.polynomial_operations import (
+    IntegerPolynomial,
+    IntegerPolynomialCompositionRequest,
+    IntegerPolynomialCompositionResult,
+    IntegerPolynomialContentResult,
+    IntegerPolynomialEvaluationRequest,
+    IntegerPolynomialEvaluationResult,
+    IntegerPolynomialGcdResult,
+    IntegerPolynomialPairRequest,
+    IntegerPolynomialPrimitivePartResult,
+    IntegerPolynomialRequest,
+    IntegerPolynomialShiftRequest,
+    IntegerPolynomialShiftResult,
+    RationalFunctionRequest,
+    RationalPartialFractionResult,
+    RationalPartialFractionTerm,
+    RationalPolynomialDerivativeResult,
+    RationalPolynomialDivisionRequest,
+    RationalPolynomialDivisionResult,
+    RationalPolynomialEvaluationRequest,
+    RationalPolynomialEvaluationResult,
+    RationalPolynomialIntegralResult,
+    RationalPolynomialRequest,
+)
+from jacobian.contracts.results import ContractModel
+from jacobian.domains.polynomial.operations import _poly, _rational, _wire
+
+_X = Symbol("x")
+
+
+def _integer_poly(polynomial: IntegerPolynomial) -> Poly:
+    return Poly.from_list(
+        [int(coefficient) for coefficient in polynomial.coefficients],
+        _X,
+        domain="ZZ",
+    )
+
+
+def _integer_wire(polynomial: Poly) -> IntegerPolynomial:
+    return IntegerPolynomial(
+        coefficients=tuple(
+            str(int(coefficient)) for coefficient in polynomial.all_coeffs()
+        )
+    )
+
+
+def integer_polynomial_gcd(request: ContractModel) -> ContractModel:
+    request = cast(IntegerPolynomialPairRequest, request)
+    left = _integer_poly(request.left)
+    right = _integer_poly(request.right)
+    gcd = left.gcd(right)
+    return IntegerPolynomialGcdResult(
+        gcd=_integer_wire(gcd),
+        left_content=str(int(left.content())),
+        right_content=str(int(right.content())),
+        gcd_content=str(int(gcd.content())),
+    )
+
+
+def integer_polynomial_content(request: ContractModel) -> ContractModel:
+    request = cast(IntegerPolynomialRequest, request)
+    return IntegerPolynomialContentResult(
+        content=str(int(_integer_poly(request.polynomial).content()))
+    )
+
+
+def integer_polynomial_primitive_part(request: ContractModel) -> ContractModel:
+    request = cast(IntegerPolynomialRequest, request)
+    source = _integer_poly(request.polynomial)
+    content, primitive = source.primitive()
+    reconstructed = primitive.mul_ground(content)
+    return IntegerPolynomialPrimitivePartResult(
+        content=str(int(content)),
+        primitive_part=_integer_wire(primitive),
+        reconstruction=_integer_wire(reconstructed),
+    )
+
+
+def integer_polynomial_evaluate(request: ContractModel) -> ContractModel:
+    request = cast(IntegerPolynomialEvaluationRequest, request)
+    point = int(request.point)
+    value = _integer_poly(request.polynomial).eval(point)
+    return IntegerPolynomialEvaluationResult(point=request.point, value=str(int(value)))
+
+
+def integer_polynomial_compose(request: ContractModel) -> ContractModel:
+    request = cast(IntegerPolynomialCompositionRequest, request)
+    composition = _integer_poly(request.outer).compose(_integer_poly(request.inner))
+    return IntegerPolynomialCompositionResult(composition=_integer_wire(composition))
+
+
+def integer_polynomial_shift(request: ContractModel) -> ContractModel:
+    """Compute ``p(x + a)`` using SymPy's exact dense shift."""
+    request = cast(IntegerPolynomialShiftRequest, request)
+    shifted = _integer_poly(request.polynomial).shift(request.shift)
+    return IntegerPolynomialShiftResult(
+        shift=request.shift,
+        shifted=_integer_wire(shifted),
+    )
+
+
+def rational_polynomial_division(request: ContractModel) -> ContractModel:
+    request = cast(RationalPolynomialDivisionRequest, request)
+    left = _poly(request.left)
+    right = _poly(request.right)
+    quotient, remainder = left.div(right)
+    reconstruction = quotient * right + remainder
+    variables = request.left.variables
+    return RationalPolynomialDivisionResult(
+        quotient=_wire(quotient, variables),
+        remainder=_wire(remainder, variables),
+        reconstruction=_wire(reconstruction, variables),
+    )
+
+
+def rational_polynomial_evaluate(request: ContractModel) -> ContractModel:
+    request = cast(RationalPolynomialEvaluationRequest, request)
+    point = request.point.as_fraction()
+    value = _poly(request.polynomial).eval(Rational(point.numerator, point.denominator))
+    return RationalPolynomialEvaluationResult(
+        point=request.point,
+        value=_rational(value),
+    )
+
+
+def rational_polynomial_derivative(request: ContractModel) -> ContractModel:
+    request = cast(RationalPolynomialRequest, request)
+    return RationalPolynomialDerivativeResult(
+        derivative=_wire(
+            _poly(request.polynomial).diff(),
+            request.polynomial.variables,
+        )
+    )
+
+
+def rational_polynomial_integral(request: ContractModel) -> ContractModel:
+    request = cast(RationalPolynomialRequest, request)
+    return RationalPolynomialIntegralResult(
+        antiderivative=_wire(
+            _poly(request.polynomial).integrate(),
+            request.polynomial.variables,
+        )
+    )
+
+
+def _partial_fraction_term(
+    numerator: Any,
+    denominator: Any,
+    generator: Symbol,
+    variables: tuple[str, ...],
+) -> RationalPartialFractionTerm:
+    denominator_poly = Poly(denominator, generator, domain="QQ")
+    denominator_coefficient, factors = denominator_poly.factor_list()
+    if len(factors) != 1:
+        raise ValueError("SymPy returned a non-atomic partial-fraction denominator")
+    denominator_factor, exponent = factors[0]
+    leading_coefficient = denominator_factor.LC()
+    monic_factor = denominator_factor.monic()
+    scale = denominator_coefficient * leading_coefficient**exponent
+    normalized_numerator = Poly(numerator / scale, generator, domain="QQ")
+    return RationalPartialFractionTerm(
+        numerator=_wire(normalized_numerator, variables),
+        denominator_factor=_wire(monic_factor, variables),
+        denominator_exponent=int(exponent),
+    )
+
+
+def _partial_fraction_sort_key(
+    term: RationalPartialFractionTerm,
+) -> tuple[tuple[tuple[tuple[int, ...], int, int], ...], int]:
+    factor_terms = tuple(
+        (
+            factor_term.exponents,
+            int(factor_term.coefficient.num),
+            int(factor_term.coefficient.den),
+        )
+        for factor_term in term.denominator_factor.polynomial.terms
+    )
+    return factor_terms, term.denominator_exponent
+
+
+def rational_partial_fraction_decomposition(
+    request: ContractModel,
+) -> ContractModel:
+    request = cast(RationalFunctionRequest, request)
+    variables = request.numerator.variables
+    generator = _poly(request.numerator).gens[0]
+    source = cancel(
+        _poly(request.numerator).as_expr() / _poly(request.denominator).as_expr()
+    )
+    decomposition = apart(source, generator)
+    polynomial_part = Poly(0, generator, domain="QQ")
+    proper_terms: list[RationalPartialFractionTerm] = []
+    for summand in Add.make_args(decomposition):
+        numerator, denominator = fraction(cancel(summand))
+        denominator_poly = Poly(denominator, generator, domain="QQ")
+        if denominator_poly.degree() == 0:
+            polynomial_part += Poly(
+                numerator / denominator_poly.LC(),
+                generator,
+                domain="QQ",
+            )
+        else:
+            proper_terms.append(
+                _partial_fraction_term(
+                    numerator,
+                    denominator,
+                    generator,
+                    variables,
+                )
+            )
+
+    reconstructed = cancel(together(decomposition))
+    reconstructed_numerator, reconstructed_denominator = fraction(reconstructed)
+    denominator_poly = Poly(reconstructed_denominator, generator, domain="QQ")
+    denominator_lead = denominator_poly.LC()
+    normalized_numerator = Poly(
+        reconstructed_numerator / denominator_lead,
+        generator,
+        domain="QQ",
+    )
+    normalized_denominator = denominator_poly.monic()
+    return RationalPartialFractionResult(
+        polynomial_part=_wire(polynomial_part, variables),
+        terms=tuple(sorted(proper_terms, key=_partial_fraction_sort_key)),
+        reconstruction_numerator=_wire(normalized_numerator, variables),
+        reconstruction_denominator=_wire(normalized_denominator, variables),
+    )
+
+
+__all__ = [
+    "integer_polynomial_compose",
+    "integer_polynomial_content",
+    "integer_polynomial_evaluate",
+    "integer_polynomial_gcd",
+    "integer_polynomial_primitive_part",
+    "rational_partial_fraction_decomposition",
+    "rational_polynomial_derivative",
+    "rational_polynomial_division",
+    "rational_polynomial_evaluate",
+    "rational_polynomial_integral",
+]

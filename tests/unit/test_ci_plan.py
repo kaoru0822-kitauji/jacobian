@@ -8,100 +8,99 @@ import pytest
 PLANNER = Path(__file__).parents[2] / ".github" / "scripts" / "classify-ci-paths"
 VALIDATOR = Path(__file__).parents[2] / ".github" / "scripts" / "validate-ci-plan"
 
+BOOLEAN_KEYS = (
+    "run-python",
+    "run-core",
+    "run-integration",
+    "run-coverage",
+    "run-lean",
+    "run-npm",
+    "run-static",
+    "run-build",
+    "run-security",
+    "run-duplicate",
+)
+
+
+def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
+    return {
+        "classification": classification,
+        **{key: str(key in enabled).lower() for key in BOOLEAN_KEYS},
+    }
+
 
 @pytest.mark.parametrize(
     ("paths", "expected"),
     [
-        (
-            (),
-            {
-                "classification": "full",
-                "run-python": "true",
-                "run-lean": "true",
-                "run-npm": "true",
-                "run-static": "true",
-                "run-build": "true",
-                "run-security": "true",
-                "run-duplicate": "true",
-            },
-        ),
+        ((), _expected_plan("full", *BOOLEAN_KEYS)),
         (
             ("README.md", "docs/how-to/contribute.md", ".github/CODEOWNERS"),
-            {
-                "classification": "docs",
-                "run-python": "false",
-                "run-lean": "false",
-                "run-npm": "false",
-                "run-static": "false",
-                "run-build": "false",
-                "run-security": "false",
-                "run-duplicate": "false",
-            },
+            _expected_plan("docs"),
         ),
         (
             ("npm/package.json", "npm/npm-packaging.test.mjs"),
-            {
-                "classification": "npm",
-                "run-python": "false",
-                "run-lean": "false",
-                "run-npm": "true",
-                "run-static": "false",
-                "run-build": "false",
-                "run-security": "false",
-                "run-duplicate": "false",
-            },
+            _expected_plan("npm", "run-npm"),
         ),
         (
             ("docs/index.md", "npm/package.json"),
-            {
-                "classification": "npm",
-                "run-python": "false",
-                "run-lean": "false",
-                "run-npm": "true",
-                "run-static": "false",
-                "run-build": "false",
-                "run-security": "false",
-                "run-duplicate": "false",
-            },
+            _expected_plan("npm", "run-npm"),
+        ),
+        (
+            ("tests/unit/test_kernel.py",),
+            _expected_plan(
+                "python-core",
+                "run-python",
+                "run-core",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/integration/test_kernel.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-integration",
+                "run-lean",
+                "run-static",
+            ),
+        ),
+        (
+            ("lean/JacobianLeanRuntime.lean",),
+            _expected_plan("lean", "run-lean"),
+        ),
+        (
+            ("tests/unit/test_kernel.py", "lean/JacobianLeanRuntime.lean"),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-lean",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/unit/test_kernel.py", "tests/integration/test_kernel.py"),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-coverage",
+                "run-lean",
+                "run-static",
+            ),
         ),
         (
             ("src/jacobian/kernel.py",),
-            {
-                "classification": "full",
-                "run-python": "true",
-                "run-lean": "true",
-                "run-npm": "true",
-                "run-static": "true",
-                "run-build": "true",
-                "run-security": "true",
-                "run-duplicate": "true",
-            },
+            _expected_plan("full", *BOOLEAN_KEYS),
         ),
         (
             ("docs/index.md", "pyproject.toml"),
-            {
-                "classification": "full",
-                "run-python": "true",
-                "run-lean": "true",
-                "run-npm": "true",
-                "run-static": "true",
-                "run-build": "true",
-                "run-security": "true",
-                "run-duplicate": "true",
-            },
+            _expected_plan("full", *BOOLEAN_KEYS),
         ),
         (
             (".github/workflows/ci.yml",),
-            {
-                "classification": "full",
-                "run-python": "true",
-                "run-lean": "true",
-                "run-npm": "true",
-                "run-static": "true",
-                "run-build": "true",
-                "run-security": "true",
-                "run-duplicate": "true",
-            },
+            _expected_plan("full", *BOOLEAN_KEYS),
         ),
     ],
 )
@@ -143,16 +142,7 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
-    assert plan == {
-        "classification": "docs",
-        "run-python": "false",
-        "run-lean": "true",
-        "run-npm": "false",
-        "run-static": "false",
-        "run-build": "false",
-        "run-security": "false",
-        "run-duplicate": "false",
-    }
+    assert plan == _expected_plan("lean", "run-lean")
 
 
 @pytest.mark.parametrize(
@@ -161,6 +151,10 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
         ("README.md",),
         ("npm/package.json",),
         ("src/jacobian/kernel.py",),
+        ("tests/unit/test_kernel.py",),
+        ("tests/integration/test_kernel.py",),
+        ("lean/JacobianLeanRuntime.lean",),
+        ("tests/unit/test_kernel.py", "lean/JacobianLeanRuntime.lean"),
         ("--force-lean", "--", "README.md"),
         ("--force-lean", "--", "npm/package.json"),
     ],

@@ -14,6 +14,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.checkers import EvidenceKind
+from jacobian.provider_runtime import python_distribution_provider_runtime
 from jacobian.registry import (
     CheckerCompatibilityError,
     CheckerExecutableChangedError,
@@ -223,3 +224,35 @@ def test_checker_registry_binds_external_runtime_identity(tmp_path: Path) -> Non
         match="changed after authorization",
     ):
         registry.require_active(checker.checker_id)
+
+
+@pytest.mark.integration
+@pytest.mark.conformance
+def test_checker_registry_authorizes_python_distribution_runtime(
+    tmp_path: Path,
+) -> None:
+    runtime = python_distribution_provider_runtime(
+        "pydantic",
+        distribution_name="pydantic",
+        import_name="pydantic",
+        required_attributes=("BaseModel",),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT",
+        configuration={"import_name": "pydantic"},
+    )
+    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+
+    checker = registry.authorize(
+        name="distribution-backed-v1",
+        entrypoint="jacobian_checkers.reject:check",
+        evidence_kind="WITNESS",
+        format_id="example.witness",
+        format_version="1",
+        claim_schema_uris=(CLAIM_SCHEMA_A,),
+        semantics_uris=(CLAIM_SCHEMA_A,),
+        candidate_schema_uris=(CLAIM_SCHEMA_A,),
+        provider_runtime=runtime,
+    )
+
+    assert registry.require_active(checker.checker_id).provider_runtime == runtime

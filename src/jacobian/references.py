@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from jacobian.artifacts import ArtifactService
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.claims import ClaimSpec
 from jacobian.contracts.evidence import (
     CertificateEnvelope,
@@ -672,22 +675,30 @@ class ReferenceInstaller:
         target_schema: str | None = None,
         target_semantics: str | None = None,
     ) -> str:
-        registration = self.checkers.authorize(
-            name=name,
-            entrypoint=entrypoint,
-            evidence_kind=evidence_kind,
-            format_id=format_id,
-            format_version="1",
-            claim_schema_uris=(claim_schema,),
-            semantics_uris=(semantics,),
-            candidate_schema_uris=(candidate_schema,),
-            target_schema_uris=((target_schema,) if target_schema is not None else ()),
-            target_semantics_uris=(
-                (target_semantics,) if target_semantics is not None else ()
-            ),
-            reason="bundled reference checker",
+        return (
+            CheckerInstaller(self.checkers)
+            .install(
+                CheckerOperation(
+                    name=name,
+                    entrypoint=entrypoint,
+                    evidence_kind=EvidenceKind(evidence_kind),
+                    format_id=format_id,
+                    format_version="1",
+                    claim_schema_uris=(claim_schema,),
+                    semantics_uris=(semantics,),
+                    candidate_schema_uris=(candidate_schema,),
+                    target_schema_uris=(
+                        (target_schema,) if target_schema is not None else ()
+                    ),
+                    target_semantics_uris=(
+                        (target_semantics,) if target_semantics is not None else ()
+                    ),
+                    reason="bundled reference checker",
+                ),
+                authorize=True,
+            )
+            .require_checker_id()
         )
-        return registration.checker_id
 
 
 def reference_catalog(

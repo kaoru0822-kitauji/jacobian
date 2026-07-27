@@ -91,17 +91,25 @@ def _text(value: object, *, name: str, limit: int) -> str:
 def _source(statement: str, proof: str, import_name: str | None) -> str:
     if "\n" in statement or "\r" in statement or ":=" in statement:
         raise ValueError("statement must be one Lean expression")
-    if proof.strip().splitlines()[0].strip() == "by":
-        raise ValueError("proof must omit the leading `by`")
-    indented_proof = "\n".join(f"  {line}" for line in proof.splitlines())
+    proof_lines = proof.splitlines()
+    complete_proof_term = proof_lines[0].strip() == "by"
+    theorem = (
+        f"theorem jacobian_theorem : {statement} := {proof}"
+        if complete_proof_term
+        else "\n".join(
+            (
+                f"theorem jacobian_theorem : {statement} := by",
+                "\n".join(f"  {line}" for line in proof_lines),
+            )
+        )
+    )
     lines = [
         *([f"import {import_name}"] if import_name is not None else []),
         *(
             (
                 "set_option autoImplicit false",
                 "set_option warningAsError true",
-                f"theorem jacobian_theorem : {statement} := by",
-                indented_proof,
+                theorem,
                 "#print axioms jacobian_theorem",
                 "",
             )

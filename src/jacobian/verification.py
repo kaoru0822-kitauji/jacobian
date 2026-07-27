@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.bounded_process import run_bounded_process
+from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
@@ -234,6 +234,13 @@ class VerificationService:
             environment=environment,
             stdout_limit=self.max_checker_output_bytes,
             stderr_limit=self.max_checker_diagnostic_bytes,
+            resource_limits=ProcessResourceLimits(
+                cpu_seconds=max(1, int(effective_timeout) + 1),
+                # Lean/Mathlib reserves a large virtual heap even for small
+                # proofs; keep it bounded without applying the much smaller
+                # arithmetic-worker profile.
+                address_space_bytes=16 * 1024 * 1024 * 1024,
+            ),
         )
         if completed.timed_out:
             raise subprocess.TimeoutExpired(
@@ -291,6 +298,7 @@ class VerificationService:
         checker_id: str,
         timeout_seconds: float | None = None,
         include_artifact_metadata: bool = False,
+        include_semantics_artifact: bool = False,
     ) -> ResultEnvelope:
         """Replay a bound witness with the explicitly selected checker."""
 
@@ -385,6 +393,12 @@ class VerificationService:
                 ),
                 "expected_bindings": expected_bindings,
             }
+            if include_semantics_artifact:
+                semantics_artifact = self.store.get(candidate.manifest.semantics_uri)
+                request["semantics"] = self._checker_artifact(
+                    semantics_artifact,
+                    include_storage_metadata=include_artifact_metadata,
+                )
             request_digest = _digest_bytes(canonicalize_json(request))
             decision = self._run_checker(
                 entrypoint=checker.entrypoint,
