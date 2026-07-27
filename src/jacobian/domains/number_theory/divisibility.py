@@ -31,7 +31,6 @@ from jacobian.domains.number_theory.operations import (
     decide_odd,
     decide_perfect,
     decide_square,
-    decide_squarefree,
 )
 
 DIVISIBILITY_CAPABILITIES = (
@@ -153,16 +152,6 @@ DIVISIBILITY_CAPABILITIES = (
         NonnegativeIntegerRequest,
         BooleanResult,
         decide_square,
-        "number-theory",
-        "predicate",
-    ),
-    number_theory_operation(
-        "integer.decide.squarefree",
-        "Decide squarefreeness",
-        "Decide whether a positive integer has no squared prime divisor.",
-        NonnegativeIntegerRequest,
-        BooleanResult,
-        decide_squarefree,
         "number-theory",
         "predicate",
     ),

@@ -67,6 +67,15 @@ class FactorizationRequest(ContractModel):
     )
 
 
+class ArithmeticFunctionRequest(ContractModel):
+    """A small nonnegative integer with an explicit factorization budget."""
+
+    n: StrictInt = Field(ge=0, le=_MAX_N_SMALL)
+    resource_budget: FactorizationResourceBudget = Field(
+        default_factory=FactorizationResourceBudget
+    )
+
+
 class IntegerPairRequest(ContractModel):
     """Two canonical integers supplied to a symmetric binary operation."""
 

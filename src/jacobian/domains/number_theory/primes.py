@@ -18,7 +18,6 @@ from jacobian.domains.number_theory.operations import (
     compute_previous_prime,
     compute_prime_count,
     compute_primorial,
-    compute_radical,
     decide_prime,
 )
 
@@ -100,16 +99,6 @@ PRIME_CAPABILITIES = (
         PositiveIntegerRequest,
         IntegerValueResult,
         compute_mobius,
-        "number-theory",
-        "arithmetic-function",
-    ),
-    number_theory_operation(
-        "integer.compute.radical",
-        "Compute integer radical",
-        "Compute the product of distinct prime divisors of one positive integer.",
-        PositiveIntegerRequest,
-        IntegerValueResult,
-        compute_radical,
         "number-theory",
         "arithmetic-function",
     ),

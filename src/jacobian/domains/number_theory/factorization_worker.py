@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 
 from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
-from jacobian.contracts.number_theory import FactorizationRequest
+from jacobian.contracts.number_theory import (
+    ArithmeticFunctionRequest,
+    FactorizationRequest,
+)
+from jacobian.contracts.results import ContractModel
 from jacobian.domains.number_theory.operations import (
+    compute_radical,
+    decide_squarefree,
     enumerate_divisors,
     enumerate_proper_divisors,
     factorize_primes,
@@ -16,10 +23,15 @@ from jacobian.domains.number_theory.operations import (
 
 PROTOCOL = "jacobian.number-theory.factorization.sympy.v1"
 
-_OPERATIONS = {
-    "divisors": enumerate_divisors,
-    "proper_divisors": enumerate_proper_divisors,
-    "prime_factorization": factorize_primes,
+_OPERATIONS: dict[
+    str,
+    tuple[type[ContractModel], Callable[[ContractModel], ContractModel]],
+] = {
+    "divisors": (FactorizationRequest, enumerate_divisors),
+    "proper_divisors": (FactorizationRequest, enumerate_proper_divisors),
+    "prime_factorization": (FactorizationRequest, factorize_primes),
+    "squarefree": (ArithmeticFunctionRequest, decide_squarefree),
+    "radical": (ArithmeticFunctionRequest, compute_radical),
 }
 
 
@@ -34,8 +46,8 @@ def main() -> int:
             raise ValueError("unexpected worker request fields")
         if payload["protocol"] != PROTOCOL:
             raise ValueError("unsupported worker protocol")
-        operation = _OPERATIONS[payload["operation"]]
-        request = FactorizationRequest.model_validate(payload["request"])
+        request_model, operation = _OPERATIONS[payload["operation"]]
+        request = request_model.model_validate(payload["request"])
         result = operation(request)
         sys.stdout.buffer.write(
             canonicalize_json(

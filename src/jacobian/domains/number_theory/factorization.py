@@ -11,8 +11,11 @@ from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.number_theory import (
+    ArithmeticFunctionRequest,
+    BooleanResult,
     DivisorListResult,
     FactorizationRequest,
+    IntegerValueResult,
     PrimeFactorizationResult,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
@@ -42,10 +45,9 @@ def _diagnostic(code: str, message: str) -> CapabilityDiagnostic:
 def _compute[ResultT: ContractModel](
     operation: str,
     result_model: type[ResultT],
-    request: FactorizationRequest,
+    request: FactorizationRequest | ArithmeticFunctionRequest,
 ) -> ComputedOutcome[ResultT]:
-    value = int(request.value)
-    if value == 0:
+    if isinstance(request, FactorizationRequest) and int(request.value) == 0:
         return ComputedNotApplicable(
             _diagnostic(
                 "INTEGER_FACTORIZATION_NOT_APPLICABLE",
@@ -145,23 +147,26 @@ def _compute[ResultT: ContractModel](
         )
 
 
-def _operation[ResultT: ContractModel](
+def _operation[RequestT: ContractModel, ResultT: ContractModel](
     *,
     capability_id: str,
     title: str,
     description: str,
     operation: str,
+    request_model: type[RequestT],
     result_model: type[ResultT],
     tags: tuple[str, ...],
-) -> ComputedOperation[FactorizationRequest, ResultT]:
-    def implementation(request: FactorizationRequest) -> ComputedOutcome[ResultT]:
+) -> ComputedOperation[RequestT, ResultT]:
+    def implementation(request: RequestT) -> ComputedOutcome[ResultT]:
+        if not isinstance(request, (FactorizationRequest, ArithmeticFunctionRequest)):
+            raise TypeError("unsupported factorization request model")
         return _compute(operation, result_model, request)
 
     return ComputedOperation(
         capability_id=capability_id,
         title=title,
         description=description,
-        request_model=FactorizationRequest,
+        request_model=request_model,
         result_model=result_model,
         implementation=implementation,
         relation_id=capability_id.replace(".compute.", ".relation.", 1),
@@ -178,6 +183,7 @@ FACTORIZATION_CAPABILITIES = (
             "SymPy worker. Timeout is a non-conclusion."
         ),
         operation="divisors",
+        request_model=FactorizationRequest,
         result_model=DivisorListResult,
         tags=("number-theory", "enumeration"),
     ),
@@ -189,6 +195,7 @@ FACTORIZATION_CAPABILITIES = (
             "resource-bounded SymPy worker. Timeout is a non-conclusion."
         ),
         operation="proper_divisors",
+        request_model=FactorizationRequest,
         result_model=DivisorListResult,
         tags=("number-theory", "enumeration"),
     ),
@@ -200,7 +207,32 @@ FACTORIZATION_CAPABILITIES = (
             "resource-bounded SymPy worker. Timeout is a non-conclusion."
         ),
         operation="prime_factorization",
+        request_model=FactorizationRequest,
         result_model=PrimeFactorizationResult,
         tags=("number-theory", "factorization"),
+    ),
+    _operation(
+        capability_id="integer.decide.squarefree",
+        title="Decide squarefreeness",
+        description=(
+            "Decide whether a bounded nonnegative integer is square-free in an "
+            "isolated, resource-bounded SymPy worker."
+        ),
+        operation="squarefree",
+        request_model=ArithmeticFunctionRequest,
+        result_model=BooleanResult,
+        tags=("number-theory", "predicate"),
+    ),
+    _operation(
+        capability_id="integer.compute.radical",
+        title="Compute integer radical",
+        description=(
+            "Compute the product of distinct prime divisors in an isolated, "
+            "resource-bounded SymPy worker."
+        ),
+        operation="radical",
+        request_model=ArithmeticFunctionRequest,
+        result_model=IntegerValueResult,
+        tags=("number-theory", "arithmetic-function"),
     ),
 )

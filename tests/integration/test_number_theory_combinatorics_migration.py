@@ -264,6 +264,30 @@ def test_factorization_is_complete_in_an_isolated_bounded_worker(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
+@pytest.mark.parametrize(
+    ("capability_id", "expected"),
+    (
+        ("integer.decide.squarefree", {"holds": True}),
+        ("integer.compute.radical", {"value": "30"}),
+    ),
+)
+def test_factorization_derived_operations_complete_in_the_worker(
+    tmp_path: Path,
+    capability_id: str,
+    expected: dict[str, object],
+) -> None:
+    result = _service(tmp_path).invoke(
+        CapabilityRequest(
+            capability_id=capability_id,
+            input={"n": 30, "resource_budget": {"wall_seconds": 10}},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == expected
+    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
+
+
 def test_factorization_timeout_is_an_artifact_free_non_conclusion(
     tmp_path: Path,
     monkeypatch,
@@ -302,6 +326,47 @@ def test_factorization_timeout_is_an_artifact_free_non_conclusion(
     limits = observed["resource_limits"]
     assert limits.cpu_seconds == 2
     assert limits.address_space_bytes == 512 * 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    ("capability_id", "payload"),
+    (
+        (
+            "integer.decide.squarefree",
+            {"n": 30, "resource_budget": {"wall_seconds": 1}},
+        ),
+        (
+            "integer.compute.radical",
+            {"n": 30, "resource_budget": {"wall_seconds": 1}},
+        ),
+    ),
+)
+def test_factorization_derived_timeout_is_a_non_conclusion(
+    tmp_path: Path,
+    monkeypatch,
+    capability_id: str,
+    payload: dict[str, object],
+) -> None:
+    monkeypatch.setattr(
+        "jacobian.domains.number_theory.factorization.run_bounded_process",
+        lambda *args, **kwargs: BoundedProcessResult(
+            returncode=None,
+            stdout=b"",
+            stderr=b"",
+            stdout_exceeded=False,
+            stderr_exceeded=False,
+            timed_out=True,
+        ),
+    )
+
+    result = _service(tmp_path).invoke(
+        CapabilityRequest(capability_id=capability_id, input=payload)
+    )
+
+    assert result.execution.status is ExecutionStatus.TIMEOUT
+    assert result.diagnostics[0].code == "INTEGER_FACTORIZATION_TIMEOUT"
+    assert result.artifact_uris == ()
+    assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
 def test_in_process_factorization_dependencies_have_small_input_bounds() -> None:

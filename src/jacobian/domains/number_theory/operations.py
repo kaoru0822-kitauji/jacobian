@@ -18,6 +18,7 @@ import math
 from typing import Literal, cast
 
 from jacobian.contracts.number_theory import (
+    ArithmeticFunctionRequest,
     BooleanResult,
     ChineseRemainderRequest,
     ChineseRemainderResult,
@@ -196,7 +197,7 @@ def decide_squarefree(request: ContractModel) -> ContractModel:
     """Decide squarefreeness using ``sympy.factorint``."""
     from sympy import factorint
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = cast(ArithmeticFunctionRequest, request).n
     if n == 0:
         return BooleanResult(holds=False)
     return BooleanResult(holds=all(power == 1 for power in factorint(n).values()))
@@ -331,7 +332,7 @@ def compute_radical(request: ContractModel) -> ContractModel:
     """Compute the product of distinct prime divisors using ``sympy.factorint``."""
     from sympy import factorint
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = cast(ArithmeticFunctionRequest, request).n
     return IntegerValueResult(value=str(math.prod(factorint(n))))
 
 
