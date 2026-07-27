@@ -31,13 +31,33 @@ class GraphGirthResult(ContractModel):
 
 
 class GraphDiameterResult(ContractModel):
-    diameter: StrictInt = Field(ge=-1, le=31)
+    status: Literal["COMPUTED", "NOT_APPLICABLE"]
+    diameter: StrictInt | None = Field(default=None, ge=0, le=31)
     connected: StrictBool
+    exactness: Literal["EXACT", "NOT_APPLICABLE"]
+    detail: str | None = Field(default=None, min_length=1, max_length=512)
 
     @model_validator(mode="after")
     def bind_connectivity(self) -> Self:
-        if self.connected == (self.diameter < 0):
-            raise ValueError("diameter -1 is reserved for disconnected graphs")
+        if self.status == "COMPUTED":
+            if (
+                self.diameter is None
+                or not self.connected
+                or self.exactness != "EXACT"
+                or self.detail is not None
+            ):
+                raise ValueError(
+                    "computed diameter requires an exact value on a connected graph"
+                )
+        elif (
+            self.diameter is not None
+            or self.connected
+            or self.exactness != "NOT_APPLICABLE"
+            or self.detail is None
+        ):
+            raise ValueError(
+                "inapplicable diameter requires no value and an explicit detail"
+            )
         return self
 
 
@@ -98,7 +118,34 @@ class GraphCoreResult(ContractModel):
 
 
 class GraphRadiusResult(ContractModel):
-    radius: StrictInt = Field(ge=0, le=31)
+    status: Literal["COMPUTED", "NOT_APPLICABLE"]
+    radius: StrictInt | None = Field(default=None, ge=0, le=31)
+    connected: StrictBool
+    exactness: Literal["EXACT", "NOT_APPLICABLE"]
+    detail: str | None = Field(default=None, min_length=1, max_length=512)
+
+    @model_validator(mode="after")
+    def bind_connectivity(self) -> Self:
+        if self.status == "COMPUTED":
+            if (
+                self.radius is None
+                or not self.connected
+                or self.exactness != "EXACT"
+                or self.detail is not None
+            ):
+                raise ValueError(
+                    "computed radius requires an exact value on a connected graph"
+                )
+        elif (
+            self.radius is not None
+            or self.connected
+            or self.exactness != "NOT_APPLICABLE"
+            or self.detail is None
+        ):
+            raise ValueError(
+                "inapplicable radius requires no value and an explicit detail"
+            )
+        return self
 
 
 class GraphCardinalityMaximumResult(ContractModel):

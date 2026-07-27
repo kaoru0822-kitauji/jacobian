@@ -64,6 +64,7 @@ def _computed[
     result_model: type[ResultT],
     operation: Callable[[nx.Graph[str]], ResultT],
     *tags: str,
+    version: str = "1",
 ) -> ComputedOperation[GraphInvariantRequest, ResultT]:
     def implementation(
         request: GraphInvariantRequest,
@@ -91,6 +92,7 @@ def _computed[
         relation_id=capability_id.removesuffix(".compute") + ".relation",
         tags=("graph", "invariant", *tags),
         invalid_request=_INVALID_REQUEST,
+        version=version,
     )
 
 
@@ -102,8 +104,18 @@ def _girth(graph: nx.Graph[str]) -> GraphGirthResult:
 
 def _diameter(graph: nx.Graph[str]) -> GraphDiameterResult:
     if not graph or not nx.is_connected(graph):
-        return GraphDiameterResult(diameter=-1, connected=False)
-    return GraphDiameterResult(diameter=int(nx.diameter(graph)), connected=True)
+        return GraphDiameterResult(
+            status="NOT_APPLICABLE",
+            connected=False,
+            exactness="NOT_APPLICABLE",
+            detail="diameter requires a nonempty connected graph",
+        )
+    return GraphDiameterResult(
+        status="COMPUTED",
+        diameter=int(nx.diameter(graph)),
+        connected=True,
+        exactness="EXACT",
+    )
 
 
 def _edge_connectivity(graph: nx.Graph[str]) -> GraphEdgeConnectivityResult:
@@ -174,11 +186,19 @@ def _triangle_count(graph: nx.Graph[str]) -> GraphTriangleCountResult:
 
 
 def _radius(graph: nx.Graph[str]) -> GraphRadiusResult:
-    if not graph:
-        return GraphRadiusResult(radius=0)
-    if not nx.is_connected(graph):
-        raise ValueError("radius requires a connected graph")
-    return GraphRadiusResult(radius=int(nx.radius(graph)))
+    if not graph or not nx.is_connected(graph):
+        return GraphRadiusResult(
+            status="NOT_APPLICABLE",
+            connected=False,
+            exactness="NOT_APPLICABLE",
+            detail="radius requires a nonempty connected graph",
+        )
+    return GraphRadiusResult(
+        status="COMPUTED",
+        radius=int(nx.radius(graph)),
+        connected=True,
+        exactness="EXACT",
+    )
 
 
 def _k_core_execute(
@@ -435,6 +455,7 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _radius,
         "radius",
         "exact",
+        version="2",
     ),
     ComputedOperation(
         capability_id="graph.k_core.compute",
@@ -464,6 +485,7 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _diameter,
         "diameter",
         "exact",
+        version="2",
     ),
     _computed(
         "graph.invariant.edge_connectivity.compute",

@@ -312,7 +312,14 @@ def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
             capability_id="graph.compute.properties",
             input={
                 "graph_uri": searched.output["candidates"][0]["graph_uri"],
-                "properties": ["order", "diameter", "made_up_invariant"],
+                "properties": [
+                    "order",
+                    "diameter",
+                    "radius",
+                    "eccentricities",
+                    "average_eccentricity",
+                    "made_up_invariant",
+                ],
             },
         )
     )
@@ -331,11 +338,17 @@ def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
         "backend": "networkx",
         "detail": None,
     }
-    assert outcomes["diameter"]["status"] == "NOT_APPLICABLE"
-    assert outcomes["diameter"]["value"] is None
-    assert outcomes["diameter"]["exactness"] == "NOT_APPLICABLE"
-    assert outcomes["diameter"]["backend"] == "networkx"
-    assert outcomes["diameter"]["detail"]
+    for invariant in (
+        "diameter",
+        "radius",
+        "eccentricities",
+        "average_eccentricity",
+    ):
+        assert outcomes[invariant]["status"] == "NOT_APPLICABLE"
+        assert outcomes[invariant]["value"] is None
+        assert outcomes[invariant]["exactness"] == "NOT_APPLICABLE"
+        assert outcomes[invariant]["backend"] == "networkx"
+        assert outcomes[invariant]["detail"]
     assert outcomes["made_up_invariant"] == {
         "invariant": "made_up_invariant",
         "status": "UNSUPPORTED",
