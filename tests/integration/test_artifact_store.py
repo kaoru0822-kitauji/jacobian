@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -342,7 +343,10 @@ def test_blob_writes_do_not_rescan_the_blob_tree(
 def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     committed = store._blob_bytes_committed()
-    store._adjust_blob_bytes_committed(512)
+    store._adjust_blob_bytes_committed(
+        512,
+        reconciliation_required=True,
+    )
 
     reopened = ArtifactStore(tmp_path)
 
@@ -350,7 +354,149 @@ def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
-def test_duplicate_put_uses_store_open_integrity_validation(
+def test_store_open_migrates_legacy_quota_metadata(tmp_path: Path) -> None:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    database = tmp_path / "metadata.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE blob_quota (
+                id INTEGER PRIMARY KEY CHECK (id = 0),
+                size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0)
+            )
+            """
+        )
+        connection.execute("INSERT INTO blob_quota (id, size_bytes) VALUES (0, 999)")
+
+    store = ArtifactStore(tmp_path)
+
+    with sqlite3.connect(database) as connection:
+        columns = {
+            str(row[1]) for row in connection.execute("PRAGMA table_info(blob_quota)")
+        }
+        row = connection.execute(
+            """
+            SELECT size_bytes, reconciliation_required
+            FROM blob_quota
+            WHERE id = 0
+            """
+        ).fetchone()
+    assert "reconciliation_required" in columns
+    assert row == (0, 0)
+    assert store._blob_bytes_committed() == 0
+
+
+@pytest.mark.integration
+def test_concurrent_store_open_migrates_legacy_quota_metadata_once(
+    tmp_path: Path,
+) -> None:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    database = tmp_path / "metadata.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE blob_quota (
+                id INTEGER PRIMARY KEY CHECK (id = 0),
+                size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0)
+            )
+            """
+        )
+        connection.execute("INSERT INTO blob_quota (id, size_bytes) VALUES (0, 0)")
+    script = """
+import sys
+from jacobian.store import ArtifactStore
+
+ArtifactStore(sys.argv[1])
+"""
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(tmp_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for _ in range(2)
+    ]
+    completed = [process.communicate(timeout=30) for process in processes]
+
+    assert [process.returncode for process in processes] == [0, 0], completed
+    with sqlite3.connect(database) as connection:
+        columns = [
+            str(row[1]) for row in connection.execute("PRAGMA table_info(blob_quota)")
+        ]
+    assert columns.count("reconciliation_required") == 1
+
+
+@pytest.mark.integration
+def test_store_open_recovers_process_death_before_blob_publication(
+    tmp_path: Path,
+) -> None:
+    script = """
+import os
+import sys
+from jacobian.store import ArtifactStore
+
+store = ArtifactStore(sys.argv[1])
+adjust = store._adjust_blob_bytes_committed
+
+def reserve_then_exit(delta, *, reconciliation_required):
+    adjust(delta, reconciliation_required=reconciliation_required)
+    os._exit(0)
+
+store._adjust_blob_bytes_committed = reserve_then_exit
+store._write_blob(b"reserved-but-unpublished")
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+    reopened = ArtifactStore(tmp_path)
+
+    assert reopened._blob_bytes_committed() == 0
+    assert not tuple((tmp_path / "blobs" / "sha256").glob("*/*"))
+
+
+@pytest.mark.integration
+def test_store_open_recovers_process_death_after_blob_publication(
+    tmp_path: Path,
+) -> None:
+    data = b"published-before-clean-marker"
+    script = """
+import os
+import sys
+from jacobian.store import ArtifactStore
+
+store = ArtifactStore(sys.argv[1])
+store._mark_blob_quota_reconciled = lambda: os._exit(0)
+store._write_blob(sys.argv[2].encode("ascii"))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path), data.decode("ascii")],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+    reopened = ArtifactStore(tmp_path)
+    digest = f"sha256:{sha256(data).hexdigest()}"
+
+    assert reopened._blob_bytes_committed() == len(data)
+    assert reopened._read_blob(digest) == data
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows revalidates blob accounting on every store open",
+)
+def test_clean_store_open_does_not_scan_the_blob_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -358,12 +504,15 @@ def test_duplicate_put_uses_store_open_integrity_validation(
     data = b"validated once per unchanged blob"
     digest = store._write_blob(data)
 
-    def unexpected_read(_path: Path) -> bytes:
-        raise AssertionError("unchanged validated blobs must not be reread")
+    def unexpected_scan(_path: Path) -> None:
+        raise AssertionError("clean store startup must trust durable quota metadata")
 
-    monkeypatch.setattr(Path, "read_bytes", unexpected_read)
+    monkeypatch.setattr(Path, "iterdir", unexpected_scan)
 
-    assert store._write_blob(data) == digest
+    reopened = ArtifactStore(tmp_path)
+
+    assert reopened._blob_bytes_committed() == len(data)
+    assert reopened._blob_path(digest).is_file()
 
 
 @pytest.mark.integration

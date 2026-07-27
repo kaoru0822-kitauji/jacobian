@@ -176,8 +176,17 @@ class ArtifactStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _initialize_database(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.executescript(
                 """
@@ -205,10 +214,26 @@ class ArtifactStore:
                 );
                 CREATE TABLE IF NOT EXISTS blob_quota (
                     id INTEGER PRIMARY KEY CHECK (id = 0),
-                    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0)
+                    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+                    reconciliation_required INTEGER NOT NULL DEFAULT 1
+                        CHECK (reconciliation_required IN (0, 1))
                 );
                 """
             )
+        with self._exclusive_blob_lock(), self._connection() as connection:
+            quota_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(blob_quota)")
+            }
+            if "reconciliation_required" not in quota_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE blob_quota
+                    ADD COLUMN reconciliation_required
+                        INTEGER NOT NULL DEFAULT 1
+                        CHECK (reconciliation_required IN (0, 1))
+                    """
+                )
         self._reconcile_blob_quota()
 
     def _blob_path(self, digest: str) -> Path:
@@ -258,42 +283,88 @@ class ArtifactStore:
         return total
 
     def _reconcile_blob_quota(self) -> None:
-        """Rebuild durable quota accounting once when the store is opened."""
+        """Recover quota accounting only after an interrupted blob mutation."""
 
         with self._exclusive_blob_lock():
+            with self._connection() as connection:
+                row = connection.execute(
+                    """
+                    SELECT reconciliation_required
+                    FROM blob_quota
+                    WHERE id = 0
+                    """
+                ).fetchone()
+            if (
+                os.name != "nt"
+                and row is not None
+                and not bool(row["reconciliation_required"])
+            ):
+                return
+
             total = self._scan_blob_bytes_committed()
-            with self._connect() as connection:
+            with self._connection() as connection:
                 connection.execute(
                     """
-                    INSERT INTO blob_quota (id, size_bytes)
-                    VALUES (0, ?)
+                    INSERT INTO blob_quota (
+                        id,
+                        size_bytes,
+                        reconciliation_required
+                    )
+                    VALUES (0, ?, 0)
                     ON CONFLICT(id) DO UPDATE
-                    SET size_bytes = excluded.size_bytes
+                    SET size_bytes = excluded.size_bytes,
+                        reconciliation_required = 0
                     """,
                     (total,),
                 )
 
     def _blob_bytes_committed(self) -> int:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
-                "SELECT size_bytes FROM blob_quota WHERE id = 0"
+                """
+                SELECT size_bytes, reconciliation_required
+                FROM blob_quota
+                WHERE id = 0
+                """
             ).fetchone()
         if row is None:
             raise ArtifactIntegrityError("artifact store quota metadata is missing")
+        if bool(row["reconciliation_required"]):
+            raise ArtifactIntegrityError(
+                "artifact store quota metadata requires recovery"
+            )
         return int(row["size_bytes"])
 
-    def _adjust_blob_bytes_committed(self, delta: int) -> None:
-        with self._connect() as connection:
+    def _adjust_blob_bytes_committed(
+        self,
+        delta: int,
+        *,
+        reconciliation_required: bool,
+    ) -> None:
+        with self._connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE blob_quota
-                SET size_bytes = size_bytes + ?
+                SET size_bytes = size_bytes + ?,
+                    reconciliation_required = ?
                 WHERE id = 0 AND size_bytes + ? >= 0
                 """,
-                (delta, delta),
+                (delta, int(reconciliation_required), delta),
             )
         if cursor.rowcount != 1:
             raise ArtifactIntegrityError("artifact store quota metadata is invalid")
+
+    def _mark_blob_quota_reconciled(self) -> None:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE blob_quota
+                SET reconciliation_required = 0
+                WHERE id = 0
+                """
+            )
+        if cursor.rowcount != 1:
+            raise ArtifactIntegrityError("artifact store quota metadata is missing")
 
     @contextmanager
     def _exclusive_blob_lock(self) -> Iterator[None]:
@@ -319,8 +390,19 @@ class ArtifactStore:
     def _write_blob_unchecked(self, data: bytes) -> str:
         digest = _sha256(data)
         target = self._blob_path(digest)
-        target.parent.mkdir(parents=True, exist_ok=True)
         with self._exclusive_blob_lock():
+            prefix_created = not target.parent.exists()
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.parent.is_symlink() or not target.parent.is_dir():
+                raise ArtifactIntegrityError(
+                    f"blob prefix is not a local directory for {digest}"
+                )
+            if prefix_created and os.name != "nt":
+                blob_root_descriptor = os.open(self.blob_root, os.O_RDONLY)
+                try:
+                    os.fsync(blob_root_descriptor)
+                finally:
+                    os.close(blob_root_descriptor)
             if target.exists():
                 if target.is_symlink() or not target.is_file():
                     raise ArtifactIntegrityError(
@@ -369,7 +451,10 @@ class ArtifactStore:
                     handle.write(data)
                     handle.flush()
                     os.fsync(handle.fileno())
-                self._adjust_blob_bytes_committed(len(data))
+                self._adjust_blob_bytes_committed(
+                    len(data),
+                    reconciliation_required=True,
+                )
                 reserved = True
                 try:
                     os.link(temporary, target)
@@ -389,11 +474,16 @@ class ArtifactStore:
                 temporary.unlink(missing_ok=True)
                 if reserved and not published:
                     try:
-                        self._adjust_blob_bytes_committed(-len(data))
+                        self._adjust_blob_bytes_committed(
+                            -len(data),
+                            reconciliation_required=False,
+                        )
                     except (ArtifactIntegrityError, sqlite3.Error):
                         _LOGGER.exception(
                             "failed to release an unpublished blob quota reservation"
                         )
+            if published:
+                self._mark_blob_quota_reconciled()
             stat = target.stat()
             self._validated_blobs[digest] = (
                 stat.st_dev,
@@ -405,7 +495,7 @@ class ArtifactStore:
         return digest
 
     def _artifact_exists(self, artifact_uri: str) -> bool:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 "SELECT 1 FROM artifacts WHERE artifact_uri = ?",
                 (artifact_uri,),
@@ -545,7 +635,7 @@ class ArtifactStore:
         self._write_blob(canonical_bytes)
         self._write_blob(manifest_bytes)
 
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO artifacts (
@@ -603,7 +693,7 @@ class ArtifactStore:
 
         manifest_digest = _digest_from_uri(artifact_uri)
         committed_references: set[str] = set()
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 "SELECT * FROM artifacts WHERE artifact_uri = ?",
                 (artifact_uri,),
@@ -691,7 +781,7 @@ class ArtifactStore:
     def find_by_object_digest(self, object_digest: str) -> tuple[str, ...]:
         """Return every artifact URI carrying a mathematical object digest."""
 
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT artifact_uri
