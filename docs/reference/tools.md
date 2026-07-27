@@ -115,12 +115,43 @@ enabled bundled references, configured exclusions, and operator-installed
 adapters. A static list in this document would therefore describe only one
 installation snapshot.
 
-Read `capability://catalog`, or call `capability.describe` without a capability
-ID, for the exact installed IDs and compact descriptors. Call
-`capability.describe` with one ID before invocation to inspect its complete
-input and output schemas, supported modes, provider identity, availability,
-and checker requirements. Do not infer installation or payload fields from
-examples in documentation.
+`capability.describe` has two forms. Search or browse to retrieve compact
+installed outcomes without loading every schema:
+
+```json
+{
+  "query": "find a counterexample to associativity",
+  "domain": "universal_algebra",
+  "mode": "EXPLORE",
+  "limit": 10
+}
+```
+
+`query` searches published capability IDs, titles, descriptions, and tags.
+`domain` filters the domain-owned capability namespace, with exact tag matches
+also accepted. `mode` and `limit` are optional. Omit `query` to browse the
+installed inventory in stable ID order. Results report `matched_on` and
+`matched_terms`; their deterministic ranking is retrieval, not a recommendation
+or mathematical strategy. Agents may search repeatedly across concepts and
+domains and compose any number of capabilities.
+
+Call `capability.describe` again with only one returned `capability_id` to
+inspect its complete input and output schemas, supported modes, provider
+identity, availability, checker requirements, and descriptor-owned invocation
+examples:
+
+```json
+{"capability_id": "universal_algebra.search.countermodel"}
+```
+
+Published invocation examples are validated against the descriptor schema when
+the capability is installed. Domain-owned examples may additionally be
+constructed through the complete Pydantic request model. They illustrate valid
+calls; they do not prescribe a research workflow.
+
+Read `capability://catalog` when a client or operator needs the complete
+machine-readable inventory in one response. Do not infer current installation
+membership or payload fields from static documentation.
 
 Domain reference documents define constraints that remain useful independent
 of catalog membership:
@@ -185,11 +216,34 @@ expose a generic `solver.solve` or `sandbox.run` truth primitive.
 An adapter or plugin cannot authorize its own checker. Checker administration
 is operator-controlled and outside the model-facing MCP surface.
 
+## Operating guidance and prompts
+
+The initialization response describes when the mathematical toolbox may help
+and points to the two-tool discovery interface. It does not choose task
+decomposition, proof strategy, capability composition, iteration, or stopping
+criteria.
+
+Read `jacobian://instructions` to recover the complete operating model without
+reconnecting. The resource explains discovery, exact contract inspection,
+composition, result dimensions, verification boundaries, artifacts, and
+workspace semantics.
+
+Two optional MCP prompts provide protocol scaffolding:
+
+- `jacobian-discover` turns a mathematical task into discovery and exact-contract
+  steps while leaving strategy with the agent.
+- `jacobian-check-evidence` explains how to look for a compatible independent
+  checker without treating search or computed evidence as verified.
+
+Clients that do not support resources or prompts can use the same tools from
+their published descriptions and schemas.
+
 ## Resources
 
 Read-only discovery and large-object access use MCP resources:
 
 ```text
+jacobian://instructions
 artifact://sha256/<digest>
 capability://catalog
 reference://catalog

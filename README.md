@@ -177,7 +177,14 @@ Architecture decisions are recorded in the
 
 `jacobian setup` registers the local server with one or more supported clients.
 The server advertises the capability entry points and direct workspace tools;
-clients with MCP resource support can also read `capability://catalog`.
+`capability.describe(query=...)` searches compact installed outcomes before an
+agent inspects an exact contract and invokes it. This is a toolbox interface:
+agents own mathematical decomposition, exploration, and composition.
+
+Clients with MCP resource support can read `jacobian://instructions` for the
+operating guide and `capability://catalog` for the complete machine inventory.
+Clients with prompt support can optionally request `jacobian-discover` or
+`jacobian-check-evidence` for protocol scaffolding.
 
 Remote clients can connect through Streamable HTTP or SSE with bearer-token
 authentication and subject-bound tenant state. See
