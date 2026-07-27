@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from typing import Any
 
+from pydantic import ValidationError
 
-def _rational(value: dict[str, Any]) -> Any:
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
+from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.validated_analysis import RationalLinearProgramRequest
+
+
+def _rational(value: CanonicalRational) -> Any:
     import sympy
 
-    return sympy.Rational(int(value["num"]), int(value["den"]))
+    return sympy.Rational(int(value.num), int(value.den))
 
 
 def _wire(value: Any) -> dict[str, str]:
@@ -20,7 +29,7 @@ def _wire(value: Any) -> dict[str, str]:
     return {"num": str(rational.p), "den": str(rational.q)}
 
 
-def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
+def _linear_program(request: RationalLinearProgramRequest) -> dict[str, Any]:
     import sympy
     from sympy.solvers.simplex import (
         InfeasibleLPError,
@@ -29,12 +38,12 @@ def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
         lpmax,
     )
 
-    program = payload["program"]
-    objective = sympy.Matrix([[_rational(v) for v in program["objective"]]])
+    program = request.program
+    objective = sympy.Matrix([[_rational(value) for value in program.objective]])
     coefficients = sympy.Matrix(
-        [[_rational(value) for value in row] for row in program["coefficients"]]
+        [[_rational(value) for value in row] for row in program.coefficients]
     )
-    rhs = sympy.Matrix([_rational(value) for value in program["rhs"]])
+    rhs = sympy.Matrix([_rational(value) for value in program.rhs])
     try:
         primal_value, primal_values = linprog(
             objective,
@@ -117,12 +126,15 @@ def _linear_program(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> int:
-    payload = json.loads(sys.stdin.read())
-    sys.stdout.write(
-        json.dumps(
-            _linear_program(payload),
-            sort_keys=True,
-            separators=(",", ":"),
+    try:
+        payload = loads_strict_json(sys.stdin.buffer.read())
+        request = RationalLinearProgramRequest.model_validate(payload)
+    except (CanonicalizationError, ValidationError, ValueError):
+        sys.stderr.write("invalid rational optimization worker request\n")
+        return 2
+    sys.stdout.buffer.write(
+        canonicalize_json(
+            _linear_program(request),
         )
     )
     return 0

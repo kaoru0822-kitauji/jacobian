@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 
 import pytest
@@ -329,3 +330,70 @@ def test_rational_lp_obligation_rejects_wrong_candidate_dimensions() -> None:
                 "dual_candidate": [_rational(1), _rational(0)],
             }
         )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        '{"program":{},"unexpected":true}',
+        (
+            '{"program":{"variables":["x"],'
+            '"objective":[{"num":"01","den":"1"}],'
+            '"coefficients":[[{"num":"1","den":"1"}]],'
+            '"rhs":[{"num":"1","den":"1"}]},"wall_seconds":10}'
+        ),
+        '{"program":{},"program":{},"wall_seconds":10}',
+    ),
+)
+def test_rational_lp_worker_rejects_malformed_protocol(payload: str) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-m",
+            "jacobian.domains.optimization.worker",
+        ],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 2
+    assert completed.stdout == ""
+    assert completed.stderr == "invalid rational optimization worker request\n"
+
+
+def test_invalid_rational_lp_never_reaches_backend_worker(
+    analysis_runtime: _Runtime,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian.domains.optimization import operations
+
+    def unexpected_worker(
+        _payload: dict[str, object],
+        *,
+        wall_seconds: int,
+    ) -> dict[str, object]:
+        raise AssertionError(f"worker unexpectedly called with {wall_seconds=}")
+
+    monkeypatch.setattr(operations, "_run_worker", unexpected_worker)
+    result = analysis_runtime.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="optimization.linear.rational_optimum.compute",
+            input={
+                "program": {
+                    "variables": ["x", "y"],
+                    "objective": [_rational(1), _rational(2)],
+                    "coefficients": [[_rational(1)]],
+                    "rhs": [_rational(1)],
+                },
+                "wall_seconds": 10,
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_RATIONAL_OPTIMIZATION_REQUEST"
+    assert result.artifact_uris == ()

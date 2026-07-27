@@ -68,7 +68,7 @@ def _linear_program(
     try:
         result = RationalLinearProgramResult.model_validate(
             _run_worker(
-                request.model_dump(mode="json", exclude={"wall_seconds"}),
+                request.model_dump(mode="json"),
                 wall_seconds=request.wall_seconds,
             )
         )
