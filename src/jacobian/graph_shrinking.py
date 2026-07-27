@@ -238,6 +238,7 @@ class GraphCounterexampleShrinkAdapter:
             objectives=("vertices", "edges"),
             evaluation_budget=validated.evaluation_budget,
             reducer_timeout_seconds=validated.reducer_timeout_seconds,
+            proposal_validator=_validate_exact_graph_reduction,
         )
         attempts = tuple(self._attempt(step) for step in shrunk.steps)
         final = self._load_graph(shrunk.final_target_uri)
@@ -376,20 +377,18 @@ class GraphCounterexampleShrinkAdapter:
         if step.proposed_uri is not None:
             before = self._load_graph(step.from_uri)
             after = self._load_graph(step.proposed_uri)
-            removed_vertices = sorted(set(before["vertices"]) - set(after["vertices"]))
-            removed_edges = sorted(
-                set(map(tuple, before["edges"])) - set(map(tuple, after["edges"]))
-            )
-            if step.reducer == GraphReduction.DELETE_VERTEX.value:
-                if len(removed_vertices) != 1:
-                    return _invalid_attempt(step, "vertex reduction was not atomic")
-                deleted_vertex = removed_vertices[0]
-            elif step.reducer == GraphReduction.DELETE_EDGE.value:
-                if removed_vertices or len(removed_edges) != 1:
-                    return _invalid_attempt(step, "edge reduction was not atomic")
-                deleted_edge = removed_edges[0]
+            try:
+                deleted_vertex, deleted_edge = _exact_graph_reduction(
+                    step.reducer,
+                    before,
+                    after,
+                )
+            except ValueError as exc:
+                return _invalid_attempt(step, str(exc))
         if step.accepted:
             outcome = GraphReductionOutcome.ACCEPTED_VERIFIED
+        elif step.input_status is InputStatus.REJECTED and step.proposed_uri is None:
+            outcome = GraphReductionOutcome.INVALID_REDUCTION
         elif step.execution_status is not ExecutionStatus.COMPLETED:
             outcome = GraphReductionOutcome.CHECKER_ERROR
         elif (
@@ -409,6 +408,55 @@ class GraphCounterexampleShrinkAdapter:
             verification_record_uri=step.verification_record_uri,
             detail=step.detail,
         )
+
+
+def _validate_exact_graph_reduction(
+    reducer: str,
+    before: Any,
+    after: Any,
+) -> None:
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        raise ValueError("graph reducer inputs must be objects")
+    _exact_graph_reduction(reducer, before, after)
+
+
+def _exact_graph_reduction(
+    reducer: str,
+    before: dict[str, Any],
+    after: dict[str, Any],
+) -> tuple[str | None, tuple[str, str] | None]:
+    if reducer == GraphReduction.DELETE_VERTEX.value:
+        removed_vertices = sorted(set(before["vertices"]) - set(after["vertices"]))
+        if len(removed_vertices) != 1:
+            raise ValueError("proposal is not an exact single-vertex deletion")
+        deleted_vertex = removed_vertices[0]
+        expected = {
+            **before,
+            "vertices": [
+                vertex for vertex in before["vertices"] if vertex != deleted_vertex
+            ],
+            "edges": [edge for edge in before["edges"] if deleted_vertex not in edge],
+        }
+        if after != expected:
+            raise ValueError("proposal is not an exact single-vertex deletion")
+        return deleted_vertex, None
+
+    if reducer == GraphReduction.DELETE_EDGE.value:
+        removed_edges = sorted(
+            set(map(tuple, before["edges"])) - set(map(tuple, after["edges"]))
+        )
+        if len(removed_edges) != 1:
+            raise ValueError("proposal is not an exact single-edge deletion")
+        deleted_edge = removed_edges[0]
+        expected = {
+            **before,
+            "edges": [edge for edge in before["edges"] if tuple(edge) != deleted_edge],
+        }
+        if after != expected:
+            raise ValueError("proposal is not an exact single-edge deletion")
+        return None, deleted_edge
+
+    raise ValueError("proposal uses an unsupported graph reducer")
 
 
 def _invalid_attempt(step: Any, detail: str) -> GraphReductionAttempt:

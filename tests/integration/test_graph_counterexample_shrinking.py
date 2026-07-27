@@ -136,6 +136,23 @@ def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
 
 @pytest.mark.integration
 @pytest.mark.contract
+def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
+    tmp_path: Path,
+) -> None:
+    kernel, graph_uri = _kernel_with_redundant_odd_cycle(tmp_path)
+    kernel.shrinking.executor = _UnrelatedEditExecutor()  # type: ignore[assignment]
+
+    result = _shrink(kernel, graph_uri)
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["final_graph_uri"] == graph_uri
+    assert result.output["attempts"][0]["outcome"] == "INVALID_REDUCTION"
+    assert result.output["attempts"][0]["verification_record_uri"] is None
+    assert "exact single-vertex deletion" in result.output["attempts"][0]["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.contract
 def test_graph_counterexample_shrink_order_is_deterministic(tmp_path: Path) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
@@ -169,6 +186,35 @@ class _TimeoutExecutor:
             output=None,
             diagnostics="",
             detail="fixture reducer timeout",
+            runtime_ms=1,
+        )
+
+
+class _UnrelatedEditExecutor:
+    def run(self, **_: Any) -> PluginExecutionResult:
+        return PluginExecutionResult(
+            status=ExecutionStatus.COMPLETED,
+            output={
+                "response_version": "1",
+                "current_objectives": {"vertices": 4, "edges": 4},
+                "reductions": [
+                    {
+                        "reducer": "delete_vertex",
+                        "payload": {
+                            "graph_schema_version": "1",
+                            "vertices": ["a", "b", "c", "e"],
+                            "edges": [
+                                ["a", "b"],
+                                ["a", "c"],
+                                ["b", "c"],
+                            ],
+                        },
+                        "objectives": {"vertices": 3, "edges": 3},
+                    }
+                ],
+            },
+            diagnostics="",
+            detail=None,
             runtime_ms=1,
         )
 
