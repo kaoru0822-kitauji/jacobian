@@ -175,9 +175,7 @@ def test_exact_checker_runtime_requires_rational_polynomial_api(
         lambda _name: incomplete_flint,
     )
 
-    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(
-        refresh=True
-    )
+    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(refresh=True)
 
     assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert runtime.digest is None
@@ -199,9 +197,7 @@ def test_exact_checker_runtime_rejects_different_linked_flint_version(
         lambda _name: SimpleNamespace(__FLINT_VERSION__="3.5.0"),
     )
 
-    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(
-        refresh=True
-    )
+    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(refresh=True)
 
     assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert runtime.digest is None

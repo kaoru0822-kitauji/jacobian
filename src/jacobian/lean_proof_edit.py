@@ -170,9 +170,7 @@ class LeanProofEditAdapter:
             baseline_accepted=baseline_verified,
             baseline_candidate_uri=baseline.candidate_uri,
             baseline_certificate_uri=baseline.certificate_uri,
-            baseline_verification_record_uri=(
-                baseline.result.verification_record_uri
-            ),
+            baseline_verification_record_uri=(baseline.result.verification_record_uri),
             checker_execution_status=checked.result.execution.status,
             accepted=verified,
             claim_uri=checked.claim_uri,
