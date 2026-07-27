@@ -76,7 +76,7 @@ def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
     assert result.output["verification"] == "UNVERIFIED"
     assert result.output["proposal_uri"] in result.artifact_uris
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert "does not certify" in result.assurance.basis
+    assert "does not establish truth" in result.assurance.basis
 
 
 @pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
