@@ -300,6 +300,17 @@ proof and returns a verification_record_uri. Otherwise report UNKNOWN and
 UNVERIFIED. Public examples are not evaluation answers.
 """
 
+AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS = """\
+Use only the jacobian_local mathematical toolbox for mathematical computation.
+Do not use shell commands or create programs. Capability IDs and a successful
+tool sequence are intentionally not supplied. Search or browse the installed
+capabilities, inspect any exact contracts you judge useful, and compose the
+available operations according to your own mathematical strategy. A discovery
+rank is not a recommendation. Report only conclusions and assurance supported
+by returned scope, completeness, evidence, and verification records. Public
+invocation examples demonstrate contracts; they are not evaluation answers.
+"""
+
 
 class BenchmarkError(RuntimeError):
     """The A/B runner, report, or known-answer evidence is invalid."""
@@ -2559,9 +2570,13 @@ def _run_condition(
             + json.dumps(expression.model_dump(mode="json"), sort_keys=True)
             + "\n"
         )
-    condition_instructions = _condition_instructions(
-        case.get("task_type"),
-        condition,
+    condition_instructions = (
+        AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS
+        if condition == "treatment" and case.get("autonomous_discovery") is True
+        else _condition_instructions(
+            case.get("task_type"),
+            condition,
+        )
     )
     prompt = (
         condition_instructions
@@ -2671,6 +2686,31 @@ def _run_condition(
         "capability_rejection_count": telemetry["capability_rejection_count"],
         "capability_attempt_ids": telemetry["capability_attempt_ids"],
         "capability_ids": telemetry["capability_ids"],
+        "capability_descriptions": telemetry["capability_descriptions"],
+        "discovery_query_count": sum(
+            description["query"] is not None
+            for description in telemetry["capability_descriptions"]
+        ),
+        "exact_description_count": sum(
+            description["capability_id"] is not None
+            for description in telemetry["capability_descriptions"]
+        ),
+        "discovered_capability_ids": sorted(
+            {
+                capability_id
+                for description in telemetry["capability_descriptions"]
+                for capability_id in description["match_ids"]
+            }
+        ),
+        "discovery_to_attempt_ids": sorted(
+            {
+                capability_id
+                for description in telemetry["capability_descriptions"]
+                for capability_id in description["match_ids"]
+            }
+            & set(telemetry["capability_attempt_ids"])
+        ),
+        "autonomous_discovery_case": case.get("autonomous_discovery") is True,
         "shell_calls": telemetry["shell_calls"],
         "shell_call_count": len(telemetry["shell_calls"]),
         "workspace_file_count": sum(
@@ -3012,6 +3052,7 @@ def build_dispatch_plan(
             {
                 "case_id": case["case_id"],
                 "task_type": case.get("task_type"),
+                "autonomous_discovery": case.get("autonomous_discovery") is True,
                 "conditions": list(conditions),
                 "repetitions": repetitions,
                 "model_runs": case_run_count,

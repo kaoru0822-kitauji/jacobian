@@ -1,0 +1,28 @@
+{
+  "case_id": "GRAPH-DISCOVERY-AB-001",
+  "version": "1",
+  "task_type": "graph",
+  "autonomous_discovery": true,
+  "title": "Autonomously discover tools for a bounded graph counterexample",
+  "prompt": "Challenge the claim that every connected triangle-free simple graph on exactly 7 vertices with minimum degree at least 2 is bipartite. If false, return one explicit counterexample and exact values for order, size, connected, bipartite, minimum_degree, maximum_degree, triangle_count, and independence_number. Set conclusion to FALSE exactly when the supplied graph is a counterexample. This is a bounded construction task, not a proof about larger graphs.",
+  "expected": {
+    "conclusion": "FALSE",
+    "constraints": {
+      "order": 7,
+      "connected": true,
+      "triangle_free": true,
+      "minimum_degree": 2,
+      "bipartite": false
+    },
+    "properties": [
+      "order",
+      "size",
+      "connected",
+      "bipartite",
+      "minimum_degree",
+      "maximum_degree",
+      "triangle_count",
+      "independence_number"
+    ]
+  }
+}

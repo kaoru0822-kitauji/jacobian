@@ -377,6 +377,48 @@ def test_ab_smt_task_selects_its_own_control_and_treatment_instructions() -> Non
     assert "Erdos" not in treatment
 
 
+def test_autonomous_discovery_prompt_exposes_the_toolbox_without_leaking_a_path() -> (
+    None
+):
+    instructions = BENCHMARK["AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS"]
+    normalized = " ".join(instructions.split())
+
+    assert (
+        "Capability IDs and a successful tool sequence are intentionally not supplied"
+        in normalized
+    )
+    assert "own mathematical strategy" in normalized
+    assert "rank is not a recommendation" in normalized
+    assert "graph.search.atlas" not in instructions
+    assert "graph.compute.properties" not in instructions
+
+
+def test_autonomous_discovery_case_is_visible_in_the_bounded_dispatch_plan() -> None:
+    load_cases = cast(Any, BENCHMARK["load_cases"])
+    build_plan = cast(Any, BENCHMARK["build_dispatch_plan"])
+    cases = load_cases(["GRAPH-DISCOVERY-AB-001"])
+
+    plan = build_plan(
+        cases,
+        repetitions=2,
+        model="fixture-model",
+        reasoning_effort="medium",
+        timeout_seconds=30,
+    )
+
+    assert plan["model_run_count"] == 4
+    assert plan["cases"] == [
+        {
+            "case_id": "GRAPH-DISCOVERY-AB-001",
+            "task_type": "graph",
+            "autonomous_discovery": True,
+            "conditions": ["control", "treatment"],
+            "repetitions": 2,
+            "model_runs": 4,
+        }
+    ]
+
+
 def test_ab_smt_scorer_preserves_rejected_holey_proof(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -512,6 +554,7 @@ def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> N
         "capability_rejection_count": 0,
         "successful_tool_calls": ["capability.invoke"],
         "capability_attempt_ids": [],
+        "capability_descriptions": [],
         "capability_ids": [],
         "capability_invocations": [],
     }
