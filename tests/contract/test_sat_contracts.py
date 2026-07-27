@@ -261,6 +261,13 @@ def test_exploration_request_exposes_only_enforced_budget_fields() -> None:
                 },
             }
         )
+    with pytest.raises(ValidationError):
+        SatExplorationRequest.model_validate(
+            {
+                "cnf_uri": _ARTIFACT_A,
+                "resource_budget": {"wall_seconds": 151},
+            }
+        )
 
 
 @pytest.mark.contract

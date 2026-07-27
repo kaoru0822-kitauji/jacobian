@@ -8,9 +8,10 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
@@ -30,6 +31,7 @@ from jacobian.adapters.mcp.guidance import (
     discovery_prompt,
     evidence_check_prompt,
 )
+from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityDiscoveryCursorError
 from jacobian.contracts.capabilities import (
@@ -62,12 +64,80 @@ from jacobian.contracts.workspaces import (
 
 _LOGGER = logging.getLogger(__name__)
 
+_RELATED_CAPABILITIES: dict[str, tuple[tuple[str, str], ...]] = {
+    "sat.cnf.materialize": (
+        ("sat.model.find", "find a candidate named assignment"),
+        ("sat.model.verify", "independently verify a candidate assignment"),
+        ("sat.unsat_proof.find", "produce an addition-only DRAT candidate"),
+        ("sat.unsat_proof.verify", "independently verify the exact DRAT proof"),
+    ),
+    "sat.model.find": (
+        ("sat.cnf.materialize", "materialize the exact input CNF"),
+        ("sat.model.verify", "independently verify the named assignment"),
+    ),
+    "sat.unsat_proof.find": (
+        ("sat.cnf.materialize", "materialize the exact input CNF"),
+        ("sat.unsat_proof.verify", "independently verify the retained DRAT proof"),
+    ),
+    "smt.unsat_proof.find": (
+        ("smt.unsat_proof.verify", "independently verify compatible proof evidence"),
+        (
+            "sat.cnf.materialize",
+            "prefer named Boolean CNF for finite colorings and forbidden patterns",
+        ),
+    ),
+}
+
 if TYPE_CHECKING:
     from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
     from jacobian.adapters.mcp.remote import TenantKernelRouter
     from jacobian.kernel import JacobianKernel
+
+
+def _invoke_capability_with_cancellation(
+    kernel: Any,
+    request: CapabilityRequest,
+    cancellation_event: threading.Event,
+) -> CapabilityResult:
+    with bounded_process_cancellation(cancellation_event):
+        result: CapabilityResult = kernel.capabilities.invoke(request)
+        return result
+
+
+def _consume_cancelled_worker_result(task: asyncio.Task[CapabilityResult]) -> None:
+    with suppress(BaseException):
+        task.result()
+
+
+def _capability_inspection_extensions(
+    capability_id: str,
+    descriptors: dict[str, CapabilityDescriptor],
+) -> dict[str, Any]:
+    extensions: dict[str, Any] = {}
+    related = [
+        {
+            "capability_id": related_id,
+            "relationship": relationship,
+        }
+        for related_id, relationship in _RELATED_CAPABILITIES.get(capability_id, ())
+        if related_id in descriptors
+    ]
+    if related:
+        extensions["related_capabilities"] = related
+    if capability_id.startswith(("sat.", "smt.")):
+        extensions["synchronous_execution"] = {
+            "remote_safe_wall_seconds_max": 150,
+            "timeout_is_a_non_conclusion": True,
+            "partition_larger_searches": True,
+            "backend_suitability": (
+                "Named Boolean CNF is preferred for finite colorings and forbidden "
+                "finite configurations; use SMT when arithmetic or "
+                "uninterpreted-function structure is essential."
+            ),
+        }
+    return extensions
 
 
 WORKSPACE_TOOL_NAMES = frozenset(
@@ -480,11 +550,17 @@ def create_server(
                 for example in descriptor.invocation_examples
             ],
         }
+        response.update(_capability_inspection_extensions(capability_id, descriptors))
         if capability_id == "lean.check" and active_kernel.lean_checkers:
             response["cache"] = {
                 "key": "exact content-addressed certificate and active checker digest",
                 "max_entries": 128,
                 "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
+                "mathlib_warmup": (
+                    active_kernel.lean.mathlib_warmup_health()
+                    if active_kernel.lean is not None
+                    else {"status": "UNAVAILABLE", "detail": None}
+                ),
             }
         return response
 
@@ -502,14 +578,29 @@ def create_server(
         ctx: Context[AppState, Any] | None = None,
     ) -> CapabilityResult:
         active_kernel = _kernel(ctx)
-        return await asyncio.to_thread(
-            active_kernel.capabilities.invoke,
-            CapabilityRequest(
-                capability_id=capability_id,
-                mode=mode,
-                input=payload,
-            ),
+        cancellation_event = threading.Event()
+        worker = asyncio.create_task(
+            asyncio.to_thread(
+                _invoke_capability_with_cancellation,
+                active_kernel,
+                CapabilityRequest(
+                    capability_id=capability_id,
+                    mode=mode,
+                    input=payload,
+                ),
+                cancellation_event,
+            )
         )
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            cancellation_event.set()
+            worker.add_done_callback(_consume_cancelled_worker_result)
+            _LOGGER.info(
+                "MCP capability invocation cancelled capability_id=%s",
+                capability_id,
+            )
+            raise
 
     @server.tool(
         name="workspace.open",

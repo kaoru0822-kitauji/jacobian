@@ -382,6 +382,11 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
             written = json.loads(write_result.content[0].text)
             assert written["findings_written"] == 2
             assert written["attempts_written"] == 1
+            assert len(written["unverified_finding_ids"]) == 2
+            assert (
+                "cannot establish an exact mathematical conclusion"
+                in written["assurance_notice"]
+            )
 
             conflicting_mark_result = await client.call_tool(
                 "workspace.write",
@@ -548,6 +553,36 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
                 "sat.unsat_proof.verify",
             }.intersection(all_ids)
             assert expected_sat_ids.issubset(search_ids)
+
+            coloring_search = await client.call_tool(
+                "capability.describe",
+                {
+                    "query": (
+                        "finite coloring forbidden monochromatic triples exact "
+                        "finite existence certified exhaustive search"
+                    ),
+                    "limit": 20,
+                },
+            )
+            coloring_ids = {
+                descriptor["capability_id"]
+                for descriptor in json.loads(coloring_search.content[0].text)["matches"]
+            }
+            assert expected_sat_ids.issubset(coloring_ids)
+
+            materialize_description = await client.call_tool(
+                "capability.describe",
+                {"capability_id": "sat.cnf.materialize"},
+            )
+            materialize = json.loads(materialize_description.content[0].text)
+            assert materialize["invocations"][0]["name"] == "finite-coloring-cnf"
+            assert (
+                materialize["synchronous_execution"]["remote_safe_wall_seconds_max"]
+                == 150
+            )
+            assert {
+                item["capability_id"] for item in materialize["related_capabilities"]
+            }.issuperset(expected_sat_ids - {"sat.cnf.materialize"})
 
             first_page = await client.call_tool(
                 "capability.describe",

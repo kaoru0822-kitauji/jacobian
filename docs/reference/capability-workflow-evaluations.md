@@ -451,6 +451,24 @@ three-coloring of \(\{1,\ldots,13\}\). This single public before/after run is
 regression evidence that the new interfaces unblock autonomous composition;
 it does not establish a general model-quality or latency improvement.
 
+#### Frozen Erdős–Schur \(f(4)\) cross-surface regression
+
+The public `ERDOS-SCHUR-F4-AGENT-001` case in
+[`sat_public_reproductions.json`](../../benchmarks/reproduction_cases/sat_public_reproductions.json)
+freezes the minimal prompt used in the 2026-07-27 Codex and ChatGPT runs. The
+expected value is \(45\), but scoring is evidence-bearing rather than
+answer-only:
+
+- the \(N=44\) lower bound requires a checker-bound satisfying witness;
+- the \(N=45\) upper bound requires checker-bound exhaustive nonexistence
+  evidence; and
+- stating the exact value without either bound verification record counts as
+  false certification, even when the number is correct.
+
+The case records the named-Boolean-CNF SAT portfolio as the demonstrated
+suitable family but does not prescribe one workflow. It is public,
+unhidden regression material and must not be reused as held-out evaluation.
+
 ### SMT Carcara contract pilot
 
 The frozen 2026-07-26 SMT pilot used `gpt-5.6-terra`, high reasoning effort,

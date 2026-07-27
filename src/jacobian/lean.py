@@ -17,7 +17,12 @@ from jacobian.contracts.lean import (
     LeanEnvironment,
     LeanVerifyResult,
 )
-from jacobian.contracts.results import Execution, ExecutionStatus, ResultEnvelope
+from jacobian.contracts.results import (
+    Execution,
+    ExecutionStatus,
+    ResultEnvelope,
+    Verification,
+)
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.references import LeanCheckerInstallation
 from jacobian.registry import CheckerRegistryError
@@ -48,6 +53,8 @@ class LeanService:
             weakref.WeakValueDictionary()
         )
         self._warmup_started = False
+        self._mathlib_warmup_status = "NOT_STARTED"
+        self._mathlib_warmup_detail: str | None = None
 
     def verify(
         self,
@@ -173,6 +180,7 @@ class LeanService:
             if self._warmup_started:
                 return False
             self._warmup_started = True
+            self._mathlib_warmup_status = "RUNNING"
         thread = threading.Thread(
             target=self._warm_mathlib,
             name="jacobian-lean-mathlib-warmup",
@@ -183,13 +191,40 @@ class LeanService:
 
     def _warm_mathlib(self) -> None:
         try:
-            self.verify(
-                statement="1 + 1 = 2",
-                proof="rfl",
+            checked = self.verify(
+                statement="True",
+                proof="by trivial",
                 environment=LeanEnvironment.MATHLIB,
             )
-        except Exception:
+            healthy = (
+                checked.result.execution.status is ExecutionStatus.COMPLETED
+                and checked.result.assurance.verification is Verification.VERIFIED
+            )
+            with self._cache_lock:
+                self._mathlib_warmup_status = "HEALTHY" if healthy else "UNHEALTHY"
+                self._mathlib_warmup_detail = (
+                    None
+                    if healthy
+                    else (
+                        checked.result.input.errors[0]
+                        if checked.result.input.errors
+                        else "the MATHLIB smoke proof was not accepted"
+                    )
+                )
+        except Exception as exc:
+            with self._cache_lock:
+                self._mathlib_warmup_status = "UNHEALTHY"
+                self._mathlib_warmup_detail = type(exc).__name__
             _LOGGER.exception("Lean Mathlib warm-up failed")
+
+    def mathlib_warmup_health(self) -> dict[str, str | None]:
+        """Return model-facing health without exposing runtime paths."""
+
+        with self._cache_lock:
+            return {
+                "status": self._mathlib_warmup_status,
+                "detail": self._mathlib_warmup_detail,
+            }
 
     def _cached_result(
         self,

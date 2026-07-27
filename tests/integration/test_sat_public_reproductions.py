@@ -36,6 +36,10 @@ def _load_cases() -> list[dict[str, Any]]:
     assert suite["scored"] is False
     assert suite["purpose"].endswith("never hidden evaluation")
     assert len(suite["attack_coverage"]) >= 4
+    agent_case = suite["agent_regressions"][0]
+    assert agent_case["case_id"] == "ERDOS-SCHUR-F4-AGENT-001"
+    assert agent_case["expected_answer"] == 45
+    assert agent_case["route_is_not_prescribed"] is True
     cases = suite["cases"]
     assert isinstance(cases, list)
     return cases

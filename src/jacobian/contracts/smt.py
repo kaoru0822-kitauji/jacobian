@@ -195,7 +195,14 @@ class SmtExplorationBudget(ContractModel):
     """cvc5 limits enforced by both its solver and the worker process."""
 
     budget_version: Literal["1"] = "1"
-    wall_seconds: StrictInt = Field(ge=1, le=300)
+    wall_seconds: StrictInt = Field(
+        ge=1,
+        le=150,
+        description=(
+            "Synchronous cvc5 wall-time budget. Partition searches expected to "
+            "exceed the cross-client-safe 150-second ceiling."
+        ),
+    )
 
     def artifact_budget(self) -> SmtResourceBudget:
         return SmtResourceBudget(wall_seconds=self.wall_seconds)

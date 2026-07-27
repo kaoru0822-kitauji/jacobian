@@ -13,7 +13,11 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from jacobian.bounded_process import BoundedProcessResult, run_bounded_process
+from jacobian.bounded_process import (
+    BoundedProcessResult,
+    bounded_process_cancelled,
+    run_bounded_process,
+)
 from jacobian.canonical import loads_strict_json
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
@@ -23,6 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
@@ -218,7 +223,8 @@ class Cvc5UnsatProofFindAdapter:
             description=(
                 "Ask pinned cvc5 to emit raw Alethe for one QF_UF, QF_LIA, or "
                 "QF_LRA query; preserving bytes or observing no holes does not "
-                "establish UNSAT."
+                "establish UNSAT. The synchronous budget is at most 150 seconds; "
+                "named Boolean CNF is generally better for finite colorings."
             ),
             provider="cvc5",
             provider_runtime=backend.runtime,
@@ -235,6 +241,27 @@ class Cvc5UnsatProofFindAdapter:
                 "qf-uf",
                 "qf-lia",
                 "qf-lra",
+            ),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="qf-lia-contradiction",
+                    description=(
+                        "Minimal valid request shape for a bounded arithmetic "
+                        "contradiction."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input={
+                        "logic": "QF_LIA",
+                        "smtlib_text": (
+                            "(set-logic QF_LIA)\n"
+                            "(declare-fun x () Int)\n"
+                            "(assert (= x 0))\n"
+                            "(assert (= x 1))\n"
+                            "(check-sat)\n"
+                        ),
+                        "resource_budget": {"wall_seconds": 30},
+                    },
+                ),
             ),
         )
 
@@ -269,6 +296,22 @@ class Cvc5UnsatProofFindAdapter:
                 )
             ) from exc
         run = self.backend.run(resolved, validated)
+        if (
+            run.execution_status is ExecutionStatus.COMPLETED
+            and bounded_process_cancelled()
+        ):
+            run = _Cvc5Run(
+                execution_status=ExecutionStatus.CANCELLED,
+                runtime_ms=run.runtime_ms,
+                diagnostic=CapabilityDiagnostic(
+                    code="CVC5_CANCELLED",
+                    stage="solver_execution",
+                    message=(
+                        "The client cancelled after cvc5 stopped and before proof "
+                        "materialization; no solver proof evidence was retained."
+                    ),
+                ),
+            )
         if run.execution_status is not ExecutionStatus.COMPLETED:
             return _failed_result(self.descriptor, request, resolved, run)
         assert run.solver_status is not None
@@ -416,6 +459,18 @@ def _operational_failure(
     started: float,
     completed: BoundedProcessResult,
 ) -> _Cvc5Run | None:
+    if completed.cancelled:
+        return _run_failure(
+            started,
+            status=ExecutionStatus.CANCELLED,
+            code="CVC5_CANCELLED",
+            stage="solver_execution",
+            message=(
+                "The client cancelled the cvc5 operation; the worker was "
+                "terminated and no mathematical conclusion or solver evidence "
+                "was retained."
+            ),
+        )
     if completed.stdout_exceeded or completed.stderr_exceeded:
         return _run_failure(
             started,

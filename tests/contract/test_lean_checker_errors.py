@@ -12,6 +12,7 @@ from jacobian_checkers.lean4 import (
     _lean_rejection,
     _LeanSetupError,
     _run_lean,
+    _source,
     _validate_lean,
 )
 
@@ -119,6 +120,17 @@ def test_mathlib_validates_the_exact_lake_compiler_command(
     assert validated == [(("/usr/bin/lake", "env", "lean"), tmp_path)]
 
 
+def test_source_accepts_let_expressions_and_inline_by_terms() -> None:
+    inline = _source("True", "by trivial", None)
+    witness = _source("let n : Nat := 2; n + n = 4", "rfl", None)
+
+    assert "theorem jacobian_theorem : (True) := by trivial" in inline
+    assert ":= by\n  by trivial" not in inline
+    assert (
+        "theorem jacobian_theorem : (let n : Nat := 2; n + n = 4) := by\n  rfl"
+    ) in witness
+
+
 def test_missing_pinned_toolchain_names_the_install_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -131,7 +143,8 @@ def test_missing_pinned_toolchain_names_the_install_command(
         _validate_lean(("/opt/elan/bin/elan", "run", LEAN_TOOLCHAIN, "lean"))
 
     assert str(raised.value) == (
-        "The pinned Lean 4.31.0 toolchain is unavailable. Install it with "
+        "TOOLCHAIN_PROBE: The pinned Lean 4.31.0 toolchain is unavailable. "
+        "Install it with "
         "`elan toolchain install leanprover/lean4:v4.31.0`, then retry."
     )
 

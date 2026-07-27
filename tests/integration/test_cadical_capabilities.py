@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import shutil
+import threading
 from pathlib import Path
 
 import pytest
 
+from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.cadical import install_cadical_capabilities
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -145,7 +148,35 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-def test_proof_find_preserves_raw_text_drat_without_self_verification(
+def test_model_find_returns_named_values_after_lexicographic_remapping(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = _fake_cadical(
+        tmp_path,
+        "assert pathlib.Path(sys.argv[-1]).read_bytes() == "
+        "b'p cnf 3 3\\n1 0\\n2 0\\n-3 0\\n'\n"
+        "print('s SATISFIABLE')\n"
+        "print('v 1 2 -3 0')\n"
+        "raise SystemExit(10)",
+    )
+    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
+    cnf = kernel.sat.put_cnf(
+        variable_names=("n1", "n2", "n10"),
+        clauses=((1,), (-2,), (3,)),
+    )
+
+    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+
+    assert result.output["assignment"] == {
+        "n1": True,
+        "n10": True,
+        "n2": False,
+    }
+    assert "named variable map" in result.output["detail"]
+
+
+def test_proof_find_normalizes_deletions_without_self_verification(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -176,10 +207,53 @@ def test_proof_find_preserves_raw_text_drat_without_self_verification(
     proof_uri = result.output["proof_uri"]
     stored = kernel.store.get(proof_uri)
     proof = SatProofArtifact.model_validate(stored.payload)
-    assert proof.raw_bytes() == b"0\nd -1 0\n"
+    assert proof.raw_bytes() == b"0\n"
+    assert "removed 1 operational deletion step(s)" in result.output["detail"]
     assert proof.proof_format == "DRAT"
     assert proof.proof_format_version == "drat-text/v1"
     assert stored.manifest.parents == (cnf.artifact_uri,)
+
+
+@pytest.mark.skipif(
+    shutil.which("drat-trim") is None,
+    reason="DRAT-trim is not installed",
+)
+def test_cadical_deletion_heavy_proof_replays_in_strict_checker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = _fake_cadical(
+        tmp_path,
+        "proof = pathlib.Path(sys.argv[-1])\n"
+        "proof.write_bytes((b'd -2 0\\n' * 50000) + b'0\\n')\n"
+        "print('s UNSATISFIABLE')\n"
+        "raise SystemExit(20)",
+    )
+    kernel = _kernel_with_fake(
+        tmp_path,
+        monkeypatch,
+        executable,
+        install_references=True,
+    )
+    cnf = kernel.sat.put_cnf(
+        variable_names=("x", "y"),
+        clauses=((1,), (-1,), (2,)),
+    )
+
+    produced = _invoke(kernel, "sat.unsat_proof.find", cnf.artifact_uri)
+    proof_uri = produced.output["proof_uri"]
+    assert kernel.sat.resolve_proof(proof_uri).proof.raw_bytes() == b"0\n"
+
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.unsat_proof.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"proof_uri": proof_uri},
+        )
+    )
+
+    assert verified.output["status"] == "VERIFIED_UNSAT"
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
 @pytest.mark.parametrize(
@@ -247,6 +321,29 @@ def test_timeout_is_operational_and_materializes_no_solver_evidence(
     assert result.diagnostics[0].code == "CADICAL_TIMEOUT"
     assert result.artifact_uris == (cnf.artifact_uri,)
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
+
+
+def test_client_cancellation_terminates_solver_and_materializes_no_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = _fake_cadical(tmp_path, "time.sleep(30)")
+    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
+    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    cancellation_event = threading.Event()
+    cancellation_event.set()
+
+    with bounded_process_cancellation(cancellation_event):
+        result = _invoke(
+            kernel,
+            "sat.model.find",
+            cnf.artifact_uri,
+            wall_seconds=150,
+        )
+
+    assert result.execution.status is ExecutionStatus.CANCELLED
+    assert result.diagnostics[0].code == "CADICAL_CANCELLED"
+    assert result.artifact_uris == (cnf.artifact_uri,)
 
 
 def test_partial_model_fails_closed_without_an_assignment(
@@ -340,7 +437,7 @@ def test_oversized_proof_fails_closed_before_reading_or_materialization(
     result = _invoke(kernel, "sat.unsat_proof.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
-    assert result.diagnostics[0].code == "CADICAL_PROOF_LIMIT_EXCEEDED"
+    assert result.diagnostics[0].code == "CADICAL_DURABLE_PROOF_LIMIT_EXCEEDED"
     assert result.artifact_uris == (cnf.artifact_uri,)
 
 

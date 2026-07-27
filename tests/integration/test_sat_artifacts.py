@@ -91,6 +91,39 @@ def test_sat_cnf_materialization_capability_exposes_reusable_identity(
     assert result.output["semantics_uri"] == kernel.sat.installation.semantics_uri
     assert result.output["variable_map_digest"] == resolved.cnf.variable_map_digest
     assert result.output["dimacs_digest"] == resolved.cnf.dimacs_digest
+    assert result.output["caller_order_changed"] is True
+    assert result.output["variable_bindings_complete"] is True
+    assert result.output["variable_bindings"] == [
+        {"id": 1, "name": "a"},
+        {"id": 2, "name": "b"},
+    ]
+    assert "named assignment map" in result.output["variable_order_note"]
+
+
+def test_sat_materialization_makes_lexicographic_name_order_explicit(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="sat.cnf.materialize",
+            mode=CapabilityMode.EXPLORE,
+            input={
+                "variable_names": ["n1", "n2", "n10"],
+                "clauses": [[1], [-2], [3]],
+            },
+        )
+    )
+
+    assert result.output["caller_order_changed"] is True
+    assert result.output["variable_bindings"] == [
+        {"id": 1, "name": "n1"},
+        {"id": 2, "name": "n10"},
+        {"id": 3, "name": "n2"},
+    ]
+    resolved = kernel.sat.resolve_cnf(result.output["cnf_uri"])
+    assert resolved.cnf.to_dimacs_bytes() == b"p cnf 3 3\n1 0\n2 0\n-3 0\n"
 
 
 @pytest.mark.integration

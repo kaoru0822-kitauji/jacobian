@@ -480,7 +480,7 @@ def _bounded_drat_trim(
     cnf: bytes,
     proof: bytes,
     expected_runtime_digest: str,
-) -> bool:
+) -> tuple[bool, str | None]:
     with tempfile.TemporaryDirectory(prefix="jacobian-drat-trim-") as directory:
         root = Path(directory)
         cnf_path = root / "input.cnf"
@@ -563,7 +563,7 @@ def _bounded_drat_trim(
                 timeout=DRAT_TRIM_TIMEOUT_SECONDS,
             )
         if stdout_exceeded.is_set() or stderr_exceeded.is_set():
-            return False
+            return False, "DRAT_OUTPUT_LIMIT_EXCEEDED"
         if _sha256(executable.read_bytes()) != expected_runtime_digest:
             raise ValueError("DRAT-trim runtime changed during replay")
         try:
@@ -577,17 +577,25 @@ def _bounded_drat_trim(
             ]
             bytes(stderr).decode("ascii")
         except UnicodeDecodeError:
-            return False
+            return False, "DRAT_INVALID_CHECKER_OUTPUT"
         statuses = [line for line in lines if line.startswith("s ")]
         protocol_lines = all(
             line == "c" or line.startswith(("c ", "s ")) for line in lines
         )
-        return (
+        accepted = (
             process.returncode == 0
             and statuses == ["s VERIFIED"]
             and protocol_lines
             and not stderr
         )
+        if accepted:
+            return True, None
+        deletion_warning = any(
+            line.startswith("c WARNING: deleted clause") for line in lines
+        )
+        if deletion_warning:
+            return False, "DRAT_DELETION_WARNING_REJECTED"
+        return False, "DRAT_PROOF_REJECTED"
 
 
 def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
@@ -652,14 +660,16 @@ def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
             expected_bindings=expected_bindings,
         )
         executable, runtime_digest = _authorized_runtime()
-        accepted = _bounded_drat_trim(
+        accepted, rejection_code = _bounded_drat_trim(
             executable,
             cnf=_dimacs_bytes(clauses, variable_count),
             proof=raw_proof,
             expected_runtime_digest=runtime_digest,
         )
         if not accepted:
-            return _reject_proof("DRAT-trim did not accept the exact bound proof")
+            return _reject_proof(
+                f"{rejection_code}: DRAT-trim did not accept the exact bound proof"
+            )
         return {
             "accepted": True,
             "conclusion": "TRUE",

@@ -216,6 +216,18 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
     assert written.scratch_written == 1
     assert written.findings_written == 3
     assert written.attempts_written == 1
+    assert set(written.unverified_finding_ids) == {
+        written.id_map["A1"],
+        written.id_map["G1"],
+        written.id_map["L1"],
+    }
+    assert set(written.unresolved_dependency_ids) == {
+        written.id_map["A1"],
+        written.id_map["G1"],
+    }
+    assert "cannot establish an exact mathematical conclusion" in (
+        written.assurance_notice
+    )
     revision_artifact = kernel.store.get(written.revision_artifact_uri)
     assert opened.revision_artifact_uri in revision_artifact.manifest.parents
     revision = WorkspaceRevision.model_validate(revision_artifact.payload)

@@ -17,9 +17,11 @@ LEAN_TOOLCHAIN = f"leanprover/lean4:v{LEAN_VERSION}"
 MATHLIB_COMMIT = "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
 MATHLIB_AXIOMS = frozenset({"Classical.choice", "Quot.sound", "propext"})
 _TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 15
+_MATHLIB_COMPILE_TIMEOUT_SECONDS = 180
 _FORBIDDEN = re.compile(
-    r"\b(?:admit|axiom|elab|import|macro|native_decide|opaque|run_tac|"
-    r"set_option|sorry|syntax|unsafe)\b|#",
+    r"\b(?:admit|axiom|class|def|elab|end|example|import|instance|lemma|macro|"
+    r"namespace|native_decide|opaque|run_tac|section|set_option|sorry|syntax|"
+    r"theorem|unsafe)\b|#",
     re.IGNORECASE,
 )
 _AXIOMS = re.compile(r"'jacobian_theorem' depends on axioms: \[([^\]]*)\]")
@@ -89,16 +91,20 @@ def _text(value: object, *, name: str, limit: int) -> str:
 
 
 def _source(statement: str, proof: str, import_name: str | None) -> str:
-    if "\n" in statement or "\r" in statement or ":=" in statement:
+    if "\n" in statement or "\r" in statement:
         raise ValueError("statement must be one Lean expression")
+    if any(marker in statement for marker in ("--", "/-", "-/")):
+        raise ValueError(
+            "statement comments are outside the single-expression boundary"
+        )
     proof_lines = proof.splitlines()
-    complete_proof_term = proof_lines[0].strip() == "by"
+    complete_proof_term = re.match(r"^by(?:\s|$)", proof.lstrip()) is not None
     theorem = (
-        f"theorem jacobian_theorem : {statement} := {proof}"
+        f"theorem jacobian_theorem : ({statement}) := {proof}"
         if complete_proof_term
         else "\n".join(
             (
-                f"theorem jacobian_theorem : {statement} := by",
+                f"theorem jacobian_theorem : ({statement}) := by",
                 "\n".join(f"  {line}" for line in proof_lines),
             )
         )
@@ -125,7 +131,8 @@ def _lean_command(name: str) -> tuple[str, ...]:
     launcher = shutil.which(name)
     if launcher is None:
         raise _LeanSetupError(
-            f"The pinned Lean {LEAN_VERSION} toolchain is unavailable. Install "
+            f"TOOLCHAIN_RESOLUTION: The pinned Lean {LEAN_VERSION} {name} "
+            "launcher is unavailable. Install "
             f"it with `elan toolchain install {LEAN_TOOLCHAIN}`, then retry."
         )
     return (launcher,)
@@ -155,12 +162,14 @@ def _validate_lean(
         ).stdout.strip()
     except subprocess.SubprocessError as exc:
         raise _LeanSetupError(
-            f"The pinned Lean {LEAN_VERSION} toolchain is unavailable. Install "
+            f"TOOLCHAIN_PROBE: The pinned Lean {LEAN_VERSION} toolchain is "
+            "unavailable. Install "
             f"it with `elan toolchain install {LEAN_TOOLCHAIN}`, then retry."
         ) from exc
     if version != LEAN_VERSION or commit != LEAN_COMMIT:
         raise _LeanSetupError(
-            f"The installed Lean toolchain does not match Jacobian's pinned "
+            f"TOOLCHAIN_PROBE: The installed Lean toolchain does not match "
+            "Jacobian's pinned "
             f"{LEAN_VERSION} release. Reinstall it with `elan toolchain install "
             f"{LEAN_TOOLCHAIN}`, then retry."
         )
@@ -227,30 +236,49 @@ def _mathlib_runtime() -> Path:
     manifest_path = runtime / "lake-manifest.json"
     toolchain_path = runtime / "lean-toolchain"
     if not manifest_path.is_file() or not toolchain_path.is_file():
-        raise RuntimeError("the pinned mathlib runtime is unavailable")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        raise _LeanSetupError(
+            "MATHLIB_MANIFEST: the pinned mathlib runtime is unavailable"
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise _LeanSetupError(
+            "MATHLIB_MANIFEST: the pinned mathlib manifest could not be read"
+        ) from exc
     packages = manifest.get("packages")
     if manifest.get("packagesDir") != ".lake/packages" or not isinstance(
         packages, list
     ):
-        raise RuntimeError("the mathlib manifest is malformed")
+        raise _LeanSetupError("MATHLIB_MANIFEST: the mathlib manifest is malformed")
     revisions = {
         package.get("name"): package.get("rev")
         for package in packages
         if isinstance(package, dict)
     }
     if revisions.get("mathlib") != MATHLIB_COMMIT:
-        raise RuntimeError("the installed mathlib commit is not authorized")
+        raise _LeanSetupError(
+            "MATHLIB_MANIFEST: the installed mathlib commit is not authorized"
+        )
     packages_directory = runtime / ".lake" / "packages"
     for package in packages:
         if not isinstance(package, dict):
-            raise RuntimeError("the mathlib manifest contains an invalid package")
-        _validate_package_checkout(packages_directory, package)
+            raise _LeanSetupError(
+                "MATHLIB_MANIFEST: the mathlib manifest contains an invalid package"
+            )
+        try:
+            _validate_package_checkout(packages_directory, package)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+            raise _LeanSetupError(
+                "MATHLIB_MANIFEST: a pinned mathlib package checkout failed "
+                "integrity validation"
+            ) from exc
     if (
         toolchain_path.read_text(encoding="utf-8").strip()
         != f"leanprover/lean4:v{LEAN_VERSION}"
     ):
-        raise RuntimeError("the mathlib runtime requests another Lean toolchain")
+        raise _LeanSetupError(
+            "MATHLIB_MANIFEST: the mathlib runtime requests another Lean toolchain"
+        )
     return runtime
 
 
@@ -313,7 +341,7 @@ def _run_lean(
         command = [*lake_command, "env", "lean"]
         _validate_lean(tuple(command), cwd=runtime)
         memory_mb = "8192"
-        timeout_seconds = 90
+        timeout_seconds = _MATHLIB_COMPILE_TIMEOUT_SECONDS
         cwd_context = tempfile.TemporaryDirectory(prefix="jacobian-lean-home-")
         cwd = runtime
         runtime_home = os.environ.get("HOME", cwd_context.name)
@@ -332,28 +360,39 @@ def _run_lean(
         **({"ELAN_HOME": elan_home} if elan_home is not None else {}),
     }
     with cwd_context:
-        return subprocess.run(
-            [
-                *command,
-                "--stdin",
-                "-t",
-                "0",
-                "-T",
-                "1000000000",
-                "-M",
-                memory_mb,
-                "-j",
-                "1",
-                "--trust=0",
-            ],
-            cwd=cwd,
-            env=process_environment,
-            input=source,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
+        try:
+            return subprocess.run(
+                [
+                    *command,
+                    "--stdin",
+                    "-t",
+                    "0",
+                    "-T",
+                    "1000000000",
+                    "-M",
+                    memory_mb,
+                    "-j",
+                    "1",
+                    "--trust=0",
+                ],
+                cwd=cwd,
+                env=process_environment,
+                input=source,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            stage = (
+                "LEAN_COMPILE_TIMEOUT"
+                if environment_name == "MATHLIB"
+                else "LEAN_CORE_TIMEOUT"
+            )
+            raise _LeanSetupError(
+                f"{stage}: Lean exceeded its {timeout_seconds}-second compile "
+                "budget; no proof conclusion follows"
+            ) from exc
 
 
 def _reported_axioms(diagnostics: str) -> frozenset[str]:

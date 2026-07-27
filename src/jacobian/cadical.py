@@ -13,7 +13,12 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from jacobian.bounded_process import BoundedProcessResult, run_bounded_process
+from jacobian.bounded_process import (
+    BoundedProcessResult,
+    ProcessResourceLimits,
+    bounded_process_cancelled,
+    run_bounded_process,
+)
 from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -45,6 +50,7 @@ from jacobian.schema_registry import model_schema
 CADICAL_STDOUT_LIMIT = 16_000_000
 CADICAL_STDERR_LIMIT = 64_000
 CADICAL_PROOF_LIMIT = 6_000_000
+CADICAL_RAW_PROOF_LIMIT = 64_000_000
 
 _SolverStatus = Literal["SATISFIABLE", "UNSATISFIABLE", "UNKNOWN"]
 
@@ -56,7 +62,16 @@ class _CadicalRun:
     solver_status: _SolverStatus | None = None
     model_literals: tuple[int, ...] = ()
     proof: bytes | None = None
+    removed_deletion_steps: int = 0
     diagnostic: CapabilityDiagnostic | None = None
+
+
+class _CadicalRawProofLimitError(OverflowError):
+    pass
+
+
+class _CadicalDurableProofLimitError(OverflowError):
+    pass
 
 
 def install_cadical_capabilities(
@@ -161,6 +176,9 @@ class _CadicalBackend:
                     },
                     stdout_limit=CADICAL_STDOUT_LIMIT,
                     stderr_limit=CADICAL_STDERR_LIMIT,
+                    resource_limits=ProcessResourceLimits(
+                        file_size_bytes=CADICAL_RAW_PROOF_LIMIT,
+                    ),
                 )
             except OSError:
                 return _run_failure(
@@ -168,6 +186,21 @@ class _CadicalBackend:
                     code="CADICAL_EXECUTION_FAILED",
                     stage="solver_execution",
                     message="The pinned CaDiCaL process could not be started.",
+                )
+            if (
+                produce_proof
+                and completed.returncode not in {0, 10, 20}
+                and proof_path.is_file()
+                and proof_path.stat().st_size >= CADICAL_RAW_PROOF_LIMIT
+            ):
+                return _run_failure(
+                    started,
+                    code="CADICAL_RAW_PROOF_LIMIT_EXCEEDED",
+                    stage="proof_capture",
+                    message=(
+                        "CaDiCaL reached the operating-system raw proof file-size "
+                        "limit; no proof evidence was retained."
+                    ),
                 )
             operational = _operational_failure(started, completed)
             if operational is not None:
@@ -200,7 +233,7 @@ class _CadicalBackend:
             proof: bytes | None = None
             if produce_proof and solver_status == "UNSATISFIABLE":
                 try:
-                    proof = _read_proof_file(proof_path)
+                    proof, removed_deletion_steps = _read_proof_file(proof_path)
                 except FileNotFoundError:
                     return _run_failure(
                         started,
@@ -211,14 +244,26 @@ class _CadicalBackend:
                             "requested DRAT proof file."
                         ),
                     )
-                except OverflowError:
+                except _CadicalRawProofLimitError:
                     return _run_failure(
                         started,
-                        code="CADICAL_PROOF_LIMIT_EXCEEDED",
+                        code="CADICAL_RAW_PROOF_LIMIT_EXCEEDED",
                         stage="proof_capture",
                         message=(
-                            "The raw CaDiCaL proof exceeded the configured durable "
-                            "artifact limit and was not read or retained."
+                            "The raw CaDiCaL proof exceeded the bounded capture limit "
+                            "before normalization and was not retained."
+                        ),
+                    )
+                except _CadicalDurableProofLimitError:
+                    return _run_failure(
+                        started,
+                        code="CADICAL_DURABLE_PROOF_LIMIT_EXCEEDED",
+                        stage="proof_capture",
+                        message=(
+                            "The addition-only normalized CaDiCaL proof still "
+                            "exceeded the durable artifact limit. Partition the "
+                            "search or use a smaller certificate; no conclusion "
+                            "follows."
                         ),
                     )
                 except OSError:
@@ -237,6 +282,11 @@ class _CadicalBackend:
                 solver_status=solver_status,
                 model_literals=model_literals,
                 proof=proof,
+                removed_deletion_steps=(
+                    removed_deletion_steps
+                    if produce_proof and solver_status == "UNSATISFIABLE"
+                    else 0
+                ),
             )
 
     def _runtime_changed(self) -> bool:
@@ -263,15 +313,27 @@ class CadicalModelFindAdapter:
             version="1",
             title="Find a SAT assignment",
             description=(
-                "Ask pinned CaDiCaL to produce one total assignment for an exact "
-                "canonical CNF; the candidate remains unverified."
+                "Find a named Boolean witness for an exact finite CNF, including "
+                "finite colorings and forbidden configurations. Pinned CaDiCaL "
+                "produces one total assignment; the candidate remains unverified "
+                "until sat.model.verify accepts it."
             ),
             provider="cadical",
             provider_runtime=backend.runtime,
             modes=(CapabilityMode.EXPLORE,),
             input_schema=model_schema(SatExplorationRequest),
             output_schema=model_schema(SatModelFindOutput),
-            tags=("sat", "cnf", "assignment", "exploration", "cadical"),
+            tags=(
+                "sat",
+                "cnf",
+                "assignment",
+                "exploration",
+                "cadical",
+                "boolean-encoding",
+                "finite-coloring",
+                "exact-finite-existence",
+                "named-assignment",
+            ),
         )
 
     @property
@@ -281,6 +343,11 @@ class CadicalModelFindAdapter:
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated, resolved = _resolve_request(self.sat, request)
         run = self.backend.run_model(resolved.cnf, validated.resource_budget)
+        if (
+            run.execution_status is ExecutionStatus.COMPLETED
+            and bounded_process_cancelled()
+        ):
+            run = _cancelled_after_solver(run)
         if run.execution_status is not ExecutionStatus.COMPLETED:
             return _failed_result(self.descriptor, request, resolved, run)
         assert run.solver_status is not None
@@ -335,8 +402,9 @@ class CadicalModelFindAdapter:
             assignment_uri=assignment_uri,
             assignment=assignment,
             detail=(
-                "CaDiCaL produced a total assignment candidate; it remains "
-                "unverified until sat.model.verify accepts it."
+                "CaDiCaL produced a total assignment candidate. The inline named "
+                "variable map is the authoritative model-facing interpretation; "
+                "it remains unverified until sat.model.verify accepts it."
                 if assignment_uri is not None
                 else (
                     f"CaDiCaL reported {run.solver_status} without producing an "
@@ -380,15 +448,27 @@ class CadicalUnsatProofFindAdapter:
             version="1",
             title="Find a SAT UNSAT proof",
             description=(
-                "Ask pinned CaDiCaL to emit raw text DRAT for an exact canonical "
-                "CNF; preserving the proof does not establish UNSAT."
+                "Run certified exhaustive search for an exact finite Boolean CNF. "
+                "Pinned CaDiCaL emits normalized text DRAT; preserving the proof "
+                "does not establish UNSAT until sat.unsat_proof.verify accepts it."
             ),
             provider="cadical",
             provider_runtime=backend.runtime,
             modes=(CapabilityMode.EXPLORE,),
             input_schema=model_schema(SatExplorationRequest),
             output_schema=model_schema(SatUnsatProofFindOutput),
-            tags=("sat", "cnf", "unsat", "proof", "exploration", "cadical"),
+            tags=(
+                "sat",
+                "cnf",
+                "unsat",
+                "proof",
+                "exploration",
+                "cadical",
+                "boolean-encoding",
+                "finite-coloring",
+                "forbidden-configurations",
+                "certified-exhaustive-search",
+            ),
         )
 
     @property
@@ -398,6 +478,11 @@ class CadicalUnsatProofFindAdapter:
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
         validated, resolved = _resolve_request(self.sat, request)
         run = self.backend.run_proof(resolved.cnf, validated.resource_budget)
+        if (
+            run.execution_status is ExecutionStatus.COMPLETED
+            and bounded_process_cancelled()
+        ):
+            run = _cancelled_after_solver(run)
         if run.execution_status is not ExecutionStatus.COMPLETED:
             return _failed_result(self.descriptor, request, resolved, run)
         assert run.solver_status is not None
@@ -416,8 +501,11 @@ class CadicalUnsatProofFindAdapter:
             cnf_uri=resolved.artifact.artifact_uri,
             proof_uri=proof_uri,
             detail=(
-                "CaDiCaL produced raw text DRAT bytes; they remain unverified until "
-                "an independent proof checker accepts them."
+                "CaDiCaL produced text DRAT. Jacobian removed "
+                f"{run.removed_deletion_steps} operational deletion step(s) before "
+                "storage so the exact retained addition-only proof matches the "
+                "strict replay profile; it remains unverified until an independent "
+                "proof checker accepts it."
                 if proof_uri is not None
                 else (
                     f"CaDiCaL reported {run.solver_status} without producing an "
@@ -561,6 +649,18 @@ def _operational_failure(
     started: float,
     completed: BoundedProcessResult,
 ) -> _CadicalRun | None:
+    if completed.cancelled:
+        return _run_failure(
+            started,
+            status=ExecutionStatus.CANCELLED,
+            code="CADICAL_CANCELLED",
+            stage="solver_execution",
+            message=(
+                "The client cancelled the CaDiCaL operation; the worker was "
+                "terminated and no mathematical conclusion or solver evidence "
+                "was retained."
+            ),
+        )
     if completed.stdout_exceeded or completed.stderr_exceeded:
         return _run_failure(
             started,
@@ -593,6 +693,21 @@ def _operational_failure(
             ),
         )
     return None
+
+
+def _cancelled_after_solver(run: _CadicalRun) -> _CadicalRun:
+    return _CadicalRun(
+        execution_status=ExecutionStatus.CANCELLED,
+        runtime_ms=run.runtime_ms,
+        diagnostic=CapabilityDiagnostic(
+            code="CADICAL_CANCELLED",
+            stage="solver_execution",
+            message=(
+                "The client cancelled after CaDiCaL stopped and before evidence "
+                "materialization; no solver evidence was retained."
+            ),
+        ),
+    )
 
 
 def _run_failure(
@@ -675,23 +790,40 @@ def _total_assignment(
     return tuple(values[index] for index in range(1, variable_count + 1))
 
 
-def _read_proof_file(path: Path) -> bytes:
+def _read_proof_file(path: Path) -> tuple[bytes, int]:
     path_metadata = path.stat(follow_symlinks=False)
     if not stat.S_ISREG(path_metadata.st_mode):
         raise OSError("proof output is not a regular file")
+    if path_metadata.st_size > CADICAL_RAW_PROOF_LIMIT:
+        raise _CadicalRawProofLimitError("raw proof output exceeds its capture limit")
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     try:
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
             raise OSError("proof output is not a regular file")
-        if metadata.st_size > CADICAL_PROOF_LIMIT:
-            raise OverflowError("proof output exceeds its durable artifact limit")
+        if metadata.st_size > CADICAL_RAW_PROOF_LIMIT:
+            raise _CadicalRawProofLimitError(
+                "raw proof output exceeds its capture limit"
+            )
+        normalized = bytearray()
+        removed_deletion_steps = 0
         with os.fdopen(descriptor, "rb", closefd=False) as stream:
-            proof = stream.read(CADICAL_PROOF_LIMIT + 1)
-        if len(proof) > CADICAL_PROOF_LIMIT:
-            raise OverflowError("proof output grew beyond its durable artifact limit")
-        return proof
+            for line in stream:
+                marker = line.lstrip()
+                if marker.startswith((b"d ", b"d\t")):
+                    removed_deletion_steps += 1
+                    continue
+                normalized.extend(line)
+                if len(normalized) > CADICAL_PROOF_LIMIT:
+                    raise _CadicalDurableProofLimitError(
+                        "normalized proof exceeds its durable artifact limit"
+                    )
+        if os.fstat(descriptor).st_size > CADICAL_RAW_PROOF_LIMIT:
+            raise _CadicalRawProofLimitError(
+                "raw proof output grew beyond its capture limit"
+            )
+        return bytes(normalized), removed_deletion_steps
     finally:
         os.close(descriptor)
 
