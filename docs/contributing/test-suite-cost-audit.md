@@ -44,19 +44,10 @@ store now reuses immutable content-addressed artifacts while constructing an
 isolated request value for each case. All attack cases remain. This reduced the
 fast lane by about 85 percent, from 43.92 to 6.55 seconds.
 
-CI previously used `pytest-split` to divide each Python version between two
-GitHub-hosted runners. That design depended on a committed timing snapshot,
-which became stale as the suite expanded: only 582 of 1,042 selected tests
-still had measurements during the issue #109 investigation. The timeout had
-become the effective stale-data detector.
-
-The Python matrix now uses two stable semantic lanes per supported version:
-core tests and integration/end-to-end tests. xdist's `worksteal` scheduler
-balances the live queue across each runner's four CPUs. This preserves four-way
-runner concurrency without coupling partitioning to historical node-ID
-measurements. It removes the timing snapshot, refresh process, and opaque
-duration-based partition while keeping failures attributable to a documented
-test layer.
+The Python matrix uses two stable semantic lanes per supported version: core
+tests and integration/end-to-end tests. xdist's `worksteal` scheduler balances
+the live queue across each runner's four CPUs. This preserves four-way runner
+concurrency while keeping failures attributable to a documented test layer.
 
 ## Development policy
 
