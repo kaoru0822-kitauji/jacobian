@@ -232,11 +232,37 @@ passes through `JacobianKernel.register_capability`, so portfolio exclusions
 apply uniformly. There is no global operation registry, recursive package
 scan, compatibility adapter, or registration side effect.
 
+The built-in portfolio spans arithmetic, number theory, combinatorics, finite
+sets, sequences, geometry, graph optimization and invariants, matrices,
+lattices, polynomials, validated real analysis, finite probability, and
+rational optimization. Each bundle declares the provider runtime and backend
+version whose identity appears in descriptors and results. The installed
+catalog, rather than this list, remains the authority for availability and
+exact contracts.
+
 `AtomicServiceAdapter` has a narrower role: it projects existing stateful
 services that already return rich result envelopes. Domain-owned mathematical
 functions use domain operations instead. Checker-backed verification remains
 specialized because authorization, evidence binding, and replay are trust
 boundaries rather than producer metadata.
+
+The [domain operation library reference](../reference/domain-operation-library.md)
+defines the producer outcomes, bounded-search obligations, and independent
+exact-replay path.
+
+### Lean formal intermediates
+
+Lean exploration exposes typed proof states, tactic transitions, bounded
+dependency subgraphs, premise-retrieval provenance, and exact proof edits.
+These are agent-visible intermediate objects rather than an opaque proof-repair
+workflow. An accepted proof edit is bound to an independent Lean verification
+record; validation or generation alone cannot accept it.
+
+Proof repair is an agent-owned composition rather than a single opaque
+capability. Agents compose proof-state inspection, premise retrieval, an exact
+edit proposal, checker-backed edit validation, and `lean.check` as distinct
+operations. Generated edits remain unverified unless independent replay accepts
+the exact proof.
 
 ### Epistemic workspace
 
@@ -368,6 +394,9 @@ capability entrypoints, each implementation package digest, runtime and build
 identity, and platform compatibility. Discovery inspects source files without
 importing the package. Capability resolution remeasures the package before
 execution, so a changed file cannot continue under the installed snapshot.
+Providers that execute multiple maintained components use a composite identity
+that binds every source tree or Python distribution record; resolution
+remeasures every component rather than trusting the top-level package alone.
 
 The initial package format hashes regular package files, while declared and
 imported modules must be Python source. Symlinks, traversal outside the
@@ -395,6 +424,19 @@ a proof-assistant kernel. Different programming languages are useful for
 defense in depth, but language diversity alone does not establish mathematical
 independence.
 
+Domain-owned exact replay declarations do not authorize themselves.
+Operator-controlled installation translates each declaration into a checker
+registry entry with explicit schema, semantics, evidence-format, candidate,
+and provider-runtime compatibility. The producer remains capped at `COMPUTED`;
+the separately installed verification capability may return `VERIFIED` only
+after replay creates a fully bound verification record.
+
+Bounded workers, including checker replay, execute outside the control process
+with wall-time and output limits. Supported POSIX environments additionally
+apply CPU and address-space limits before execution. Checker dispatch
+remeasures the authorized provider identity, and an interrupted or
+identity-mismatched replay cannot create a verification record.
+
 ## Bounded discovery
 
 A bounded enumeration capability validates its claim, domain contract, scope,
@@ -417,6 +459,14 @@ wall-time limits, cancellation, and errors. Even a complete report remains
 unverified. Canonical mathematical objects retain ordinary artifact identity;
 the search key separately hashes the canonical object digest together with the
 canonicalizer implementation digest.
+
+Short bounded mathematical searches use the same fail-closed distinction
+without creating a durable experiment. They preserve the typed incumbent,
+bounds, trace, declared scope, and an open optimality obligation. A search may
+finish operationally with a useful partial result while completeness remains
+`UNKNOWN`; `COMPLETED` therefore describes execution, not optimality or a
+mathematical conclusion. Timeout, cancellation, and worker failure retain
+inspectable partial artifacts at heuristic assurance.
 
 Representation-changing capabilities follow a producer/checker split. A
 transformer stores the target, relation label, implementation digest, and proof

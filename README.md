@@ -153,6 +153,7 @@ agent-authored state; workspace entries remain `UNVERIFIED`.
 | [Product model](docs/explanation/product-blueprint.md) | Capability contracts, ownership, artifacts, and assurance |
 | [Product goals](docs/explanation/goals.md) | Active priorities and research direction |
 | [Tool surface](docs/reference/tools.md) | MCP resources, tools, and invocation contracts |
+| [Domain operation library](docs/reference/domain-operation-library.md) | Built-in producer, bounded-search, artifact, and exact-replay contracts |
 | [Provider runtime](docs/reference/provider-runtime.md) | Backend availability, compatibility, and identity |
 | [v0.2 specification](docs/reference/specifications/v0.2.md) | Supported release behavior and conformance |
 | [Testing strategy](docs/reference/testing-strategy.md) | Validation layers, commands, and CI responsibilities |
@@ -164,6 +165,11 @@ Specialized contracts cover
 [exact rational matrix determinants](docs/reference/matrix-rational-determinant.md),
 [integer matrix HNF](docs/reference/matrix-hermite-normal-form.md), and
 [Lean declaration discovery](docs/reference/lean-declaration-discovery.md).
+The [domain-capability how-to](docs/how-to/invoke-domain-capabilities.md)
+demonstrates discovery, computed invocation, bounded-result interpretation,
+and exact replay. The
+[Lean formal-intermediates reference](docs/reference/lean-formal-intermediates.md)
+covers proof states, premise retrieval, dependency graphs, and checked edits.
 Architecture decisions are recorded in the
 [ADR index](docs/explanation/adr/index.md).
 
@@ -184,8 +190,10 @@ Some capabilities use backends that are not installed by default:
 
 - CaDiCaL finds SAT models and UNSAT proof artifacts.
 - cvc5 produces SMT UNSAT proofs; Carcara independently checks Alethe.
-- The `flint` extra produces exact rational solution and inconsistency
-  witnesses and integer row Hermite normal forms.
+- The `flint` extra provides Python-FLINT/Arb operations for exact rational
+  systems, integer matrices and lattices, polynomials, and validated numerical
+  computation. Individual capabilities and independent replay support depend
+  on the installed catalog.
 - Pinned Lean `CORE` and `MATHLIB` environments check formal certificates.
 
 Backend availability is not verification authority. Provider output remains

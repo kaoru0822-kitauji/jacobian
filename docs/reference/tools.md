@@ -125,13 +125,15 @@ examples in documentation.
 Domain reference documents define constraints that remain useful independent
 of catalog membership:
 
+- [domain operation library](domain-operation-library.md);
 - [SAT artifact contracts](sat-artifacts.md);
 - [SMT Alethe artifact contracts](smt-artifacts.md);
 - [exact rational linear-system evidence](linear-rational-solutions.md);
 - [exact rational matrix determinants](matrix-rational-determinant.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
-- [Lean declaration discovery contract](lean-declaration-discovery.md).
+- [Lean declaration discovery contract](lean-declaration-discovery.md); and
+- [Lean formal intermediates](lean-formal-intermediates.md).
 
 ## Mathematical operation portfolio
 
