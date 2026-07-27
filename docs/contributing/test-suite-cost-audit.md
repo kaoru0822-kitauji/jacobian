@@ -120,12 +120,14 @@ remote reproduction without rerunning unrelated matrices. On the measured
 host, the resulting `make check` completed 256 selected tests in 8.36 seconds.
 
 Source-to-suite ownership is declared in `.github/ci-ownership.json` and tested
-against tracked source files. Unknown paths still fail closed. Each CI run
-reports workflow elapsed time (the observable critical path), summed runner
-minutes, and its longest job, making both reviewer latency and compute growth
-visible. Scheduled lanes exercise repeated property/stateful tests, alternate
-orders, optional providers, and the core performance benchmark outside the
-pull-request critical path.
+against tracked source files. Unknown paths still fail closed. Lean ownership is
+narrow: only modules that require the pinned Lean toolchain map to the Lean
+lane. Mocked Lean-adapter contract tests stay in the ordinary integration lane.
+Each CI run reports workflow elapsed time (the observable critical path), summed
+runner minutes, longest job, and integration shard skew, making both reviewer
+latency and compute growth visible. Scheduled lanes exercise repeated
+property/stateful tests, alternate orders, optional providers, and the core
+performance benchmark outside the pull-request critical path.
 
 Do not run the complete non-Lean and Lean suites repeatedly during
 implementation and then immediately repeat them in pull-request CI. Use
