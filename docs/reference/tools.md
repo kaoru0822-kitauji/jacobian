@@ -199,6 +199,13 @@ Useful low-level operations may retain descriptive IDs such as
 `certificate.verify`. Those names identify capabilities invoked through
 `capability.invoke`; they are not separate MCP tools.
 
+`claim.conjunction.split` and `claim.implication.obligations` operate on the
+registered v1 `PROPOSITIONAL_STRUCTURE` artifact. They return only immediate,
+ordered subtrees plus source-bound reconstruction data, preserve nested
+grouping, and report `COMPUTED` rather than proof verification. Raw natural
+language and printed Lean expressions are outside this contract; exact Lean
+decomposition requires a future typed elaborated-expression artifact.
+
 Opaque multi-stage commands are not part of the public surface. Agents should
 compose generation, evaluation, ranking, falsification,
 refinement, and verification from separately invocable capabilities. An
