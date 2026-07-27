@@ -189,7 +189,12 @@ def convex_hull_points(request: ContractModel) -> ContractModel:
     if isinstance(hull, Point2D):
         points = (hull,)
     elif isinstance(hull, (Line2D, Segment2D)):
-        points = tuple(cast(tuple[Point2D, Point2D], hull.points))
+        points = tuple(
+            sorted(
+                cast(tuple[Point2D, Point2D], hull.points),
+                key=lambda point: (point.x, point.y),
+            )
+        )
     else:
         points = tuple(cast(Polygon, hull).vertices)
     return GeometryPointSetResult(points=tuple(_wire_point(point) for point in points))

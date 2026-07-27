@@ -802,6 +802,11 @@ class JacobianKernel:
             self._install_capability_bundle(bundle)
 
     def _install_capability_bundle(self, bundle: DomainBundle) -> None:
+        if (
+            bundle.provider_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            return
         installation = self.operation_installer.install(bundle)
         if bundle.domain_id in self.domain_bundles:
             raise ValueError(f"duplicate capability bundle: {bundle.domain_id}")
