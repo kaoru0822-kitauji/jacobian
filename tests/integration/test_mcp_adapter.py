@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -434,6 +435,113 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert unknown_result["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
 
     asyncio.run(scenario())
+
+
+@pytest.mark.integration
+def test_mcp_compact_capability_index_is_searchable_and_paginated(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+            resource_result = await client.read_resource("capability://catalog")
+            full_catalog = json.loads(resource_result.contents[0].text)
+            all_ids = {
+                descriptor["capability_id"]
+                for descriptor in full_catalog["capabilities"]
+            }
+
+            listed = await client.call_tool("capability.describe", {})
+            index = json.loads(listed.content[0].text)
+            assert len(listed.content[0].text.encode("utf-8")) < 128 * 1024
+            assert index["catalog_digest"].startswith("sha256:")
+            assert index["returned_count"] == len(index["capabilities"])
+            indexed_ids = {
+                descriptor["capability_id"] for descriptor in index["capabilities"]
+            }
+            assert all(
+                "input_schema" not in descriptor for descriptor in index["capabilities"]
+            )
+            cursor = index["next_cursor"]
+            while cursor is not None:
+                next_page = await client.call_tool(
+                    "capability.describe",
+                    {"cursor": cursor},
+                )
+                page = json.loads(next_page.content[0].text)
+                assert len(next_page.content[0].text.encode("utf-8")) < 128 * 1024
+                indexed_ids.update(
+                    descriptor["capability_id"] for descriptor in page["capabilities"]
+                )
+                cursor = page["next_cursor"]
+            assert indexed_ids == all_ids
+
+            searched = await client.call_tool(
+                "capability.describe",
+                {"query": "SAT UNSAT proof"},
+            )
+            search_index = json.loads(searched.content[0].text)
+            search_ids = {
+                descriptor["capability_id"]
+                for descriptor in search_index["capabilities"]
+            }
+            expected_sat_ids = {
+                "sat.cnf.materialize",
+                "sat.unsat_proof.find",
+                "sat.unsat_proof.verify",
+            }.intersection(all_ids)
+            assert expected_sat_ids.issubset(search_ids)
+
+            first_page = await client.call_tool(
+                "capability.describe",
+                {},
+            )
+            first = json.loads(first_page.content[0].text)
+            assert first["returned_count"] == 50
+            assert first["next_cursor"] is not None
+            second_page = await client.call_tool(
+                "capability.describe",
+                {"cursor": first["next_cursor"]},
+            )
+            second = json.loads(second_page.content[0].text)
+            assert {
+                descriptor["capability_id"] for descriptor in first["capabilities"]
+            }.isdisjoint(
+                descriptor["capability_id"] for descriptor in second["capabilities"]
+            )
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
+def test_mcp_logs_bounded_tool_metrics_without_arguments(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="jacobian.adapters.mcp.server")
+
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+            await client.call_tool(
+                "capability.describe",
+                {"query": "private-query-marker"},
+            )
+
+    asyncio.run(scenario())
+
+    messages = [record.getMessage() for record in caplog.records]
+    metric = next(
+        message
+        for message in messages
+        if "MCP tool call tool=capability.describe status=success" in message
+    )
+    assert "duration_ms=" in metric
+    assert "response_bytes=" in metric
+    assert "argument_digest=sha256:" in metric
+    assert "private-query-marker" not in metric
 
 
 @pytest.mark.integration

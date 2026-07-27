@@ -140,6 +140,7 @@ from jacobian.registry import CheckerRegistry
 from jacobian.sat import SatArtifactService, install_sat_artifacts
 from jacobian.sat_capabilities import (
     SatAssignmentCheckerInstallation,
+    SatCnfMaterializationAdapter,
     SatUnsatProofCheckerInstallation,
     install_sat_assignment_checker,
     install_sat_unsat_proof_checker,
@@ -310,6 +311,7 @@ class JacobianKernel:
         self.lean_declarations: LeanDeclarationService | None = None
         self.lean_exploration: LeanExplorationInstallation | None = None
         self.capabilities = CapabilityService(self.store, self.memory)
+        self.register_capability(SatCnfMaterializationAdapter(self.sat))
         self.sat_assignment_checker: SatAssignmentCheckerInstallation
         sat_assignment_adapter, self.sat_assignment_checker = (
             install_sat_assignment_checker(

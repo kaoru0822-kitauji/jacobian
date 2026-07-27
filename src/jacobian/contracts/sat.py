@@ -33,6 +33,10 @@ SatVariableName = Annotated[
         strict=True,
     ),
 ]
+SatInputClause = Annotated[
+    tuple[StrictInt, ...],
+    Field(max_length=1_000_000),
+]
 CanonicalBase64 = Annotated[
     str,
     StringConstraints(
@@ -139,6 +143,41 @@ class SatCnfBinding(ContractModel):
 
     binding_version: Literal["1"] = "1"
     cnf_artifact_uri: ArtifactUri
+    cnf_object_digest: Sha256Digest
+    cnf_payload_digest: Sha256Digest
+    variable_map_digest: Sha256Digest
+    dimacs_digest: Sha256Digest
+    projection_format: Literal["DIMACS-CNF"]
+    projection_version: Literal["jacobian.dimacs.cnf/v1"]
+    variable_count: StrictInt = Field(ge=0, le=1_000_000)
+    clause_count: StrictInt = Field(ge=0, le=1_000_000)
+
+
+class SatCnfMaterializationRequest(ContractModel):
+    """Bounded symbolic CNF input accepted before any artifact write."""
+
+    request_version: Literal["1"] = "1"
+    variable_names: tuple[SatVariableName, ...] = Field(max_length=1_000_000)
+    clauses: tuple[SatInputClause, ...] = Field(max_length=1_000_000)
+
+    @model_validator(mode="after")
+    def require_valid_bounded_cnf(self) -> Self:
+        if sum(len(clause) for clause in self.clauses) > 2_000_000:
+            raise ValueError("CNF input may contain at most 2,000,000 literals")
+        canonicalize_cnf(
+            variable_names=self.variable_names,
+            clauses=self.clauses,
+        )
+        return self
+
+
+class SatCnfMaterializationOutput(ContractModel):
+    """Stored canonical CNF identity consumable by SAT capabilities."""
+
+    materialization_version: Literal["1"] = "1"
+    cnf_uri: ArtifactUri
+    schema_uri: ArtifactUri
+    semantics_uri: ArtifactUri
     cnf_object_digest: Sha256Digest
     cnf_payload_digest: Sha256Digest
     variable_map_digest: Sha256Digest

@@ -12,7 +12,7 @@ model-facing MCP surface contains five tools:
 
 | MCP tool | Purpose |
 | --- | --- |
-| `capability.describe` | Read an installed capability's descriptor and exact input and output schemas. |
+| `capability.describe` | Search the compact installed index, or read one capability's exact schemas by ID. |
 | `capability.invoke` | Invoke an installed capability in `EXPLORE` or `VERIFY` mode. |
 | `workspace.open` | Create one durable agent workspace, canonical problem card, pinned `main` branch, and immutable initial revision. |
 | `workspace.write` | Append scratch, findings, attempts, lifecycle marks, and focus against an exact base revision. |
@@ -115,8 +115,10 @@ enabled bundled references, configured exclusions, and operator-installed
 adapters. A static list in this document would therefore describe only one
 installation snapshot.
 
-Read `capability://catalog`, or call `capability.describe` without a capability
-ID, for the exact installed IDs and compact descriptors. Call
+Read `capability://catalog` for the complete exact catalog. Calling
+`capability.describe` without a capability ID returns a compact 50-item page
+with a stable catalog digest; pass `query` to search IDs, titles, descriptions,
+providers, and tags, then follow `next_cursor` when present. Call
 `capability.describe` with one ID before invocation to inspect its complete
 input and output schemas, supported modes, provider identity, availability,
 and checker requirements. Do not infer installation or payload fields from

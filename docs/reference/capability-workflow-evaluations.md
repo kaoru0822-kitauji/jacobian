@@ -395,6 +395,31 @@ consolidation of the SAT outcomes. The frozen sample is too small for a powered
 comparative claim; add new cases and repetitions without reopening these cases
 for tuning.
 
+#### Autonomous CNF-authoring public regression
+
+A 2026-07-27 public regression used `gpt-5.6-sol` at `xhigh` reasoning on the
+Erdős–Schur instance \(f(3)\), with only the instruction to use Jacobian MCP and
+solve the stated problem. This is a visible reproduction case, not a hidden or
+statistically powered evaluation. The pre-change run made 35 MCP calls,
+including nine identical unfiltered discovery calls, and received 11,030,675
+serialized MCP-response bytes. It consumed 3,935,943 input tokens.
+
+With compact searchable discovery and `sat.cnf.materialize`, one treatment run
+made 12 MCP calls with no repeated MCP arguments and received 108,543 response
+bytes, a 99.0% reduction. It consumed 414,274 input tokens, an 89.5% reduction.
+The agent itself authored and materialized the 39-variable, 178-clause
+\(N=13\) CNF and the 42-variable, 203-clause \(N=14\) CNF. It then composed:
+
+- `sat.model.find` with `sat.model.verify`, reaching
+  `VERIFIED_SATISFYING`; and
+- `sat.unsat_proof.find` with `sat.unsat_proof.verify`, reaching
+  `VERIFIED_UNSAT`.
+
+The final mathematical answer was correct and included a readable
+three-coloring of \(\{1,\ldots,13\}\). This single public before/after run is
+regression evidence that the new interfaces unblock autonomous composition;
+it does not establish a general model-quality or latency improvement.
+
 ### SMT Carcara contract pilot
 
 The frozen 2026-07-26 SMT pilot used `gpt-5.6-terra`, high reasoning effort,

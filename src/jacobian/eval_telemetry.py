@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -55,6 +57,33 @@ def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _mcp_response_bytes(item: Mapping[str, Any]) -> int:
+    result = item.get("result")
+    try:
+        encoded = json.dumps(
+            result,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        return 0
+    return len(encoded)
+
+
+def _mcp_call_signature(tool: str, arguments: object) -> tuple[str, str]:
+    try:
+        encoded = json.dumps(
+            arguments,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        encoded = b"unserializable"
+    return tool, f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
 def parse_agent_transcript(path: Path) -> dict[str, Any]:
     """Return calls, usage, failures, and successful capability dataflow."""
 
@@ -68,6 +97,11 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
     tool_error_count = 0
     parameter_error_count = 0
     capability_rejection_count = 0
+    mcp_response_bytes = 0
+    mcp_response_bytes_by_tool: Counter[str] = Counter()
+    mcp_call_signatures: Counter[tuple[str, str]] = Counter()
+    capability_describe_index_calls = 0
+    capability_describe_exact_calls = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             event = json.loads(line)
@@ -92,6 +126,17 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             tool = item["tool"]
             mcp_calls.append(tool)
             arguments = item.get("arguments")
+            response_bytes = _mcp_response_bytes(item)
+            mcp_response_bytes += response_bytes
+            mcp_response_bytes_by_tool[tool] += response_bytes
+            mcp_call_signatures[_mcp_call_signature(tool, arguments)] += 1
+            if tool == "capability.describe":
+                if isinstance(arguments, Mapping) and isinstance(
+                    arguments.get("capability_id"), str
+                ):
+                    capability_describe_exact_calls += 1
+                else:
+                    capability_describe_index_calls += 1
             if (
                 tool == "capability.invoke"
                 and isinstance(arguments, Mapping)
@@ -172,4 +217,20 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         "capability_attempt_ids": capability_attempt_ids,
         "capability_ids": capability_ids,
         "capability_invocations": capability_invocations,
+        "mcp_response_bytes": mcp_response_bytes,
+        "mcp_response_bytes_by_tool": dict(sorted(mcp_response_bytes_by_tool.items())),
+        "repeated_mcp_call_count": sum(
+            count - 1 for count in mcp_call_signatures.values() if count > 1
+        ),
+        "repeated_mcp_calls": [
+            {
+                "tool": tool,
+                "argument_digest": argument_digest,
+                "count": count,
+            }
+            for (tool, argument_digest), count in sorted(mcp_call_signatures.items())
+            if count > 1
+        ],
+        "capability_describe_index_calls": capability_describe_index_calls,
+        "capability_describe_exact_calls": capability_describe_exact_calls,
     }

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -19,7 +21,9 @@ from mcp_types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field, StrictInt
 
 from jacobian import __version__
+from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
+    CapabilityDescriptor,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -56,23 +60,20 @@ if TYPE_CHECKING:
 
 
 SERVER_INSTRUCTIONS = (
-    "Call capability.describe before the first invocation of an unfamiliar "
-    "capability passed to capability.invoke; do not guess payload fields. Direct "
-    "workspace.* tools publish their input shape and enforce documented cross-field "
-    "invariants without capability discovery. Use EXPLORE for low-friction search and "
-    "VERIFY only when a durable checked conclusion is needed. Retrieved memory, "
-    "search, evaluation, generated evidence, workspace entries, and lifecycle marks "
-    "are not proof. Only assurance level VERIFIED with a local verification record is "
-    "verified. Writing, retrieving, closing, retracting, superseding, or pinning a "
-    "workspace entry never promotes mathematical assurance. Operational completion, "
-    "failure to find a witness, and exhausted or bounded search are not mathematical "
-    "conclusions. Follow returned artifact:// and experiment:// resources instead of "
-    "requesting large payloads inline."
+    "Call capability.describe before invoking an unfamiliar capability; do not guess "
+    "payload fields. Direct workspace.* tools publish their input shape and need no "
+    "capability discovery. Use EXPLORE for search and VERIFY for durable checked "
+    "conclusions. Only assurance level VERIFIED with a local verification record is "
+    "proof; retrieved, generated, or workspace evidence is not. A workspace entry "
+    "never promotes mathematical assurance. Operational completion, failure to find a "
+    "witness, and bounded search are not mathematical conclusions. Follow artifact:// "
+    "and experiment:// resources instead of requesting large payloads inline."
 )
 
 WORKSPACE_TOOL_NAMES = frozenset(
     {"workspace.open", "workspace.write", "workspace.query"}
 )
+_CAPABILITY_INDEX_PAGE_SIZE = 50
 
 
 class AgentRecoveryError(RuntimeError):
@@ -91,6 +92,90 @@ def _tool_annotations(
         idempotent_hint=idempotent,
         open_world_hint=False,
     )
+
+
+def _argument_digest(arguments: dict[str, Any]) -> str:
+    try:
+        encoded = canonicalize_json(arguments)
+    except (TypeError, ValueError):
+        encoded = json.dumps(
+            arguments,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _response_size(value: Any) -> int:
+    try:
+        if hasattr(value, "model_dump_json"):
+            return len(value.model_dump_json().encode("utf-8"))
+        return len(
+            json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ).encode("utf-8")
+        )
+    except (TypeError, ValueError):
+        return -1
+
+
+def _catalog_digest(
+    catalog_version: str,
+    capabilities: tuple[CapabilityDescriptor, ...],
+) -> str:
+    payload = {
+        "catalog_version": catalog_version,
+        "capabilities": [
+            descriptor.model_dump(mode="json") for descriptor in capabilities
+        ],
+    }
+    return f"sha256:{hashlib.sha256(canonicalize_json(payload)).hexdigest()}"
+
+
+def _compact_descriptor(descriptor: CapabilityDescriptor) -> dict[str, Any]:
+    runtime = descriptor.provider_runtime
+    return {
+        "capability_id": descriptor.capability_id,
+        "version": descriptor.version,
+        "title": descriptor.title,
+        "description": descriptor.description,
+        "provider": descriptor.provider,
+        "availability": (
+            runtime.availability.value if runtime is not None else "UNKNOWN"
+        ),
+        "modes": [mode.value for mode in descriptor.modes],
+        "tags": list(descriptor.tags),
+    }
+
+
+def _search_capabilities(
+    descriptors: tuple[CapabilityDescriptor, ...],
+    *,
+    query: str | None,
+) -> list[CapabilityDescriptor]:
+    query_tokens = tuple(query.casefold().split()) if query else ()
+    matches: list[tuple[int, CapabilityDescriptor]] = []
+    for descriptor in descriptors:
+        searchable = " ".join(
+            (
+                descriptor.capability_id,
+                descriptor.title,
+                descriptor.description,
+                descriptor.provider,
+                *descriptor.tags,
+            )
+        ).casefold()
+        score = sum(token in searchable for token in query_tokens)
+        if query_tokens and score == 0:
+            continue
+        matches.append((score, descriptor))
+    matches.sort(key=lambda item: (-item[0], item[1].capability_id))
+    return [descriptor for _score, descriptor in matches]
 
 
 def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
@@ -189,9 +274,18 @@ def create_server(
             arguments: dict[str, Any],
             context: Context[AppState, Any] | None = None,
         ) -> Any:
+            started = time.monotonic()
+            argument_digest = _argument_digest(arguments)
             try:
-                return await super().call_tool(name, arguments, context)
+                result = await super().call_tool(name, arguments, context)
             except MCPError:
+                _LOGGER.info(
+                    "MCP tool call tool=%s status=error duration_ms=%.3f "
+                    "response_bytes=0 argument_digest=%s",
+                    name,
+                    (time.monotonic() - started) * 1000,
+                    argument_digest,
+                )
                 raise
             except Exception as exc:
                 _LOGGER.warning(
@@ -199,7 +293,23 @@ def create_server(
                     name,
                     exc_info=exc,
                 )
+                _LOGGER.info(
+                    "MCP tool call tool=%s status=error duration_ms=%.3f "
+                    "response_bytes=0 argument_digest=%s",
+                    name,
+                    (time.monotonic() - started) * 1000,
+                    argument_digest,
+                )
                 raise ValueError(_public_tool_error(name, exc)) from None
+            _LOGGER.info(
+                "MCP tool call tool=%s status=success duration_ms=%.3f "
+                "response_bytes=%d argument_digest=%s",
+                name,
+                (time.monotonic() - started) * 1000,
+                _response_size(result),
+                argument_digest,
+            )
+            return result
 
     configured_root = _configured_root(state_dir)
     kernel = (
@@ -246,14 +356,16 @@ def create_server(
     @server.tool(
         name="capability.describe",
         description=(
-            "Read an installed capability's exact descriptor and input schema. Call "
-            "this before guessing fields."
+            "Search a compact installed-capability index, or pass capability_id to "
+            "read its exact schemas. Use query and cursor for discovery."
         ),
         annotations=_tool_annotations(read_only=True, idempotent=True),
         structured_output=True,
     )
     async def capability_describe(
         capability_id: str | None = None,
+        query: Annotated[str | None, Field(max_length=512)] = None,
+        cursor: Annotated[str | None, Field(max_length=128)] = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_kernel = _kernel(ctx)
@@ -262,7 +374,50 @@ def create_server(
             item.capability_id: item for item in capability_catalog.capabilities
         }
         if capability_id is None:
-            return capability_catalog.model_dump(mode="json")
+            filtered = _search_capabilities(
+                capability_catalog.capabilities,
+                query=query,
+            )
+            start = 0
+            if cursor is not None:
+                for index, descriptor in enumerate(filtered):
+                    if descriptor.capability_id == cursor:
+                        start = index + 1
+                        break
+                else:
+                    return {
+                        "error": {
+                            "code": "INVALID_CURSOR",
+                            "stage": "capability_discovery",
+                            "message": "The capability index cursor is not in this result set.",
+                            "hint": "Restart this filtered query without a cursor.",
+                        }
+                    }
+            page = filtered[start : start + _CAPABILITY_INDEX_PAGE_SIZE]
+            next_cursor = (
+                page[-1].capability_id
+                if page and start + len(page) < len(filtered)
+                else None
+            )
+            return {
+                "index_version": "1",
+                "catalog_version": capability_catalog.catalog_version,
+                "catalog_digest": _catalog_digest(
+                    capability_catalog.catalog_version,
+                    capability_catalog.capabilities,
+                ),
+                "total_count": len(filtered),
+                "returned_count": len(page),
+                "capabilities": [
+                    _compact_descriptor(descriptor) for descriptor in page
+                ],
+                "next_cursor": next_cursor,
+                "exact_descriptor_hint": (
+                    "Call capability.describe with one capability_id for exact input "
+                    "and output schemas. The complete catalog remains available at "
+                    "capability://catalog."
+                ),
+            }
         try:
             descriptor = descriptors[capability_id]
         except KeyError:
