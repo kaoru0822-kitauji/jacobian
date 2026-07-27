@@ -169,6 +169,37 @@ Freeze the tree and oracle before the comparison. This ablation measures a
 capability's marginal contribution to the portfolio and informs retention,
 consolidation, and ranking.
 
+### Autonomous capability-discovery slice
+
+`GRAPH-DISCOVERY-AB-001` is a public harness-validation case for the
+intent-led MCP surface. The treatment prompt names neither capability IDs nor
+a successful sequence. It presents Jacobian as a mathematical toolbox and
+leaves search, exact contract inspection, composition, iteration, and stopping
+criteria to the agent. The control retains the existing no-Jacobian condition.
+This slice therefore measures whether the treatment agent autonomously
+discovers and uses relevant installed operations; it is not by itself a clean
+ablation of search ranking against the former full-catalog response.
+
+Transcript telemetry records every successful discovery query, exact
+description, returned capability ID, invocation attempt, and successful
+invocation. The result reports `discovery_query_count`,
+`exact_description_count`, `discovered_capability_ids`, and
+`discovery_to_attempt_ids` alongside correctness, false certification,
+parameter errors, tool calls, tokens, and elapsed time. Outcome correctness and
+evidence binding remain primary; merely calling discovery does not pass.
+
+Plan the two-condition harness without starting a model:
+
+```bash
+uv run python benchmarks/agent_ab.py \
+  --case GRAPH-DISCOVERY-AB-001 \
+  --repetitions 3
+```
+
+Model execution remains explicit and budgeted with `--execute` and
+`--max-model-runs 6`. A single pair is a harness validation, not a powered
+comparative performance claim.
+
 ## Development pilot evidence
 
 The 2026-07-25 development pilot used the same configured model, medium

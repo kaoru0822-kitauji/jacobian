@@ -63,6 +63,7 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
     capability_attempt_ids: list[str] = []
     capability_ids: list[str] = []
     capability_invocations: list[dict[str, Any]] = []
+    capability_descriptions: list[dict[str, Any]] = []
     shell_calls: list[str] = []
     usage: dict[str, Any] | None = None
     tool_error_count = 0
@@ -118,6 +119,50 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
                 tool_error_count += 1
             else:
                 successful_calls.append(tool)
+                if tool == "capability.describe" and isinstance(arguments, Mapping):
+                    matches = (
+                        response.get("matches")
+                        if isinstance(response, Mapping)
+                        else None
+                    )
+                    capability_descriptions.append(
+                        {
+                            "kind": (
+                                response.get("kind")
+                                if isinstance(response, Mapping)
+                                and isinstance(response.get("kind"), str)
+                                else None
+                            ),
+                            "query": (
+                                arguments.get("query")
+                                if isinstance(arguments.get("query"), str)
+                                else None
+                            ),
+                            "domain": (
+                                arguments.get("domain")
+                                if isinstance(arguments.get("domain"), str)
+                                else None
+                            ),
+                            "mode": (
+                                arguments.get("mode")
+                                if isinstance(arguments.get("mode"), str)
+                                else None
+                            ),
+                            "capability_id": (
+                                arguments.get("capability_id")
+                                if isinstance(arguments.get("capability_id"), str)
+                                else None
+                            ),
+                            "match_ids": [
+                                match["capability_id"]
+                                for match in matches
+                                if isinstance(match, Mapping)
+                                and isinstance(match.get("capability_id"), str)
+                            ]
+                            if isinstance(matches, list)
+                            else [],
+                        }
+                    )
                 if (
                     tool == "capability.invoke"
                     and isinstance(response, Mapping)
@@ -172,4 +217,5 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         "capability_attempt_ids": capability_attempt_ids,
         "capability_ids": capability_ids,
         "capability_invocations": capability_invocations,
+        "capability_descriptions": capability_descriptions,
     }

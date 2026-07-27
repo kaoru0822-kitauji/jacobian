@@ -26,6 +26,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityRelationship,
     CapabilityRelationshipStatus,
@@ -1477,6 +1478,23 @@ class PolynomialIdentityAdapter:
             input_schema=model_schema(PolynomialIdentityRequest),
             output_schema=model_schema(PolynomialIdentityOutput),
             tags=("polynomial", "identity", "verification", "exact-rational"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="zero_identity",
+                    description=(
+                        "Independently verify that two zero polynomials are equal "
+                        "in QQ[x]."
+                    ),
+                    mode=CapabilityMode.VERIFY,
+                    input=PolynomialIdentityRequest.model_validate(
+                        {
+                            "variables": ["x"],
+                            "left": {"terms": []},
+                            "right": {"terms": []},
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property

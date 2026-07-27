@@ -515,6 +515,10 @@ The CLI and MCP layer must be thin enough to test by equivalence:
 - the Python API, CLI, and `capability.invoke` return the same semantic result
   envelope for the same descriptor version and artifact inputs;
 - `capability.describe`, `capability://catalog`, and invocation schemas agree;
+- the canonical digest in `tests/snapshots/mcp_agent_surface.sha256` covers server
+  metadata and instructions, every tool description/schema/annotation, resources
+  and templates, prompts, the operating resource text, and representative browse,
+  query, and exact-description results;
 - malformed requests fail before kernel invocation;
 - large artifacts and traces are returned as resource URIs;
 - response-size limits are enforced;

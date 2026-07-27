@@ -20,6 +20,9 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityDiscoveryMatch,
+    CapabilityDiscoveryRequest,
+    CapabilityDiscoveryResult,
     CapabilityObligationStatus,
     CapabilityProviderAvailability,
     CapabilityRelationshipStatus,
@@ -36,7 +39,24 @@ if TYPE_CHECKING:
     from jacobian.kernel import JacobianKernel
 
 _ENTRYPOINT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
+_DISCOVERY_TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 _LOGGER = logging.getLogger(__name__)
+_DISCOVERY_STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "for",
+        "find",
+        "from",
+        "in",
+        "of",
+        "on",
+        "the",
+        "to",
+        "with",
+    }
+)
 
 
 class CapabilityError(RuntimeError):
@@ -88,6 +108,14 @@ class CapabilityService:
             )
         _validator(descriptor.input_schema)
         _validator(descriptor.output_schema)
+        for example in descriptor.invocation_examples:
+            try:
+                _validate_payload(descriptor.input_schema, example.input)
+            except CapabilityError as exc:
+                raise CapabilityError(
+                    f"capability {descriptor.capability_id} invocation example "
+                    f"{example.name!r} does not match its input schema"
+                ) from exc
         self._adapters[descriptor.capability_id] = adapter
 
     def catalog(self) -> CapabilityCatalog:
@@ -95,6 +123,63 @@ class CapabilityService:
             capabilities=tuple(
                 self._adapters[name].descriptor for name in sorted(self._adapters)
             )
+        )
+
+    def discover(
+        self,
+        request: CapabilityDiscoveryRequest,
+    ) -> CapabilityDiscoveryResult:
+        """Return compact installed outcomes ordered by deterministic relevance."""
+
+        descriptors = tuple(
+            self._adapters[name].descriptor for name in sorted(self._adapters)
+        )
+        available_domains = tuple(
+            sorted({_capability_domain(descriptor) for descriptor in descriptors})
+        )
+        normalized_domain = (
+            _normalize_domain(request.domain) if request.domain is not None else None
+        )
+        ranked: list[tuple[int, CapabilityDiscoveryMatch]] = []
+        for descriptor in descriptors:
+            if request.mode is not None and request.mode not in descriptor.modes:
+                continue
+            if normalized_domain is not None and not _matches_domain(
+                descriptor,
+                normalized_domain,
+            ):
+                continue
+            score, matched_on, matched_terms = _discovery_relevance(
+                descriptor,
+                request.query,
+            )
+            if request.query is not None and score == 0:
+                continue
+            ranked.append(
+                (
+                    score,
+                    CapabilityDiscoveryMatch(
+                        capability_id=descriptor.capability_id,
+                        title=descriptor.title,
+                        description=descriptor.description,
+                        modes=descriptor.modes,
+                        tags=descriptor.tags,
+                        matched_on=matched_on,
+                        matched_terms=matched_terms,
+                        has_invocation_examples=bool(descriptor.invocation_examples),
+                    ),
+                )
+            )
+        ranked.sort(key=lambda item: (-item[0], item[1].capability_id))
+        total_matches = len(ranked)
+        return CapabilityDiscoveryResult(
+            query=request.query,
+            domain=normalized_domain,
+            mode=request.mode,
+            matches=tuple(match for _, match in ranked[: request.limit]),
+            total_matches=total_matches,
+            truncated=total_matches > request.limit,
+            available_domains=available_domains,
         )
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
@@ -403,6 +488,79 @@ def _compiled_validator(canonical_schema: bytes) -> Draft202012Validator:
 
 def _validator(schema: dict[str, object]) -> Draft202012Validator:
     return _compiled_validator(canonicalize_json(schema))
+
+
+def _normalize_discovery_text(value: str) -> str:
+    return "-".join(_DISCOVERY_TOKEN_PATTERN.findall(value.casefold()))
+
+
+def _discovery_terms(query: str) -> frozenset[str]:
+    return frozenset(
+        term
+        for term in _DISCOVERY_TOKEN_PATTERN.findall(query.casefold())
+        if term not in _DISCOVERY_STOP_WORDS
+    )
+
+
+def _token_set(value: str) -> frozenset[str]:
+    return frozenset(_DISCOVERY_TOKEN_PATTERN.findall(value.casefold()))
+
+
+def _discovery_relevance(
+    descriptor: CapabilityDescriptor,
+    query: str | None,
+) -> tuple[int, tuple[str, ...], tuple[str, ...]]:
+    if query is None:
+        return 0, (), ()
+    query_terms = _discovery_terms(query)
+    if not query_terms:
+        return 0, (), ()
+    identifier_terms = _token_set(descriptor.capability_id)
+    tag_terms = frozenset(term for tag in descriptor.tags for term in _token_set(tag))
+    title_terms = _token_set(descriptor.title)
+    description_terms = _token_set(descriptor.description)
+    score = 0
+    matched_on: list[str] = []
+    matched_terms: set[str] = set()
+    for label, terms, weight in (
+        ("capability_id", identifier_terms, 12),
+        ("tags", tag_terms, 10),
+        ("title", title_terms, 8),
+        ("description", description_terms, 3),
+    ):
+        overlap = query_terms & terms
+        if overlap:
+            score += weight * len(overlap)
+            matched_on.append(label)
+            matched_terms.update(overlap)
+    normalized_query = _normalize_discovery_text(query)
+    if normalized_query and normalized_query in _normalize_discovery_text(
+        f"{descriptor.capability_id} {descriptor.title} {descriptor.description}"
+    ):
+        score += 20
+        matched_on.append("phrase")
+    return score, tuple(matched_on), tuple(sorted(matched_terms))
+
+
+def _normalize_domain(value: str) -> str:
+    return "_".join(_DISCOVERY_TOKEN_PATTERN.findall(value.casefold()))
+
+
+def _capability_domain(descriptor: CapabilityDescriptor) -> str:
+    """Project the domain-owned namespace from one installed capability ID."""
+
+    return descriptor.capability_id.partition(".")[0]
+
+
+def _matches_domain(
+    descriptor: CapabilityDescriptor,
+    normalized_domain: str,
+) -> bool:
+    normalized_tags = {_normalize_domain(tag) for tag in descriptor.tags}
+    return (
+        normalized_domain == _normalize_domain(_capability_domain(descriptor))
+        or normalized_domain in normalized_tags
+    )
 
 
 def _validate_payload(

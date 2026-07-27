@@ -23,6 +23,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
@@ -387,7 +388,91 @@ class UniversalAlgebraSearchCountermodelAdapter:
                 "universal-algebra",
                 "finite-model",
                 "countermodel",
+                "counterexample",
                 "bounded-search",
+            ),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="commutative_nonassociative_magma",
+                    description=(
+                        "Search order-two commutative magmas for a counterexample "
+                        "to associativity."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input=UniversalAlgebraCountermodelSearchRequest.model_validate(
+                        {
+                            "order": 2,
+                            "source_laws": [
+                                {
+                                    "law_id": "commutative",
+                                    "variables": ["x", "y"],
+                                    "left": {
+                                        "kind": "PRODUCT",
+                                        "left": {
+                                            "kind": "VARIABLE",
+                                            "variable": "x",
+                                        },
+                                        "right": {
+                                            "kind": "VARIABLE",
+                                            "variable": "y",
+                                        },
+                                    },
+                                    "right": {
+                                        "kind": "PRODUCT",
+                                        "left": {
+                                            "kind": "VARIABLE",
+                                            "variable": "y",
+                                        },
+                                        "right": {
+                                            "kind": "VARIABLE",
+                                            "variable": "x",
+                                        },
+                                    },
+                                }
+                            ],
+                            "target_law": {
+                                "law_id": "associative",
+                                "variables": ["x", "y", "z"],
+                                "left": {
+                                    "kind": "PRODUCT",
+                                    "left": {
+                                        "kind": "PRODUCT",
+                                        "left": {
+                                            "kind": "VARIABLE",
+                                            "variable": "x",
+                                        },
+                                        "right": {
+                                            "kind": "VARIABLE",
+                                            "variable": "y",
+                                        },
+                                    },
+                                    "right": {
+                                        "kind": "VARIABLE",
+                                        "variable": "z",
+                                    },
+                                },
+                                "right": {
+                                    "kind": "PRODUCT",
+                                    "left": {
+                                        "kind": "VARIABLE",
+                                        "variable": "x",
+                                    },
+                                    "right": {
+                                        "kind": "PRODUCT",
+                                        "left": {
+                                            "kind": "VARIABLE",
+                                            "variable": "y",
+                                        },
+                                        "right": {
+                                            "kind": "VARIABLE",
+                                            "variable": "z",
+                                        },
+                                    },
+                                },
+                            },
+                        }
+                    ).model_dump(mode="json"),
+                ),
             ),
         )
 

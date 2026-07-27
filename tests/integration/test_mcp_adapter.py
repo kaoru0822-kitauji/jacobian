@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from jacobian.adapters.mcp.guidance import OPERATING_GUIDE
 from jacobian.adapters.mcp.server import (
     WORKSPACE_TOOL_NAMES,
     _public_tool_error,
@@ -33,6 +34,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
         from mcp import Client
 
         async with Client(server, raise_exceptions=True) as client:
+            assert client.instructions == server.instructions
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
             assert set(tools) == MCP_TOOL_NAMES
@@ -44,7 +46,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 sort_keys=True,
                 separators=(",", ":"),
             )
-            assert len(descriptor) < 25_000
+            assert len(descriptor) < 32_000
             assert all(
                 tool.annotations is not None
                 and tool.annotations.open_world_hint is False
@@ -52,6 +54,22 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             )
             assert tools["capability.describe"].annotations is not None
             assert tools["capability.describe"].annotations.read_only_hint is True
+            assert (
+                "ranking is deterministic retrieval"
+                in (tools["capability.describe"].description or "").lower()
+            )
+            describe_schema = tools["capability.describe"].input_schema
+            assert set(describe_schema["properties"]) == {
+                "capability_id",
+                "query",
+                "domain",
+                "mode",
+                "limit",
+            }
+            assert describe_schema["additionalProperties"] is False
+            assert (
+                tools["capability.invoke"].input_schema["additionalProperties"] is False
+            )
             assert tools["workspace.open"].annotations is not None
             assert tools["workspace.open"].annotations.idempotent_hint is True
             assert tools["workspace.write"].annotations is not None
@@ -61,6 +79,40 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             assert all(
                 tools[name].output_schema is None for name in WORKSPACE_TOOL_NAMES
             )
+
+            resources = await client.list_resources()
+            resource_uris = {str(resource.uri) for resource in resources.resources}
+            assert "jacobian://instructions" in resource_uris
+            instructions = await client.read_resource("jacobian://instructions")
+            assert instructions.contents[0].text == OPERATING_GUIDE
+
+            prompts = await client.list_prompts()
+            prompt_names = {prompt.name for prompt in prompts.prompts}
+            assert prompt_names == {
+                "jacobian-check-evidence",
+                "jacobian-discover",
+            }
+            discovery_prompt = await client.get_prompt(
+                "jacobian-discover",
+                {"task": "Explore structures related to a conjecture."},
+            )
+            rendered_prompt = discovery_prompt.messages[0].content.text
+            assert "research strategy" in rendered_prompt
+            assert "Search any outcomes or concepts" in rendered_prompt
+
+            discovery_result = await client.call_tool(
+                "capability.describe",
+                {"query": "search mathematical knowledge", "limit": 3},
+            )
+            discovery = json.loads(discovery_result.content[0].text)
+            assert discovery["kind"] == "discovery"
+            assert 0 < len(discovery["matches"]) <= 3
+            assert "input_schema" not in discovery["matches"][0]
+            assert discovery["next_step"] == {
+                "tool": "capability.describe",
+                "argument": "capability_id",
+                "choose_from": "matches[].capability_id",
+            }
 
             catalog_result = await client.read_resource("capability://catalog")
             catalog = json.loads(catalog_result.contents[0].text)
@@ -447,7 +499,7 @@ def test_mcp_tool_failures_return_safe_actionable_errors(tmp_path: Path) -> None
             )
             response = json.loads(unknown_capability.content[0].text)
             assert response["error"]["code"] == "UNKNOWN_CAPABILITY"
-            assert "list installed capabilities" in response["error"]["hint"]
+            assert "search installed capabilities" in response["error"]["hint"]
 
     asyncio.run(scenario())
 

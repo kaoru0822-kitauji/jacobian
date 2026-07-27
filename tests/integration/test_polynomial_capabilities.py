@@ -95,6 +95,29 @@ def _identity_input(
 
 
 @pytest.mark.integration
+def test_polynomial_identity_descriptor_example_is_directly_invocable(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    descriptors = {
+        descriptor.capability_id: descriptor
+        for descriptor in kernel.capabilities.catalog().capabilities
+    }
+    descriptor = descriptors["polynomial.identity.verify"]
+    example = descriptor.invocation_examples[0]
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=descriptor.capability_id,
+            mode=example.mode,
+            input=example.input,
+        )
+    )
+
+    assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+
+@pytest.mark.integration
 def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
