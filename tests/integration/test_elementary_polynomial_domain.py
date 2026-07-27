@@ -201,6 +201,43 @@ def test_partial_fraction_uses_the_declared_univariate_generator(
     ]
 
 
+def test_partial_fraction_normalizes_non_monic_denominators_exactly(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    numerator = _polynomial([(2, 2, 1), (1, -3, 1), (0, 1, 1)], "t")
+    denominator = _polynomial([(2, 6, 1), (1, -3, 1), (0, -3, 1)], "t")
+
+    result = _invoke(
+        kernel,
+        "polynomial.rational.compute.partial_fraction_decomposition",
+        {"numerator": numerator, "denominator": denominator},
+    )
+
+    # The source cancels to (2t - 1)/(6t + 3). Both the structured
+    # decomposition and the reconstruction use the same monic factor t + 1/2:
+    # 1/3 - (1/3)/(t + 1/2) = (t/3 - 1/6)/(t + 1/2).
+    assert result["polynomial_part"] == _polynomial([(0, 1, 3)], "t")
+    assert result["terms"] == [
+        {
+            "numerator": _polynomial([(0, -1, 3)], "t"),
+            "denominator_factor": _polynomial(
+                [(1, 1, 1), (0, 1, 2)],
+                "t",
+            ),
+            "denominator_exponent": 1,
+        }
+    ]
+    assert result["reconstruction_numerator"] == _polynomial(
+        [(1, 1, 3), (0, -1, 6)],
+        "t",
+    )
+    assert result["reconstruction_denominator"] == _polynomial(
+        [(1, 1, 1), (0, 1, 2)],
+        "t",
+    )
+
+
 def test_elementary_polynomial_requests_fail_closed_before_artifact_writes(
     tmp_path: Path,
 ) -> None:

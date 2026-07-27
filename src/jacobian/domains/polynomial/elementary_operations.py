@@ -201,8 +201,13 @@ def rational_partial_fraction_decomposition(
     proper_terms: list[RationalPartialFractionTerm] = []
     for summand in Add.make_args(decomposition):
         numerator, denominator = fraction(cancel(summand))
-        if denominator == 1:
-            polynomial_part += Poly(numerator, generator, domain="QQ")
+        denominator_poly = Poly(denominator, generator, domain="QQ")
+        if denominator_poly.degree() == 0:
+            polynomial_part += Poly(
+                numerator / denominator_poly.LC(),
+                generator,
+                domain="QQ",
+            )
         else:
             proper_terms.append(
                 _partial_fraction_term(
