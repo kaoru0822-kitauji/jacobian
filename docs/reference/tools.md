@@ -129,6 +129,7 @@ of catalog membership:
 - [SMT Alethe artifact contracts](smt-artifacts.md);
 - [exact rational linear-system evidence](linear-rational-solutions.md);
 - [exact rational matrix determinants](matrix-rational-determinant.md);
+- [graph counterexample shrinking](graph-counterexample-shrinking.md);
 - [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
 - [typed polynomial expression normalization](polynomial-expression-normalization.md);
 - [Lean declaration discovery contract](lean-declaration-discovery.md).

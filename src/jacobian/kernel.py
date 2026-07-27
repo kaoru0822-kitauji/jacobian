@@ -54,6 +54,10 @@ from jacobian.graph_isomorphism import (
     GraphIsomorphismInstallation,
     install_graph_isomorphism,
 )
+from jacobian.graph_shrinking import (
+    GraphShrinkingInstallation,
+    install_graph_shrinking,
+)
 from jacobian.lean import LeanService
 from jacobian.lean_declarations import (
     LeanDeclarationService,
@@ -447,6 +451,19 @@ class JacobianKernel:
         )
         for graph_adapter in graph_adapters:
             self.register_capability(graph_adapter)
+        self.graph_shrinking: GraphShrinkingInstallation
+        graph_shrinking, self.graph_shrinking = install_graph_shrinking(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.plugins,
+            self.checkers,
+            self.shrinking,
+            self.graph,
+            self.reference_installer,
+            authorize_checker=install_references,
+        )
+        self.register_capability(graph_shrinking)
         self._install_graph_coloring_capabilities(install_references)
         self._install_geometry_capabilities()
         self.graph_isomorphism: GraphIsomorphismInstallation
