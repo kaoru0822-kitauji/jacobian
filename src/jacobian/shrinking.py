@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.claims import ClaimValidationService
+from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.plugins import CapabilityName
 from jacobian.contracts.results import (
@@ -388,7 +389,7 @@ class ShrinkService:
         expected_schema: str,
         semantics_uri: str,
         proposal_validator: Callable[[str, Any, Any], None] | None,
-    ) -> StoredArtifact:
+    ) -> ArtifactPutResult:
         normalized = self.schemas.validate(expected_schema, payload)
         if proposal_validator is not None:
             proposal_validator(reducer, current.payload, normalized)
