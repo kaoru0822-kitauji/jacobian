@@ -59,6 +59,8 @@ def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
 
 def _mcp_response_bytes(item: Mapping[str, Any]) -> int:
     result = item.get("result")
+    if result is None:
+        return 0
     try:
         encoded = json.dumps(
             result,
@@ -128,7 +130,8 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             arguments = item.get("arguments")
             response_bytes = _mcp_response_bytes(item)
             mcp_response_bytes += response_bytes
-            mcp_response_bytes_by_tool[tool] += response_bytes
+            if response_bytes:
+                mcp_response_bytes_by_tool[tool] += response_bytes
             mcp_call_signatures[_mcp_call_signature(tool, arguments)] += 1
             if tool == "capability.describe":
                 if isinstance(arguments, Mapping) and isinstance(
