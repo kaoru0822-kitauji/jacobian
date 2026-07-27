@@ -206,6 +206,7 @@ def check_exact_geometry(request: dict[str, Any]) -> dict[str, Any]:
             "request_version",
             "claim",
             "candidate",
+            "semantics",
             "scope",
             "witness",
             "expected_bindings",
@@ -215,8 +216,11 @@ def check_exact_geometry(request: dict[str, Any]) -> dict[str, Any]:
             return _reject("unsupported checker request")
         claim = request["claim"]
         candidate = request["candidate"]
+        semantics = request["semantics"]
         witness = request["witness"]
-        if not all(_valid_artifact(item) for item in (claim, candidate, witness)):
+        if not all(
+            _valid_artifact(item) for item in (claim, candidate, semantics, witness)
+        ):
             return _reject("checker artifact metadata is malformed")
         bindings = request["expected_bindings"]
         if not _valid_bindings(bindings):
@@ -224,6 +228,8 @@ def check_exact_geometry(request: dict[str, Any]) -> dict[str, Any]:
         if (
             bindings["claim_digest"] != claim["object_digest"]
             or bindings["candidate_digest"] != candidate["object_digest"]
+            or bindings["semantics_digest"] != semantics["object_digest"]
+            or semantics["artifact_uri"] != claim["semantics_uri"]
         ):
             return _reject("expected evidence bindings do not match artifacts")
         if (

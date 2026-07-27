@@ -117,6 +117,13 @@ def _request(
     result: dict[str, Any],
 ) -> dict[str, Any]:
     semantics = _uri("e")
+    semantics_artifact = _artifact(
+        "e",
+        {"kind": "semantics"},
+        semantics=_uri("0"),
+        parents=[],
+    )
+    semantics_artifact["object_digest"] = "sha256:" + "8" * 64
     claim = _artifact("1", source, semantics=semantics, parents=[])
     candidate = _artifact(
         "3", result, semantics=semantics, parents=[claim["artifact_uri"]]
@@ -150,6 +157,7 @@ def _request(
         "request_version": "1",
         "claim": claim,
         "candidate": candidate,
+        "semantics": semantics_artifact,
         "scope": None,
         "witness": witness,
         "expected_bindings": bindings,
@@ -342,6 +350,20 @@ def test_exact_domain_checker_rejects_claim_binding_substitution(
 ) -> None:
     mutated = copy.deepcopy(checker_request)
     mutated["claim"]["object_digest"] = "sha256:" + "9" * 64
+
+    assert checker(mutated)["accepted"] is False
+
+
+@pytest.mark.parametrize(("checker", "checker_request"), _CASES)
+def test_exact_domain_checker_rejects_forged_semantics_digest(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    checker_request: dict[str, Any],
+) -> None:
+    mutated = copy.deepcopy(checker_request)
+    forged = "sha256:" + "9" * 64
+    mutated["expected_bindings"]["semantics_digest"] = forged
+    mutated["witness"]["payload"]["bindings"]["semantics_digest"] = forged
+    mutated["witness"]["payload_digest"] = _digest(mutated["witness"]["payload"])
 
     assert checker(mutated)["accepted"] is False
 

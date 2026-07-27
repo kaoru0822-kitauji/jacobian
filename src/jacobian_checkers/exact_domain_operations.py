@@ -108,6 +108,7 @@ def _bound_request(
         "request_version",
         "claim",
         "candidate",
+        "semantics",
         "scope",
         "witness",
         "expected_bindings",
@@ -117,6 +118,7 @@ def _bound_request(
         raise ValueError("checker request version or scope is unsupported")
     claim = _artifact(request["claim"])
     candidate = _artifact(request["candidate"])
+    semantics = _artifact(request["semantics"])
     witness = _artifact(request["witness"])
     if (
         len(candidate["parents"]) != 1
@@ -136,8 +138,8 @@ def _bound_request(
         or bindings["encoding_digest"] is not None
         or bindings["claim_digest"] != claim["object_digest"]
         or bindings["candidate_digest"] != candidate["object_digest"]
-        or not isinstance(bindings["semantics_digest"], str)
-        or _DIGEST.fullmatch(bindings["semantics_digest"]) is None
+        or bindings["semantics_digest"] != semantics["object_digest"]
+        or semantics["artifact_uri"] != claim["semantics_uri"]
     ):
         raise ValueError("evidence bindings are malformed or mismatched")
     envelope = witness["payload"]

@@ -57,6 +57,14 @@ def _request(
     operation_id: str = "geometry.points.compute.squared_distance",
 ) -> dict[str, Any]:
     semantics_uri = _uri("e")
+    semantics = _artifact(
+        uri_character="e",
+        object_character="3",
+        schema_character="6",
+        semantics_uri=_uri("0"),
+        payload={"kind": "semantics"},
+        parents=[],
+    )
     claim_payload: dict[str, Any]
     candidate_payload: dict[str, Any]
     if operation_id == "geometry.points.compute.squared_distance":
@@ -126,6 +134,7 @@ def _request(
         "request_version": "1",
         "claim": claim,
         "candidate": candidate,
+        "semantics": semantics,
         "scope": None,
         "witness": witness,
         "expected_bindings": bindings,
@@ -177,6 +186,16 @@ def test_checker_rejects_operation_substitution() -> None:
     request["witness"]["payload"]["payload"]["operation_id"] = (
         "geometry.points.compute.squared_distance"
     )
+    _refresh(request["witness"])
+
+    assert check_exact_geometry(request)["accepted"] is False
+
+
+def test_checker_rejects_forged_semantics_digest() -> None:
+    request = _request()
+    forged = "sha256:" + "9" * 64
+    request["expected_bindings"]["semantics_digest"] = forged
+    request["witness"]["payload"]["bindings"]["semantics_digest"] = forged
     _refresh(request["witness"])
 
     assert check_exact_geometry(request)["accepted"] is False

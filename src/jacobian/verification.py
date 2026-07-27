@@ -298,6 +298,7 @@ class VerificationService:
         checker_id: str,
         timeout_seconds: float | None = None,
         include_artifact_metadata: bool = False,
+        include_semantics_artifact: bool = False,
     ) -> ResultEnvelope:
         """Replay a bound witness with the explicitly selected checker."""
 
@@ -392,6 +393,12 @@ class VerificationService:
                 ),
                 "expected_bindings": expected_bindings,
             }
+            if include_semantics_artifact:
+                semantics_artifact = self.store.get(candidate.manifest.semantics_uri)
+                request["semantics"] = self._checker_artifact(
+                    semantics_artifact,
+                    include_storage_metadata=include_artifact_metadata,
+                )
             request_digest = _digest_bytes(canonicalize_json(request))
             decision = self._run_checker(
                 entrypoint=checker.entrypoint,

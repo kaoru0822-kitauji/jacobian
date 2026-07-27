@@ -347,6 +347,7 @@ class ExactDomainResultVerificationAdapter:
             witness_uri=witness.artifact_uri,
             checker_id=declaration.checker_id,
             include_artifact_metadata=True,
+            include_semantics_artifact=True,
         )
         verified = (
             checked.execution.status is ExecutionStatus.COMPLETED
