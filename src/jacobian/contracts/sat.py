@@ -389,6 +389,106 @@ class SatUnsatProofVerificationOutput(ContractModel):
         return self
 
 
+class SatLratResourceLimits(ContractModel):
+    """Explicit limits for bounded ASCII LRAT replay."""
+
+    timeout_ms: StrictInt = Field(default=30_000, ge=0, le=120_000)
+    max_proof_bytes: StrictInt = Field(default=4_194_304, ge=1, le=67_108_864)
+    max_steps: StrictInt = Field(default=100_000, ge=1, le=2_000_000)
+    max_hints_per_step: StrictInt = Field(default=100_000, ge=1, le=1_000_000)
+    max_clause_literals: StrictInt = Field(default=100_000, ge=0, le=1_000_000)
+
+
+class SatLratProofArtifact(ContractModel):
+    """Exact, unverified ASCII LRAT bytes bound to one canonical CNF."""
+
+    proof_format: Literal["LRAT-ASCII"] = "LRAT-ASCII"
+    proof_format_version: Literal["jacobian.lrat.rup/v1"] = "jacobian.lrat.rup/v1"
+    cnf: SatCnfBinding
+    proof_base64: str = Field(min_length=1)
+    proof_digest: Sha256Digest
+    proof_byte_count: StrictInt = Field(ge=1)
+    limits: SatLratResourceLimits
+
+    @model_validator(mode="after")
+    def bind_exact_bytes(self) -> Self:
+        raw = _decode_base64(self.proof_base64)
+        if self.proof_base64 != base64.b64encode(raw).decode("ascii"):
+            raise ValueError("LRAT proof must use canonical base64")
+        if self.proof_digest != _sha256(raw) or self.proof_byte_count != len(raw):
+            raise ValueError("LRAT proof digest or byte count does not match")
+        if len(raw) > self.limits.max_proof_bytes:
+            raise ValueError("LRAT proof exceeds its declared byte limit")
+        return self
+
+    @classmethod
+    def from_bytes(
+        cls,
+        *,
+        cnf: SatCnfBinding,
+        proof: bytes,
+        limits: SatLratResourceLimits,
+    ) -> Self:
+        return cls(
+            cnf=cnf,
+            proof_base64=base64.b64encode(proof).decode("ascii"),
+            proof_digest=_sha256(proof),
+            proof_byte_count=len(proof),
+            limits=limits,
+        )
+
+
+class SatLratVerificationRequest(ContractModel):
+    """Replay exact ASCII LRAT against one canonical CNF."""
+
+    cnf_uri: ArtifactUri
+    proof_base64: str = Field(min_length=1)
+    limits: SatLratResourceLimits = SatLratResourceLimits()
+    cancelled: bool = False
+
+    @model_validator(mode="after")
+    def validate_proof_encoding(self) -> Self:
+        raw = _decode_base64(self.proof_base64)
+        if self.proof_base64 != base64.b64encode(raw).decode("ascii"):
+            raise ValueError("LRAT proof must use canonical base64")
+        if not raw:
+            raise ValueError("LRAT proof must not be empty")
+        if len(raw) > self.limits.max_proof_bytes:
+            raise ValueError("LRAT proof exceeds max_proof_bytes")
+        return self
+
+
+class SatLratVerificationOutput(ContractModel):
+    """Fail-closed projection of independent LRAT replay."""
+
+    status: Literal[
+        "VERIFIED_UNSAT",
+        "REJECTED",
+        "UNSUPPORTED",
+        "TIMEOUT",
+        "CANCELLED",
+        "ERROR",
+    ]
+    conclusion: Literal["TRUE", "UNKNOWN"]
+    cnf_uri: ArtifactUri
+    proof_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    checker_id: CheckerUri
+    verification_record_uri: ArtifactUri | None = None
+    detail: str = Field(min_length=1, max_length=1024)
+
+    @model_validator(mode="after")
+    def bind_verified_projection(self) -> Self:
+        if self.status == "VERIFIED_UNSAT":
+            if self.conclusion != "TRUE" or self.verification_record_uri is None:
+                raise ValueError(
+                    "verified LRAT requires TRUE and a verification record"
+                )
+        elif self.conclusion != "UNKNOWN" or self.verification_record_uri is not None:
+            raise ValueError("non-verified LRAT cannot carry a conclusion or record")
+        return self
+
+
 def canonicalize_cnf(
     *,
     variable_names: Sequence[str],

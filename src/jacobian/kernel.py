@@ -144,6 +144,9 @@ from jacobian.sat_capabilities import (
     install_sat_assignment_checker,
     install_sat_unsat_proof_checker,
 )
+from jacobian.sat_lrat_capabilities import (
+    install_sat_lrat_verifier,
+)
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
@@ -338,6 +341,17 @@ class JacobianKernel:
         )
         if proof_adapter is not None:
             self.register_capability(proof_adapter)
+        lrat_adapter, self.sat_lrat = install_sat_lrat_verifier(
+            self.store,
+            self.schemas,
+            self.artifacts,
+            self.sat,
+            self.verification,
+            self.checkers,
+            authorize_checker=install_references,
+        )
+        if lrat_adapter is not None:
+            self.register_capability(lrat_adapter)
         self.carcara_runtime: CapabilityProviderRuntime = carcara_provider_runtime()
         self.smt_unsat_proof_checker: SmtUnsatProofCheckerInstallation
         smt_proof_adapter, self.smt_unsat_proof_checker = (
