@@ -23,6 +23,7 @@ REPRODUCTIONS = (
 pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.subprocess,
+    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
     pytest.mark.skipif(
         shutil.which("cadical") is None or shutil.which("drat-trim") is None,
         reason="pinned CaDiCaL and DRAT-trim runtimes are not installed",
@@ -43,7 +44,7 @@ def _load_cases() -> list[dict[str, Any]]:
 def test_sat_public_reproductions_reach_checker_bound_results(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path / "state", install_references=True)
+    kernel = JacobianKernel(tmp_path, install_references=True)
 
     for case in _load_cases():
         cnf = kernel.sat.put_cnf(

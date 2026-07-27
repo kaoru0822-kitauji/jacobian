@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
@@ -26,8 +27,19 @@ from jacobian.plugins.registry import PluginRegistryError
 
 pytestmark = [
     pytest.mark.conformance,
-    pytest.mark.usefixtures("initialized_kernel_store"),
 ]
+
+
+@pytest.fixture
+def plugin_kernel(
+    tmp_path: Path,
+    kernel_store_template: Path,
+) -> JacobianKernel:
+    """Kernel rooted at ``tmp_path/state`` so plugin packages can live beside it."""
+
+    state = tmp_path / "state"
+    shutil.copytree(kernel_store_template, state)
+    return JacobianKernel(state)
 
 
 def _install_external_plugin(
@@ -195,9 +207,10 @@ def _install_external_plugin(
 @pytest.mark.conformance
 def test_registry_snapshot_binds_contract_source_runtime_and_platform(
     tmp_path: Path,
+    plugin_kernel: JacobianKernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path / "state")
+    kernel = plugin_kernel
     plugin_id, implementation_uris, marker, _ = _install_external_plugin(
         kernel,
         tmp_path,
@@ -244,9 +257,10 @@ def test_registry_snapshot_binds_contract_source_runtime_and_platform(
 @pytest.mark.integration
 def test_registry_snapshot_fails_closed_on_runtime_mismatch(
     tmp_path: Path,
+    plugin_kernel: JacobianKernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path / "state")
+    kernel = plugin_kernel
     plugin_id, _, _, _ = _install_external_plugin(kernel, tmp_path, monkeypatch)
     installed_runtime = kernel.plugins.snapshot(plugin_id).runtime_identity
     incompatible = installed_runtime.model_copy(
@@ -265,9 +279,10 @@ def test_registry_snapshot_fails_closed_on_runtime_mismatch(
 @pytest.mark.subprocess
 def test_external_plugin_passes_the_generic_conformance_kit(
     tmp_path: Path,
+    plugin_kernel: JacobianKernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path / "state")
+    kernel = plugin_kernel
     plugin_id, _, _, claim_uri = _install_external_plugin(
         kernel,
         tmp_path,
