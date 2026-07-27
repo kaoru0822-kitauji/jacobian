@@ -20,6 +20,9 @@ from jacobian.capabilities import (
     CapabilityService,
     load_capability_adapter,
 )
+from jacobian.claim_decomposition_capabilities import (
+    install_claim_decomposition_capabilities,
+)
 from jacobian.claims import ClaimValidationService
 from jacobian.conjectures import ConjectureService
 from jacobian.contracts.capabilities import (
@@ -258,6 +261,13 @@ class JacobianKernel:
             self.schemas,
             self.plugins,
         )
+        claim_decomposition_adapters, self.claim_decomposition = (
+            install_claim_decomposition_capabilities(
+                self.store,
+                self.schemas,
+                self.artifacts,
+            )
+        )
         self.plugin_executor = PluginExecutor()
         self.structures = StructureService(
             self.store,
@@ -464,6 +474,8 @@ class JacobianKernel:
                 self.register_capability(cvc5_adapter)
         for atomic_adapter in install_atomic_capabilities(self):
             self.register_capability(atomic_adapter)
+        for claim_decomposition_adapter in claim_decomposition_adapters:
+            self.register_capability(claim_decomposition_adapter)
         self.register_capability(KnowledgeSearchAdapter(self.memory))
         self.finite_partition: FinitePartitionInstallation
         finite_partition, self.finite_partition = install_finite_partition(
