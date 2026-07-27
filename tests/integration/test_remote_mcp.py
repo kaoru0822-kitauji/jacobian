@@ -13,6 +13,7 @@ import pytest
 from jacobian.adapters.mcp.remote import (
     StaticTokenGrant,
     StaticTokenVerifier,
+    TenantKernelLimitError,
     TenantKernelRouter,
     load_static_token_file,
 )
@@ -143,7 +144,11 @@ def test_remote_configuration_errors_name_the_rule_and_recovery(
 
 @pytest.mark.integration
 def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
-    router = TenantKernelRouter(tmp_path, install_references=False)
+    router = TenantKernelRouter(
+        tmp_path,
+        install_references=False,
+        max_tenant_kernels=2,
+    )
     alpha = router.kernel_for("alpha")
     beta = router.kernel_for("beta")
     stored = alpha.store.register_descriptor(
@@ -154,6 +159,9 @@ def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
     )
 
     assert alpha.store.root != beta.store.root
+    assert router.kernel_for("alpha") is alpha
+    with pytest.raises(TenantKernelLimitError, match="tenant limit"):
+        router.kernel_for("gamma")
     with pytest.raises(ArtifactNotFoundError):
         beta.store.get(stored)
 
