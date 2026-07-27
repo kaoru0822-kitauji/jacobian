@@ -241,6 +241,46 @@ def test_direct_elaboration_parser_preserves_multiline_core_expression() -> None
     )
 
 
+def test_direct_elaboration_parser_accepts_plain_lean_check_output() -> None:
+    assert lean_statements._parse_elaborated_expression("True : Prop\n") == "True"
+
+
+@pytest.mark.skipif(not LEAN_AVAILABLE, reason="Lean is not installed")
+def test_direct_elaboration_core_runtime_matrix() -> None:
+    successful_cases = (
+        ("True", "True"),
+        ("False", "False"),
+        ("1 = 1", "@Eq"),
+        ("∀ n : Nat, n = n", "∀"),
+    )
+    for statement, expected_fragment in successful_cases:
+        result = lean_statements._elaborate_proposition(statement)
+        assert result.elaborates is True
+        assert result.errors == ()
+        assert result.elaborated_expression is not None
+        assert expected_fragment in result.elaborated_expression
+
+    failed_cases = (
+        ("NotARealTypeXYZ", "unknown identifier"),
+        ("∀ n : Nat,", "unexpected token"),
+    )
+    for statement, expected_diagnostic in failed_cases:
+        result = lean_statements._elaborate_proposition(statement)
+        assert result.elaborates is False
+        assert result.elaborated_expression is None
+        assert any(expected_diagnostic in error.lower() for error in result.errors)
+
+
+def test_direct_elaboration_parser_preserves_coded_lean_error() -> None:
+    output = (
+        "fixture.lean:4:8: error(lean.unknownIdentifier): "
+        "Unknown identifier `NotARealTypeXYZ`\n"
+    )
+
+    assert lean_statements._parse_lean_messages(output) == [output.strip()]
+    assert lean_statements._lean_message_severity(output) == "ERROR"
+
+
 # ---------------------------------------------------------------------------
 # lean.statement.compare
 # ---------------------------------------------------------------------------
