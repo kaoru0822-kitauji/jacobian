@@ -19,7 +19,17 @@ from mcp_types import ToolAnnotations
 from pydantic import AnyHttpUrl, Field, StrictInt
 
 from jacobian import __version__
+from jacobian.adapters.mcp.guidance import (
+    CAPABILITY_DESCRIBE_DESCRIPTION,
+    CAPABILITY_INVOKE_DESCRIPTION,
+    OPERATING_GUIDE,
+    SERVER_DESCRIPTION,
+    SERVER_INSTRUCTIONS,
+    discovery_prompt,
+    evidence_check_prompt,
+)
 from jacobian.contracts.capabilities import (
+    CapabilityDiscoveryRequest,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -55,21 +65,6 @@ if TYPE_CHECKING:
     from jacobian.kernel import JacobianKernel
 
 
-SERVER_INSTRUCTIONS = (
-    "Call capability.describe before the first invocation of an unfamiliar "
-    "capability passed to capability.invoke; do not guess payload fields. Direct "
-    "workspace.* tools publish their input shape and enforce documented cross-field "
-    "invariants without capability discovery. Use EXPLORE for low-friction search and "
-    "VERIFY only when a durable checked conclusion is needed. Retrieved memory, "
-    "search, evaluation, generated evidence, workspace entries, and lifecycle marks "
-    "are not proof. Only assurance level VERIFIED with a local verification record is "
-    "verified. Writing, retrieving, closing, retracting, superseding, or pinning a "
-    "workspace entry never promotes mathematical assurance. Operational completion, "
-    "failure to find a witness, and exhausted or bounded search are not mathematical "
-    "conclusions. Follow returned artifact:// and experiment:// resources instead of "
-    "requesting large payloads inline."
-)
-
 WORKSPACE_TOOL_NAMES = frozenset(
     {"workspace.open", "workspace.write", "workspace.query"}
 )
@@ -103,7 +98,7 @@ def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
     for tool_name in tool_names:
         tool = manager.get_tool(tool_name)
         if tool is None:  # pragma: no cover - registration invariant
-            raise RuntimeError(f"workspace tool was not registered: {tool_name}")
+            raise RuntimeError(f"MCP tool was not registered: {tool_name}")
         argument_model = tool.fn_metadata.arg_model
         argument_model.model_config["extra"] = "forbid"
         argument_model.model_rebuild(force=True)
@@ -232,10 +227,7 @@ def create_server(
     server: MCPServer[AppState] = JacobianMCPServer(
         name="jacobian",
         title="Jacobian Mathematical Workbench",
-        description=(
-            "Capability-first mathematical tools, research memory, and optional "
-            "verification"
-        ),
+        description=SERVER_DESCRIPTION,
         instructions=SERVER_INSTRUCTIONS,
         version=__version__,
         lifespan=lifespan,
@@ -245,24 +237,88 @@ def create_server(
 
     @server.tool(
         name="capability.describe",
-        description=(
-            "Read an installed capability's exact descriptor and input schema. Call "
-            "this before guessing fields."
-        ),
+        title="Discover mathematical capabilities",
+        description=CAPABILITY_DESCRIBE_DESCRIPTION,
         annotations=_tool_annotations(read_only=True, idempotent=True),
         structured_output=True,
     )
     async def capability_describe(
-        capability_id: str | None = None,
+        capability_id: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "Exact installed capability ID. When supplied, omit query, "
+                    "domain, mode, and limit."
+                )
+            ),
+        ] = None,
+        query: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                max_length=512,
+                description=(
+                    "Natural-language mathematical outcome to find; no capability "
+                    "ID is required."
+                ),
+            ),
+        ] = None,
+        domain: Annotated[
+            str | None,
+            Field(
+                pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
+                description=(
+                    "Optional domain tag filter, such as universal_algebra, graph, "
+                    "polynomial, or lean."
+                ),
+            ),
+        ] = None,
+        mode: Annotated[
+            CapabilityMode | None,
+            Field(description="Optional EXPLORE or VERIFY capability filter."),
+        ] = None,
+        limit: Annotated[
+            StrictInt | None,
+            Field(
+                ge=1,
+                le=50,
+                description="Maximum compact discovery matches; defaults to 10.",
+            ),
+        ] = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_kernel = _kernel(ctx)
+        search_arguments = (query, domain, mode, limit)
+        if capability_id is not None and any(
+            argument is not None for argument in search_arguments
+        ):
+            raise AgentRecoveryError(
+                "capability_id is an exact lookup and cannot be combined with query, "
+                "domain, mode, or limit. Use one discovery call followed by one exact "
+                "description call."
+            )
+        if capability_id is None:
+            discovered = active_kernel.capabilities.discover(
+                CapabilityDiscoveryRequest(
+                    query=query,
+                    domain=domain,
+                    mode=mode,
+                    limit=limit if limit is not None else 10,
+                )
+            )
+            return {
+                "kind": "discovery",
+                **discovered.model_dump(mode="json"),
+                "next_step": {
+                    "tool": "capability.describe",
+                    "argument": "capability_id",
+                    "choose_from": "matches[].capability_id",
+                },
+            }
         capability_catalog = active_kernel.capabilities.catalog()
         descriptors = {
             item.capability_id: item for item in capability_catalog.capabilities
         }
-        if capability_id is None:
-            return capability_catalog.model_dump(mode="json")
         try:
             descriptor = descriptors[capability_id]
         except KeyError:
@@ -271,8 +327,8 @@ def create_server(
                 "workspace tool directly using its published input schema."
                 if capability_id.startswith("workspace.")
                 else (
-                    "Call capability.describe without a capability_id to list installed "
-                    "capabilities."
+                    "Call capability.describe with a mathematical query to search "
+                    "installed capabilities."
                 )
             )
             return {
@@ -284,7 +340,23 @@ def create_server(
                     "available_capability_ids": sorted(descriptors),
                 }
             }
-        response: dict[str, Any] = {"capability": descriptor.model_dump(mode="json")}
+        response: dict[str, Any] = {
+            "kind": "capability",
+            "capability": descriptor.model_dump(mode="json"),
+            "invocations": [
+                {
+                    "name": example.name,
+                    "description": example.description,
+                    "tool": "capability.invoke",
+                    "arguments": {
+                        "capability_id": descriptor.capability_id,
+                        "mode": example.mode.value,
+                        "payload": example.input,
+                    },
+                }
+                for example in descriptor.invocation_examples
+            ],
+        }
         if capability_id == "lean.check" and active_kernel.lean_checkers:
             response["cache"] = {
                 "key": "exact content-addressed certificate and active checker digest",
@@ -295,11 +367,8 @@ def create_server(
 
     @server.tool(
         name="capability.invoke",
-        description=(
-            "Invoke an installed mathematical capability in the fast EXPLORE or "
-            "checker-backed VERIFY lane. Call capability.describe first for exact "
-            "payload fields; do not guess aliases."
-        ),
+        title="Execute a mathematical capability",
+        description=CAPABILITY_INVOKE_DESCRIPTION,
         annotations=_tool_annotations(),
         structured_output=True,
     )
@@ -538,8 +607,26 @@ def create_server(
             ),
         )
 
-    _forbid_extra_tool_arguments(server, *WORKSPACE_TOOL_NAMES)
+    _forbid_extra_tool_arguments(
+        server,
+        "capability.describe",
+        "capability.invoke",
+        *WORKSPACE_TOOL_NAMES,
+    )
     _publish_workspace_normalization_aliases(server)
+
+    @server.resource(
+        "jacobian://instructions",
+        name="jacobian-instructions",
+        title="Jacobian operating guide",
+        description=(
+            "Complete guidance for discovering, invoking, and independently checking "
+            "Jacobian mathematical capabilities."
+        ),
+        mime_type="text/markdown",
+    )
+    async def jacobian_instructions_resource() -> str:
+        return OPERATING_GUIDE
 
     @server.resource(
         "artifact://sha256/{digest}",
@@ -712,6 +799,42 @@ def create_server(
             ensure_ascii=False,
             sort_keys=True,
         )
+
+    @server.prompt(
+        name="jacobian-discover",
+        title="Discover Jacobian capabilities",
+        description=(
+            "Guide capability discovery without choosing the agent's mathematical "
+            "research strategy."
+        ),
+    )
+    def jacobian_discover_prompt(
+        task: Annotated[
+            str,
+            Field(description="The mathematical task or desired outcome."),
+        ],
+    ) -> str:
+        return discovery_prompt(task)
+
+    @server.prompt(
+        name="jacobian-check-evidence",
+        title="Check mathematical evidence with Jacobian",
+        description=(
+            "Guide selection and use of an installed independent checker without "
+            "promoting unverified evidence."
+        ),
+    )
+    def jacobian_check_evidence_prompt(
+        claim: Annotated[
+            str,
+            Field(description="The exact mathematical claim to check."),
+        ],
+        artifact_uri: Annotated[
+            str | None,
+            Field(description="Optional artifact:// URI carrying candidate evidence."),
+        ] = None,
+    ) -> str:
+        return evidence_check_prompt(claim, artifact_uri)
 
     return server
 
