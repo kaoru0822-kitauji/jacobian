@@ -18,15 +18,18 @@ Jacobian gives agents composable mathematical capabilities. Its principles are:
 - inspectable intermediate artifacts; and
 - independent verification of exact claims and evidence.
 
-Each capability exposes one coherent mathematical outcome. It may coordinate
-backend calls, but useful intermediate objects, failures, relationships, and
-proof obligations remain visible. Results and artifacts report execution
-status, provenance, scope, completeness, exactness, assurance, completion,
-available certificates, and required checkers.
+Each capability exposes one coherent, inspectable mathematical outcome. It may
+coordinate backend calls, but useful intermediate artifacts, failures,
+relationships, scope, completeness, assurance, and proof obligations remain
+visible.
 
-Agents own multi-step strategy.
-Workflow capabilities must expose intermediate artifacts and verification
-boundaries.
+Jacobian exposes mathematical affordances, not research policy. Capabilities
+must remain atomic, searchable, and freely composable. Do not prescribe
+preferred decompositions, proof strategies, cross-capability workflows,
+verification order, or stopping criteria through discovery, ranking, prompts,
+or adapters. Capabilities may implement specific mathematical methods, while
+agents remain free to choose and compose them. Prompts and resources may
+explain protocol and evidence semantics, but remain optional.
 
 Design against the existing portfolio. Reuse typed artifacts that expose the
 needed outcome; declare overlap and keep useful intermediates. Before
@@ -36,10 +39,12 @@ consequential, use the
 [evaluation plan](docs/reference/capability-workflow-evaluations.md). Routine
 additions need no exhaustive pairwise or leave-one-out evaluation.
 
-Use `capability://catalog` to discover capabilities, `capability.describe` to
-inspect contracts, and `capability.invoke` to execute them. Prefer domain-owned
-IDs to generic schemas, verb taxonomies, mechanical backend wrappers, or new
-top-level MCP tools.
+Use `capability.describe(query=...)` for intent-led search,
+`capability.describe(capability_id=...)` for exact contracts and invocation
+examples, and `capability.invoke` to execute. Use `capability://catalog` for the
+complete machine-readable inventory. Prefer domain-owned capability IDs to
+generic schemas, verb taxonomies, mechanical backend wrappers, or new top-level
+MCP tools.
 
 Prefer thin adapters to maintained mathematical systems. Pin versions when
 reproducibility, certificates, or verification depend on them.
