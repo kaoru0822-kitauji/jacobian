@@ -21,6 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
@@ -78,9 +79,10 @@ class SatCnfMaterializationAdapter:
             version="1",
             title="Materialize a canonical SAT CNF",
             description=(
-                "Validate named variables and integer clauses, canonicalize them, "
-                "and store the exact CNF artifact consumed by SAT model and UNSAT "
-                "proof search and verification capabilities."
+                "Encode exact finite existence problems, including finite colorings "
+                "and forbidden configurations, as named Boolean variables and "
+                "clauses. Canonicalize and store the exact CNF consumed by SAT model "
+                "and certified exhaustive UNSAT search capabilities."
             ),
             provider="jacobian.sat",
             provider_runtime=known_provider_runtime(
@@ -98,6 +100,37 @@ class SatCnfMaterializationAdapter:
                 "model",
                 "unsat",
                 "proof",
+                "boolean-encoding",
+                "finite-coloring",
+                "forbidden-configurations",
+                "exact-finite-existence",
+                "certified-exhaustive-search",
+            ),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="finite-coloring-cnf",
+                    description=(
+                        "Encode two items with exactly one of two colors and forbid "
+                        "them from sharing a color."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input={
+                        "variable_names": [
+                            "item1_red",
+                            "item1_blue",
+                            "item2_red",
+                            "item2_blue",
+                        ],
+                        "clauses": [
+                            [1, 2],
+                            [-1, -2],
+                            [3, 4],
+                            [-3, -4],
+                            [-1, -3],
+                            [-2, -4],
+                        ],
+                    },
+                ),
             ),
         )
 
@@ -131,6 +164,13 @@ class SatCnfMaterializationAdapter:
         )
         resolved = self.sat.resolve_cnf(stored.artifact_uri)
         binding = resolved.binding
+        canonical_bindings = resolved.cnf.variables
+        bindings_inline = (
+            canonical_bindings if len(canonical_bindings) <= 4096 else None
+        )
+        caller_names = tuple(validated.variable_names)
+        canonical_names = tuple(variable.name for variable in canonical_bindings)
+        caller_order_changed = caller_names != canonical_names
         output = SatCnfMaterializationOutput(
             cnf_uri=binding.cnf_artifact_uri,
             schema_uri=self.sat.installation.cnf_schema_uri,
@@ -143,6 +183,19 @@ class SatCnfMaterializationAdapter:
             projection_version=binding.projection_version,
             variable_count=binding.variable_count,
             clause_count=binding.clause_count,
+            variable_bindings=bindings_inline,
+            variable_bindings_complete=bindings_inline is not None,
+            caller_order_changed=caller_order_changed,
+            variable_order_note=(
+                "Caller order differs from canonical DIMACS order. Input literals "
+                "were remapped soundly; interpret solver results only through the "
+                "named assignment map or the canonical variable bindings."
+                if caller_order_changed
+                else (
+                    "Caller order already matches canonical DIMACS order. Continue "
+                    "to interpret solver results through named assignments."
+                )
+            ),
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
@@ -312,7 +365,8 @@ class SatAssignmentVerificationAdapter:
             title="Verify a SAT assignment",
             description=(
                 "Independently replay one total assignment against every clause "
-                "of its exact bound canonical CNF."
+                "of its exact bound canonical CNF, establishing a finite Boolean "
+                "existence witness when accepted."
             ),
             provider="jacobian.sat",
             provider_runtime=known_provider_runtime(
@@ -323,7 +377,15 @@ class SatAssignmentVerificationAdapter:
             modes=(CapabilityMode.VERIFY,),
             input_schema=model_schema(SatAssignmentVerificationRequest),
             output_schema=model_schema(SatAssignmentVerificationOutput),
-            tags=("sat", "cnf", "assignment", "verification"),
+            tags=(
+                "sat",
+                "cnf",
+                "assignment",
+                "verification",
+                "finite-coloring",
+                "exact-finite-existence",
+                "named-assignment",
+            ),
         )
 
     @property
@@ -511,15 +573,26 @@ class SatUnsatProofVerificationAdapter:
             version="1",
             title="Verify a SAT UNSAT proof",
             description=(
-                "Replay exact raw text DRAT against its bound canonical CNF in "
-                "operator-authorized pinned DRAT-trim."
+                "Independently replay exact normalized text DRAT against its bound "
+                "canonical CNF in operator-authorized pinned DRAT-trim, establishing "
+                "certified exhaustive nonexistence only when accepted."
             ),
             provider="drat-trim",
             provider_runtime=descriptor_runtime,
             modes=(CapabilityMode.VERIFY,),
             input_schema=model_schema(SatUnsatProofVerificationRequest),
             output_schema=model_schema(SatUnsatProofVerificationOutput),
-            tags=("sat", "cnf", "unsat", "proof", "verification", "drat"),
+            tags=(
+                "sat",
+                "cnf",
+                "unsat",
+                "proof",
+                "verification",
+                "drat",
+                "finite-coloring",
+                "forbidden-configurations",
+                "certified-exhaustive-search",
+            ),
         )
 
     @property

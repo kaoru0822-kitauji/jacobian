@@ -13,6 +13,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderRuntime,
     CapabilityRequest,
@@ -141,7 +142,9 @@ class LeanCheckAdapter:
             title="Check a Lean proof",
             description=(
                 "Compile and replay one proposition with the pinned CORE or MATHLIB "
-                "kernel profile."
+                "kernel profile. Statements are single Lean expressions, including "
+                "finite-witness let expressions; declarations and trust escapes are "
+                "forbidden."
             ),
             provider="jacobian.lean4",
             provider_runtime=provider_runtime,
@@ -157,7 +160,22 @@ class LeanCheckAdapter:
                 "additionalProperties": False,
             },
             output_schema=_OBJECT_SCHEMA,
-            tags=("lean", "proof", "verification"),
+            tags=("lean", "proof", "verification", "finite-witness"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="finite-witness-let",
+                    description=(
+                        "Check a finite witness encoded as one let expression without "
+                        "adding declarations."
+                    ),
+                    mode=CapabilityMode.VERIFY,
+                    input={
+                        "environment": "CORE",
+                        "statement": "let n : Nat := 2; n + n = 4",
+                        "proof": "rfl",
+                    },
+                ),
+            ),
         )
 
     @property

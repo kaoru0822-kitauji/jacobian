@@ -97,6 +97,11 @@ and `clauses` as signed integer arrays. Its closed request model validates all
 cross-field constraints and the two-million-literal aggregate bound before the
 artifact service writes anything. It returns the canonical `cnf_uri`, schema
 and semantics URIs, counts, projection identity, and all exact binding digests.
+For at most 4,096 variables it also returns the complete canonical
+DIMACS-ID-to-name binding inline. `caller_order_changed` and
+`variable_order_note` make lexicographic remapping explicit; model-facing code
+should interpret assignments by name rather than assuming that canonical IDs
+retain caller order. Larger maps remain available in the exact CNF artifact.
 
 The result has `COMPUTED` assurance and makes no SAT or UNSAT conclusion.
 `sat.model.find` and `sat.unsat_proof.find` consume the returned `cnf_uri`;
@@ -156,13 +161,15 @@ vendor a binary. An operator may build that revision using the upstream
 Both operations accept:
 
 - one exact canonical `cnf_uri`; and
-- an enforced wall-time bound plus an optional CaDiCaL conflict bound.
+- an enforced wall-time bound of at most 150 seconds plus an optional CaDiCaL
+  conflict bound.
 
 They do not accept a memory bound because this adapter does not yet enforce
 one. The exact canonical DIMACS bytes are written to an isolated temporary
 directory. CaDiCaL runs in a bounded process group with fixed `C` locale,
 bounded stdout and stderr, and descendant termination on timeout or excess
-output.
+output. Remote MCP cancellation is propagated into the bounded process group;
+cancelled work retains no solver evidence.
 
 `sat.model.find` accepts only the documented competition protocol: exit 10
 plus `s SATISFIABLE` and a unique, range-checked, zero-terminated literal for
@@ -176,11 +183,20 @@ inspectable; it does not add assurance. The candidate becomes mathematically
 assured only if a later `sat.model.verify` invocation independently accepts it.
 
 `sat.unsat_proof.find` invokes CaDiCaL with `--no-binary` and an explicit proof
-path. Exit 20 plus `s UNSATISFIABLE` permits the adapter to read at most
-6,000,000 bytes from a non-symlink regular file and preserve them as
-`drat-text/v1`. Empty proof bytes are allowed because an input containing an
-empty clause can require no added proof step. The result still reports
-`conclusion: UNKNOWN`; no solver status or stored bytes establish UNSAT.
+path. Exit 20 plus `s UNSATISFIABLE` permits the adapter to read a bounded raw
+proof from a non-symlink regular file. The producer deterministically removes
+DRAT deletion lines before storing at most 6,000,000 normalized bytes as
+`drat-text/v1`. This aligns harmless deletion warnings with the authorized
+checker's strict profile without weakening the independent checker:
+DRAT-trim still verifies the exact stored addition-only proof against the
+exact bound CNF. A proof whose later RAT steps require prior deletions may
+therefore be rejected after normalization, but it cannot be promoted without
+successful replay. The raw capture limit is separately bounded at 64,000,000
+bytes and enforced as an operating-system worker file-size limit on supported
+POSIX hosts; exceeding either limit returns a distinct fail-closed diagnostic.
+Empty proof bytes are allowed because an input containing an empty clause can
+require no added proof step. The result still reports `conclusion: UNKNOWN`;
+no solver status or stored bytes establish UNSAT.
 
 Exit 0 is recorded only as solver status `UNKNOWN`. A SAT report from the
 proof producer, an UNSAT report from the model producer, or any bounded attempt

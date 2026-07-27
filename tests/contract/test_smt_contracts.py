@@ -91,6 +91,12 @@ def test_problem_contract_pins_one_exact_quantifier_free_query() -> None:
             SmtProblemArtifact.from_text(logic="QF_UF", smtlib_text=invalid)
 
 
+def test_synchronous_smt_budget_stays_below_remote_deadline() -> None:
+    assert SmtExplorationBudget(wall_seconds=150).wall_seconds == 150
+    with pytest.raises(ValidationError):
+        SmtExplorationBudget(wall_seconds=151)
+
+
 def test_command_scanner_ignores_comments_strings_and_quoted_symbols() -> None:
     text = (
         "(set-logic QF_UF)\n"

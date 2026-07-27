@@ -186,6 +186,17 @@ class SatCnfMaterializationOutput(ContractModel):
     projection_version: Literal["jacobian.dimacs.cnf/v1"]
     variable_count: StrictInt = Field(ge=0, le=1_000_000)
     clause_count: StrictInt = Field(ge=0, le=1_000_000)
+    variable_bindings: tuple[SatVariableBinding, ...] | None = Field(
+        default=None,
+        max_length=4096,
+        description=(
+            "Complete canonical DIMACS-ID-to-name map when it fits the bounded "
+            "inline response; otherwise read the CNF artifact."
+        ),
+    )
+    variable_bindings_complete: StrictBool
+    caller_order_changed: StrictBool
+    variable_order_note: str = Field(min_length=1, max_length=512)
 
 
 class SatResourceBudget(ContractModel):
@@ -209,7 +220,14 @@ class SatExplorationBudget(ContractModel):
     """CaDiCaL limits that the exploration adapter actually enforces."""
 
     budget_version: Literal["1"] = "1"
-    wall_seconds: StrictInt = Field(ge=1, le=86_400)
+    wall_seconds: StrictInt = Field(
+        ge=1,
+        le=150,
+        description=(
+            "Synchronous CaDiCaL wall-time budget. Partition searches expected "
+            "to exceed the cross-client-safe 150-second ceiling."
+        ),
+    )
     conflicts: StrictInt | None = Field(
         default=None,
         ge=1,

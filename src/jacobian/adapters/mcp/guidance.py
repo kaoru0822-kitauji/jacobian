@@ -18,7 +18,8 @@ SERVER_INSTRUCTIONS = (
     "discovery. EXPLORE returns proposed, heuristic, or computed evidence; use VERIFY "
     "only with an installed independent checker. Execution status, completeness, "
     "mathematical conclusion, and assurance are separate. Failure to find a witness "
-    "and bounded or exhausted search are not mathematical conclusions. Only assurance "
+    "and bounded or exhausted search are not mathematical conclusions. Synchronous "
+    "SAT/SMT calls are capped at 150 seconds; partition larger searches. Only assurance "
     "level VERIFIED with a local verification record is verified. A workspace entry "
     "never promotes mathematical assurance. Read "
     "jacobian://instructions for the complete operating guide."
@@ -61,6 +62,9 @@ for proposed, heuristic, or computed evidence and VERIFY only for an installed
 checker-backed contract. After invocation, inspect execution, scope, completeness,
 relationships, open obligations, assurance, diagnostics, and artifact URIs
 independently. COMPLETED does not by itself establish a mathematical conclusion.
+Synchronous SAT and SMT requests are capped at 150 seconds so structured TIMEOUT or
+CANCELLED diagnostics can arrive before remote transport deadlines. Partition larger
+searches; retrying a cancelled call starts a new computation.
 
 Examples:
 - `{"capability_id":"integer.compute.gcd","mode":"EXPLORE","payload":{"left":"84","right":"30"}}`
@@ -126,7 +130,9 @@ Follow returned `artifact://` and `experiment://` resources instead of requestin
 large payloads inline. Workspace findings, attempts, lifecycle marks, focus, and
 retrieval remain agent-authored operational state. Writing, closing, retracting,
 superseding, archiving, or pinning a workspace entry never promotes mathematical
-assurance.
+assurance. In particular, a workspace card titled as an exact value remains
+UNVERIFIED unless a separate checker-backed capability returns VERIFIED with its
+bound verification record.
 """
 
 

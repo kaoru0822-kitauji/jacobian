@@ -48,6 +48,21 @@
       ]
     }
   ],
+  "agent_regressions": [
+    {
+      "case_id": "ERDOS-SCHUR-F4-AGENT-001",
+      "prompt": "use jacobian mcp to solve this Erdős problem instance: Let f(k) be the least integer N such that every k-coloring of {1,...,N} contains a monochromatic solution to a+b=c. Determine f(4) and justify both bounds exactly.",
+      "expected_answer": 45,
+      "required_evidence": [
+        "checker-bound satisfying witness for N=44",
+        "checker-bound exhaustive nonexistence evidence for N=45"
+      ],
+      "preferred_capability_family": "named Boolean CNF plus independent SAT assignment and DRAT verification",
+      "route_is_not_prescribed": true,
+      "false_certification_if": "an exact final claim lacks either bound verification record",
+      "source": "2026-07-27 public Codex and ChatGPT cross-surface regression"
+    }
+  ],
   "attack_coverage": [
     {
       "variant": "flipped or incomplete assignment",

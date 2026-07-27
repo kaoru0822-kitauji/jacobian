@@ -70,7 +70,11 @@ Lean results are cached only for an exact content-addressed certificate and
 the currently active checker digest. The bounded in-memory cache holds 128
 entries; a changed proof, statement, environment, checker, or authorization
 state cannot reuse an entry. `capability.describe` for `lean.check` reports the
-configured checker timeouts and cache policy.
+cache policy and the MATHLIB warm-up state (`RUNNING`, `HEALTHY`, or
+`UNHEALTHY`). Before advertising a deployment, wait for `HEALTHY` and invoke a
+deployed smoke check with `statement: "True"`, `proof: "by trivial"`, and
+`environment: "MATHLIB"`. An unhealthy deployment must not recommend the
+MATHLIB profile.
 
 ## Container deployment
 
@@ -105,5 +109,9 @@ subject to the same tenant-routing interface.
   there.
 - Run one Jacobian process per state root until a lease model is implemented.
 - Apply CPU, memory, filesystem, and network policy outside Jacobian.
+- Synchronous SAT and SMT solver requests are capped at 150 seconds so a
+  structured fail-closed response precedes common remote-client deadlines.
+  Client cancellation terminates the bound solver process group. Partition
+  larger searches instead of holding one HTTP request open.
 - Do not interpret HTTP success, solver completion, or an MCP response as a
   verified mathematical result.

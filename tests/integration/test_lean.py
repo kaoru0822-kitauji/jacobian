@@ -144,7 +144,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
     kernel = JacobianKernel(tmp_path, install_references=True)
     assert kernel.lean is not None
     assert kernel.lean_declarations is not None
-    assert kernel.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds == 105
+    assert kernel.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds == 225
 
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -250,6 +250,28 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     }
 
 
+@pytest.mark.parametrize(
+    ("statement", "proof"),
+    (
+        ("let n : Nat := 2; n + n = 4", "rfl"),
+        ("(fun n : Nat => n + n) 2 = 4", "rfl"),
+        ("True", "by trivial"),
+    ),
+)
+def test_core_lean_accepts_single_expression_witness_forms(
+    tmp_path: Path,
+    statement: str,
+    proof: str,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    assert kernel.lean is not None
+
+    verified = kernel.lean.verify(statement=statement, proof=proof)
+
+    assert verified.result.conclusion is Conclusion.TRUE
+    assert verified.result.assurance.verification is Verification.VERIFIED
+
+
 def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> None:
     async def scenario() -> None:
         from mcp import Client
@@ -258,6 +280,14 @@ def test_core_lean_check_runs_through_capability_mcp_surface(tmp_path: Path) -> 
             create_server(tmp_path),
             raise_exceptions=True,
         ) as client:
+            described = await client.call_tool(
+                "capability.describe",
+                {"capability_id": "lean.check"},
+            )
+            descriptor = json.loads(described.content[0].text)
+            assert descriptor["invocations"][0]["name"] == "finite-witness-let"
+            assert descriptor["cache"]["mathlib_warmup"]["status"] == "NOT_STARTED"
+
             response = await client.call_tool(
                 "capability.invoke",
                 {

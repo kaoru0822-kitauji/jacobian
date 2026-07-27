@@ -191,7 +191,7 @@ def test_propose_directly_elaborates_environment_bound_proposition(
         "_lean_version_info",
         lambda: ("4.31.0", "lean-commit"),
     )
-    propose, _, _ = _build_adapters(tmp_path)
+    propose, _ = _build_adapters(tmp_path)
 
     result = propose.invoke(
         CapabilityRequest(

@@ -416,6 +416,21 @@ class WorkspaceService:
             attempts_written=len(prepared.revision.attempts),
             marks_written=len(prepared.revision.marks),
             focus_updated=prepared.revision.focus is not None,
+            unverified_finding_ids=tuple(
+                finding.card_id for finding in prepared.revision.findings
+            ),
+            unresolved_dependency_ids=tuple(
+                sorted(
+                    {
+                        dependency_id
+                        for finding in prepared.revision.findings
+                        for dependency_id in (
+                            *finding.dependency_ids,
+                            *finding.assumption_ids,
+                        )
+                    }
+                )
+            ),
         )
 
         with self._connect() as connection:

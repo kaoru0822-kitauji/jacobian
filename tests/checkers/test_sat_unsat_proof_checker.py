@@ -194,6 +194,25 @@ def test_checker_accepts_cleanup_deletions_after_the_empty_clause(
     assert decision["conclusion"] == "TRUE"
 
 
+def test_checker_reports_strict_deletion_warning_code(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
+) -> None:
+    executable, _marker = _fake_checker(
+        tmp_path,
+        "print('c WARNING: deleted clause on proof line 4 does not occur: [0] -2 0')\n"
+        "raise SystemExit(80)",
+    )
+    _install_runtime_environment(monkeypatch, executable)
+
+    decision = check_unsat_proof(proof_request_factory(b"d -2 0\n-1 0\n0\n"))
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+    assert decision["detail"].startswith("DRAT_DELETION_WARNING_REJECTED:")
+
+
 def test_binding_and_lineage_attacks_are_rejected_before_drat_trim(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

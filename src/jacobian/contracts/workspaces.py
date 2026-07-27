@@ -621,6 +621,15 @@ class WorkspaceWriteResult(ContractModel):
     attempts_written: StrictInt = Field(ge=0)
     marks_written: StrictInt = Field(default=0, ge=0)
     focus_updated: bool
+    unverified_finding_ids: tuple[WorkspaceCardId, ...] = ()
+    unresolved_dependency_ids: tuple[WorkspaceCardId, ...] = ()
+    assurance_notice: Literal[
+        "Workspace findings, attempts, search counts, TIMEOUT, and UNKNOWN remain "
+        "UNVERIFIED and cannot establish an exact mathematical conclusion."
+    ] = (
+        "Workspace findings, attempts, search counts, TIMEOUT, and UNKNOWN remain "
+        "UNVERIFIED and cannot establish an exact mathematical conclusion."
+    )
 
 
 class WorkspaceItemSummary(ContractModel):
