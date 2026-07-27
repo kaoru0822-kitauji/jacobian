@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -319,6 +322,112 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     assert not second.is_alive()
     assert sum(isinstance(outcome, str) for outcome in outcomes) == 1
     assert sum(isinstance(outcome, StoreLimitError) for outcome in outcomes) == 1
+
+
+@pytest.mark.integration
+def test_blob_writes_do_not_rescan_the_blob_tree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+
+    def unexpected_scan(_path: Path) -> None:
+        raise AssertionError("blob writes must use durable quota accounting")
+
+    monkeypatch.setattr(Path, "iterdir", unexpected_scan)
+    store._write_blob(b"constant-time quota accounting")
+
+
+@pytest.mark.integration
+def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    committed = store._blob_bytes_committed()
+    store._adjust_blob_bytes_committed(512)
+
+    reopened = ArtifactStore(tmp_path)
+
+    assert reopened._blob_bytes_committed() == committed
+
+
+@pytest.mark.integration
+def test_duplicate_put_uses_store_open_integrity_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    data = b"validated once per unchanged blob"
+    digest = store._write_blob(data)
+
+    def unexpected_read(_path: Path) -> bytes:
+        raise AssertionError("unchanged validated blobs must not be reread")
+
+    monkeypatch.setattr(Path, "read_bytes", unexpected_read)
+
+    assert store._write_blob(data) == digest
+
+
+@pytest.mark.integration
+def test_duplicate_put_rechecks_a_changed_blob(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    original = b"original"
+    digest = store._write_blob(original)
+    store._blob_path(digest).write_bytes(b"tampered")
+
+    with pytest.raises(ArtifactIntegrityError, match="does not match"):
+        store._write_blob(original)
+
+
+@pytest.mark.integration
+def test_failed_blob_publication_releases_quota_reservation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    committed = store._blob_bytes_committed()
+
+    def fail_link(_source: str, _target: str) -> None:
+        raise OSError("link failed")
+
+    monkeypatch.setattr(os, "link", fail_link)
+
+    with pytest.raises(StoreError, match="could not write"):
+        store._write_blob(b"unpublished")
+
+    assert store._blob_bytes_committed() == committed
+
+
+@pytest.mark.integration
+def test_cross_process_blob_writes_cannot_oversubscribe_quota(
+    tmp_path: Path,
+) -> None:
+    script = """
+import sys
+from jacobian.store import ArtifactStore, StoreLimitError, StoreLimits
+
+store = ArtifactStore(sys.argv[1], limits=StoreLimits(max_total_blob_bytes=900))
+try:
+    store._write_blob(sys.argv[2].encode("ascii") * 600)
+except StoreLimitError:
+    print("limited")
+else:
+    print("committed")
+"""
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(tmp_path), value],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for value in ("a", "b")
+    ]
+    completed = [process.communicate(timeout=30) for process in processes]
+
+    assert [process.returncode for process in processes] == [0, 0]
+    assert sorted(stdout.strip() for stdout, _stderr in completed) == [
+        "committed",
+        "limited",
+    ]
 
 
 @pytest.mark.integration
