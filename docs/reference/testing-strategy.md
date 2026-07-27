@@ -41,7 +41,6 @@ make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
-make refresh-lean-test-durations
 make check
 make check-static
 make validate-full
@@ -88,22 +87,19 @@ meaningful layer without a committed timing snapshot or node-ID partition.
 Both Python 3.12 lanes record coverage, and the dependent reporting job
 combines those two data artifacts.
 
-Tests marked
-`lean_runtime` are excluded from those runs and divided by measured duration
-between two dedicated runners with pinned Lean and Mathlib caches. The split
-collects the full marker-selected suite, so new Lean tests cannot fall outside
-a file allowlist. Refresh `.lean_test_durations` after adding or materially
-changing those tests. Each runner executes its lane serially, avoiding
-concurrent multi-gigabyte Mathlib processes on one machine while shortening
-the CI critical path and preserving real-backend coverage. A manually
-dispatched Lean debug workflow accepts one pytest node or file selector and
-provides the same pinned remote environment for focused reproduction when
-local Lean is impractical.
+Tests marked `lean_runtime` are excluded from the Python lanes and run serially
+on one dedicated runner with pinned Lean and Mathlib caches. The marker-selected
+run automatically includes new Lean tests without a file allowlist or timing
+snapshot, while serial execution avoids concurrent multi-gigabyte Mathlib
+processes on one machine. A manually dispatched Lean debug workflow accepts
+one pytest node or file selector and provides the same pinned remote
+environment for focused reproduction when local Lean is impractical.
 The Python Debug workflow provides the same focused remote reproduction for
 one ordinary pytest file or node on either supported Python version.
-Python 3.12 shards write raw coverage data; a dependent job combines both
-files before enforcing the repository threshold and producing the XML report.
-Python 3.13 runs the same two groups without duplicate instrumentation.
+The two Python 3.12 semantic lanes write raw coverage data; a dependent job
+combines both files before enforcing the repository threshold and producing
+the XML report. Python 3.13 runs the same lanes without duplicate
+instrumentation.
 Coverage.py's subprocess patch includes plugin and checker workers so
 clean-process execution is not misreported as uncovered.
 Measured costs and lane policy are recorded in the

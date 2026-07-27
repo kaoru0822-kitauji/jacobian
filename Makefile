@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed refresh-lean-test-durations build check check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed build check check-static validate-full agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -62,15 +62,6 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
-
-refresh-lean-test-durations: ## Refresh Lean CI shard timings serially.
-	@durations=$$(mktemp .lean_test_durations.XXXXXX); \
-	trap 'rm -f "$$durations"' EXIT; \
-	printf '{}\n' > "$$durations"; \
-	$(UV_RUN) pytest -n 0 -m lean_runtime --store-durations \
-		--clean-durations --durations-path "$$durations" && \
-	chmod 0644 "$$durations" && \
-	mv "$$durations" .lean_test_durations
 
 build: ## Build Python source and wheel distributions.
 	uv build

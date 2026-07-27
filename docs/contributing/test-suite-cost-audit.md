@@ -16,7 +16,6 @@ machine-local observations, not performance gates.
 | Integration, excluding end-to-end and Lean | 275 | 218.88 s | Real stores, subprocesses, adapters, and capability composition |
 | End-to-end | 5 | 33.84 s | Distinct complete mathematical workflows |
 | `make test-lean` | 20 | 218.26 s | Serial pinned Lean and Mathlib coverage |
-| Non-Lean duration calibration | 526 | 285.13 s | Refresh data for CI shard assignment |
 
 Static validation was not a material bottleneck: Ruff, formatting, mypy,
 dependency checks, build, and documentation checks completed in about 16
@@ -74,13 +73,10 @@ CI is unavailable or an environment-specific failure requires it. Do not use
 unfiltered `uv run pytest` as the default handoff command because it mixes Lean
 into the general parallel pool.
 
-Recent CI phase timing supports retaining two independent Lean shards. On both
-lanes, Lean toolchain and Mathlib cache setup took about 83 to 85 seconds,
-`lake build repl` took 11 to 12 seconds, and selected tests took 66 to 71
-seconds. Sharing Jacobian's build output would serialize both shards behind a
-new preparation job to avoid only the small build phase, so CI keeps the build
-local to each parallel lane. The workflow records these phases for future
-decisions.
+The Lean suite runs serially on one prepared runner. This avoids concurrent
+multi-gigabyte Mathlib processes, collects every `lean_runtime` test without a
+file allowlist, and keeps the pinned toolchain setup attached to the tests that
+consume it.
 
 ## Follow-up opportunities
 

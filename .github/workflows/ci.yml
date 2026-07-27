@@ -252,16 +252,12 @@ jobs:
           esac
           test "$TEST_RESULT" = "success"
 
-  lean-test-shards:
-    name: Lean Tests (${{ matrix.lane }})
+  lean-test-run:
+    name: Lean Runtime
     needs: plan
     if: needs.plan.outputs.run-lean == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        lane: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare Lean test environment
@@ -276,16 +272,12 @@ jobs:
           echo "| Selected Lean tests | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
         env:
-          PYTEST_ARGS: >-
-            --splits 2 --group ${{ matrix.lane }}
-            --splitting-algorithm least_duration
-            --durations-path .lean_test_durations
-            --durations=10
+          PYTEST_ARGS: --durations=10
 
   lean-test:
     name: Lean Tests
     if: always()
-    needs: [plan, lean-test-shards]
+    needs: [plan, lean-test-run]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -293,12 +285,12 @@ jobs:
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_LEAN: ${{ needs.plan.outputs.run-lean }}
-          SHARD_RESULT: ${{ needs.lean-test-shards.result }}
+          LEAN_RESULT: ${{ needs.lean-test-run.result }}
         run: |
           test "$PLAN_RESULT" = "success"
           case "$RUN_LEAN" in
-            true) test "$SHARD_RESULT" = "success" ;;
-            false) test "$SHARD_RESULT" = "skipped" ;;
+            true) test "$LEAN_RESULT" = "success" ;;
+            false) test "$LEAN_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
 
