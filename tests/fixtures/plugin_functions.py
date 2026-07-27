@@ -15,6 +15,13 @@ def echo(request: dict[str, Any]) -> dict[str, Any]:
     return {"seen": request}
 
 
+def report_environment(_request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "secret": os.environ.get("JACOBIAN_TEST_SECRET"),
+        "https_proxy": os.environ.get("HTTPS_PROXY"),
+    }
+
+
 def wait_forever(_request: dict[str, Any]) -> dict[str, Any]:
     time.sleep(60)
     return {"unreachable": True}

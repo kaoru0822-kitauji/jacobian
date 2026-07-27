@@ -196,7 +196,7 @@ class CheckerRegistry:
             registration.model_dump(mode="json", exclude_none=True)
         )
 
-        with self._connect() as connection:
+        with self._exclusive_policy_lock(), self._connect() as connection:
             existing = connection.execute(
                 """
                 SELECT registration_json, authorized, executable_digest
@@ -409,7 +409,7 @@ class CheckerRegistry:
                         target_semantics_uri=target_semantics_uri,
                     )
                 )
-            except CheckerCompatibilityError:
+            except CheckerRegistryError:
                 continue
         if not compatible:
             raise CheckerNotFoundError(

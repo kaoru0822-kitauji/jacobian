@@ -52,6 +52,8 @@ _PROVIDER_KEYS = {
     "features",
     "checker_ids",
     "configuration",
+    "distribution_import_name",
+    "distribution_required_attributes",
     "diagnostic",
 }
 MAX_MATRIX_DIMENSION = 32

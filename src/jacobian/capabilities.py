@@ -384,7 +384,10 @@ class CapabilityService:
         if result.assurance.level is not CapabilityAssuranceLevel.VERIFIED:
             return
         record_uri = result.assurance.verification_record_uri
-        assert record_uri is not None
+        if record_uri is None:
+            raise CapabilityError(
+                "verified capability result has no verification record URI"
+            )
         try:
             record_artifact = self.store.get(record_uri)
             record = VerificationRecord.model_validate(record_artifact.payload)
@@ -560,9 +563,10 @@ def _discovery_relevance(
             matched_on.append(label)
             matched_terms.update(overlap)
     normalized_query = _normalize_discovery_text(query)
-    if normalized_query and normalized_query in _normalize_discovery_text(
+    normalized_text = _normalize_discovery_text(
         f"{descriptor.capability_id} {descriptor.title} {descriptor.description}"
-    ):
+    )
+    if normalized_query and f"-{normalized_query}-" in f"-{normalized_text}-":
         score += 20
         matched_on.append("phrase")
     return score, tuple(matched_on), tuple(sorted(matched_terms))
@@ -594,7 +598,8 @@ def _validate_payload(
     payload: dict[str, object],
 ) -> dict[str, object]:
     normalized = loads_strict_json(canonicalize_json(payload))
-    assert isinstance(normalized, dict)
+    if not isinstance(normalized, dict):
+        raise CapabilityError("capability payload must normalize to an object")
     errors = sorted(
         _validator(schema).iter_errors(normalized),
         key=lambda error: tuple(str(part) for part in error.absolute_path),

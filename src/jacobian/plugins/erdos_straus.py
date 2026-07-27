@@ -106,7 +106,8 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
         errors.extend(_validate_candidate_for_claim(claim, candidate))
     if errors:
         raise ValueError("; ".join(errors))
-    assert isinstance(candidate, dict)
+    if not isinstance(candidate, dict):
+        raise ValueError("candidate must be an object")
 
     lower = candidate["lower_bound"]
     upper = candidate["upper_bound"]
@@ -150,7 +151,8 @@ def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
         errors.extend(_validate_candidate_for_claim(claim, candidate))
     if errors:
         raise ValueError("; ".join(errors))
-    assert isinstance(candidate, dict)
+    if not isinstance(candidate, dict):
+        raise ValueError("candidate must be an object")
 
     lower = candidate["lower_bound"]
     upper = candidate["upper_bound"]

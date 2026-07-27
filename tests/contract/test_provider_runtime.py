@@ -22,6 +22,7 @@ from jacobian.provider_runtime import (
     ProviderRuntimeError,
     composite_provider_runtime,
     exact_domain_checker_provider_runtime,
+    python_distribution_provider_runtime,
     require_provider_runtime_unchanged,
 )
 
@@ -217,3 +218,28 @@ def test_measurement_status_cannot_hide_missing_elapsed_time() -> None:
         match="incomplete provider measurement requires a detail",
     ):
         ProviderMeasurementSample(status=ProviderMeasurementStatus.SKIPPED)
+
+
+def test_python_distribution_unchanged_check_replays_feature_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = python_distribution_provider_runtime(
+        "pydantic",
+        distribution_name="pydantic",
+        import_name="pydantic",
+        required_attributes=("BaseModel",),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT",
+        refresh=True,
+    )
+    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    assert runtime.distribution_import_name == "pydantic"
+    assert runtime.distribution_required_attributes == ("BaseModel",)
+    monkeypatch.setattr(
+        provider_runtime.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(),
+    )
+
+    with pytest.raises(ProviderRuntimeError, match="installed and healthy"):
+        require_provider_runtime_unchanged(runtime)

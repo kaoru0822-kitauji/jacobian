@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
@@ -95,6 +96,44 @@ def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> No
         "AUTHORIZED",
         "REVOKED",
     ]
+
+
+@pytest.mark.integration
+def test_concurrent_duplicate_authorize_is_serialized(tmp_path: Path) -> None:
+    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+    barrier = threading.Barrier(8)
+    registrations = []
+    errors: list[Exception] = []
+
+    def authorize() -> None:
+        barrier.wait()
+        try:
+            registrations.append(
+                registry.authorize(
+                    name="reject-all-v1",
+                    entrypoint="jacobian_checkers.reject:check",
+                    evidence_kind="WITNESS",
+                    format_id="example.witness",
+                    format_version="1",
+                    claim_schema_uris=(CLAIM_SCHEMA_A,),
+                    semantics_uris=(CLAIM_SCHEMA_A,),
+                    candidate_schema_uris=(CLAIM_SCHEMA_A,),
+                )
+            )
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=authorize) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert errors == []
+    assert len({registration.checker_id for registration in registrations}) == 1
+    assert [
+        event.action for event in registry.audit_log(registrations[0].checker_id)
+    ] == ["AUTHORIZED"]
 
 
 @pytest.mark.integration

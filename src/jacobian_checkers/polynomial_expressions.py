@@ -59,6 +59,8 @@ _PROVIDER_KEYS = {
     "features",
     "checker_ids",
     "configuration",
+    "distribution_import_name",
+    "distribution_required_attributes",
     "diagnostic",
 }
 _NORMALIZATION_CONFIGURATION = {

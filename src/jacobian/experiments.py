@@ -797,7 +797,10 @@ class ExperimentService:
                         detail="enumerator reported complete bounded scope",
                     )
                     return
-                assert page.next_cursor is not None
+                if page.next_cursor is None:
+                    raise ExperimentError(
+                        "incomplete enumerator page requires next_cursor"
+                    )
                 if cursor is not None and canonicalize_json(
                     page.next_cursor
                 ) == canonicalize_json(cursor):

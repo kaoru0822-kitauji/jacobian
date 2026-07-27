@@ -16,10 +16,15 @@ from mcp.server.auth.provider import AccessToken
 from jacobian.kernel import JacobianKernel
 
 _TENANT_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+DEFAULT_MAX_TENANT_KERNELS = 32
 
 
 class AuthenticationError(PermissionError):
     """A remote request lacks a usable authenticated tenant subject."""
+
+
+class TenantKernelLimitError(RuntimeError):
+    """The server cannot admit another in-memory tenant kernel."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,11 +79,15 @@ class TenantKernelRouter:
         install_references: bool = True,
         allow_anonymous: bool = False,
         capability_adapter_entrypoints: tuple[str, ...] = (),
+        max_tenant_kernels: int = DEFAULT_MAX_TENANT_KERNELS,
     ) -> None:
+        if max_tenant_kernels < 1:
+            raise ValueError("max_tenant_kernels must be positive")
         self.root = Path(root)
         self.install_references = install_references
         self.allow_anonymous = allow_anonymous
         self.capability_adapter_entrypoints = capability_adapter_entrypoints
+        self.max_tenant_kernels = max_tenant_kernels
         self._kernels: dict[str, JacobianKernel] = {}
         self._lock = threading.Lock()
 
@@ -100,6 +109,10 @@ class TenantKernelRouter:
         with self._lock:
             kernel = self._kernels.get(tenant_key)
             if kernel is None:
+                if len(self._kernels) >= self.max_tenant_kernels:
+                    raise TenantKernelLimitError(
+                        "This server has reached its in-memory tenant limit."
+                    )
                 kernel = JacobianKernel(
                     self.root / "tenants" / tenant_key,
                     install_references=self.install_references,

@@ -986,5 +986,9 @@ class JacobianKernel:
         """Install an operator-owned adapter without changing the kernel or MCP."""
 
         if adapter.descriptor.capability_id in self._capability_exclusions:
+            _LOGGER.debug(
+                "Capability %s excluded by operator configuration",
+                adapter.descriptor.capability_id,
+            )
             return
         self.capabilities.register(adapter)

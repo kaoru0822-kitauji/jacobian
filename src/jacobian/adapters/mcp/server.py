@@ -321,6 +321,7 @@ def create_server(
     auth: Any | None = None,
     capability_adapter_entrypoints: tuple[str, ...] = (),
     capability_exclusions: frozenset[str] = frozenset(),
+    max_tenant_kernels: int | None = None,
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over the Jacobian kernel."""
 
@@ -332,7 +333,10 @@ def create_server(
     from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
-    from jacobian.adapters.mcp.remote import TenantKernelRouter
+    from jacobian.adapters.mcp.remote import (
+        DEFAULT_MAX_TENANT_KERNELS,
+        TenantKernelRouter,
+    )
     from jacobian.kernel import JacobianKernel
     from jacobian.references import reference_catalog
 
@@ -404,6 +408,11 @@ def create_server(
             install_references=install_references,
             allow_anonymous=allow_anonymous,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
+            max_tenant_kernels=(
+                DEFAULT_MAX_TENANT_KERNELS
+                if max_tenant_kernels is None
+                else max_tenant_kernels
+            ),
         )
         if tenant_isolation
         else None
@@ -1117,7 +1126,10 @@ def _configured_root(state_dir: str | Path | None) -> Path:
 
 
 def _public_tool_error(tool_name: str, exc: Exception) -> str:
-    from jacobian.adapters.mcp.remote import AuthenticationError
+    from jacobian.adapters.mcp.remote import (
+        AuthenticationError,
+        TenantKernelLimitError,
+    )
     from jacobian.experiments import ExperimentNotFoundError
     from jacobian.registry import CheckerNotFoundError
     from jacobian.store import ArtifactNotFoundError
@@ -1143,6 +1155,12 @@ def _public_tool_error(tool_name: str, exc: Exception) -> str:
         code = "AUTHENTICATION_REQUIRED"
         message = str(tool_error)
         hint = "Authenticate with a configured bearer token, then retry."
+    elif isinstance(tool_error, TenantKernelLimitError):
+        code = "TENANT_KERNEL_LIMIT"
+        message = str(tool_error)
+        hint = (
+            "Retry on another server instance or ask the operator to raise the limit."
+        )
     elif isinstance(tool_error, PermissionError):
         code = "PERMISSION_DENIED"
         message = "Jacobian could not access the required local resource."
@@ -1270,7 +1288,15 @@ def main() -> None:
         default=[],
         help="operator-approved package.module:factory entrypoint; repeatable",
     )
+    parser.add_argument(
+        "--max-tenant-kernels",
+        type=int,
+        default=32,
+        help="maximum in-memory tenant kernels for remote transports",
+    )
     args = parser.parse_args()
+    if args.max_tenant_kernels < 1:
+        parser.error("--max-tenant-kernels must be positive")
     args.path = args.path if args.path.startswith("/") else f"/{args.path}"
     if args.transport == "stdio":
         if args.auth_tokens_file is not None or args.allow_anonymous:
@@ -1313,6 +1339,7 @@ def main() -> None:
         token_verifier=token_verifier,
         auth=auth,
         capability_adapter_entrypoints=tuple(args.capability_adapter),
+        max_tenant_kernels=args.max_tenant_kernels,
     )
     if args.transport == "streamable-http":
         server.run(

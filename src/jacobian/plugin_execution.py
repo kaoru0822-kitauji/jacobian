@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import time
 from dataclasses import dataclass
@@ -13,6 +12,7 @@ from jacobian.bounded_process import run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.implementation import package_source_digest
+from jacobian.worker_environment import worker_environment
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,8 +81,7 @@ class PluginExecutor:
 
         started = time.monotonic()
         expected_digest = implementation_digest or package_source_digest(entrypoint)
-        environment = dict(os.environ)
-        environment.update({"PYTHONHASHSEED": "0", "TZ": "UTC"})
+        environment = worker_environment()
         completed = run_bounded_process(
             [
                 sys.executable,
@@ -205,4 +204,9 @@ def _bounded_text(value: bytes | str | None, *, limit: int) -> str:
     if value is None:
         return ""
     raw = value.encode("utf-8", errors="replace") if isinstance(value, str) else value
-    return raw[:limit].decode("utf-8", errors="replace")
+    if len(raw) <= limit:
+        selected = raw
+    else:
+        marker = b"\n...[truncated]"
+        selected = raw[: max(0, limit - len(marker))] + marker[:limit]
+    return selected.decode("utf-8", errors="replace")

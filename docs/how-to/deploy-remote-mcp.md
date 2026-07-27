@@ -40,6 +40,7 @@ uv run jacobian-mcp \
   --port 8000 \
   --path /mcp \
   --state-dir /var/lib/jacobian \
+  --max-tenant-kernels 32 \
   --auth-tokens-file /run/secrets/jacobian-tokens.json \
   --public-base-url https://math-tools.example.org
 ```
@@ -47,13 +48,17 @@ uv run jacobian-mcp \
 Put a TLS-terminating reverse proxy in front of `127.0.0.1:8000`. The public
 URL must route `/mcp` without stripping the path. Each authenticated subject is
 mapped to a separate hashed directory below
-`/var/lib/jacobian/tenants/`.
+`/var/lib/jacobian/tenants/`. The server retains at most 32 tenant kernels by
+default. Existing tenants remain available at the limit; new tenants receive a
+bounded admission error. Set `--max-tenant-kernels` to match the instance's
+memory budget.
 
 For a disposable local transport test only:
 
 ```sh
 uv run jacobian-mcp \
   --transport streamable-http \
+  --max-tenant-kernels 32 \
   --allow-anonymous
 ```
 

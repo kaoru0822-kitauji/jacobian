@@ -209,12 +209,8 @@ def _find_omitted_path(candidate: dict[str, Any], max_length: int) -> list[str] 
 
 
 def _find_odd_cycle(candidate: dict[str, Any]) -> list[str] | None:
-    """Return a directed simple cycle of odd length, or None if none exists."""
+    """Return an odd cycle in the underlying graph, or None if none exists."""
     g = _as_digraph(candidate)
-    for cycle in nx.simple_cycles(g):
-        if len(cycle) >= 3 and len(cycle) % 2 == 1:
-            return cycle
-    # Fallback: look for an odd cycle in the underlying undirected graph.
     ug = g.to_undirected()
     if nx.is_bipartite(ug):
         return None
@@ -656,7 +652,11 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
             response["detail"] = "no odd cycle to preserve"
             return response
         protected_vertices = set(cycle)
-        protected_arcs = set(pairwise(cycle)) | {(cycle[-1], cycle[0])}
+        cycle_edges = set(pairwise(cycle)) | {(cycle[-1], cycle[0])}
+        protected_arcs = cycle_edges | {
+            (target_vertex, source_vertex)
+            for source_vertex, target_vertex in cycle_edges
+        }
     else:
         return _rejected(["unsupported predicate for reductions"], start)
 

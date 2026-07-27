@@ -140,10 +140,43 @@ class CapabilityProviderRuntime(ContractModel):
     features: tuple[str, ...] = ()
     checker_ids: tuple[CheckerUri, ...] = ()
     configuration: dict[str, Any] = Field(default_factory=dict)
+    distribution_import_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+    )
+    distribution_required_attributes: tuple[str, ...] = Field(
+        default=(),
+        max_length=64,
+    )
     diagnostic: str | None = Field(default=None, min_length=1, max_length=512)
 
     @model_validator(mode="after")
     def validate_runtime_identity(self) -> Self:
+        if len(set(self.distribution_required_attributes)) != len(
+            self.distribution_required_attributes
+        ):
+            raise ValueError("provider feature probe attributes must be unique")
+        if any(
+            not attribute.isidentifier()
+            for attribute in self.distribution_required_attributes
+        ):
+            raise ValueError("provider feature probe attributes must be identifiers")
+        if self.distribution_import_name is not None and any(
+            not component.isidentifier()
+            for component in self.distribution_import_name.split(".")
+        ):
+            raise ValueError("provider distribution import name is invalid")
+        if (
+            self.distribution_import_name is not None
+            or self.distribution_required_attributes
+        ) and (
+            self.digest_kind
+            is not CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD
+        ):
+            raise ValueError(
+                "provider distribution probes require a Python distribution digest"
+            )
         if self.availability is CapabilityProviderAvailability.AVAILABLE:
             if self.version is None or self.digest is None or self.digest_kind is None:
                 raise ValueError(
