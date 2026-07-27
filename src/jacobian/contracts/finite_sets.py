@@ -10,6 +10,7 @@ from jacobian.contracts.exact import CanonicalInteger
 from jacobian.contracts.results import ContractModel
 
 _MAX_SET_SIZE = 128
+_MAX_BINARY_SET_RESULT_SIZE = 2 * _MAX_SET_SIZE
 
 
 class FiniteIntegerSet(ContractModel):
@@ -34,7 +35,9 @@ class FiniteSetPairRequest(ContractModel):
 class FiniteSetElementListResult(ContractModel):
     """Sorted distinct integers produced by a binary set operation."""
 
-    elements: tuple[CanonicalInteger, ...] = Field(max_length=_MAX_SET_SIZE)
+    elements: tuple[CanonicalInteger, ...] = Field(
+        max_length=_MAX_BINARY_SET_RESULT_SIZE
+    )
 
     @model_validator(mode="after")
     def require_sorted_unique(self) -> Self:
@@ -49,7 +52,7 @@ class FiniteSetElementListResult(ContractModel):
 class FiniteSetCardinalityResult(ContractModel):
     """Number of distinct elements in one finite set."""
 
-    cardinality: int = Field(ge=0, le=_MAX_SET_SIZE)
+    cardinality: int = Field(ge=0, le=_MAX_BINARY_SET_RESULT_SIZE)
 
 
 class FiniteSetBooleanResult(ContractModel):
