@@ -174,7 +174,8 @@ class WitnessSearchService:
             response = PluginWitnessResponse.model_validate(execution.output)
             witness_uri = None
             if response.status == WitnessSearchStatus.NONE_CERTIFIED:
-                assert response.certificate_uri is not None
+                if response.certificate_uri is None:
+                    raise ValueError("NONE_CERTIFIED response requires certificate_uri")
                 verified = self.verification.verify_certificate(
                     certificate_uri=response.certificate_uri
                 )

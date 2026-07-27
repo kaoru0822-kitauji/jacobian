@@ -330,7 +330,9 @@ def _single_proof_state(response: Mapping[str, Any]) -> int:
     ):
         errors = _response_errors(response)
         if errors:
-            return -1
+            raise RuntimeError(
+                "Lean did not expose one replayable proof state: " + "; ".join(errors)
+            )
         raise RuntimeError("Lean did not expose one replayable proof state")
     proof_state = sorries[0]["proofState"]
     assert isinstance(proof_state, int)

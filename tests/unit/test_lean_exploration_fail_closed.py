@@ -15,7 +15,11 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_exploration import LeanProofStateAdapter, _Resources
+from jacobian.lean_exploration import (
+    LeanProofStateAdapter,
+    _Resources,
+    _single_proof_state,
+)
 
 
 def test_typed_goal_extraction_failure_is_a_structured_non_conclusion(
@@ -74,3 +78,16 @@ def test_typed_goal_extraction_failure_is_a_structured_non_conclusion(
 
     assert error.value.diagnostic.code == "LEAN_PROOF_STATE_EXTRACTION_FAILED"
     assert error.value.diagnostic.stage == "proof_state_extraction"
+
+
+def test_single_proof_state_raises_with_lean_errors() -> None:
+    response = {
+        "sorries": [],
+        "messages": [
+            {"severity": "error", "data": "unknown identifier"},
+            {"severity": "error", "data": "type mismatch"},
+        ],
+    }
+
+    with pytest.raises(RuntimeError, match=r"unknown identifier.*type mismatch"):
+        _single_proof_state(response)
