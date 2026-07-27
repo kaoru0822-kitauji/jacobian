@@ -19,9 +19,7 @@ from jacobian.domains.finite_sets.operations import (
 def maximum_disjoint_pair() -> FiniteSetPairRequest:
     return FiniteSetPairRequest(
         left=FiniteIntegerSet(elements=tuple(str(value) for value in range(128))),
-        right=FiniteIntegerSet(
-            elements=tuple(str(value) for value in range(128, 256))
-        ),
+        right=FiniteIntegerSet(elements=tuple(str(value) for value in range(128, 256))),
     )
 
 
