@@ -69,6 +69,13 @@ def main() -> None:
                 payload={"values": list(range(256))},
             ),
         )
+        for index in range(256):
+            store._write_blob(f"startup-scaling-{index}".encode())
+        runner.bench_func(
+            "artifact-store-clean-open-populated",
+            ArtifactStore,
+            Path(directory),
+        )
 
 
 if __name__ == "__main__":
