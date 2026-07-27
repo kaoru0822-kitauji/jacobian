@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import re
 import time
 from functools import lru_cache
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.capabilities import (
@@ -61,6 +63,23 @@ _DISCOVERY_STOP_WORDS = frozenset(
 
 class CapabilityError(RuntimeError):
     """A capability descriptor, request, or assurance boundary is invalid."""
+
+
+class _PayloadValidationError(CapabilityError):
+    """Structured descriptor-schema failure safe for public diagnostics."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: str,
+        actual_type: str,
+        expected: str,
+    ) -> None:
+        super().__init__(message)
+        self.path = path
+        self.actual_type = actual_type
+        self.expected = expected
 
 
 class CapabilityDiscoveryCursorError(ValueError):
@@ -258,7 +277,11 @@ class CapabilityService:
         try:
             normalized_input = _validate_payload(descriptor.input_schema, request.input)
         except CapabilityError as exc:
-            path = _error_path(exc)
+            path = (
+                exc.path
+                if isinstance(exc, _PayloadValidationError)
+                else _error_path(exc)
+            )
             result = _failed_result(
                 descriptor=descriptor,
                 request=request,
@@ -270,8 +293,16 @@ class CapabilityService:
                         + (f" at {path}." if path else ".")
                     ),
                     path=path,
-                    expected="input matching the capability descriptor JSON Schema",
-                    actual_type="object",
+                    expected=(
+                        exc.expected
+                        if isinstance(exc, _PayloadValidationError)
+                        else "input matching the capability descriptor JSON Schema"
+                    ),
+                    actual_type=(
+                        exc.actual_type
+                        if isinstance(exc, _PayloadValidationError)
+                        else _json_value_type(request.input)
+                    ),
                     hint="Call capability.describe and follow the advertised input schema.",
                 ),
             )
@@ -607,8 +638,47 @@ def _validate_payload(
     if errors:
         first = errors[0]
         location = "/".join(str(part) for part in first.absolute_path) or "$"
-        raise CapabilityError(f"{location}: {first.message}")
+        raise _PayloadValidationError(
+            f"{location}: {first.message}",
+            path=location,
+            actual_type=_json_value_type(first.instance),
+            expected=_schema_expectation(first),
+        )
     return normalized
+
+
+def _json_value_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return type(value).__name__
+
+
+def _schema_expectation(error: JsonSchemaValidationError) -> str:
+    if error.validator == "enum" and isinstance(error.validator_value, list):
+        allowed = ", ".join(
+            json.dumps(value, ensure_ascii=False) for value in error.validator_value
+        )
+        return f"one of: {allowed}"
+    if error.validator == "const":
+        return f"the constant {json.dumps(error.validator_value, ensure_ascii=False)}"
+    if error.validator == "type":
+        expected = error.validator_value
+        if isinstance(expected, list):
+            return "JSON type " + " or ".join(str(item) for item in expected)
+        return f"JSON type {expected}"
+    return "input matching the capability descriptor JSON Schema"
 
 
 def _episode_summary(result: CapabilityResult) -> str:
