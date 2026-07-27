@@ -44,11 +44,17 @@ store now reuses immutable content-addressed artifacts while constructing an
 isolated request value for each case. All attack cases remain. This reduced the
 fast lane by about 85 percent, from 43.92 to 6.55 seconds.
 
-CI requested `pytest-split`'s `least_duration` algorithm, but
-`.test_durations` was ignored. A fresh checkout therefore had no timings and
-fell back to an even test-count split. The measured non-Lean durations are now
-committed. At capture time the two CI groups each contained 263 tests with the
-same 558-second estimated serial cost.
+CI previously used `pytest-split` to divide each Python version between two
+GitHub-hosted runners. That design depended on a committed timing snapshot,
+which became stale as the suite expanded: only 582 of 1,042 selected tests
+still had measurements during the issue #109 investigation. The timeout had
+become the effective stale-data detector.
+
+The Python matrix now uses one runner per supported version and lets xdist's
+`worksteal` scheduler balance the live queue across the runner's four CPUs.
+This trades some cross-runner parallelism for fewer moving parts and removes
+the timing snapshot, refresh process, static partition, and multi-artifact
+coverage merge.
 
 ## Development policy
 
@@ -82,16 +88,6 @@ seconds. Sharing Jacobian's build output would serialize both shards behind a
 new preparation job to avoid only the small build phase, so CI keeps the build
 local to each parallel lane. The workflow records these phases for future
 decisions.
-
-Refresh CI timings after a material suite expansion or when shard runtimes
-diverge:
-
-```sh
-make test-durations
-```
-
-Review and commit the resulting `.test_durations` change with the tests that
-caused it. Ordinary test edits do not need a refresh.
 
 ## Follow-up opportunities
 

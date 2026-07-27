@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed test-durations refresh-test-durations refresh-lean-test-durations build check check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed refresh-lean-test-durations build check check-static validate-full agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -62,21 +62,6 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
-
-refresh-test-durations: ## Refresh CI shard timings after major suite changes.
-	@test "$$(uname -s)" = "Linux" || { \
-		echo "refresh-test-durations requires Linux"; exit 2; \
-	}
-	@$(UV_RUN) python -c 'import sys; expected = (3, 12); actual = sys.version_info[:2]; sys.exit(f"refresh-test-durations requires Python {expected[0]}.{expected[1]}, got {actual[0]}.{actual[1]}") if actual != expected else None'
-	@durations=$$(mktemp .test_durations.XXXXXX); \
-	trap 'rm -f "$$durations"' EXIT; \
-	printf '{}\n' > "$$durations"; \
-	$(UV_RUN) pytest -m "not lean_runtime" --store-durations \
-		--clean-durations --durations-path "$$durations" && \
-	chmod 0644 "$$durations" && \
-	mv "$$durations" .test_durations
-
-test-durations: refresh-test-durations ## Refresh committed non-Lean CI shard timings.
 
 refresh-lean-test-durations: ## Refresh Lean CI shard timings serially.
 	@durations=$$(mktemp .lean_test_durations.XXXXXX); \

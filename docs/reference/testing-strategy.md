@@ -41,9 +41,7 @@ make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
-make refresh-test-durations
 make refresh-lean-test-durations
-make test-durations
 make check
 make check-static
 make validate-full
@@ -80,15 +78,15 @@ installation must not use this fixture.
 Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
 marker during collection, preventing a missing module decorator from silently
 expanding the fast loop.
-CI splits each supported Python run into two disjoint groups and retains xdist
-parallelism inside each group. The committed `.test_durations` gives
-`pytest-split` measured input for `least_duration`; refresh it with
-`make refresh-test-durations` on Linux with Python 3.12 after a major suite
-change, or when the slower shard exceeds the faster shard by more than 10% in
-two representative CI runs. Routine test edits do not require refreshes. The
-target enforces its platform, replaces timings only after a successful run,
-and leaves the previous file intact on interruption or failure. Tests marked
-`lean_runtime` are excluded from those shards and divided by measured duration
+CI runs the non-Lean suite once on each supported Python version. Each runner
+uses xdist's live `worksteal` scheduler with at most four workers, matching the
+four CPUs available on standard public Linux GitHub-hosted runners. This keeps
+load balancing responsive to the tests actually collected without a committed
+timing snapshot or static cross-runner partition. Python 3.12 also records
+coverage; the dependent reporting job consumes that single data artifact.
+
+Tests marked
+`lean_runtime` are excluded from those runs and divided by measured duration
 between two dedicated runners with pinned Lean and Mathlib caches. The split
 collects the full marker-selected suite, so new Lean tests cannot fall outside
 a file allowlist. Refresh `.lean_test_durations` after adding or materially
