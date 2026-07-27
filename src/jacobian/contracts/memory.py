@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
@@ -14,6 +14,8 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
+
+MemoryFilterValue = Annotated[str, Field(min_length=1, max_length=128)]
 
 
 class ResearchEpisode(ContractModel):
@@ -28,6 +30,53 @@ class ResearchEpisode(ContractModel):
     artifact_uris: tuple[ArtifactUri, ...] = ()
     summary: str = Field(default="", max_length=1024)
     tags: tuple[str, ...] = ()
+
+
+class KnowledgeSearchRequest(ContractModel):
+    query: str = Field(default="", max_length=512)
+    capability_id: CapabilityId | None = None
+    domains: tuple[MemoryFilterValue, ...] = Field(
+        default=(),
+        max_length=32,
+        json_schema_extra={"uniqueItems": True},
+    )
+    tags_all: tuple[MemoryFilterValue, ...] = Field(
+        default=(),
+        max_length=32,
+        json_schema_extra={"uniqueItems": True},
+    )
+    tags_any: tuple[MemoryFilterValue, ...] = Field(
+        default=(),
+        max_length=32,
+        json_schema_extra={"uniqueItems": True},
+    )
+    failure_stages: tuple[MemoryFilterValue, ...] = Field(
+        default=(),
+        max_length=32,
+        json_schema_extra={"uniqueItems": True},
+    )
+    failure_classifications: tuple[MemoryFilterValue, ...] = Field(
+        default=(),
+        max_length=32,
+        json_schema_extra={"uniqueItems": True},
+    )
+    assurance_level: CapabilityAssuranceLevel | None = None
+    cutoff: datetime | None = None
+    limit: StrictInt = Field(default=10, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def require_unique_filters(self) -> Self:
+        for field_name in (
+            "domains",
+            "tags_all",
+            "tags_any",
+            "failure_stages",
+            "failure_classifications",
+        ):
+            values = getattr(self, field_name)
+            if len(set(values)) != len(values):
+                raise ValueError(f"{field_name} must contain unique values")
+        return self
 
 
 class MemoryHit(ContractModel):

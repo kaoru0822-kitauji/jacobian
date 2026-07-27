@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from jacobian.artifacts import ArtifactService
@@ -30,7 +29,7 @@ from jacobian.contracts.lean import (
     LeanDependencyGraphRequest,
     LeanEnvironment,
 )
-from jacobian.contracts.memory import MemorySearchResult
+from jacobian.contracts.memory import KnowledgeSearchRequest, MemorySearchResult
 from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
@@ -65,47 +64,7 @@ class KnowledgeSearchAdapter:
                 features=("memory", "retrieval"),
             ),
             modes=(CapabilityMode.EXPLORE,),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "maxLength": 512},
-                    "capability_id": {"type": "string"},
-                    "domains": {
-                        "type": "array",
-                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
-                        "maxItems": 32,
-                        "uniqueItems": True,
-                    },
-                    "tags_all": {
-                        "type": "array",
-                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
-                        "maxItems": 32,
-                        "uniqueItems": True,
-                    },
-                    "tags_any": {
-                        "type": "array",
-                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
-                        "maxItems": 32,
-                        "uniqueItems": True,
-                    },
-                    "failure_stages": {
-                        "type": "array",
-                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
-                        "maxItems": 32,
-                        "uniqueItems": True,
-                    },
-                    "failure_classifications": {
-                        "type": "array",
-                        "items": {"type": "string", "minLength": 1, "maxLength": 128},
-                        "maxItems": 32,
-                        "uniqueItems": True,
-                    },
-                    "assurance_level": {"enum": ["HEURISTIC", "COMPUTED", "VERIFIED"]},
-                    "cutoff": {"type": "string", "format": "date-time"},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
-                },
-                "additionalProperties": False,
-            },
+            input_schema=model_schema(KnowledgeSearchRequest),
             output_schema=model_schema(MemorySearchResult),
             read_only=True,
             records_episode=False,
@@ -117,29 +76,20 @@ class KnowledgeSearchAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
-        selected = request.input
+        selected = KnowledgeSearchRequest.model_validate(request.input)
         result = self.memory.search(
-            query=str(selected.get("query", "")),
-            capability_id=(
-                str(selected["capability_id"]) if "capability_id" in selected else None
-            ),
-            domains=tuple(str(value) for value in selected.get("domains", ())),
-            tags_all=tuple(str(value) for value in selected.get("tags_all", ())),
-            tags_any=tuple(str(value) for value in selected.get("tags_any", ())),
-            failure_stages=tuple(
-                str(value) for value in selected.get("failure_stages", ())
-            ),
-            failure_classifications=tuple(
-                str(value) for value in selected.get("failure_classifications", ())
-            ),
-            assurance_level=selected.get("assurance_level"),
-            cutoff=(
-                datetime.fromisoformat(str(selected["cutoff"]).replace("Z", "+00:00"))
-                if "cutoff" in selected
-                else None
-            ),
-            limit=int(selected.get("limit", 10)),
+            query=selected.query,
+            capability_id=selected.capability_id,
+            domains=selected.domains,
+            tags_all=selected.tags_all,
+            tags_any=selected.tags_any,
+            failure_stages=selected.failure_stages,
+            failure_classifications=selected.failure_classifications,
+            assurance_level=selected.assurance_level,
+            cutoff=selected.cutoff,
+            limit=selected.limit,
         )
+        selected_scope = selected.model_dump(mode="json")
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
@@ -151,18 +101,7 @@ class KnowledgeSearchAdapter:
                 parameters={
                     "index_snapshot": result.index_snapshot,
                     "indexed_episode_count": result.indexed_episode_count,
-                    "query": result.query,
-                    "capability_id": selected.get("capability_id"),
-                    "domains": selected.get("domains", []),
-                    "tags_all": selected.get("tags_all", []),
-                    "tags_any": selected.get("tags_any", []),
-                    "failure_stages": selected.get("failure_stages", []),
-                    "failure_classifications": selected.get(
-                        "failure_classifications", []
-                    ),
-                    "assurance_level": selected.get("assurance_level"),
-                    "cutoff": selected.get("cutoff"),
-                    "limit": int(selected.get("limit", 10)),
+                    **selected_scope,
                 },
             ),
             completeness=CapabilityCompleteness(
