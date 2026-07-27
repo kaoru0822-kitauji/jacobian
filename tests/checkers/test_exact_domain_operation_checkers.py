@@ -296,7 +296,10 @@ _CASES: tuple[
 def _mutate_numeric_leaf(value: object) -> bool:
     if isinstance(value, dict):
         if set(value) == {"num", "den"}:
-            value["num"] = str(int(value["num"]) + 1)
+            mutated = int(value["num"]) + 1
+            if mutated == 0:
+                mutated = 1
+            value["num"] = str(mutated)
             return True
         return any(_mutate_numeric_leaf(item) for item in value.values())
     if isinstance(value, list):
@@ -304,7 +307,10 @@ def _mutate_numeric_leaf(value: object) -> bool:
             if _mutate_numeric_leaf(item):
                 return True
             if isinstance(item, str) and item.lstrip("-").isdigit():
-                value[index] = str(int(item) + 1)
+                mutated = int(item) + 1
+                if mutated == 0:
+                    mutated = 1
+                value[index] = str(mutated)
                 return True
     return False
 
