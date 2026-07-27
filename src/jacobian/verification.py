@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import platform
 import subprocess
 import sys
@@ -56,6 +55,7 @@ from jacobian.store import (
     StoredArtifact,
     StoreError,
 )
+from jacobian.worker_environment import worker_environment
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -208,8 +208,14 @@ class VerificationService:
         provider_runtime: CapabilityProviderRuntime | None = None,
         timeout_seconds: float | None = None,
     ) -> CheckerDecision:
-        environment = dict(os.environ)
-        environment.update({"PYTHONHASHSEED": "0", "TZ": "UTC"})
+        environment = worker_environment(
+            extra_variables=(
+                "ELAN_HOME",
+                "JACOBIAN_CHECKER_EXECUTABLE",
+                "JACOBIAN_CHECKER_RUNTIME_DIGEST",
+                "JACOBIAN_LEAN_RUNTIME",
+            )
+        )
         effective_timeout = min(
             30 if timeout_seconds is None else timeout_seconds,
             self.checker_timeout_seconds,

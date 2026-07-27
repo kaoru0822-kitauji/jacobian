@@ -271,6 +271,8 @@ def _valid_producer(value: object) -> bool:
         "features",
         "checker_ids",
         "configuration",
+        "distribution_import_name",
+        "distribution_required_attributes",
         "diagnostic",
     }
     configuration = value.get("configuration")

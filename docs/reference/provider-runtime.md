@@ -31,8 +31,10 @@ Every registered `CapabilityDescriptor` carries `provider_runtime`:
 `PYTHON_DISTRIBUTION_RECORD` hashes a canonical ordering of the installed
 distribution's RECORD paths, recorded hashes, and sizes. It identifies the
 installed manifest; the digest kind deliberately does not claim that Jacobian
-rehashes every package byte at startup. `SOURCE_TREE` covers the source package
-used by an entrypoint. `EXECUTABLE` covers the executable bytes.
+rehashes every package byte at startup. The runtime identity retains the import
+name and required feature attributes separately from operation configuration,
+so unchanged checks replay the original health probe. `SOURCE_TREE` covers the
+source package used by an entrypoint. `EXECUTABLE` covers the executable bytes.
 `COMPOSITE` binds an ordered set of individually measured component runtimes,
 for example Jacobian checker source plus the exact Python-FLINT distribution it
 executes. Its canonical configuration exposes the component identities, and

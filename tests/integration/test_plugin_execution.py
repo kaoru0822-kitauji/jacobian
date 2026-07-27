@@ -170,6 +170,23 @@ def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None
 
 
 @pytest.mark.integration
+def test_plugin_worker_does_not_inherit_parent_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JACOBIAN_TEST_SECRET", "do-not-forward")
+    monkeypatch.setenv("HTTPS_PROXY", "http://secret.invalid")
+
+    result = PluginExecutor().run(
+        entrypoint="tests.fixtures.plugin_functions:report_environment",
+        request={},
+        timeout_seconds=5,
+    )
+
+    assert result.status.value == "COMPLETED"
+    assert result.output == {"secret": None, "https_proxy": None}
+
+
+@pytest.mark.integration
 def test_plugin_worker_rejects_bytecode_modules(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

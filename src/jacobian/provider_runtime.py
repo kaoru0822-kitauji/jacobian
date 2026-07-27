@@ -350,9 +350,11 @@ def python_distribution_provider_runtime(
         features=features,
         checker_ids=checker_ids,
         configuration={
-            "distribution": distribution_name,
             **dict(configuration or {}),
+            "distribution": distribution_name,
         },
+        distribution_import_name=import_name,
+        distribution_required_attributes=required_attributes,
     )
 
 
@@ -391,13 +393,13 @@ def require_provider_runtime_unchanged(
 
     if runtime.digest_kind is CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD:
         distribution = runtime.configuration.get("distribution")
-        import_name = runtime.configuration.get("import_name")
-        if not isinstance(distribution, str) or not isinstance(import_name, str):
+        import_name = runtime.distribution_import_name
+        if not isinstance(distribution, str) or import_name is None:
             raise ProviderRuntimeError("Python distribution identity is incomplete")
         version, digest, _license_files = _inspect_python_distribution_identity(
             distribution,
             import_name,
-            (),
+            runtime.distribution_required_attributes,
         )
         if version != runtime.version or digest != runtime.digest:
             raise ProviderRuntimeError("Python distribution identity changed")

@@ -113,6 +113,8 @@ def _request(
                 "normal_form_convention": "FLINT_ROW_HNF",
                 "relation": "H=U*A",
             },
+            "distribution_import_name": "flint",
+            "distribution_required_attributes": ["fmpz", "fmpz_mat"],
             "diagnostic": "",
         },
         "resource_budget": {"budget_version": "1", "wall_seconds": 5},
