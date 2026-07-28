@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -11,9 +7,6 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus, InputStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _rational(value: int) -> dict[str, str]:
@@ -46,9 +39,8 @@ def _request(image: int) -> CapabilityRequest:
 
 
 def test_direct_collision_verifier_promotes_only_independent_replay(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(_request(1))
 
@@ -80,9 +72,8 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
 
 
 def test_direct_collision_verifier_fails_closed_for_wrong_image(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(_request(2))
 
@@ -103,9 +94,8 @@ def test_direct_collision_verifier_fails_closed_for_wrong_image(
 
 
 def test_direct_collision_verifier_requires_authorized_reference_checker(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     assert "polynomial.map.collision.verify" not in {
         item.capability_id for item in kernel.capabilities.catalog().capabilities

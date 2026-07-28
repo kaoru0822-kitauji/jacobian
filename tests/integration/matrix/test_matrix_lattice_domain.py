@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from pytest import MonkeyPatch
 from tests.helpers.rationals import rational_payload as _q
 
@@ -23,10 +20,7 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.matrix_lattice.capabilities import matrix_operation
 from jacobian.domains.matrix_lattice.lattice import reduce_lattice_basis
 from jacobian.domains.matrix_lattice.operations import compute_smith_normal_form
-from jacobian.kernel import JacobianKernel
 from jacobian.operations import ComputedSuccess, OperationExecutionFailure
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _qq(rows: list[list[int]]) -> dict[str, object]:
@@ -36,8 +30,7 @@ def _qq(rows: list[list[int]]) -> dict[str, object]:
     }
 
 
-def test_exact_matrix_domain_results_and_lineage(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_exact_matrix_domain_results_and_lineage(kernel) -> None:
     cases = (
         (
             "matrix.inverse.compute",
@@ -150,9 +143,8 @@ def test_exact_matrix_domain_results_and_lineage(tmp_path: Path) -> None:
 
 
 def test_invalid_matrix_request_fails_before_operation_artifacts(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.characteristic_polynomial.compute",
@@ -165,8 +157,7 @@ def test_invalid_matrix_request_fails_before_operation_artifacts(
     assert result.artifact_uris == ()
 
 
-def test_singular_matrix_inverse_is_not_applicable(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_singular_matrix_inverse_is_not_applicable(kernel) -> None:
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.inverse.compute",
@@ -185,9 +176,8 @@ def test_singular_matrix_inverse_is_not_applicable(tmp_path: Path) -> None:
 
 
 def test_inverse_accepts_exact_growth_from_maximum_size_input(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     diagonal = "9" * 256
     determinant = str(int(diagonal) ** 2 - 1)
     result = kernel.capabilities.invoke(
@@ -284,8 +274,7 @@ def test_lll_worker_allows_result_growth_beyond_input_digit_limit() -> None:
     assert largest_output <= MAX_OUTPUT_SCALAR_DIGITS
 
 
-def test_lattice_lll_returns_exact_left_transformation(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_lattice_lll_returns_exact_left_transformation(kernel) -> None:
     source = [[4, 1], [1, 3]]
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -325,7 +314,7 @@ def test_lattice_lll_returns_exact_left_transformation(tmp_path: Path) -> None:
 
 
 def test_lattice_lll_timeout_retains_no_operation_artifacts(
-    tmp_path: Path,
+    kernel,
     monkeypatch: MonkeyPatch,
 ) -> None:
     from jacobian.domains.matrix_lattice import lattice
@@ -342,7 +331,6 @@ def test_lattice_lll_timeout_retains_no_operation_artifacts(
             timed_out=True,
         ),
     )
-    kernel = JacobianKernel(tmp_path)
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="lattice.basis.reduce",

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.contracts.capabilities import (
@@ -12,15 +10,11 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     constructed = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -66,10 +60,9 @@ def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
     ],
 )
 def test_explicit_graph_construction_fails_before_artifact_writes(
-    tmp_path: Path,
+    kernel,
     input_payload: dict[str, object],
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -85,9 +78,8 @@ def test_explicit_graph_construction_fails_before_artifact_writes(
 
 
 def test_graph_atlas_search_is_bounded_complete_and_replayable(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -132,9 +124,8 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
 
 
 def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -158,9 +149,8 @@ def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
 
 
 def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     invalid_range = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -194,9 +184,8 @@ def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
 
 
 def test_graph_property_batch_materializes_exact_computed_artifact(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -300,9 +289,8 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
 
 
 def test_graph_counterexample_invariant_batch_reproduces_path_five(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -354,9 +342,8 @@ def test_graph_counterexample_invariant_batch_reproduces_path_five(
 
 
 def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -428,8 +415,7 @@ def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
     assert "made_up_invariant" not in result.output["supported_invariants"]
 
 
-def test_graph_invariant_registry_is_fixed_and_discoverable(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_graph_invariant_registry_is_fixed_and_discoverable(kernel) -> None:
     descriptor = next(
         item
         for item in kernel.capabilities.catalog().capabilities

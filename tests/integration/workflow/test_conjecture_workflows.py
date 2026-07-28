@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 import pytest
 
@@ -179,9 +178,8 @@ def _falsification(checker_id: str) -> FalsificationPlan:
 
 @pytest.mark.subprocess
 def test_repair_preserves_verified_source_and_falsification_lineage(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
         kernel
     )
@@ -228,9 +226,8 @@ def test_repair_preserves_verified_source_and_falsification_lineage(
 
 @pytest.mark.subprocess
 def test_repair_replays_the_exact_verification_record(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
         kernel
     )
@@ -264,9 +261,8 @@ def test_repair_replays_the_exact_verification_record(
 
 
 def test_generation_deduplicates_claims_and_reports_unknown_novelty(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, _, _ = _install_hypothesis_plugin(kernel)
 
     result = kernel.conjectures.run(
@@ -305,9 +301,8 @@ def test_generation_deduplicates_claims_and_reports_unknown_novelty(
 
 @pytest.mark.subprocess
 def test_parameter_generalization_keeps_sampled_region_unverified(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
         kernel
     )
@@ -367,11 +362,10 @@ def test_parameter_generalization_keeps_sampled_region_unverified(
 )
 @pytest.mark.subprocess
 def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
-    tmp_path: Path,
+    kernel,
     region_kind: str,
     expected_evidence: ParameterRegionEvidence,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
         kernel
     )
@@ -511,9 +505,8 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
 
 @pytest.mark.subprocess
 def test_hypothesis_plugin_cannot_promote_parameter_region(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
         kernel,
         transformer_entrypoint=(
@@ -551,9 +544,8 @@ def test_hypothesis_plugin_cannot_promote_parameter_region(
 
 @pytest.mark.subprocess
 def test_hypothesis_plugin_cannot_cite_unbound_region_samples(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id, _, _ = _install_hypothesis_plugin(
         kernel,
         transformer_entrypoint=(

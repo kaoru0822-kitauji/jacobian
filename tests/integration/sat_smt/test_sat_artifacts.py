@@ -40,9 +40,8 @@ def _producer() -> CapabilityProviderRuntime:
 
 
 def test_sat_service_materializes_one_identity_for_equivalent_cnf_input(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     first = kernel.sat.put_cnf(
         variable_names=("b", "a"),
@@ -62,9 +61,8 @@ def test_sat_service_materializes_one_identity_for_equivalent_cnf_input(
 
 
 def test_sat_cnf_materialization_capability_exposes_reusable_identity(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -97,9 +95,8 @@ def test_sat_cnf_materialization_capability_exposes_reusable_identity(
 
 
 def test_sat_materialization_makes_lexicographic_name_order_explicit(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -123,10 +120,9 @@ def test_sat_materialization_makes_lexicographic_name_order_explicit(
 
 
 def test_sat_cnf_materialization_validates_before_artifact_write(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     called = False
 
     def unexpected_put_cnf(**_kwargs: object) -> None:
@@ -179,9 +175,8 @@ def test_model_backed_schema_rejects_noncanonical_generic_artifact_put(
 
 
 def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     cnf_result = kernel.sat.put_cnf(
         variable_names=("a", "b"),
         clauses=((-1, 2), (1,)),
@@ -224,9 +219,8 @@ def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
 
 
 def test_sat_service_rejects_a_non_cnf_source_before_writing_evidence(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     cnf_result = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
     assignment_result = kernel.sat.put_assignment(
         cnf_uri=cnf_result.artifact_uri,

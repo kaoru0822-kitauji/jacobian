@@ -59,9 +59,8 @@ def _kernel_with_checker(root: Path) -> JacobianKernel:
 
 
 def test_expansion_term_budget_failure_is_specific_and_non_retryable(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     result = _invoke(
         kernel,
         "polynomial.expression.normalize",
@@ -140,8 +139,7 @@ def _difference_of_squares_plus_half_x() -> dict[str, Any]:
     )
 
 
-def test_sympy_normalizes_typed_multivariate_expression(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_sympy_normalizes_typed_multivariate_expression(kernel) -> None:
 
     result = _invoke(
         kernel,
@@ -179,8 +177,7 @@ def test_sympy_normalizes_typed_multivariate_expression(tmp_path: Path) -> None:
     assert result.output["expression_uri"] in resolved.artifact.manifest.parents
 
 
-def test_sympy_normalization_preserves_exact_zero(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_sympy_normalization_preserves_exact_zero(kernel) -> None:
     result = _invoke(
         kernel,
         "polynomial.expression.normalize",
@@ -354,10 +351,9 @@ def test_independent_checker_rejects_wrong_bound_coefficients(
 
 
 def test_sympy_normalization_timeout_is_operational(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(
         "jacobian.sympy_polynomial_normalization.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -385,7 +381,7 @@ def test_sympy_normalization_timeout_is_operational(
 
 
 def test_sympy_worker_gets_only_fixed_environment_and_budget(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("JACOBIAN_SYMPY_SECRET", "must-not-propagate")
@@ -420,7 +416,6 @@ def test_sympy_worker_gets_only_fixed_environment_and_budget(
             timed_out=False,
         )
 
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(
         "jacobian.sympy_polynomial_normalization.run_bounded_process",
         fake_worker,
@@ -448,10 +443,9 @@ def test_sympy_worker_gets_only_fixed_environment_and_budget(
 
 
 def test_normalization_output_is_discarded_if_runtime_identity_changes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     original = kernel.sympy_polynomial_normalization_runtime
     changed = original.model_copy(update={"digest": "sha256:" + "f" * 64})
     observations = iter((original, changed))
@@ -503,10 +497,9 @@ def test_normalization_output_is_discarded_if_runtime_identity_changes(
 
 
 def test_invalid_worker_protocol_retains_no_normalization_evidence(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(
         "jacobian.sympy_polynomial_normalization.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(

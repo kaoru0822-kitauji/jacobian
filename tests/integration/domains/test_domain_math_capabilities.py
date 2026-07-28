@@ -1,19 +1,11 @@
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
-def test_representative_exact_domain_results(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_representative_exact_domain_results(kernel) -> None:
     cases = (
         (
             "integer.compute.extended_gcd",
@@ -68,8 +60,7 @@ def test_representative_exact_domain_results(tmp_path: Path) -> None:
         assert result.output["result"] == expected
 
 
-def test_domain_error_fails_before_artifact_writes(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_domain_error_fails_before_artifact_writes(kernel) -> None:
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="modular.compute.inverse",
@@ -84,8 +75,7 @@ def test_domain_error_fails_before_artifact_writes(tmp_path: Path) -> None:
     assert result.episode_uri is None
 
 
-def test_number_theory_boundary_results(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_number_theory_boundary_results(kernel) -> None:
     empty_cases = (
         ("integer.compute.proper_divisors", {"value": "1"}, {"divisors": []}),
         ("integer.compute.proper_divisors", {"value": "-1"}, {"divisors": []}),
@@ -111,8 +101,7 @@ def test_number_theory_boundary_results(tmp_path: Path) -> None:
         assert result.artifact_uris == ()
 
 
-def test_geometric_sequence_handles_zero_terms_exactly(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_geometric_sequence_handles_zero_terms_exactly(kernel) -> None:
     cases = (
         (["0", "0", "1"], False),
         (["1", "0", "0"], True),

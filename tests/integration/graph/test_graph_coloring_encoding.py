@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.contracts.capabilities import (
@@ -14,9 +12,12 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-pytestmark = [
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
-]
+pytestmark = []
+
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _encode(kernel: JacobianKernel) -> CapabilityResult:
@@ -35,9 +36,8 @@ def _encode(kernel: JacobianKernel) -> CapabilityResult:
 
 
 def test_graph_coloring_encoding_is_canonical_and_inspectable(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = _encode(kernel)
 
@@ -54,9 +54,8 @@ def test_graph_coloring_encoding_is_canonical_and_inspectable(
 
 
 def test_graph_coloring_encoding_replays_through_generic_certificate_verifier(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     encoded = _encode(kernel)
 
     assert encoded.output["checker_id"] is not None

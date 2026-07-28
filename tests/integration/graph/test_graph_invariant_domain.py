@@ -1,14 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _graph(
@@ -18,8 +11,7 @@ def _graph(
     return {"vertices": vertices, "edges": edges}
 
 
-def test_graph_invariant_family_boundaries_and_witnesses(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_graph_invariant_family_boundaries_and_witnesses(kernel) -> None:
     triangle_tail = _graph(
         ["a", "b", "c", "d"],
         [["a", "b"], ["b", "c"], ["a", "c"], ["c", "d"]],
@@ -110,8 +102,7 @@ def test_graph_invariant_family_boundaries_and_witnesses(tmp_path: Path) -> None
     }
 
 
-def test_disconnected_and_acyclic_graph_conventions(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_disconnected_and_acyclic_graph_conventions(kernel) -> None:
     graph = _graph(["a", "b", "c"], [["a", "b"]])
     diameter = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -147,9 +138,8 @@ def test_disconnected_and_acyclic_graph_conventions(tmp_path: Path) -> None:
 
 
 def test_radius_uses_explicit_not_applicable_for_disconnected_graph(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     connected = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -184,9 +174,8 @@ def test_radius_uses_explicit_not_applicable_for_disconnected_graph(
 
 
 def test_np_hard_invariants_are_budgeted_and_carry_obligations(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     cycle = _graph(
         ["a", "b", "c", "d", "e"],
         [["a", "b"], ["b", "c"], ["c", "d"], ["d", "e"], ["a", "e"]],

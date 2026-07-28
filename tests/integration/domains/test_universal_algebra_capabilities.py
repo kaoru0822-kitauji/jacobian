@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -15,9 +14,6 @@ from jacobian.contracts.results import Conclusion
 from jacobian.contracts.universal_algebra import (
     UniversalAlgebraCountermodelSearchRequest,
 )
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _variable(name: str) -> dict[str, object]:
@@ -61,9 +57,8 @@ def _left_projection_problem() -> dict[str, object]:
 
 
 def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     descriptors = {
         descriptor.capability_id: descriptor
         for descriptor in kernel.capabilities.catalog().capabilities
@@ -79,9 +74,8 @@ def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
 
 
 def test_evaluate_laws_returns_exact_truth_and_counterexample(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -143,10 +137,9 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
 
 
 def test_complete_request_validation_precedes_artifact_writes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     problem = _left_projection_problem()
     problem["structure"]["table"] = [[0, 0]]
     artifact_put_calls = 0
@@ -172,9 +165,8 @@ def test_complete_request_validation_precedes_artifact_writes(
 
 
 def test_countermodel_search_composes_with_independent_law_replay(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     laws = _left_projection_problem()["laws"]
 
     search = kernel.capabilities.invoke(
@@ -222,9 +214,8 @@ def test_countermodel_search_composes_with_independent_law_replay(
 
 
 def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     laws = _left_projection_problem()["laws"]
 
     search = kernel.capabilities.invoke(
@@ -246,10 +237,9 @@ def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
 
 
 def test_countermodel_request_validation_precedes_artifact_writes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     laws = _left_projection_problem()["laws"]
     duplicate_target = dict(laws[1])
     duplicate_target["law_id"] = laws[0]["law_id"]
@@ -280,9 +270,8 @@ def test_countermodel_request_validation_precedes_artifact_writes(
 
 
 def test_finite_magma_table_enumeration_is_exact_and_canonical(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -308,8 +297,7 @@ def test_finite_magma_table_enumeration_is_exact_and_canonical(
     assert set(enumeration.manifest.parents) == set(result.output["table_uris"])
 
 
-def test_finite_magma_table_enumeration_handles_order_one(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_finite_magma_table_enumeration_handles_order_one(kernel) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -324,10 +312,9 @@ def test_finite_magma_table_enumeration_handles_order_one(tmp_path: Path) -> Non
 
 
 def test_finite_magma_table_enumeration_rejects_unsupported_order_before_writes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     artifact_put_calls = 0
     original_put = kernel.artifacts.put
 

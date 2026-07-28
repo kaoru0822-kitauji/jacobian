@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,7 +11,10 @@ from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _term(coefficient: int, exponents: list[int]) -> dict[str, Any]:
@@ -65,8 +67,7 @@ def _request(
     )
 
 
-def test_triangular_automorphism_is_found_and_verified(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_triangular_automorphism_is_found_and_verified(kernel) -> None:
     result = kernel.capabilities.invoke(_request(degree=2))
 
     assert result.execution.status is ExecutionStatus.COMPLETED
@@ -88,8 +89,9 @@ def test_triangular_automorphism_is_found_and_verified(tmp_path: Path) -> None:
     ]
 
 
-def test_degree_below_required_returns_bounded_no_candidate(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_degree_below_required_returns_bounded_no_candidate(
+    kernel,
+) -> None:
     result = kernel.capabilities.invoke(_request(degree=1))
 
     assert result.output["status"] == "NO_CANDIDATE_WITHIN_ANSATZ"
@@ -97,8 +99,7 @@ def test_degree_below_required_returns_bounded_no_candidate(tmp_path: Path) -> N
     assert result.output["noninvertibility_proved"] is False
 
 
-def test_redundant_explicit_ansatz_is_underdetermined(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_redundant_explicit_ansatz_is_underdetermined(kernel) -> None:
     identity = {
         "map_schema_version": "1",
         "domain": "QQ",
@@ -133,8 +134,7 @@ def test_redundant_explicit_ansatz_is_underdetermined(tmp_path: Path) -> None:
     assert "free parameters" in result.output["verification_failure"]
 
 
-def test_zero_timeout_and_unknown_budget_are_explicit(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_zero_timeout_and_unknown_budget_are_explicit(kernel) -> None:
 
     timeout = kernel.capabilities.invoke(_request(degree=2, timeout_ms=0))
     exhausted = kernel.capabilities.invoke(_request(degree=2, max_unknowns=1))
@@ -144,8 +144,9 @@ def test_zero_timeout_and_unknown_budget_are_explicit(tmp_path: Path) -> None:
     assert exhausted.output["status"] == "BUDGET_EXHAUSTED"
 
 
-def test_unknown_solver_is_unsupported_without_truth_claim(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_unknown_solver_is_unsupported_without_truth_claim(
+    kernel,
+) -> None:
     payload = deepcopy(_request(degree=2).input)
     payload["solver"] = "unknown.exact_solver"
 
@@ -162,9 +163,8 @@ def test_unknown_solver_is_unsupported_without_truth_claim(tmp_path: Path) -> No
 
 
 def test_full_support_and_coefficient_order_are_deterministic(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     first = kernel.capabilities.invoke(_request(degree=2))
     second = kernel.capabilities.invoke(_request(degree=2))
 
@@ -195,8 +195,7 @@ def test_full_support_and_coefficient_order_are_deterministic(
     "mutation",
     ["variable_order", "coefficient_domain"],
 )
-def test_ring_mismatches_fail_closed(tmp_path: Path, mutation: str) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_ring_mismatches_fail_closed(kernel, mutation: str) -> None:
     payload = deepcopy(_request(degree=2).input)
     if mutation == "variable_order":
         payload["source_variables"] = ["y", "x"]
@@ -215,9 +214,8 @@ def test_ring_mismatches_fail_closed(tmp_path: Path, mutation: str) -> None:
 
 
 def test_corrupted_found_candidate_does_not_verify(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     synthesized = kernel.capabilities.invoke(_request(degree=2))
     corrupted = deepcopy(synthesized.output["candidate_inverse_map"])
     corrupted["coordinates"][0]["terms"][1]["coefficient"]["num"] = "-2"

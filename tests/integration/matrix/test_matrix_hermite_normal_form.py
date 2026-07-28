@@ -46,8 +46,7 @@ def _kernel_with_checker(root: Path) -> JacobianKernel:
     return kernel
 
 
-def test_python_flint_produces_bound_rectangular_row_hnf(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_python_flint_produces_bound_rectangular_row_hnf(kernel) -> None:
     result = _invoke(
         kernel,
         "matrix.normal_form.hermite",
@@ -137,10 +136,9 @@ def test_hnf_runtime_rejects_a_different_linked_flint_version(
     ids=("noncanonical_integer", "ragged_rows", "digit_limit"),
 )
 def test_hnf_rejects_inputs_outside_the_exact_matrix_contract(
-    tmp_path: Path,
+    kernel,
     entries: list[list[str]],
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = _invoke(
         kernel,
@@ -230,10 +228,9 @@ def test_checker_rejects_each_independent_hnf_obligation(
 
 
 def test_python_flint_hnf_timeout_is_operational(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(
         "jacobian.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -261,7 +258,7 @@ def test_python_flint_hnf_timeout_is_operational(
 
 
 def test_hnf_worker_gets_only_fixed_environment_and_budget(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("JACOBIAN_HNF_SECRET", "must-not-propagate")
@@ -291,7 +288,6 @@ def test_hnf_worker_gets_only_fixed_environment_and_budget(
             timed_out=False,
         )
 
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr("jacobian.flint_hnf.run_bounded_process", fake_worker)
     result = _invoke(
         kernel,
@@ -316,10 +312,9 @@ def test_hnf_worker_gets_only_fixed_environment_and_budget(
 
 
 def test_hnf_output_is_discarded_if_runtime_identity_changes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     original = kernel.python_flint_hnf_runtime
     changed = original.model_copy(update={"digest": "sha256:" + "f" * 64})
     observations = iter((original, changed))
@@ -363,10 +358,9 @@ def test_hnf_output_is_discarded_if_runtime_identity_changes(
 
 
 def test_invalid_worker_protocol_retains_no_hnf_evidence(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(
         "jacobian.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(

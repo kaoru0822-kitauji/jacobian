@@ -83,11 +83,10 @@ def _kernel_with_determinant_checker(root: Path) -> JacobianKernel:
     ],
 )
 def test_matrix_determinant_compute_is_exact_and_unverified(
-    tmp_path: Path,
+    kernel,
     rows: list[list[int | Fraction]],
     expected: Fraction,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -211,9 +210,8 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
 
 
 def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -241,8 +239,7 @@ def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
     assert rank_artifact.payload["backend_version"] == sympy.__version__
 
 
-def test_matrix_determinant_rejects_rectangular_input(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_matrix_determinant_rejects_rectangular_input(kernel) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -257,9 +254,8 @@ def test_matrix_determinant_rejects_rectangular_input(tmp_path: Path) -> None:
 
 @pytest.mark.differential
 def test_matrix_determinant_matches_independent_bounded_oracle(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     random = Random(20260726)
 
     for size in range(1, 5):
@@ -283,8 +279,7 @@ def test_matrix_determinant_matches_independent_bounded_oracle(
             )
 
 
-def test_matrix_capabilities_report_sympy_provider_identity(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_matrix_capabilities_report_sympy_provider_identity(kernel) -> None:
     descriptors = {
         descriptor.capability_id: descriptor
         for descriptor in kernel.capabilities.catalog().capabilities

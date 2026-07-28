@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 _LEFT = tuple(range(6))
 _RIGHT = tuple(range(6, 14))
@@ -48,9 +41,8 @@ def _wowii_200_graph() -> dict[str, object]:
 
 
 def test_neighborhood_independence_reproduces_wowii_200_invariant(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     graph = kernel.artifacts.put(
         schema_uri=kernel.graph.graph_schema_uri,
         semantics_uri=kernel.graph.semantics_uri,

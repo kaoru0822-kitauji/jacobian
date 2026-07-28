@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-from pathlib import Path
 
 import pytest
 
@@ -17,12 +16,17 @@ pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
 
-def test_exact_proof_edit_is_bound_to_authorized_lean_check(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
+
+
+def test_exact_proof_edit_is_bound_to_authorized_lean_check(
+    kernel,
+) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -59,8 +63,9 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(tmp_path: Path) -> N
     }
 
 
-def test_proof_edit_rejects_holes_before_checker_invocation(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_proof_edit_rejects_holes_before_checker_invocation(
+    kernel,
+) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -80,9 +85,8 @@ def test_proof_edit_rejects_holes_before_checker_invocation(tmp_path: Path) -> N
 
 
 def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -105,9 +109,8 @@ def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
 
 
 def test_valid_edit_is_not_accepted_when_original_baseline_is_invalid(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(

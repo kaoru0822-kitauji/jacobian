@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 
 import pytest
 from tests.integration.infrastructure._workspace_support import _open
@@ -15,16 +14,12 @@ from jacobian.contracts.workspaces import (
     WorkspaceQueryView,
     WorkspaceWriteRequest,
 )
-from jacobian.kernel import JacobianKernel
 from jacobian.workspaces import (
     WorkspaceReferenceError,
 )
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
-
-def test_workspace_invalid_marks_leave_no_partial_state(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_workspace_invalid_marks_leave_no_partial_state(kernel) -> None:
     opened = _open(kernel, key="workspace-open-invalid-mark-001")
     seeded = kernel.workspaces.write(
         WorkspaceWriteRequest(
@@ -148,9 +143,8 @@ def test_workspace_invalid_marks_leave_no_partial_state(tmp_path: Path) -> None:
 
 
 def test_workspace_invalidating_mark_requires_explicit_reactivation(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-explicit-reactivation-001")
     seeded = kernel.workspaces.write(
         WorkspaceWriteRequest(
@@ -228,9 +222,8 @@ def test_workspace_invalidating_mark_requires_explicit_reactivation(
 
 
 def test_workspace_archiving_is_organizational_not_invalidation(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-archive-001")
     seeded = kernel.workspaces.write(
         WorkspaceWriteRequest(

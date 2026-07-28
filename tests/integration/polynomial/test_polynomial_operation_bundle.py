@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -9,9 +8,6 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _polynomial(
@@ -37,10 +33,9 @@ def _polynomial(
 
 
 def test_polynomial_bundle_installs_and_computes_exact_invariants(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     installed_ids = {
         descriptor.capability_id
@@ -286,10 +281,9 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
 
 
 def test_polynomial_output_budget_failure_is_explicit_and_writes_no_artifacts(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     artifact_writes: list[object] = []
     original_put = cast(Any, kernel.artifacts.put)
 
@@ -321,9 +315,8 @@ def test_polynomial_output_budget_failure_is_explicit_and_writes_no_artifacts(
 
 
 def test_groebner_result_budget_failure_crosses_worker_protocol(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = _invoke(
         kernel,

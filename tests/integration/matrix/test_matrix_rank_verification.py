@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.contracts.capabilities import (
@@ -11,7 +9,10 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _matrix() -> dict[str, object]:
@@ -27,8 +28,9 @@ def _matrix() -> dict[str, object]:
     }
 
 
-def test_matrix_rank_verify_independently_recomputes_rank(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_matrix_rank_verify_independently_recomputes_rank(
+    kernel,
+) -> None:
     computed = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.compute", input={"matrix": _matrix()}
@@ -46,8 +48,7 @@ def test_matrix_rank_verify_independently_recomputes_rank(tmp_path: Path) -> Non
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-def test_matrix_rank_verify_rejects_wrong_rank(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_matrix_rank_verify_rejects_wrong_rank(kernel) -> None:
     computed = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.compute", input={"matrix": _matrix()}

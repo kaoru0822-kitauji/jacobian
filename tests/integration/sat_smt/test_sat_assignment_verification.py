@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import subprocess
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,8 +21,6 @@ from jacobian.contracts.sat import SatResourceBudget
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _producer() -> CapabilityProviderRuntime:
@@ -69,10 +66,9 @@ def _verify(kernel: JacobianKernel, assignment_uri: str):
 
 @pytest.mark.subprocess
 def test_sat_assignment_is_verified_by_an_authorized_clean_process(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
 
     monkeypatch.setattr(
@@ -110,9 +106,8 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
 
 @pytest.mark.subprocess
 def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     _cnf_uri, assignment_uri = _assignment(kernel, values=(False, False))
 
     result = _verify(kernel, assignment_uri)
@@ -126,9 +121,8 @@ def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
 
 
 def test_sat_assignment_verify_requires_operator_authorized_checker(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     assert kernel.sat_assignment_checker.checker_id is None
     assert "sat.model.verify" not in {
@@ -138,10 +132,9 @@ def test_sat_assignment_verify_requires_operator_authorized_checker(
 
 
 def test_misbound_assignment_artifact_fails_before_checker_dispatch(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
     second = kernel.sat.put_cnf(variable_names=("a", "b"), clauses=((1,),))
     stored = kernel.store.get(assignment_uri)
@@ -170,10 +163,9 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
 
 
 def test_checker_timeout_cannot_create_a_sat_conclusion(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     _cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
 
     def timeout(**_kwargs: Any):
@@ -190,10 +182,9 @@ def test_checker_timeout_cannot_create_a_sat_conclusion(
 
 
 def test_checker_error_cannot_create_a_sat_conclusion(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     _cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
 
     def fail(**_kwargs: Any):

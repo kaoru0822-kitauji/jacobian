@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import shutil
-from pathlib import Path
 
 import pytest
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import CADICAL_VERSION, cadical_provider_runtime
 
 pytestmark = [
@@ -21,12 +19,11 @@ pytestmark = [
 
 
 def test_pinned_cadical_produces_a_model_and_text_drat_proof(
-    tmp_path: Path,
+    kernel,
 ) -> None:
     runtime = cadical_provider_runtime()
     if runtime.version != CADICAL_VERSION:
         pytest.skip(f"requires pinned CaDiCaL {CADICAL_VERSION}")
-    kernel = JacobianKernel(tmp_path)
     capability_ids = {
         descriptor.capability_id
         for descriptor in kernel.capabilities.catalog().capabilities

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import math
-from pathlib import Path
 
 import pytest
 from tests.helpers.rationals import rational_payload as _q
@@ -11,7 +10,10 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _simplex(
@@ -44,13 +46,12 @@ def _simplex(
 
 
 def test_backend_failure_keeps_provider_detail_local(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     import z3
 
-    kernel = JacobianKernel(tmp_path, install_references=True)
     point_uri, generators_uri = _simplex(
         kernel,
         ((1, 4), (1, 4), (1, 4)),
@@ -79,9 +80,8 @@ def test_backend_failure_keeps_provider_detail_local(
 
 @pytest.mark.subprocess
 def test_exact_membership_witness_is_independently_replayed(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     assert kernel.polytope_checkers is not None
     point_uri, generators_uri = _simplex(
         kernel,
@@ -113,9 +113,8 @@ def test_exact_membership_witness_is_independently_replayed(
 
 @pytest.mark.subprocess
 def test_exact_separator_is_generated_then_independently_checked(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     point_uri, generators_uri = _simplex(
         kernel,
         ((1, 2), (1, 2), (1, 2)),
@@ -151,8 +150,7 @@ def test_exact_separator_is_generated_then_independently_checked(
 
 
 @pytest.mark.subprocess
-def test_separator_payload_tampering_fails_closed(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_separator_payload_tampering_fails_closed(kernel) -> None:
     point_uri, generators_uri = _simplex(
         kernel,
         ((1, 2), (1, 2), (1, 2)),
@@ -189,9 +187,8 @@ def test_separator_payload_tampering_fails_closed(tmp_path: Path) -> None:
 
 
 def test_projection_is_explicit_and_bound_to_derived_artifacts(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     point = kernel.artifacts.put(
         schema_uri=kernel.polytope.point_schema_uri,
         semantics_uri=kernel.polytope.semantics_uri,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,7 +16,10 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _input(value: int) -> dict[str, Any]:
@@ -33,8 +35,7 @@ def _input(value: int) -> dict[str, Any]:
     }
 
 
-def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_solution_capability_verifies_valid_assignment(kernel) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -73,8 +74,9 @@ def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
     assert record.payload["obligation_uri"] is None
 
 
-def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_solution_capability_verifies_invalid_assignment(
+    kernel,
+) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -97,10 +99,9 @@ def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None
 
 
 def test_solution_capability_keeps_checker_failure_unknown(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     def fail(**_kwargs: Any):
         raise CheckerExecutionError("deliberate checker failure")
@@ -124,9 +125,8 @@ def test_solution_capability_keeps_checker_failure_unknown(
 
 
 def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     connection = sqlite3.connect(kernel.store.db_path)
     try:
         before = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
@@ -155,9 +155,8 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
 
 
 def test_solution_capability_is_only_available_with_checker(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     ids = {
         descriptor.capability_id

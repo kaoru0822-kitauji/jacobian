@@ -1,5 +1,4 @@
 from dataclasses import replace
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -26,8 +25,6 @@ from jacobian.operations import (
     OperationExecutionFailure,
 )
 from jacobian.provider_runtime import known_provider_runtime
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 class _SyntheticRequest(ContractModel):
@@ -105,9 +102,8 @@ def _install(kernel: JacobianKernel, bundle: DomainBundle) -> None:
 
 
 def test_synthetic_bundle_installs_and_materializes_typed_result(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     _install(kernel, _synthetic_bundle())
 
     descriptor = next(
@@ -140,8 +136,7 @@ def test_synthetic_bundle_installs_and_materializes_typed_result(
     assert result.relationships[0].target_artifact_uris == (result.artifact_uris[1],)
 
 
-def test_synthetic_bundle_fails_closed_before_artifact_writes(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_synthetic_bundle_fails_closed_before_artifact_writes(kernel) -> None:
     _install(kernel, _synthetic_bundle())
 
     result = kernel.capabilities.invoke(
@@ -166,10 +161,9 @@ def test_synthetic_bundle_fails_closed_before_artifact_writes(tmp_path: Path) ->
     ),
 )
 def test_computed_adapter_preserves_operational_failure_status(
-    tmp_path: Path,
+    kernel,
     status: ExecutionStatus,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     bundle = _synthetic_bundle()
     diagnostic = CapabilityDiagnostic(
         code="SYNTHETIC_OPERATION_FAILED",
@@ -208,9 +202,8 @@ def test_computed_failure_rejects_conclusive_status() -> None:
 
 
 def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     bundle = _synthetic_bundle()
     diagnostic = CapabilityDiagnostic(
         code="SYNTHETIC_SEARCH_TIMEOUT",
@@ -250,9 +243,8 @@ def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
 
 
 def test_bounded_adapter_materializes_interrupted_partial_result(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     bundle = _synthetic_bundle()
     diagnostic = CapabilityDiagnostic(
         code="SYNTHETIC_SEARCH_TIMEOUT",
@@ -295,9 +287,8 @@ def test_bounded_adapter_materializes_interrupted_partial_result(
 
 
 def test_computed_adapter_rejects_invalid_implementation_result(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     bundle = _synthetic_bundle()
     original = bundle.capabilities[0]
     invalid = ComputedOperation(
@@ -339,8 +330,7 @@ def test_computed_adapter_rejects_invalid_implementation_result(
     assert result.episode_uri is None
 
 
-def test_installer_rejects_empty_and_duplicate_domain_bundles(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_installer_rejects_empty_and_duplicate_domain_bundles(kernel) -> None:
     installer = OperationInstaller(
         kernel.store,
         kernel.schemas,
@@ -355,9 +345,8 @@ def test_installer_rejects_empty_and_duplicate_domain_bundles(tmp_path: Path) ->
 
 
 def test_bounded_outcome_cannot_contradict_completion_semantics(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     bundle = _synthetic_bundle()
     contradictory = BoundedSearchOperation(
         capability_id="synthetic.search.contradictory",

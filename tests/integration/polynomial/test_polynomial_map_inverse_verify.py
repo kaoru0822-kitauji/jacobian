@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -15,7 +14,10 @@ from jacobian.contracts.results import Conclusion, ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian_checkers.polynomial_maps import check_map_inverse
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _term(coefficient: int, exponents: list[int]) -> dict[str, Any]:
@@ -87,8 +89,7 @@ def _checker_request(kernel: JacobianKernel, output: dict[str, Any]) -> dict[str
     }
 
 
-def test_two_sided_triangular_inverse_is_verified(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_two_sided_triangular_inverse_is_verified(kernel) -> None:
     forward, inverse = _triangular_maps()
 
     result = kernel.capabilities.invoke(_request(forward, inverse))
@@ -108,9 +109,8 @@ def test_two_sided_triangular_inverse_is_verified(tmp_path: Path) -> None:
 
 
 def test_overlapping_variable_names_use_simultaneous_composition(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     forward = {
         "map_schema_version": "1",
         "domain": "QQ",
@@ -149,9 +149,8 @@ def test_overlapping_variable_names_use_simultaneous_composition(
 
 
 def test_unrepresentable_composition_is_rejected_before_artifacts(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     high_degree = {
         "map_schema_version": "1",
         "domain": "QQ",
@@ -176,8 +175,9 @@ def test_unrepresentable_composition_is_rejected_before_artifacts(
     assert result.artifact_uris == ()
 
 
-def test_perturbed_inverse_coefficient_is_verified_false(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_perturbed_inverse_coefficient_is_verified_false(
+    kernel,
+) -> None:
     forward, inverse = _triangular_maps()
     inverse["coordinates"][0]["terms"][1]["coefficient"]["num"] = "-2"
 
@@ -191,8 +191,7 @@ def test_perturbed_inverse_coefficient_is_verified_false(tmp_path: Path) -> None
     assert any(item["terms"] for item in residuals["forward_after_inverse"])
 
 
-def test_checker_rejects_residual_coefficient_tampering(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_checker_rejects_residual_coefficient_tampering(kernel) -> None:
     forward, inverse = _triangular_maps()
     result = kernel.capabilities.invoke(_request(forward, inverse))
     checker_request = _checker_request(kernel, result.output)
@@ -214,9 +213,8 @@ def test_checker_rejects_residual_coefficient_tampering(tmp_path: Path) -> None:
     ),
 )
 def test_one_declared_identity_direction_never_verifies(
-    tmp_path: Path, zero_direction: str, nonzero_direction: str
+    kernel, zero_direction: str, nonzero_direction: str
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     forward, inverse = _triangular_maps()
     result = kernel.capabilities.invoke(_request(forward, inverse))
     checker_request = _checker_request(kernel, result.output)
@@ -234,10 +232,7 @@ def test_one_declared_identity_direction_never_verifies(
 
 
 @pytest.mark.parametrize("tamper", ("domain", "source_order", "target_order"))
-def test_checker_rejects_domain_and_order_substitution(
-    tmp_path: Path, tamper: str
-) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_checker_rejects_domain_and_order_substitution(kernel, tamper: str) -> None:
     forward, inverse = _triangular_maps()
     result = kernel.capabilities.invoke(_request(forward, inverse))
     checker_request = _checker_request(kernel, result.output)
@@ -255,10 +250,7 @@ def test_checker_rejects_domain_and_order_substitution(
 
 
 @pytest.mark.parametrize("source", ("scope", "inverse"))
-def test_checker_rejects_source_map_coefficient_tampering(
-    tmp_path: Path, source: str
-) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_checker_rejects_source_map_coefficient_tampering(kernel, source: str) -> None:
     forward, inverse = _triangular_maps()
     result = kernel.capabilities.invoke(_request(forward, inverse))
     checker_request = _checker_request(kernel, result.output)
@@ -282,10 +274,7 @@ def test_checker_rejects_source_map_coefficient_tampering(
         "forward_after_inverse_checker_records",
     ),
 )
-def test_checker_rejects_incomplete_checker_record_family(
-    tmp_path: Path, family: str
-) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_checker_rejects_incomplete_checker_record_family(kernel, family: str) -> None:
     forward, inverse = _triangular_maps()
     result = kernel.capabilities.invoke(_request(forward, inverse))
     checker_request = _checker_request(kernel, result.output)

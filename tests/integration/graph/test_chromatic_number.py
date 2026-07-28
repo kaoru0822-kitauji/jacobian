@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 import z3  # type: ignore[import-untyped]
 
@@ -15,8 +13,6 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _invoke(
@@ -32,9 +28,8 @@ def _invoke(
 
 
 def test_chromatic_number_returns_first_satisfying_k_with_witness(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     result = _invoke(
         kernel,
         {
@@ -77,10 +72,9 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
 
 
 def test_chromatic_number_timeout_is_unknown_and_preserves_bounds(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(z3.Solver, "check", lambda _solver: z3.unknown)
 
     result = _invoke(
@@ -113,9 +107,8 @@ def test_chromatic_number_timeout_is_unknown_and_preserves_bounds(
 
 
 def test_chromatic_number_rejects_repeated_undirected_edges(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     result = _invoke(
         kernel,
         {
@@ -131,7 +124,7 @@ def test_chromatic_number_rejects_repeated_undirected_edges(
 
 
 def test_chromatic_number_rejects_result_for_a_different_vertex_universe(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from jacobian.domains.graph_optimization import chromatic_number
@@ -149,7 +142,6 @@ def test_chromatic_number_rejects_result_for_a_different_vertex_universe(
         )
 
     monkeypatch.setattr(chromatic_number, "solve_chromatic_number", invalid_result)
-    kernel = JacobianKernel(tmp_path)
     result = _invoke(
         kernel,
         {

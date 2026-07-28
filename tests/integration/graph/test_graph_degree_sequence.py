@@ -1,24 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def test_degree_sequence_realization_materializes_replayable_graph(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -46,9 +38,8 @@ def test_degree_sequence_realization_materializes_replayable_graph(
 
 
 def test_degree_sequence_non_graphical_result_has_replayable_obstruction(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(

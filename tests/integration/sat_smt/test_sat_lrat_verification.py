@@ -14,8 +14,12 @@ from jacobian.kernel import JacobianKernel
 
 pytestmark = [
     pytest.mark.subprocess,
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
+
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _verify(kernel: JacobianKernel, cnf_uri: str, proof: bytes, **extra: object):
@@ -32,8 +36,9 @@ def _verify(kernel: JacobianKernel, cnf_uri: str, proof: bytes, **extra: object)
     )
 
 
-def test_rup_lrat_derives_empty_clause_and_binds_artifacts(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
+    kernel,
+) -> None:
     cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
 
     result = _verify(kernel, cnf.artifact_uri, b"3 0 1 2 0\n")
@@ -63,8 +68,7 @@ def test_rup_lrat_derives_empty_clause_and_binds_artifacts(tmp_path) -> None:
         b"3 0 1 2",  # truncated framing
     ),
 )
-def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(tmp_path, proof) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(kernel, proof) -> None:
     cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
 
     result = _verify(kernel, cnf.artifact_uri, proof)
@@ -74,8 +78,7 @@ def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(tmp_path, proof) -
     assert result.output["verification_record_uri"] is None
 
 
-def test_negative_rat_hint_is_explicitly_unsupported(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_negative_rat_hint_is_explicitly_unsupported(kernel) -> None:
     cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
 
     result = _verify(kernel, cnf.artifact_uri, b"3 0 -1 2 0\n")
@@ -84,8 +87,7 @@ def test_negative_rat_hint_is_explicitly_unsupported(tmp_path) -> None:
     assert result.output["conclusion"] == "UNKNOWN"
 
 
-def test_timeout_and_cancellation_are_fail_closed(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_timeout_and_cancellation_are_fail_closed(kernel) -> None:
     cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
 
     timed_out = _verify(

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from tests.helpers.capabilities import invoke_capability as _invoke
 
@@ -21,12 +19,16 @@ from jacobian.provider_runtime import (
 
 pytestmark = [
     pytest.mark.external_backend,
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
 
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
+
+
 def test_cadical_text_proof_replays_in_pinned_drat_trim(
-    tmp_path: Path,
+    kernel,
 ) -> None:
     cadical = cadical_provider_runtime()
     drat_trim = drat_trim_provider_runtime()
@@ -34,7 +36,6 @@ def test_cadical_text_proof_replays_in_pinned_drat_trim(
         pytest.skip(f"requires pinned CaDiCaL {CADICAL_VERSION}")
     if drat_trim.version != DRAT_TRIM_RELEASE_TAG:
         pytest.skip(f"requires pinned DRAT-trim {DRAT_TRIM_RELEASE_TAG}")
-    kernel = JacobianKernel(tmp_path, install_references=True)
     cnf = kernel.sat.put_cnf(
         variable_names=(
             "p1h1",

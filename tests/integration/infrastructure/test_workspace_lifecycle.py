@@ -232,10 +232,9 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
 
 
 def test_workspace_supersession_and_reactivation_are_explicit(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-supersede-001")
     seeded = kernel.workspaces.write(
         WorkspaceWriteRequest(
@@ -340,10 +339,9 @@ def test_workspace_supersession_and_reactivation_are_explicit(
 
 
 def test_workspace_query_uses_one_revision_snapshot(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-query-snapshot-001")
     projection_started = Event()
     continue_projection = Event()
@@ -409,10 +407,9 @@ def test_workspace_query_uses_one_revision_snapshot(
 
 
 def test_workspace_recent_views_follow_acceptance_order(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-acceptance-order-001")
     monkeypatch.setattr(
         "jacobian.workspaces._now",

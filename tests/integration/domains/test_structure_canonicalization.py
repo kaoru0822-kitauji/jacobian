@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
-def test_isomorphic_graphs_share_one_canonical_object(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_isomorphic_graphs_share_one_canonical_object(kernel) -> None:
     reference = kernel.references["graph_paths"]
     first = kernel.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
@@ -45,8 +45,9 @@ def test_isomorphic_graphs_share_one_canonical_object(tmp_path: Path) -> None:
     assert first_result.result.assurance.verification.value == "UNVERIFIED"
 
 
-def test_nonisomorphic_graphs_have_distinct_canonical_keys(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_nonisomorphic_graphs_have_distinct_canonical_keys(
+    kernel,
+) -> None:
     reference = kernel.references["graph_paths"]
     path = kernel.artifacts.put(
         schema_uri=reference.candidate_schema_uri,

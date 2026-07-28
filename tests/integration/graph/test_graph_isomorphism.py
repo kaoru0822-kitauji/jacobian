@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.contracts.capabilities import (
@@ -13,7 +11,10 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _graph_uri(
@@ -55,8 +56,7 @@ def _input(
     }
 
 
-def test_graph_isomorphism_verifies_a_valid_bijection(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_graph_isomorphism_verifies_a_valid_bijection(kernel) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -80,8 +80,7 @@ def test_graph_isomorphism_verifies_a_valid_bijection(tmp_path: Path) -> None:
     assert result.output["verification_record_uri"] in result.artifact_uris
 
 
-def test_graph_isomorphism_verifies_a_negative_result(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_graph_isomorphism_verifies_a_negative_result(kernel) -> None:
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -100,8 +99,9 @@ def test_graph_isomorphism_verifies_a_negative_result(tmp_path: Path) -> None:
     )
 
 
-def test_graph_isomorphism_keeps_checker_rejection_unknown(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_graph_isomorphism_keeps_checker_rejection_unknown(
+    kernel,
+) -> None:
     checker_id = kernel.graph_isomorphism.checker_id
     assert checker_id is not None
     request_input = _input(kernel, {"a": "x", "b": "z", "c": "y"})
@@ -127,9 +127,8 @@ def test_graph_isomorphism_keeps_checker_rejection_unknown(tmp_path: Path) -> No
 
 
 def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -167,9 +166,8 @@ def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
 
 
 def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     left_graph_uri = _graph_uri(
         kernel,
         vertices=["c", "a", "b"],
@@ -200,9 +198,8 @@ def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(
 
 
 def test_graph_isomorphism_rejects_incompatible_graph_artifact(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     wrong_artifact = kernel.artifacts.put(
         schema_uri=kernel.graph.scope_schema_uri,
         semantics_uri=kernel.graph.semantics_uri,
@@ -238,9 +235,8 @@ def test_graph_isomorphism_rejects_incompatible_graph_artifact(
 
 
 def test_graph_isomorphism_is_unavailable_without_reference_checkers(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     assert "graph.isomorphism.verify" not in {
         descriptor.capability_id
