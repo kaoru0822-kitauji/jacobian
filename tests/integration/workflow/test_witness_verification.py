@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from jacobian.bounded_process import BoundedProcessResult
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope
@@ -13,6 +14,7 @@ from jacobian.contracts.results import (
     Arithmetic,
     Conclusion,
     Coverage,
+    ExecutionStatus,
     Method,
     Verification,
 )
@@ -126,6 +128,62 @@ def _graph_case(
         witness.artifact_uri,
         candidate_schema,
     )
+
+
+@pytest.mark.parametrize(
+    ("stopped", "expected_status"),
+    [
+        (
+            BoundedProcessResult(
+                returncode=-9,
+                stdout=b"",
+                stderr=b"",
+                stdout_exceeded=False,
+                stderr_exceeded=False,
+                timed_out=True,
+                cancelled=False,
+            ),
+            ExecutionStatus.TIMEOUT,
+        ),
+        (
+            BoundedProcessResult(
+                returncode=-9,
+                stdout=b"",
+                stderr=b"",
+                stdout_exceeded=False,
+                stderr_exceeded=False,
+                timed_out=False,
+                cancelled=True,
+            ),
+            ExecutionStatus.CANCELLED,
+        ),
+    ],
+)
+def test_checker_timeout_and_cancellation_are_non_conclusions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stopped: BoundedProcessResult,
+    expected_status: ExecutionStatus,
+) -> None:
+    _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
+        tmp_path
+    )
+    monkeypatch.setattr(
+        "jacobian.verification.run_bounded_process",
+        lambda *_args, **_kwargs: stopped,
+    )
+
+    result = service.verify_witness(
+        claim_uri=claim_uri,
+        candidate_uri=candidate_uri,
+        witness_uri=witness_uri,
+        checker_id=checker_id,
+    )
+
+    assert result.execution.status is expected_status
+    assert result.conclusion is Conclusion.UNKNOWN
+    assert result.assurance.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
 
 
 @pytest.mark.subprocess

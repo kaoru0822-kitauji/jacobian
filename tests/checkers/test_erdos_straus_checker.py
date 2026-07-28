@@ -106,3 +106,21 @@ def test_checker_rejects_range_substitution() -> None:
     request["candidate"]["payload"]["upper_bound"] = 5
 
     assert check_decomposition_table(request)["accepted"] is False
+
+
+def test_checker_rejects_binding_substitution() -> None:
+    request = _request(
+        [
+            {"n": 2, "x": 1, "y": 2, "z": 2},
+            {"n": 3, "x": 1, "y": 4, "z": 12},
+            {"n": 4, "x": 2, "y": 3, "z": 6},
+        ]
+    )
+    rebound = dict(request["witness"]["payload"]["bindings"])
+    rebound["candidate_digest"] = "sha256:" + "9" * 64
+    request["witness"]["payload"]["bindings"] = rebound
+
+    decision = check_decomposition_table(request)
+
+    assert decision["accepted"] is False
+    assert "bindings" in decision["detail"]

@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
-from jacobian.contracts.results import Conclusion, Verification
+from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
 from jacobian.registry import CheckerRegistry
 from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
 
 
-@pytest.mark.subprocess
-@pytest.mark.conformance
-def test_complete_path_enumeration_certificate_is_verified(tmp_path: Path) -> None:
+def _certificate_case(
+    tmp_path: Path,
+) -> tuple[ArtifactStore, VerificationService, str]:
     store = ArtifactStore(tmp_path)
     claim_schema = store.register_descriptor(
         kind="schema",
@@ -123,10 +124,70 @@ def test_complete_path_enumeration_certificate_is_verified(tmp_path: Path) -> No
         candidate_schema_uris=(candidate_schema,),
     )
 
-    result = VerificationService(store, registry).verify_certificate(
-        certificate_uri=certificate_artifact.artifact_uri
+    return (
+        store,
+        VerificationService(store, registry),
+        certificate_artifact.artifact_uri,
     )
+
+
+@pytest.mark.subprocess
+@pytest.mark.conformance
+def test_complete_path_enumeration_certificate_is_verified(tmp_path: Path) -> None:
+    _, service, certificate_uri = _certificate_case(tmp_path)
+
+    result = service.verify_certificate(certificate_uri=certificate_uri)
 
     assert result.conclusion is Conclusion.FALSE
     assert result.assurance.verification is Verification.VERIFIED
     assert result.assurance.coverage.value == "EXHAUSTIVE"
+
+
+def test_certificate_binding_substitution_is_rejected(tmp_path: Path) -> None:
+    store, service, certificate_uri = _certificate_case(tmp_path)
+    original = store.get(certificate_uri)
+    payload = deepcopy(original.payload)
+    payload["bindings"]["candidate_digest"] = "sha256:" + "9" * 64
+    rebound = store.put(
+        schema_uri=original.manifest.schema_uri,
+        semantics_uri=original.manifest.semantics_uri,
+        payload=payload,
+        parents=original.manifest.parents,
+    )
+
+    result = service.verify_certificate(certificate_uri=rebound.artifact_uri)
+
+    assert result.conclusion is Conclusion.UNKNOWN
+    assert result.assurance.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
+
+
+def test_certificate_without_bound_parents_is_rejected(tmp_path: Path) -> None:
+    store, service, certificate_uri = _certificate_case(tmp_path)
+    original = store.get(certificate_uri)
+    unbound = store.put(
+        schema_uri=original.manifest.schema_uri,
+        semantics_uri=original.manifest.semantics_uri,
+        payload=original.payload,
+    )
+
+    result = service.verify_certificate(certificate_uri=unbound.artifact_uri)
+
+    assert result.conclusion is Conclusion.UNKNOWN
+    assert result.assurance.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None
+
+
+def test_corrupt_certificate_payload_is_an_operational_failure(
+    tmp_path: Path,
+) -> None:
+    store, service, certificate_uri = _certificate_case(tmp_path)
+    certificate = store.get(certificate_uri)
+    store._blob_path(certificate.manifest.payload_digest).write_bytes(b"corrupt")
+
+    result = service.verify_certificate(certificate_uri=certificate_uri)
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.conclusion is Conclusion.UNKNOWN
+    assert result.assurance.verification is Verification.UNVERIFIED
+    assert result.verification_record_uri is None

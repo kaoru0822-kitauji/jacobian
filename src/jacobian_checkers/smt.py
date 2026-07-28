@@ -621,5 +621,9 @@ def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
                 "against the full bound QF_UF query"
             ),
         }
+    except subprocess.TimeoutExpired:
+        return _reject(
+            "CARCARA_TIMEOUT: Carcara did not finish; no proof conclusion is available"
+        )
     except (KeyError, OSError, TypeError, ValueError, OverflowError):
         return _reject("malformed or unauthorized SMT proof checker request")

@@ -357,3 +357,22 @@ def test_missing_runtime_authorization_is_rejected(
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_drat_timeout_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
+) -> None:
+    executable, marker = _fake_checker(
+        tmp_path,
+        "import time\ntime.sleep(5)",
+    )
+    _install_runtime_environment(monkeypatch, executable)
+    monkeypatch.setattr("jacobian_checkers.sat.DRAT_TRIM_TIMEOUT_SECONDS", 0.1)
+
+    decision = check_unsat_proof(proof_request_factory(_DEFAULT_PROOF))
+
+    assert marker.read_text(encoding="utf-8") == "called"
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"

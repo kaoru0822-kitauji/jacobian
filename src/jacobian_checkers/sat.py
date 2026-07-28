@@ -681,6 +681,10 @@ def check_unsat_proof(request: dict[str, Any]) -> dict[str, Any]:
                 f"{len(clauses)} canonical clauses"
             ),
         }
+    except subprocess.TimeoutExpired:
+        return _reject_proof(
+            "DRAT_TIMEOUT: DRAT-trim did not finish; no proof conclusion is available"
+        )
     except (KeyError, OSError, TypeError, ValueError, OverflowError):
         return _reject_proof("malformed or unauthorized SAT proof checker request")
 

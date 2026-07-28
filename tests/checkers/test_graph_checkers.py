@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
+import pytest
+
 from jacobian_checkers.graph_paths import (
     check_odd_cycle,
     check_path_enumeration,
@@ -47,6 +52,52 @@ def test_two_coloring_checker_rejects_boolean_colors() -> None:
     )
 
     assert decision["accepted"] is False
+
+
+@pytest.mark.parametrize(
+    ("checker", "vertices", "arcs", "witness_format", "role", "payload"),
+    [
+        (
+            check_odd_cycle,
+            ["a", "b", "c"],
+            [["a", "b"], ["b", "c"], ["c", "a"]],
+            "graph.odd_cycle",
+            "DEFEATS_CANDIDATE",
+            {"cycle": ["a", "b", "c"]},
+        ),
+        (
+            check_two_coloring,
+            ["a", "b"],
+            [["a", "b"]],
+            "graph.2coloring",
+            "SUPPORTS_CLAIM",
+            {"coloring": {"a": 0, "b": 1}},
+        ),
+    ],
+)
+def test_graph_witness_checkers_reject_binding_substitution(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    vertices: list[str],
+    arcs: list[list[str]],
+    witness_format: str,
+    role: str,
+    payload: dict[str, Any],
+) -> None:
+    request = _graph_witness_request(
+        vertices=vertices,
+        arcs=arcs,
+        witness_format=witness_format,
+        role=role,
+        payload=payload,
+    )
+    rebound = dict(request["witness"]["payload"]["bindings"])
+    rebound["candidate_digest"] = "sha256:" + "9" * 64
+    request["witness"]["payload"]["bindings"] = rebound
+
+    decision = checker(request)
+
+    assert decision["accepted"] is False
+    assert "bindings" in decision["detail"]
 
 
 def test_path_enumeration_continues_through_intermediate_terminal() -> None:

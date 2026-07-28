@@ -343,3 +343,22 @@ def test_excessive_output_and_runtime_mutation_fail_closed(
 
     assert mutated_decision["accepted"] is False
     assert mutated_decision["conclusion"] == "UNKNOWN"
+
+
+def test_carcara_timeout_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    proof_request_factory: ProofRequestFactory,
+) -> None:
+    executable, marker = _fake_checker(
+        tmp_path,
+        "import time\ntime.sleep(5)",
+    )
+    _install_runtime_environment(monkeypatch, executable)
+    monkeypatch.setattr("jacobian_checkers.smt.CARCARA_TIMEOUT_SECONDS", 0.1)
+
+    decision = check_unsat_proof(proof_request_factory())
+
+    assert marker.read_text(encoding="utf-8") == "called"
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
