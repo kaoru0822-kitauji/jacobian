@@ -6,6 +6,7 @@ from jacobian.contracts.geometry import (
     GeometryPointResult,
     PointTripleRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.geometry._support import geometry_operation
 from jacobian.domains.geometry.operations import centroid, circumcircle, orientation
 
@@ -39,5 +40,6 @@ TRIANGLE_CAPABILITIES = (
         circumcircle,
         "geometry",
         "circle",
+        invocation_examples=(example("right_triangle_circumcircle", "Construct the circumcircle of a right triangle.", {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "2", "den": "1"}, "y": {"num": "0", "den": "1"}}, "third": {"x": {"num": "0", "den": "1"}, "y": {"num": "2", "den": "1"}}}),),
     ),
 )
