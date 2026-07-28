@@ -320,6 +320,7 @@ class BoundedSearchOperationAdapter:
             input_schema=model_schema(operation.request_model),
             output_schema=model_schema(operation.result_model),
             tags=operation.tags,
+            invocation_examples=operation.invocation_examples,
         )
 
     @property
