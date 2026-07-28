@@ -48,7 +48,7 @@ def _invoke(
     )
 
 
-def test_atomic_capability_catalog_exposes_only_composable_operations(
+def test_atomic_capability_catalog_includes_required_and_excludes_composite_operations(
     tmp_path: Path,
 ) -> None:
     kernel = JacobianKernel(tmp_path)
