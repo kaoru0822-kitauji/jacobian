@@ -85,8 +85,23 @@
     },
     {
       "name": "repository-policy",
-      "patterns": ["AGENTS.md", ".pre-commit-config.yaml", ".jscpd.json"],
+      "patterns": [
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        ".pre-commit-config.yaml",
+        ".jscpd.json"
+      ],
       "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+    },
+    {
+      "name": "test-support",
+      "patterns": ["tests/helpers/**", "tests/conftest.py"],
+      "suites": ["core", "integration", "static"]
+    },
+    {
+      "name": "benchmarks",
+      "patterns": ["benchmarks/**"],
+      "suites": ["core", "integration", "static", "build"]
     }
   ],
   "fallback": {

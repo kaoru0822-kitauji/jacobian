@@ -70,10 +70,10 @@ make validate-full
 ```
 
 `make test-fast` collects only unit, contract, checker, and reference
-directories, then excludes integration-marked cases. Avoiding collection of
-integration and end-to-end modules keeps the loop short without dropping
-independent checker tests. Suite fixture infrastructure that builds and freezes
-kernel store templates lives under `tests/integration/` for the same reason.
+directories and excludes `slow` cases under a single process. Prefer the
+function-scoped `kernel` / `kernel_with_references` fixtures when attaching to
+seeded stores. Avoid inventing layer-marker filters; directory Make targets own
+suite selection.
 Named contract, checker, MCP, and storage targets
 make common affected areas discoverable without adding another test runner.
 `make check` combines fast Ruff, strict typing, and non-integration test
@@ -84,9 +84,11 @@ checks when relevant.
 `make validate-full` is the broad local Python, Lean, static, and package
 escape hatch, not a routine handoff requirement. It does not reproduce CI's
 Python 3.13 compatibility, combined coverage, security, duplicate-code, or npm
-lanes. The full Python suite uses `pytest-xdist` work stealing and
+lanes. The full Python suite opts into `pytest-xdist` through Make targets
+(`make test`, `make test-core`, `make test-integration`) with work stealing and
 at most four workers because test durations vary substantially and many tests
-wait on isolated subprocesses. `make test-failed` is the failure-recovery
+wait on isolated subprocesses. Bare `pytest` stays single-process so focused
+debugging and Lean reproduction do not accidentally start a worker pool. `make test-failed` is the failure-recovery
 shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
 execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
 120-second per-test backstop prevents local deadlocks from hanging indefinitely
@@ -140,10 +142,12 @@ environment for focused reproduction when local Lean is impractical.
 The Python Debug workflow provides the same focused remote reproduction for
 one ordinary pytest file or node on either supported Python version.
 When coverage is enabled for an exhaustive plan, the Python 3.12 core lane and
-three integration partitions write raw coverage data; a dependent job combines
-all four files before enforcing the repository threshold and producing the XML
-report. Coverage.py's subprocess patch includes plugin and checker workers so
-clean-process execution is not misreported as uncovered.
+each integration shard write raw coverage data; a dependent job combines the
+core file plus every shard file before enforcing the repository threshold and
+producing the XML report. The shard count is owned by
+[`.github/ci-config.json`](../../.github/ci-config.json). Coverage.py's
+subprocess patch includes plugin and checker workers so clean-process execution
+is not misreported as uncovered.
 Measured costs and lane policy are recorded in the
 [test-suite cost audit](../contributing/test-suite-cost-audit.md).
 
@@ -158,7 +162,8 @@ lanes. Merge-queue checks and pushes to `main` always use the exhaustive plan,
 which also enables coverage and the second Python version. Stable aggregate
 Python and Lean jobs preserve required status semantics when their underlying
 matrices are conditional. Maintainer-applied `ci:full` and `ci:lean` labels can
-force all lanes or add Lean respectively. Overrides are additive only and
+force all lanes or add Lean respectively; label events re-trigger CI so the
+override applies without an extra push. Overrides are additive only and
 cannot weaken the plan selected from changed paths. A scheduled validation
 workflow separately exercises repeated property/stateful stress, alternate
 ordering seeds, optional providers, and the core performance benchmark outside
@@ -586,37 +591,36 @@ already happens to pass it.
 
 ## Test organization
 
-An initial layout may use:
+Directory ownership is the source of truth:
 
 ```text
 tests/
+    unit/
     contract/
-    property/
-    stateful/
+    checkers/
+    reference/
     integration/
-    subprocess/
-    conformance/
-    differential/
+    end_to_end/
+    helpers/
     fixtures/
 ```
 
 Package-local tests are appropriate for focused behavior. Cross-package trust
-tests live in the top-level groups above. Suggested pytest markers are:
+tests live in the top-level groups above. Runtime pytest markers currently in
+use are:
 
 ```text
-contract
+external_backend
+lean_runtime
+slow
 property
 stateful
-integration
-subprocess
-conformance
-differential
-external_backend
-slow
 benchmark
 agent_eval
 ```
 
+Layer markers such as `integration` or `end_to_end` are intentionally not used;
+select those suites by directory through Make targets.
 Markers are selection tools, not excuses for leaving required tests out of
 release validation.
 

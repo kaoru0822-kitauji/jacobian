@@ -194,6 +194,41 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             (".github/workflows/ci.yml",),
             _expected_plan("full", *FUNCTIONAL_KEYS),
         ),
+        (
+            ("CONTRIBUTING.md",),
+            _expected_plan("full", *FUNCTIONAL_KEYS),
+        ),
+        (
+            ("tests/helpers/capabilities.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/conftest.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+            ),
+        ),
+        (
+            ("benchmarks/benchmark_core.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+                "run-build",
+            ),
+        ),
     ],
 )
 def test_ci_plan_fails_closed_outside_isolated_paths(

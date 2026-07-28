@@ -7,8 +7,9 @@ EVAL_ARGS ?=
 CORE_TEST_PATHS := tests/unit tests/contract tests/checkers tests/reference
 INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
+PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
 
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed duplicate-code npm-test build check precommit check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed duplicate-code npm-test todo-check coverage build check precommit check-static validate-full agent-eval bench-core
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -39,18 +40,18 @@ typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
 
 test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
-	$(UV_RUN) pytest -m "not lean_runtime" $(TESTS) $(PYTEST_ARGS)
+	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" $(TESTS) $(PYTEST_ARGS)
 
 test-fast: ## Sequential core edit loop (unit/contract/checkers/reference, no xdist).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" \
 		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
 
 test-core: ## Parallel core suites (same paths as test-fast, uses xdist by default).
-	$(UV_RUN) pytest -m "not lean_runtime" \
+	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
 		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
 
 test-integration: ## Run the directory-owned integration suites.
-	$(UV_RUN) pytest -m "not lean_runtime" \
+	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
 		$(if $(TESTS),$(TESTS),$(INTEGRATION_TEST_PATHS)) $(PYTEST_ARGS)
 
 test-contracts: ## Run contract tests.
@@ -77,7 +78,7 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_ARGS)
 
 test-failed: ## Re-run failures from the previous pytest invocation.
-	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
+	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) --lf -m "not lean_runtime" $(PYTEST_ARGS)
 
 duplicate-code: ## Run the CI duplicate-code detector locally.
 	npx --yes jscpd@5.0.12 --config .jscpd.json .
@@ -85,6 +86,19 @@ duplicate-code: ## Run the CI duplicate-code detector locally.
 npm-test: ## Run the npm package tests and dry-run pack.
 	npm test --prefix npm
 	npm pack --dry-run --prefix npm
+
+todo-check: ## Fail on TODO comments that do not reference an issue.
+	@violations="$$(rg --pcre2 -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"; \
+	if [ -n "$$violations" ]; then \
+	  printf '%s\n' "$$violations"; \
+	  echo "TODO comments must reference an issue, e.g. TODO(#123)." >&2; \
+	  exit 1; \
+	fi
+
+coverage: ## Combine coverage data files and enforce the repository threshold.
+	$(UV_RUN) coverage combine
+	$(UV_RUN) coverage report --fail-under=50
+	$(UV_RUN) coverage xml
 
 build: ## Build Python source and wheel distributions.
 	uv build
@@ -95,9 +109,12 @@ precommit: ## Fix and run every routine local handoff check.
 	$(MAKE) fix
 	$(MAKE) check
 
-check-static: lint-full typecheck build ## Run CI-owned static and package checks locally.
+check-static: lint-full typecheck todo-check build ## Run CI-owned static checks plus a local package build.
 
 validate-full: lint-full typecheck test test-lean build ## Run broad local validation (slow; omits security/duplicate/npm CI lanes).
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)
+
+bench-core: ## Run the core performance benchmark script.
+	$(UV_RUN) python benchmarks/benchmark_core.py
