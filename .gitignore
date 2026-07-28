@@ -35,3 +35,6 @@ dist/
 htmlcov/
 benchmarks/results/
 lean/.lake/
+
+# Test infrastructure state
+.test_durations

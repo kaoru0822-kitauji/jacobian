@@ -404,7 +404,7 @@ jobs:
       - if: needs.plan.outputs.run-coverage == 'true'
         run: uv run --frozen coverage combine coverage-data
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage report | tee coverage-report.txt
+        run: uv run --frozen coverage report --fail-under=50 | tee coverage-report.txt
         shell: bash -o pipefail {0}
       - if: needs.plan.outputs.run-coverage == 'true'
         run: uv run --frozen coverage xml
