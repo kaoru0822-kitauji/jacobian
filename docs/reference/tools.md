@@ -123,19 +123,20 @@ installed outcomes without loading every schema:
   "query": "find a counterexample to associativity",
   "domain": "universal_algebra",
   "mode": "EXPLORE",
-  "limit": 10
+  "limit": 5
 }
 ```
 
 `query` searches published capability IDs, titles, descriptions, and tags.
 `domain` filters the domain-owned capability namespace, with exact tag matches
-also accepted. `mode` and `limit` are optional. Omit `query` to browse the
-installed inventory in stable ID order. Each response includes a stable catalog
-digest; when `next_cursor` is present, pass it back with the same filters and
-limit to continue. Results report `matched_on` and `matched_terms`; their
-deterministic ranking is retrieval, not a recommendation or mathematical
-strategy. Agents may search repeatedly across concepts and domains and compose
-any number of capabilities.
+also accepted. `mode` and `limit` are optional; `limit` defaults to 5 and is
+bounded from 1 through 20. Omit `query` to browse the installed inventory in
+stable ID order. Each response includes stable catalog and operator-policy
+digests and is bounded to 16 KiB; when `next_cursor` is present, pass it back
+with the same filters and limit to continue. Results report `matched_on` and
+`matched_terms`; their deterministic ranking is retrieval, not a recommendation
+or mathematical strategy. Start with five results, inspect only the strongest
+one or two relevant contracts, then search again only when useful.
 
 Call `capability.describe` again with only one returned `capability_id` to
 inspect its complete input and output schemas, supported modes, provider
@@ -196,6 +197,15 @@ IDs and contracts where mathematical semantics differ. For example,
 `polynomial.compute.groebner_basis` should not be forced through a universal
 object or solver schema.
 
+`graph.construct.explicit` validates a complete bounded vertex/edge request
+before writing anything, canonicalizes labels and undirected edges, and returns
+the domain-owned simple-graph artifact accepted by graph consumers. Generic
+`artifact.put` still does not authorize graph semantics.
+`graph.induced_tree.maximum.verify` independently exhausts all vertex subsets
+for stored exact producer results of order at most 16. It binds the complete
+graph-optimization input and result lineage and does not reuse the producer's
+Z3 search. Larger inputs return an unsupported non-conclusion.
+
 Useful low-level operations may retain descriptive IDs such as
 `claim.validate`, `witness.find`, `witness.verify`, or
 `certificate.verify`. Those names identify capabilities invoked through
@@ -229,6 +239,16 @@ expose a generic `solver.solve` or `sandbox.run` truth primitive.
 
 An adapter or plugin cannot authorize its own checker. Checker administration
 is operator-controlled and outside the model-facing MCP surface.
+
+Operators may additionally constrain visible and invocable capabilities by
+exact ID, domain, tag, or mode. The
+`COMPUTE_VERIFY_NO_RETRIEVAL` profile denies retrieval-tagged capabilities and
+`knowledge.search`; it is intended for evaluation isolation where only
+computation and independent verification should be available. Catalog and
+discovery responses bind the active policy profile and digest. A direct call to
+a hidden capability fails with `CAPABILITY_POLICY_DENIED`. Capability policy
+changes availability only: it cannot install a checker, authorize one, or
+change verification authority.
 
 ## Operating guidance and prompts
 

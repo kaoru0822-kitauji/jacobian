@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import logging
 import re
 import time
+from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
@@ -25,6 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDiscoveryMatch,
     CapabilityDiscoveryRequest,
     CapabilityDiscoveryResult,
+    CapabilityMode,
     CapabilityObligationStatus,
     CapabilityProviderAvailability,
     CapabilityRelationshipStatus,
@@ -94,6 +97,150 @@ class CapabilityInvocationError(RuntimeError):
         self.diagnostic = diagnostic
 
 
+CapabilityPolicyProfile = Literal["DEFAULT", "COMPUTE_VERIFY_NO_RETRIEVAL"]
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityPolicy:
+    """Operator-controlled capability visibility and invocation policy.
+
+    Policy can restrict evaluation/runtime availability, but it never installs,
+    authorizes, or changes the authority of a checker.
+    """
+
+    profile: CapabilityPolicyProfile = "DEFAULT"
+    allowed_capability_ids: frozenset[str] = frozenset()
+    denied_capability_ids: frozenset[str] = frozenset()
+    allowed_domains: frozenset[str] = frozenset()
+    denied_domains: frozenset[str] = frozenset()
+    allowed_tags: frozenset[str] = frozenset()
+    denied_tags: frozenset[str] = frozenset()
+    allowed_modes: frozenset[CapabilityMode] = frozenset()
+    denied_modes: frozenset[CapabilityMode] = frozenset()
+
+    def __post_init__(self) -> None:
+        if self.profile not in {"DEFAULT", "COMPUTE_VERIFY_NO_RETRIEVAL"}:
+            raise ValueError(f"unknown capability policy profile: {self.profile!r}")
+        if any(
+            not isinstance(mode, CapabilityMode)
+            for mode in self.allowed_modes | self.denied_modes
+        ):
+            raise ValueError("capability policy modes must be CapabilityMode values")
+        if self.profile == "COMPUTE_VERIFY_NO_RETRIEVAL":
+            object.__setattr__(
+                self,
+                "denied_capability_ids",
+                self.denied_capability_ids | {"knowledge.search"},
+            )
+            object.__setattr__(
+                self,
+                "denied_tags",
+                self.denied_tags | {"retrieval"},
+            )
+        for allowed, denied, label in (
+            (
+                self.allowed_capability_ids,
+                self.denied_capability_ids,
+                "capability IDs",
+            ),
+            (self.allowed_domains, self.denied_domains, "domains"),
+            (self.allowed_tags, self.denied_tags, "tags"),
+            (self.allowed_modes, self.denied_modes, "modes"),
+        ):
+            overlap = allowed & denied
+            if overlap:
+                raise ValueError(
+                    f"capability policy allows and denies the same {label}: "
+                    + ", ".join(sorted(str(item) for item in overlap))
+                )
+        for value in (
+            *self.allowed_capability_ids,
+            *self.denied_capability_ids,
+            *self.allowed_domains,
+            *self.denied_domains,
+            *self.allowed_tags,
+            *self.denied_tags,
+        ):
+            if not value.strip():
+                raise ValueError("capability policy values must not be blank")
+
+    @property
+    def definition(self) -> dict[str, object]:
+        return {
+            "policy_version": "1",
+            "profile": self.profile,
+            "allowed_capability_ids": sorted(self.allowed_capability_ids),
+            "denied_capability_ids": sorted(self.denied_capability_ids),
+            "allowed_domains": sorted(self.allowed_domains),
+            "denied_domains": sorted(self.denied_domains),
+            "allowed_tags": sorted(self.allowed_tags),
+            "denied_tags": sorted(self.denied_tags),
+            "allowed_modes": sorted(mode.value for mode in self.allowed_modes),
+            "denied_modes": sorted(mode.value for mode in self.denied_modes),
+            "checker_authorization_affected": False,
+        }
+
+    @property
+    def digest(self) -> str:
+        return (
+            "sha256:" + hashlib.sha256(canonicalize_json(self.definition)).hexdigest()
+        )
+
+    def project(
+        self,
+        descriptor: CapabilityDescriptor,
+    ) -> CapabilityDescriptor | None:
+        reasons = self.denial_reasons(descriptor)
+        if reasons:
+            return None
+        visible_modes = tuple(
+            mode
+            for mode in descriptor.modes
+            if (not self.allowed_modes or mode in self.allowed_modes)
+            and mode not in self.denied_modes
+        )
+        if not visible_modes:
+            return None
+        return descriptor.model_copy(update={"modes": visible_modes})
+
+    def denial_reasons(
+        self,
+        descriptor: CapabilityDescriptor,
+        *,
+        mode: CapabilityMode | None = None,
+    ) -> tuple[str, ...]:
+        capability_id = descriptor.capability_id
+        domain = _normalize_domain(_capability_domain(descriptor))
+        tags = {_normalize_domain(tag) for tag in descriptor.tags}
+        reasons: list[str] = []
+        if (
+            self.allowed_capability_ids
+            and capability_id not in self.allowed_capability_ids
+        ):
+            reasons.append("capability_id_not_allowed")
+        if capability_id in self.denied_capability_ids:
+            reasons.append("capability_id_denied")
+        if self.allowed_domains and domain not in {
+            _normalize_domain(value) for value in self.allowed_domains
+        }:
+            reasons.append("domain_not_allowed")
+        if domain in {_normalize_domain(value) for value in self.denied_domains}:
+            reasons.append("domain_denied")
+        normalized_allowed_tags = {
+            _normalize_domain(value) for value in self.allowed_tags
+        }
+        if normalized_allowed_tags and not tags & normalized_allowed_tags:
+            reasons.append("tag_not_allowed")
+        if tags & {_normalize_domain(value) for value in self.denied_tags}:
+            reasons.append("tag_denied")
+        if mode is not None:
+            if self.allowed_modes and mode not in self.allowed_modes:
+                reasons.append("mode_not_allowed")
+            if mode in self.denied_modes:
+                reasons.append("mode_denied")
+        return tuple(reasons)
+
+
 class CapabilityAdapter(Protocol):
     """Operator-installed adapter; registration requires no MCP changes."""
 
@@ -106,9 +253,16 @@ class CapabilityAdapter(Protocol):
 class CapabilityService:
     """Validate, dispatch, trust-check, and remember mathematical operations."""
 
-    def __init__(self, store: ArtifactStore, memory: ResearchMemory) -> None:
+    def __init__(
+        self,
+        store: ArtifactStore,
+        memory: ResearchMemory,
+        *,
+        policy: CapabilityPolicy | None = None,
+    ) -> None:
         self.store = store
         self.memory = memory
+        self.policy = policy or CapabilityPolicy()
         self._adapters: dict[str, CapabilityAdapter] = {}
 
     def register(self, adapter: CapabilityAdapter) -> None:
@@ -142,10 +296,16 @@ class CapabilityService:
         self._adapters[descriptor.capability_id] = adapter
 
     def catalog(self) -> CapabilityCatalog:
+        visible = tuple(
+            projected
+            for name in sorted(self._adapters)
+            if (projected := self.policy.project(self._adapters[name].descriptor))
+            is not None
+        )
         return CapabilityCatalog(
-            capabilities=tuple(
-                self._adapters[name].descriptor for name in sorted(self._adapters)
-            )
+            policy_profile=self.policy.profile,
+            policy_digest=self.policy.digest,
+            capabilities=visible,
         )
 
     def discover(
@@ -154,9 +314,7 @@ class CapabilityService:
     ) -> CapabilityDiscoveryResult:
         """Return compact installed outcomes ordered by deterministic relevance."""
 
-        descriptors = tuple(
-            self._adapters[name].descriptor for name in sorted(self._adapters)
-        )
+        descriptors = self.catalog().capabilities
         available_domains = tuple(
             sorted({_capability_domain(descriptor) for descriptor in descriptors})
         )
@@ -245,12 +403,46 @@ class CapabilityService:
                     ),
                 ),
                 context={
-                    "available_capability_ids": sorted(self._adapters),
+                    "available_capability_ids": [
+                        descriptor.capability_id
+                        for descriptor in self.catalog().capabilities
+                    ],
                 },
             )
             _log_invocation(result, started)
             return result
         descriptor = adapter.descriptor
+        policy_reasons = self.policy.denial_reasons(
+            descriptor,
+            mode=request.mode,
+        )
+        if policy_reasons:
+            result = _resolution_failure(
+                request=request,
+                capability_version=descriptor.version,
+                diagnostic=CapabilityDiagnostic(
+                    code="CAPABILITY_POLICY_DENIED",
+                    stage="capability_policy",
+                    message=(
+                        f"Capability {request.capability_id!r} is denied by the "
+                        "operator-controlled capability policy."
+                    ),
+                    hint=(
+                        "Choose a capability visible in capability.describe, or ask "
+                        "the operator to change the evaluation/runtime policy."
+                    ),
+                    details={
+                        "policy_profile": self.policy.profile,
+                        "policy_digest": self.policy.digest,
+                        "reasons": list(policy_reasons),
+                        "checker_authorization_affected": False,
+                    },
+                ),
+                context={"capability_policy": self.policy.definition},
+            )
+            result = result.model_copy(update=_provider_provenance(descriptor))
+            _log_invocation(result, started)
+            return result
         if request.mode not in descriptor.modes:
             result = _resolution_failure(
                 request=request,
@@ -303,7 +495,17 @@ class CapabilityService:
                         if isinstance(exc, _PayloadValidationError)
                         else _json_value_type(request.input)
                     ),
-                    hint="Call capability.describe and follow the advertised input schema.",
+                    hint=(
+                        "Correct the reported field. The exact required and missing "
+                        "top-level fields are included in diagnostic details."
+                    ),
+                    details={
+                        "required_fields": descriptor.input_schema.get("required", []),
+                        "missing_fields": sorted(
+                            set(descriptor.input_schema.get("required", []))
+                            - set(request.input)
+                        ),
+                    },
                 ),
             )
             _log_invocation(result, started)

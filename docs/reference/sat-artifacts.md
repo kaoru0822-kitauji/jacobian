@@ -258,6 +258,14 @@ requires the source lineage, and materializes a `sat.unsat-proof@1`
 `CertificateEnvelope`. The certificate binds the CNF claim, proof candidate,
 SAT semantics, exact artifact URIs, payload digests, and parents.
 
+Its model-facing output always reports
+`verified_claim_scope: "CANONICAL_CNF_ONLY"`. Acceptance establishes only that
+the exact bound canonical CNF is unsatisfiable. It does not establish that a
+caller-authored CNF correctly encodes a graph property, threshold, coloring
+instance, or other domain claim. Such a claim needs a domain-owned result and
+an operator-authorized domain checker that independently binds or reconstructs
+the encoding.
+
 The capability is installed only when bundled references are enabled and the
 operator authorizes an available DRAT-trim runtime. The supported runtime is
 upstream release `v05.22.2023`, source commit

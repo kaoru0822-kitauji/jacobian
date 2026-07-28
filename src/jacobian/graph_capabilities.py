@@ -24,6 +24,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityRelationship,
     CapabilityRequest,
@@ -33,6 +34,10 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.graph_composition import (
+    GraphExplicitConstructionOutput,
+    GraphExplicitConstructionRequest,
+)
 from jacobian.contracts.graph_degree_sequence import (
     GraphDegreeSequenceClaim,
     GraphDegreeSequenceObstruction,
@@ -55,6 +60,7 @@ from jacobian.contracts.graph_invariants import (
     GraphNeighborhoodIndependenceReplayPayload,
     GraphNeighborhoodIndependenceRequest,
 )
+from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.graph_atlas import graph_atlas_order
 from jacobian.provider_runtime import known_provider_runtime
@@ -167,6 +173,7 @@ def install_graph_capabilities(
     authorize_checker: bool,
 ) -> tuple[
     tuple[
+        GraphExplicitConstructionAdapter,
         GraphAtlasSearchAdapter,
         GraphPropertyAdapter,
         GraphDegreeSequenceAdapter,
@@ -327,6 +334,7 @@ def install_graph_capabilities(
     )
     return (
         (
+            GraphExplicitConstructionAdapter(resources),
             GraphAtlasSearchAdapter(resources),
             GraphPropertyAdapter(resources),
             GraphDegreeSequenceAdapter(resources),
@@ -334,6 +342,144 @@ def install_graph_capabilities(
         ),
         installation,
     )
+
+
+class GraphExplicitConstructionAdapter:
+    """Materialize one caller-supplied graph through the graph domain contract."""
+
+    def __init__(self, resources: GraphCapabilityResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="graph.construct.explicit",
+            version="1",
+            title="Materialize an explicit simple graph",
+            description=(
+                "Validate and canonicalize one bounded explicit finite simple "
+                "undirected graph, then return a domain-owned graph artifact accepted "
+                "by graph capabilities."
+            ),
+            provider="jacobian.networkx",
+            provider_runtime=known_provider_runtime(
+                "jacobian.networkx",
+                features=("simple-undirected-graphs", "canonical-materialization"),
+            ),
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=model_schema(GraphExplicitConstructionRequest),
+            output_schema=model_schema(GraphExplicitConstructionOutput),
+            tags=("graph", "construction", "explicit", "artifact-materialization"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="three-vertex-path",
+                    description=(
+                        "Materialize a path while allowing noncanonical caller order."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input={
+                        "vertices": ["c", "a", "b"],
+                        "edges": [["b", "a"], ["c", "b"]],
+                    },
+                ),
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        started = time.monotonic()
+        try:
+            validated = GraphExplicitConstructionRequest.model_validate(request.input)
+        except ValidationError as exc:
+            raw_errors = exc.errors(include_url=False, include_context=False)
+            errors = [dict(item) for item in raw_errors]
+            path_parts = raw_errors[0]["loc"] if raw_errors else ()
+            path = ".".join(str(item) for item in path_parts) or None
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_EXPLICIT_GRAPH",
+                    stage="graph_input_validation",
+                    message=(
+                        "The complete explicit graph request violates finite "
+                        "simple-undirected-graph semantics."
+                    ),
+                    path=path,
+                    schema_uri=self.resources.graph_schema_uri,
+                    expected=(
+                        "at most 256 unique nonempty string vertices and at most "
+                        "32,640 unique non-loop edges over declared endpoints"
+                    ),
+                    hint=(
+                        "Correct the reported vertices or edges; validation completes "
+                        "before any graph artifact is written."
+                    ),
+                    details={"validation_errors": errors},
+                )
+            ) from exc
+
+        vertices = tuple(sorted(validated.vertices))
+        edges = tuple(
+            sorted(
+                (left, right) if left < right else (right, left)
+                for left, right in validated.edges
+            )
+        )
+        graph = SimpleUndirectedGraph(vertices=vertices, edges=edges)
+        graph_payload = graph.model_dump(mode="json")
+        stored = self.resources.artifacts.put(
+            schema_uri=self.resources.graph_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=graph_payload,
+            summary=(
+                f"explicit simple undirected graph of order {len(vertices)} "
+                f"and size {len(edges)}"
+            ),
+        )
+        output = GraphExplicitConstructionOutput(
+            graph_uri=stored.artifact_uri,
+            graph_object_digest=stored.object_digest,
+            graph_schema_uri=self.resources.graph_schema_uri,
+            graph_semantics_uri=self.resources.semantics_uri,
+            graph=graph,
+            order=len(vertices),
+            size=len(edges),
+        )
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=_runtime_ms(started),
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="the complete caller-supplied finite simple graph",
+                parameters={
+                    "order": len(vertices),
+                    "size": len(edges),
+                    "graph_schema_uri": self.resources.graph_schema_uri,
+                    "graph_semantics_uri": self.resources.semantics_uri,
+                },
+                artifact_uri=stored.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.COMPLETE,
+                basis=(
+                    "the complete validated vertex and edge sets were canonically "
+                    "materialized"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "domain contract validation and deterministic canonicalization; "
+                    "no mathematical property was asserted"
+                ),
+            ),
+            artifact_uris=(stored.artifact_uri,),
+        )
 
 
 class GraphAtlasSearchAdapter:
@@ -1175,7 +1321,10 @@ def _load_graph(resources: GraphCapabilityResources, graph_uri: str) -> nx.Graph
                 stage="graph_resolution",
                 message="The requested graph artifact is unavailable.",
                 path="graph_uri",
-                hint="Use a graph URI returned by graph.search.atlas.",
+                hint=(
+                    "Use a graph URI returned by graph.construct.explicit, "
+                    "graph.search.atlas, or another graph-domain producer."
+                ),
             )
         ) from exc
     if (
@@ -1190,7 +1339,10 @@ def _load_graph(resources: GraphCapabilityResources, graph_uri: str) -> nx.Graph
                 message="The artifact is not a compatible simple undirected graph.",
                 path="graph_uri",
                 schema_uri=resources.graph_schema_uri,
-                hint="Use a graph URI returned by graph.search.atlas.",
+                hint=(
+                    "Use a graph URI returned by graph.construct.explicit, "
+                    "graph.search.atlas, or another graph-domain producer."
+                ),
             )
         )
     payload = artifact.payload

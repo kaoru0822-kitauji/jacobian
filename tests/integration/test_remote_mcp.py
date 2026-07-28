@@ -296,7 +296,9 @@ async def _remote_tenant_scenario(port: int) -> None:
             httpx2.AsyncClient(
                 headers={"Authorization": f"Bearer {token}"},
                 trust_env=False,
-                timeout=30,
+                # The first request constructs the tenant's complete capability
+                # kernel; keep transport tolerance separate from backend budgets.
+                timeout=60,
             ) as http,
             Client(
                 streamable_http_client(url, http_client=http),

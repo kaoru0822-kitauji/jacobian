@@ -590,6 +590,11 @@ def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
     assert diagnostic.actual_type == "string"
     assert diagnostic.expected == "JSON type integer"
     assert "fixture-secret-value" not in diagnostic.message
+    assert diagnostic.details == {
+        "required_fields": ["value"],
+        "missing_fields": [],
+    }
+    assert "fixture-secret-value" not in repr(diagnostic)
 
 
 @pytest.mark.integration

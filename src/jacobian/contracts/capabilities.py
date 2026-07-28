@@ -56,7 +56,7 @@ class CapabilityDiscoveryRequest(ContractModel):
         pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
     )
     mode: CapabilityMode | None = None
-    limit: int = Field(default=10, ge=1, le=50, strict=True)
+    limit: int = Field(default=5, ge=1, le=20, strict=True)
     cursor: CapabilityId | None = None
 
     @model_validator(mode="after")
@@ -433,6 +433,7 @@ class CapabilityDiagnostic(ContractModel):
     expected: str | None = Field(default=None, max_length=1024)
     actual_type: str | None = Field(default=None, max_length=128)
     hint: str | None = Field(default=None, max_length=1024)
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class CapabilityResult(ContractModel):
@@ -519,4 +520,6 @@ class CapabilityResult(ContractModel):
 
 class CapabilityCatalog(ContractModel):
     catalog_version: Literal["1"] = "1"
+    policy_profile: str = Field(min_length=1, max_length=64)
+    policy_digest: Sha256Digest
     capabilities: tuple[CapabilityDescriptor, ...]

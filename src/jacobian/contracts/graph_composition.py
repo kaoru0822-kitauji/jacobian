@@ -22,9 +22,11 @@ from __future__ import annotations
 
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, StrictInt, model_validator
 
-from jacobian.contracts.common import ArtifactUri
+from jacobian.contracts.common import ArtifactUri, Sha256Digest
+from jacobian.contracts.graph_coloring import GraphVertex
+from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.contracts.results import ContractModel
 
 #: Operations supported by ``graph.construct.compose``.
@@ -37,6 +39,49 @@ CompositionOperation = Literal[
 
 #: Unary operations that consume only the left graph.
 _UNARY_OPERATIONS: frozenset[str] = frozenset({"COMPLEMENT"})
+
+
+class GraphExplicitConstructionRequest(ContractModel):
+    """One bounded explicit simple-undirected-graph materialization request.
+
+    Edge orientation and input order are immaterial. The producer emits one
+    canonical payload with sorted vertices and sorted ascending endpoint pairs.
+    """
+
+    vertices: tuple[GraphVertex, ...] = Field(max_length=256)
+    edges: tuple[tuple[GraphVertex, GraphVertex], ...] = Field(max_length=32640)
+
+    @model_validator(mode="after")
+    def require_bounded_simple_graph(self) -> Self:
+        vertex_set = set(self.vertices)
+        if len(vertex_set) != len(self.vertices):
+            raise ValueError("graph vertices must be unique")
+        if any(left == right for left, right in self.edges):
+            raise ValueError("graph edges must not contain self-loops")
+        if any(
+            left not in vertex_set or right not in vertex_set
+            for left, right in self.edges
+        ):
+            raise ValueError("graph edges must reference declared vertices")
+        normalized = {tuple(sorted(edge)) for edge in self.edges}
+        if len(normalized) != len(self.edges):
+            raise ValueError("graph edges must be unique ignoring orientation")
+        return self
+
+
+class GraphExplicitConstructionOutput(ContractModel):
+    """Canonical graph artifact produced from one completely validated request."""
+
+    graph_uri: ArtifactUri
+    graph_object_digest: Sha256Digest
+    graph_schema_uri: ArtifactUri
+    graph_semantics_uri: ArtifactUri
+    graph: SimpleUndirectedGraph
+    order: StrictInt = Field(ge=0, le=256)
+    size: StrictInt = Field(ge=0, le=32640)
+    canonicalization: Literal["SORTED_VERTICES_ASCENDING_ENDPOINT_EDGES"] = (
+        "SORTED_VERTICES_ASCENDING_ENDPOINT_EDGES"
+    )
 
 
 class GraphCompositionRequest(ContractModel):

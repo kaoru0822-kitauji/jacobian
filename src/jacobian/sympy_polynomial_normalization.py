@@ -30,6 +30,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.polynomial_expressions import (
     SYMPY_POLYNOMIAL_NORMALIZATION_CONFIGURATION,
+    PolynomialExpansionTermBudgetError,
     PolynomialExpressionNormalizeOutput,
     PolynomialExpressionNormalizeRequest,
 )
@@ -236,6 +237,47 @@ class SympyPolynomialExpressionNormalizeAdapter:
             ).artifact_uri
             resolved = self.expressions.resolve_expression(expression_uri)
         except (ValidationError, ValueError) as exc:
+            budget_error = _expansion_budget_error(exc)
+            if budget_error is not None:
+                raise CapabilityInvocationError(
+                    CapabilityDiagnostic(
+                        code="EXPANSION_TERM_BUDGET_EXCEEDED",
+                        stage="bounded_normalization",
+                        message=(
+                            "The typed expression has a conservatively proven "
+                            "expansion larger than the hard normalization term budget."
+                        ),
+                        path="expression.expression",
+                        schema_uri=(
+                            self.expressions.installation.expression_schema_uri
+                        ),
+                        expected=(
+                            f"expanded term upper bound at most {budget_error.limit}"
+                        ),
+                        hint=(
+                            "Keep the expression factored and use an operation that "
+                            "does not require full sparse expansion, or split the "
+                            "calculation into smaller exact polynomial expressions."
+                        ),
+                        details={
+                            "limit": budget_error.limit,
+                            "estimated_expanded_terms_upper_bound": (
+                                budget_error.estimated_expanded_terms_upper_bound
+                            ),
+                            "bound_kind": "CONSERVATIVE_UPPER_BOUND",
+                            "requested_exponent": budget_error.requested_exponent,
+                            "retryable_with_same_input": False,
+                            "alternatives": [
+                                "use a factored symbolic operation",
+                                "split the expression before normalization",
+                                "use a domain capability with bounded coefficient access",
+                            ],
+                            "normalization_uri": None,
+                            "checker_input_available": False,
+                        },
+                    )
+                ) from exc
+            validation_errors = _validation_errors(exc)
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_TYPED_POLYNOMIAL_EXPRESSION",
@@ -252,6 +294,7 @@ class SympyPolynomialExpressionNormalizeAdapter:
                         "Declare every variable and use typed nodes; do not pass "
                         "formula strings or expression denominators."
                     ),
+                    details={"validation_errors": validation_errors},
                 )
             ) from exc
 
@@ -431,6 +474,35 @@ def _failure(
         runtime_ms=_runtime_ms(started),
         detail=detail,
     )
+
+
+def _expansion_budget_error(
+    error: ValidationError | ValueError,
+) -> PolynomialExpansionTermBudgetError | None:
+    if isinstance(error, PolynomialExpansionTermBudgetError):
+        return error
+    if isinstance(error, ValidationError):
+        for item in error.errors():
+            context = item.get("ctx")
+            nested = context.get("error") if isinstance(context, dict) else None
+            if isinstance(nested, PolynomialExpansionTermBudgetError):
+                return nested
+    return None
+
+
+def _validation_errors(error: ValidationError | ValueError) -> list[dict[str, Any]]:
+    if isinstance(error, ValidationError):
+        return [
+            dict(item)
+            for item in error.errors(include_url=False, include_context=False)
+        ]
+    return [
+        {
+            "type": type(error).__name__,
+            "loc": ["expression"],
+            "msg": str(error),
+        }
+    ]
 
 
 def _runtime_ms(started: float) -> int:

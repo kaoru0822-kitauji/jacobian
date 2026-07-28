@@ -11,8 +11,8 @@ SERVER_INSTRUCTIONS = (
     "When a task involves exact computation, structure discovery, transformation, "
     "bounded search, counterexample generation, formal-environment inspection, or "
     "independent checking, begin with capability.describe. You do not need to know a "
-    "capability ID. Search for any mathematical outcomes or concepts that may help, "
-    "inspect exact contracts, and compose capability.invoke calls as you judge useful. "
+    "capability ID. Start discovery with limit 5, inspect only the strongest one or "
+    "two relevant contracts, and compose capability.invoke calls as you judge useful. "
     "Jacobian does not choose the task decomposition or research strategy. "
     "Direct workspace.* tools publish their own input shape and do not use capability "
     "discovery. EXPLORE returns proposed, heuristic, or computed evidence; use VERIFY "
@@ -34,7 +34,8 @@ inspection, or independent checking. You do not need to know a capability ID.
 
 Discovery:
 - Pass `query` to rank compact installed outcomes by mathematical intent.
-- Optionally filter with `domain` and `mode`; `limit` is between 1 and 50.
+- Optionally filter with `domain` and `mode`; `limit` is between 1 and 20 and
+  defaults to 5.
 - Omit all arguments to browse a compact installed catalog.
 - When `next_cursor` is present, pass it back with the same filters and limit to
   continue without loading the complete catalog.
@@ -49,7 +50,7 @@ Exact inspection:
   identity, and validated invocation examples.
 
 Examples:
-- `{"query":"find a counterexample to associativity","domain":"universal_algebra","mode":"EXPLORE","limit":10}`
+- `{"query":"find a counterexample to associativity","domain":"universal_algebra","mode":"EXPLORE","limit":5}`
 - `{"query":"verify a polynomial identity","mode":"VERIFY","limit":5}`
 - `{"capability_id":"polynomial.compute.gcd"}`
 """
@@ -97,7 +98,8 @@ Search with `capability.describe(query=...)`, optionally filtered by `domain` an
 `mode`. Results are compact candidates ranked by deterministic matches against
 published descriptor metadata; `matched_on` and `matched_terms` make that retrieval
 visible. Ranking is not a recommendation. Follow `next_cursor` with unchanged
-filters and limit when a discovery result is truncated.
+filters and limit when a discovery result is truncated. Start with `limit=5`; inspect
+only the strongest one or two relevant candidates before broadening or paging.
 
 Search as many outcomes, concepts, or domains as useful. For any candidate, call
 `capability.describe(capability_id=...)` with only its exact ID, then follow the

@@ -11,6 +11,7 @@ import json
 import re
 from collections.abc import Callable
 from fractions import Fraction
+from itertools import combinations
 from typing import Any
 
 import flint
@@ -636,7 +637,113 @@ def check_matrix_smith_normal_form(request: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _induced_tree_maximum(
+    source: dict[str, Any],
+    result: dict[str, Any],
+) -> bool:
+    graph = source.get("graph")
+    if not isinstance(graph, dict):
+        raise ValueError("graph optimization input is malformed")
+    vertices = graph.get("vertices")
+    edges = graph.get("edges")
+    if (
+        graph.get("graph_schema_version") != "1"
+        or not isinstance(vertices, list)
+        or len(vertices) > 16
+        or not all(isinstance(vertex, str) and vertex for vertex in vertices)
+        or len(vertices) != len(set(vertices))
+        or not isinstance(edges, list)
+    ):
+        raise ValueError("graph lies outside the exhaustive checker scope")
+    vertex_set = set(vertices)
+    normalized_edges: set[tuple[str, str]] = set()
+    for edge in edges:
+        if (
+            not isinstance(edge, list)
+            or len(edge) != 2
+            or not all(isinstance(endpoint, str) for endpoint in edge)
+            or edge[0] == edge[1]
+            or edge[0] not in vertex_set
+            or edge[1] not in vertex_set
+        ):
+            raise ValueError("graph edge payload is malformed")
+        normalized_edges.add(tuple(sorted((edge[0], edge[1]))))
+    if len(normalized_edges) != len(edges):
+        raise ValueError("graph edge payload contains duplicates")
+
+    adjacency = {vertex: set[str]() for vertex in vertices}
+    for left, right in normalized_edges:
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+
+    def is_induced_tree(candidate: tuple[str, ...]) -> bool:
+        if not candidate:
+            return False
+        selected = set(candidate)
+        edge_count = sum(
+            1
+            for left, right in normalized_edges
+            if left in selected and right in selected
+        )
+        if edge_count != len(candidate) - 1:
+            return False
+        reached = {candidate[0]}
+        frontier = [candidate[0]]
+        while frontier:
+            current = frontier.pop()
+            for neighbor in adjacency[current] & selected:
+                if neighbor not in reached:
+                    reached.add(neighbor)
+                    frontier.append(neighbor)
+        return len(reached) == len(candidate)
+
+    claimed = result.get("optimum_value")
+    witness = result.get("witness_vertices")
+    if (
+        result.get("status") != "EXACT"
+        or result.get("convention") != "NONEMPTY_CONNECTED_ACYCLIC_EMPTY_SOURCE_ZERO"
+        or type(claimed) is not int
+        or claimed < 0
+        or claimed > len(vertices)
+        or result.get("order") != len(vertices)
+        or result.get("incumbent_value") != claimed
+        or result.get("lower_bound") != claimed
+        or result.get("upper_bound") != claimed
+        or not isinstance(witness, list)
+        or len(witness) != claimed
+        or not all(isinstance(vertex, str) for vertex in witness)
+        or len(witness) != len(set(witness))
+        or any(vertex not in vertex_set for vertex in witness)
+    ):
+        return False
+    if claimed == 0:
+        if vertices or witness:
+            return False
+    elif not is_induced_tree(tuple(witness)):
+        return False
+
+    actual = 0
+    for cardinality in range(len(vertices), 0, -1):
+        if any(
+            is_induced_tree(candidate)
+            for candidate in combinations(vertices, cardinality)
+        ):
+            actual = cardinality
+            break
+    return actual == claimed
+
+
+def check_graph_induced_tree_maximum(request: dict[str, Any]) -> dict[str, Any]:
+    return _run(
+        request,
+        operation_id="graph.induced_tree.maximum.compute",
+        witness_format="graph.induced-tree.maximum.exhaustive-replay",
+        replay=_induced_tree_maximum,
+    )
+
+
 __all__ = [
+    "check_graph_induced_tree_maximum",
     "check_matrix_characteristic_polynomial",
     "check_matrix_nullspace",
     "check_matrix_rref",

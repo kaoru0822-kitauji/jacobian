@@ -575,7 +575,8 @@ class SatUnsatProofVerificationAdapter:
             description=(
                 "Independently replay exact normalized text DRAT against its bound "
                 "canonical CNF in operator-authorized pinned DRAT-trim, establishing "
-                "certified exhaustive nonexistence only when accepted."
+                "UNSAT for that canonical CNF only when accepted. This verifier does "
+                "not certify any graph, coloring, or other domain encoding."
             ),
             provider="drat-trim",
             provider_runtime=descriptor_runtime,
@@ -691,6 +692,7 @@ class SatUnsatProofVerificationAdapter:
                 else "the proof was not independently accepted"
             )
         output = SatUnsatProofVerificationOutput(
+            verified_claim_scope="CANONICAL_CNF_ONLY",
             status=status,
             conclusion="TRUE" if verified else "UNKNOWN",
             cnf_uri=resolved.cnf_artifact.artifact_uri,
@@ -728,7 +730,8 @@ class SatUnsatProofVerificationAdapter:
             scope=CapabilityScope(
                 description="the full exact canonical CNF bound by the raw proof",
                 parameters={
-                    "declared_scope": "FULL_CNF",
+                    "declared_scope": "CANONICAL_CNF_ONLY",
+                    "domain_encoding_verified": False,
                     "variable_count": resolved.proof.cnf.variable_count,
                     "clause_count": resolved.proof.cnf.clause_count,
                     "proof_format": resolved.proof.proof_format,
