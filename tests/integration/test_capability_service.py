@@ -587,6 +587,8 @@ def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
     assert diagnostic.message == (
         "The capability input does not match its advertised schema at value."
     )
+    assert diagnostic.actual_type == "string"
+    assert diagnostic.expected == "JSON type integer"
     assert "fixture-secret-value" not in diagnostic.message
 
 

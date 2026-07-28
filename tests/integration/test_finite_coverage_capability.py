@@ -108,6 +108,29 @@ def test_finite_coverage_supports_registered_integer_canonicalizer(tmp_path) -> 
     assert result.output["canonicalizer_id"] == "finite.integer.decimal@1"
 
 
+def test_finite_coverage_unknown_canonicalizer_reports_precise_schema_error(
+    tmp_path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        _request(
+            ["alpha"],
+            [["alpha"]],
+            canonicalizer_id="finite.unknown@1",
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    diagnostic = result.diagnostics[0]
+    assert diagnostic.code == "INVALID_REQUEST"
+    assert diagnostic.path == "canonicalizer_id"
+    assert diagnostic.actual_type == "string"
+    assert diagnostic.expected == (
+        'one of: "finite.integer.decimal@1", "finite.string.nfc@1"'
+    )
+
+
 def test_finite_coverage_rejects_nfc_collisions_in_scope(tmp_path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 

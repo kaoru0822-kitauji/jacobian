@@ -306,16 +306,27 @@ class PolynomialExpressionNormalizationVerificationAdapter:
                 artifact_uri=resolved.expression_artifact.artifact_uri,
             ),
             completeness=CapabilityCompleteness(
-                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if verified
+                    else CapabilityCompletenessStatus.NOT_APPLICABLE
+                ),
                 basis=(
-                    "direct exact replay covers the full finite AST relation; no "
-                    "search or enumeration claim is made"
+                    "the independent checker replayed every node and canonical "
+                    "coefficient of the bound finite AST relation"
+                    if verified
+                    else "direct exact replay makes no accepted completeness claim"
                 ),
                 assurance_level=(
-                    CapabilityAssuranceLevel.COMPUTED
-                    if checked.execution.status is ExecutionStatus.COMPLETED
-                    else CapabilityAssuranceLevel.HEURISTIC
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else (
+                        CapabilityAssuranceLevel.COMPUTED
+                        if checked.execution.status is ExecutionStatus.COMPLETED
+                        else CapabilityAssuranceLevel.HEURISTIC
+                    )
                 ),
+                verification_record_uri=record_uri,
             ),
             assurance=CapabilityAssurance(
                 level=(
