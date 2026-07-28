@@ -111,6 +111,10 @@ _DIRECT_ELABORATION_OPTIONS = (
     LeanElaborationOption(name="pp.universes", value="true"),
 )
 _LEAN_NAME = re.compile(r"\b[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z0-9_']+)*\b")
+_LEAN_MESSAGE_KIND = re.compile(
+    r"(?:^|:\s*)(error|warning|info)(?:\([^)]*\))?:",
+    re.IGNORECASE,
+)
 _LEAN_KEYWORDS = frozenset(
     {
         "Prop",
@@ -185,7 +189,9 @@ def _elaborate_proposition(
     )
     output = _execute_lean_source(source, timeout_seconds=timeout_seconds)
     messages = tuple(_parse_lean_messages(output))
-    errors = tuple(message for message in messages if "error:" in message.lower())
+    errors = tuple(
+        message for message in messages if _lean_message_severity(message) == "ERROR"
+    )
     expression = None if errors else _parse_elaborated_expression(output)
     if not errors and expression is None:
         errors = ("error: Lean did not emit the elaborated proposition",)
@@ -237,7 +243,9 @@ def _run_lean_source(
 ) -> _ElaborationResult:
     output = _execute_lean_source(source, timeout_seconds=timeout_seconds)
     messages = _parse_lean_messages(output)
-    errors = tuple(m for m in messages if "error:" in m.lower())
+    errors = tuple(
+        message for message in messages if _lean_message_severity(message) == "ERROR"
+    )
     elaborates = len(errors) == 0
     return _ElaborationResult(
         elaborates=elaborates,
@@ -269,10 +277,17 @@ def _execute_lean_source(source: str, *, timeout_seconds: int) -> str:
 
 
 def _parse_elaborated_expression(output: str) -> str | None:
-    match = re.search(r"\binfo:\s*(.+?)\s*:\s*Prop(?:\s|$)", output, re.DOTALL)
-    if match is None:
+    diagnostic_match = re.search(
+        r"\binfo:\s*(.+?)\s*:\s*Prop(?:\s|$)", output, re.DOTALL
+    )
+    if diagnostic_match is not None:
+        return " ".join(diagnostic_match.group(1).split())
+    # Lean's command-line frontend emits successful ``#check`` output as the
+    # bare ``<expression> : Prop`` line.  It does not add an ``info:`` prefix.
+    plain_match = re.fullmatch(r"\s*(.+?)\s*:\s*Prop\s*", output, re.DOTALL)
+    if plain_match is None:
         return None
-    return " ".join(match.group(1).split())
+    return " ".join(plain_match.group(1).split())
 
 
 def _parse_lean_messages(output: str) -> list[str]:
@@ -282,23 +297,40 @@ def _parse_lean_messages(output: str) -> list[str]:
         if not stripped:
             continue
         if re.match(
-            r"^.*:\d+:\d+:\s*(error|warning|info):", stripped
-        ) or stripped.lower().startswith(("error:", "warning:", "info:")):
+            r"^.*:\d+:\d+:\s*(error|warning|info)(?:\([^)]*\))?:",
+            stripped,
+            re.IGNORECASE,
+        ) or re.match(
+            r"^(error|warning|info)(?:\([^)]*\))?:",
+            stripped,
+            re.IGNORECASE,
+        ):
             messages.append(stripped)
     return messages
+
+
+def _lean_message_severity(
+    message: str,
+) -> Literal["ERROR", "WARNING", "INFO"]:
+    match = _LEAN_MESSAGE_KIND.search(message)
+    if match is None:
+        return "INFO"
+    kind = match.group(1).lower()
+    if kind == "error":
+        return "ERROR"
+    if kind == "warning":
+        return "WARNING"
+    return "INFO"
 
 
 def _diagnostics(messages: tuple[str, ...]) -> tuple[LeanElaborationDiagnostic, ...]:
     diagnostics: list[LeanElaborationDiagnostic] = []
     for message in messages:
-        lowered = message.lower()
-        severity: Literal["ERROR", "WARNING", "INFO"] = (
-            "ERROR"
-            if "error:" in lowered
-            else ("WARNING" if "warning:" in lowered else "INFO")
-        )
         diagnostics.append(
-            LeanElaborationDiagnostic(severity=severity, message=message)
+            LeanElaborationDiagnostic(
+                severity=_lean_message_severity(message),
+                message=message,
+            )
         )
     return tuple(diagnostics)
 
