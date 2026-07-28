@@ -18,6 +18,7 @@ from jacobian.contracts.validated_analysis import (
     ArbPointEnclosureRequest,
     ArbPointEnclosureResult,
 )
+from jacobian.domains._examples import example
 from jacobian.operations import (
     BoundedSearchIncomplete,
     BoundedSearchInterrupted,
@@ -182,6 +183,7 @@ POINT_ENCLOSURE_CAPABILITIES = (
             "the declared bounded execution"
         ),
         tags=("analysis", "validated", "arb", "enclosure", "bounded"),
+        invocation_examples=(example("sqrt_zero", "Enclose sqrt(0) at 32-bit precision.", {"function": "SQRT", "argument": {"num": "0", "den": "1"}, "precision_bits": 32, "wall_seconds": 1}),),
     ),
 )
 
