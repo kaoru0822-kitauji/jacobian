@@ -34,6 +34,7 @@ from jacobian.contracts.matrices import (
     MatrixHermiteNormalFormRequest,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.flint_hnf_worker import FLINT_HNF_WORKER_PROTOCOL
 from jacobian.matrix_normal_forms import MatrixNormalFormArtifactService
 from jacobian.provider_runtime import (
@@ -182,6 +183,7 @@ class PythonFlintHermiteNormalFormAdapter:
                 "exact",
                 "python-flint",
             ),
+            invocation_examples=(example("unit_matrix", "Compute the row HNF of the one-by-one unit matrix.", {"matrix": {"entries": [["1"]]}}),),
         )
 
     @property
