@@ -15,6 +15,7 @@ from jacobian.contracts.number_theory import (
     DiscreteLogarithmResult,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.operations import (
     BoundedSearchOperation,
     BoundedSearchOutcome,
@@ -160,4 +161,5 @@ DISCRETE_LOGARITHM_CAPABILITY = BoundedSearchOperation(
     obligation=_obligation,
     incomplete_basis="the bounded worker did not establish a conclusion",
     tags=("number-theory", "modular", "discrete-logarithm", "bounded", "sympy"),
+    invocation_examples=(example("two_to_one_mod_three", "Solve 2^x = 1 modulo 3.", {"base": 2, "target": 1, "modulus": 3, "resource_budget": {"wall_seconds": 1}}),),
 )
