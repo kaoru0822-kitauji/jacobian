@@ -12,7 +12,6 @@ STATE_URI = "artifact://sha256/" + "a" * 64
 DIGEST = "sha256:" + "b" * 64
 
 
-@pytest.mark.contract
 def test_state_request_accepts_uri_without_replacement_source() -> None:
     request = LeanProofStateRequest(state_uri=STATE_URI, tactic="constructor")
 
@@ -20,7 +19,6 @@ def test_state_request_accepts_uri_without_replacement_source() -> None:
     assert request.proof_prefix == ()
 
 
-@pytest.mark.contract
 def test_state_request_rejects_uri_with_replacement_prefix() -> None:
     with pytest.raises(ValidationError, match="cannot be combined"):
         LeanProofStateRequest(
@@ -30,7 +28,6 @@ def test_state_request_rejects_uri_with_replacement_prefix() -> None:
         )
 
 
-@pytest.mark.contract
 def test_state_artifact_binds_completion_to_normalized_goals() -> None:
     with pytest.raises(ValidationError, match="completion"):
         LeanProofStateArtifact(

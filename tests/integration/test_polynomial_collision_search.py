@@ -42,7 +42,6 @@ def _request(exponent: int) -> CapabilityRequest:
     )
 
 
-@pytest.mark.integration
 def test_collision_search_returns_first_deterministic_candidate(
     tmp_path: Path,
 ) -> None:
@@ -62,7 +61,6 @@ def test_collision_search_returns_first_deterministic_candidate(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
-@pytest.mark.integration
 def test_collision_search_reports_partial_grid_after_early_collision(
     tmp_path: Path,
 ) -> None:
@@ -108,7 +106,6 @@ def test_collision_search_reports_partial_grid_after_early_collision(
     assert relationship_artifacts <= set(result.artifact_uris)
 
 
-@pytest.mark.integration
 def test_collision_search_reports_exact_completed_not_found_scope(
     tmp_path: Path,
 ) -> None:
@@ -131,7 +128,6 @@ def test_collision_search_reports_exact_completed_not_found_scope(
     )
 
 
-@pytest.mark.integration
 def test_collision_search_validates_grid_bound_before_artifact_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

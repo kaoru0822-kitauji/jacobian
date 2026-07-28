@@ -57,7 +57,6 @@ def _binding(*, variable_count: int = 2) -> SatCnfBinding:
     )
 
 
-@pytest.mark.contract
 def test_cnf_canonicalization_normalizes_map_literals_clauses_and_tautologies() -> None:
     first = canonicalize_cnf(
         variable_names=("b", "a"),
@@ -79,7 +78,6 @@ def test_cnf_canonicalization_normalizes_map_literals_clauses_and_tautologies() 
     assert first.dimacs_digest.startswith("sha256:")
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize(
     ("mutation", "message"),
     (
@@ -116,7 +114,6 @@ def test_canonical_cnf_rejects_noncanonical_or_misbound_payloads(
         CanonicalCnf.model_validate(payload)
 
 
-@pytest.mark.contract
 def test_cnf_canonicalization_rejects_invalid_variable_maps_and_literals() -> None:
     with pytest.raises(ValueError, match="variable names must be unique"):
         canonicalize_cnf(variable_names=("x", "x"), clauses=((1,),))
@@ -126,7 +123,6 @@ def test_cnf_canonicalization_rejects_invalid_variable_maps_and_literals() -> No
         canonicalize_cnf(variable_names=("x",), clauses=((2,),))
 
 
-@pytest.mark.contract
 def test_assignment_is_total_strict_and_cannot_claim_verification() -> None:
     assignment = SatAssignmentArtifact(
         cnf=_binding(),
@@ -152,7 +148,6 @@ def test_assignment_is_total_strict_and_cannot_claim_verification() -> None:
         SatAssignmentArtifact.model_validate(payload)
 
 
-@pytest.mark.contract
 def test_assignment_and_proof_require_an_available_exact_producer() -> None:
     unavailable = _producer().model_copy(
         update={
@@ -184,7 +179,6 @@ def test_assignment_and_proof_require_an_available_exact_producer() -> None:
         SatProofArtifact.model_validate(proof)
 
 
-@pytest.mark.contract
 def test_proof_preserves_exact_bytes_and_rejects_digest_or_encoding_mutation() -> None:
     proof = SatProofArtifact.from_bytes(
         cnf=_binding(),
@@ -208,7 +202,6 @@ def test_proof_preserves_exact_bytes_and_rejects_digest_or_encoding_mutation() -
         SatProofArtifact.model_validate(payload)
 
 
-@pytest.mark.contract
 def test_binding_and_budget_fields_are_required_and_fail_closed() -> None:
     assignment = SatAssignmentArtifact(
         cnf=_binding(),
@@ -235,7 +228,6 @@ def test_binding_and_budget_fields_are_required_and_fail_closed() -> None:
         SatAssignmentArtifact.model_validate(assignment)
 
 
-@pytest.mark.contract
 def test_exploration_request_exposes_only_enforced_budget_fields() -> None:
     request = SatExplorationRequest.model_validate(
         {
@@ -270,7 +262,6 @@ def test_exploration_request_exposes_only_enforced_budget_fields() -> None:
         )
 
 
-@pytest.mark.contract
 def test_exploration_outputs_never_project_a_solver_status_as_a_conclusion() -> None:
     model = SatModelFindOutput(
         status="NO_ASSIGNMENT_PRODUCED",

@@ -26,7 +26,6 @@ from jacobian.store import ArtifactNotFoundError
 from jacobian.workspaces import WorkspaceNotFoundError
 
 
-@pytest.mark.integration
 def test_static_tokens_bind_distinct_authenticated_subjects() -> None:
     verifier = StaticTokenVerifier(
         (
@@ -44,7 +43,6 @@ def test_static_tokens_bind_distinct_authenticated_subjects() -> None:
     assert unknown is None
 
 
-@pytest.mark.integration
 def test_remote_configuration_errors_name_the_rule_and_recovery(
     tmp_path: Path,
 ) -> None:
@@ -142,7 +140,6 @@ def test_remote_configuration_errors_name_the_rule_and_recovery(
         load_static_token_file(token_file)
 
 
-@pytest.mark.integration
 def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
     router = TenantKernelRouter(
         tmp_path,
@@ -166,7 +163,6 @@ def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
         beta.store.get(stored)
 
 
-@pytest.mark.integration
 def test_tenant_router_isolates_epistemic_workspaces(tmp_path: Path) -> None:
     router = TenantKernelRouter(tmp_path, install_references=False)
     alpha = router.kernel_for("alpha")
@@ -189,7 +185,6 @@ def test_tenant_router_isolates_epistemic_workspaces(tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.integration
 def test_token_file_is_strict_and_remote_cli_fails_closed(
     tmp_path: Path,
 ) -> None:
@@ -227,7 +222,6 @@ def test_token_file_is_strict_and_remote_cli_fails_closed(
     assert "require --auth-tokens-file" in completed.stderr
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_authenticated_streamable_http_isolates_tenant_memory(
     tmp_path: Path,

@@ -290,7 +290,6 @@ class MisboundVerifiedAdapter:
         )
 
 
-@pytest.mark.integration
 def test_external_adapter_invocation_is_recorded_and_retrievable(
     tmp_path: Path,
 ) -> None:
@@ -314,7 +313,6 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
 
 
-@pytest.mark.integration
 def test_installed_capability_discovery_is_compact_deterministic_and_transparent(
     tmp_path: Path,
 ) -> None:
@@ -387,7 +385,6 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
     assert "fixture_graph" in first.available_domains
 
 
-@pytest.mark.integration
 def test_capability_registration_rejects_an_invalid_invocation_example(
     tmp_path: Path,
 ) -> None:
@@ -423,7 +420,6 @@ def test_capability_registration_rejects_an_invalid_invocation_example(
         kernel.register_capability(adapter)
 
 
-@pytest.mark.integration
 def test_knowledge_search_filters_episode_domain_tags_and_failures(
     tmp_path: Path,
 ) -> None:
@@ -492,7 +488,6 @@ def test_knowledge_search_filters_episode_domain_tags_and_failures(
     assert result.output["index_snapshot"].startswith("sha256:")
 
 
-@pytest.mark.integration
 def test_knowledge_search_reports_snapshot_bounded_partial_results(
     tmp_path: Path,
 ) -> None:
@@ -528,7 +523,6 @@ def test_knowledge_search_reports_snapshot_bounded_partial_results(
     assert result.output["completeness"] == "PARTIAL"
 
 
-@pytest.mark.integration
 def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
 
@@ -550,7 +544,6 @@ def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None
     assert result.output["available_capability_ids"]
 
 
-@pytest.mark.integration
 def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     kernel.register_capability(ComputedAdapter())
@@ -569,7 +562,6 @@ def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> No
     assert result.output["available_modes"] == ["EXPLORE"]
 
 
-@pytest.mark.integration
 def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     kernel.register_capability(ComputedAdapter())
@@ -597,7 +589,6 @@ def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
     assert "fixture-secret-value" not in repr(diagnostic)
 
 
-@pytest.mark.integration
 def test_adapter_failure_does_not_expose_internal_exception_text(
     tmp_path: Path,
 ) -> None:
@@ -624,7 +615,6 @@ def test_adapter_failure_does_not_expose_internal_exception_text(
     assert "RuntimeError" not in result.execution.detail
 
 
-@pytest.mark.integration
 def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     kernel.register_capability(ForgedProviderAdapter())
@@ -641,7 +631,6 @@ def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.integration
 def test_external_adapter_loads_from_an_operator_entrypoint(tmp_path: Path) -> None:
     kernel = JacobianKernel(
         tmp_path,
@@ -660,7 +649,6 @@ def test_external_adapter_loads_from_an_operator_entrypoint(tmp_path: Path) -> N
     assert result.output == {"value": 5}
 
 
-@pytest.mark.integration
 def test_adapter_cannot_promote_without_a_local_verification_record(
     tmp_path: Path,
 ) -> None:
@@ -677,7 +665,6 @@ def test_adapter_cannot_promote_without_a_local_verification_record(
         )
 
 
-@pytest.mark.integration
 def test_first_class_relationship_endpoints_must_be_exposed(
     tmp_path: Path,
 ) -> None:
@@ -693,7 +680,6 @@ def test_first_class_relationship_endpoints_must_be_exposed(
         )
 
 
-@pytest.mark.integration
 def test_verified_relationship_must_match_checker_selected_endpoints(
     tmp_path: Path,
 ) -> None:
@@ -734,7 +720,6 @@ def test_verified_relationship_must_match_checker_selected_endpoints(
         )
 
 
-@pytest.mark.integration
 def test_verified_relationship_must_match_checker_selected_obligation(
     tmp_path: Path,
 ) -> None:
@@ -773,7 +758,6 @@ def test_verified_relationship_must_match_checker_selected_obligation(
         )
 
 
-@pytest.mark.integration
 @pytest.mark.lean_runtime
 @pytest.mark.skipif(
     shutil.which("lean") is None,
@@ -799,7 +783,6 @@ def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
     assert result.output["conclusion"] == "TRUE"
 
 
-@pytest.mark.integration
 @pytest.mark.lean_runtime
 @pytest.mark.skipif(
     shutil.which("lean") is None,

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
 from mcp import Client
 
 from jacobian.adapters.mcp.server import create_server
@@ -91,7 +90,6 @@ async def _capture_surface(state_dir: Path) -> dict[str, Any]:
         }
 
 
-@pytest.mark.integration
 def test_complete_agent_facing_mcp_surface_matches_snapshot(tmp_path: Path) -> None:
     actual = asyncio.run(_capture_surface(tmp_path))
     canonical = json.dumps(

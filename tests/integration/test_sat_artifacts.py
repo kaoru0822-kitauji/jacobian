@@ -39,8 +39,6 @@ def _producer() -> CapabilityProviderRuntime:
     )
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_sat_service_materializes_one_identity_for_equivalent_cnf_input(
     tmp_path: Path,
 ) -> None:
@@ -63,8 +61,6 @@ def test_sat_service_materializes_one_identity_for_equivalent_cnf_input(
     assert stored.manifest.semantics_uri == kernel.sat.installation.semantics_uri
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_sat_cnf_materialization_capability_exposes_reusable_identity(
     tmp_path: Path,
 ) -> None:
@@ -126,8 +122,6 @@ def test_sat_materialization_makes_lexicographic_name_order_explicit(
     assert resolved.cnf.to_dimacs_bytes() == b"p cnf 3 3\n1 0\n2 0\n-3 0\n"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_sat_cnf_materialization_validates_before_artifact_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -157,8 +151,6 @@ def test_sat_cnf_materialization_validates_before_artifact_write(
     assert result.diagnostics[0].code == "INVALID_CNF"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_model_backed_schema_rejects_noncanonical_generic_artifact_put(
     tmp_path: Path,
 ) -> None:
@@ -186,8 +178,6 @@ def test_model_backed_schema_rejects_noncanonical_generic_artifact_put(
         )
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
     tmp_path: Path,
 ) -> None:
@@ -233,8 +223,6 @@ def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
     assert proof.raw_bytes() == b"d -1 2 0\n0\n"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_sat_service_rejects_a_non_cnf_source_before_writing_evidence(
     tmp_path: Path,
 ) -> None:

@@ -65,7 +65,6 @@ def _request(
     )
 
 
-@pytest.mark.integration
 def test_triangular_automorphism_is_found_and_verified(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     result = kernel.capabilities.invoke(_request(degree=2))
@@ -89,7 +88,6 @@ def test_triangular_automorphism_is_found_and_verified(tmp_path: Path) -> None:
     ]
 
 
-@pytest.mark.integration
 def test_degree_below_required_returns_bounded_no_candidate(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     result = kernel.capabilities.invoke(_request(degree=1))
@@ -99,7 +97,6 @@ def test_degree_below_required_returns_bounded_no_candidate(tmp_path: Path) -> N
     assert result.output["noninvertibility_proved"] is False
 
 
-@pytest.mark.integration
 def test_redundant_explicit_ansatz_is_underdetermined(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     identity = {
@@ -136,7 +133,6 @@ def test_redundant_explicit_ansatz_is_underdetermined(tmp_path: Path) -> None:
     assert "free parameters" in result.output["verification_failure"]
 
 
-@pytest.mark.integration
 def test_zero_timeout_and_unknown_budget_are_explicit(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -148,7 +144,6 @@ def test_zero_timeout_and_unknown_budget_are_explicit(tmp_path: Path) -> None:
     assert exhausted.output["status"] == "BUDGET_EXHAUSTED"
 
 
-@pytest.mark.integration
 def test_unknown_solver_is_unsupported_without_truth_claim(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     payload = deepcopy(_request(degree=2).input)
@@ -166,7 +161,6 @@ def test_unknown_solver_is_unsupported_without_truth_claim(tmp_path: Path) -> No
     assert result.output["noninvertibility_proved"] is False
 
 
-@pytest.mark.integration
 def test_full_support_and_coefficient_order_are_deterministic(
     tmp_path: Path,
 ) -> None:
@@ -197,7 +191,6 @@ def test_full_support_and_coefficient_order_are_deterministic(
     ]
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     "mutation",
     ["variable_order", "coefficient_domain"],
@@ -221,7 +214,6 @@ def test_ring_mismatches_fail_closed(tmp_path: Path, mutation: str) -> None:
     assert result.artifact_uris == ()
 
 
-@pytest.mark.integration
 def test_corrupted_found_candidate_does_not_verify(
     tmp_path: Path,
 ) -> None:

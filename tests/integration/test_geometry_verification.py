@@ -82,7 +82,6 @@ def test_geometry_checker_availability_does_not_grant_authority(
     assert installation.checker_id is None
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("operation_id", "payload"),
     [
@@ -130,7 +129,6 @@ def test_selected_geometry_results_verify_through_public_dispatch(
     assert verified.assurance.verification_record_uri is not None
 
 
-@pytest.mark.integration
 def test_mutated_geometry_candidate_is_rejected_without_false_conclusion(
     tmp_path: Path,
 ) -> None:

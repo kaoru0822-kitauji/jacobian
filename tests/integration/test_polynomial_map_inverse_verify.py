@@ -87,7 +87,6 @@ def _checker_request(kernel: JacobianKernel, output: dict[str, Any]) -> dict[str
     }
 
 
-@pytest.mark.integration
 def test_two_sided_triangular_inverse_is_verified(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     forward, inverse = _triangular_maps()
@@ -108,7 +107,6 @@ def test_two_sided_triangular_inverse_is_verified(tmp_path: Path) -> None:
     assert residuals["forward_after_inverse"] == [{"terms": []}, {"terms": []}]
 
 
-@pytest.mark.integration
 def test_overlapping_variable_names_use_simultaneous_composition(
     tmp_path: Path,
 ) -> None:
@@ -150,7 +148,6 @@ def test_overlapping_variable_names_use_simultaneous_composition(
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_unrepresentable_composition_is_rejected_before_artifacts(
     tmp_path: Path,
 ) -> None:
@@ -179,7 +176,6 @@ def test_unrepresentable_composition_is_rejected_before_artifacts(
     assert result.artifact_uris == ()
 
 
-@pytest.mark.integration
 def test_perturbed_inverse_coefficient_is_verified_false(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     forward, inverse = _triangular_maps()
@@ -195,7 +191,6 @@ def test_perturbed_inverse_coefficient_is_verified_false(tmp_path: Path) -> None
     assert any(item["terms"] for item in residuals["forward_after_inverse"])
 
 
-@pytest.mark.integration
 def test_checker_rejects_residual_coefficient_tampering(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     forward, inverse = _triangular_maps()
@@ -211,7 +206,6 @@ def test_checker_rejects_residual_coefficient_tampering(tmp_path: Path) -> None:
     assert decision["conclusion"] == Conclusion.UNKNOWN.value
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("zero_direction", "nonzero_direction"),
     (
@@ -239,7 +233,6 @@ def test_one_declared_identity_direction_never_verifies(
     assert decision["conclusion"] == Conclusion.UNKNOWN.value
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize("tamper", ("domain", "source_order", "target_order"))
 def test_checker_rejects_domain_and_order_substitution(
     tmp_path: Path, tamper: str
@@ -261,7 +254,6 @@ def test_checker_rejects_domain_and_order_substitution(
     assert decision["conclusion"] == Conclusion.UNKNOWN.value
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize("source", ("scope", "inverse"))
 def test_checker_rejects_source_map_coefficient_tampering(
     tmp_path: Path, source: str
@@ -283,7 +275,6 @@ def test_checker_rejects_source_map_coefficient_tampering(
     assert decision["conclusion"] == Conclusion.UNKNOWN.value
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     "family",
     (

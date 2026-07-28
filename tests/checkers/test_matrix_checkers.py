@@ -10,7 +10,6 @@ from jacobian_checkers.matrices import (
 )
 
 
-@pytest.mark.contract
 def test_kernel_checker_accepts_exact_nonzero_vector() -> None:
     decision = check_kernel_vector(
         _witness_request(
@@ -30,7 +29,6 @@ def test_kernel_checker_accepts_exact_nonzero_vector() -> None:
     assert decision["conclusion"] == "FALSE"
 
 
-@pytest.mark.contract
 def test_kernel_checker_rejects_zero_vector() -> None:
     decision = check_kernel_vector(
         _witness_request(
@@ -49,7 +47,6 @@ def test_kernel_checker_rejects_zero_vector() -> None:
     assert decision["accepted"] is False
 
 
-@pytest.mark.contract
 def test_maxdet_checker_replays_all_512_matrices() -> None:
     bindings = {
         "claim_digest": "sha256:" + "a" * 64,
@@ -102,7 +99,6 @@ def test_maxdet_checker_replays_all_512_matrices() -> None:
     assert decision["coverage"] == "EXHAUSTIVE"
 
 
-@pytest.mark.contract
 def test_maximizer_witness_checker_replays_scope() -> None:
     bindings = {
         "claim_digest": "sha256:" + "a" * 64,
@@ -152,7 +148,6 @@ def test_maximizer_witness_checker_replays_scope() -> None:
     assert decision["coverage"] == "EXHAUSTIVE"
 
 
-@pytest.mark.contract
 def test_maximizer_witness_checker_accepts_an_alternative_bound_maximizer() -> None:
     bindings = _bindings()
     proposed = {
@@ -180,7 +175,6 @@ def test_maximizer_witness_checker_accepts_an_alternative_bound_maximizer() -> N
     assert decision["conclusion"] == "TRUE"
 
 
-@pytest.mark.contract
 def test_maximizer_witness_checker_rejects_nonmaximal_bound_candidate() -> None:
     bindings = {
         "claim_digest": "sha256:" + "a" * 64,
@@ -234,7 +228,6 @@ def test_maximizer_witness_checker_rejects_nonmaximal_bound_candidate() -> None:
     assert decision["accepted"] is False
 
 
-@pytest.mark.contract
 def test_maximizer_witness_checker_replays_all_65536_matrices() -> None:
     matrix = {
         "rows": 4,
@@ -261,7 +254,6 @@ def test_maximizer_witness_checker_replays_all_65536_matrices() -> None:
     assert decision["detail"] == "replayed all 65536 matrices in the declared scope"
 
 
-@pytest.mark.contract
 def test_maximizer_witness_checker_rejects_over_budget_before_enumeration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

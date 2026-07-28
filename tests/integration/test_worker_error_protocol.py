@@ -11,7 +11,6 @@ from jacobian.plugin_execution import _plugin_failure_detail
 from jacobian.verification import _checker_failure_detail
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("module", "entrypoint", "public_detail"),
     [
@@ -56,7 +55,6 @@ def test_source_changes_cross_worker_boundary_as_typed_codes(
         assert _checker_failure_detail(response) == public_detail
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("module", "entrypoint"),
     [

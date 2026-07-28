@@ -31,8 +31,6 @@ from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_witness_search_stores_bound_unverified_evidence(tmp_path: Path) -> None:
     service, store, claim_uri, candidate_uri, plugin_id = _witness_fixture(tmp_path)
 
@@ -55,8 +53,6 @@ def test_witness_search_stores_bound_unverified_evidence(tmp_path: Path) -> None
     )
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 @pytest.mark.parametrize(
     ("certificate_conclusion", "expected_status"),
     [

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from jacobian.artifacts import ArtifactService
 from jacobian.claims import ClaimValidationService
 from jacobian.contracts.claims import ClaimSpec
@@ -17,8 +15,6 @@ from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_shrinker_rejects_nonpreserving_step_without_trusting_reducer_completeness(
     tmp_path: Path,
 ) -> None:
@@ -49,8 +45,6 @@ def test_shrinker_rejects_nonpreserving_step_without_trusting_reducer_completene
     assert result.result.assurance.verification.value == "VERIFIED"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_shrinker_rejects_non_improving_proposal(tmp_path: Path) -> None:
     (
         service,
@@ -83,8 +77,6 @@ def test_shrinker_rejects_non_improving_proposal(tmp_path: Path) -> None:
     assert "strictly improve" in result.steps[0].detail
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_shrinker_does_not_trust_empty_reducer_response_for_minimality(
     tmp_path: Path,
 ) -> None:
@@ -118,8 +110,6 @@ def test_shrinker_does_not_trust_empty_reducer_response_for_minimality(
     assert result.minimality.value == "NONE"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_shrinker_does_not_treat_checker_error_as_boundary_rejection(
     tmp_path: Path,
 ) -> None:

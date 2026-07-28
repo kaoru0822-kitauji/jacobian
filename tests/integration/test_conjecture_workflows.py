@@ -28,7 +28,6 @@ from jacobian.contracts.search import SearchBudget
 from jacobian.kernel import JacobianKernel
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.conformance,
     pytest.mark.usefixtures("initialized_kernel_store"),
 ]

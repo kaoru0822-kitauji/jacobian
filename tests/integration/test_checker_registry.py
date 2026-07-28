@@ -30,7 +30,6 @@ CLAIM_SCHEMA_A = "artifact://sha256/" + "a" * 64
 CLAIM_SCHEMA_B = "artifact://sha256/" + "b" * 64
 
 
-@pytest.mark.integration
 def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
     registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
     selection = {
@@ -67,7 +66,6 @@ def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
         registry.select_compatible(**selection)
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
@@ -98,7 +96,6 @@ def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> No
     ]
 
 
-@pytest.mark.integration
 def test_concurrent_duplicate_authorize_is_serialized(tmp_path: Path) -> None:
     registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
     barrier = threading.Barrier(8)
@@ -136,7 +133,6 @@ def test_concurrent_duplicate_authorize_is_serialized(tmp_path: Path) -> None:
     ] == ["AUTHORIZED"]
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 @pytest.mark.parametrize("corruption", ["registration", "digest_column"])
 def test_checker_registry_rejects_identity_metadata_corruption(
@@ -182,7 +178,6 @@ def test_checker_registry_rejects_identity_metadata_corruption(
         registry.get(checker.checker_id)
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 @pytest.mark.parametrize(
     ("evidence_kind", "claim_schemas", "semantics", "candidate_schemas", "targets"),
@@ -224,7 +219,6 @@ def test_checker_authorization_requires_explicit_compatibility_scope(
         )
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_checker_registry_binds_external_runtime_identity(tmp_path: Path) -> None:
     executable = tmp_path / "external-checker"
@@ -265,7 +259,6 @@ def test_checker_registry_binds_external_runtime_identity(tmp_path: Path) -> Non
         registry.require_active(checker.checker_id)
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_checker_registry_authorizes_python_distribution_runtime(
     tmp_path: Path,

@@ -49,7 +49,6 @@ MATHLIB_OLEAN = (
 )
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.external_backend,
     pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),

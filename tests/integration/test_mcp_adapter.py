@@ -23,7 +23,6 @@ CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}
 MCP_TOOL_NAMES = CAPABILITY_TOOL_NAMES | WORKSPACE_TOOL_NAMES
 
 
-@pytest.mark.integration
 def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
     tmp_path: Path,
 ) -> None:
@@ -150,7 +149,6 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
     tmp_path: Path,
 ) -> None:
@@ -451,7 +449,6 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
     async def scenario() -> None:
         from mcp import Client
@@ -496,7 +493,6 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 def test_mcp_no_retrieval_policy_is_operator_bound_and_fail_closed(
     tmp_path: Path,
 ) -> None:
@@ -541,7 +537,6 @@ def test_mcp_no_retrieval_policy_is_operator_bound_and_fail_closed(
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 def test_mcp_compact_capability_index_is_searchable_and_paginated(
     tmp_path: Path,
 ) -> None:
@@ -664,7 +659,6 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 def test_mcp_logs_bounded_tool_metrics_without_arguments(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -694,7 +688,6 @@ def test_mcp_logs_bounded_tool_metrics_without_arguments(
     assert "private-query-marker" not in metric
 
 
-@pytest.mark.integration
 def test_mcp_tool_failures_return_safe_actionable_errors(tmp_path: Path) -> None:
     async def scenario() -> None:
         from mcp import Client
@@ -713,7 +706,6 @@ def test_mcp_tool_failures_return_safe_actionable_errors(tmp_path: Path) -> None
     assert internal["error"]["code"] == "OPERATION_FAILED"
 
 
-@pytest.mark.integration
 def test_mcp_protocol_and_authentication_errors_remain_distinct(tmp_path: Path) -> None:
     from mcp.shared.exceptions import MCPError
 
@@ -744,7 +736,6 @@ def test_mcp_protocol_and_authentication_errors_remain_distinct(tmp_path: Path) 
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_mcp_stdio_entrypoint_exposes_capability_and_workspace_tools(
     tmp_path: Path,
@@ -770,7 +761,6 @@ def test_mcp_stdio_entrypoint_exposes_capability_and_workspace_tools(
     asyncio.run(scenario())
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_mcp_entrypoint_has_nonstarting_help() -> None:
     completed = subprocess.run(

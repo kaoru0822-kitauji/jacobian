@@ -21,7 +21,6 @@ DIGEST = "sha256:" + "b" * 64
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.contract
 def test_proposal_request_rejects_multiline_statement() -> None:
     with pytest.raises(ValidationError, match="one Lean expression"):
         LeanStatementProposalRequest(
@@ -30,7 +29,6 @@ def test_proposal_request_rejects_multiline_statement() -> None:
         )
 
 
-@pytest.mark.contract
 def test_proposal_request_rejects_declaration_syntax() -> None:
     with pytest.raises(ValidationError, match=":="):
         LeanStatementProposalRequest(
@@ -39,7 +37,6 @@ def test_proposal_request_rejects_declaration_syntax() -> None:
         )
 
 
-@pytest.mark.contract
 def test_proposal_request_accepts_valid_input() -> None:
     req = LeanStatementProposalRequest(
         informal_claim="one plus one equals two",
@@ -50,7 +47,6 @@ def test_proposal_request_accepts_valid_input() -> None:
     assert req.source_locator == "https://example.com/claim"
 
 
-@pytest.mark.contract
 def test_direct_elaboration_does_not_require_informal_claim() -> None:
     request = LeanStatementProposalRequest(
         operation="ELABORATE_PROPOSITION",
@@ -60,7 +56,6 @@ def test_direct_elaboration_does_not_require_informal_claim() -> None:
     assert request.informal_claim is None
 
 
-@pytest.mark.contract
 def test_direct_elaboration_rejects_informal_claim() -> None:
     with pytest.raises(ValidationError, match="must be omitted"):
         LeanStatementProposalRequest(
@@ -75,7 +70,6 @@ def test_direct_elaboration_rejects_informal_claim() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.contract
 def test_proposal_artifact_requires_sorry_when_elaborates() -> None:
     with pytest.raises(ValidationError, match="at least one sorry"):
         LeanStatementProposalArtifact(
@@ -92,7 +86,6 @@ def test_proposal_artifact_requires_sorry_when_elaborates() -> None:
         )
 
 
-@pytest.mark.contract
 def test_proposal_artifact_accepts_non_elaborating_with_zero_sorry() -> None:
     artifact = LeanStatementProposalArtifact(
         environment="CORE",
@@ -110,7 +103,6 @@ def test_proposal_artifact_accepts_non_elaborating_with_zero_sorry() -> None:
     assert artifact.sorry_count == 0
 
 
-@pytest.mark.contract
 def test_direct_elaboration_artifact_requires_expression_on_success() -> None:
     with pytest.raises(ValidationError, match="return an expression"):
         LeanStatementProposalArtifact(
@@ -132,7 +124,6 @@ def test_direct_elaboration_artifact_requires_expression_on_success() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.contract
 def test_comparison_request_rejects_multiline_statement_a() -> None:
     with pytest.raises(ValidationError, match="statement_a"):
         LeanStatementComparisonRequest(
@@ -141,7 +132,6 @@ def test_comparison_request_rejects_multiline_statement_a() -> None:
         )
 
 
-@pytest.mark.contract
 def test_comparison_request_rejects_declaration_in_statement_b() -> None:
     with pytest.raises(ValidationError, match="statement_b"):
         LeanStatementComparisonRequest(
@@ -150,7 +140,6 @@ def test_comparison_request_rejects_declaration_in_statement_b() -> None:
         )
 
 
-@pytest.mark.contract
 def test_comparison_request_accepts_axiom_sets() -> None:
     req = LeanStatementComparisonRequest(
         statement_a="True",
@@ -166,7 +155,6 @@ def test_comparison_request_accepts_axiom_sets() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.contract
 def test_comparison_artifact_rejects_both_elaborate_without_check() -> None:
     with pytest.raises(ValidationError, match="both_elaborate"):
         LeanStatementComparisonArtifact(
@@ -186,7 +174,6 @@ def test_comparison_artifact_rejects_both_elaborate_without_check() -> None:
         )
 
 
-@pytest.mark.contract
 def test_comparison_artifact_accepts_no_elaboration_when_unchecked() -> None:
     artifact = LeanStatementComparisonArtifact(
         environment="CORE",

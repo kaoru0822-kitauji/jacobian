@@ -203,7 +203,6 @@ def _install_external_plugin(
     )
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_registry_snapshot_binds_contract_source_runtime_and_platform(
     tmp_path: Path,
@@ -254,7 +253,6 @@ def test_registry_snapshot_binds_contract_source_runtime_and_platform(
     assert marker.exists()
 
 
-@pytest.mark.integration
 def test_registry_snapshot_fails_closed_on_runtime_mismatch(
     tmp_path: Path,
     plugin_kernel: JacobianKernel,
@@ -275,7 +273,6 @@ def test_registry_snapshot_fails_closed_on_runtime_mismatch(
         kernel.plugins.resolve(plugin_id, CapabilityName.EVALUATOR)
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_external_plugin_passes_the_generic_conformance_kit(
     tmp_path: Path,

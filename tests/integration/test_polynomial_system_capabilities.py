@@ -39,7 +39,6 @@ def _input(value: int) -> dict[str, Any]:
     }
 
 
-@pytest.mark.integration
 def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -80,7 +79,6 @@ def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
     assert record.payload["obligation_uri"] is None
 
 
-@pytest.mark.integration
 def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -104,7 +102,6 @@ def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None
     assert record.payload["obligation_uri"] is None
 
 
-@pytest.mark.integration
 def test_solution_capability_keeps_checker_failure_unknown(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -132,7 +129,6 @@ def test_solution_capability_keeps_checker_failure_unknown(
     assert result.relationships == ()
 
 
-@pytest.mark.integration
 def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
     tmp_path: Path,
 ) -> None:
@@ -164,7 +160,6 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
     assert before == after
 
 
-@pytest.mark.integration
 def test_solution_capability_is_only_available_with_checker(
     tmp_path: Path,
 ) -> None:

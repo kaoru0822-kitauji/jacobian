@@ -13,7 +13,6 @@ from jacobian.canonical import (
 from jacobian.contracts.exact import CanonicalRational
 
 
-@pytest.mark.contract
 def test_equivalent_rationals_have_identical_canonical_bytes() -> None:
     first = canonicalize_json({"weight": {"num": "2", "den": "4"}})
     second = canonicalize_json({"weight": {"num": "1", "den": "2"}})
@@ -21,7 +20,6 @@ def test_equivalent_rationals_have_identical_canonical_bytes() -> None:
     assert first == second == b'{"weight":{"den":"2","num":"1"}}'
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize(
     "value",
     [
@@ -35,7 +33,6 @@ def test_ambiguous_or_inexact_json_is_rejected(value: object) -> None:
         canonicalize_json(value)
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize(
     ("value", "message"),
     [
@@ -59,20 +56,17 @@ def test_canonical_errors_preserve_only_repair_relevant_context(
     assert "tuple" not in str(raised.value)
 
 
-@pytest.mark.contract
 def test_canonical_rational_wire_model_rejects_unreduced_input() -> None:
     with pytest.raises(ValidationError):
         CanonicalRational.model_validate({"num": "2", "den": "4"})
 
 
-@pytest.mark.contract
 def test_num_den_is_a_reserved_exact_rational_shape() -> None:
     assert canonicalize_json({"num": "2", "den": "4"}) == canonicalize_json(
         {"num": "1", "den": "2"}
     )
 
 
-@pytest.mark.contract
 def test_num_den_schema_property_map_is_regular_json() -> None:
     encoded = canonicalize_json(
         {
@@ -84,7 +78,6 @@ def test_num_den_schema_property_map_is_regular_json() -> None:
     assert encoded == b'{"den":{"type":"string"},"num":{"type":"string"}}'
 
 
-@pytest.mark.contract
 def test_unicode_bom_and_non_json_tuples_are_rejected() -> None:
     with pytest.raises(CanonicalizationError):
         canonicalize_json(b'\xef\xbb\xbf{"value":1}')
@@ -92,7 +85,6 @@ def test_unicode_bom_and_non_json_tuples_are_rejected() -> None:
         canonicalize_json({"value": (1, 2)})
 
 
-@pytest.mark.contract
 @pytest.mark.conformance
 def test_nesting_beyond_the_configured_limit_is_rejected() -> None:
     with pytest.raises(CanonicalizationError, match="depth"):
@@ -102,7 +94,6 @@ def test_nesting_beyond_the_configured_limit_is_rejected() -> None:
         )
 
 
-@pytest.mark.contract
 @pytest.mark.property
 @given(
     numerator=st.integers(min_value=-(10**100), max_value=10**100),

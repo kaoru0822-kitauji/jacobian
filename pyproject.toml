@@ -65,11 +65,8 @@ addopts = "-ra --strict-config --strict-markers -n auto --maxprocesses=4 --dist=
 testpaths = ["tests"]
 timeout = 120
 markers = [
-    "contract: public wire and Python contract tests",
     "property: property-based invariant tests",
     "stateful: persistent lifecycle state-machine tests",
-    "integration: real filesystem, SQLite, or process-boundary tests",
-    "end_to_end: complete user-visible research-kernel workflows",
     "subprocess: clean-process replay tests",
     "conformance: normative release conformance cases",
     "differential: independent implementation comparisons",

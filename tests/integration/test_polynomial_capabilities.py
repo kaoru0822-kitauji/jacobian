@@ -94,7 +94,6 @@ def _identity_input(
     }
 
 
-@pytest.mark.integration
 def test_polynomial_identity_descriptor_example_is_directly_invocable(
     tmp_path: Path,
 ) -> None:
@@ -117,7 +116,6 @@ def test_polynomial_identity_descriptor_example_is_directly_invocable(
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -169,7 +167,6 @@ def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None
     assert rejected.verification_record_uri is None
 
 
-@pytest.mark.integration
 def test_polynomial_identity_verifies_a_difference(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -191,7 +188,6 @@ def test_polynomial_identity_verifies_a_difference(tmp_path: Path) -> None:
     assert record.payload["relation_id"] is None
 
 
-@pytest.mark.integration
 def test_polynomial_identity_preserves_checker_rejection_as_unknown(
     tmp_path: Path,
 ) -> None:
@@ -216,7 +212,6 @@ def test_polynomial_identity_preserves_checker_rejection_as_unknown(
     assert result.relationships == ()
 
 
-@pytest.mark.integration
 def test_jacobian_canonically_omits_zero_partial_derivatives(
     tmp_path: Path,
 ) -> None:
@@ -251,7 +246,6 @@ def test_jacobian_canonically_omits_zero_partial_derivatives(
     }
 
 
-@pytest.mark.integration
 def test_jacobian_represents_derived_exponents_above_the_source_limit(
     tmp_path: Path,
 ) -> None:
@@ -296,7 +290,6 @@ def test_jacobian_represents_derived_exponents_above_the_source_limit(
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     tmp_path: Path,
 ) -> None:
@@ -412,7 +405,6 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     assert verified.output["verification_record_uri"]
 
 
-@pytest.mark.integration
 def test_collision_checker_rejects_a_forged_image(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     polynomial_map = _jacobian_counterexample_map()
@@ -487,7 +479,6 @@ def test_collision_checker_rejects_a_forged_image(tmp_path: Path) -> None:
     assert rejected.output["verification_record_uri"] is None
 
 
-@pytest.mark.integration
 def test_collision_comparison_does_not_promote_forged_evaluations(
     tmp_path: Path,
 ) -> None:
@@ -552,7 +543,6 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
     assert rejected.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
-@pytest.mark.integration
 def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
     tmp_path: Path,
 ) -> None:
@@ -594,7 +584,6 @@ def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
     assert "conclusion" not in result.output
 
 
-@pytest.mark.integration
 def test_collision_rejects_evaluations_from_different_maps(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     x = symbols("x")
@@ -637,7 +626,6 @@ def test_collision_rejects_evaluations_from_different_maps(tmp_path: Path) -> No
     assert result.diagnostics[0].code == "POLYNOMIAL_EVALUATION_MAP_MISMATCH"
 
 
-@pytest.mark.integration
 def test_collision_validates_evaluation_dimensions_before_artifact_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -695,7 +683,6 @@ def test_collision_validates_evaluation_dimensions_before_artifact_writes(
     assert artifact_put_calls == 0
 
 
-@pytest.mark.integration
 def test_polynomial_map_evaluation_is_exact_and_materialized(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     polynomial_map = _jacobian_counterexample_map()
@@ -721,7 +708,6 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(tmp_path: Path) -> 
     assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("capability_id", "payload", "diagnostic_code"),
     [

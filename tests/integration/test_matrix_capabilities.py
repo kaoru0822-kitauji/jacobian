@@ -67,7 +67,6 @@ def _kernel_with_determinant_checker(root: Path) -> JacobianKernel:
     return kernel
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("rows", "expected"),
     [
@@ -106,7 +105,6 @@ def test_matrix_determinant_compute_is_exact_and_unverified(
     assert determinant_artifact.payload["backend_version"] == sympy.__version__
 
 
-@pytest.mark.integration
 def test_matrix_determinant_verify_independently_recomputes_exact_value(
     tmp_path: Path,
 ) -> None:
@@ -141,7 +139,6 @@ def test_matrix_determinant_verify_independently_recomputes_exact_value(
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> None:
     kernel = _kernel_with_determinant_checker(tmp_path)
     computed = kernel.capabilities.invoke(
@@ -177,7 +174,6 @@ def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> 
     assert rejected.assurance.level is not CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -212,7 +208,6 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
     assert timed_out.assurance.level is not CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
     tmp_path: Path,
 ) -> None:
@@ -244,7 +239,6 @@ def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
     assert rank_artifact.payload["backend_version"] == sympy.__version__
 
 
-@pytest.mark.integration
 def test_matrix_determinant_rejects_rectangular_input(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
 
@@ -259,7 +253,6 @@ def test_matrix_determinant_rejects_rectangular_input(tmp_path: Path) -> None:
     assert result.diagnostics[0].code == "INVALID_EXACT_MATRIX_REQUEST"
 
 
-@pytest.mark.integration
 @pytest.mark.differential
 def test_matrix_determinant_matches_independent_bounded_oracle(
     tmp_path: Path,
@@ -288,7 +281,6 @@ def test_matrix_determinant_matches_independent_bounded_oracle(
             )
 
 
-@pytest.mark.integration
 def test_matrix_capabilities_report_sympy_provider_identity(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     descriptors = {

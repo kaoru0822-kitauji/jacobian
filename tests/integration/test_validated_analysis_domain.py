@@ -27,8 +27,6 @@ from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
-pytestmark = pytest.mark.integration
-
 
 def _rational(num: int, den: int = 1) -> dict[str, str]:
     return {"num": str(num), "den": str(den)}

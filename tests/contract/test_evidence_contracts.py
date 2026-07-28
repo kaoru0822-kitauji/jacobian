@@ -9,7 +9,6 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.evidence import CertificateEnvelope
 
 
-@pytest.mark.contract
 @pytest.mark.conformance
 def test_certificate_payload_must_match_its_declared_digest() -> None:
     original_payload = {"rows": [{"candidate": "0", "value": "1"}]}

@@ -20,7 +20,6 @@ from jacobian.provider_runtime import (
 )
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.external_backend,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]

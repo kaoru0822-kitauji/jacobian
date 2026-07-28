@@ -19,7 +19,6 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.usefixtures("initialized_kernel_store"),
 ]
 

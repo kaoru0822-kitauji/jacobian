@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from jacobian.artifacts import ArtifactService
 from jacobian.claims import ClaimValidationService
 from jacobian.contracts.claims import ClaimSpec
@@ -13,8 +11,6 @@ from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_claim_validation_rejects_missing_plugin_capability(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     schemas = SchemaRegistry(store)

@@ -27,8 +27,6 @@ from jacobian.store import ArtifactStore
 
 LEAN_AVAILABLE = shutil.which("lean") is not None
 
-pytestmark = [pytest.mark.integration]
-
 
 # ---------------------------------------------------------------------------
 # Fixtures.

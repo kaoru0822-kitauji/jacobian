@@ -11,7 +11,6 @@ from jacobian.kernel import JacobianKernel
 from jacobian.store import StoreLimitError
 
 
-@pytest.mark.integration
 def test_cli_init_reports_reference_domains_and_polytope_formats(
     tmp_path: Path,
 ) -> None:
@@ -45,7 +44,6 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
     assert catalog["lean4"]["profiles"]["MATHLIB"]["checker_timeout_seconds"] == 225
 
 
-@pytest.mark.integration
 def test_cli_help_exposes_v02_operations() -> None:
     result = CliRunner().invoke(app, ["--help"])
 
@@ -69,7 +67,6 @@ def test_cli_help_exposes_v02_operations() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.integration
 def test_cli_measures_exact_provider_without_implicit_cold_install(
     tmp_path: Path,
 ) -> None:
@@ -94,7 +91,6 @@ def test_cli_measures_exact_provider_without_implicit_cold_install(
     assert measurement["reproduction_case"]["status"] == "COMPLETED"
 
 
-@pytest.mark.integration
 def test_cli_missing_input_file_returns_an_actionable_json_error(
     tmp_path: Path,
 ) -> None:
@@ -125,7 +121,6 @@ def test_cli_missing_input_file_returns_an_actionable_json_error(
     assert str(missing) not in result.stderr
 
 
-@pytest.mark.integration
 def test_cli_invalid_json_returns_an_actionable_json_error(tmp_path: Path) -> None:
     payload = tmp_path / "payload.json"
     payload.write_text('{"value": NaN}', encoding="utf-8")
@@ -158,7 +153,6 @@ def test_cli_invalid_json_returns_an_actionable_json_error(tmp_path: Path) -> No
     assert "Traceback" not in result.stderr
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("as_directory", "expected_code"),
     [
@@ -210,7 +204,6 @@ def test_cli_storage_limit_has_a_capacity_recovery_action() -> None:
     assert "fixture" not in str(error)
 
 
-@pytest.mark.integration
 @pytest.mark.usefixtures("initialized_kernel_store_with_references")
 def test_cli_enumeration_completes_before_the_local_process_exits(
     tmp_path: Path,

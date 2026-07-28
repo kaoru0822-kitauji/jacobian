@@ -10,7 +10,6 @@ import pytest
 from jacobian.plugin_execution import PluginExecutor
 
 
-@pytest.mark.integration
 def test_plugin_executor_returns_only_canonical_result() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:echo",
@@ -23,7 +22,6 @@ def test_plugin_executor_returns_only_canonical_result() -> None:
     assert "untrusted plugin diagnostic" in result.diagnostics
 
 
-@pytest.mark.integration
 def test_plugin_executor_rejects_changed_implementation_digest() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:echo",
@@ -40,7 +38,6 @@ def test_plugin_executor_rejects_changed_implementation_digest() -> None:
     )
 
 
-@pytest.mark.integration
 def test_plugin_executor_does_not_expose_untrusted_exception_text() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:propose_declared_failure",
@@ -57,7 +54,6 @@ def test_plugin_executor_does_not_expose_untrusted_exception_text() -> None:
     assert "fixture" not in result.detail
 
 
-@pytest.mark.integration
 def test_module_import_diagnostics_do_not_corrupt_worker_protocol() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.noisy_module:echo",
@@ -70,7 +66,6 @@ def test_module_import_diagnostics_do_not_corrupt_worker_protocol() -> None:
     assert "module import diagnostic" in result.diagnostics
 
 
-@pytest.mark.integration
 def test_plugin_timeout_has_no_mathematical_output() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:wait_forever",
@@ -86,7 +81,6 @@ def test_plugin_timeout_has_no_mathematical_output() -> None:
     )
 
 
-@pytest.mark.integration
 def test_plugin_unreadable_response_explains_recovery() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:exit_without_response",
@@ -102,7 +96,6 @@ def test_plugin_unreadable_response_explains_recovery() -> None:
     )
 
 
-@pytest.mark.integration
 def test_plugin_diagnostic_limit_fails_closed() -> None:
     start = time.monotonic()
     result = PluginExecutor(max_diagnostic_bytes=32).run(
@@ -120,7 +113,6 @@ def test_plugin_diagnostic_limit_fails_closed() -> None:
     )
 
 
-@pytest.mark.integration
 def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
     marker = tmp_path / "descendant-survived"
 
@@ -135,7 +127,6 @@ def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
     assert not marker.exists()
 
 
-@pytest.mark.integration
 def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) -> None:
     marker = tmp_path / "pipe-holder-survived"
     start = time.monotonic()
@@ -154,7 +145,6 @@ def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) ->
     assert not marker.exists()
 
 
-@pytest.mark.integration
 def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None:
     marker = tmp_path / "detached-descendant-survived"
 
@@ -169,7 +159,6 @@ def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None
     assert not marker.exists()
 
 
-@pytest.mark.integration
 def test_plugin_worker_does_not_inherit_parent_secrets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -186,7 +175,6 @@ def test_plugin_worker_does_not_inherit_parent_secrets(
     assert result.output == {"secret": None, "https_proxy": None}
 
 
-@pytest.mark.integration
 def test_plugin_worker_rejects_bytecode_modules(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

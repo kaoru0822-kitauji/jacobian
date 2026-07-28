@@ -21,7 +21,6 @@ from jacobian.contracts.results import Execution, ExecutionStatus
 RECORD_URI = "artifact://sha256/" + "a" * 64
 
 
-@pytest.mark.contract
 def test_explore_lane_cannot_claim_verified_assurance() -> None:
     with pytest.raises(ValidationError, match="exploration lane"):
         CapabilityResult(
@@ -37,7 +36,6 @@ def test_explore_lane_cannot_claim_verified_assurance() -> None:
         )
 
 
-@pytest.mark.contract
 def test_nonverified_assurance_cannot_smuggle_a_record_uri() -> None:
     with pytest.raises(ValidationError, match="only verified"):
         CapabilityAssurance(
@@ -47,7 +45,6 @@ def test_nonverified_assurance_cannot_smuggle_a_record_uri() -> None:
         )
 
 
-@pytest.mark.contract
 def test_complete_result_requires_an_explicit_scope() -> None:
     with pytest.raises(
         ValidationError, match="complete result requires explicit scope"
@@ -69,7 +66,6 @@ def test_complete_result_requires_an_explicit_scope() -> None:
         )
 
 
-@pytest.mark.contract
 def test_failed_execution_cannot_claim_completeness() -> None:
     with pytest.raises(ValidationError, match="failed execution cannot be complete"):
         CapabilityResult(
@@ -93,7 +89,6 @@ def test_failed_execution_cannot_claim_completeness() -> None:
         )
 
 
-@pytest.mark.contract
 def test_verified_relationship_must_use_result_checker_record() -> None:
     other_record = "artifact://sha256/" + "b" * 64
     with pytest.raises(
@@ -122,7 +117,6 @@ def test_verified_relationship_must_use_result_checker_record() -> None:
         )
 
 
-@pytest.mark.contract
 def test_discharged_obligation_requires_verified_result() -> None:
     with pytest.raises(
         ValidationError,

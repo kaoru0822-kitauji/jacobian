@@ -16,8 +16,6 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.integration
-
 
 def _invoke(
     kernel: JacobianKernel,

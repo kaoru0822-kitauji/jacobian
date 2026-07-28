@@ -9,11 +9,6 @@ import pytest
 
 from jacobian.kernel import JacobianKernel
 
-_LAYER_MARKERS = {
-    "integration": pytest.mark.integration,
-    "end_to_end": pytest.mark.end_to_end,
-}
-
 
 def _freeze_kernel_store(root: Path) -> None:
     """Checkpoint the template database and remove its volatile WAL files."""
@@ -104,23 +99,7 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    """Keep layer markers aligned and reject unsafe parallel Lean execution."""
-
-    tests_root = Path(__file__).parent
-    for item in items:
-        try:
-            layer = Path(item.path).relative_to(tests_root).parts[0]
-        except ValueError:
-            msg = (
-                f"test {item.nodeid} is not under {tests_root}; "
-                "layer markers cannot be assigned safely"
-            )
-            raise pytest.UsageError(msg) from None
-        except IndexError:
-            continue
-        marker = _LAYER_MARKERS.get(layer)
-        if marker is not None:
-            item.add_marker(marker)
+    """Reject unsafe parallel Lean execution."""
 
     workers = config.getoption("numprocesses", default=None)
     if workers in (None, 0, "0"):

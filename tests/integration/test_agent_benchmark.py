@@ -39,7 +39,6 @@ def _invoke(
     )
 
 
-@pytest.mark.integration
 def test_graph_capability_scorer_checks_multi_call_artifacts(
     tmp_path: Path,
 ) -> None:
@@ -494,7 +493,6 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     assert score["passed"] is True
 
 
-@pytest.mark.integration
 @pytest.mark.skipif(
     shutil.which("lean") is None,
     reason="Lean is not installed",

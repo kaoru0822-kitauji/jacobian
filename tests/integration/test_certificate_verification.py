@@ -13,7 +13,6 @@ from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_complete_path_enumeration_certificate_is_verified(tmp_path: Path) -> None:

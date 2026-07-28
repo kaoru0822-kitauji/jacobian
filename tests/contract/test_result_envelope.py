@@ -7,7 +7,6 @@ from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.results import ResultEnvelope, validate_result_envelope
 
 
-@pytest.mark.contract
 def test_timeout_cannot_carry_a_verified_false_conclusion() -> None:
     with pytest.raises(ValidationError):
         ResultEnvelope.model_validate(
@@ -29,7 +28,6 @@ def test_timeout_cannot_carry_a_verified_false_conclusion() -> None:
         )
 
 
-@pytest.mark.contract
 def test_timeout_is_represented_as_unknown_unverified_execution() -> None:
     result = ResultEnvelope.model_validate(
         {
@@ -49,7 +47,6 @@ def test_timeout_is_represented_as_unknown_unverified_execution() -> None:
     assert result.model_dump(mode="json")["execution"]["status"] == "TIMEOUT"
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize(
     ("conclusion", "arithmetic", "method", "coverage"),
     [
@@ -77,7 +74,6 @@ def test_verified_result_rejects_non_replayable_assurance(
         )
 
 
-@pytest.mark.contract
 def test_verified_result_requires_claim_and_semantics_bindings() -> None:
     for missing in ("claim_digest", "semantics_digest"):
         payload = _verified_result()
@@ -86,7 +82,6 @@ def test_verified_result_requires_claim_and_semantics_bindings() -> None:
             ResultEnvelope.model_validate(payload)
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize("method", ["DIRECT_WITNESS", "EXHAUSTIVE_FINITE"])
 def test_verified_result_requires_candidate_binding(method: str) -> None:
     payload = _verified_result(
@@ -99,7 +94,6 @@ def test_verified_result_requires_candidate_binding(method: str) -> None:
         ResultEnvelope.model_validate(payload)
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize(
     ("arithmetic", "coverage"),
     [
@@ -133,7 +127,6 @@ def test_checked_certificates_support_non_rational_proof_mechanisms(
     assert decision.accepted is True
 
 
-@pytest.mark.contract
 def test_trust_boundary_revalidates_model_construct_instances() -> None:
     malformed = ResultEnvelope.model_construct(
         **_verified_result(
@@ -146,7 +139,6 @@ def test_trust_boundary_revalidates_model_construct_instances() -> None:
         validate_result_envelope(malformed)
 
 
-@pytest.mark.contract
 def test_checker_relationship_requires_exact_artifact_endpoints() -> None:
     decision = {
         "accepted": True,
