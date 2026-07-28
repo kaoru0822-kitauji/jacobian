@@ -417,6 +417,7 @@ class SatUnsatProofVerificationRequest(ContractModel):
 class SatUnsatProofVerificationOutput(ContractModel):
     """Model-facing projection of one independent DRAT replay."""
 
+    verified_claim_scope: Literal["CANONICAL_CNF_ONLY"] = "CANONICAL_CNF_ONLY"
     status: Literal[
         "VERIFIED_UNSAT",
         "REJECTED",

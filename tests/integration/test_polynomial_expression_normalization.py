@@ -78,6 +78,49 @@ def _kernel_with_checker(root: Path) -> JacobianKernel:
     return kernel
 
 
+def test_expansion_term_budget_failure_is_specific_and_non_retryable(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+    result = _invoke(
+        kernel,
+        "polynomial.expression.normalize",
+        {
+            "expression": _expression(
+                {
+                    "kind": "power",
+                    "base": {
+                        "kind": "add",
+                        "operands": [_variable("x") for _ in range(16)],
+                    },
+                    "exponent": 4,
+                }
+            )
+        },
+        mode=CapabilityMode.EXPLORE,
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    diagnostic = result.diagnostics[0]
+    assert diagnostic.code == "EXPANSION_TERM_BUDGET_EXCEEDED"
+    assert diagnostic.stage == "bounded_normalization"
+    assert diagnostic.details == {
+        "limit": 1024,
+        "estimated_expanded_terms_upper_bound": 1025,
+        "bound_kind": "CONSERVATIVE_UPPER_BOUND",
+        "requested_exponent": 4,
+        "retryable_with_same_input": False,
+        "alternatives": [
+            "use a factored symbolic operation",
+            "split the expression before normalization",
+            "use a domain capability with bounded coefficient access",
+        ],
+        "normalization_uri": None,
+        "checker_input_available": False,
+    }
+    assert result.artifact_uris == ()
+
+
 def _difference_of_squares_plus_half_x() -> dict[str, Any]:
     return _expression(
         {
@@ -259,6 +302,7 @@ def test_normalization_rejects_inputs_outside_typed_ast_contract(
     assert result.output["error"]["stage"] in {
         "capability_input_validation",
         "input_validation",
+        "bounded_normalization",
     }
 
 

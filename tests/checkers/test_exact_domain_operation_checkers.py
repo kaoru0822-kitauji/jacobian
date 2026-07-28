@@ -10,6 +10,7 @@ import pytest
 
 import jacobian_checkers.exact_domain_operations as checker_module
 from jacobian_checkers.exact_domain_operations import (
+    check_graph_induced_tree_maximum,
     check_matrix_characteristic_polynomial,
     check_matrix_nullspace,
     check_matrix_rref,
@@ -290,6 +291,30 @@ _CASES: tuple[
             },
         ),
     ),
+    (
+        check_graph_induced_tree_maximum,
+        _request(
+            "graph.induced_tree.maximum.compute",
+            "graph.induced-tree.maximum.exhaustive-replay",
+            {
+                "graph": {
+                    "graph_schema_version": "1",
+                    "vertices": ["a", "b", "c", "d"],
+                    "edges": [["a", "b"], ["b", "c"], ["c", "d"], ["a", "d"]],
+                }
+            },
+            {
+                "status": "EXACT",
+                "convention": "NONEMPTY_CONNECTED_ACYCLIC_EMPTY_SOURCE_ZERO",
+                "order": 4,
+                "optimum_value": 3,
+                "incumbent_value": 3,
+                "lower_bound": 3,
+                "upper_bound": 3,
+                "witness_vertices": ["a", "b", "c"],
+            },
+        ),
+    ),
 )
 
 
@@ -301,7 +326,13 @@ def _mutate_numeric_leaf(value: object) -> bool:
                 mutated = 1
             value["num"] = str(mutated)
             return True
-        return any(_mutate_numeric_leaf(item) for item in value.values())
+        for key, item in value.items():
+            if _mutate_numeric_leaf(item):
+                return True
+            if type(item) is int:
+                value[key] = item + 1
+                return True
+        return False
     if isinstance(value, list):
         for index, item in enumerate(value):
             if _mutate_numeric_leaf(item):
@@ -311,6 +342,9 @@ def _mutate_numeric_leaf(value: object) -> bool:
                 if mutated == 0:
                     mutated = 1
                 value[index] = str(mutated)
+                return True
+            if type(item) is int:
+                value[index] = item + 1
                 return True
     return False
 

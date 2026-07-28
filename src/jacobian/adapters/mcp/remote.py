@@ -13,6 +13,7 @@ from typing import Any
 
 from mcp.server.auth.provider import AccessToken
 
+from jacobian.capabilities import CapabilityPolicy
 from jacobian.kernel import JacobianKernel
 
 _TENANT_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -79,6 +80,7 @@ class TenantKernelRouter:
         install_references: bool = True,
         allow_anonymous: bool = False,
         capability_adapter_entrypoints: tuple[str, ...] = (),
+        capability_policy: CapabilityPolicy | None = None,
         max_tenant_kernels: int = DEFAULT_MAX_TENANT_KERNELS,
     ) -> None:
         if max_tenant_kernels < 1:
@@ -87,6 +89,7 @@ class TenantKernelRouter:
         self.install_references = install_references
         self.allow_anonymous = allow_anonymous
         self.capability_adapter_entrypoints = capability_adapter_entrypoints
+        self.capability_policy = capability_policy
         self.max_tenant_kernels = max_tenant_kernels
         self._kernels: dict[str, JacobianKernel] = {}
         self._lock = threading.Lock()
@@ -119,6 +122,7 @@ class TenantKernelRouter:
                     capability_adapter_entrypoints=(
                         self.capability_adapter_entrypoints
                     ),
+                    capability_policy=self.capability_policy,
                 )
                 self._kernels[tenant_key] = kernel
             return kernel

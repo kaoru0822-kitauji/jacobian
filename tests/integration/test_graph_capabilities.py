@@ -18,6 +18,75 @@ pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 @pytest.mark.integration
+def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    constructed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.construct.explicit",
+            input={
+                "vertices": ["c", "a", "b"],
+                "edges": [["b", "a"], ["c", "b"]],
+            },
+        )
+    )
+
+    assert constructed.execution.status is ExecutionStatus.COMPLETED
+    assert constructed.output["graph"] == {
+        "graph_schema_version": "1",
+        "vertices": ["a", "b", "c"],
+        "edges": [["a", "b"], ["b", "c"]],
+    }
+    graph_uri = constructed.output["graph_uri"]
+    stored = kernel.store.get(graph_uri)
+    assert stored.payload == constructed.output["graph"]
+    assert stored.manifest.schema_uri == kernel.graph.graph_schema_uri
+    assert stored.manifest.semantics_uri == kernel.graph.semantics_uri
+    assert stored.manifest.object_digest == constructed.output["graph_object_digest"]
+
+    properties = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.compute.properties",
+            input={"graph_uri": graph_uri, "properties": ["order", "tree"]},
+        )
+    )
+    assert properties.execution.status is ExecutionStatus.COMPLETED
+    assert properties.output["properties"]["order"]["value"] == 3
+    assert properties.output["properties"]["tree"]["value"] is True
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "input_payload",
+    [
+        {"vertices": ["a", "a"], "edges": []},
+        {"vertices": ["a"], "edges": [["a", "a"]]},
+        {"vertices": ["a"], "edges": [["a", "b"]]},
+        {"vertices": ["a", "b"], "edges": [["a", "b"], ["b", "a"]]},
+    ],
+)
+def test_explicit_graph_construction_fails_before_artifact_writes(
+    tmp_path: Path,
+    input_payload: dict[str, object],
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.construct.explicit",
+            input=input_payload,
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_EXPLICIT_GRAPH"
+    assert result.artifact_uris == ()
+    assert result.diagnostics[0].details["validation_errors"]
+
+
+@pytest.mark.integration
 def test_graph_atlas_search_is_bounded_complete_and_replayable(
     tmp_path: Path,
 ) -> None:

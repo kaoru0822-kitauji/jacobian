@@ -17,6 +17,7 @@ from jacobian.builtin_capabilities import (
 from jacobian.cadical import install_cadical_capabilities
 from jacobian.capabilities import (
     CapabilityAdapter,
+    CapabilityPolicy,
     CapabilityService,
     load_capability_adapter,
 )
@@ -214,6 +215,7 @@ class JacobianKernel:
         install_references: bool = False,
         capability_adapter_entrypoints: tuple[str, ...] = (),
         capability_exclusions: frozenset[str] = frozenset(),
+        capability_policy: CapabilityPolicy | None = None,
     ) -> None:
         # Construction-time exclusions support controlled portfolio ablations.
         # They are not a runtime authorization or access-control mechanism.
@@ -361,7 +363,11 @@ class JacobianKernel:
         self.lean_exploration: LeanExplorationInstallation | None = None
         self.geometry_checker: GeometryCheckerInstallation | None = None
         self.exact_domain_checkers: ExactDomainCheckerInstallation | None = None
-        self.capabilities = CapabilityService(self.store, self.memory)
+        self.capabilities = CapabilityService(
+            self.store,
+            self.memory,
+            policy=capability_policy,
+        )
         self.register_capability(SatCnfMaterializationAdapter(self.sat))
         self.sat_assignment_checker: SatAssignmentCheckerInstallation
         sat_assignment_adapter, self.sat_assignment_checker = (
@@ -879,6 +885,7 @@ class JacobianKernel:
 
         polynomial = self.domain_bundles.get("polynomial")
         matrix = self.domain_bundles.get("matrix")
+        graph = self.domain_bundles.get("graph_optimization")
         if polynomial is None or matrix is None:
             return
         adapters, self.exact_domain_checkers = install_exact_domain_verification(
@@ -889,6 +896,7 @@ class JacobianKernel:
             self.checkers,
             polynomial=polynomial,
             matrix=matrix,
+            graph=graph,
             authorize=authorize,
         )
         for adapter in adapters:

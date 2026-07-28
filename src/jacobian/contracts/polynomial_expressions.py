@@ -111,6 +111,24 @@ class PolynomialExpressionAnalysis:
     coefficient_digit_budget: int
 
 
+class PolynomialExpansionTermBudgetError(ValueError):
+    """A conservative static expansion bound exceeds the hard term cap."""
+
+    def __init__(
+        self,
+        *,
+        estimated_expanded_terms_upper_bound: int,
+        requested_exponent: int | None,
+    ) -> None:
+        self.limit = MAX_EXPRESSION_TERMS
+        self.estimated_expanded_terms_upper_bound = estimated_expanded_terms_upper_bound
+        self.requested_exponent = requested_exponent
+        super().__init__(
+            "the conservative polynomial expansion bound exceeds the "
+            f"{self.limit}-term budget"
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class _NodeAnalysis:
     node_count: int
@@ -135,7 +153,10 @@ def analyze_polynomial_expression(
     if analysis.depth > MAX_EXPRESSION_DEPTH:
         raise ValueError("polynomial expressions are limited to depth 16")
     if analysis.term_upper_bound > MAX_EXPRESSION_TERMS:
-        raise ValueError("polynomial expression expansion exceeds the 1024-term budget")
+        raise PolynomialExpansionTermBudgetError(
+            estimated_expanded_terms_upper_bound=analysis.term_upper_bound,
+            requested_exponent=_maximum_requested_power(expression),
+        )
     if any(
         exponent > MAX_EXPRESSION_EXPONENT for exponent in analysis.maximum_exponents
     ):
@@ -153,6 +174,24 @@ def analyze_polynomial_expression(
         maximum_exponents=analysis.maximum_exponents,
         coefficient_digit_budget=analysis.coefficient_digit_budget,
     )
+
+
+def _maximum_requested_power(expression: PolynomialExpressionNode) -> int | None:
+    if isinstance(expression, PolynomialPowerExpression):
+        nested = _maximum_requested_power(expression.base)
+        return (
+            expression.exponent if nested is None else max(expression.exponent, nested)
+        )
+    if isinstance(expression, (PolynomialAddExpression, PolynomialMultiplyExpression)):
+        powers = tuple(
+            power
+            for operand in expression.operands
+            if (power := _maximum_requested_power(operand)) is not None
+        )
+        return max(powers) if powers else None
+    if isinstance(expression, PolynomialNegateExpression):
+        return _maximum_requested_power(expression.operand)
+    return None
 
 
 def _analyze_node(

@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
@@ -33,7 +33,7 @@ from jacobian.adapters.mcp.guidance import (
 )
 from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityDiscoveryCursorError
+from jacobian.capabilities import CapabilityDiscoveryCursorError, CapabilityPolicy
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiscoveryRequest,
@@ -63,6 +63,7 @@ from jacobian.contracts.workspaces import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
 
 _RELATED_CAPABILITIES: dict[str, tuple[tuple[str, str], ...]] = {
     "sat.cnf.materialize": (
@@ -222,7 +223,7 @@ def _capability_discovery_response(
                 query=query,
                 domain=domain,
                 mode=mode,
-                limit=limit if limit is not None else 10,
+                limit=limit if limit is not None else 5,
                 cursor=cursor,
             )
         )
@@ -238,9 +239,11 @@ def _capability_discovery_response(
                 ),
             }
         }
-    return {
+    response = {
         "kind": "discovery",
         "catalog_version": catalog.catalog_version,
+        "policy_profile": catalog.policy_profile,
+        "policy_digest": catalog.policy_digest,
         "catalog_digest": _catalog_digest(
             catalog.catalog_version,
             catalog.capabilities,
@@ -251,7 +254,48 @@ def _capability_discovery_response(
             "argument": "capability_id",
             "choose_from": "matches[].capability_id",
         },
+        "response_byte_limit": CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT,
+        "truncation_reason": None,
     }
+    matches = cast(list[dict[str, Any]], response["matches"])
+    while (
+        len(canonicalize_json(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
+        and len(matches) > 1
+    ):
+        matches.pop()
+        response["truncated"] = True
+        response["next_cursor"] = matches[-1]["capability_id"]
+        response["truncation_reason"] = "BYTE_LIMIT"
+    available_domains = cast(list[str], response["available_domains"])
+    response["available_domains_total"] = len(available_domains)
+    response["available_domains_truncated"] = False
+    while (
+        len(canonicalize_json(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
+        and available_domains
+    ):
+        available_domains.pop()
+        response["available_domains_truncated"] = True
+        response["truncation_reason"] = "BYTE_LIMIT"
+    response["match_metadata_truncated"] = False
+    compact_fields = ("tags", "matched_on", "matched_terms")
+    while len(canonicalize_json(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT:
+        removed = False
+        for match in matches:
+            for field in compact_fields:
+                values = match.get(field)
+                if isinstance(values, list) and values:
+                    values.pop()
+                    removed = True
+                    response["match_metadata_truncated"] = True
+                    response["truncation_reason"] = "BYTE_LIMIT"
+                    break
+            if removed:
+                break
+        if not removed:
+            raise RuntimeError(
+                "compact capability discovery response exceeds its hard byte limit"
+            )
+    return response
 
 
 def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
@@ -321,6 +365,7 @@ def create_server(
     auth: Any | None = None,
     capability_adapter_entrypoints: tuple[str, ...] = (),
     capability_exclusions: frozenset[str] = frozenset(),
+    capability_policy: CapabilityPolicy | None = None,
     max_tenant_kernels: int | None = None,
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over the Jacobian kernel."""
@@ -400,6 +445,7 @@ def create_server(
             install_references=install_references,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
             capability_exclusions=capability_exclusions,
+            capability_policy=capability_policy,
         )
     )
     tenant_router = (
@@ -408,6 +454,7 @@ def create_server(
             install_references=install_references,
             allow_anonymous=allow_anonymous,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
+            capability_policy=capability_policy,
             max_tenant_kernels=(
                 DEFAULT_MAX_TENANT_KERNELS
                 if max_tenant_kernels is None
@@ -481,8 +528,11 @@ def create_server(
             StrictInt | None,
             Field(
                 ge=1,
-                le=50,
-                description="Maximum compact discovery matches; defaults to 10.",
+                le=20,
+                description=(
+                    "Maximum compact discovery matches; defaults to 5. Start with "
+                    "5 and inspect only the strongest one or two candidates."
+                ),
             ),
         ] = None,
         cursor: Annotated[
@@ -544,6 +594,8 @@ def create_server(
             }
         response: dict[str, Any] = {
             "kind": "capability",
+            "policy_profile": capability_catalog.policy_profile,
+            "policy_digest": capability_catalog.policy_digest,
             "capability": descriptor.model_dump(mode="json"),
             "invocations": [
                 {
@@ -1289,6 +1341,52 @@ def main() -> None:
         help="operator-approved package.module:factory entrypoint; repeatable",
     )
     parser.add_argument(
+        "--capability-policy-profile",
+        choices=("DEFAULT", "COMPUTE_VERIFY_NO_RETRIEVAL"),
+        default="DEFAULT",
+        help=(
+            "operator capability policy profile; the no-retrieval profile is "
+            "intended for compute/verify evaluation isolation"
+        ),
+    )
+    for option, destination, help_text in (
+        (
+            "--allow-capability",
+            "allowed_capability_ids",
+            "allow only this capability ID; repeatable",
+        ),
+        (
+            "--deny-capability",
+            "denied_capability_ids",
+            "deny this capability ID; repeatable",
+        ),
+        ("--allow-domain", "allowed_domains", "allow only this domain; repeatable"),
+        ("--deny-domain", "denied_domains", "deny this domain; repeatable"),
+        ("--allow-tag", "allowed_tags", "allow only capabilities with this tag"),
+        ("--deny-tag", "denied_tags", "deny capabilities with this tag"),
+    ):
+        parser.add_argument(
+            option,
+            dest=destination,
+            action="append",
+            default=[],
+            help=help_text,
+        )
+    parser.add_argument(
+        "--allow-mode",
+        action="append",
+        default=[],
+        choices=tuple(mode.value for mode in CapabilityMode),
+        help="allow only this capability mode; repeatable",
+    )
+    parser.add_argument(
+        "--deny-mode",
+        action="append",
+        default=[],
+        choices=tuple(mode.value for mode in CapabilityMode),
+        help="deny this capability mode; repeatable",
+    )
+    parser.add_argument(
         "--max-tenant-kernels",
         type=int,
         default=32,
@@ -1298,12 +1396,24 @@ def main() -> None:
     if args.max_tenant_kernels < 1:
         parser.error("--max-tenant-kernels must be positive")
     args.path = args.path if args.path.startswith("/") else f"/{args.path}"
+    capability_policy = CapabilityPolicy(
+        profile=args.capability_policy_profile,
+        allowed_capability_ids=frozenset(args.allowed_capability_ids),
+        denied_capability_ids=frozenset(args.denied_capability_ids),
+        allowed_domains=frozenset(args.allowed_domains),
+        denied_domains=frozenset(args.denied_domains),
+        allowed_tags=frozenset(args.allowed_tags),
+        denied_tags=frozenset(args.denied_tags),
+        allowed_modes=frozenset(CapabilityMode(value) for value in args.allow_mode),
+        denied_modes=frozenset(CapabilityMode(value) for value in args.deny_mode),
+    )
     if args.transport == "stdio":
         if args.auth_tokens_file is not None or args.allow_anonymous:
             parser.error("remote authentication options cannot be used with stdio")
         create_server(
             state_dir=args.state_dir,
             capability_adapter_entrypoints=tuple(args.capability_adapter),
+            capability_policy=capability_policy,
         ).run("stdio")
         return
 
@@ -1339,6 +1449,7 @@ def main() -> None:
         token_verifier=token_verifier,
         auth=auth,
         capability_adapter_entrypoints=tuple(args.capability_adapter),
+        capability_policy=capability_policy,
         max_tenant_kernels=args.max_tenant_kernels,
     )
     if args.transport == "streamable-http":

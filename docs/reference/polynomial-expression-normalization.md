@@ -27,10 +27,19 @@ or `parse_expr`. This boundary matters because the
 The complete tree is limited to 128 nodes and depth 16. Validation also rejects
 an expression when conservative bounds exceed:
 
-- 1,024 expanded nonzero terms;
+- the 1,024-term expanded-term budget;
 - exponent 127 for any declared variable;
 - 256 decimal digits in one rational numerator or denominator; or
 - a 4,096-digit conservative coefficient-arithmetic budget.
+
+An expansion-bound failure uses
+`EXPANSION_TERM_BUDGET_EXCEEDED` at the `bounded_normalization` stage. Its
+structured details report the 1,024-term limit, the conservative expanded-term
+upper bound and its bound kind, the largest requested power when present,
+alternatives, and
+`retryable_with_same_input: false`. It also reports null normalization evidence
+and unavailable checker input. This is a resource-bound non-conclusion, not an
+invalid-variable diagnostic, and validation occurs before artifact writes.
 
 The request includes a wall-clock budget from 1 to 60 seconds; the default is
 10 seconds.

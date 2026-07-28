@@ -171,6 +171,79 @@ def test_public_seam_reports_valid_multivariate_result_as_unsupported(
     assert checked.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
+def test_induced_tree_result_is_domain_bound_and_independently_replayed(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path, install_references=True)
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.induced_tree.maximum.compute",
+            input={
+                "graph": {
+                    "vertices": ["a", "b", "c", "d"],
+                    "edges": [
+                        ["a", "b"],
+                        ["b", "c"],
+                        ["c", "d"],
+                        ["d", "a"],
+                    ],
+                },
+                "resource_budget": {
+                    "wall_seconds": 5,
+                    "max_solver_calls": 33,
+                    "max_order": 16,
+                },
+            },
+        )
+    )
+    assert computed.output["optimum_value"] == 3
+    result_uri = computed.artifact_uris[1]
+
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.induced_tree.maximum.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": result_uri},
+        )
+    )
+
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"
+    assert verified.output["operation_id"] == "graph.induced_tree.maximum.compute"
+    assert verified.output["verification_record_uri"] is not None
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+
+    result_artifact = kernel.store.get(result_uri)
+    false_payload = dict(result_artifact.payload)
+    false_payload.update(
+        {
+            "optimum_value": 4,
+            "incumbent_value": 4,
+            "lower_bound": 4,
+            "upper_bound": 4,
+            "witness_vertices": ["a", "b", "c", "d"],
+        }
+    )
+    false_result = kernel.artifacts.put(
+        schema_uri=result_artifact.manifest.schema_uri,
+        semantics_uri=result_artifact.manifest.semantics_uri,
+        parents=result_artifact.manifest.parents,
+        payload=false_payload,
+        summary="adversarial false maximum induced-tree result",
+    )
+    rejected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.induced_tree.maximum.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": false_result.artifact_uri},
+        )
+    )
+    assert rejected.execution.status is ExecutionStatus.COMPLETED
+    assert rejected.output["status"] == "REJECTED"
+    assert rejected.output["conclusion"] == "UNKNOWN"
+    assert rejected.output["verification_record_uri"] is None
+
+
 def test_operator_can_leave_exact_result_verification_unavailable(
     tmp_path: Path,
 ) -> None:

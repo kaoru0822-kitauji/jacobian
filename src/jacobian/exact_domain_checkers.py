@@ -37,6 +37,9 @@ from jacobian.contracts.results import (
     ExecutionStatus,
     Verification,
 )
+from jacobian.domains.graph_optimization.checkers import (
+    GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS,
+)
 from jacobian.domains.matrix_lattice.checkers import MATRIX_EXACT_REPLAY_CHECKERS
 from jacobian.domains.polynomial.checkers import POLYNOMIAL_EXACT_REPLAY_CHECKERS
 from jacobian.operation_installation import InstalledDomainBundle
@@ -70,9 +73,10 @@ def install_exact_domain_checkers(
     *,
     polynomial: InstalledDomainBundle,
     matrix: InstalledDomainBundle,
+    graph: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> ExactDomainCheckerInstallation:
-    """Install independent FLINT replay against dynamically registered schemas."""
+    """Install independent exact replay against dynamically registered schemas."""
 
     installer = CheckerInstaller(checkers)
     provider_runtime = exact_domain_checker_provider_runtime()
@@ -80,9 +84,20 @@ def install_exact_domain_checkers(
     for installed, declaration in (
         *((polynomial, item) for item in POLYNOMIAL_EXACT_REPLAY_CHECKERS),
         *((matrix, item) for item in MATRIX_EXACT_REPLAY_CHECKERS),
+        *(
+            ()
+            if graph is None
+            else tuple(
+                (graph, item) for item in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS
+            )
+        ),
     ):
+        is_graph_checker = declaration.capability_id.startswith("graph.")
         operation = CheckerOperation(
-            name=f"{declaration.capability_id} independent FLINT replay",
+            name=(
+                f"{declaration.capability_id} independent "
+                + ("finite exhaustive replay" if is_graph_checker else "FLINT replay")
+            ),
             entrypoint=(
                 f"jacobian_checkers.exact_domain_operations:{declaration.function}"
             ),
@@ -95,8 +110,13 @@ def install_exact_domain_checkers(
                 installed.result_schema_uris[declaration.capability_id],
             ),
             reason=(
-                "operator-authorized Python-FLINT exact replay independent "
-                "of the SymPy producer"
+                "operator-authorized finite exhaustive checker independent of "
+                "the Z3 producer"
+                if is_graph_checker
+                else (
+                    "operator-authorized Python-FLINT exact replay independent "
+                    "of the SymPy producer"
+                )
             ),
             provider_runtime=provider_runtime,
         )
@@ -124,6 +144,7 @@ def install_exact_domain_verification(
     *,
     polynomial: InstalledDomainBundle,
     matrix: InstalledDomainBundle,
+    graph: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> tuple[tuple[CapabilityAdapter, ...], ExactDomainCheckerInstallation]:
     """Authorize exact replay and expose domain-owned verification capabilities."""
@@ -132,6 +153,7 @@ def install_exact_domain_verification(
         checkers,
         polynomial=polynomial,
         matrix=matrix,
+        graph=graph,
         authorize=authorize,
     )
     witness_schema_uri = schemas.register_model(
@@ -153,6 +175,36 @@ def install_exact_domain_verification(
     matrix_declarations = tuple(
         _installed_declaration(matrix, declaration, installation)
         for declaration in MATRIX_EXACT_REPLAY_CHECKERS
+    )
+    graph_declarations = (
+        ()
+        if graph is None
+        else tuple(
+            _installed_declaration(graph, declaration, installation)
+            for declaration in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS
+        )
+    )
+    graph_adapters: tuple[CapabilityAdapter, ...] = (
+        ()
+        if not graph_declarations
+        else (
+            ExactDomainResultVerificationAdapter(
+                capability_id="graph.induced_tree.maximum.verify",
+                title="Verify a maximum induced tree result",
+                description=(
+                    "Independently exhaust bounded vertex subsets to verify one "
+                    "stored exact maximum induced-tree result and its graph binding."
+                ),
+                tags=("verification", "exact", "graph", "induced-tree"),
+                store=store,
+                schemas=schemas,
+                artifacts=artifacts,
+                verification=verification,
+                declarations=graph_declarations,
+                witness_schema_uri=witness_schema_uri,
+                provider_runtime=installation.provider_runtime,
+            ),
+        )
     )
     return (
         (
@@ -188,6 +240,7 @@ def install_exact_domain_verification(
                 witness_schema_uri=witness_schema_uri,
                 provider_runtime=installation.provider_runtime,
             ),
+            *graph_adapters,
         ),
         installation,
     )
@@ -272,7 +325,7 @@ class ExactDomainResultVerificationAdapter:
                     path="result_uri",
                     hint=(
                         "Pass a result_uri returned by one supported exact "
-                        "polynomial or matrix producer."
+                        "polynomial, matrix, or graph producer."
                     ),
                 )
             ) from exc
@@ -289,8 +342,8 @@ class ExactDomainResultVerificationAdapter:
                 result_uri=result_artifact.artifact_uri,
                 checker_id=declaration.checker_id,
                 detail=(
-                    "The authorized FLINT replay currently supports only "
-                    "univariate polynomial artifacts for this operation."
+                    "The authorized checker does not support this result's bounded "
+                    "input scope; no mathematical conclusion follows."
                 ),
             )
             return CapabilityResult(
@@ -300,10 +353,10 @@ class ExactDomainResultVerificationAdapter:
                 execution=Execution(status=ExecutionStatus.COMPLETED),
                 output=output.model_dump(mode="json"),
                 scope=CapabilityScope(
-                    description="the supported univariate checker scope",
+                    description="the authorized independent checker's bounded scope",
                     parameters={
                         "operation_id": declaration.declaration.capability_id,
-                        "polynomial_variables": 1,
+                        "scope_supported": False,
                     },
                     artifact_uri=input_artifact.artifact_uri,
                 ),
@@ -433,7 +486,7 @@ class ExactDomainResultVerificationAdapter:
                 level=assurance_level,
                 basis=(
                     "accepted in a clean process by the operator-authorized "
-                    "independent Python-FLINT checker"
+                    "independent exact replay checker"
                     if verified
                     else (
                         "checker replay completed without accepting the candidate; "
@@ -492,6 +545,13 @@ class ExactDomainResultVerificationAdapter:
 
 
 def _checker_supports(operation_id: str, payload: object) -> bool:
+    if operation_id == "graph.induced_tree.maximum.compute":
+        return (
+            isinstance(payload, dict)
+            and isinstance(payload.get("graph"), dict)
+            and isinstance(payload["graph"].get("vertices"), list)
+            and len(payload["graph"]["vertices"]) <= 16
+        )
     if not operation_id.startswith("polynomial."):
         return True
     if not isinstance(payload, dict):

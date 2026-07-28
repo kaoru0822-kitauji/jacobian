@@ -17,6 +17,7 @@ from jacobian.adapters.mcp.server import (
     _public_tool_error,
     create_server,
 )
+from jacobian.capabilities import CapabilityPolicy
 
 CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}
 MCP_TOOL_NAMES = CAPABILITY_TOOL_NAMES | WORKSPACE_TOOL_NAMES
@@ -496,6 +497,51 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
+def test_mcp_no_retrieval_policy_is_operator_bound_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        policy = CapabilityPolicy(profile="COMPUTE_VERIFY_NO_RETRIEVAL")
+        async with Client(
+            create_server(tmp_path, capability_policy=policy),
+            raise_exceptions=True,
+        ) as client:
+            resource = await client.read_resource("capability://catalog")
+            catalog = json.loads(resource.contents[0].text)
+            assert catalog["policy_profile"] == "COMPUTE_VERIFY_NO_RETRIEVAL"
+            assert catalog["policy_digest"] == policy.digest
+            assert "knowledge.search" not in {
+                descriptor["capability_id"] for descriptor in catalog["capabilities"]
+            }
+            assert all(
+                "retrieval" not in descriptor["tags"]
+                for descriptor in catalog["capabilities"]
+            )
+
+            denied = await client.call_tool(
+                "capability.invoke",
+                {
+                    "capability_id": "knowledge.search",
+                    "mode": "EXPLORE",
+                    "payload": {"query": "counterexample", "limit": 5},
+                },
+            )
+            result = json.loads(denied.content[0].text)
+            assert result["execution"]["status"] == "ERROR"
+            assert result["output"]["error"]["code"] == "CAPABILITY_POLICY_DENIED"
+            assert result["diagnostics"][0]["details"] == {
+                "policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
+                "policy_digest": policy.digest,
+                "reasons": ["capability_id_denied", "tag_denied"],
+                "checker_authorization_affected": False,
+            }
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
 def test_mcp_compact_capability_index_is_searchable_and_paginated(
     tmp_path: Path,
 ) -> None:
@@ -512,12 +558,14 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             listed = await client.call_tool(
                 "capability.describe",
-                {"limit": 50},
+                {"limit": 20},
             )
             index = json.loads(listed.content[0].text)
-            assert len(listed.content[0].text.encode("utf-8")) < 128 * 1024
+            assert len(listed.content[0].text.encode("utf-8")) <= 16 * 1024
             assert index["catalog_digest"].startswith("sha256:")
-            assert len(index["matches"]) <= 50
+            assert index["policy_digest"].startswith("sha256:")
+            assert index["response_byte_limit"] == 16 * 1024
+            assert len(index["matches"]) <= 20
             indexed_ids = {
                 descriptor["capability_id"] for descriptor in index["matches"]
             }
@@ -528,10 +576,10 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
             while cursor is not None:
                 next_page = await client.call_tool(
                     "capability.describe",
-                    {"cursor": cursor, "limit": 50},
+                    {"cursor": cursor, "limit": 20},
                 )
                 page = json.loads(next_page.content[0].text)
-                assert len(next_page.content[0].text.encode("utf-8")) < 128 * 1024
+                assert len(next_page.content[0].text.encode("utf-8")) <= 16 * 1024
                 assert page["catalog_digest"] == index["catalog_digest"]
                 indexed_ids.update(
                     descriptor["capability_id"] for descriptor in page["matches"]
@@ -586,14 +634,14 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             first_page = await client.call_tool(
                 "capability.describe",
-                {"limit": 50},
+                {"limit": 20},
             )
             first = json.loads(first_page.content[0].text)
-            assert len(first["matches"]) == 50
+            assert len(first["matches"]) <= 20
             assert first["next_cursor"] is not None
             second_page = await client.call_tool(
                 "capability.describe",
-                {"cursor": first["next_cursor"], "limit": 50},
+                {"cursor": first["next_cursor"], "limit": 20},
             )
             second = json.loads(second_page.content[0].text)
             assert {
@@ -607,7 +655,7 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
                 {
                     "query": "definitely-no-matching-capability",
                     "cursor": first["next_cursor"],
-                    "limit": 50,
+                    "limit": 20,
                 },
             )
             invalid = json.loads(invalid_cursor.content[0].text)
