@@ -43,7 +43,10 @@ from jacobian.domains.graph_optimization.checkers import (
 from jacobian.domains.matrix_lattice.checkers import MATRIX_EXACT_REPLAY_CHECKERS
 from jacobian.domains.polynomial.checkers import POLYNOMIAL_EXACT_REPLAY_CHECKERS
 from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.provider_runtime import exact_domain_checker_provider_runtime
+from jacobian.provider_runtime import (
+    exact_domain_checker_provider_runtime,
+    graph_exact_checker_provider_runtime,
+)
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
@@ -55,7 +58,7 @@ class ExactDomainCheckerInstallation:
     """Authorized checker identities keyed by producer capability ID."""
 
     checker_ids: dict[str, str | None]
-    provider_runtime: CapabilityProviderRuntime
+    provider_runtimes: dict[str, CapabilityProviderRuntime]
     witness_schema_uri: str | None = None
 
 
@@ -68,39 +71,47 @@ class _InstalledDeclaration:
     checker_id: str
 
 
+def _provider_runtime_key(declaration: ExactReplayCheckerDeclaration) -> str:
+    if declaration.entrypoint_module == "jacobian_checkers.exact_domain_operations":
+        return "python-flint"
+    if declaration.entrypoint_module == "jacobian_checkers.graph_exact_operations":
+        return "finite-graph"
+    raise ValueError(
+        "exact replay checker declaration uses an unsupported provider runtime"
+    )
+
+
 def install_exact_domain_checkers(
     checkers: CheckerRegistry,
     *,
     polynomial: InstalledDomainBundle,
     matrix: InstalledDomainBundle,
     graph: InstalledDomainBundle | None = None,
+    graph_invariants: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> ExactDomainCheckerInstallation:
     """Install independent exact replay against dynamically registered schemas."""
 
     installer = CheckerInstaller(checkers)
-    provider_runtime = exact_domain_checker_provider_runtime()
+    provider_runtimes = {
+        "python-flint": exact_domain_checker_provider_runtime(),
+        "finite-graph": graph_exact_checker_provider_runtime(),
+    }
     checker_ids: dict[str, str | None] = {}
+    declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
     for installed, declaration in (
         *((polynomial, item) for item in POLYNOMIAL_EXACT_REPLAY_CHECKERS),
         *((matrix, item) for item in MATRIX_EXACT_REPLAY_CHECKERS),
-        *(
-            ()
-            if graph is None
-            else tuple(
-                (graph, item) for item in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS
-            )
+        *_available_graph_declaration_bundles(
+            graph=graph,
+            graph_invariants=graph_invariants,
         ),
     ):
-        is_graph_checker = declaration.capability_id.startswith("graph.")
+        declarations_by_id[declaration.capability_id] = declaration
+        runtime_key = _provider_runtime_key(declaration)
         operation = CheckerOperation(
-            name=(
-                f"{declaration.capability_id} independent "
-                + ("finite exhaustive replay" if is_graph_checker else "FLINT replay")
-            ),
-            entrypoint=(
-                f"jacobian_checkers.exact_domain_operations:{declaration.function}"
-            ),
+            name=f"{declaration.capability_id} independent {declaration.replay_method}",
+            entrypoint=(f"{declaration.entrypoint_module}:{declaration.function}"),
             evidence_kind=EvidenceKind.WITNESS,
             format_id=declaration.format_id,
             format_version="1",
@@ -109,29 +120,32 @@ def install_exact_domain_checkers(
             candidate_schema_uris=(
                 installed.result_schema_uris[declaration.capability_id],
             ),
-            reason=(
-                "operator-authorized finite exhaustive checker independent of "
-                "the Z3 producer"
-                if is_graph_checker
-                else (
-                    "operator-authorized Python-FLINT exact replay independent "
-                    "of the SymPy producer"
-                )
-            ),
-            provider_runtime=provider_runtime,
+            reason=declaration.reason,
+            provider_runtime=provider_runtimes[runtime_key],
         )
         checker_ids[declaration.capability_id] = installer.install(
             operation,
             authorize=authorize,
         ).checker_id
-    authorized_ids = tuple(
-        checker_id for checker_id in checker_ids.values() if checker_id is not None
-    )
+    authorized_ids = {
+        runtime_key: tuple(
+            checker_id
+            for capability_id, checker_id in checker_ids.items()
+            if checker_id is not None
+            and _provider_runtime_key(declarations_by_id[capability_id]) == runtime_key
+        )
+        for runtime_key in provider_runtimes
+    }
     return ExactDomainCheckerInstallation(
         checker_ids=checker_ids,
-        provider_runtime=exact_domain_checker_provider_runtime(
-            checker_ids=authorized_ids
-        ),
+        provider_runtimes={
+            "python-flint": exact_domain_checker_provider_runtime(
+                checker_ids=authorized_ids["python-flint"]
+            ),
+            "finite-graph": graph_exact_checker_provider_runtime(
+                checker_ids=authorized_ids["finite-graph"]
+            ),
+        },
     )
 
 
@@ -145,6 +159,7 @@ def install_exact_domain_verification(
     polynomial: InstalledDomainBundle,
     matrix: InstalledDomainBundle,
     graph: InstalledDomainBundle | None = None,
+    graph_invariants: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> tuple[tuple[CapabilityAdapter, ...], ExactDomainCheckerInstallation]:
     """Authorize exact replay and expose domain-owned verification capabilities."""
@@ -154,6 +169,7 @@ def install_exact_domain_verification(
         polynomial=polynomial,
         matrix=matrix,
         graph=graph,
+        graph_invariants=graph_invariants,
         authorize=authorize,
     )
     witness_schema_uri = schemas.register_model(
@@ -164,7 +180,7 @@ def install_exact_domain_verification(
     installation = ExactDomainCheckerInstallation(
         checker_ids=installed.checker_ids,
         witness_schema_uri=witness_schema_uri,
-        provider_runtime=installed.provider_runtime,
+        provider_runtimes=installed.provider_runtimes,
     )
     if not authorize:
         return (), installation
@@ -176,35 +192,32 @@ def install_exact_domain_verification(
         _installed_declaration(matrix, declaration, installation)
         for declaration in MATRIX_EXACT_REPLAY_CHECKERS
     )
-    graph_declarations = (
-        ()
-        if graph is None
-        else tuple(
-            _installed_declaration(graph, declaration, installation)
-            for declaration in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS
+    graph_declarations = tuple(
+        _installed_declaration(
+            bundle,
+            declaration,
+            installation,
+        )
+        for bundle, declaration in _available_graph_declaration_bundles(
+            graph=graph,
+            graph_invariants=graph_invariants,
         )
     )
-    graph_adapters: tuple[CapabilityAdapter, ...] = (
-        ()
-        if not graph_declarations
-        else (
-            ExactDomainResultVerificationAdapter(
-                capability_id="graph.induced_tree.maximum.verify",
-                title="Verify a maximum induced tree result",
-                description=(
-                    "Independently exhaust bounded vertex subsets to verify one "
-                    "stored exact maximum induced-tree result and its graph binding."
-                ),
-                tags=("verification", "exact", "graph", "induced-tree"),
-                store=store,
-                schemas=schemas,
-                artifacts=artifacts,
-                verification=verification,
-                declarations=graph_declarations,
-                witness_schema_uri=witness_schema_uri,
-                provider_runtime=installation.provider_runtime,
-            ),
+    graph_adapters: tuple[CapabilityAdapter, ...] = tuple(
+        ExactDomainResultVerificationAdapter(
+            capability_id=_verification_metadata(declaration)[0],
+            title=_verification_metadata(declaration)[1],
+            description=_verification_metadata(declaration)[2],
+            tags=declaration.declaration.verification_tags,
+            store=store,
+            schemas=schemas,
+            artifacts=artifacts,
+            verification=verification,
+            declarations=(declaration,),
+            witness_schema_uri=witness_schema_uri,
+            provider_runtime=installation.provider_runtimes["finite-graph"],
         )
+        for declaration in graph_declarations
     )
     return (
         (
@@ -222,7 +235,7 @@ def install_exact_domain_verification(
                 verification=verification,
                 declarations=polynomial_declarations,
                 witness_schema_uri=witness_schema_uri,
-                provider_runtime=installation.provider_runtime,
+                provider_runtime=installation.provider_runtimes["python-flint"],
             ),
             ExactDomainResultVerificationAdapter(
                 capability_id="matrix.result.verify",
@@ -238,12 +251,48 @@ def install_exact_domain_verification(
                 verification=verification,
                 declarations=matrix_declarations,
                 witness_schema_uri=witness_schema_uri,
-                provider_runtime=installation.provider_runtime,
+                provider_runtime=installation.provider_runtimes["python-flint"],
             ),
             *graph_adapters,
         ),
         installation,
     )
+
+
+def _verification_metadata(
+    installed: _InstalledDeclaration,
+) -> tuple[str, str, str]:
+    declaration = installed.declaration
+    if (
+        declaration.verification_capability_id is None
+        or declaration.verification_title is None
+        or declaration.verification_description is None
+    ):
+        raise ValueError(
+            "separately exposed exact replay requires verification metadata"
+        )
+    return (
+        declaration.verification_capability_id,
+        declaration.verification_title,
+        declaration.verification_description,
+    )
+
+
+def _available_graph_declaration_bundles(
+    *,
+    graph: InstalledDomainBundle | None,
+    graph_invariants: InstalledDomainBundle | None,
+) -> tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...]:
+    available: list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]] = []
+    for declaration in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS:
+        bundle = (
+            graph_invariants
+            if declaration.capability_id.startswith("graph.invariant.")
+            else graph
+        )
+        if bundle is not None:
+            available.append((bundle, declaration))
+    return tuple(available)
 
 
 def _installed_declaration(
@@ -268,7 +317,7 @@ class ExactDomainArtifactError(ValueError):
 
 
 class ExactDomainResultVerificationAdapter:
-    """Verify one stored exact producer result using independent FLINT replay."""
+    """Verify one stored exact producer result using independent bounded replay."""
 
     def __init__(
         self,
@@ -298,7 +347,7 @@ class ExactDomainResultVerificationAdapter:
             version="1",
             title=title,
             description=description,
-            provider="jacobian.exact-domain-checkers",
+            provider=provider_runtime.provider,
             provider_runtime=provider_runtime,
             modes=(CapabilityMode.VERIFY,),
             input_schema=model_schema(ExactDomainResultVerificationRequest),
