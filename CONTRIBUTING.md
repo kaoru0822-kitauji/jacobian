@@ -76,10 +76,11 @@ add real-Lean validation to an otherwise isolated plan. These overrides only
 add work; labels cannot reduce the fail-closed path classification.
 Pull requests run the canonical Python version. Merge-queue groups and pushes
 to `main` additionally run supported-version compatibility and combined
-coverage as exhaustive gates. Refresh committed integration shard timings with
-`make test-durations` after substantial suite-shape changes.
-When integration timings materially change, run `make test-durations` and
-commit the refreshed `.test_durations` file with the affected tests.
+coverage as exhaustive gates. CI shards integration tests using
+pytest-split; the `.test_durations` file is git-ignored and regenerated
+locally with `make test-durations` after substantial suite-shape changes.
+The committed `Makefile` target updates the local shard data but does not
+commit it — the file is intentionally untracked to avoid merge conflicts.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 

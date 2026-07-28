@@ -109,7 +109,7 @@ jobs:
             pyproject.toml
             uv.lock
       - if: needs.plan.outputs.run-static == 'true'
-        run: uv sync --frozen --dev
+        run: uv sync --locked --dev
       - if: needs.plan.outputs.run-static == 'true'
         run: make lint-full
       - if: needs.plan.outputs.run-static == 'true'
@@ -141,7 +141,7 @@ jobs:
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv sync --frozen --dev
+      - run: uv sync --locked --dev
       - run: make security-audit
 
   validate-agents-md:
@@ -178,7 +178,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: >-
-          uv run --frozen pytest
+          uv run --locked pytest
           -m "not integration and not end_to_end and not lean_runtime"
           --junitxml=pytest.xml
           ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
@@ -219,7 +219,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: >-
-          uv run --frozen pytest
+          uv run --locked pytest
           -m "(integration or end_to_end) and not lean_runtime"
           --splits 3
           --group ${{ matrix.shard }}
@@ -259,7 +259,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: >-
-          uv run --frozen pytest
+          uv run --locked pytest
           -m "not lean_runtime"
           --junitxml=pytest.xml
           --durations=10
@@ -394,7 +394,7 @@ jobs:
             pyproject.toml
             uv.lock
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv sync --frozen --dev
+        run: uv sync --locked --dev
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         if: needs.plan.outputs.run-coverage == 'true'
         with:
@@ -402,12 +402,12 @@ jobs:
           path: coverage-data
           merge-multiple: true
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage combine coverage-data
+        run: uv run --locked coverage combine coverage-data
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage report --fail-under=50 | tee coverage-report.txt
+        run: uv run --locked coverage report --fail-under=50 | tee coverage-report.txt
         shell: bash -o pipefail {0}
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage xml
+        run: uv run --locked coverage xml
       - name: Post coverage summary to PR
         if: >-
           needs.plan.outputs.run-coverage == 'true' &&

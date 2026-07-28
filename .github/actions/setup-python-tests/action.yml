@@ -21,13 +21,13 @@ runs:
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}
-      run: uv sync --frozen --dev
+      run: uv sync --locked --dev
     - name: Require the requested Python version
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}
       run: >-
-        uv run --frozen python -c
+        uv run --locked python -c
         "import os, sys;
         expected = tuple(map(int, os.environ['UV_PYTHON'].split('.')));
         assert sys.version_info[:2] == expected,

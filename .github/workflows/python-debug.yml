@@ -46,7 +46,7 @@ jobs:
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv sync --frozen --dev
+      - run: uv sync --locked --dev
       - name: Run focused Python test
         env:
           TEST_SELECTOR: ${{ inputs.pytest-selector }}
@@ -56,4 +56,4 @@ jobs:
           if [ -n "$TEST_KEYWORD" ]; then
             args+=(-k "$TEST_KEYWORD")
           fi
-          uv run --frozen pytest "${args[@]}"
+          uv run --locked pytest "${args[@]}"

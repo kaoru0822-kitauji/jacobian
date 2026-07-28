@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-UV_RUN := uv run --frozen
+UV_RUN := uv run --locked
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
@@ -63,7 +63,7 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
 
-test-durations: ## Refresh committed integration shard timings for pytest-split.
+test-durations: ## Refresh local integration shard timings for pytest-split (untracked; CI falls back to average if absent).
 	$(UV_RUN) pytest \
 		-m "(integration or end_to_end) and not lean_runtime" \
 		--store-durations --clean-durations --durations-path .test_durations \
