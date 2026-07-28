@@ -61,7 +61,7 @@ dev = [
 packages = ["src/jacobian", "src/jacobian_checkers"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers -n auto --maxprocesses=4 --dist=worksteal"
+addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
 timeout = 120
 markers = [

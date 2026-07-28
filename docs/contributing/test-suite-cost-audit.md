@@ -177,6 +177,13 @@ of multi-second kernel startups. Modules that need authorized references opt
 into `initialized_kernel_store_with_references` instead of rebuilding that
 install on every case.
 
+Attaching `JacobianKernel(tmp_path)` after the store fixture is intentional, not
+a double bootstrap: the session template pays fresh construction once per worker,
+`copytree` seeds each test root in milliseconds, and attach reuses content-
+addressed descriptors in well under a second. Prefer the `kernel` /
+`kernel_with_references` fixtures for that attach step; do not remove the store
+fixtures to "avoid double construction."
+
 Suite infrastructure checks for the store templates themselves also live under
 `tests/integration/`: building and freezing those snapshots is multi-second
 setup work and must not run in the routine fast lane.

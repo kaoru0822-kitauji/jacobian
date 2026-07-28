@@ -28,11 +28,7 @@
     },
     {
       "name": "lean-python-tests",
-      "patterns": [
-        "tests/integration/lean/test_lean.py",
-        "tests/integration/lean/test_lean_proof_edit.py",
-        "tests/integration/lean/test_lean_exploration_capabilities.py"
-      ],
+      "patterns": ["tests/integration/lean/**"],
       "suites": ["lean", "static"]
     },
     {
@@ -80,6 +76,7 @@
         ".github/scripts/**",
         ".github/workflows/**",
         ".github/ci-impact.json",
+        ".github/ci-config.json",
         "pyproject.toml",
         "uv.lock",
         "Makefile"
@@ -88,8 +85,23 @@
     },
     {
       "name": "repository-policy",
-      "patterns": ["AGENTS.md", ".pre-commit-config.yaml", ".jscpd.json"],
+      "patterns": [
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        ".pre-commit-config.yaml",
+        ".jscpd.json"
+      ],
       "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+    },
+    {
+      "name": "test-support",
+      "patterns": ["tests/helpers/**", "tests/conftest.py"],
+      "suites": ["core", "integration", "static"]
+    },
+    {
+      "name": "benchmarks",
+      "patterns": ["benchmarks/**"],
+      "suites": ["core", "integration", "static", "build"]
     }
   ],
   "fallback": {

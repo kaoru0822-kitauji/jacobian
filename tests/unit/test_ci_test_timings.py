@@ -8,6 +8,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "manage-test-timings"
+CI_CONFIG = ROOT / ".github" / "ci-config.json"
+
+
+def shard_count() -> int:
+    return int(
+        json.loads(CI_CONFIG.read_text(encoding="utf-8"))["integration_shard_count"]
+    )
 
 
 def run_script(
@@ -41,8 +48,9 @@ def test_prepare_falls_back_to_equal_weighting_without_github_context(
 
 
 def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> None:
+    count = shard_count()
     inputs: list[str] = []
-    for shard in range(1, 5):
+    for shard in range(1, count + 1):
         path = tmp_path / f"shard-{shard}.json"
         path.write_text(
             json.dumps({f"tests/integration/test_{shard}.py::test_case": shard}),
@@ -68,13 +76,14 @@ def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> No
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["version"] == 1
     assert payload["suite"] == "integration"
-    assert payload["shard_count"] == 4
-    assert len(payload["durations"]) == 4
+    assert payload["shard_count"] == count
+    assert len(payload["durations"]) == count
 
 
 def test_merge_rejects_duplicate_node_ids(tmp_path: Path) -> None:
+    count = shard_count()
     inputs: list[str] = []
-    for shard in range(1, 5):
+    for shard in range(1, count + 1):
         path = tmp_path / f"shard-{shard}.json"
         path.write_text(
             json.dumps(

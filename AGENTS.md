@@ -119,7 +119,8 @@ Non-obvious caveats:
 - `make test-fast` is the quick core loop; `make check` (lint + typecheck +
   test-fast) is the pre-push gate. Never run bare `uv run pytest` across the whole
   suite — it mixes `lean_runtime` tests into the xdist pool and pytest rejects it;
-  use the `make test-*` targets instead.
+  use the `make test-*` targets instead. Parallel xdist is enabled by Make
+  targets (`test`, `test-core`, `test-integration`), not by global pytest addopts.
 - Quick end-to-end smoke of the product surface: `uv run jacobian --state-dir .jacobian init`
   (CLI), or start the MCP server with
   `uv run jacobian-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --allow-anonymous`

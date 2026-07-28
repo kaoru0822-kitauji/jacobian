@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from tests.helpers.capabilities import invoke_capability as _invoke
 
 import jacobian.provider_runtime as provider_runtime
 from jacobian.bounded_process import BoundedProcessResult
@@ -15,8 +16,6 @@ from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
     CapabilityMode,
     CapabilityProviderAvailability,
-    CapabilityRequest,
-    CapabilityResult,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
@@ -29,22 +28,6 @@ pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 def _matrix(entries: list[list[int | str]]) -> dict[str, Any]:
     return {"entries": [[str(value) for value in row] for row in entries]}
-
-
-def _invoke(
-    kernel: JacobianKernel,
-    capability_id: str,
-    payload: dict[str, Any],
-    *,
-    mode: CapabilityMode,
-) -> CapabilityResult:
-    return kernel.capabilities.invoke(
-        CapabilityRequest(
-            capability_id=capability_id,
-            mode=mode,
-            input=payload,
-        )
-    )
 
 
 def _kernel_with_checker(root: Path) -> JacobianKernel:

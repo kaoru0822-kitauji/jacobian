@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.installations import install_capability_bundle
 from tests.helpers.polynomials import univariate_term as _term
 
-from jacobian.artifacts import ArtifactService
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -18,10 +18,6 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.polynomial_positivity_capabilities import (
     install_polynomial_positivity_capabilities,
 )
-from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
-from jacobian.verification import VerificationService
 from jacobian_checkers.polynomial_positivity import check_positivity
 
 # ---------------------------------------------------------------------------
@@ -268,20 +264,10 @@ def test_checker_rejects_noncanonical_rational() -> None:
 
 @pytest.fixture()
 def installation(tmp_path: Path):
-    store = ArtifactStore(tmp_path / "store")
-    schemas = SchemaRegistry(store)
-    artifacts = ArtifactService(store, schemas)
-    checkers = CheckerRegistry(tmp_path / "checkers.sqlite3")
-    verification = VerificationService(store, checkers)
-    adapters, installed = install_polynomial_positivity_capabilities(
-        store,
-        schemas,
-        artifacts,
-        verification,
-        checkers,
-        authorize_checker=True,
+    return install_capability_bundle(
+        tmp_path,
+        install_polynomial_positivity_capabilities,
     )
-    return adapters, installed, store
 
 
 def test_decide_capability_finds_positive_linear(installation) -> None:

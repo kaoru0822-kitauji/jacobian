@@ -2,12 +2,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from tests.helpers.capabilities import invoke_capability as _invoke
 
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
-    CapabilityRequest,
-    CapabilityResult,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
@@ -35,16 +34,6 @@ def _polynomial(
             ]
         },
     }
-
-
-def _invoke(
-    kernel: JacobianKernel,
-    capability_id: str,
-    payload: dict[str, object],
-) -> CapabilityResult:
-    return kernel.capabilities.invoke(
-        CapabilityRequest(capability_id=capability_id, input=payload)
-    )
 
 
 def test_polynomial_bundle_installs_and_computes_exact_invariants(

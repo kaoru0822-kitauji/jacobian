@@ -1,6 +1,7 @@
 """Suite-wide pytest conventions."""
 
 import gc
+import os
 import shutil
 import sqlite3
 from pathlib import Path
@@ -96,23 +97,51 @@ def initialized_kernel_store_with_references(
     )
 
 
+@pytest.fixture
+def kernel(tmp_path: Path, initialized_kernel_store: None) -> JacobianKernel:
+    """Attach a kernel to a per-test copy of the core descriptor snapshot."""
+
+    _ = initialized_kernel_store
+    return JacobianKernel(tmp_path)
+
+
+@pytest.fixture
+def kernel_with_references(
+    tmp_path: Path,
+    initialized_kernel_store_with_references: None,
+) -> JacobianKernel:
+    """Attach a kernel to a per-test copy that already has authorized references."""
+
+    _ = initialized_kernel_store_with_references
+    return JacobianKernel(tmp_path, install_references=True)
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    """Reject unsafe parallel Lean execution."""
+    """Reject unsafe parallel Lean execution on controllers and xdist workers."""
 
     workers = config.getoption("numprocesses", default=None)
-    if workers in (None, 0, "0"):
+    under_xdist = hasattr(config, "workerinput") or bool(
+        os.environ.get("PYTEST_XDIST_WORKER")
+    )
+    parallel = under_xdist or workers not in (None, 0, "0")
+    if not parallel:
         return
     lean_items = [
         item.nodeid for item in items if item.get_closest_marker("lean_runtime")
     ]
-    if lean_items:
-        sample = ", ".join(lean_items[:3])
-        raise pytest.UsageError(
-            "Lean runtime tests cannot run under pytest-xdist. "
-            "Use `make test` for the non-Lean suite or `make test-lean` "
-            f"for serial Lean validation. Selected Lean tests include: {sample}"
-        )
+    if not lean_items:
+        return
+    sample = ", ".join(lean_items[:3])
+    message = (
+        "Lean runtime tests cannot run under pytest-xdist. "
+        "Use `make test` for the non-Lean suite or `make test-lean` "
+        f"for serial Lean validation. Selected Lean tests include: {sample}"
+    )
+    if under_xdist:
+        # UsageError on workers only kills the worker; exit so the controller fails closed.
+        pytest.exit(message, returncode=4)
+    raise pytest.UsageError(message)

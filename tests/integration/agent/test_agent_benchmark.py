@@ -6,12 +6,9 @@ from pathlib import Path
 
 import pytest
 from benchmarks import agent_mcp as benchmark
+from tests.helpers.capabilities import invoke_capability as _invoke
 
-from jacobian.contracts.capabilities import (
-    CapabilityMode,
-    CapabilityRequest,
-    CapabilityResult,
-)
+from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.kernel import JacobianKernel
 
@@ -25,18 +22,6 @@ def _feedback() -> dict[str, list[str]]:
         "domain_knowledge_gaps": [],
         "suggested_improvements": [],
     }
-
-
-def _invoke(
-    kernel: JacobianKernel,
-    capability_id: str,
-    payload: dict[str, object],
-    *,
-    mode: CapabilityMode = CapabilityMode.EXPLORE,
-) -> CapabilityResult:
-    return kernel.capabilities.invoke(
-        CapabilityRequest(capability_id=capability_id, mode=mode, input=payload)
-    )
 
 
 def test_graph_capability_scorer_checks_multi_call_artifacts(

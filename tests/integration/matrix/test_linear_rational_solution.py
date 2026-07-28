@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.capabilities import invoke_capability as _invoke
 from tests.helpers.rationals import rational_payload as _q
 
 import jacobian.provider_runtime as provider_runtime
@@ -19,8 +20,6 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
-    CapabilityRequest,
-    CapabilityResult,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
@@ -44,22 +43,6 @@ def _system(
         },
         "rhs": [wire(value) for value in rhs],
     }
-
-
-def _invoke(
-    kernel: JacobianKernel,
-    capability_id: str,
-    payload: dict[str, Any],
-    *,
-    mode: CapabilityMode,
-) -> CapabilityResult:
-    return kernel.capabilities.invoke(
-        CapabilityRequest(
-            capability_id=capability_id,
-            mode=mode,
-            input=payload,
-        )
-    )
 
 
 def _kernel_with_linear_checker(root: Path) -> JacobianKernel:

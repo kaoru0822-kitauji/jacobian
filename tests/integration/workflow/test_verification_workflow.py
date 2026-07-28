@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.helpers.capabilities import invoke_capability as _invoke
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
     CapabilityMode,
-    CapabilityRequest,
 )
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.contracts.results import Conclusion, Verification
@@ -34,18 +34,6 @@ def _claim(
         "required_capabilities": capabilities,
         "correspondence_status": "HUMAN_REVIEWED",
     }
-
-
-def _invoke(
-    kernel: JacobianKernel,
-    capability_id: str,
-    payload: dict[str, object],
-    *,
-    mode: CapabilityMode = CapabilityMode.EXPLORE,
-):
-    return kernel.capabilities.invoke(
-        CapabilityRequest(capability_id=capability_id, mode=mode, input=payload)
-    )
 
 
 def test_atomic_capability_catalog_includes_required_and_excludes_composite_operations(

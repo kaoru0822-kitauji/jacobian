@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -17,21 +18,22 @@ from jacobian.provider_runtime import carcara_provider_runtime
 
 pytestmark = [
     pytest.mark.external_backend,
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
 _FIXTURES = Path(__file__).parents[2] / "fixtures" / "smt"
 
 
 @pytest.fixture(scope="module")
-def kernel(tmp_path_factory: pytest.TempPathFactory) -> JacobianKernel:
+def kernel(
+    tmp_path_factory: pytest.TempPathFactory,
+    kernel_store_template_with_references: Path,
+) -> JacobianKernel:
     runtime = carcara_provider_runtime()
     if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
         pytest.skip("the exact operator-provenanced Carcara runtime is unavailable")
-    installed = JacobianKernel(
-        tmp_path_factory.mktemp("carcara-kernel"),
-        install_references=True,
-    )
+    root = tmp_path_factory.mktemp("carcara-kernel")
+    shutil.copytree(kernel_store_template_with_references, root, dirs_exist_ok=True)
+    installed = JacobianKernel(root, install_references=True)
     assert installed.carcara_runtime == runtime
     return installed
 

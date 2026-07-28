@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.installations import install_capability_bundle
 from tests.helpers.polynomials import univariate_term as _term
 
-from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -18,10 +18,6 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.polynomial_interval_capabilities import (
     install_polynomial_interval_capabilities,
 )
-from jacobian.registry import CheckerRegistry
-from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
-from jacobian.verification import VerificationService
 
 
 def _polynomial(variable: str, terms: list[dict[str, Any]]) -> dict[str, Any]:
@@ -43,20 +39,10 @@ def _interval(lo: str, hi: str) -> dict[str, Any]:
 
 @pytest.fixture()
 def installation(tmp_path: Path):
-    store = ArtifactStore(tmp_path / "store")
-    schemas = SchemaRegistry(store)
-    artifacts = ArtifactService(store, schemas)
-    checkers = CheckerRegistry(tmp_path / "checkers.sqlite3")
-    verification = VerificationService(store, checkers)
-    adapters, installed = install_polynomial_interval_capabilities(
-        store,
-        schemas,
-        artifacts,
-        verification,
-        checkers,
-        authorize_checker=True,
+    return install_capability_bundle(
+        tmp_path,
+        install_polynomial_interval_capabilities,
     )
-    return adapters, installed, store
 
 
 def test_enclose_capability_computes_a_valid_bernstein_enclosure(

@@ -58,9 +58,14 @@ pytestmark = [
 
 def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
     tmp_path: Path,
+    kernel_store_template_with_references: Path,
 ) -> None:
-    indexed_kernel = JacobianKernel(tmp_path / "indexed", install_references=True)
-    fresh_kernel = JacobianKernel(tmp_path / "fresh", install_references=True)
+    indexed_root = tmp_path / "indexed"
+    fresh_root = tmp_path / "fresh"
+    shutil.copytree(kernel_store_template_with_references, indexed_root)
+    shutil.copytree(kernel_store_template_with_references, fresh_root)
+    indexed_kernel = JacobianKernel(indexed_root, install_references=True)
+    fresh_kernel = JacobianKernel(fresh_root, install_references=True)
     indexed = indexed_kernel.lean_declarations
     fresh = fresh_kernel.lean_declarations
     assert indexed is not None
