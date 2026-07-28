@@ -5,6 +5,7 @@ from jacobian.contracts.sequences import (
     IntegerSequenceIndexListResult,
     IntegerSequenceRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.sequences._support import sequence_operation
 from jacobian.domains.sequences.operations import (
     frequencies,
@@ -21,6 +22,7 @@ SEQUENCE_SEARCH_CAPABILITIES = (
         frequencies,
         "sequence",
         "counting",
+        invocation_examples=(example("frequencies_1_2_1", "Count frequencies in 1, 2, and 1.", {"values": ["1", "2", "1"]}),),
     ),
     sequence_operation(
         "sequence.compute.zero_indices",
@@ -31,5 +33,6 @@ SEQUENCE_SEARCH_CAPABILITIES = (
         zero_indices,
         "sequence",
         "search",
+        invocation_examples=(example("zero_indices_2_0_3", "Locate zero terms in 2, 0, and 3.", {"values": ["2", "0", "3"]}),),
     ),
 )
