@@ -22,8 +22,8 @@ from jacobian.contracts.polynomial_operations import (
     RationalPolynomialIntegralResult,
     RationalPolynomialRequest,
 )
-from jacobian.domains.polynomial._support import polynomial_operation
 from jacobian.domains._examples import example
+from jacobian.domains.polynomial._support import polynomial_operation
 from jacobian.domains.polynomial.elementary_operations import (
     integer_polynomial_compose,
     integer_polynomial_content,

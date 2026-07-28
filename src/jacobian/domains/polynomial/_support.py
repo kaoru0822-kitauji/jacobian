@@ -5,7 +5,10 @@ from dataclasses import replace
 
 from sympy.polys.polyerrors import PolynomialError
 
-from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.contracts.capabilities import (
+    CapabilityDiagnostic,
+    CapabilityInvocationExample,
+)
 from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.domains.polynomial.operations import PolynomialOutputBudgetError
 from jacobian.operations import (
@@ -37,6 +40,7 @@ def polynomial_operation[
     result_model: type[ResultT],
     operation: Callable[[ContractModel], ContractModel],
     *tags: str,
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
 ) -> ComputedOperation[RequestT, ResultT]:
     """Declare an exact polynomial operation with bounded-output failure semantics."""
 
@@ -48,6 +52,7 @@ def polynomial_operation[
         result_model,
         operation,
         *tags,
+        invocation_examples=invocation_examples,
     )
     implementation = declared.implementation
 
