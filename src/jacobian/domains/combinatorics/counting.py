@@ -6,6 +6,7 @@ from jacobian.contracts.combinatorics import (
     NonnegativeIntegerRequest,
     NonnegativePairRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.combinatorics._support import (
     combinatorics_operation,
 )
@@ -62,6 +63,7 @@ COUNTING_CAPABILITIES = (
         binomial,
         "combinatorics",
         "counting",
+        invocation_examples=(example("binomial_5_choose_2", "Compute 5 choose 2.", {"n": 5, "k": 2}),),
     ),
     combinatorics_operation(
         "combinatorics.compute.multinomial",

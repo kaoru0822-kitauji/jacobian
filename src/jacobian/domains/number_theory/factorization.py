@@ -9,7 +9,10 @@ from pydantic import ValidationError
 
 from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
-from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.contracts.capabilities import (
+    CapabilityDiagnostic,
+    CapabilityInvocationExample,
+)
 from jacobian.contracts.number_theory import (
     ArithmeticFunctionRequest,
     BooleanResult,
@@ -19,6 +22,7 @@ from jacobian.contracts.number_theory import (
     PrimeFactorizationResult,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.operations import (
     ComputedNotApplicable,
     ComputedOperation,
@@ -156,6 +160,7 @@ def _operation[RequestT: ContractModel, ResultT: ContractModel](
     request_model: type[RequestT],
     result_model: type[ResultT],
     tags: tuple[str, ...],
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
 ) -> ComputedOperation[RequestT, ResultT]:
     def implementation(request: RequestT) -> ComputedOutcome[ResultT]:
         if not isinstance(request, (FactorizationRequest, ArithmeticFunctionRequest)):
@@ -171,6 +176,7 @@ def _operation[RequestT: ContractModel, ResultT: ContractModel](
         implementation=implementation,
         relation_id=capability_id.replace(".compute.", ".relation.", 1),
         tags=tags,
+        invocation_examples=invocation_examples,
     )
 
 
@@ -198,6 +204,7 @@ FACTORIZATION_CAPABILITIES = (
         request_model=FactorizationRequest,
         result_model=DivisorListResult,
         tags=("number-theory", "enumeration"),
+        invocation_examples=(example("proper_divisors_12", "Enumerate the proper divisors of 12.", {"value": "12"}),),
     ),
     _operation(
         capability_id="integer.compute.prime_factorization",
