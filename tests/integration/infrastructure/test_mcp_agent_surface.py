@@ -11,7 +11,7 @@ from mcp import Client
 from jacobian.adapters.mcp.server import create_server
 
 SNAPSHOT_PATH = (
-    Path(__file__).resolve().parents[1] / "snapshots" / "mcp_agent_surface.sha256"
+    Path(__file__).resolve().parents[2] / "snapshots" / "mcp_agent_surface.sha256"
 )
 FIXTURE_ENTRYPOINT = "tests.fixtures.capability_functions:create_adapter"
 

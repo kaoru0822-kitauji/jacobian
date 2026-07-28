@@ -20,7 +20,7 @@ pytestmark = [
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
-_FIXTURES = Path(__file__).parents[1] / "fixtures" / "smt"
+_FIXTURES = Path(__file__).parents[2] / "fixtures" / "smt"
 
 
 @pytest.fixture(scope="module")

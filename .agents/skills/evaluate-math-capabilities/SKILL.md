@@ -67,7 +67,7 @@ Read `AGENTS.md` and inspect:
 - `benchmarks/agent_ab.py`
 - `benchmarks/ab_cases/`
 - `src/jacobian/eval_telemetry.py`
-- `tests/integration/test_agent_ab_benchmark.py`
+- `tests/integration/agent/test_agent_ab_benchmark.py`
 - the relevant capability descriptors, checkers, and contracts.
 
 Extend the established case schemas and runner when practical. Do not create a

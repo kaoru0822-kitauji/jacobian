@@ -19,7 +19,7 @@ def test_parallel_pytest_rejects_selected_lean_runtime_tests() -> None:
             "2",
             "-m",
             "lean_runtime",
-            "tests/integration/test_lean.py",
+            "tests/integration/lean/test_lean.py",
         ],
         cwd=PROJECT_ROOT,
         capture_output=True,

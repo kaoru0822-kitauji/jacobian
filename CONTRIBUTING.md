@@ -38,13 +38,13 @@ recorded in the
 Tests can be narrowed without learning another wrapper:
 
 ```sh
-make test TESTS=tests/integration/test_mcp_adapter.py
-make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-contracts
 make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
-make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
+make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,

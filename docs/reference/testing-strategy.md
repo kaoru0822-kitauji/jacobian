@@ -57,13 +57,13 @@ The current local development entry points are:
 ```sh
 make test-fast
 make test-failed
-make test TESTS=tests/integration/test_mcp_adapter.py
-make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-contracts
 make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
-make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
+make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
 make check
 make check-static
 make validate-full

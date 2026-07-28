@@ -34,7 +34,7 @@ from jacobian.lean_declarations import (
     LeanSubprocessDeclarationBackend,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MATHLIB_OLEAN = (
     PROJECT_ROOT
     / "lean"
