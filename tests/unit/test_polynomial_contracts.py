@@ -3,10 +3,16 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from jacobian.contracts.exact import (
+    bounded_rational_grid_size,
+    bounded_rational_scalars,
+)
+from jacobian.contracts.polynomial_systems import PolynomialSystemRationalSearchRequest
 from jacobian.contracts.polynomials import (
     PolynomialCollisionOutput,
     PolynomialCollisionPayload,
     PolynomialCollisionRequest,
+    PolynomialCollisionSearchRequest,
     PolynomialEvaluationRequest,
     PolynomialJacobianRequest,
     PolynomialMapEvaluation,
@@ -36,6 +42,27 @@ def _identity_map(dimension: int = 1) -> dict[str, object]:
             }
             for coordinate in range(dimension)
         ],
+    }
+
+
+def _linear_system(dimension: int = 1) -> dict[str, object]:
+    return {
+        "system_schema_version": "1",
+        "domain": "QQ",
+        "variables": [f"x{index}" for index in range(dimension)],
+        "equations": [
+            {
+                "terms": [
+                    {
+                        "coefficient": _rational(1),
+                        "exponents": [
+                            int(variable == 0) for variable in range(dimension)
+                        ],
+                    }
+                ]
+            }
+        ],
+        "inequations": [],
     }
 
 
@@ -132,3 +159,51 @@ def test_source_map_rejects_exponents_reserved_for_derived_artifacts() -> None:
 
     with pytest.raises(ValidationError, match="source polynomial exponents"):
         RationalPolynomialMap.model_validate(polynomial_map)
+
+
+def test_bounded_rational_scalars_deduplicate_equivalents() -> None:
+    assert len(bounded_rational_scalars(8, 8)) == 87
+    assert bounded_rational_grid_size(8, 8, 2) == 7569
+
+
+def test_collision_search_accepts_exact_grid_within_limit() -> None:
+    # Loose upper bound is 136**2 = 18496; exact deduplicated grid is 87**2 = 7569.
+    PolynomialCollisionSearchRequest.model_validate(
+        {
+            "map": _identity_map(2),
+            "max_abs_numerator": 8,
+            "max_denominator": 8,
+        }
+    )
+
+
+def test_collision_search_rejects_exact_grid_over_limit() -> None:
+    with pytest.raises(ValidationError, match="10,000"):
+        PolynomialCollisionSearchRequest.model_validate(
+            {
+                "map": _identity_map(4),
+                "max_abs_numerator": 8,
+                "max_denominator": 8,
+            }
+        )
+
+
+def test_system_search_accepts_exact_grid_within_limit() -> None:
+    PolynomialSystemRationalSearchRequest.model_validate(
+        {
+            "system": _linear_system(2),
+            "max_abs_numerator": 8,
+            "max_denominator": 8,
+        }
+    )
+
+
+def test_system_search_rejects_exact_grid_over_limit() -> None:
+    with pytest.raises(ValidationError, match="10,000"):
+        PolynomialSystemRationalSearchRequest.model_validate(
+            {
+                "system": _linear_system(4),
+                "max_abs_numerator": 8,
+                "max_denominator": 8,
+            }
+        )
