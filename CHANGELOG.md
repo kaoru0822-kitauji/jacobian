@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.4.0-alpha.0...jacobian-v0.4.1-alpha.0) (2026-07-28)
+
+
+### Bug Fixes
+
+* **ci:** stabilize release and integration shard gates ([6893e3b](https://github.com/morluto/jacobian/commit/6893e3b2ff599cd1cd31c1b1fb285e871ae2a018))
+* **ci:** stabilize release and integration shard gates ([9bfe43a](https://github.com/morluto/jacobian/commit/9bfe43a6a36bb2cd94af9b99452e178405157255))
+
 ## [0.4.0-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.3.0-alpha.0...jacobian-v0.4.0-alpha.0) (2026-07-28)
 
 
