@@ -98,7 +98,7 @@ def test_kernel_store_template_is_quiescent_and_copyable(
             for destination in destinations
         ]
         for future in futures:
-            future.result()
+            future.result(timeout=30)
     gc.collect()
 
 

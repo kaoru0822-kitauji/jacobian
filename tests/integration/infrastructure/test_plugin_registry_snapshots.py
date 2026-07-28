@@ -122,8 +122,8 @@ def _install_external_plugin(
         "PYTHONPATH",
         str(tmp_path) if not existing_path else f"{tmp_path}:{existing_path}",
     )
-    sys.modules.pop("external_plugin", None)
-    sys.modules.pop("external_plugin.entry", None)
+    monkeypatch.delitem(sys.modules, "external_plugin", raising=False)
+    monkeypatch.delitem(sys.modules, "external_plugin.entry", raising=False)
 
     claim_schema_uri = kernel.schemas.register(
         name="external-plugin.claim",
