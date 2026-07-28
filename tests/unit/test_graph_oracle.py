@@ -52,6 +52,15 @@ def test_graph_oracle_rejects_wrong_exact_property() -> None:
         )
 
 
+def test_graph_oracle_accepts_maximum_independence_scope() -> None:
+    graph = {"vertices": [str(index) for index in range(18)], "edges": []}
+
+    properties = compute_properties(graph)
+
+    assert properties["order"] == 18
+    assert properties["independence_number"] == 18
+
+
 def test_graph_oracle_rejects_exponential_independence_scope() -> None:
     graph = {"vertices": [str(index) for index in range(19)], "edges": []}
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from jacobian.plugins.erdos_straus import (
     evaluate_capability,
     find_witness_capability,
@@ -66,22 +68,30 @@ def test_find_witness_returns_complete_exact_table() -> None:
     )
 
 
-def test_find_witness_rejects_wrong_role_or_range() -> None:
-    for request in (
-        {
-            "claim": _claim(),
-            "candidate": _candidate(),
-            "witness_role": "DEFEATS_CANDIDATE",
-        },
-        {
-            "claim": _claim(2, 100),
-            "candidate": _candidate(2, 99),
-            "witness_role": "SUPPORTS_CLAIM",
-        },
-    ):
-        try:
-            find_witness_capability(request)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("invalid witness request was accepted")
+@pytest.mark.parametrize(
+    ("witness_request", "message"),
+    (
+        (
+            {
+                "claim": _claim(),
+                "candidate": _candidate(),
+                "witness_role": "DEFEATS_CANDIDATE",
+            },
+            "supports only SUPPORTS_CLAIM witnesses",
+        ),
+        (
+            {
+                "claim": _claim(2, 100),
+                "candidate": _candidate(2, 99),
+                "witness_role": "SUPPORTS_CLAIM",
+            },
+            "candidate range must exactly match the claim range",
+        ),
+    ),
+)
+def test_find_witness_rejects_wrong_role_or_range(
+    witness_request: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        find_witness_capability(witness_request)

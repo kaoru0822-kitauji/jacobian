@@ -50,6 +50,7 @@ def test_ci_timing_summary_reports_elapsed_and_runner_minutes(tmp_path: Path) ->
         check=True,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     assert "Critical path (workflow elapsed) | 5.0 min" in completed.stdout
