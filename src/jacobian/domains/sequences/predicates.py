@@ -33,7 +33,13 @@ SEQUENCE_PREDICATE_CAPABILITIES = (
         decide_geometric,
         "sequence",
         "predicate",
-        invocation_examples=(example("powers_of_two", "Recognize a geometric sequence of powers of two.", {"values": ["2", "4", "8", "16"]}),),
+        invocation_examples=(
+            example(
+                "powers_of_two",
+                "Recognize a geometric sequence of powers of two.",
+                {"values": ["2", "4", "8", "16"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.decide.nondecreasing",

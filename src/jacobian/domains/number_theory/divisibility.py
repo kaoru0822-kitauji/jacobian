@@ -65,7 +65,13 @@ DIVISIBILITY_CAPABILITIES = (
         compute_extended_gcd,
         "number-theory",
         "certificate",
-        invocation_examples=(example("bezout_84_30", "Compute Bezout coefficients for 84 and 30.", {"left": "84", "right": "30"}),),
+        invocation_examples=(
+            example(
+                "bezout_84_30",
+                "Compute Bezout coefficients for 84 and 30.",
+                {"left": "84", "right": "30"},
+            ),
+        ),
     ),
     number_theory_operation(
         "integer.compute.valuation",

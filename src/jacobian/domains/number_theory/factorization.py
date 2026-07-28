@@ -204,7 +204,13 @@ FACTORIZATION_CAPABILITIES = (
         request_model=FactorizationRequest,
         result_model=DivisorListResult,
         tags=("number-theory", "enumeration"),
-        invocation_examples=(example("proper_divisors_12", "Enumerate the proper divisors of 12.", {"value": "12"}),),
+        invocation_examples=(
+            example(
+                "proper_divisors_12",
+                "Enumerate the proper divisors of 12.",
+                {"value": "12"},
+            ),
+        ),
     ),
     _operation(
         capability_id="integer.compute.prime_factorization",

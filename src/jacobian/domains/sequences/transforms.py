@@ -42,7 +42,13 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         first_differences,
         "sequence",
         "transform",
-        invocation_examples=(example("square_first_differences", "Compute differences of consecutive squares.", {"values": ["1", "4", "9", "16"]}),),
+        invocation_examples=(
+            example(
+                "square_first_differences",
+                "Compute differences of consecutive squares.",
+                {"values": ["1", "4", "9", "16"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.prefix_products",
@@ -83,7 +89,13 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         prefix_gcds,
         "sequence",
         "divisibility",
-        invocation_examples=(example("prefix_gcds_18_24_15", "Compute prefix gcds of 18, 24, and 15.", {"values": ["18", "24", "15"]}),),
+        invocation_examples=(
+            example(
+                "prefix_gcds_18_24_15",
+                "Compute prefix gcds of 18, 24, and 15.",
+                {"values": ["18", "24", "15"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.prefix_lcms",

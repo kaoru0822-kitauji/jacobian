@@ -63,7 +63,9 @@ COUNTING_CAPABILITIES = (
         binomial,
         "combinatorics",
         "counting",
-        invocation_examples=(example("binomial_5_choose_2", "Compute 5 choose 2.", {"n": 5, "k": 2}),),
+        invocation_examples=(
+            example("binomial_5_choose_2", "Compute 5 choose 2.", {"n": 5, "k": 2}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.multinomial",

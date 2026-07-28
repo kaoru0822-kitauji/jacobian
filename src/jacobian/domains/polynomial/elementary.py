@@ -52,7 +52,16 @@ INTEGER_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "integer",
         "gcd",
-        invocation_examples=(example("integer_gcd", "Compute the GCD of two integer polynomials.", {"left": {"coefficients": ["6", "6", "0"]}, "right": {"coefficients": ["8", "8", "0"]}}),),
+        invocation_examples=(
+            example(
+                "integer_gcd",
+                "Compute the GCD of two integer polynomials.",
+                {
+                    "left": {"coefficients": ["6", "6", "0"]},
+                    "right": {"coefficients": ["8", "8", "0"]},
+                },
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.integer.compute.content",
@@ -89,7 +98,13 @@ INTEGER_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "integer",
         "evaluation",
-        invocation_examples=(example("evaluate_at_four", "Evaluate 2x²-3x+1 at 4.", {"polynomial": {"coefficients": ["2", "-3", "1"]}, "point": "4"}),),
+        invocation_examples=(
+            example(
+                "evaluate_at_four",
+                "Evaluate 2x²-3x+1 at 4.",
+                {"polynomial": {"coefficients": ["2", "-3", "1"]}, "point": "4"},
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.integer.compute.compose",
@@ -129,7 +144,48 @@ RATIONAL_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "rational",
         "division",
-        invocation_examples=(example("divide_x_squared_minus_one", "Divide x²-1 by x-1.", {"left": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}, "right": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [1]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}}),),
+        invocation_examples=(
+            example(
+                "divide_x_squared_minus_one",
+                "Divide x²-1 by x-1.",
+                {
+                    "left": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [2],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                    "right": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [1],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                },
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.rational.compute.evaluate",
@@ -152,7 +208,31 @@ RATIONAL_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "rational",
         "derivative",
-        invocation_examples=(example("cubic_derivative", "Differentiate one half x³ minus 2x.", {"polynomial": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "2"}, "exponents": [3]}, {"coefficient": {"num": "-2", "den": "1"}, "exponents": [1]}]}}}),),
+        invocation_examples=(
+            example(
+                "cubic_derivative",
+                "Differentiate one half x³ minus 2x.",
+                {
+                    "polynomial": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "2"},
+                                    "exponents": [3],
+                                },
+                                {
+                                    "coefficient": {"num": "-2", "den": "1"},
+                                    "exponents": [1],
+                                },
+                            ]
+                        },
+                    }
+                },
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.rational.compute.integral",

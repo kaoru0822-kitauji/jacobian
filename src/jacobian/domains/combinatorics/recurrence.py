@@ -59,6 +59,8 @@ RECURRENCE_CAPABILITIES = (
         bernoulli,
         "combinatorics",
         "sequence",
-        invocation_examples=(example("bernoulli_4", "Compute the fourth Bernoulli number.", {"n": 4}),),
+        invocation_examples=(
+            example("bernoulli_4", "Compute the fourth Bernoulli number.", {"n": 4}),
+        ),
     ),
 )
