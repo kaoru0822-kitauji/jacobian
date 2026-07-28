@@ -1,0 +1,26 @@
+from __future__ import annotations
+
+import pytest
+
+from jacobian.contracts.workspaces import (
+    WorkspaceOpenRequest,
+    WorkspaceOpenResult,
+)
+from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
+
+def _open(
+    kernel: JacobianKernel,
+    *,
+    key: str = "workspace-open-001",
+) -> WorkspaceOpenResult:
+    return kernel.workspaces.open(
+        WorkspaceOpenRequest(
+            idempotency_key=key,
+            name="bounded conjecture",
+            problem="Determine whether P(n) holds for every n in the declared scope.",
+            tags=("bounded",),
+        )
+    )

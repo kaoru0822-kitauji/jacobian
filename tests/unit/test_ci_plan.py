@@ -121,7 +121,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/integration/agent/test_agent_ab_benchmark.py",),
+            ("tests/integration/agent/test_agent_ab_protocol.py",),
             _expected_plan(
                 "python-integration",
                 "run-python",

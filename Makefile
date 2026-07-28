@@ -65,7 +65,11 @@ test-storage: ## Run artifact, registry, and workspace integration tests.
 	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_artifact_store.py \
 		tests/integration/infrastructure/test_checker_registry.py \
 		tests/integration/infrastructure/test_plugin_registry_snapshots.py \
-		tests/integration/infrastructure/test_workspaces.py $(PYTEST_ARGS)
+		tests/integration/infrastructure/test_workspace_revisions.py \
+		tests/integration/infrastructure/test_workspace_lifecycle.py \
+		tests/integration/infrastructure/test_workspace_scaling.py \
+		tests/integration/infrastructure/test_workspace_invalidation.py \
+		$(PYTEST_ARGS)
 
 test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_ARGS=....
 	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_ARGS)
