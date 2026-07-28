@@ -101,10 +101,6 @@ class PluginExecutor:
             limit=self.max_diagnostic_bytes,
         )
         if completed.timed_out:
-            diagnostics = _bounded_text(
-                completed.stderr,
-                limit=self.max_diagnostic_bytes,
-            )
             return PluginExecutionResult(
                 status=ExecutionStatus.TIMEOUT,
                 output=None,

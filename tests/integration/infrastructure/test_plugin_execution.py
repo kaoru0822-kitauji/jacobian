@@ -115,14 +115,20 @@ def test_plugin_diagnostic_limit_fails_closed() -> None:
 
 def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
     marker = tmp_path / "descendant-survived"
+    started_marker = tmp_path / "descendant-started"
 
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:spawn_delayed_child",
-        request={"marker": str(marker)},
-        timeout_seconds=0.2,
+        request={
+            "marker": str(marker),
+            "started_marker": str(started_marker),
+            "delay_seconds": 3,
+        },
+        timeout_seconds=2,
     )
     time.sleep(1.2)
 
+    assert started_marker.read_text(encoding="utf-8") == "started"
     assert result.status.value == "TIMEOUT"
     assert not marker.exists()
 
@@ -133,7 +139,7 @@ def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) ->
 
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:spawn_child_then_return",
-        request={"marker": str(marker), "delay_seconds": 3},
+        request={"marker": str(marker)},
         timeout_seconds=2,
     )
     elapsed = time.monotonic() - start
