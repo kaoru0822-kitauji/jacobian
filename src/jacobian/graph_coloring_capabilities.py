@@ -37,6 +37,7 @@ from jacobian.contracts.graph_coloring import (
     GraphColoringEncodingScope,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.graph_coloring_semantics import canonical_graph, coloring_cnf
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
@@ -178,6 +179,7 @@ class GraphColoringEncodingAdapter:
             input_schema=model_schema(GraphColoringEncodingRequest),
             output_schema=model_schema(GraphColoringEncodingOutput),
             tags=("graph", "coloring", "sat", "cnf", "encoding"),
+            invocation_examples=(example("single_vertex_two_colors", "Encode a one-vertex graph with two colors.", {"graph": {"vertices": ["v"], "edges": []}, "colors": 2}),),
         )
 
     @property
