@@ -5,10 +5,12 @@ from typing import Any
 from jacobian.contracts.capabilities import CapabilityInvocationExample, CapabilityMode
 
 
-def example(name: str, description: str, input: dict[str, Any]) -> CapabilityInvocationExample:
+def example(
+    name: str, description: str, payload: dict[str, Any]
+) -> CapabilityInvocationExample:
     return CapabilityInvocationExample(
         name=name,
         description=description,
         mode=CapabilityMode.EXPLORE,
-        input=input,
+        input=payload,
     )
