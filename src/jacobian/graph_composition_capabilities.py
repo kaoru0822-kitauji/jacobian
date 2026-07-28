@@ -51,6 +51,7 @@ from jacobian.contracts.graph_composition import (
     GraphEnumerationScopeArtifact,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.graph_atlas import graph_atlas_order
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -428,6 +429,7 @@ class GraphEnumerateNonisomorphicAdapter:
                 "nonisomorphic",
                 "bounded-search",
             ),
+            invocation_examples=(example("order_zero", "Enumerate graphs of order zero.", {"order": 0, "limit": 1, "offset": 0}),),
         )
 
     @property
