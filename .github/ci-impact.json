@@ -29,9 +29,9 @@
     {
       "name": "lean-python-tests",
       "patterns": [
-        "tests/integration/test_lean.py",
-        "tests/integration/test_lean_proof_edit.py",
-        "tests/integration/test_lean_exploration_capabilities.py"
+        "tests/integration/lean/test_lean.py",
+        "tests/integration/lean/test_lean_proof_edit.py",
+        "tests/integration/lean/test_lean_exploration_capabilities.py"
       ],
       "suites": ["lean", "static"]
     },

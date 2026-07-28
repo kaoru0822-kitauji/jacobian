@@ -29,7 +29,7 @@ pytestmark = [
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 
-_FIXTURES = Path(__file__).parents[1] / "fixtures" / "smt"
+_FIXTURES = Path(__file__).parents[2] / "fixtures" / "smt"
 _PROBLEM = (_FIXTURES / "qf_uf_equality_unsat.smt2").read_text(encoding="ascii")
 _PROOF = (_FIXTURES / "qf_uf_equality_unsat.alethe").read_bytes()
 

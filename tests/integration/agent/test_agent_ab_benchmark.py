@@ -39,7 +39,7 @@ def _kernel_from_template(
     return state_dir, JacobianKernel(state_dir, install_references=install_references)
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 BENCHMARK = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "agent_ab.py"))
 
 

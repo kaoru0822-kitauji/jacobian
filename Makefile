@@ -58,14 +58,14 @@ test-checkers: ## Run independent checker tests.
 	$(UV_RUN) pytest -n 0 tests/checkers $(PYTEST_ARGS)
 
 test-mcp: ## Run focused local and remote MCP integration tests.
-	$(UV_RUN) pytest -n 0 tests/integration/test_mcp_adapter.py \
-		tests/integration/test_remote_mcp.py $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_mcp_adapter.py \
+		tests/integration/infrastructure/test_remote_mcp.py $(PYTEST_ARGS)
 
 test-storage: ## Run artifact, registry, and workspace integration tests.
-	$(UV_RUN) pytest -n 0 tests/integration/test_artifact_store.py \
-		tests/integration/test_checker_registry.py \
-		tests/integration/test_plugin_registry_snapshots.py \
-		tests/integration/test_workspaces.py $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_artifact_store.py \
+		tests/integration/infrastructure/test_checker_registry.py \
+		tests/integration/infrastructure/test_plugin_registry_snapshots.py \
+		tests/integration/infrastructure/test_workspaces.py $(PYTEST_ARGS)
 
 test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_ARGS=....
 	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_ARGS)

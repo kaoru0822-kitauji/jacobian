@@ -62,7 +62,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/integration/test_kernel.py",),
+            ("tests/integration/infrastructure/test_kernel.py",),
             _expected_plan(
                 "python-integration",
                 "run-python",
@@ -85,7 +85,10 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/unit/test_kernel.py", "tests/integration/test_kernel.py"),
+            (
+                "tests/unit/test_kernel.py",
+                "tests/integration/infrastructure/test_kernel.py",
+            ),
             _expected_plan(
                 "selective",
                 "run-python",
@@ -99,7 +102,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             _expected_plan("full", *FUNCTIONAL_KEYS),
         ),
         (
-            ("tests/integration/test_lean.py",),
+            ("tests/integration/lean/test_lean.py",),
             _expected_plan(
                 "selective",
                 "run-python",
@@ -109,7 +112,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/integration/test_lean_replayable_state_capability.py",),
+            ("tests/integration/lean/test_lean_replayable_state_capability.py",),
             _expected_plan(
                 "python-integration",
                 "run-python",
@@ -118,7 +121,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/integration/test_agent_ab_benchmark.py",),
+            ("tests/integration/agent/test_agent_ab_benchmark.py",),
             _expected_plan(
                 "python-integration",
                 "run-python",
@@ -230,7 +233,7 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
         ("npm/package.json",),
         ("src/jacobian/kernel.py",),
         ("tests/unit/test_kernel.py",),
-        ("tests/integration/test_kernel.py",),
+        ("tests/integration/infrastructure/test_kernel.py",),
         ("lean/JacobianLeanRuntime.lean",),
         ("tests/unit/test_kernel.py", "lean/JacobianLeanRuntime.lean"),
         ("--force-lean", "--", "README.md"),

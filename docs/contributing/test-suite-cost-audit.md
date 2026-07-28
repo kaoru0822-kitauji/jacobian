@@ -60,7 +60,7 @@ Use the cheapest lane that preserves the boundary being changed:
 
 ```sh
 make test-fast
-make test TESTS=tests/integration/test_mcp_adapter.py
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
 make test
 make test-lean
 make validate-full

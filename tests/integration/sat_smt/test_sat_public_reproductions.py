@@ -15,7 +15,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REPRODUCTIONS = (
     PROJECT_ROOT / "benchmarks" / "reproduction_cases" / "sat_public_reproductions.json"
 )

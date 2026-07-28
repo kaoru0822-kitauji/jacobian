@@ -76,7 +76,9 @@ def test_merge_rejects_duplicate_node_ids(tmp_path: Path) -> None:
     for shard in range(1, 5):
         path = tmp_path / f"shard-{shard}.json"
         path.write_text(
-            json.dumps({"tests/integration/test_shared.py::test_case": shard}),
+            json.dumps(
+                {"tests/integration/infrastructure/test_shared.py::test_case": shard}
+            ),
             encoding="utf-8",
         )
         inputs.extend(["--input", str(path)])
