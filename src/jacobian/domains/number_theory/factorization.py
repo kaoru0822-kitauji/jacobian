@@ -192,6 +192,7 @@ FACTORIZATION_CAPABILITIES = (
         request_model=FactorizationRequest,
         result_model=DivisorListResult,
         tags=("number-theory", "enumeration"),
+        invocation_examples=(example("divisors_12", "Enumerate the positive divisors of 12.", {"value": "12"}),),
     ),
     _operation(
         capability_id="integer.compute.proper_divisors",
@@ -223,6 +224,7 @@ FACTORIZATION_CAPABILITIES = (
         request_model=FactorizationRequest,
         result_model=PrimeFactorizationResult,
         tags=("number-theory", "factorization"),
+        invocation_examples=(example("prime_factorization_360", "Factor 360 into prime powers.", {"value": "360"}),),
     ),
     _operation(
         capability_id="integer.decide.squarefree",
@@ -235,6 +237,7 @@ FACTORIZATION_CAPABILITIES = (
         request_model=ArithmeticFunctionRequest,
         result_model=BooleanResult,
         tags=("number-theory", "predicate"),
+        invocation_examples=(example("squarefree_30", "Check whether 30 is square-free.", {"n": 30}),),
     ),
     _operation(
         capability_id="integer.compute.radical",
@@ -247,5 +250,6 @@ FACTORIZATION_CAPABILITIES = (
         request_model=ArithmeticFunctionRequest,
         result_model=IntegerValueResult,
         tags=("number-theory", "arithmetic-function"),
+        invocation_examples=(example("radical_360", "Compute the radical of 360.", {"n": 360}),),
     ),
 )
