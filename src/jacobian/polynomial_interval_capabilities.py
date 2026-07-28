@@ -77,6 +77,7 @@ from jacobian.contracts.results import (
     ExecutionStatus,
     Verification,
 )
+from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -267,6 +268,7 @@ class PolynomialIntervalEncloseAdapter:
                 "bernstein",
                 "exact-computation",
             ),
+            invocation_examples=(example("constant_zero_interval", "Enclose the zero polynomial on [0,1].", {"polynomial": {"variable": "x", "polynomial": {"terms": []}}, "interval": {"lo": {"num": "0", "den": "1"}, "hi": {"num": "1", "den": "1"}}}),),
         )
 
     @property
