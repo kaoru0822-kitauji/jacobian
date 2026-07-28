@@ -8,6 +8,7 @@ from jacobian.contracts.number_theory import (
     LegendreSymbolRequest,
     LegendreSymbolResult,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.number_theory._support import number_theory_operation
 from jacobian.domains.number_theory.operations import (
     compute_factorial_valuation,
@@ -25,6 +26,7 @@ DERIVED_NUMBER_THEORY_CAPABILITIES = (
         compute_floor_square_root,
         "number-theory",
         "square",
+        invocation_examples=(example("floor_sqrt_80", "Compute floor(sqrt(80)).", {"n": 80}),),
     ),
     number_theory_operation(
         "number_theory.compute.legendre_symbol",
@@ -35,6 +37,7 @@ DERIVED_NUMBER_THEORY_CAPABILITIES = (
         compute_legendre_symbol,
         "number-theory",
         "quadratic-residue",
+        invocation_examples=(example("legendre_2_mod_7", "Compute the Legendre symbol (2/7).", {"a": 2, "prime": 7}),),
     ),
     number_theory_operation(
         "number_theory.compute.factorial_valuation",
@@ -45,5 +48,6 @@ DERIVED_NUMBER_THEORY_CAPABILITIES = (
         compute_factorial_valuation,
         "number-theory",
         "valuation",
+        invocation_examples=(example("valuation_10_factorial_base_2", "Compute the exponent of 2 in 10!.", {"n": 10, "base": 2}),),
     ),
 )
