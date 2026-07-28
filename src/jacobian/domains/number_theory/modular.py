@@ -10,6 +10,7 @@ from jacobian.contracts.number_theory import (
     ModulusRequest,
     QuadraticResiduesResult,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.number_theory._support import (
     number_theory_operation,
 )
@@ -35,6 +36,13 @@ MODULAR_CAPABILITIES = (
         "number-theory",
         "modular",
         "jacobi-symbol",
+        invocation_examples=(
+            example(
+                "jacobi_10_21",
+                "Compute the Jacobi symbol (10/21).",
+                {"a": "10", "n": 21},
+            ),
+        ),
     ),
     number_theory_operation(
         "modular.compute.inverse",
@@ -66,6 +74,13 @@ MODULAR_CAPABILITIES = (
         "number-theory",
         "modular",
         "enumeration",
+        invocation_examples=(
+            example(
+                "quadratic_residues_mod_10",
+                "Enumerate quadratic residues modulo 10.",
+                {"modulus": 10},
+            ),
+        ),
     ),
     number_theory_operation(
         "modular.solve.chinese_remainder",
@@ -76,6 +91,13 @@ MODULAR_CAPABILITIES = (
         solve_chinese_remainder,
         "number-theory",
         "modular",
+        invocation_examples=(
+            example(
+                "crt_2_mod_3_3_mod_5",
+                "Solve x=2 mod 3 and x=3 mod 5.",
+                {"residues": [2, 3], "moduli": [3, 5]},
+            ),
+        ),
     ),
     DISCRETE_LOGARITHM_CAPABILITY,
 )

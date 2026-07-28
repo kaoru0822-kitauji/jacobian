@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
@@ -64,6 +65,7 @@ class ComputedOperation[
     relation_id: str
     tags: tuple[str, ...] = ()
     invalid_request: CapabilityDiagnostic | None = None
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
     version: str = "1"
 
 
@@ -103,6 +105,7 @@ class ComputedOperationFactory:
         result_model: type[ResultT],
         operation: Callable[[ContractModel], ContractModel],
         *tags: str,
+        invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
     ) -> ComputedOperation[RequestT, ResultT]:
         def implementation(request: RequestT) -> ComputedOutcome[ResultT]:
             try:
@@ -119,6 +122,7 @@ class ComputedOperationFactory:
             implementation=implementation,
             relation_id=_relation_id(capability_id),
             tags=tags,
+            invocation_examples=invocation_examples,
         )
 
 

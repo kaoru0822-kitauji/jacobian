@@ -4,6 +4,7 @@ from jacobian.contracts.finite_sets import (
     FiniteSetElementListResult,
     FiniteSetPairRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.finite_sets._support import finite_set_operation
 from jacobian.domains.finite_sets.operations import (
     set_difference,
@@ -22,6 +23,13 @@ SET_OPERATION_CAPABILITIES = (
         set_union,
         "finite-set",
         "exact",
+        invocation_examples=(
+            example(
+                "union_1_2_and_2_3",
+                "Union two overlapping finite sets.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
+            ),
+        ),
     ),
     finite_set_operation(
         "finite_set.compute.intersection",
@@ -52,5 +60,12 @@ SET_OPERATION_CAPABILITIES = (
         set_symmetric_difference,
         "finite-set",
         "exact",
+        invocation_examples=(
+            example(
+                "symmetric_difference",
+                "Compute the symmetric difference of two finite sets.",
+                {"left": {"elements": ["3", "1"]}, "right": {"elements": ["2", "3"]}},
+            ),
+        ),
     ),
 )

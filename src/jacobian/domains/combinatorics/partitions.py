@@ -7,6 +7,7 @@ from jacobian.contracts.combinatorics import (
     NonnegativeIntegerRequest,
     NonnegativePairRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.combinatorics._support import (
     combinatorics_operation,
 )
@@ -72,5 +73,12 @@ PARTITION_CAPABILITIES = (
         "combinatorics",
         "partition",
         "enumeration",
+        invocation_examples=(
+            example(
+                "partitions_of_5_with_two_parts",
+                "Enumerate partitions of 5 using at most two parts.",
+                {"n": 5, "max_parts": 2},
+            ),
+        ),
     ),
 )

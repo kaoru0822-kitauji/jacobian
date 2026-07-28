@@ -7,6 +7,7 @@ from jacobian.contracts.combinatorics import (
     NonnegativeIntegerRequest,
     RationalResult,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.combinatorics._support import (
     combinatorics_operation,
 )
@@ -58,5 +59,8 @@ RECURRENCE_CAPABILITIES = (
         bernoulli,
         "combinatorics",
         "sequence",
+        invocation_examples=(
+            example("bernoulli_4", "Compute the fourth Bernoulli number.", {"n": 4}),
+        ),
     ),
 )

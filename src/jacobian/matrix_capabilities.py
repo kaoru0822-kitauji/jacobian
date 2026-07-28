@@ -35,6 +35,7 @@ from jacobian.contracts.matrices import (
     MatrixRankRequest,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
@@ -124,6 +125,21 @@ class MatrixDeterminantAdapter:
             input_schema=model_schema(MatrixDeterminantRequest),
             output_schema=model_schema(MatrixDeterminantOutput),
             tags=("matrix", "determinant", "exact-computation"),
+            invocation_examples=(
+                example(
+                    "determinant_minus_six",
+                    "Compute the determinant of [[0,2],[3,4]].",
+                    {
+                        "matrix": {
+                            "domain": "QQ",
+                            "entries": [
+                                [{"num": "0", "den": "1"}, {"num": "2", "den": "1"}],
+                                [{"num": "3", "den": "1"}, {"num": "4", "den": "1"}],
+                            ],
+                        }
+                    },
+                ),
+            ),
         )
 
     @property
@@ -190,6 +206,37 @@ class MatrixRankAdapter:
             input_schema=model_schema(MatrixRankRequest),
             output_schema=model_schema(MatrixRankOutput),
             tags=("matrix", "rank", "exact-computation"),
+            invocation_examples=(
+                example(
+                    "rank_three_by_four",
+                    "Compute rank and pivots of a rectangular rational matrix.",
+                    {
+                        "matrix": {
+                            "domain": "QQ",
+                            "entries": [
+                                [
+                                    {"num": "1", "den": "1"},
+                                    {"num": "2", "den": "1"},
+                                    {"num": "3", "den": "1"},
+                                    {"num": "4", "den": "1"},
+                                ],
+                                [
+                                    {"num": "2", "den": "1"},
+                                    {"num": "4", "den": "1"},
+                                    {"num": "6", "den": "1"},
+                                    {"num": "8", "den": "1"},
+                                ],
+                                [
+                                    {"num": "0", "den": "1"},
+                                    {"num": "1", "den": "1"},
+                                    {"num": "1", "den": "1"},
+                                    {"num": "0", "den": "1"},
+                                ],
+                            ],
+                        }
+                    },
+                ),
+            ),
         )
 
     @property

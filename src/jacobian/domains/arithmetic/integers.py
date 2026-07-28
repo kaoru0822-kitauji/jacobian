@@ -15,6 +15,7 @@ from jacobian.contracts.arithmetic import (
     IntegerValueRequest,
     IntegerValueResult,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.arithmetic._support import arithmetic_operation
 from jacobian.domains.arithmetic.operations import (
     absolute_value,
@@ -75,6 +76,13 @@ INTEGER_CAPABILITIES = (
         base_digits,
         "integer",
         "representation",
+        invocation_examples=(
+            example(
+                "negative_binary",
+                "Expand negative ten in base two.",
+                {"value": "-10", "base": 2},
+            ),
+        ),
     ),
     arithmetic_operation(
         "integer.compute.nth_root",
@@ -85,5 +93,12 @@ INTEGER_CAPABILITIES = (
         nth_root,
         "number-theory",
         "root",
+        invocation_examples=(
+            example(
+                "non_exact_cube_root",
+                "Floor cube root of 65.",
+                {"value": 65, "degree": 3},
+            ),
+        ),
     ),
 )

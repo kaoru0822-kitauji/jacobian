@@ -15,6 +15,7 @@ from jacobian.contracts.rationals import (
     RationalValueRequest,
     RationalValueResult,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.arithmetic._support import arithmetic_operation
 from jacobian.domains.arithmetic.operations import (
     ceiling,
@@ -73,6 +74,13 @@ RATIONAL_CAPABILITIES = (
         sum_rationals,
         "rational",
         "exact",
+        invocation_examples=(
+            example(
+                "one_half_plus_one_third",
+                "Add one half and one third.",
+                {"left": {"num": "1", "den": "2"}, "right": {"num": "1", "den": "3"}},
+            ),
+        ),
     ),
     arithmetic_operation(
         "rational.compute.difference",
@@ -153,6 +161,13 @@ RATIONAL_CAPABILITIES = (
         continued_fraction,
         "rational",
         "representation",
+        invocation_examples=(
+            example(
+                "negative_seven_fifths",
+                "Expand negative seven fifths as a continued fraction.",
+                {"value": {"num": "-7", "den": "5"}},
+            ),
+        ),
     ),
     arithmetic_operation(
         "rational.decide.equal",
