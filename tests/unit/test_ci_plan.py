@@ -194,6 +194,7 @@ def test_ci_plan_fails_closed_outside_isolated_paths(
         check=True,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     assert (
@@ -207,6 +208,7 @@ def test_full_override_expands_an_isolated_plan() -> None:
         check=True,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
@@ -220,6 +222,7 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
         check=True,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
@@ -246,9 +249,10 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         check=True,
         capture_output=True,
         text=True,
+        timeout=30,
     ).stdout
 
-    subprocess.run([VALIDATOR], input=plan, check=True, text=True)
+    subprocess.run([VALIDATOR], input=plan, check=True, text=True, timeout=30)
 
 
 @pytest.mark.parametrize(
@@ -289,6 +293,7 @@ def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> N
         input=plan,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     assert completed.returncode != 0
@@ -301,6 +306,7 @@ def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:
         check=True,
         capture_output=True,
         text=True,
+        timeout=30,
     ).stdout.splitlines()
 
     unowned = []

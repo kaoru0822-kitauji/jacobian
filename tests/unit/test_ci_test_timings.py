@@ -21,6 +21,7 @@ def run_script(
         check=False,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
 
