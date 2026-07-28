@@ -27,11 +27,51 @@ TEST_ROOTS = ("tests/integration/", "tests/end_to_end/")
 
 
 def integration_shard_count() -> int:
+    return int(ci_config()["integration_shard_count"])
+
+
+def ci_config() -> dict[str, Any]:
     payload = json.loads(CONFIG.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("ci-config.json must contain a JSON object")
     count = payload.get("integration_shard_count")
     if not isinstance(count, int) or isinstance(count, bool) or count < 1:
         raise ValueError("integration_shard_count must be a positive integer")
-    return count
+    for key in ("node_version_jscpd", "node_version_npm"):
+        value = payload.get(key)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"{key} must be a non-empty string")
+    return payload
+
+
+def node_version(role: str) -> str:
+    key = f"node_version_{role}"
+    return str(ci_config()[key])
+
+
+def pytest_split_version() -> str:
+    """Return the pinned pytest-split version from pyproject.toml."""
+
+    pyproject = ROOT / "pyproject.toml"
+    for line in pyproject.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith(('"pytest-split==', "'pytest-split==")):
+            version = stripped.split("==", 1)[1].rstrip("\",'")
+            if version:
+                return version
+    raise ValueError("pytest-split pin not found in pyproject.toml")
+
+
+def emit_plan_outputs() -> None:
+    """Print GitHub Actions outputs for shard, Node, and pytest-split pins."""
+
+    config = ci_config()
+    count = int(config["integration_shard_count"])
+    print(f"integration-shard-count={count}")
+    print(f"integration-shards={json.dumps(list(range(1, count + 1)))}")
+    print(f"node-version-jscpd={config['node_version_jscpd']}")
+    print(f"node-version-npm={config['node_version_npm']}")
+    print(f"pytest-split-version={pytest_split_version()}")
 
 
 def warning(message: str) -> None:
@@ -230,18 +270,31 @@ def main() -> None:
     merge_parser.add_argument("--output", type=Path, required=True)
     merge_parser.add_argument("--source-sha", required=True)
     merge_parser.add_argument("--python-version", required=True)
-    merge_parser.add_argument("--pytest-split-version", required=True)
+    merge_parser.add_argument(
+        "--pytest-split-version",
+        default=None,
+        help="defaults to the pytest-split pin in pyproject.toml",
+    )
+
+    subparsers.add_parser("emit-plan-outputs")
+    node_parser = subparsers.add_parser("node-version")
+    node_parser.add_argument("role", choices=("jscpd", "npm"))
 
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args.output)
+    elif args.command == "emit-plan-outputs":
+        emit_plan_outputs()
+    elif args.command == "node-version":
+        print(node_version(args.role))
     else:
+        split_version = args.pytest_split_version or pytest_split_version()
         merge(
             args.input,
             args.output,
             args.source_sha,
             args.python_version,
-            args.pytest_split_version,
+            split_version,
         )
 
 
