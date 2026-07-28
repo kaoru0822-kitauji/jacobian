@@ -54,6 +54,7 @@ POINT_CAPABILITIES = (
         collinear,
         "geometry",
         "incidence",
+        invocation_examples=(example("collinear_x_axis", "Check three points on the x-axis.", {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}, "third": {"x": {"num": "2", "den": "1"}, "y": {"num": "0", "den": "1"}}}),),
     ),
     geometry_operation(
         "geometry.points.decide.concyclic",
@@ -64,6 +65,7 @@ POINT_CAPABILITIES = (
         concyclic,
         "geometry",
         "circle",
+        invocation_examples=(example("unit_circle_points", "Check four points on the unit circle.", {"first": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}}, "third": {"x": {"num": "-1", "den": "1"}, "y": {"num": "0", "den": "1"}}, "fourth": {"x": {"num": "0", "den": "1"}, "y": {"num": "-1", "den": "1"}}}),),
     ),
     geometry_operation(
         "geometry.points.compute.convex_hull",
