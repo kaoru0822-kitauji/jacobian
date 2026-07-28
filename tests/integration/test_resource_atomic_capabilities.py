@@ -141,12 +141,24 @@ def test_consolidated_domain_results_are_exact_computed_evidence(
                     "edges": [["a", "b"], ["b", "c"]],
                 }
             },
-            {"radius": 1},
+            {
+                "status": "COMPUTED",
+                "radius": 1,
+                "connected": True,
+                "exactness": "EXACT",
+                "detail": None,
+            },
         ),
         (
             "graph.invariant.radius.compute",
             {"graph": {"vertices": [], "edges": []}},
-            {"radius": 0},
+            {
+                "status": "NOT_APPLICABLE",
+                "radius": None,
+                "connected": False,
+                "exactness": "NOT_APPLICABLE",
+                "detail": "radius requires a nonempty connected graph",
+            },
         ),
         (
             "graph.k_core.compute",

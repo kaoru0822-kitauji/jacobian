@@ -29,7 +29,13 @@ def test_graph_invariant_family_boundaries_and_witnesses(tmp_path: Path) -> None
         (
             "graph.invariant.diameter.compute",
             triangle_tail,
-            {"diameter": 2, "connected": True},
+            {
+                "status": "COMPUTED",
+                "diameter": 2,
+                "connected": True,
+                "exactness": "EXACT",
+                "detail": None,
+            },
         ),
         (
             "graph.invariant.edge_connectivity.compute",
@@ -93,11 +99,55 @@ def test_disconnected_and_acyclic_graph_conventions(tmp_path: Path) -> None:
             input={"graph": graph},
         )
     )
-    assert diameter.output["result"] == {"diameter": -1, "connected": False}
+    assert diameter.execution.status is ExecutionStatus.COMPLETED
+    assert diameter.output["result"] == {
+        "status": "NOT_APPLICABLE",
+        "diameter": None,
+        "connected": False,
+        "exactness": "NOT_APPLICABLE",
+        "detail": "diameter requires a nonempty connected graph",
+    }
     assert girth.output["result"] == {"girth": 0, "has_cycle": False}
     assert trees.output["result"] == {
         "spanning_tree_count": 0,
         "connected": False,
+    }
+
+
+def test_radius_uses_explicit_not_applicable_for_disconnected_graph(
+    tmp_path: Path,
+) -> None:
+    kernel = JacobianKernel(tmp_path)
+
+    connected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.invariant.radius.compute",
+            input={"graph": _graph(["a", "b", "c"], [["a", "b"], ["b", "c"]])},
+        )
+    )
+    disconnected = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.invariant.radius.compute",
+            input={"graph": _graph(["a", "b", "c"], [["a", "b"]])},
+        )
+    )
+
+    assert connected.capability_version == "2"
+    assert disconnected.capability_version == "2"
+    assert connected.output["result"] == {
+        "status": "COMPUTED",
+        "radius": 1,
+        "connected": True,
+        "exactness": "EXACT",
+        "detail": None,
+    }
+    assert disconnected.execution.status is ExecutionStatus.COMPLETED
+    assert disconnected.output["result"] == {
+        "status": "NOT_APPLICABLE",
+        "radius": None,
+        "connected": False,
+        "exactness": "NOT_APPLICABLE",
+        "detail": "radius requires a nonempty connected graph",
     }
 
 
