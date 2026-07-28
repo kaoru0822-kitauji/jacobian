@@ -8,9 +8,13 @@ import importlib.machinery
 import importlib.util
 import os
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+
+_PACKAGE_DIGEST_CACHE: dict[str, str] | None = None
 
 
 class ImplementationError(RuntimeError):
@@ -164,14 +168,63 @@ def package_source_digest(entrypoint: str) -> str:
     Binding the package rather than only the named module prevents unchecked
     helper modules and data files from changing an authorized implementation.
     Bytecode caches are excluded because workers execute measured source.
+
+    Callers may enter :func:`cached_package_digests` during a kernel attach so
+    repeated authorizations of the same package reuse one digest without
+    suppressing later on-disk package edits outside that scope.
     """
 
     module_name, _ = split_entrypoint(entrypoint)
+    top_level, *remaining = module_name.split(".")
+    _ensure_module_in_package(top_level, remaining)
+    cache = _PACKAGE_DIGEST_CACHE
+    if cache is not None and top_level in cache:
+        return cache[top_level]
+    digest = _digest_top_level_package(top_level)
+    if cache is not None:
+        cache[top_level] = digest
+    return digest
+
+
+@contextmanager
+def cached_package_digests() -> Iterator[None]:
+    """Reuse top-level package digests within one attach/authorization batch."""
+
+    global _PACKAGE_DIGEST_CACHE
+    if _PACKAGE_DIGEST_CACHE is not None:
+        yield
+        return
+    _PACKAGE_DIGEST_CACHE = {}
+    try:
+        yield
+    finally:
+        _PACKAGE_DIGEST_CACHE = None
+
+
+def _ensure_module_in_package(top_level: str, remaining: list[str]) -> None:
+    specification = importlib.machinery.PathFinder.find_spec(top_level)
+    if specification is None:
+        raise ImplementationError(f"cannot resolve package {top_level!r}")
+    locations = specification.submodule_search_locations
+    if locations:
+        roots = [Path(location) for location in locations]
+        if not _module_exists_in_roots(roots, remaining):
+            module_name = ".".join([top_level, *remaining])
+            raise ImplementationError(f"cannot resolve module {module_name!r}")
+        return
+    if remaining:
+        raise ImplementationError(f"{top_level!r} is not a package")
+    if specification.origin is None:
+        raise ImplementationError(f"module {top_level!r} has no source")
+
+
+def _digest_top_level_package(top_level: str) -> str:
+    entries = _package_entries(top_level)
     digest = hashlib.sha256()
     digest.update(b"jacobian.python-package.v2\x00")
-    digest.update(module_name.split(".", 1)[0].encode("utf-8"))
+    digest.update(top_level.encode("utf-8"))
     digest.update(b"\x00")
-    for relative_name, source in _package_entries(module_name):
+    for relative_name, source in entries:
         name_bytes = relative_name.encode("utf-8")
         content = source.read_bytes()
         digest.update(len(name_bytes).to_bytes(8, "big"))

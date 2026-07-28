@@ -133,8 +133,7 @@ def _request(
     )
 
 
-def test_search_run_checkpoints_strategy_neutral_lineage(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_search_run_checkpoints_strategy_neutral_lineage(kernel) -> None:
     claim_uri, plugin_id = _install_search_plugin(kernel)
 
     handle = kernel.search.start(
@@ -177,9 +176,8 @@ def test_search_run_checkpoints_strategy_neutral_lineage(tmp_path: Path) -> None
 
 
 def test_resume_rejects_archive_page_rebound_to_another_plugin(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
     handle = kernel.search.start(
         _request(
@@ -232,10 +230,9 @@ def test_resume_rejects_archive_page_rebound_to_another_plugin(
 
 
 def test_checkpoint_persistence_is_included_in_wall_accounting(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
     original_put = kernel.search._put_internal_artifact
     current_time = 0.0
@@ -266,10 +263,9 @@ def test_checkpoint_persistence_is_included_in_wall_accounting(
 
 
 def test_checkpoint_persistence_cannot_complete_past_wall_budget(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
     original_put = kernel.search._put_internal_artifact
     current_time = 0.0
@@ -303,10 +299,9 @@ def test_checkpoint_persistence_cannot_complete_past_wall_budget(
 
 
 def test_concurrent_retries_create_one_search_invocation(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
     request = _request(
         claim_uri,
@@ -336,8 +331,7 @@ def test_concurrent_retries_create_one_search_invocation(
     assert event_types.count("REQUEST_REUSED") == 8
 
 
-def test_search_lifecycle_events_are_append_only(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_search_lifecycle_events_are_append_only(kernel) -> None:
     claim_uri, plugin_id = _install_search_plugin(kernel)
     handle = kernel.search.start(
         _request(
@@ -369,8 +363,7 @@ def test_search_lifecycle_events_are_append_only(tmp_path: Path) -> None:
         )
 
 
-def test_idempotency_key_cannot_be_rebound(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_idempotency_key_cannot_be_rebound(kernel) -> None:
     claim_uri, plugin_id = _install_search_plugin(kernel)
     first = _request(
         claim_uri,
@@ -396,9 +389,8 @@ def test_idempotency_key_cannot_be_rebound(tmp_path: Path) -> None:
 
 
 def test_search_pauses_and_resumes_without_duplicate_lineage(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         proposer_entrypoint=(
@@ -644,8 +636,7 @@ def test_corrupt_snapshot_is_quarantined_without_blocking_recovery(
 
 
 @pytest.mark.subprocess
-def test_proposer_timeout_fails_closed(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_proposer_timeout_fails_closed(kernel) -> None:
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         proposer_entrypoint=("tests.fixtures.plugin_functions:propose_search_forever"),
@@ -676,9 +667,8 @@ def test_proposer_timeout_fails_closed(tmp_path: Path) -> None:
 
 
 def test_malformed_proposal_fails_without_evidence_promotion(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         proposer_entrypoint=(
@@ -705,9 +695,8 @@ def test_malformed_proposal_fails_without_evidence_promotion(
 
 @pytest.mark.subprocess
 def test_partial_iteration_accounting_survives_malformed_candidate(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         proposer_entrypoint=(
@@ -750,12 +739,11 @@ def test_partial_iteration_accounting_survives_malformed_candidate(
     ],
 )
 def test_search_plugin_failures_remain_operational(
-    tmp_path: Path,
+    kernel,
     entrypoint: str,
     detail: str,
     case_id: str,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     if entrypoint.endswith("propose_large_search_output"):
         kernel.plugin_executor.max_output_bytes = 1024
     claim_uri, plugin_id = _install_search_plugin(
@@ -779,11 +767,10 @@ def test_search_plugin_failures_remain_operational(
 
 
 def test_terminal_archive_failure_marks_search_error(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
 
     def fail_archive(*_args: object, **_kwargs: object) -> object:
@@ -811,8 +798,7 @@ def test_terminal_archive_failure_marks_search_error(
     assert "fixture archive failure" in caplog.text
 
 
-def test_plugin_cannot_widen_operator_batch_policy(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_plugin_cannot_widen_operator_batch_policy(kernel) -> None:
     kernel.search.max_batch_size = 1
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
@@ -837,8 +823,7 @@ def test_plugin_cannot_widen_operator_batch_policy(tmp_path: Path) -> None:
     assert snapshot.accounting.proposed_candidates == 0
 
 
-def test_search_batch_respects_evaluator_limit(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_search_batch_respects_evaluator_limit(kernel) -> None:
     kernel.evaluation.max_batch_size = 2
     kernel.search.max_batch_size = 3
     claim_uri, plugin_id = _install_search_plugin(kernel)
@@ -859,8 +844,7 @@ def test_search_batch_respects_evaluator_limit(tmp_path: Path) -> None:
     assert snapshot.accounting.iterations == 2
 
 
-def test_search_batch_respects_archive_parent_limit(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_search_batch_respects_archive_parent_limit(kernel) -> None:
     claim_uri, plugin_id = _install_search_plugin(kernel)
     kernel.store.limits = StoreLimits(max_parents=6)
     handle = kernel.search.start(
@@ -882,8 +866,7 @@ def test_search_batch_respects_archive_parent_limit(tmp_path: Path) -> None:
         assert len(kernel.store.get(page_uri).manifest.parents) <= 6
 
 
-def test_refiner_cannot_claim_verification(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_refiner_cannot_claim_verification(kernel) -> None:
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         refiner_entrypoint=(
@@ -911,9 +894,8 @@ def test_refiner_cannot_claim_verification(tmp_path: Path) -> None:
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_verified_counterexample_feedback_reaches_refiner(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         refiner_entrypoint=(
@@ -967,9 +949,8 @@ def test_verified_counterexample_feedback_reaches_refiner(
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_supporting_checker_decision_is_not_counted_as_counterexample(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(
         kernel,
         include_witness_oracle=True,

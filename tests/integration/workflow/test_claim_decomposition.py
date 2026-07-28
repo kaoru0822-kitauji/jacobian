@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.claim_decomposition_capabilities import reconstruct
@@ -18,8 +16,6 @@ from jacobian.contracts.claim_decomposition import (
     StructuredClaimArtifact,
 )
 from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _atom(node_id: str, symbol: str | None = None) -> LogicalClaimNode:
@@ -49,9 +45,8 @@ def _invoke(kernel: JacobianKernel, capability_id: str, source_uri: str):
 
 
 def test_conjunction_split_preserves_order_grouping_and_reconstructs(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     nested = LogicalClaimNode(
         node_id="nested",
         connective=LogicalConnective.CONJUNCTION,
@@ -83,9 +78,8 @@ def test_conjunction_split_preserves_order_grouping_and_reconstructs(
 
 
 def test_conjunction_split_preserves_duplicate_subtrees_as_occurrences(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     root = LogicalClaimNode(
         node_id="root",
         connective=LogicalConnective.CONJUNCTION,
@@ -101,9 +95,8 @@ def test_conjunction_split_preserves_duplicate_subtrees_as_occurrences(
 
 
 def test_implication_obligations_are_directional_and_reconstruct(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     consequent = LogicalClaimNode(
         node_id="bc",
         connective=LogicalConnective.IMPLICATION,
@@ -127,8 +120,7 @@ def test_implication_obligations_are_directional_and_reconstruct(
     assert reconstruct(record) == root
 
 
-def test_reconstruction_rejects_tampered_ordered_child(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_reconstruction_rejects_tampered_ordered_child(kernel) -> None:
     root = LogicalClaimNode(
         node_id="root",
         connective=LogicalConnective.CONJUNCTION,
@@ -155,11 +147,10 @@ def test_reconstruction_rejects_tampered_ordered_child(tmp_path: Path) -> None:
     ],
 )
 def test_unsupported_top_level_connective_is_explicitly_rejected(
-    tmp_path: Path,
+    kernel,
     capability_id: str,
     connective: LogicalConnective,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     children = (
         () if connective is LogicalConnective.ATOM else (_atom("left"), _atom("right"))
     )

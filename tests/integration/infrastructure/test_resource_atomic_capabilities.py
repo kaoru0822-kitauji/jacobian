@@ -2,28 +2,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import CapabilityAssuranceLevel, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def test_resource_portfolio_has_more_than_one_hundred_atomic_capabilities(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     assert len(kernel.capabilities.catalog().capabilities) >= 100
 
 
 def test_consolidated_domain_results_are_exact_computed_evidence(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     cases = (
         (
             "integer.compute.prime_count",
@@ -182,9 +173,8 @@ def test_consolidated_domain_results_are_exact_computed_evidence(
 
 
 def test_domain_atomic_input_failure_is_not_a_mathematical_conclusion(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="number_theory.compute.legendre_symbol",

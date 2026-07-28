@@ -111,26 +111,24 @@ def install_polynomial_system_capabilities(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact rational polynomial-system solution checker",
-                    entrypoint="jacobian_checkers.polynomial_systems:check_solution",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="polynomial.system_solution_replay",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(assignment_schema_uri,),
-                    reason="bundled independent exact polynomial-system evaluator",
-                ),
-                authorize=True,
-            )
-            .checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational polynomial-system solution checker",
+                entrypoint="jacobian_checkers.polynomial_systems:check_solution",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.system_solution_replay",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(assignment_schema_uri,),
+                reason="bundled independent exact polynomial-system evaluator",
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = PolynomialSystemInstallation(
         semantics_uri=semantics_uri,
         system_schema_uri=system_schema_uri,

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.artifacts import ArtifactValidationError
 from jacobian.kernel import JacobianKernel
 
-pytestmark = [
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
-]
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def _claim_payload(
@@ -36,9 +35,8 @@ def _claim_payload(
 
 
 def test_path_closure_claim_requires_simple_path_semantics(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]
 
     with pytest.raises(ArtifactValidationError, match="simple"):
@@ -54,8 +52,7 @@ def test_path_closure_claim_requires_simple_path_semantics(
         )
 
 
-def test_maxdet_claim_requires_a_bounded_matrix_scope(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_maxdet_claim_requires_a_bounded_matrix_scope(kernel) -> None:
     reference = kernel.references["matrices"]
 
     with pytest.raises(ArtifactValidationError, match="scope"):
@@ -71,8 +68,7 @@ def test_maxdet_claim_requires_a_bounded_matrix_scope(tmp_path: Path) -> None:
         )
 
 
-def test_graph_candidate_schema_rejects_incomplete_arc(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_graph_candidate_schema_rejects_incomplete_arc(kernel) -> None:
     reference = kernel.references["graph_paths"]
 
     with pytest.raises(ArtifactValidationError):
@@ -86,8 +82,7 @@ def test_graph_candidate_schema_rejects_incomplete_arc(tmp_path: Path) -> None:
         )
 
 
-def test_erdos_straus_claim_requires_a_bounded_range(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_erdos_straus_claim_requires_a_bounded_range(kernel) -> None:
     reference = kernel.references["erdos_straus"]
 
     with pytest.raises(ArtifactValidationError, match="upper_bound"):

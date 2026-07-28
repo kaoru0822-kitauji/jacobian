@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,9 +16,6 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, WitnessRole
 from jacobian.contracts.results import Conclusion, InputStatus, Verification
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _wire_fraction(value: Fraction | int) -> dict[str, str]:
@@ -95,9 +91,9 @@ def _identity_input(
 
 
 def test_polynomial_identity_descriptor_example_is_directly_invocable(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     descriptors = {
         descriptor.capability_id: descriptor
         for descriptor in kernel.capabilities.catalog().capabilities
@@ -116,9 +112,11 @@ def test_polynomial_identity_descriptor_example_is_directly_invocable(
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_polynomial_identity_verifies_equal_coefficients(
+    kernel_with_references,
+) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
@@ -167,9 +165,9 @@ def test_polynomial_identity_verifies_equal_coefficients(tmp_path: Path) -> None
     assert rejected.verification_record_uri is None
 
 
-def test_polynomial_identity_verifies_a_difference(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_polynomial_identity_verifies_a_difference(kernel_with_references) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
@@ -189,10 +187,10 @@ def test_polynomial_identity_verifies_a_difference(tmp_path: Path) -> None:
 
 
 def test_polynomial_identity_duplicate_terms_return_actionable_recovery(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
@@ -222,9 +220,9 @@ def test_polynomial_identity_duplicate_terms_return_actionable_recovery(
 
 
 def test_polynomial_identity_preserves_checker_rejection_as_unknown(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     checker_id = kernel.polynomial.identity_checker_id
     assert checker_id is not None
     kernel.checkers.revoke(checker_id, reason="exercise fail-closed projection")
@@ -246,9 +244,9 @@ def test_polynomial_identity_preserves_checker_rejection_as_unknown(
 
 
 def test_jacobian_canonically_omits_zero_partial_derivatives(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     x, y = symbols("x y")
     polynomial_map = {
         "map_schema_version": "1",
@@ -280,9 +278,9 @@ def test_jacobian_canonically_omits_zero_partial_derivatives(
 
 
 def test_jacobian_represents_derived_exponents_above_the_source_limit(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     x, y = symbols("x y")
     polynomial_map = {
         "map_schema_version": "1",
@@ -324,9 +322,9 @@ def test_jacobian_represents_derived_exponents_above_the_source_limit(
 
 
 def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     polynomial_map = _jacobian_counterexample_map()
 
     jacobian = kernel.capabilities.invoke(
@@ -438,8 +436,8 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     assert verified.output["verification_record_uri"]
 
 
-def test_collision_checker_rejects_a_forged_image(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> None:
+    kernel = kernel_with_references
     polynomial_map = _jacobian_counterexample_map()
     first_evaluation = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -513,9 +511,9 @@ def test_collision_checker_rejects_a_forged_image(tmp_path: Path) -> None:
 
 
 def test_collision_comparison_does_not_promote_forged_evaluations(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -577,9 +575,9 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
 
 
 def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = kernel_with_references
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -617,8 +615,7 @@ def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
     assert "conclusion" not in result.output
 
 
-def test_collision_rejects_evaluations_from_different_maps(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_collision_rejects_evaluations_from_different_maps(kernel) -> None:
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -660,10 +657,9 @@ def test_collision_rejects_evaluations_from_different_maps(tmp_path: Path) -> No
 
 
 def test_collision_validates_evaluation_dimensions_before_artifact_writes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -716,8 +712,7 @@ def test_collision_validates_evaluation_dimensions_before_artifact_writes(
     assert artifact_put_calls == 0
 
 
-def test_polynomial_map_evaluation_is_exact_and_materialized(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_polynomial_map_evaluation_is_exact_and_materialized(kernel) -> None:
     polynomial_map = _jacobian_counterexample_map()
 
     result = kernel.capabilities.invoke(
@@ -818,13 +813,12 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(tmp_path: Path) -> 
     ],
 )
 def test_complete_request_validation_precedes_artifact_writes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
     capability_id: str,
     payload: dict[str, Any],
     diagnostic_code: str,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     artifact_put_calls = 0
     original_put = kernel.artifacts.put
 

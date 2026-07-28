@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -11,9 +9,6 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.checkers import CheckerDecision
 from jacobian.contracts.results import Arithmetic, Conclusion, Coverage, Method
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _request(mode: CapabilityMode, *, missing_last: bool = False) -> CapabilityRequest:
@@ -34,8 +29,7 @@ def _request(mode: CapabilityMode, *, missing_last: bool = False) -> CapabilityR
     )
 
 
-def test_finite_partition_explore_keeps_coverage_obligation_open(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_finite_partition_explore_keeps_coverage_obligation_open(kernel) -> None:
 
     result = kernel.capabilities.invoke(_request(CapabilityMode.EXPLORE))
 
@@ -46,9 +40,11 @@ def test_finite_partition_explore_keeps_coverage_obligation_open(tmp_path) -> No
     assert result.obligations[0].status is CapabilityObligationStatus.OPEN
 
 
-def test_finite_partition_verify_replays_and_discharges_obligation(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_partition_verify_replays_and_discharges_obligation(
+    kernel_with_references,
+) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(_request(CapabilityMode.VERIFY))
 
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
@@ -60,9 +56,11 @@ def test_finite_partition_verify_replays_and_discharges_obligation(tmp_path) -> 
     assert result.obligations[0].status is CapabilityObligationStatus.DISCHARGED
 
 
-def test_finite_partition_verify_fails_closed_on_incomplete_cases(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_partition_verify_fails_closed_on_incomplete_cases(
+    kernel_with_references,
+) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         _request(CapabilityMode.VERIFY, missing_last=True)
     )
@@ -74,10 +72,11 @@ def test_finite_partition_verify_fails_closed_on_incomplete_cases(tmp_path) -> N
 
 
 def test_verification_rejects_checker_obligation_outside_request(
-    tmp_path,
+    kernel_with_references,
     monkeypatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+
+    kernel = kernel_with_references
 
     def accept_with_unbound_obligation(
         *,
@@ -113,8 +112,7 @@ def test_verification_rejects_checker_obligation_outside_request(
     assert result.obligations[0].status is CapabilityObligationStatus.OPEN
 
 
-def test_finite_partition_duplicate_case_ids_cannot_report_complete(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_finite_partition_duplicate_case_ids_cannot_report_complete(kernel) -> None:
     request = _request(CapabilityMode.EXPLORE)
     request.input["cases"][1]["case_id"] = "even"
 

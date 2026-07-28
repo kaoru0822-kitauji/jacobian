@@ -102,28 +102,24 @@ def install_graph_coloring_capabilities(
         version="1",
         model=CertificateEnvelope,
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="independent graph-coloring CNF encoding checker",
-                    entrypoint="jacobian_checkers.graph_coloring:check_encoding",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="graph.coloring.encoding",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(candidate_schema_uri,),
-                    reason=(
-                        "bundled standard-library replay of graph-to-CNF semantics"
-                    ),
-                ),
-                authorize=True,
-            )
-            .checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="independent graph-coloring CNF encoding checker",
+                entrypoint="jacobian_checkers.graph_coloring:check_encoding",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="graph.coloring.encoding",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(candidate_schema_uri,),
+                reason=("bundled standard-library replay of graph-to-CNF semantics"),
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = GraphColoringInstallation(
         semantics_uri=semantics_uri,
         claim_schema_uri=claim_schema_uri,

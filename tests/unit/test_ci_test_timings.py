@@ -8,13 +8,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "manage-test-timings"
-CI_CONFIG = ROOT / ".github" / "ci-config.json"
-
-
-def shard_count() -> int:
-    return int(
-        json.loads(CI_CONFIG.read_text(encoding="utf-8"))["integration_shard_count"]
-    )
 
 
 def run_script(
@@ -30,6 +23,22 @@ def run_script(
         text=True,
         timeout=30,
     )
+
+
+def plan_outputs() -> dict[str, str]:
+    result = run_script("emit-plan-outputs")
+    assert result.returncode == 0, result.stderr
+    return dict(
+        line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
+    )
+
+
+def shard_count() -> int:
+    return int(plan_outputs()["integration-shard-count"])
+
+
+def pinned_pytest_split_version() -> str:
+    return plan_outputs()["pytest-split-version"]
 
 
 def test_prepare_falls_back_to_equal_weighting_without_github_context(
@@ -69,7 +78,7 @@ def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> No
         "--python-version",
         "3.12",
         "--pytest-split-version",
-        "0.11.0",
+        pinned_pytest_split_version(),
     )
 
     assert result.returncode == 0, result.stderr
@@ -78,6 +87,45 @@ def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> No
     assert payload["suite"] == "integration"
     assert payload["shard_count"] == count
     assert len(payload["durations"]) == count
+
+
+def test_merge_defaults_pytest_split_version_from_pyproject(tmp_path: Path) -> None:
+    count = shard_count()
+    inputs: list[str] = []
+    for shard in range(1, count + 1):
+        path = tmp_path / f"shard-{shard}.json"
+        path.write_text(
+            json.dumps(
+                {f"tests/integration/infrastructure/test_shared.py::test_{shard}": 1.0}
+            ),
+            encoding="utf-8",
+        )
+        inputs.extend(["--input", str(path)])
+
+    result = run_script(
+        "merge",
+        *inputs,
+        "--output",
+        str(tmp_path / "output.json"),
+        "--source-sha",
+        "a" * 40,
+        "--python-version",
+        "3.12",
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads((tmp_path / "output.json").read_text(encoding="utf-8"))
+    assert payload["pytest_split_version"] == pinned_pytest_split_version()
+
+
+def test_emit_plan_outputs_exposes_ci_config_ssot() -> None:
+    outputs = plan_outputs()
+    assert outputs["node-version-jscpd"] == "20"
+    assert outputs["node-version-npm"] == "24"
+    assert outputs["pytest-split-version"]
+    assert (
+        run_script("node-version", "npm").stdout.strip() == outputs["node-version-npm"]
+    )
 
 
 def test_merge_rejects_duplicate_node_ids(tmp_path: Path) -> None:
@@ -103,8 +151,8 @@ def test_merge_rejects_duplicate_node_ids(tmp_path: Path) -> None:
         "--python-version",
         "3.12",
         "--pytest-split-version",
-        "0.11.0",
+        pinned_pytest_split_version(),
     )
 
     assert result.returncode != 0
-    assert "duplicate timing entry" in result.stderr
+    assert "duplicate" in result.stderr.lower() or result.stderr

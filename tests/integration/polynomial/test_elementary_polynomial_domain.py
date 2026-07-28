@@ -1,12 +1,6 @@
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _polynomial(
@@ -45,9 +39,8 @@ def _invoke(
 
 
 def test_integer_polynomial_operations_preserve_ring_semantics(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     assert _invoke(
         kernel,
@@ -103,9 +96,8 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
 
 
 def test_rational_polynomial_operations_return_typed_intermediates(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     division = _invoke(
         kernel,
@@ -142,9 +134,8 @@ def test_rational_polynomial_operations_return_typed_intermediates(
 
 
 def test_partial_fraction_output_is_structured_and_reconstructs(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     numerator = _polynomial([(2, 1, 1), (1, 2, 1), (0, 3, 1)])
     denominator = _polynomial([(3, 1, 1), (2, 4, 1), (1, 5, 1), (0, 2, 1)])
 
@@ -177,9 +168,8 @@ def test_partial_fraction_output_is_structured_and_reconstructs(
 
 
 def test_partial_fraction_uses_the_declared_univariate_generator(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     numerator = _polynomial([(1, 1, 1), (0, 3, 1)], "t")
     denominator = _polynomial([(2, 1, 1), (0, -1, 1)], "t")
 
@@ -206,9 +196,8 @@ def test_partial_fraction_uses_the_declared_univariate_generator(
 
 
 def test_partial_fraction_normalizes_non_monic_denominators_exactly(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     numerator = _polynomial([(2, 2, 1), (1, -3, 1), (0, 1, 1)], "t")
     denominator = _polynomial([(2, 6, 1), (1, -3, 1), (0, -3, 1)], "t")
 
@@ -243,9 +232,8 @@ def test_partial_fraction_normalizes_non_monic_denominators_exactly(
 
 
 def test_elementary_polynomial_requests_fail_closed_before_artifact_writes(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     outcome = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.integer.compute.compose",

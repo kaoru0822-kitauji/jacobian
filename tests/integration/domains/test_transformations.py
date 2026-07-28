@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 @pytest.mark.subprocess
 def test_matrix_representation_change_is_independently_verified(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]
     source = kernel.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
@@ -47,8 +47,7 @@ def test_matrix_representation_change_is_independently_verified(
     )
 
 
-def test_transformation_target_rebinding_fails_closed(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_transformation_target_rebinding_fails_closed(kernel) -> None:
     reference = kernel.references["matrices"]
     source = kernel.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
@@ -94,8 +93,7 @@ def test_transformation_target_rebinding_fails_closed(tmp_path: Path) -> None:
     assert result.verification_record_uri is None
 
 
-def test_transformation_relation_rebinding_fails_closed(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_transformation_relation_rebinding_fails_closed(kernel) -> None:
     reference = kernel.references["matrices"]
     source = kernel.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
@@ -132,8 +130,9 @@ def test_transformation_relation_rebinding_fails_closed(tmp_path: Path) -> None:
     assert result.verification_record_uri is None
 
 
-def test_transformation_obligation_tampering_fails_closed(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_transformation_obligation_tampering_fails_closed(
+    kernel,
+) -> None:
     reference = kernel.references["matrices"]
     source = kernel.artifacts.put(
         schema_uri=reference.candidate_schema_uri,

@@ -39,6 +39,9 @@ jobs:
       run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
       integration-shard-count: ${{ steps.shards.outputs.integration-shard-count }}
       integration-shards: ${{ steps.shards.outputs.integration-shards }}
+      node-version-jscpd: ${{ steps.shards.outputs.node-version-jscpd }}
+      node-version-npm: ${{ steps.shards.outputs.node-version-npm }}
+      pytest-split-version: ${{ steps.shards.outputs.pytest-split-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,19 +49,7 @@ jobs:
           persist-credentials: false
       - id: shards
         name: Load integration shard configuration
-        run: |
-          python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          from pathlib import Path
-
-          count = json.loads(Path(".github/ci-config.json").read_text(encoding="utf-8"))[
-              "integration_shard_count"
-          ]
-          if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-              raise SystemExit("integration_shard_count must be a positive integer")
-          print(f"integration-shard-count={count}")
-          print(f"integration-shards={json.dumps(list(range(1, count + 1)))}")
-          PY
+        run: .github/scripts/manage-test-timings emit-plan-outputs >> "$GITHUB_OUTPUT"
       - name: Prepare integration timing hint
         env:
           GH_TOKEN: ${{ github.token }}
@@ -359,7 +350,7 @@ jobs:
             --output .ci/integration-test-durations.json \
             --source-sha "${{ github.sha }}" \
             --python-version "3.12" \
-            --pytest-split-version "0.11.0"
+            --pytest-split-version "${{ needs.plan.outputs.pytest-split-version }}"
       - name: Publish timing hint
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -664,7 +655,7 @@ jobs:
       - if: needs.plan.outputs.run-duplicate == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          node-version: ${{ needs.plan.outputs.node-version-jscpd }}
       - if: needs.plan.outputs.run-duplicate == 'true'
         run: npx --yes jscpd@5.0.12 --config .jscpd.json .
 
@@ -702,7 +693,7 @@ jobs:
       - if: needs.plan.outputs.run-npm == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
+          node-version: ${{ needs.plan.outputs.node-version-npm }}
           package-manager-cache: false
       - if: needs.plan.outputs.run-npm == 'true'
         run: npm test

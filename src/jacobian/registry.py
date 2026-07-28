@@ -13,7 +13,10 @@ from pathlib import Path
 from typing import BinaryIO
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
-from jacobian.contracts.capabilities import CapabilityProviderRuntime
+from jacobian.contracts.capabilities import (
+    CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
+)
 from jacobian.contracts.checkers import (
     CheckerAuditEvent,
     CheckerRegistration,
@@ -97,6 +100,7 @@ class CheckerRegistry:
             self.database_path.name + ".checker-policy.lock"
         )
         self._policy_lock_state = _PolicyLockState()
+        self.bind_existing_when_omitted = False
         self._initialize_database()
 
     @contextmanager
@@ -290,6 +294,77 @@ class CheckerRegistry:
                     "Authorize the current implementation as a new checker version."
                 )
         return registration
+
+    def bind_existing(
+        self,
+        *,
+        name: str,
+        entrypoint: str,
+        evidence_kind: EvidenceKind | str,
+        format_id: str,
+        format_version: str,
+        claim_schema_uris: tuple[str, ...],
+        semantics_uris: tuple[str, ...],
+        candidate_schema_uris: tuple[str, ...],
+        target_schema_uris: tuple[str, ...] = (),
+        target_semantics_uris: tuple[str, ...] = (),
+        provider_runtime: CapabilityProviderRuntime | None = None,
+    ) -> str | None:
+        """Return an already-authorized checker_id without writing authorization.
+
+        Used to reconstitute process-local adapters from a store that already
+        contains operator-authorized checkers. Missing or revoked checkers fail
+        closed as ``None`` rather than authorizing.
+        """
+
+        selected_kind = EvidenceKind(evidence_kind)
+        scope_error = _compatibility_scope_error(
+            evidence_kind=selected_kind,
+            claim_schema_uris=claim_schema_uris,
+            semantics_uris=semantics_uris,
+            candidate_schema_uris=candidate_schema_uris,
+            target_schema_uris=target_schema_uris,
+            target_semantics_uris=target_semantics_uris,
+        )
+        if scope_error is not None:
+            raise CheckerRegistryError(scope_error)
+        if provider_runtime is not None and (
+            provider_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+            or provider_runtime.digest is None
+            or provider_runtime.digest_kind is None
+        ):
+            # Match authorization gates that omit unavailable providers.
+            return None
+        try:
+            _require_runtime_unchanged(provider_runtime)
+        except CheckerExecutableChangedError:
+            return None
+        executable_digest = compute_entrypoint_digest(entrypoint)
+        unbound_registration = CheckerRegistration(
+            checker_id="checker://sha256/" + "0" * 64,
+            name=name,
+            entrypoint=entrypoint,
+            executable_digest=executable_digest,
+            provider_runtime=provider_runtime,
+            evidence_kind=selected_kind,
+            format_id=format_id,
+            format_version=format_version,
+            claim_schema_uris=tuple(sorted(claim_schema_uris)),
+            semantics_uris=tuple(sorted(semantics_uris)),
+            candidate_schema_uris=tuple(sorted(candidate_schema_uris)),
+            target_schema_uris=tuple(sorted(target_schema_uris)),
+            target_semantics_uris=tuple(sorted(target_semantics_uris)),
+            authorized=True,
+        )
+        checker_id = _checker_identifier(unbound_registration)
+        try:
+            registration = self.get(checker_id)
+        except CheckerNotFoundError:
+            return None
+        if not registration.authorized:
+            return None
+        return registration.checker_id
 
     def get(self, checker_id: str) -> CheckerRegistration:
         """Return a checker registration, including its revocation state."""

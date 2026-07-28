@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.contracts.capabilities import (
@@ -13,8 +10,6 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _poly(*coefficients_ascending: int) -> dict[str, object]:
@@ -77,8 +72,7 @@ def _computed_gcd(kernel: JacobianKernel):
     )
 
 
-def test_public_seam_verifies_exact_producer_result(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_public_seam_verifies_exact_producer_result(kernel) -> None:
     adapters = _install_verification(kernel, authorize=True)
     runtime = adapters[0].descriptor.provider_runtime
     assert runtime is not None
@@ -104,8 +98,7 @@ def test_public_seam_verifies_exact_producer_result(tmp_path: Path) -> None:
     assert len(verified.artifact_uris) == 4
 
 
-def test_public_seam_rejects_validly_shaped_false_result(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_public_seam_rejects_validly_shaped_false_result(kernel) -> None:
     _install_verification(kernel, authorize=True)
     computed = _computed_gcd(kernel)
     input_uri = computed.output["input_uri"]
@@ -141,9 +134,8 @@ def test_public_seam_rejects_validly_shaped_false_result(tmp_path: Path) -> None
 
 
 def test_public_seam_reports_valid_multivariate_result_as_unsupported(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     _install_verification(kernel, authorize=True)
     computed = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -173,10 +165,9 @@ def test_public_seam_reports_valid_multivariate_result_as_unsupported(
 
 
 def test_induced_tree_result_is_domain_bound_and_independently_replayed(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    computed = kernel.capabilities.invoke(
+    computed = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.compute",
             input={
@@ -200,7 +191,7 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     assert computed.output["optimum_value"] == 3
     result_uri = computed.artifact_uris[1]
 
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.verify",
             mode=CapabilityMode.VERIFY,
@@ -219,7 +210,7 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     )
     assert "FLINT" not in verified.execution.detail
 
-    result_artifact = kernel.store.get(result_uri)
+    result_artifact = kernel_with_references.store.get(result_uri)
     false_payload = dict(result_artifact.payload)
     false_payload.update(
         {
@@ -230,14 +221,14 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
             "witness_vertices": ["a", "b", "c", "d"],
         }
     )
-    false_result = kernel.artifacts.put(
+    false_result = kernel_with_references.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
         payload=false_payload,
         summary="adversarial false maximum induced-tree result",
     )
-    rejected = kernel.capabilities.invoke(
+    rejected = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.verify",
             mode=CapabilityMode.VERIFY,
@@ -251,10 +242,9 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
 
 
 def test_maximum_matching_result_uses_independent_tutte_berge_replay(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    computed = kernel.capabilities.invoke(
+    computed = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.compute",
             input={
@@ -271,7 +261,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     )
     result_uri = computed.artifact_uris[1]
 
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
             mode=CapabilityMode.VERIFY,
@@ -292,7 +282,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     )
     runtime = next(
         descriptor.provider_runtime
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in kernel_with_references.capabilities.catalog().capabilities
         if descriptor.capability_id == "graph.invariant.maximum_matching.verify"
     )
     assert runtime is not None
@@ -301,8 +291,8 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         component["provider"] for component in runtime.configuration["components"]
     } == {"jacobian.graph-exact-checker-source"}
 
-    result_artifact = kernel.store.get(result_uri)
-    false_result = kernel.artifacts.put(
+    result_artifact = kernel_with_references.store.get(result_uri)
+    false_result = kernel_with_references.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
@@ -316,7 +306,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         },
         summary="adversarial feasible but nonmaximum matching result",
     )
-    rejected = kernel.capabilities.invoke(
+    rejected = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
             mode=CapabilityMode.VERIFY,
@@ -331,9 +321,8 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
 
 
 def test_operator_can_leave_exact_result_verification_unavailable(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     adapters = _install_verification(kernel, authorize=False)
 

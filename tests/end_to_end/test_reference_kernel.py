@@ -15,7 +15,10 @@ from jacobian.contracts.evidence import (
 )
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+
+@pytest.fixture
+def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
+    return kernel_with_references
 
 
 def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
@@ -119,8 +122,7 @@ def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
     assert replayed["assurance"]["verification"] == "VERIFIED"
 
 
-def test_matrix_kernel_witness_and_independent_replay(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_matrix_kernel_witness_and_independent_replay(kernel) -> None:
     reference = kernel.references["matrices"]
     claim = kernel.artifacts.put(
         schema_uri=reference.claim_schema_uri,
@@ -170,8 +172,9 @@ def test_matrix_kernel_witness_and_independent_replay(tmp_path: Path) -> None:
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-def test_erdos_straus_range_witness_and_independent_replay(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_erdos_straus_range_witness_and_independent_replay(
+    kernel,
+) -> None:
     reference = kernel.references["erdos_straus"]
     claim = kernel.artifacts.put(
         schema_uri=reference.claim_schema_uri,
@@ -218,8 +221,7 @@ def test_erdos_straus_range_witness_and_independent_replay(tmp_path: Path) -> No
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-def test_matrix_maxdet_certificate_replays_full_scope(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
     reference = kernel.references["matrices"]
     claim = kernel.artifacts.put(
         schema_uri=reference.claim_schema_uri,
@@ -310,8 +312,7 @@ def test_matrix_maxdet_certificate_replays_full_scope(tmp_path: Path) -> None:
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-def test_graph_counterexample_shrinks_to_the_odd_cycle(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_graph_counterexample_shrinks_to_the_odd_cycle(kernel) -> None:
     reference = kernel.references["graph_paths"]
     claim = kernel.artifacts.put(
         schema_uri=reference.claim_schema_uri,

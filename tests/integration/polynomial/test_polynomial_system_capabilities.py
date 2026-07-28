@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -14,10 +13,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _input(value: int) -> dict[str, Any]:
@@ -33,10 +29,9 @@ def _input(value: int) -> dict[str, Any]:
     }
 
 
-def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_solution_capability_verifies_valid_assignment(kernel_with_references) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -57,12 +52,12 @@ def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
         result.relationships[0].verification_record_uri
         == result.assurance.verification_record_uri
     )
-    certificate = kernel.store.get(result.output["certificate_uri"])
+    certificate = kernel_with_references.store.get(result.output["certificate_uri"])
     assert (
         certificate.payload["payload"]["equation_residuals"]
         == (result.output["equation_residuals"])
     )
-    record = kernel.store.get(result.output["verification_record_uri"])
+    record = kernel_with_references.store.get(result.output["verification_record_uri"])
     assert result.output["certificate_uri"] in record.manifest.parents
     assert record.payload["relationship_source_artifact_uris"] == [
         result.output["assignment_uri"]
@@ -73,10 +68,11 @@ def test_solution_capability_verifies_valid_assignment(tmp_path: Path) -> None:
     assert record.payload["obligation_uri"] is None
 
 
-def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_solution_capability_verifies_invalid_assignment(
+    kernel_with_references,
+) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -89,7 +85,7 @@ def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None
     assert result.output["residuals_assurance"] == "VERIFIED"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.relationships == ()
-    record = kernel.store.get(result.output["verification_record_uri"])
+    record = kernel_with_references.store.get(result.output["verification_record_uri"])
     assert record.payload["relation_id"] is None
     assert record.payload["relationship_source_artifact_uris"] == []
     assert record.payload["relationship_target_artifact_uris"] == []
@@ -97,16 +93,15 @@ def test_solution_capability_verifies_invalid_assignment(tmp_path: Path) -> None
 
 
 def test_solution_capability_keeps_checker_failure_unknown(
-    tmp_path: Path,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
     def fail(**_kwargs: Any):
         raise CheckerExecutionError("deliberate checker failure")
 
-    monkeypatch.setattr(kernel.verification, "_run_checker", fail)
-    result = kernel.capabilities.invoke(
+    monkeypatch.setattr(kernel_with_references.verification, "_run_checker", fail)
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -124,10 +119,9 @@ def test_solution_capability_keeps_checker_failure_unknown(
 
 
 def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    connection = sqlite3.connect(kernel.store.db_path)
+    connection = sqlite3.connect(kernel_with_references.store.db_path)
     try:
         before = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
     finally:
@@ -135,7 +129,7 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
     invalid = _input(2)
     invalid["assignment"].append({"num": "3", "den": "1"})
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -143,7 +137,7 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
         )
     )
 
-    connection = sqlite3.connect(kernel.store.db_path)
+    connection = sqlite3.connect(kernel_with_references.store.db_path)
     try:
         after = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
     finally:
@@ -155,9 +149,8 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
 
 
 def test_solution_capability_is_only_available_with_checker(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     ids = {
         descriptor.capability_id

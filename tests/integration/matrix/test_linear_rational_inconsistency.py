@@ -50,9 +50,8 @@ def _kernel_with_checker(root: Path) -> JacobianKernel:
 
 
 def test_python_flint_finds_normalized_unverified_inconsistency_witness(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     assert (
         kernel.python_flint_runtime.availability
         is CapabilityProviderAvailability.AVAILABLE
@@ -85,8 +84,7 @@ def test_python_flint_finds_normalized_unverified_inconsistency_witness(
     assert result.output["system_uri"] in resolved.artifact.manifest.parents
 
 
-def test_no_certificate_is_not_a_consistency_conclusion(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_no_certificate_is_not_a_consistency_conclusion(kernel) -> None:
     result = _invoke(
         kernel,
         "linear.rational_inconsistency.find",
@@ -124,10 +122,9 @@ def test_independent_checker_verifies_inconsistency(tmp_path: Path) -> None:
 
 
 def test_inconsistency_timeout_retains_no_certificate(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     monkeypatch.setattr(
         "jacobian.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(

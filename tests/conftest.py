@@ -113,7 +113,7 @@ def kernel_with_references(
     """Attach a kernel to a per-test copy that already has authorized references."""
 
     _ = initialized_kernel_store_with_references
-    return JacobianKernel(tmp_path, install_references=True)
+    return JacobianKernel(tmp_path, hydrate_authorized=True)
 
 
 @pytest.hookimpl(trylast=True)

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
@@ -11,9 +9,6 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _request(
@@ -33,9 +28,11 @@ def _request(
     )
 
 
-def test_finite_coverage_verifies_exactly_once_across_pages(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_coverage_verifies_exactly_once_across_pages(
+    kernel_with_references,
+) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         _request(["alpha", "beta", "gamma"], [["alpha"], ["beta", "gamma"]])
     )
@@ -61,9 +58,9 @@ def test_finite_coverage_verifies_exactly_once_across_pages(tmp_path) -> None:
     assert result.output["canonicalizer_uri"] in archive.manifest.parents
 
 
-def test_finite_coverage_reports_omission_and_duplicate(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_coverage_reports_omission_and_duplicate(kernel_with_references) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         _request(["alpha", "beta", "gamma"], [["alpha", "beta"], ["beta"]])
     )
@@ -81,9 +78,9 @@ def test_finite_coverage_reports_omission_and_duplicate(tmp_path) -> None:
     assert result.obligations[0].status is CapabilityObligationStatus.OPEN
 
 
-def test_finite_coverage_reports_items_outside_scope(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_coverage_reports_items_outside_scope(kernel_with_references) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         _request(["alpha", "beta"], [["alpha", "beta", "gamma"]])
     )
@@ -93,9 +90,11 @@ def test_finite_coverage_reports_items_outside_scope(tmp_path) -> None:
     assert result.output["verification_record_uri"] is None
 
 
-def test_finite_coverage_supports_registered_integer_canonicalizer(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_coverage_supports_registered_integer_canonicalizer(
+    kernel_with_references,
+) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         _request(
             [1, 2, 3],
@@ -109,10 +108,10 @@ def test_finite_coverage_supports_registered_integer_canonicalizer(tmp_path) -> 
 
 
 def test_finite_coverage_unknown_canonicalizer_reports_precise_schema_error(
-    tmp_path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(
         _request(
             ["alpha"],
@@ -131,17 +130,18 @@ def test_finite_coverage_unknown_canonicalizer_reports_precise_schema_error(
     )
 
 
-def test_finite_coverage_rejects_nfc_collisions_in_scope(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_finite_coverage_rejects_nfc_collisions_in_scope(
+    kernel_with_references,
+) -> None:
 
+    kernel = kernel_with_references
     result = kernel.capabilities.invoke(_request(["é", "e\u0301"], [["é"]]))
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["error"]["code"] == "DUPLICATE_FINITE_SCOPE_KEY"
 
 
-def test_finite_coverage_is_unavailable_without_authorized_checker(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_finite_coverage_is_unavailable_without_authorized_checker(kernel) -> None:
 
     result = kernel.capabilities.invoke(_request(["alpha"], [["alpha"]]))
 

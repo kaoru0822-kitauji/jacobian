@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.contracts.capabilities import (
@@ -12,17 +10,13 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    constructed = kernel.capabilities.invoke(
+    constructed = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.explicit",
             input={
@@ -39,13 +33,13 @@ def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
         "edges": [["a", "b"], ["b", "c"]],
     }
     graph_uri = constructed.output["graph_uri"]
-    stored = kernel.store.get(graph_uri)
+    stored = kernel_with_references.store.get(graph_uri)
     assert stored.payload == constructed.output["graph"]
-    assert stored.manifest.schema_uri == kernel.graph.graph_schema_uri
-    assert stored.manifest.semantics_uri == kernel.graph.semantics_uri
+    assert stored.manifest.schema_uri == kernel_with_references.graph.graph_schema_uri
+    assert stored.manifest.semantics_uri == kernel_with_references.graph.semantics_uri
     assert stored.manifest.object_digest == constructed.output["graph_object_digest"]
 
-    properties = kernel.capabilities.invoke(
+    properties = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             input={"graph_uri": graph_uri, "properties": ["order", "tree"]},
@@ -66,12 +60,11 @@ def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
     ],
 )
 def test_explicit_graph_construction_fails_before_artifact_writes(
-    tmp_path: Path,
+    kernel_with_references,
     input_payload: dict[str, object],
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.explicit",
             input=input_payload,
@@ -85,11 +78,10 @@ def test_explicit_graph_construction_fails_before_artifact_writes(
 
 
 def test_graph_atlas_search_is_bounded_complete_and_replayable(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -117,7 +109,7 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
 
     for candidate in result.output["candidates"]:
         graph_uri = candidate["graph_uri"]
-        graph = kernel.store.get(graph_uri)
+        graph = kernel_with_references.store.get(graph_uri)
         assert candidate["graph"] == graph.payload
         assert graph.payload["graph_schema_version"] == "1"
         assert len(graph.payload["vertices"]) == 5
@@ -125,18 +117,17 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
         assert candidate["properties"]["triangle_count"] == 0
         assert candidate["properties"]["independence_number"] == 3
 
-    scope = kernel.store.get(result.scope.artifact_uri)
+    scope = kernel_with_references.store.get(result.scope.artifact_uri)
     assert scope.payload["source"] == "networkx.graph_atlas_g"
     assert scope.payload["order"] == 5
     assert scope.payload["enumerated_count"] > 0
 
 
 def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -158,11 +149,10 @@ def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
 
 
 def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    invalid_range = kernel.capabilities.invoke(
+    invalid_range = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -179,7 +169,7 @@ def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
     assert invalid_range.diagnostics[0].path == "constraints/minimum_edges"
     assert invalid_range.episode_uri is None
 
-    missing_graph = kernel.capabilities.invoke(
+    missing_graph = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             input={
@@ -194,10 +184,9 @@ def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
 
 
 def test_graph_property_batch_materializes_exact_computed_artifact(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    searched = kernel.capabilities.invoke(
+    searched = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -209,7 +198,7 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     )
     graph_uri = searched.output["candidates"][0]["graph_uri"]
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             mode=CapabilityMode.EXPLORE,
@@ -278,7 +267,9 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     assert set(relationship.target_artifact_uris[1:]) == {
         binding["artifact_uri"] for binding in result.output["results"]
     }
-    property_artifact = kernel.store.get(result.output["property_artifact_uri"])
+    property_artifact = kernel_with_references.store.get(
+        result.output["property_artifact_uri"]
+    )
     assert set(property_artifact.manifest.parents) == {
         graph_uri,
         *(binding["artifact_uri"] for binding in result.output["results"]),
@@ -294,15 +285,14 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
         "triangle_count",
     ]
     for binding in result.output["results"]:
-        invariant_artifact = kernel.store.get(binding["artifact_uri"])
+        invariant_artifact = kernel_with_references.store.get(binding["artifact_uri"])
         assert invariant_artifact.manifest.parents == (graph_uri,)
         assert invariant_artifact.payload["result"] == binding["result"]
 
 
 def test_graph_counterexample_invariant_batch_reproduces_path_five(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -354,9 +344,8 @@ def test_graph_counterexample_invariant_batch_reproduces_path_five(
 
 
 def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -428,8 +417,7 @@ def test_graph_invariant_batch_preserves_unsupported_and_not_applicable_results(
     assert "made_up_invariant" not in result.output["supported_invariants"]
 
 
-def test_graph_invariant_registry_is_fixed_and_discoverable(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_graph_invariant_registry_is_fixed_and_discoverable(kernel) -> None:
     descriptor = next(
         item
         for item in kernel.capabilities.catalog().capabilities

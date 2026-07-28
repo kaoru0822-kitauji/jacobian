@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from tests.integration.infrastructure._workspace_support import _open
 
 from jacobian.contracts.workspaces import (
@@ -14,13 +11,9 @@ from jacobian.contracts.workspaces import (
     WorkspaceQueryView,
     WorkspaceWriteRequest,
 )
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
-def test_workspace_context_handles_a_deep_dependency_chain(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_workspace_context_handles_a_deep_dependency_chain(kernel) -> None:
     opened = _open(kernel, key="workspace-open-deep-context-001")
     revision_id = opened.revision_id
     previous_card_id: str | None = None
@@ -74,8 +67,7 @@ def test_workspace_context_handles_a_deep_dependency_chain(tmp_path: Path) -> No
     assert len(context.context.dependencies) == 1
 
 
-def test_workspace_supersession_handles_a_deep_chain(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_workspace_supersession_handles_a_deep_chain(kernel) -> None:
     opened = _open(kernel, key="workspace-open-deep-supersession-001")
     revision_id = opened.revision_id
     card_ids: list[str] = []
@@ -143,9 +135,8 @@ def test_workspace_supersession_handles_a_deep_chain(tmp_path: Path) -> None:
 
 
 def test_workspace_context_truncation_and_stale_roots_are_deterministic(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-context-budget-001")
     seeded = kernel.workspaces.write(
         WorkspaceWriteRequest(

@@ -140,23 +140,21 @@ def install_finite_partition(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    checker_id = None
-    if authorize_checker:
-        registration = CheckerInstaller(checkers).install(
-            CheckerOperation(
-                name="finite partition coverage checker",
-                entrypoint="jacobian_checkers.finite_partition:check_partition",
-                evidence_kind=EvidenceKind.CERTIFICATE,
-                format_id="finite.partition",
-                format_version="1",
-                claim_schema_uris=(claim_schema_uri,),
-                semantics_uris=(semantics_uri,),
-                candidate_schema_uris=(partition_schema_uri,),
-                reason="operator requested bundled reference checker installation",
-            ),
-            authorize=True,
-        )
-        checker_id = registration.checker_id
+    registration = CheckerInstaller(checkers).install(
+        CheckerOperation(
+            name="finite partition coverage checker",
+            entrypoint="jacobian_checkers.finite_partition:check_partition",
+            evidence_kind=EvidenceKind.CERTIFICATE,
+            format_id="finite.partition",
+            format_version="1",
+            claim_schema_uris=(claim_schema_uri,),
+            semantics_uris=(semantics_uri,),
+            candidate_schema_uris=(partition_schema_uri,),
+            reason="operator requested bundled reference checker installation",
+        ),
+        authorize=authorize_checker,
+    )
+    checker_id = registration.checker_id
     installation = FinitePartitionInstallation(
         checker_id=checker_id,
         semantics_uri=semantics_uri,

@@ -1,7 +1,3 @@
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
@@ -17,9 +13,6 @@ from jacobian.contracts.geometry import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.geometry import GEOMETRY_BUNDLE
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 ZERO = {"num": "0", "den": "1"}
 ONE = {"num": "1", "den": "1"}
@@ -31,9 +24,8 @@ PXY = {"x": TWO, "y": TWO}
 
 
 def test_geometry_capabilities_are_distinct_and_every_contract_completes(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     line_x = {"first": P0, "second": PX}
     line_y = {"first": P0, "second": PY}
     payloads = {
@@ -69,8 +61,7 @@ def test_geometry_capabilities_are_distinct_and_every_contract_completes(
         assert len(result.artifact_uris) == 2
 
 
-def test_geometry_exact_outputs_are_inline_and_materialized(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_geometry_exact_outputs_are_inline_and_materialized(kernel) -> None:
 
     distance = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -97,9 +88,8 @@ def test_geometry_exact_outputs_are_inline_and_materialized(tmp_path: Path) -> N
 
 
 def test_convex_hull_returns_segment_endpoints_for_two_points(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -113,9 +103,8 @@ def test_convex_hull_returns_segment_endpoints_for_two_points(
 
 
 def test_convex_hull_returns_extreme_endpoints_for_collinear_points(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     middle = {"x": ONE, "y": ONE}
 
     result = kernel.capabilities.invoke(
@@ -129,8 +118,7 @@ def test_convex_hull_returns_extreme_endpoints_for_collinear_points(
     assert result.output["result"] == {"points": [P0, PXY]}
 
 
-def test_degenerate_geometry_fails_before_artifact_writes(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_degenerate_geometry_fails_before_artifact_writes(kernel) -> None:
 
     invalid_line = kernel.capabilities.invoke(
         CapabilityRequest(

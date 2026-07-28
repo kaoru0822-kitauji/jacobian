@@ -179,26 +179,24 @@ def install_polynomial_interval_capabilities(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact rational polynomial interval Bernstein enclosure checker",
-                    entrypoint="jacobian_checkers.polynomial_intervals:check_enclosure",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="polynomial.interval_bernstein_enclosure_replay",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(enclosure_schema_uri,),
-                    reason="bundled independent Bernstein-coefficient enclosure checker",
-                ),
-                authorize=True,
-            )
-            .checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational polynomial interval Bernstein enclosure checker",
+                entrypoint="jacobian_checkers.polynomial_intervals:check_enclosure",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.interval_bernstein_enclosure_replay",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(enclosure_schema_uri,),
+                reason="bundled independent Bernstein-coefficient enclosure checker",
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = PolynomialIntervalInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,

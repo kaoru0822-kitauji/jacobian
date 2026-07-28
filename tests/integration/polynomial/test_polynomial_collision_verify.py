@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -11,9 +7,6 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus, InputStatus
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _rational(value: int) -> dict[str, str]:
@@ -46,11 +39,10 @@ def _request(image: int) -> CapabilityRequest:
 
 
 def test_direct_collision_verifier_promotes_only_independent_replay(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    result = kernel.capabilities.invoke(_request(1))
+    result = kernel_with_references.capabilities.invoke(_request(1))
 
     assert result.output["collision_verified"] is True
     assert result.output["conclusion"] == "FALSE"
@@ -67,7 +59,7 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
     relationship = result.relationships[0]
     assert relationship.status is CapabilityRelationshipStatus.VERIFIED
     assert relationship.verification_record_uri == record_uri
-    record = kernel.store.get(record_uri).payload
+    record = kernel_with_references.store.get(record_uri).payload
     assert record["relation_id"] == relationship.relation_id
     assert tuple(record["relationship_source_artifact_uris"]) == (
         relationship.source_artifact_uris
@@ -80,11 +72,10 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
 
 
 def test_direct_collision_verifier_fails_closed_for_wrong_image(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
 
-    result = kernel.capabilities.invoke(_request(2))
+    result = kernel_with_references.capabilities.invoke(_request(2))
 
     assert result.output["collision_verified"] is False
     assert result.output["conclusion"] == "UNKNOWN"
@@ -103,9 +94,8 @@ def test_direct_collision_verifier_fails_closed_for_wrong_image(
 
 
 def test_direct_collision_verifier_requires_authorized_reference_checker(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     assert "polynomial.map.collision.verify" not in {
         item.capability_id for item in kernel.capabilities.catalog().capabilities

@@ -107,26 +107,24 @@ def install_graph_isomorphism(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact finite simple-graph isomorphism checker",
-                    entrypoint="jacobian_checkers.graph_isomorphism:check_isomorphism",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="graph.isomorphism_replay",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(mapping_schema_uri,),
-                    reason="bundled independent adjacency-preservation checker",
-                ),
-                authorize=True,
-            )
-            .checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact finite simple-graph isomorphism checker",
+                entrypoint="jacobian_checkers.graph_isomorphism:check_isomorphism",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="graph.isomorphism_replay",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(mapping_schema_uri,),
+                reason="bundled independent adjacency-preservation checker",
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = GraphIsomorphismInstallation(
         semantics_uri=semantics_uri,
         source_graph_semantics_uri=graph.semantics_uri,

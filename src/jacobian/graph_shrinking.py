@@ -7,6 +7,8 @@ from typing import Any, cast
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -103,21 +105,26 @@ def install_graph_shrinking(
         summary="untrusted simple-graph deletion reducer plugin",
     )
     plugins.install(manifest.artifact_uri)
-    checker_id = None
-    if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact non-bipartite graph property preservation checker",
-            entrypoint=(
-                "jacobian_checkers.graph_shrinking:check_non_bipartite_preservation"
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name=("exact non-bipartite graph property preservation checker"),
+                entrypoint=(
+                    "jacobian_checkers.graph_shrinking:check_non_bipartite_preservation"
+                ),
+                evidence_kind=EvidenceKind.PRESERVATION,
+                format_id=_PRESERVATION_FORMAT,
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(graph.semantics_uri,),
+                candidate_schema_uris=(graph.graph_schema_uri,),
+                reason=("bundled independent finite simple-graph property checker"),
             ),
-            evidence_kind="PRESERVATION",
-            format_id=_PRESERVATION_FORMAT,
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(graph.semantics_uri,),
-            candidate_schema_uris=(graph.graph_schema_uri,),
-            reason="bundled independent finite simple-graph property checker",
-        ).checker_id
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = GraphShrinkingInstallation(
         plugin_id=manifest.artifact_uri,
         claim_schema_uri=claim_schema_uri,

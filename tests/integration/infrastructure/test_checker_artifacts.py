@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.evidence import (
@@ -15,8 +11,6 @@ from jacobian.contracts.evidence import (
 )
 from jacobian.kernel import JacobianKernel
 from jacobian.store import StoredArtifact
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _witness_schema_uri(kernel: JacobianKernel) -> str:
@@ -54,9 +48,8 @@ def _claim_and_candidate(
 
 
 def test_put_witness_envelope_binds_digests_and_parents(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim, candidate = _claim_and_candidate(kernel)
     semantics = _semantics_artifact(kernel)
     witness_schema_uri = _witness_schema_uri(kernel)
@@ -95,9 +88,8 @@ def test_put_witness_envelope_binds_digests_and_parents(
 
 
 def test_put_witness_envelope_parents_order_is_claim_then_candidate(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     claim, candidate = _claim_and_candidate(kernel)
     semantics = _semantics_artifact(kernel)
     witness_schema_uri = _witness_schema_uri(kernel)

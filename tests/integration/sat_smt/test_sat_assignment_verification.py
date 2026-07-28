@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import subprocess
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,8 +21,6 @@ from jacobian.contracts.sat import SatResourceBudget
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
 def _producer() -> CapabilityProviderRuntime:
@@ -69,11 +66,10 @@ def _verify(kernel: JacobianKernel, assignment_uri: str):
 
 @pytest.mark.subprocess
 def test_sat_assignment_is_verified_by_an_authorized_clean_process(
-    tmp_path: Path,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
+    cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
 
     monkeypatch.setattr(
         jacobian_checkers.sat,
@@ -87,7 +83,7 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
             "detail": "parent-process monkeypatch",
         },
     )
-    result = _verify(kernel, assignment_uri)
+    result = _verify(kernel_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
@@ -97,9 +93,9 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     assert result.output["assignment_uri"] == assignment_uri
     record_uri = result.assurance.verification_record_uri
     assert record_uri is not None
-    record_artifact = kernel.store.get(record_uri)
+    record_artifact = kernel_with_references.store.get(record_uri)
     record = VerificationRecord.model_validate(record_artifact.payload)
-    assert record.checker_id == kernel.sat_assignment_checker.checker_id
+    assert record.checker_id == kernel_with_references.sat_assignment_checker.checker_id
     assert record.evidence_uri == result.output["witness_uri"]
     assert set(record_artifact.manifest.parents) == {
         cnf_uri,
@@ -110,12 +106,13 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
 
 @pytest.mark.subprocess
 def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    _cnf_uri, assignment_uri = _assignment(kernel, values=(False, False))
+    _cnf_uri, assignment_uri = _assignment(
+        kernel_with_references, values=(False, False)
+    )
 
-    result = _verify(kernel, assignment_uri)
+    result = _verify(kernel_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
@@ -126,9 +123,8 @@ def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
 
 
 def test_sat_assignment_verify_requires_operator_authorized_checker(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     assert kernel.sat_assignment_checker.checker_id is None
     assert "sat.model.verify" not in {
@@ -138,16 +134,17 @@ def test_sat_assignment_verify_requires_operator_authorized_checker(
 
 
 def test_misbound_assignment_artifact_fails_before_checker_dispatch(
-    tmp_path: Path,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
-    second = kernel.sat.put_cnf(variable_names=("a", "b"), clauses=((1,),))
-    stored = kernel.store.get(assignment_uri)
+    cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
+    second = kernel_with_references.sat.put_cnf(
+        variable_names=("a", "b"), clauses=((1,),)
+    )
+    stored = kernel_with_references.store.get(assignment_uri)
     payload = deepcopy(stored.payload)
     payload["cnf"]["cnf_artifact_uri"] = second.artifact_uri
-    forged = kernel.store.put(
+    forged = kernel_with_references.store.put(
         schema_uri=stored.manifest.schema_uri,
         semantics_uri=stored.manifest.semantics_uri,
         payload=payload,
@@ -161,8 +158,10 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
         called = True
         raise AssertionError("checker must not receive malformed source bindings")
 
-    monkeypatch.setattr(kernel.verification, "_run_checker", unexpected_checker)
-    result = _verify(kernel, forged.artifact_uri)
+    monkeypatch.setattr(
+        kernel_with_references.verification, "_run_checker", unexpected_checker
+    )
+    result = _verify(kernel_with_references, forged.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
@@ -170,17 +169,16 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
 
 
 def test_checker_timeout_cannot_create_a_sat_conclusion(
-    tmp_path: Path,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    _cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
+    _cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
 
     def timeout(**_kwargs: Any):
         raise subprocess.TimeoutExpired(cmd=("sat-assignment-checker",), timeout=1)
 
-    monkeypatch.setattr(kernel.verification, "_run_checker", timeout)
-    result = _verify(kernel, assignment_uri)
+    monkeypatch.setattr(kernel_with_references.verification, "_run_checker", timeout)
+    result = _verify(kernel_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
@@ -190,17 +188,16 @@ def test_checker_timeout_cannot_create_a_sat_conclusion(
 
 
 def test_checker_error_cannot_create_a_sat_conclusion(
-    tmp_path: Path,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    _cnf_uri, assignment_uri = _assignment(kernel, values=(False, True))
+    _cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
 
     def fail(**_kwargs: Any):
         raise CheckerExecutionError("deliberate checker failure")
 
-    monkeypatch.setattr(kernel.verification, "_run_checker", fail)
-    result = _verify(kernel, assignment_uri)
+    monkeypatch.setattr(kernel_with_references.verification, "_run_checker", fail)
+    result = _verify(kernel_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED

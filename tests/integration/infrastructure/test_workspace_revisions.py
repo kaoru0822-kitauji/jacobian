@@ -69,8 +69,7 @@ def test_workspace_open_is_idempotent_and_restart_replays_revision(
     assert "retrieval does not promote" in resume.warning
 
 
-def test_workspace_write_cannot_add_a_second_problem(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_workspace_write_cannot_add_a_second_problem(kernel) -> None:
     opened = _open(kernel, key="workspace-open-single-problem-001")
     problem_draft = WorkspaceFindingDraft(
         client_ref="P2",
@@ -135,9 +134,8 @@ def test_workspace_write_cannot_add_a_second_problem(tmp_path: Path) -> None:
 
 
 def test_workspace_write_builds_resume_frontier_and_attempt_views(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel)
     request = WorkspaceWriteRequest(
         idempotency_key="workspace-write-batch-001",
@@ -257,9 +255,8 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
 
 
 def test_workspace_rejects_stale_base_without_partial_index_writes(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel)
     accepted = kernel.workspaces.write(
         WorkspaceWriteRequest(
@@ -332,9 +329,8 @@ def test_workspace_rejects_stale_base_without_partial_index_writes(
 
 
 def test_workspace_rejects_idempotency_rebinding_and_invalid_references(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     opened = _open(kernel, key="workspace-open-binding-001")
 
     with pytest.raises(WorkspaceIdempotencyError, match="different workspace request"):
@@ -392,8 +388,7 @@ def test_workspace_rejects_idempotency_rebinding_and_invalid_references(
         )
 
 
-def test_workspace_focus_clear_is_explicit_and_resumable(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+def test_workspace_focus_clear_is_explicit_and_resumable(kernel) -> None:
     opened = _open(kernel, key="workspace-open-focus-clear-001")
 
     cleared = kernel.workspaces.write(

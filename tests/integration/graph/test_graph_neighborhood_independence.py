@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 _LEFT = tuple(range(6))
 _RIGHT = tuple(range(6, 14))
@@ -48,17 +41,16 @@ def _wowii_200_graph() -> dict[str, object]:
 
 
 def test_neighborhood_independence_reproduces_wowii_200_invariant(
-    tmp_path: Path,
+    kernel_with_references,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    graph = kernel.artifacts.put(
-        schema_uri=kernel.graph.graph_schema_uri,
-        semantics_uri=kernel.graph.semantics_uri,
+    graph = kernel_with_references.artifacts.put(
+        schema_uri=kernel_with_references.graph.graph_schema_uri,
+        semantics_uri=kernel_with_references.graph.semantics_uri,
         payload=_wowii_200_graph(),
         summary="WOWII Conjecture 200 public counterexample graph",
     )
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.neighborhood_independence",
             input={"graph_uri": graph.artifact_uri},
@@ -74,10 +66,13 @@ def test_neighborhood_independence_reproduces_wowii_200_invariant(
         for record in result.output["records"]
     )
     assert result.output["certificate_uri"] in result.artifact_uris
-    assert result.output["checker_id"] == kernel.graph.neighborhood_checker_id
+    assert (
+        result.output["checker_id"]
+        == kernel_with_references.graph.neighborhood_checker_id
+    )
     assert "conclusion" not in result.output
 
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,

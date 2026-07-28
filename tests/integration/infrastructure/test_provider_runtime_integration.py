@@ -26,8 +26,6 @@ from jacobian.domains.graph_optimization.invariant_bundle import (
 from jacobian.kernel import JacobianKernel
 from jacobian.provider_measurements import _cold_install_spec
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
-
 
 class UnavailableAdapter:
     descriptor = CapabilityDescriptor(
@@ -54,9 +52,8 @@ class UnavailableAdapter:
 
 
 def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     descriptors = {
         item.capability_id: item for item in kernel.capabilities.catalog().capabilities
     }
@@ -98,9 +95,8 @@ def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
 
 
 def test_unavailable_adapter_is_rejected_before_catalog_advertisement(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     with pytest.raises(CapabilityError, match="is unavailable"):
         kernel.register_capability(UnavailableAdapter())
@@ -139,8 +135,10 @@ def test_graph_domain_runtime_identities_bind_every_executed_backend() -> None:
 
 def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
     tmp_path: Path,
+    initialized_kernel_store_with_references: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _ = initialized_kernel_store_with_references
     unavailable = CapabilityProviderRuntime(
         provider="jacobian.lean4",
         availability=CapabilityProviderAvailability.UNAVAILABLE,
@@ -154,7 +152,7 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
         lambda **_kwargs: unavailable,
     )
 
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
 
     assert kernel.lean is None
     assert kernel.lean_proof_edit is None
@@ -171,9 +169,8 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
 
 
 def test_invocation_binds_descriptor_runtime_to_result_provenance(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     descriptor = next(
         item
         for item in kernel.capabilities.catalog().capabilities

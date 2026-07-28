@@ -322,85 +322,78 @@ def install_polynomial_capabilities(
         version="1",
         schema=model_schema(PolynomialFactorizationArtifact),
     )
-    collision_checker_id = None
-    jacobian_checker_id = None
-    identity_checker_id = None
-    inverse_checker_id = None
-    if authorize_checker:
-        collision_checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact rational polynomial-map collision checker",
-                    entrypoint="jacobian_checkers.polynomial_maps:check_collision",
-                    evidence_kind=EvidenceKind.WITNESS,
-                    format_id="polynomial.map_collision",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(map_schema_uri,),
-                    reason="bundled polynomial-map reference checker",
-                ),
-                authorize=True,
-            )
-            .checker_id
+    collision_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational polynomial-map collision checker",
+                entrypoint="jacobian_checkers.polynomial_maps:check_collision",
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="polynomial.map_collision",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(map_schema_uri,),
+                reason="bundled polynomial-map reference checker",
+            ),
+            authorize=authorize_checker,
         )
-        jacobian_checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact sparse polynomial Jacobian replay checker",
-                    entrypoint="jacobian_checkers.polynomial_maps:check_jacobian",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="polynomial.jacobian_replay",
-                    format_version="1",
-                    claim_schema_uris=(jacobian_claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(jacobian_schema_uri,),
-                    reason="bundled independent sparse-polynomial Jacobian checker",
-                ),
-                authorize=True,
-            )
-            .checker_id
+        .checker_id
+    )
+    jacobian_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact sparse polynomial Jacobian replay checker",
+                entrypoint="jacobian_checkers.polynomial_maps:check_jacobian",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.jacobian_replay",
+                format_version="1",
+                claim_schema_uris=(jacobian_claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(jacobian_schema_uri,),
+                reason="bundled independent sparse-polynomial Jacobian checker",
+            ),
+            authorize=authorize_checker,
         )
-        identity_checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact sparse rational polynomial identity checker",
-                    entrypoint="jacobian_checkers.polynomial_maps:check_identity",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="polynomial.identity_replay",
-                    format_version="1",
-                    claim_schema_uris=(identity_claim_schema_uri,),
-                    semantics_uris=(identity_semantics_uri,),
-                    candidate_schema_uris=(right_polynomial_schema_uri,),
-                    reason="bundled independent sparse-polynomial identity checker",
-                ),
-                authorize=True,
-            )
-            .checker_id
+        .checker_id
+    )
+    identity_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact sparse rational polynomial identity checker",
+                entrypoint="jacobian_checkers.polynomial_maps:check_identity",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.identity_replay",
+                format_version="1",
+                claim_schema_uris=(identity_claim_schema_uri,),
+                semantics_uris=(identity_semantics_uri,),
+                candidate_schema_uris=(right_polynomial_schema_uri,),
+                reason="bundled independent sparse-polynomial identity checker",
+            ),
+            authorize=authorize_checker,
         )
-        inverse_checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact two-sided polynomial-map inverse checker",
-                    entrypoint="jacobian_checkers.polynomial_maps:check_map_inverse",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="polynomial.map.inverse.two_sided_replay",
-                    format_version="1",
-                    claim_schema_uris=(inverse_claim_schema_uri,),
-                    semantics_uris=(inverse_semantics_uri,),
-                    candidate_schema_uris=(inverse_residual_schema_uri,),
-                    reason=(
-                        "bundled independent two-sided sparse-polynomial map checker"
-                    ),
-                ),
-                authorize=True,
-            )
-            .checker_id
+        .checker_id
+    )
+    inverse_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact two-sided polynomial-map inverse checker",
+                entrypoint="jacobian_checkers.polynomial_maps:check_map_inverse",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.map.inverse.two_sided_replay",
+                format_version="1",
+                claim_schema_uris=(inverse_claim_schema_uri,),
+                semantics_uris=(inverse_semantics_uri,),
+                candidate_schema_uris=(inverse_residual_schema_uri,),
+                reason=("bundled independent two-sided sparse-polynomial map checker"),
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,

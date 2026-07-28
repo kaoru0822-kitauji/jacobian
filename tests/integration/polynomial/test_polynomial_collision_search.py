@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -10,9 +9,6 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityRequest,
 )
-from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _map(exponent: int) -> dict[str, object]:
@@ -43,9 +39,8 @@ def _request(exponent: int) -> CapabilityRequest:
 
 
 def test_collision_search_returns_first_deterministic_candidate(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(_request(2))
 
@@ -62,9 +57,8 @@ def test_collision_search_returns_first_deterministic_candidate(
 
 
 def test_collision_search_reports_partial_grid_after_early_collision(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(_request(0))
 
@@ -107,9 +101,8 @@ def test_collision_search_reports_partial_grid_after_early_collision(
 
 
 def test_collision_search_reports_exact_completed_not_found_scope(
-    tmp_path: Path,
+    kernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
 
     result = kernel.capabilities.invoke(_request(1))
 
@@ -129,10 +122,9 @@ def test_collision_search_reports_exact_completed_not_found_scope(
 
 
 def test_collision_search_validates_grid_bound_before_artifact_writes(
-    tmp_path: Path,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     artifact_put_calls = 0
     original_put = kernel.artifacts.put
 
