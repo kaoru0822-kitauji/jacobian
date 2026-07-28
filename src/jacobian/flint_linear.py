@@ -470,6 +470,7 @@ class PythonFlintRationalInconsistencyFindAdapter:
                 "certificate",
                 "python-flint",
             ),
+            invocation_examples=(example("inconsistent_one_variable", "Analyze x=1 and x=2 as an inconsistent system.", {"system": {"variables": ["x"], "coefficients": {"entries": [[{"num": "1", "den": "1"}], [{"num": "1", "den": "1"}]]}, "rhs": [{"num": "1", "den": "1"}, {"num": "2", "den": "1"}]}}),),
         )
 
     @property
