@@ -1,5 +1,127 @@
 # Changelog
 
+## [0.4.0-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.3.0-alpha.0...jacobian-v0.4.0-alpha.0) (2026-07-28)
+
+
+### Features
+
+* add bounded LRAT certificate verification ([fe321e9](https://github.com/morluto/jacobian/commit/fe321e9b008655ddafcdc100d4bc686b77e60f3f))
+* **analysis:** add validated computation bundle ([6467d75](https://github.com/morluto/jacobian/commit/6467d75318457967c10646d565eee8433d83db35))
+* **capabilities:** add deterministic installed discovery ([9dd9855](https://github.com/morluto/jacobian/commit/9dd9855301f9643888f36ae94cf74df6ff474bea))
+* **capabilities:** add exact primitive and geometry operations ([273ee39](https://github.com/morluto/jacobian/commit/273ee396cf3f29d33e52086bc572d4c5d9ca8356))
+* **capabilities:** add resource-mined atomic domains ([d36dc1e](https://github.com/morluto/jacobian/commit/d36dc1ed07c801d00552634b6e8c1dec80524cd5))
+* **capabilities:** define discovery and invocation contracts ([771c453](https://github.com/morluto/jacobian/commit/771c45336ed88a96c129dd1a3c2386c68a5c7893))
+* **capabilities:** publish validated invocation examples ([01c804c](https://github.com/morluto/jacobian/commit/01c804c14f66dc2f8bf23f3f22d4cc3202ca611e))
+* **checkers:** verify exact domain results independently ([baf3f94](https://github.com/morluto/jacobian/commit/baf3f947ad5a70cc8a90983bcd973d8f6d91a52e))
+* **claims:** add deterministic logical decomposition ([8f55572](https://github.com/morluto/jacobian/commit/8f55572cbd54a6e013f61e7d7d29b9a55334f695))
+* **claims:** add deterministic logical decomposition ([53453e8](https://github.com/morluto/jacobian/commit/53453e860c994c00d9fee98f012188ef434c4067))
+* **claims:** add deterministic logical decomposition ([7bf6621](https://github.com/morluto/jacobian/commit/7bf66219f8f2806fc1e0b26e1aa16d9b887c49ed))
+* **claims:** add deterministic logical decomposition ([cda8bf5](https://github.com/morluto/jacobian/commit/cda8bf5c68ba95584e264296f12d4eacfd67cbfc))
+* **claims:** add deterministic logical decomposition ([90dd120](https://github.com/morluto/jacobian/commit/90dd120c785a7614243cfac153a93c67c0b6235d))
+* **claims:** add deterministic logical decomposition ([82c8f91](https://github.com/morluto/jacobian/commit/82c8f91e95ebfed009218c1b46e165fc8f15ed78))
+* **graph:** add exact counterexample invariants ([5932286](https://github.com/morluto/jacobian/commit/5932286a64adaa43d22ad3e640d572689d985ead))
+* **lean:** add typed formal intermediates ([8f7d0cd](https://github.com/morluto/jacobian/commit/8f7d0cd62a7acbee2b2e05b29bc03dace5b30f65))
+* **matrix-graph:** migrate exact domain operations ([c17c6fe](https://github.com/morluto/jacobian/commit/c17c6fef5d0cd4d14d49d70023cc9144b93d871c))
+* **mcp:** expose intent-led discovery and guidance ([5a1322d](https://github.com/morluto/jacobian/commit/5a1322d488f5d50338a80dface57d2e5a7f867dd))
+* **mcp:** unblock autonomous SAT composition ([833e960](https://github.com/morluto/jacobian/commit/833e960f019b00ca4101adecbaba69d35aac4660))
+* **mcp:** unblock autonomous SAT composition ([a48d835](https://github.com/morluto/jacobian/commit/a48d835a369cf5e8175e64f870d3799f6dfab36a))
+* **number-theory:** bound factorization operations ([dd86643](https://github.com/morluto/jacobian/commit/dd866438ed00f23511a166d6c66791a949f7128f))
+* **polynomial:** add exact operation bundle ([ac0edd4](https://github.com/morluto/jacobian/commit/ac0edd4bfa829adb91d02886dc38fe68900a86e8))
+* **polynomial:** synthesize bounded inverse candidates ([af2303d](https://github.com/morluto/jacobian/commit/af2303d1b19a52ae2a18143fcfa20772c4d5e106))
+* **polynomial:** verify two-sided map inverses ([784ae77](https://github.com/morluto/jacobian/commit/784ae77ef03a1cba21562a419e1daa5d8d4799a7))
+* **search:** expose bounded optimization obligations ([a26885a](https://github.com/morluto/jacobian/commit/a26885a21005dd31a4cde10f2b54bb7e8a69b944))
+* **skills:** add capability implementation workflows ([078c3a4](https://github.com/morluto/jacobian/commit/078c3a4f6a782d836f0570ad7e76902d3f6fc645))
+
+
+### Bug Fixes
+
+* **analysis:** bind optimization and provider outcomes ([721a260](https://github.com/morluto/jacobian/commit/721a260528229ad8e295f1e1717ed6a4766388d9))
+* **capabilities:** use canonical library-backed primitives ([88f951a](https://github.com/morluto/jacobian/commit/88f951a61a55810373887d75f757b9a0e5641cce))
+* **checkers:** accept canonical polynomial artifacts ([3a9ed35](https://github.com/morluto/jacobian/commit/3a9ed353441a6429d0458b47e93e9600b40e89e0))
+* **checkers:** accept distribution runtime identities ([fabb9d1](https://github.com/morluto/jacobian/commit/fabb9d14d8573f9e752c94ba327963300caa0b7b))
+* **checkers:** bind exact FLINT runtime identity ([e1c8dc3](https://github.com/morluto/jacobian/commit/e1c8dc3db96484d482af7a4aec6ec55260b3fd88))
+* **checkers:** bind exact replay to semantics artifacts ([7a206f8](https://github.com/morluto/jacobian/commit/7a206f8589e88287035ee8979a1797d46e1a55fb))
+* **checkers:** validate geometry semantics digests ([889333d](https://github.com/morluto/jacobian/commit/889333d6e1257e45d7e48c2b213663b817b6c891))
+* **ci:** release superseded workflow runs promptly ([eeff467](https://github.com/morluto/jacobian/commit/eeff4677c260e8ac53930fe6f0a38da544f9bc9d))
+* **ci:** release superseded workflow runs promptly ([2768027](https://github.com/morluto/jacobian/commit/276802728a40e9d8f9a7eac25340d219597472ce))
+* **ci:** use --locked instead of --frozen for fail-fast lockfile validation ([391ab3a](https://github.com/morluto/jacobian/commit/391ab3a73168317ac340d5c7dcbcf0117934f4cf))
+* **container:** install optional math providers ([940f2a9](https://github.com/morluto/jacobian/commit/940f2a97035d4af443f9099745094d489dc1e25b))
+* **discovery:** match phrases on token boundaries ([27ffad8](https://github.com/morluto/jacobian/commit/27ffad80e04f6698c7ff4170cadd557086b80eae))
+* **domains:** handle exact operation edge cases ([c79fb0a](https://github.com/morluto/jacobian/commit/c79fb0aa1905657411fba4ea44f7b5fa76433c7a))
+* enforce coverage threshold, fail closed on out-of-tree tests, and harden devex tooling ([c899559](https://github.com/morluto/jacobian/commit/c899559685ed83e3f0a3b20409e84250e9ce98cf))
+* enforce coverage threshold, fail closed on out-of-tree tests, and harden devex tooling ([d726368](https://github.com/morluto/jacobian/commit/d7263688cc5f30cc167a5c0b1a12e64c61dd0df1))
+* exact rational grid bounds and test hygiene ([751d306](https://github.com/morluto/jacobian/commit/751d306f720ad741e63fe55ce280547639cd8dfd))
+* **finite-sets:** cover maximum binary outputs ([af68257](https://github.com/morluto/jacobian/commit/af68257f5af48a39ae94db2c42877d814c3511b9))
+* **graph:** bind bounded results to source graphs ([6096dc9](https://github.com/morluto/jacobian/commit/6096dc91db43453bb2502933f94916454c05ca19))
+* **graph:** bound exponential oracle paths ([c3d8f0d](https://github.com/morluto/jacobian/commit/c3d8f0db7942208f21a857cd8443bfc313d22d59))
+* **graph:** correct proposal artifact return type ([180eb16](https://github.com/morluto/jacobian/commit/180eb16bc4073efe338ddfaf7588975600c14569))
+* **graph:** require exact reducer deletions ([153eb05](https://github.com/morluto/jacobian/commit/153eb056bc506cefc38ad8940383dd9dee5f9439))
+* harden capability trust and evaluation boundaries ([d8610b1](https://github.com/morluto/jacobian/commit/d8610b1d5b66012d7a6f97c5d03ab4899b4bd409))
+* harden capability trust and evaluation boundaries ([7f11734](https://github.com/morluto/jacobian/commit/7f11734cf18d9ae473e9fd3b283294e5f6f8e3a4))
+* harden remote MCP solver workflows ([2c7ebd5](https://github.com/morluto/jacobian/commit/2c7ebd5222cf029e5e7a612fe401c5232133585f))
+* harden remote MCP solver workflows ([193fe30](https://github.com/morluto/jacobian/commit/193fe30384d4115783423b7344e92e5e99913adf))
+* **lean:** align v2 capability contracts ([b0e7383](https://github.com/morluto/jacobian/commit/b0e738380481479907de07a24668d85e6e455ee9))
+* **lean:** bind proof edit replay results ([5bf33eb](https://github.com/morluto/jacobian/commit/5bf33eb969a43ac21112ce0140bd87ae3ecbec68))
+* **lean:** fail closed on proof validation gaps ([a54c8a5](https://github.com/morluto/jacobian/commit/a54c8a5efc5458cb46e1f60cdfee11ce773dbfcd))
+* **lean:** parse Lean 4.31 proposition elaboration output ([b0f1efb](https://github.com/morluto/jacobian/commit/b0f1efb188f8720a7abc1d39deacc1c002231654))
+* **make:** drop pcre2 requirement from todo-check ([ace396b](https://github.com/morluto/jacobian/commit/ace396b1101dbbf9d6aea700df70a7b4a40b99f2))
+* **mcp:** bound tenant kernel admission ([05f7161](https://github.com/morluto/jacobian/commit/05f716186f610abc2389b9be6109a852483f6514))
+* **mcp:** harden token and scope boundary tests ([bc73d6a](https://github.com/morluto/jacobian/commit/bc73d6afb52e1bcdbdf32d61b39c71832ffc34be))
+* **memory:** validate structured search requests ([f5b5944](https://github.com/morluto/jacobian/commit/f5b59442ba0ddc64b23fbc50d7433db289cee633))
+* **number-theory:** bound factorization predicates ([6bc99ed](https://github.com/morluto/jacobian/commit/6bc99edd88c5de4cd64b3e58f6cb36b091d4f290))
+* **optimization:** validate bounded worker requests ([40f7f61](https://github.com/morluto/jacobian/commit/40f7f61dfb919060493c6b6a66dcca5508df06da))
+* **polynomial:** enumerate rational grids lazily ([b31a317](https://github.com/morluto/jacobian/commit/b31a317c9509ce9c363bac775a9ebfc0b27b853a))
+* **polynomial:** preserve rational partial fractions ([b69a7ab](https://github.com/morluto/jacobian/commit/b69a7ab83c54b051da0f5a3b8740330dcdb7f0a0))
+* **polynomials:** validate rational grids by exact deduplicated size ([86293f3](https://github.com/morluto/jacobian/commit/86293f3ce251ab3c2929a7a596ab7bc2df48bd3f))
+* **registry:** serialize checker policy updates ([ac1cb46](https://github.com/morluto/jacobian/commit/ac1cb46bd54258a77a7f1bcb62e4d7601bb75d3e))
+* **runtime:** bind worker and provider identities ([3d601b0](https://github.com/morluto/jacobian/commit/3d601b0d7d2d6f9b81073e1880869615e799b5b4))
+* **runtime:** harden optional bundle startup ([1915e0a](https://github.com/morluto/jacobian/commit/1915e0a29f59878cd9195328c766798989948bbf))
+* **runtime:** lazy-load optional solver backends ([2a62415](https://github.com/morluto/jacobian/commit/2a6241553c8e01c8dd60105fc056325abb7da33b))
+* **runtime:** preserve clean worker completion ([273a96a](https://github.com/morluto/jacobian/commit/273a96a145184cd29d197b8145f4dcfeb330a5ee))
+* **runtime:** preserve installed provider profiles ([1c84179](https://github.com/morluto/jacobian/commit/1c84179466f987cb7f1c4cb8dc0121aee5afbe2a))
+* **runtime:** replace removable boundary assertions ([24579e7](https://github.com/morluto/jacobian/commit/24579e769d222eccf4dee45eec619803df4a6fb2))
+* **sat:** bound LRAT encoding before decoding ([159da89](https://github.com/morluto/jacobian/commit/159da893c1d63e5ce1b0c3f8e7df2929a6c62269))
+* **store:** make blob quota accounting constant time ([20ff6cf](https://github.com/morluto/jacobian/commit/20ff6cf65298ef24d1d9925cebf4b220bd9f515e))
+* **store:** recover quota metadata after interrupted writes ([41b1426](https://github.com/morluto/jacobian/commit/41b142675046789869ffd53614dee9f40b851107))
+* **store:** serialize database initialization ([c151c10](https://github.com/morluto/jacobian/commit/c151c1005657970fac9177881c308ba0c677e1af))
+* **verification:** preserve fail-closed checker outcomes ([836dee1](https://github.com/morluto/jacobian/commit/836dee15d9d419bbba713e7783102de9b53e6407))
+* **workers:** preserve bounded operation failures ([7fef60b](https://github.com/morluto/jacobian/commit/7fef60be4d189df175708d4f166651b8ec7b1a4f))
+
+
+### Performance Improvements
+
+* **benchmarks:** measure populated startup ([eb8ea3c](https://github.com/morluto/jacobian/commit/eb8ea3c192e3ec8c97b88766ef0bc6c06f63d336))
+* **graph:** cache Graph Atlas representatives ([77babd0](https://github.com/morluto/jacobian/commit/77babd07f2ee6a105fed4e13561ece3631bf2ede))
+* **kernel:** batch durable bootstrap registration ([b71aa9b](https://github.com/morluto/jacobian/commit/b71aa9bc1d082e6fe97179be0c78f4299f580897))
+* **polynomial:** enumerate inverse supports directly ([ff81fae](https://github.com/morluto/jacobian/commit/ff81faeac681d7f1e42db8dfb1d458d52f1e1be3))
+
+
+### Dependencies
+
+* **deps-dev:** bump hypothesis from 6.161.5 to 6.161.6 ([dc6a9b2](https://github.com/morluto/jacobian/commit/dc6a9b25fa038d1f8434057bba1ec932f556d75a))
+* **deps:** bump actions/download-artifact from 5.0.0 to 8.0.1 ([3917598](https://github.com/morluto/jacobian/commit/3917598e5cf45d6e6ce456397791cfbbdba63658))
+* **deps:** bump actions/setup-python from 6.3.0 to 7.0.0 ([2fed2d5](https://github.com/morluto/jacobian/commit/2fed2d562ec795087c81d5062e5d0d277ff34f49))
+* **deps:** bump actions/upload-artifact from 4.6.2 to 7.0.1 ([9ed9229](https://github.com/morluto/jacobian/commit/9ed922948bc928c4f97891988659fbc35e941517))
+* **deps:** bump z3-solver from 4.16.0.0 to 5.0.0.0 ([7ef3b2e](https://github.com/morluto/jacobian/commit/7ef3b2e0a5a74fa5b0d66b7b58457a2630c4f5f9))
+
+
+### Documentation
+
+* add Cursor Cloud environment setup notes to AGENTS.md ([d8d9697](https://github.com/morluto/jacobian/commit/d8d96975565a60407c8bf605031fb39a8929c439))
+* add Cursor Cloud environment setup notes to AGENTS.md ([6f6cd97](https://github.com/morluto/jacobian/commit/6f6cd971f2eb08844d6e3743803376f85a5a6157))
+* **agents:** preserve agent-owned mathematical strategy ([b9cfd06](https://github.com/morluto/jacobian/commit/b9cfd062c4f288480b00f175e7064505981ae35c))
+* clarify domain operation contributor rules ([5857daa](https://github.com/morluto/jacobian/commit/5857daa21eea0ff41591cba9e275940073a2ed20))
+* clarify workflow ownership ([d228212](https://github.com/morluto/jacobian/commit/d228212a498841ee4d07d05e740e97a97a7ce108))
+* define test suite ownership model ([8ab266e](https://github.com/morluto/jacobian/commit/8ab266e9a092e386a25fbb183ae31996b5cd6153))
+* explain domain operation workflows ([42faa2a](https://github.com/morluto/jacobian/commit/42faa2a410e210763518cf77e605150e6a6955ee))
+* **mcp:** document discovery prompts and resources ([4fb064e](https://github.com/morluto/jacobian/commit/4fb064e6fde5174b473eb20d40301d74684e2af6))
+* record atomic capability mining evidence ([c8458af](https://github.com/morluto/jacobian/commit/c8458af57376b2dbfba4bf2c84a2909f5137aac6))
+* record fixture cost fixes after the ownership merge ([cb2706f](https://github.com/morluto/jacobian/commit/cb2706f96013077f6b46c61ecbcf579dfa8c02ce))
+* remove capability mining ledger ([c996a2d](https://github.com/morluto/jacobian/commit/c996a2dbe9686a86abd823c0f17cdd796e485931))
+* remove obsolete timing history ([1e2ba99](https://github.com/morluto/jacobian/commit/1e2ba996d6e23f2f1c8cb875d4e9409fcfb6d636))
+* **skills:** standardize capability handoffs ([6df410e](https://github.com/morluto/jacobian/commit/6df410e0553cbdcf98309abbcac79b1d96b08123))
+* **testing:** clarify local validation scope ([af1bb9f](https://github.com/morluto/jacobian/commit/af1bb9fd0e95d55b955832312ba42d4a2e16a36e))
+
 ## [0.3.0-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.2.0-alpha.0...jacobian-v0.3.0-alpha.0) (2026-07-26)
 
 
