@@ -7,6 +7,7 @@ from jacobian.contracts.number_theory import (
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.number_theory._support import (
     number_theory_operation,
 )
@@ -31,6 +32,7 @@ PRIME_CAPABILITIES = (
         decide_prime,
         "number-theory",
         "predicate",
+        invocation_examples=(example("prime_17", "Check whether 17 is prime.", {"value": "17"}),),
     ),
     number_theory_operation(
         "integer.compute.next_prime",
@@ -41,6 +43,7 @@ PRIME_CAPABILITIES = (
         compute_next_prime,
         "number-theory",
         "prime",
+        invocation_examples=(example("next_prime_14", "Find the next prime after 14.", {"n": 14}),),
     ),
     number_theory_operation(
         "integer.compute.previous_prime",
@@ -51,6 +54,7 @@ PRIME_CAPABILITIES = (
         compute_previous_prime,
         "number-theory",
         "prime",
+        invocation_examples=(example("previous_prime_14", "Find the previous prime before 14.", {"n": 14}),),
     ),
     number_theory_operation(
         "integer.compute.prime_count",
@@ -61,6 +65,7 @@ PRIME_CAPABILITIES = (
         compute_prime_count,
         "number-theory",
         "prime",
+        invocation_examples=(example("prime_count_20", "Count primes through 20.", {"n": 20}),),
     ),
     number_theory_operation(
         "integer.compute.nth_prime",
@@ -71,6 +76,7 @@ PRIME_CAPABILITIES = (
         compute_nth_prime,
         "number-theory",
         "prime",
+        invocation_examples=(example("nth_prime_6", "Compute the sixth prime.", {"n": 6}),),
     ),
     number_theory_operation(
         "integer.compute.primorial",
@@ -81,6 +87,7 @@ PRIME_CAPABILITIES = (
         compute_primorial,
         "number-theory",
         "prime",
+        invocation_examples=(example("primorial_5", "Compute the product of the first five primes.", {"n": 5}),),
     ),
     number_theory_operation(
         "integer.compute.euler_totient",
@@ -91,6 +98,7 @@ PRIME_CAPABILITIES = (
         compute_euler_totient,
         "number-theory",
         "arithmetic-function",
+        invocation_examples=(example("totient_12", "Count residues coprime to 12.", {"n": 12}),),
     ),
     number_theory_operation(
         "integer.compute.mobius",
@@ -101,5 +109,6 @@ PRIME_CAPABILITIES = (
         compute_mobius,
         "number-theory",
         "arithmetic-function",
+        invocation_examples=(example("mobius_30", "Compute the Mobius value of 30.", {"n": 30}),),
     ),
 )
