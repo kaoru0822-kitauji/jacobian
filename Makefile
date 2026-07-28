@@ -8,7 +8,7 @@ CORE_TEST_PATHS := tests/unit tests/contract tests/checkers tests/reference
 INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
 
-.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed build check precommit check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed duplicate-code npm-test build check precommit check-static validate-full agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -41,11 +41,11 @@ typecheck: ## Run strict static type checking.
 test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
 	$(UV_RUN) pytest -m "not lean_runtime" $(TESTS) $(PYTEST_ARGS)
 
-test-fast: ## Run the sequential core feedback loop.
+test-fast: ## Sequential core edit loop (unit/contract/checkers/reference, no xdist).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" \
 		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
 
-test-core: ## Run the directory-owned core suites.
+test-core: ## Parallel core suites (same paths as test-fast, uses xdist by default).
 	$(UV_RUN) pytest -m "not lean_runtime" \
 		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
 
@@ -79,6 +79,13 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
 
+duplicate-code: ## Run the CI duplicate-code detector locally.
+	npx --yes jscpd@5.0.12 --config .jscpd.json .
+
+npm-test: ## Run the npm package tests and dry-run pack.
+	npm test --prefix npm
+	npm pack --dry-run --prefix npm
+
 build: ## Build Python source and wheel distributions.
 	uv build
 
@@ -90,7 +97,7 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck build ## Run CI-owned static and package checks locally.
 
-validate-full: lint-full typecheck test test-lean build ## Run broad local validation (slow and exceptional; not every CI lane).
+validate-full: lint-full typecheck test test-lean build ## Run broad local validation (slow; omits security/duplicate/npm CI lanes).
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

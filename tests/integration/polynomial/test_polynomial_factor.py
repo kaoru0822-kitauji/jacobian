@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from tests.helpers.polynomials import univariate_term as _term
 
 from jacobian.contracts.capabilities import (
@@ -11,13 +8,10 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
-
 
 def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
-    tmp_path: Path,
+    kernel: JacobianKernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     polynomial = {
         "terms": [
             _term(1, 2),
@@ -51,10 +45,8 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
 
 
 def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
-    tmp_path: Path,
+    kernel: JacobianKernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.factor.compute",
@@ -70,9 +62,8 @@ def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
 
 
 def test_factor_compute_preserves_rational_coefficient_and_irreducible_factor(
-    tmp_path: Path,
+    kernel: JacobianKernel,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
     polynomial = {
         "terms": [
             {

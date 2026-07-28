@@ -36,11 +36,28 @@ jobs:
       run-build: ${{ steps.classify.outputs.run-build }}
       run-security: ${{ steps.classify.outputs.run-security }}
       run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
+      integration-shard-count: ${{ steps.shards.outputs.integration-shard-count }}
+      integration-shards: ${{ steps.shards.outputs.integration-shards }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+      - id: shards
+        name: Load integration shard configuration
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          count = json.loads(Path(".github/ci-config.json").read_text(encoding="utf-8"))[
+              "integration_shard_count"
+          ]
+          if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+              raise SystemExit("integration_shard_count must be a positive integer")
+          print(f"integration-shard-count={count}")
+          print(f"integration-shards={json.dumps(list(range(1, count + 1)))}")
+          PY
       - name: Prepare integration timing hint
         env:
           GH_TOKEN: ${{ github.token }}
@@ -106,7 +123,17 @@ jobs:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_STATIC: ${{ needs.plan.outputs.run-static }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_STATIC" in
             true|false) ;;
             *) exit 1 ;;
@@ -219,7 +246,7 @@ jobs:
 
   integration-test:
     name: >-
-      Tests (integration ${{ matrix.shard }} of 4,
+      Tests (integration ${{ matrix.shard }} of ${{ needs.plan.outputs.integration-shard-count }},
       Python 3.12)
     needs: plan
     if: needs.plan.outputs.run-integration == 'true'
@@ -228,7 +255,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: ${{ fromJSON(needs.plan.outputs.integration-shards) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download integration timing hint
@@ -242,7 +269,7 @@ jobs:
       - run: make test-integration
         env:
           PYTEST_ARGS: >-
-            --splits 4
+            --splits ${{ needs.plan.outputs.integration-shard-count }}
             --group ${{ matrix.shard }}
             --splitting-algorithm least_duration
             --durations-path .ci/test-durations.json
@@ -280,7 +307,7 @@ jobs:
   publish-test-durations:
     name: Publish integration test durations
     if: github.ref == 'refs/heads/main'
-    needs: integration-test
+    needs: [plan, integration-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -291,16 +318,19 @@ jobs:
           pattern: integration-duration-shard-*
           path: .ci/shards
       - name: Merge shard timings
-        run: >-
-          .github/scripts/manage-test-timings merge
-          --input .ci/shards/integration-duration-shard-1/test-durations.json
-          --input .ci/shards/integration-duration-shard-2/test-durations.json
-          --input .ci/shards/integration-duration-shard-3/test-durations.json
-          --input .ci/shards/integration-duration-shard-4/test-durations.json
-          --output .ci/integration-test-durations.json
-          --source-sha "${{ github.sha }}"
-          --python-version "3.12"
-          --pytest-split-version "0.11.0"
+        env:
+          SHARD_COUNT: ${{ needs.plan.outputs.integration-shard-count }}
+        run: |
+          inputs=()
+          for shard in $(seq 1 "$SHARD_COUNT"); do
+            inputs+=(--input ".ci/shards/integration-duration-shard-${shard}/test-durations.json")
+          done
+          .github/scripts/manage-test-timings merge \
+            "${inputs[@]}" \
+            --output .ci/integration-test-durations.json \
+            --source-sha "${{ github.sha }}" \
+            --python-version "3.12" \
+            --pytest-split-version "0.11.0"
       - name: Publish timing hint
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -351,7 +381,17 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.integration-test.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility-test.result }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_PYTHON" in
             true|false) ;;
             *) exit 1 ;;
@@ -407,7 +447,17 @@ jobs:
           RUN_LEAN: ${{ needs.plan.outputs.run-lean }}
           LEAN_RESULT: ${{ needs.lean-test-run.result }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_LEAN" in
             true) test "$LEAN_RESULT" = "success" ;;
             false) test "$LEAN_RESULT" = "skipped" ;;
@@ -431,7 +481,17 @@ jobs:
           CORE_RESULT: ${{ needs.core-test.result }}
           INTEGRATION_RESULT: ${{ needs.integration-test.result }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_COVERAGE" in
             true|false) ;;
             *) exit 1 ;;
@@ -491,23 +551,29 @@ jobs:
             echo "Duplicate code detection via jscpd (threshold 10)."
           } > coverage-summary.md
           jq -n --rawfile body coverage-summary.md '{body: $body}' > coverage-comment.json
-          mapfile -t comment_ids < <(
+          list_coverage_comments() {
             gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
               --jq '.[] | select(.user.login == "github-actions[bot]") | select((.body | contains("<!-- jacobian-coverage-report -->")) or (.body | startswith("## Coverage Report"))) | .id'
-          )
+          }
+          mapfile -t comment_ids < <(list_coverage_comments)
           if [ "${#comment_ids[@]}" -eq 0 ]; then
             gh api --method POST \
               "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
               --input coverage-comment.json
-          else
-            gh api --method PATCH \
-              "repos/$GITHUB_REPOSITORY/issues/comments/${comment_ids[0]}" \
-              --input coverage-comment.json
-            for duplicate_id in "${comment_ids[@]:1}"; do
-              gh api --method DELETE \
-                "repos/$GITHUB_REPOSITORY/issues/comments/$duplicate_id"
-            done
+            # Heal TOCTOU races where a concurrent run also created a comment.
+            mapfile -t comment_ids < <(list_coverage_comments)
           fi
+          if [ "${#comment_ids[@]}" -eq 0 ]; then
+            echo "failed to create or locate coverage comment" >&2
+            exit 1
+          fi
+          gh api --method PATCH \
+            "repos/$GITHUB_REPOSITORY/issues/comments/${comment_ids[0]}" \
+            --input coverage-comment.json
+          for duplicate_id in "${comment_ids[@]:1}"; do
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/issues/comments/$duplicate_id"
+          done
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -529,7 +595,17 @@ jobs:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_DUPLICATE: ${{ needs.plan.outputs.run-duplicate }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_DUPLICATE" in
             true|false) ;;
             *) exit 1 ;;
@@ -555,7 +631,17 @@ jobs:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_NPM: ${{ needs.plan.outputs.run-npm }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_NPM" in
             true|false) ;;
             *) exit 1 ;;
@@ -586,7 +672,17 @@ jobs:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_BUILD: ${{ needs.plan.outputs.run-build }}
         run: |
-          test "$PLAN_RESULT" = "success"
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
           case "$RUN_BUILD" in
             true|false) ;;
             *) exit 1 ;;

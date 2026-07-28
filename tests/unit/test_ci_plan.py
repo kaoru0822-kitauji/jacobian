@@ -114,9 +114,20 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         (
             ("tests/integration/lean/test_lean_replayable_state_capability.py",),
             _expected_plan(
-                "python-integration",
+                "selective",
                 "run-python",
                 "run-integration",
+                "run-lean",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/integration/lean/test_lean_statement_capabilities.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-integration",
+                "run-lean",
                 "run-static",
             ),
         ),
@@ -279,8 +290,36 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         "run-duplicate=false\n",
         "classification=docs\n"
         "run-python=false\n"
+        "run-core=false\n"
+        "run-integration=false\n"
+        "run-coverage=false\n"
+        "run-compatibility=false\n"
         "run-lean=false\n"
         "run-npm=true\n"
+        "run-static=false\n"
+        "run-build=false\n"
+        "run-security=false\n"
+        "run-duplicate=false\n",
+        "classification=docs\n"
+        "run-python=true\n"
+        "run-core=true\n"
+        "run-integration=false\n"
+        "run-coverage=false\n"
+        "run-compatibility=false\n"
+        "run-lean=false\n"
+        "run-npm=false\n"
+        "run-static=false\n"
+        "run-build=false\n"
+        "run-security=false\n"
+        "run-duplicate=false\n",
+        "classification=lean\n"
+        "run-python=true\n"
+        "run-core=true\n"
+        "run-integration=false\n"
+        "run-coverage=false\n"
+        "run-compatibility=false\n"
+        "run-lean=false\n"
+        "run-npm=false\n"
         "run-static=false\n"
         "run-build=false\n"
         "run-security=false\n"
@@ -297,6 +336,27 @@ def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> N
     )
 
     assert completed.returncode != 0
+
+
+def test_every_lean_python_test_enables_the_lean_lane() -> None:
+    lean_tests = sorted(
+        path.as_posix()
+        for path in (Path(__file__).parents[2] / "tests" / "integration" / "lean").glob(
+            "test_*.py"
+        )
+    )
+    assert lean_tests
+
+    for lean_test in lean_tests:
+        completed = subprocess.run(
+            [PLANNER, lean_test],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
+        assert plan["run-lean"] == "true", lean_test
 
 
 def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:

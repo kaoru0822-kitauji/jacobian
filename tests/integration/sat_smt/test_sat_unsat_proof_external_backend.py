@@ -3,11 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.helpers.capabilities import invoke_capability as _invoke
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
-    CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import SatProofArtifact
@@ -23,22 +23,6 @@ pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
-
-
-def _invoke(
-    kernel: JacobianKernel,
-    capability_id: str,
-    payload: dict[str, object],
-    *,
-    mode: CapabilityMode,
-):
-    return kernel.capabilities.invoke(
-        CapabilityRequest(
-            capability_id=capability_id,
-            mode=mode,
-            input=payload,
-        )
-    )
 
 
 def test_cadical_text_proof_replays_in_pinned_drat_trim(

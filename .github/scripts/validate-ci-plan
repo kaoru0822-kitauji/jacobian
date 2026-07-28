@@ -18,6 +18,9 @@ BOOLEAN_KEYS = (
     "run-security",
     "run-duplicate",
 )
+FUNCTIONAL_KEYS = tuple(
+    key for key in BOOLEAN_KEYS if key not in {"run-coverage", "run-compatibility"}
+)
 CLASSIFICATIONS = {
     "docs",
     "npm",
@@ -32,6 +35,82 @@ CLASSIFICATIONS = {
 
 def fail(message: str) -> None:
     raise SystemExit(message)
+
+
+def _enabled(plan: dict[str, str], *keys: str) -> bool:
+    return all(plan[key] == "true" for key in keys)
+
+
+def _only_enabled(plan: dict[str, str], *allowed: str) -> bool:
+    allowed_set = set(allowed)
+    return all(
+        (plan[key] == "true") == (key in allowed_set) for key in BOOLEAN_KEYS
+    )
+
+
+def _validate_classification(plan: dict[str, str]) -> None:
+    classification = plan["classification"]
+    if classification == "docs":
+        if any(plan[key] == "true" for key in BOOLEAN_KEYS):
+            fail("docs CI must disable every lane")
+        return
+    if classification == "npm":
+        if not _only_enabled(plan, "run-npm"):
+            fail("npm CI must enable only run-npm")
+        return
+    if classification == "lean":
+        if not _only_enabled(plan, "run-lean"):
+            fail("lean CI must enable only run-lean")
+        return
+    if classification == "python-core":
+        if plan["run-core"] != "true" or plan["run-python"] != "true":
+            fail("python-core CI must enable run-core and run-python")
+        for key in (
+            "run-integration",
+            "run-coverage",
+            "run-compatibility",
+            "run-lean",
+            "run-npm",
+            "run-build",
+            "run-security",
+            "run-duplicate",
+        ):
+            if plan[key] == "true":
+                fail(f"python-core CI must disable {key}")
+        return
+    if classification == "python-integration":
+        if plan["run-integration"] != "true" or plan["run-python"] != "true":
+            fail("python-integration CI must enable run-integration and run-python")
+        for key in (
+            "run-core",
+            "run-coverage",
+            "run-compatibility",
+            "run-lean",
+            "run-npm",
+            "run-build",
+            "run-security",
+            "run-duplicate",
+        ):
+            if plan[key] == "true":
+                fail(f"python-integration CI must disable {key}")
+        return
+    if classification == "full":
+        if any(plan[key] != "true" for key in FUNCTIONAL_KEYS):
+            fail("full CI must enable every functional lane")
+        if plan["run-coverage"] == "true" or plan["run-compatibility"] == "true":
+            fail("full CI must leave coverage and compatibility to exhaustive")
+        return
+    if classification == "selective":
+        if not any(plan[key] == "true" for key in FUNCTIONAL_KEYS):
+            fail("selective CI must enable at least one functional lane")
+        if _enabled(plan, *FUNCTIONAL_KEYS) and not (
+            plan["run-coverage"] == "true" or plan["run-compatibility"] == "true"
+        ):
+            fail("selective CI must not match the full functional lane set")
+        return
+    if classification == "exhaustive":
+        return
+    fail(f"unhandled CI classification: {classification}")
 
 
 def main() -> None:
@@ -67,6 +146,7 @@ def main() -> None:
             fail("exhaustive CI must enable every lane")
     elif plan["run-coverage"] == "true" or plan["run-compatibility"] == "true":
         fail("coverage and compatibility are exhaustive-only lanes")
+    _validate_classification(plan)
 
 
 if __name__ == "__main__":

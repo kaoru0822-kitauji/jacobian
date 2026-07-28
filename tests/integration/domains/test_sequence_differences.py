@@ -1,12 +1,8 @@
-from pathlib import Path
-
 import pytest
 
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
-
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 @pytest.mark.parametrize(
@@ -18,12 +14,10 @@ pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
     ),
 )
 def test_finite_differences_return_natural_empty_result(
-    tmp_path: Path,
+    kernel: JacobianKernel,
     capability_id: str,
     values: list[str],
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-
     result = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id=capability_id,

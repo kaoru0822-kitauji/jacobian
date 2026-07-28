@@ -76,11 +76,11 @@ independent checker tests. Suite fixture infrastructure that builds and freezes
 kernel store templates lives under `tests/integration/` for the same reason.
 Named contract, checker, MCP, and storage targets
 make common affected areas discoverable without adding another test runner.
-`make check` combines fast Ruff and non-integration test feedback as the
-routine local pre-push gate. Developers should push after it and let CI own
-dependency and dead-code analysis, strict typing, package builds, and
-exhaustive validation. `make check-static` reproduces those CI-owned static
-and package checks when relevant.
+`make check` combines fast Ruff, strict typing, and non-integration test
+feedback as the routine local pre-push gate. Developers should push after it and
+let CI own dependency and dead-code analysis, package builds, and exhaustive
+validation. `make check-static` reproduces those CI-owned static and package
+checks when relevant.
 `make validate-full` is the broad local Python, Lean, static, and package
 escape hatch, not a routine handoff requirement. It does not reproduce CI's
 Python 3.13 compatibility, combined coverage, security, duplicate-code, or npm
@@ -97,8 +97,11 @@ Workflow tests that repeatedly construct the kernel may opt into
 `initialized_kernel_store`. Each xdist worker builds the core descriptor store
 once, then the fixture physically copies that snapshot into the test's own
 `tmp_path` before construction. SQLite metadata and blobs remain isolated per
-test; no kernel service, process, or mutable database is shared. Tests that need
-authorized reference plugins and checkers may instead opt into
+test; no kernel service, process, or mutable database is shared. Prefer the
+function-scoped `kernel` fixture (or `kernel_with_references`) when a test only
+needs to attach to that seeded root; keep explicit `JacobianKernel(tmp_path)`
+for restart, sibling-root, or bootstrap cases. Tests that need authorized
+reference plugins and checkers may instead opt into
 `initialized_kernel_store_with_references`, which copies a second immutable
 session snapshot that already includes those installs. Tests whose subject is
 fresh-store bootstrap, quota accounting, migration, or descriptor installation

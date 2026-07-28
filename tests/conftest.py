@@ -96,6 +96,23 @@ def initialized_kernel_store_with_references(
     )
 
 
+@pytest.fixture
+def kernel(tmp_path: Path, initialized_kernel_store: None) -> JacobianKernel:
+    """Attach a kernel to a per-test copy of the core descriptor snapshot."""
+
+    return JacobianKernel(tmp_path)
+
+
+@pytest.fixture
+def kernel_with_references(
+    tmp_path: Path,
+    initialized_kernel_store_with_references: None,
+) -> JacobianKernel:
+    """Attach a kernel to a per-test copy that already has authorized references."""
+
+    return JacobianKernel(tmp_path, install_references=True)
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config,

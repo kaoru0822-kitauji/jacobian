@@ -15,6 +15,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[2]
+CONFIG = ROOT / ".github" / "ci-config.json"
 ARTIFACT_NAME = "integration-test-durations"
 ARTIFACT_FILE = "integration-test-durations.json"
 MAX_BYTES = 5 * 1024 * 1024
@@ -22,6 +24,14 @@ MAX_ENTRIES = 10_000
 MAX_CANDIDATES = 5
 HTTP_TIMEOUT_SECONDS = 10
 TEST_ROOTS = ("tests/integration/", "tests/end_to_end/")
+
+
+def integration_shard_count() -> int:
+    payload = json.loads(CONFIG.read_text(encoding="utf-8"))
+    count = payload.get("integration_shard_count")
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise ValueError("integration_shard_count must be a positive integer")
+    return count
 
 
 def warning(message: str) -> None:
@@ -114,7 +124,7 @@ def artifact_durations(
     if (
         payload.get("version") != 1
         or payload.get("suite") != "integration"
-        or payload.get("shard_count") != 4
+        or payload.get("shard_count") != integration_shard_count()
     ):
         raise ValueError("timing artifact metadata is incompatible")
     return validate_durations(payload.get("durations"), ARTIFACT_FILE)
@@ -179,8 +189,11 @@ def merge(
     python_version: str,
     pytest_split_version: str,
 ) -> None:
-    if len(inputs) != 4:
-        raise ValueError(f"expected 4 shard timing files, received {len(inputs)}")
+    shard_count = integration_shard_count()
+    if len(inputs) != shard_count:
+        raise ValueError(
+            f"expected {shard_count} shard timing files, received {len(inputs)}"
+        )
     merged: dict[str, float] = {}
     for path in inputs:
         payload = load_json_bytes(path.read_bytes(), str(path))
@@ -197,7 +210,7 @@ def merge(
         "source_sha": source_sha,
         "generated_at": datetime.now(UTC).isoformat(),
         "python_version": python_version,
-        "shard_count": 4,
+        "shard_count": shard_count,
         "pytest_split_version": pytest_split_version,
         "durations": dict(sorted(merged.items())),
     }
