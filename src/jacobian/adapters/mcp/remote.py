@@ -56,11 +56,15 @@ class StaticTokenVerifier:
             raise ValueError("tenant IDs in the token file must be unique")
         if len({grant.token for grant in grants}) != len(grants):
             raise ValueError("bearer tokens in the token file must be unique")
-        self._grants = grants
+        self._grants = tuple(
+            (hashlib.sha256(grant.token.encode("utf-8")).digest(), grant)
+            for grant in grants
+        )
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        for grant in self._grants:
-            if hmac.compare_digest(token, grant.token):
+        token_digest = hashlib.sha256(token.encode("utf-8")).digest()
+        for grant_digest, grant in self._grants:
+            if hmac.compare_digest(token_digest, grant_digest):
                 return AccessToken(
                     token=token,
                     client_id=f"jacobian-tenant:{grant.tenant_id}",

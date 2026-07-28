@@ -311,6 +311,8 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                 },
             )
             assert rejected_result.is_error is True
+            rejected = json.loads(rejected_result.content[0].text)
+            assert rejected["error"]["code"] == "INVALID_INPUT"
 
             second_problem_result = await client.call_tool(
                 "workspace.write",
@@ -330,6 +332,8 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                 },
             )
             assert second_problem_result.is_error is True
+            second_problem = json.loads(second_problem_result.content[0].text)
+            assert second_problem["error"]["code"] == "INVALID_INPUT"
 
             unchanged_result = await client.call_tool(
                 "workspace.query",
@@ -406,6 +410,8 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                 },
             )
             assert conflicting_mark_result.is_error is True
+            conflicting_mark = json.loads(conflicting_mark_result.content[0].text)
+            assert conflicting_mark["error"]["code"] == "INVALID_INPUT"
 
             mark_result = await client.call_tool(
                 "workspace.write",
@@ -488,7 +494,9 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             )
             unknown_result = json.loads(unknown.content[0].text)
             assert unknown.is_error is False
+            assert unknown_result["execution"]["status"] == "ERROR"
             assert unknown_result["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
+            assert unknown_result["assurance"]["level"] != "VERIFIED"
 
     asyncio.run(scenario())
 
@@ -527,6 +535,7 @@ def test_mcp_no_retrieval_policy_is_operator_bound_and_fail_closed(
             result = json.loads(denied.content[0].text)
             assert result["execution"]["status"] == "ERROR"
             assert result["output"]["error"]["code"] == "CAPABILITY_POLICY_DENIED"
+            assert result["assurance"]["level"] != "VERIFIED"
             assert result["diagnostics"][0]["details"] == {
                 "policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
                 "policy_digest": policy.digest,
