@@ -73,6 +73,7 @@ INTEGER_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "integer",
         "content",
+        invocation_examples=(example("content_6x2_plus_9x", "Compute the coefficient content of 6x²+9x.", {"polynomial": {"coefficients": ["6", "9", "0"]}}),),
     ),
     polynomial_operation(
         "polynomial.integer.compute.primitive_part",
@@ -87,6 +88,7 @@ INTEGER_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "integer",
         "primitive",
+        invocation_examples=(example("primitive_part_6x2_plus_9x", "Compute the primitive part of 6x²+9x.", {"polynomial": {"coefficients": ["6", "9", "0"]}}),),
     ),
     polynomial_operation(
         "polynomial.integer.compute.evaluate",
@@ -116,6 +118,7 @@ INTEGER_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "integer",
         "composition",
+        invocation_examples=(example("compose_x_plus_one", "Compose x+1 with x².", {"outer": {"coefficient_order": "DESCENDING_DEGREE", "coefficients": ["1", "1"]}, "inner": {"coefficient_order": "DESCENDING_DEGREE", "coefficients": ["1", "0", "0"]}}),),
     ),
     polynomial_operation(
         "polynomial.integer.compute.shift",
@@ -127,6 +130,7 @@ INTEGER_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "integer",
         "shift",
+        invocation_examples=(example("shift_x2_by_two", "Compute p(x+2) for p(x)=x².", {"polynomial": {"coefficient_order": "DESCENDING_DEGREE", "coefficients": ["1", "0", "0"]}, "shift": 2}),),
     ),
 )
 
@@ -197,6 +201,7 @@ RATIONAL_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "rational",
         "evaluation",
+        invocation_examples=(example("rational_evaluate_x2_plus_one", "Evaluate x²+1 at 2.", {"polynomial": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "1", "den": "1"}, "exponents": [0]}]}}, "point": {"num": "2", "den": "1"}}),),
     ),
     polynomial_operation(
         "polynomial.rational.compute.derivative",
@@ -247,6 +252,7 @@ RATIONAL_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "rational",
         "integration",
+        invocation_examples=(example("integral_two_x", "Integrate 2x with zero constant.", {"polynomial": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "2", "den": "1"}, "exponents": [1]}]}}}),),
     ),
     polynomial_operation(
         "polynomial.rational.compute.partial_fraction_decomposition",
@@ -261,6 +267,7 @@ RATIONAL_POLYNOMIAL_CAPABILITIES = (
         "polynomial",
         "rational-function",
         "partial-fraction",
+        invocation_examples=(example("partial_fraction_one_over_x2_minus_one", "Decompose 1/(x²-1) into partial fractions.", {"numerator": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [0]}]}}, "denominator": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}}),),
     ),
 )
 
