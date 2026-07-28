@@ -110,7 +110,13 @@ def pytest_collection_modifyitems(
     for item in items:
         try:
             layer = Path(item.path).relative_to(tests_root).parts[0]
-        except (ValueError, IndexError):
+        except ValueError:
+            msg = (
+                f"test {item.nodeid} is not under {tests_root}; "
+                "layer markers cannot be assigned safely"
+            )
+            raise pytest.UsageError(msg) from None
+        except IndexError:
             continue
         marker = _LAYER_MARKERS.get(layer)
         if marker is not None:
