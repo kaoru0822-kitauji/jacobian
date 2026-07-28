@@ -122,6 +122,7 @@ def test_emit_plan_outputs_exposes_ci_config_ssot() -> None:
     outputs = plan_outputs()
     assert outputs["node-version-jscpd"] == "20"
     assert outputs["node-version-npm"] == "24"
+    assert outputs["pytest-randomly-shard-seed"] == "0"
     assert outputs["pytest-split-version"]
     assert (
         run_script("node-version", "npm").stdout.strip() == outputs["node-version-npm"]

@@ -1,5 +1,6 @@
 {
   "integration_shard_count": 4,
   "node_version_jscpd": "20",
-  "node_version_npm": "24"
+  "node_version_npm": "24",
+  "pytest_randomly_shard_seed": 0
 }

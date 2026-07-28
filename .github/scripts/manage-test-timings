@@ -41,6 +41,9 @@ def ci_config() -> dict[str, Any]:
         value = payload.get(key)
         if not isinstance(value, str) or not value:
             raise ValueError(f"{key} must be a non-empty string")
+    seed = payload.get("pytest_randomly_shard_seed")
+    if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
+        raise ValueError("pytest_randomly_shard_seed must be a nonnegative integer")
     return payload
 
 
@@ -71,6 +74,7 @@ def emit_plan_outputs() -> None:
     print(f"integration-shards={json.dumps(list(range(1, count + 1)))}")
     print(f"node-version-jscpd={config['node_version_jscpd']}")
     print(f"node-version-npm={config['node_version_npm']}")
+    print(f"pytest-randomly-shard-seed={config['pytest_randomly_shard_seed']}")
     print(f"pytest-split-version={pytest_split_version()}")
 
 

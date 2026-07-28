@@ -41,6 +41,7 @@ jobs:
       integration-shards: ${{ steps.shards.outputs.integration-shards }}
       node-version-jscpd: ${{ steps.shards.outputs.node-version-jscpd }}
       node-version-npm: ${{ steps.shards.outputs.node-version-npm }}
+      pytest-randomly-shard-seed: ${{ steps.shards.outputs.pytest-randomly-shard-seed }}
       pytest-split-version: ${{ steps.shards.outputs.pytest-split-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -291,6 +292,7 @@ jobs:
             --group ${{ matrix.shard }}
             --splitting-algorithm least_duration
             --durations-path .ci/test-durations.json
+            --randomly-seed ${{ needs.plan.outputs.pytest-randomly-shard-seed }}
             --store-durations
             --clean-durations
             --junitxml=pytest.xml
