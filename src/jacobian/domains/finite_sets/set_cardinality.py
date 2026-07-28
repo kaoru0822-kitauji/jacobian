@@ -4,6 +4,7 @@ from jacobian.contracts.finite_sets import (
     FiniteSetCardinalityResult,
     FiniteSetPairRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.finite_sets._support import finite_set_operation
 from jacobian.domains.finite_sets.operations import (
     intersection_cardinality,
@@ -21,6 +22,9 @@ SET_CARDINALITY_CAPABILITIES = (
         left_cardinality,
         "finite-set",
         "counting",
+        invocation_examples=(
+            example("left_cardinality_1_2_3", "Count elements in the left finite set.", {"left": {"elements": ["1", "2", "3"]}, "right": {"elements": ["2"]}}),
+        ),
     ),
     finite_set_operation(
         "finite_set.compute.intersection_cardinality",
@@ -31,6 +35,9 @@ SET_CARDINALITY_CAPABILITIES = (
         intersection_cardinality,
         "finite-set",
         "counting",
+        invocation_examples=(
+            example("intersection_cardinality_1_2_and_2_3", "Count common elements of two finite sets.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}}),
+        ),
     ),
     finite_set_operation(
         "finite_set.compute.union_cardinality",
@@ -41,5 +48,8 @@ SET_CARDINALITY_CAPABILITIES = (
         union_cardinality,
         "finite-set",
         "counting",
+        invocation_examples=(
+            example("union_cardinality_1_2_and_2_3", "Count elements in the union of two finite sets.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}}),
+        ),
     ),
 )

@@ -40,6 +40,13 @@ SET_OPERATION_CAPABILITIES = (
         set_intersection,
         "finite-set",
         "exact",
+        invocation_examples=(
+            example(
+                "intersection_1_2_and_2_3",
+                "Intersect two finite sets.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
+            ),
+        ),
     ),
     finite_set_operation(
         "finite_set.compute.difference",
@@ -50,6 +57,13 @@ SET_OPERATION_CAPABILITIES = (
         set_difference,
         "finite-set",
         "exact",
+        invocation_examples=(
+            example(
+                "difference_1_2_minus_2_3",
+                "Subtract one finite set from another.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
+            ),
+        ),
     ),
     finite_set_operation(
         "finite_set.compute.symmetric_difference",
