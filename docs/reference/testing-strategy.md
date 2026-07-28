@@ -83,6 +83,11 @@ make common affected areas discoverable without adding another test runner.
 `make test-stress` and `make test-ordering` reproduce the scheduled validation
 property-repeat and ordering-seed lanes using locked `pytest-repeat` and
 `pytest-randomly`.
+CI integration shards use one fixed `pytest-randomly` seed from
+`.github/ci-config.json`. Every shard must collect tests in the same order
+before `pytest-split` partitions them; otherwise independently randomized
+collections can overlap or omit tests. The merged timing artifact rejects
+duplicate node IDs instead of concealing such an overlap.
 `make check` combines fast Ruff, strict typing, and non-integration test
 feedback as the routine local pre-push gate. Developers should push after it and
 let CI own dependency and dead-code analysis, package builds, and exhaustive
