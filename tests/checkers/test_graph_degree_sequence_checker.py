@@ -171,3 +171,131 @@ def test_checker_rejects_fabricated_erdos_gallai_obstruction() -> None:
 
     assert decision["accepted"] is False
     assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_checker_accepts_max_degree_obstruction() -> None:
+    """A degree exceeding the simple-graph maximum is a valid non-graphical obstruction."""
+    obstruction = {
+        "kind": "MAX_DEGREE",
+        "index": 0,
+        "degree": 4,
+        "order": 4,
+    }
+    request = _request(
+        sequence=[4, 1, 1, 0],
+        candidate={
+            "result_schema_version": "1",
+            "degree_sequence": [4, 1, 1, 0],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "graph": None,
+            "obstruction": obstruction,
+        },
+        certificate_payload={
+            "method": "MAX_DEGREE_OBSTRUCTION",
+            "degree_sequence": [4, 1, 1, 0],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "obstruction": obstruction,
+        },
+    )
+
+    decision = check_degree_sequence(request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "FALSE"
+
+
+def test_checker_rejects_fabricated_max_degree_obstruction() -> None:
+    """A MAX_DEGREE obstruction whose degree does not exceed the maximum is fabricated."""
+    obstruction = {
+        "kind": "MAX_DEGREE",
+        "index": 0,
+        "degree": 3,
+        "order": 4,
+    }
+    request = _request(
+        sequence=[3, 1, 1, 0],
+        candidate={
+            "result_schema_version": "1",
+            "degree_sequence": [3, 1, 1, 0],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "graph": None,
+            "obstruction": obstruction,
+        },
+        certificate_payload={
+            "method": "MAX_DEGREE_OBSTRUCTION",
+            "degree_sequence": [3, 1, 1, 0],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "obstruction": obstruction,
+        },
+    )
+
+    decision = check_degree_sequence(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_checker_accepts_odd_sum_obstruction() -> None:
+    """An odd degree sum is a valid non-graphical obstruction."""
+    obstruction = {
+        "kind": "ODD_SUM",
+        "degree_sum": 7,
+    }
+    request = _request(
+        sequence=[3, 2, 1, 1],
+        candidate={
+            "result_schema_version": "1",
+            "degree_sequence": [3, 2, 1, 1],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "graph": None,
+            "obstruction": obstruction,
+        },
+        certificate_payload={
+            "method": "ODD_SUM_OBSTRUCTION",
+            "degree_sequence": [3, 2, 1, 1],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "obstruction": obstruction,
+        },
+    )
+
+    decision = check_degree_sequence(request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "FALSE"
+
+
+def test_checker_rejects_fabricated_odd_sum_obstruction() -> None:
+    """An ODD_SUM obstruction whose sum is even is fabricated."""
+    obstruction = {
+        "kind": "ODD_SUM",
+        "degree_sum": 6,
+    }
+    request = _request(
+        sequence=[3, 1, 1, 1],
+        candidate={
+            "result_schema_version": "1",
+            "degree_sequence": [3, 1, 1, 1],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "graph": None,
+            "obstruction": obstruction,
+        },
+        certificate_payload={
+            "method": "ODD_SUM_OBSTRUCTION",
+            "degree_sequence": [3, 1, 1, 1],
+            "conclusion": "NON_GRAPHICAL",
+            "graph_uri": None,
+            "obstruction": obstruction,
+        },
+    )
+
+    decision = check_degree_sequence(request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
