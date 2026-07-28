@@ -7,7 +7,6 @@ import multiprocessing
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
-from fractions import Fraction
 from itertools import product
 from math import prod as multiply
 from queue import Empty
@@ -45,7 +44,7 @@ from jacobian.contracts.evidence import (
     WitnessEnvelope,
     WitnessRole,
 )
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import CanonicalRational, bounded_rational_scalars
 from jacobian.contracts.polynomials import (
     PolynomialCollisionOutput,
     PolynomialCollisionPayload,
@@ -933,15 +932,8 @@ class PolynomialCollisionSearchAdapter:
         polynomial_map, map_uri = _materialize_map(self.resources, validated.map)
         scalar_values = tuple(
             CanonicalRational(num=str(value.numerator), den=str(value.denominator))
-            for value in sorted(
-                {
-                    Fraction(numerator, denominator)
-                    for denominator in range(1, validated.max_denominator + 1)
-                    for numerator in range(
-                        -validated.max_abs_numerator,
-                        validated.max_abs_numerator + 1,
-                    )
-                }
+            for value in bounded_rational_scalars(
+                validated.max_abs_numerator, validated.max_denominator
             )
         )
         grid_point_count = len(scalar_values) ** len(polynomial_map.variables)

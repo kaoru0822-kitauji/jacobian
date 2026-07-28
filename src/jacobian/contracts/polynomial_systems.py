@@ -7,7 +7,11 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 
 from jacobian.contracts.common import ArtifactUri, CheckerUri
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import (
+    RATIONAL_SEARCH_GRID_LIMIT,
+    CanonicalRational,
+    bounded_rational_grid_size,
+)
 from jacobian.contracts.polynomials import PolynomialVariable, SparseRationalPolynomial
 from jacobian.contracts.results import ContractModel
 
@@ -62,8 +66,14 @@ class PolynomialSystemRationalSearchRequest(ContractModel):
 
     @model_validator(mode="after")
     def require_bounded_grid(self) -> Self:
-        scalar_bound = (2 * self.max_abs_numerator + 1) * self.max_denominator
-        if scalar_bound ** len(self.system.variables) > 10_000:
+        if (
+            bounded_rational_grid_size(
+                self.max_abs_numerator,
+                self.max_denominator,
+                len(self.system.variables),
+            )
+            > RATIONAL_SEARCH_GRID_LIMIT
+        ):
             raise ValueError("declared rational grid exceeds 10,000 points")
         return self
 
@@ -73,8 +83,8 @@ class PolynomialSystemRationalSearchOutput(ContractModel):
     system_uri: ArtifactUri
     assignment_uri: ArtifactUri | None = None
     assignment: tuple[CanonicalRational, ...] | None = None
-    examined_assignment_count: int = Field(ge=0, le=10_000)
-    grid_assignment_count: int = Field(ge=1, le=10_000)
+    examined_assignment_count: int = Field(ge=0, le=RATIONAL_SEARCH_GRID_LIMIT)
+    grid_assignment_count: int = Field(ge=1, le=RATIONAL_SEARCH_GRID_LIMIT)
     checker_id: CheckerUri | None = None
     verification: Literal["UNVERIFIED"] = "UNVERIFIED"
     coverage: Literal["COMPLETE_SEARCH_OBJECTIVE"] = "COMPLETE_SEARCH_OBJECTIVE"

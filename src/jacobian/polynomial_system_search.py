@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from fractions import Fraction
 from itertools import product
 
 from pydantic import ValidationError
@@ -22,7 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import CanonicalRational, bounded_rational_scalars
 from jacobian.contracts.polynomial_systems import (
     PolynomialSystemRationalSearchOutput,
     PolynomialSystemRationalSearchRequest,
@@ -78,15 +77,8 @@ class PolynomialSystemRationalSearchAdapter:
         started = time.monotonic()
         values = tuple(
             CanonicalRational(num=str(value.numerator), den=str(value.denominator))
-            for value in sorted(
-                {
-                    Fraction(numerator, denominator)
-                    for denominator in range(1, validated.max_denominator + 1)
-                    for numerator in range(
-                        -validated.max_abs_numerator,
-                        validated.max_abs_numerator + 1,
-                    )
-                }
+            for value in bounded_rational_scalars(
+                validated.max_abs_numerator, validated.max_denominator
             )
         )
         grid_assignment_count = len(values) ** len(validated.system.variables)

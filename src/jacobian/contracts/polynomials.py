@@ -10,7 +10,11 @@ from typing import Annotated, Any, Literal, Self
 from pydantic import Field, StringConstraints, model_validator
 
 from jacobian.contracts.common import ArtifactUri, CheckerUri
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.contracts.exact import (
+    RATIONAL_SEARCH_GRID_LIMIT,
+    CanonicalRational,
+    bounded_rational_grid_size,
+)
 from jacobian.contracts.results import Conclusion, ContractModel, InputValidation
 
 PolynomialVariable = Annotated[
@@ -427,8 +431,14 @@ class PolynomialCollisionSearchRequest(ContractModel):
 
     @model_validator(mode="after")
     def require_bounded_grid(self) -> Self:
-        scalar_upper_bound = (2 * self.max_abs_numerator + 1) * self.max_denominator
-        if scalar_upper_bound ** len(self.map.variables) > 10_000:
+        if (
+            bounded_rational_grid_size(
+                self.max_abs_numerator,
+                self.max_denominator,
+                len(self.map.variables),
+            )
+            > RATIONAL_SEARCH_GRID_LIMIT
+        ):
             raise ValueError("declared rational grid exceeds the 10,000-point limit")
         return self
 
@@ -763,8 +773,8 @@ class PolynomialMapInverseVerifyOutput(ContractModel):
 class PolynomialCollisionSearchOutput(ContractModel):
     found: bool
     map_uri: ArtifactUri
-    examined_point_count: int = Field(ge=0, le=10_000)
-    grid_point_count: int = Field(ge=1, le=10_000)
+    examined_point_count: int = Field(ge=0, le=RATIONAL_SEARCH_GRID_LIMIT)
+    grid_point_count: int = Field(ge=1, le=RATIONAL_SEARCH_GRID_LIMIT)
     first_point: tuple[CanonicalRational, ...] | None = None
     second_point: tuple[CanonicalRational, ...] | None = None
     common_image: tuple[CanonicalRational, ...] | None = None

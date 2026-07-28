@@ -66,15 +66,12 @@ testpaths = ["tests"]
 timeout = 120
 markers = [
     "property: property-based invariant tests",
-    "stateful: persistent lifecycle state-machine tests",
     "subprocess: clean-process replay tests",
     "conformance: normative release conformance cases",
     "differential: independent implementation comparisons",
     "external_backend: tests requiring an optional external engine",
     "lean_runtime: tests requiring the pinned Lean toolchain or Mathlib runtime",
     "slow: tests excluded from the fastest development loop",
-    "benchmark: performance measurements",
-    "agent_eval: model-in-the-loop evaluations",
 ]
 
 [tool.ruff]
