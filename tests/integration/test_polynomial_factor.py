@@ -20,7 +20,6 @@ def _term(coefficient: int, exponent: int) -> dict[str, object]:
     }
 
 
-@pytest.mark.integration
 def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
     tmp_path: Path,
 ) -> None:
@@ -57,7 +56,6 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
     assert source.manifest.semantics_uri != factorization.manifest.semantics_uri
 
 
-@pytest.mark.integration
 def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
     tmp_path: Path,
 ) -> None:
@@ -77,7 +75,6 @@ def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
     assert result.output["irreducibility_verification"] == "UNVERIFIED"
 
 
-@pytest.mark.integration
 def test_factor_compute_preserves_rational_coefficient_and_irreducible_factor(
     tmp_path: Path,
 ) -> None:

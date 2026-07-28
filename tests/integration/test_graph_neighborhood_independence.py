@@ -47,7 +47,6 @@ def _wowii_200_graph() -> dict[str, object]:
     }
 
 
-@pytest.mark.integration
 def test_neighborhood_independence_reproduces_wowii_200_invariant(
     tmp_path: Path,
 ) -> None:

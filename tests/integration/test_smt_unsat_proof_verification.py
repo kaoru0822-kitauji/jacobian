@@ -26,7 +26,6 @@ from jacobian.provider_runtime import carcara_provider_runtime
 from jacobian.verification import CheckerExecutionError, _environment_digest
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 

@@ -11,7 +11,6 @@ from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import CADICAL_VERSION, cadical_provider_runtime
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.external_backend,
     pytest.mark.skipif(
         shutil.which("cadical") is None,

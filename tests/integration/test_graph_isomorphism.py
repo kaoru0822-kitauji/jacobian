@@ -55,7 +55,6 @@ def _input(
     }
 
 
-@pytest.mark.integration
 def test_graph_isomorphism_verifies_a_valid_bijection(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -81,7 +80,6 @@ def test_graph_isomorphism_verifies_a_valid_bijection(tmp_path: Path) -> None:
     assert result.output["verification_record_uri"] in result.artifact_uris
 
 
-@pytest.mark.integration
 def test_graph_isomorphism_verifies_a_negative_result(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
 
@@ -102,7 +100,6 @@ def test_graph_isomorphism_verifies_a_negative_result(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.integration
 def test_graph_isomorphism_keeps_checker_rejection_unknown(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     checker_id = kernel.graph_isomorphism.checker_id
@@ -129,7 +126,6 @@ def test_graph_isomorphism_keeps_checker_rejection_unknown(tmp_path: Path) -> No
     )
 
 
-@pytest.mark.integration
 def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
     tmp_path: Path,
 ) -> None:
@@ -170,7 +166,6 @@ def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
     )
 
 
-@pytest.mark.integration
 def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(
     tmp_path: Path,
 ) -> None:
@@ -204,7 +199,6 @@ def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(
     assert right_graph_uri in record.manifest.parents
 
 
-@pytest.mark.integration
 def test_graph_isomorphism_rejects_incompatible_graph_artifact(
     tmp_path: Path,
 ) -> None:

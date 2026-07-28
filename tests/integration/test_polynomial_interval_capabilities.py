@@ -65,7 +65,6 @@ def installation(tmp_path: Path):
     return adapters, installed, store
 
 
-@pytest.mark.integration
 def test_enclose_capability_computes_a_valid_bernstein_enclosure(
     installation,
 ) -> None:
@@ -103,7 +102,6 @@ def test_enclose_capability_computes_a_valid_bernstein_enclosure(
     assert result.relationships[0].status is CapabilityRelationshipStatus.PROPOSED
 
 
-@pytest.mark.integration
 def test_enclose_capability_handles_a_quadratic_on_a_shifted_interval(
     installation,
 ) -> None:
@@ -134,7 +132,6 @@ def test_enclose_capability_handles_a_quadratic_on_a_shifted_interval(
     assert result.output["range_exactness"] == "ENCLOSURE_VALID_NOT_EXACT"
 
 
-@pytest.mark.integration
 def test_verify_capability_confirms_a_valid_enclosure(installation) -> None:
     adapters, _installed, _store = installation
     enclose, verify = adapters
@@ -179,7 +176,6 @@ def test_verify_capability_confirms_a_valid_enclosure(installation) -> None:
     assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
 
 
-@pytest.mark.integration
 def test_verify_capability_rejects_a_false_enclosure(installation) -> None:
     adapters, _installed, _store = installation
     _enclose, verify = adapters
@@ -211,7 +207,6 @@ def test_verify_capability_rejects_a_false_enclosure(installation) -> None:
     assert result.relationships == ()
 
 
-@pytest.mark.integration
 def test_enclose_capability_rejects_a_degenerate_interval(installation) -> None:
     adapters, _installed, _store = installation
     enclose, _verify = adapters

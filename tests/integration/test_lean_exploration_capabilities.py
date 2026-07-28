@@ -12,7 +12,6 @@ from jacobian.contracts.capabilities import (
 from jacobian.kernel import JacobianKernel
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.external_backend,
     pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),

@@ -20,8 +20,6 @@ from jacobian.references import LeanCheckerInstallation
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
-pytestmark = pytest.mark.integration
-
 _ReplResponses = tuple[dict[str, object], dict[str, object], dict[str, object]]
 
 

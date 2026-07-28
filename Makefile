@@ -1,11 +1,13 @@
 .DEFAULT_GOAL := help
 
-UV_RUN := uv run --frozen
+UV_RUN := uv run --locked
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
+CORE_TEST_PATHS := tests/unit tests/contract tests/checkers tests/reference
+INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 
-.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed test-durations build check check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed build check check-static validate-full agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -37,9 +39,17 @@ typecheck: ## Run strict static type checking.
 test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
 	$(UV_RUN) pytest -m "not lean_runtime" $(TESTS) $(PYTEST_ARGS)
 
-test-fast: ## Run the sequential non-integration feedback loop.
-	$(UV_RUN) pytest -n 0 -m "not integration and not end_to_end and not lean_runtime" \
-		tests/unit tests/contract tests/checkers tests/reference $(PYTEST_ARGS)
+test-fast: ## Run the sequential core feedback loop.
+	$(UV_RUN) pytest -n 0 -m "not lean_runtime" \
+		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
+
+test-core: ## Run the directory-owned core suites.
+	$(UV_RUN) pytest -m "not lean_runtime" \
+		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
+
+test-integration: ## Run the directory-owned integration suites.
+	$(UV_RUN) pytest -m "not lean_runtime" \
+		$(if $(TESTS),$(TESTS),$(INTEGRATION_TEST_PATHS)) $(PYTEST_ARGS)
 
 test-contracts: ## Run contract tests.
 	$(UV_RUN) pytest -n 0 tests/contract $(PYTEST_ARGS)
@@ -62,12 +72,6 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest --lf -m "not lean_runtime" $(PYTEST_ARGS)
-
-test-durations: ## Refresh committed integration shard timings for pytest-split.
-	$(UV_RUN) pytest \
-		-m "(integration or end_to_end) and not lean_runtime" \
-		--store-durations --clean-durations --durations-path .test_durations \
-		$(PYTEST_ARGS)
 
 build: ## Build Python source and wheel distributions.
 	uv build

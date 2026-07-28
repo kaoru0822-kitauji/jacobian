@@ -4,10 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
 
 def test_kernel_starts_and_exposes_unrelated_capabilities_without_flint(
     tmp_path: Path,

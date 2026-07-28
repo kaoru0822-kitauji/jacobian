@@ -32,7 +32,6 @@ def _request(constant: int) -> CapabilityRequest:
     )
 
 
-@pytest.mark.integration
 def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) -> None:
     result = JacobianKernel(tmp_path, install_references=True).capabilities.invoke(
         _request(1)
@@ -43,7 +42,6 @@ def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) 
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
 
 
-@pytest.mark.integration
 def test_rational_solution_search_reports_completed_bounded_absence(
     tmp_path: Path,
 ) -> None:

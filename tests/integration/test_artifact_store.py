@@ -22,7 +22,6 @@ from jacobian.store import (
 )
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_artifact_identity_uses_canonical_payload_schema_and_semantics(
     tmp_path: Path,
@@ -92,7 +91,6 @@ def test_artifact_identity_uses_canonical_payload_schema_and_semantics(
     assert store.get(first.artifact_uri).payload == {"weight": {"den": "2", "num": "1"}}
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
@@ -125,7 +123,6 @@ def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
         store.get(artifact.artifact_uri)
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 @pytest.mark.parametrize("column", ["manifest_digest", "summary"])
 def test_modified_artifact_metadata_is_rejected_on_read(
@@ -179,7 +176,6 @@ def test_modified_artifact_metadata_is_rejected_on_read(
         store.get(artifact.artifact_uri)
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 @pytest.mark.parametrize("missing_reference", ["parent", "schema", "semantics"])
 def test_missing_reference_metadata_is_rejected_on_read(
@@ -226,7 +222,6 @@ def test_missing_reference_metadata_is_rejected_on_read(
         store.get(child.artifact_uri)
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_over_limit_artifact_leaves_no_partial_metadata(tmp_path: Path) -> None:
     store = ArtifactStore(
@@ -267,7 +262,6 @@ def test_over_limit_artifact_leaves_no_partial_metadata(tmp_path: Path) -> None:
     assert blobs_after == blobs_before
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     tmp_path: Path,
@@ -325,7 +319,6 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     assert sum(isinstance(outcome, StoreLimitError) for outcome in outcomes) == 1
 
 
-@pytest.mark.integration
 def test_blob_writes_do_not_rescan_the_blob_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -339,7 +332,6 @@ def test_blob_writes_do_not_rescan_the_blob_tree(
     store._write_blob(b"constant-time quota accounting")
 
 
-@pytest.mark.integration
 def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     committed = store._blob_bytes_committed()
@@ -353,7 +345,6 @@ def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
     assert reopened._blob_bytes_committed() == committed
 
 
-@pytest.mark.integration
 def test_store_open_migrates_legacy_quota_metadata(tmp_path: Path) -> None:
     tmp_path.mkdir(parents=True, exist_ok=True)
     database = tmp_path / "metadata.sqlite3"
@@ -386,7 +377,6 @@ def test_store_open_migrates_legacy_quota_metadata(tmp_path: Path) -> None:
     assert store._blob_bytes_committed() == 0
 
 
-@pytest.mark.integration
 def test_concurrent_store_open_migrates_legacy_quota_metadata_once(
     tmp_path: Path,
 ) -> None:
@@ -427,7 +417,6 @@ ArtifactStore(sys.argv[1])
     assert columns.count("reconciliation_required") == 1
 
 
-@pytest.mark.integration
 def test_store_open_recovers_process_death_before_blob_publication(
     tmp_path: Path,
 ) -> None:
@@ -461,7 +450,6 @@ store._write_blob(b"reserved-but-unpublished")
     assert not tuple((tmp_path / "blobs" / "sha256").glob("*/*"))
 
 
-@pytest.mark.integration
 def test_store_open_recovers_process_death_after_blob_publication(
     tmp_path: Path,
 ) -> None:
@@ -491,7 +479,6 @@ store._write_blob(sys.argv[2].encode("ascii"))
     assert reopened._read_blob(digest) == data
 
 
-@pytest.mark.integration
 @pytest.mark.skipif(
     os.name == "nt",
     reason="Windows revalidates blob accounting on every store open",
@@ -515,7 +502,6 @@ def test_clean_store_open_does_not_scan_the_blob_tree(
     assert reopened._blob_path(digest).is_file()
 
 
-@pytest.mark.integration
 def test_duplicate_put_rechecks_a_changed_blob(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     original = b"original"
@@ -526,7 +512,6 @@ def test_duplicate_put_rechecks_a_changed_blob(tmp_path: Path) -> None:
         store._write_blob(original)
 
 
-@pytest.mark.integration
 def test_failed_blob_publication_releases_quota_reservation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -545,7 +530,6 @@ def test_failed_blob_publication_releases_quota_reservation(
     assert store._blob_bytes_committed() == committed
 
 
-@pytest.mark.integration
 def test_cross_process_blob_writes_cannot_oversubscribe_quota(
     tmp_path: Path,
 ) -> None:
@@ -579,7 +563,6 @@ else:
     ]
 
 
-@pytest.mark.integration
 @pytest.mark.conformance
 def test_store_keeps_filesystem_paths_local(
     tmp_path: Path,

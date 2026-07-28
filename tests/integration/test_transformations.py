@@ -9,7 +9,6 @@ from jacobian.kernel import JacobianKernel
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_matrix_representation_change_is_independently_verified(
     tmp_path: Path,
@@ -48,7 +47,6 @@ def test_matrix_representation_change_is_independently_verified(
     )
 
 
-@pytest.mark.integration
 def test_transformation_target_rebinding_fails_closed(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]
@@ -96,7 +94,6 @@ def test_transformation_target_rebinding_fails_closed(tmp_path: Path) -> None:
     assert result.verification_record_uri is None
 
 
-@pytest.mark.integration
 def test_transformation_relation_rebinding_fails_closed(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]
@@ -135,7 +132,6 @@ def test_transformation_relation_rebinding_fails_closed(tmp_path: Path) -> None:
     assert result.verification_record_uri is None
 
 
-@pytest.mark.integration
 def test_transformation_obligation_tampering_fails_closed(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]

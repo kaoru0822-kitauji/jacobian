@@ -18,7 +18,6 @@ from jacobian.kernel import JacobianKernel
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
-@pytest.mark.end_to_end
 def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]
@@ -120,7 +119,6 @@ def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
     assert replayed["assurance"]["verification"] == "VERIFIED"
 
 
-@pytest.mark.end_to_end
 def test_matrix_kernel_witness_and_independent_replay(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]
@@ -172,7 +170,6 @@ def test_matrix_kernel_witness_and_independent_replay(tmp_path: Path) -> None:
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-@pytest.mark.end_to_end
 def test_erdos_straus_range_witness_and_independent_replay(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["erdos_straus"]
@@ -221,7 +218,6 @@ def test_erdos_straus_range_witness_and_independent_replay(tmp_path: Path) -> No
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-@pytest.mark.end_to_end
 def test_matrix_maxdet_certificate_replays_full_scope(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["matrices"]
@@ -314,7 +310,6 @@ def test_matrix_maxdet_certificate_replays_full_scope(tmp_path: Path) -> None:
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-@pytest.mark.end_to_end
 def test_graph_counterexample_shrinks_to_the_odd_cycle(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]

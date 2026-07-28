@@ -24,8 +24,6 @@ from jacobian.contracts.sat import SatResourceBudget
 from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.kernel import JacobianKernel
 
-pytestmark = pytest.mark.integration
-
 
 def _kernel_from_template(
     tmp_path: Path,

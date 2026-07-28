@@ -27,7 +27,6 @@ def _matrix() -> dict[str, object]:
     }
 
 
-@pytest.mark.integration
 def test_matrix_rank_verify_independently_recomputes_rank(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     computed = kernel.capabilities.invoke(
@@ -47,7 +46,6 @@ def test_matrix_rank_verify_independently_recomputes_rank(tmp_path: Path) -> Non
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-@pytest.mark.integration
 def test_matrix_rank_verify_rejects_wrong_rank(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     computed = kernel.capabilities.invoke(

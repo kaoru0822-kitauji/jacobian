@@ -123,7 +123,6 @@ def _matrix_claim_for_plugin(
     return claim.artifact_uri
 
 
-@pytest.mark.integration
 def test_unknown_experiment_error_explains_recovery(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -141,7 +140,6 @@ def test_unknown_experiment_error_explains_recovery(
     assert missing_uri in caplog.text
 
 
-@pytest.mark.integration
 def test_graph_enumeration_deduplicates_isomorphic_candidates(
     tmp_path: Path,
 ) -> None:
@@ -202,7 +200,6 @@ def test_graph_enumeration_deduplicates_isomorphic_candidates(
         }
 
 
-@pytest.mark.integration
 def test_experiment_metadata_uses_registered_schema_validation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -263,7 +260,6 @@ def test_experiment_metadata_uses_registered_schema_validation(
     assert kernel.references["matrices"].semantics_uri in validated_semantics_uris
 
 
-@pytest.mark.integration
 def test_matrix_enumeration_uses_the_same_experiment_contract(
     tmp_path: Path,
 ) -> None:
@@ -300,7 +296,6 @@ def test_matrix_enumeration_uses_the_same_experiment_contract(
     assert snapshot.verification.value == "UNVERIFIED"
 
 
-@pytest.mark.integration
 def test_enumeration_pages_respect_evaluator_batch_limit(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     kernel.evaluation.max_batch_size = 2
@@ -341,7 +336,6 @@ def test_enumeration_pages_respect_evaluator_batch_limit(tmp_path: Path) -> None
     assert snapshot.archive_page_uris[0] in second_page.manifest.parents
 
 
-@pytest.mark.integration
 def test_cancellation_never_becomes_an_exhaustive_conclusion(
     tmp_path: Path,
 ) -> None:
@@ -379,7 +373,6 @@ def test_cancellation_never_becomes_an_exhaustive_conclusion(
     assert snapshot.archive_uri is not None
 
 
-@pytest.mark.integration
 def test_candidate_limit_never_becomes_exhaustive_coverage(
     tmp_path: Path,
 ) -> None:
@@ -416,7 +409,6 @@ def test_candidate_limit_never_becomes_exhaustive_coverage(
     assert snapshot.accounting.raw_candidates == 2
 
 
-@pytest.mark.integration
 def test_quotient_search_requires_a_domain_canonicalizer(
     tmp_path: Path,
 ) -> None:
@@ -444,7 +436,6 @@ def test_quotient_search_requires_a_domain_canonicalizer(
         )
 
 
-@pytest.mark.integration
 def test_cancelling_a_terminal_experiment_does_not_change_it(
     tmp_path: Path,
 ) -> None:
@@ -480,7 +471,6 @@ def test_cancelling_a_terminal_experiment_does_not_change_it(
     assert after == completed
 
 
-@pytest.mark.integration
 def test_enumerator_candidate_is_validated_before_archival(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     plugin_id = _install_matrix_enumerator_plugin(
@@ -517,7 +507,6 @@ def test_enumerator_candidate_is_validated_before_archival(tmp_path: Path) -> No
     assert snapshot.archive_page_uris == ()
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_enumerator_timeout_remains_a_bounded_nonconclusion(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
@@ -560,7 +549,6 @@ def test_enumerator_timeout_remains_a_bounded_nonconclusion(tmp_path: Path) -> N
     assert snapshot.accounting.raw_candidates == 0
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_evaluator_timeout_prevents_complete_enumeration_result(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
@@ -598,7 +586,6 @@ def test_evaluator_timeout_prevents_complete_enumeration_result(tmp_path: Path) 
     assert snapshot.verification.value == "UNVERIFIED"
 
 
-@pytest.mark.integration
 def test_rejected_evaluation_batch_fails_enumeration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -649,7 +636,6 @@ def test_rejected_evaluation_batch_fails_enumeration(
     assert "simulated incomplete evaluation" not in snapshot.detail
 
 
-@pytest.mark.integration
 def test_terminal_archive_failure_marks_enumeration_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -703,7 +689,6 @@ def test_terminal_archive_failure_marks_enumeration_error(
     assert "fixture archive failure" in caplog.text
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_interrupted_experiment_is_recovered_as_an_error(tmp_path: Path) -> None:
     script = """
@@ -764,7 +749,6 @@ os._exit(0)
     assert "ended before completion" in recovered.detail
 
 
-@pytest.mark.integration
 def test_corrupt_enumeration_snapshot_does_not_block_other_recovery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

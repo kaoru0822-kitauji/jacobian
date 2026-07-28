@@ -52,7 +52,6 @@ def _simplex(
     return point_artifact.artifact_uri, generators.artifact_uri
 
 
-@pytest.mark.integration
 def test_backend_failure_keeps_provider_detail_local(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -87,7 +86,6 @@ def test_backend_failure_keeps_provider_detail_local(
     assert "internal-id=secret" in caplog.text
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_exact_membership_witness_is_independently_replayed(
     tmp_path: Path,
@@ -122,7 +120,6 @@ def test_exact_membership_witness_is_independently_replayed(
     assert verified.verification_record_uri is not None
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_exact_separator_is_generated_then_independently_checked(
     tmp_path: Path,
@@ -162,7 +159,6 @@ def test_exact_separator_is_generated_then_independently_checked(
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_separator_payload_tampering_fails_closed(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
@@ -201,7 +197,6 @@ def test_separator_payload_tampering_fails_closed(tmp_path: Path) -> None:
     assert result.verification_record_uri is None
 
 
-@pytest.mark.integration
 def test_projection_is_explicit_and_bound_to_derived_artifacts(
     tmp_path: Path,
 ) -> None:

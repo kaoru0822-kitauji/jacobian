@@ -8,8 +8,6 @@ from jacobian.artifacts import ArtifactValidationError
 from jacobian.kernel import JacobianKernel
 
 pytestmark = [
-    pytest.mark.contract,
-    pytest.mark.integration,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 

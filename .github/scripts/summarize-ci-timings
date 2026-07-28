@@ -77,9 +77,9 @@ def render(payload: Any) -> str:
         if skew_ratio >= 1.5:
             lines.extend(
                 (
-                    "Integration shards differ by at least 1.5x. Refresh committed "
-                    "timings with `make test-durations` when the suite shape changes "
-                    "substantially.",
+                    "Integration shards differ by at least 1.5x. The next successful "
+                    "main-branch integration run will publish fresh timings; until "
+                    "then, shards fall back to equal weighting.",
                     "",
                 )
             )

@@ -45,7 +45,6 @@ def _request(image: int) -> CapabilityRequest:
     )
 
 
-@pytest.mark.integration
 def test_direct_collision_verifier_promotes_only_independent_replay(
     tmp_path: Path,
 ) -> None:
@@ -80,7 +79,6 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
     assert relationship.obligation_uris == ()
 
 
-@pytest.mark.integration
 def test_direct_collision_verifier_fails_closed_for_wrong_image(
     tmp_path: Path,
 ) -> None:

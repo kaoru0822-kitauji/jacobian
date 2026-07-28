@@ -14,7 +14,6 @@ _FORBIDDEN_PREFIXES = (
 )
 
 
-@pytest.mark.contract
 @pytest.mark.conformance
 def test_independent_checkers_do_not_import_search_implementations() -> None:
     checker_root = Path("src/jacobian_checkers")

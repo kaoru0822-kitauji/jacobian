@@ -133,7 +133,6 @@ def _request(
     )
 
 
-@pytest.mark.integration
 def test_search_run_checkpoints_strategy_neutral_lineage(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
@@ -177,7 +176,6 @@ def test_search_run_checkpoints_strategy_neutral_lineage(tmp_path: Path) -> None
     assert proposer_event.payload["output_digest"].startswith("sha256:")
 
 
-@pytest.mark.integration
 def test_resume_rejects_archive_page_rebound_to_another_plugin(
     tmp_path: Path,
 ) -> None:
@@ -233,7 +231,6 @@ def test_resume_rejects_archive_page_rebound_to_another_plugin(
     assert "archive page identity does not match the search" in recovered.detail
 
 
-@pytest.mark.integration
 def test_checkpoint_persistence_is_included_in_wall_accounting(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -268,7 +265,6 @@ def test_checkpoint_persistence_is_included_in_wall_accounting(
     assert snapshot.accounting.wall_time_ms == 1_000
 
 
-@pytest.mark.integration
 def test_checkpoint_persistence_cannot_complete_past_wall_budget(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -306,7 +302,6 @@ def test_checkpoint_persistence_cannot_complete_past_wall_budget(
     assert snapshot.accounting.wall_time_ms >= 5_000
 
 
-@pytest.mark.integration
 def test_concurrent_retries_create_one_search_invocation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -341,7 +336,6 @@ def test_concurrent_retries_create_one_search_invocation(
     assert event_types.count("REQUEST_REUSED") == 8
 
 
-@pytest.mark.integration
 def test_search_lifecycle_events_are_append_only(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
@@ -375,7 +369,6 @@ def test_search_lifecycle_events_are_append_only(tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.integration
 def test_idempotency_key_cannot_be_rebound(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
@@ -402,7 +395,6 @@ def test_idempotency_key_cannot_be_rebound(tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.integration
 def test_search_pauses_and_resumes_without_duplicate_lineage(
     tmp_path: Path,
 ) -> None:
@@ -438,7 +430,6 @@ def test_search_pauses_and_resumes_without_duplicate_lineage(
     assert len(set(completed.archive_page_uris)) == 4
 
 
-@pytest.mark.integration
 def test_interrupted_search_recovers_from_checkpoint_without_chat_state(
     tmp_path: Path,
 ) -> None:
@@ -498,7 +489,6 @@ def test_interrupted_search_recovers_from_checkpoint_without_chat_state(
     assert len(set(completed.archive_page_uris)) == 4
 
 
-@pytest.mark.integration
 def test_interrupted_cancellation_remains_cancelled_after_recovery(
     tmp_path: Path,
 ) -> None:
@@ -560,7 +550,6 @@ def test_interrupted_cancellation_remains_cancelled_after_recovery(
     ]
 
 
-@pytest.mark.integration
 def test_corrupt_snapshot_is_quarantined_without_blocking_recovery(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -654,7 +643,6 @@ def test_corrupt_snapshot_is_quarantined_without_blocking_recovery(
     )
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_proposer_timeout_fails_closed(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
@@ -687,7 +675,6 @@ def test_proposer_timeout_fails_closed(tmp_path: Path) -> None:
     assert snapshot.archive_page_uris == ()
 
 
-@pytest.mark.integration
 def test_malformed_proposal_fails_without_evidence_promotion(
     tmp_path: Path,
 ) -> None:
@@ -716,7 +703,6 @@ def test_malformed_proposal_fails_without_evidence_promotion(
     assert snapshot.archive_page_uris == ()
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_partial_iteration_accounting_survives_malformed_candidate(
     tmp_path: Path,
@@ -745,7 +731,6 @@ def test_partial_iteration_accounting_survives_malformed_candidate(
     assert snapshot.accounting.evaluated_candidates == 0
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("entrypoint", "detail", "case_id"),
     [
@@ -793,7 +778,6 @@ def test_search_plugin_failures_remain_operational(
     assert snapshot.archive_page_uris == ()
 
 
-@pytest.mark.integration
 def test_terminal_archive_failure_marks_search_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -827,7 +811,6 @@ def test_terminal_archive_failure_marks_search_error(
     assert "fixture archive failure" in caplog.text
 
 
-@pytest.mark.integration
 def test_plugin_cannot_widen_operator_batch_policy(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     kernel.search.max_batch_size = 1
@@ -854,7 +837,6 @@ def test_plugin_cannot_widen_operator_batch_policy(tmp_path: Path) -> None:
     assert snapshot.accounting.proposed_candidates == 0
 
 
-@pytest.mark.integration
 def test_search_batch_respects_evaluator_limit(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     kernel.evaluation.max_batch_size = 2
@@ -877,7 +859,6 @@ def test_search_batch_respects_evaluator_limit(tmp_path: Path) -> None:
     assert snapshot.accounting.iterations == 2
 
 
-@pytest.mark.integration
 def test_search_batch_respects_archive_parent_limit(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(kernel)
@@ -901,7 +882,6 @@ def test_search_batch_respects_archive_parent_limit(tmp_path: Path) -> None:
         assert len(kernel.store.get(page_uri).manifest.parents) <= 6
 
 
-@pytest.mark.integration
 def test_refiner_cannot_claim_verification(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(
@@ -928,7 +908,6 @@ def test_refiner_cannot_claim_verification(tmp_path: Path) -> None:
     assert snapshot.archive_page_uris == ()
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_verified_counterexample_feedback_reaches_refiner(
@@ -985,7 +964,6 @@ def test_verified_counterexample_feedback_reaches_refiner(
     )
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_supporting_checker_decision_is_not_counted_as_counterexample(

@@ -6,13 +6,10 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import pytest
 from tests.conftest import _freeze_kernel_store
 
 from jacobian.kernel import JacobianKernel
 from jacobian.store import ArtifactStore
-
-pytestmark = pytest.mark.integration
 
 
 def _copy_and_check_store(

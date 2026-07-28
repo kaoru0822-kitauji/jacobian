@@ -15,11 +15,7 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 from jacobian.plugin_execution import PluginExecutionResult
 
-pytestmark = pytest.mark.integration
 
-
-@pytest.mark.integration
-@pytest.mark.contract
 def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scope(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
@@ -64,8 +60,6 @@ def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scop
     assert trace.payload["local_minimality_scope"] == scope
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
@@ -83,8 +77,6 @@ def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
     assert scope["untested_vertex_deletions"] or scope["untested_edge_deletions"]
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimality(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
@@ -103,8 +95,6 @@ def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimalit
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_graph_counterexample_shrink_requires_compatible_registered_checker(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
@@ -132,8 +122,6 @@ def test_graph_counterexample_shrink_requires_compatible_registered_checker(
     assert result.diagnostics[0].code == "GRAPH_PROPERTY_CHECKER_INVALID"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
@@ -151,8 +139,6 @@ def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
     assert result.diagnostics[0].code == "GRAPH_SHRINK_INPUT_INVALID"
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
@@ -171,8 +157,6 @@ def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
     assert "exact single-vertex deletion" in result.output["attempts"][0]["detail"]
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 @pytest.mark.slow
 def test_graph_counterexample_shrink_order_is_deterministic(
     tmp_path: Path, kernel_store_template_with_references: Path

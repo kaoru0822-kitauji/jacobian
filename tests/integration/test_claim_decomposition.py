@@ -48,7 +48,6 @@ def _invoke(kernel: JacobianKernel, capability_id: str, source_uri: str):
     )
 
 
-@pytest.mark.integration
 def test_conjunction_split_preserves_order_grouping_and_reconstructs(
     tmp_path: Path,
 ) -> None:
@@ -83,7 +82,6 @@ def test_conjunction_split_preserves_order_grouping_and_reconstructs(
     )
 
 
-@pytest.mark.integration
 def test_conjunction_split_preserves_duplicate_subtrees_as_occurrences(
     tmp_path: Path,
 ) -> None:
@@ -102,7 +100,6 @@ def test_conjunction_split_preserves_duplicate_subtrees_as_occurrences(
     ]
 
 
-@pytest.mark.integration
 def test_implication_obligations_are_directional_and_reconstruct(
     tmp_path: Path,
 ) -> None:
@@ -130,7 +127,6 @@ def test_implication_obligations_are_directional_and_reconstruct(
     assert reconstruct(record) == root
 
 
-@pytest.mark.integration
 def test_reconstruction_rejects_tampered_ordered_child(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
     root = LogicalClaimNode(
@@ -149,7 +145,6 @@ def test_reconstruction_rejects_tampered_ordered_child(tmp_path: Path) -> None:
         reconstruct(tampered)
 
 
-@pytest.mark.integration
 @pytest.mark.parametrize(
     ("capability_id", "connective"),
     [

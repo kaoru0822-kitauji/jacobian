@@ -290,7 +290,6 @@ def installation(tmp_path: Path):
     return adapters, installed, store
 
 
-@pytest.mark.integration
 def test_decide_capability_finds_positive_linear(installation) -> None:
     adapters, _installed, _store = installation
     decide, _verify = adapters
@@ -322,7 +321,6 @@ def test_decide_capability_finds_positive_linear(installation) -> None:
     )
 
 
-@pytest.mark.integration
 def test_decide_capability_detects_root_in_interval(installation) -> None:
     adapters, _installed, _store = installation
     decide, _verify = adapters
@@ -346,7 +344,6 @@ def test_decide_capability_detects_root_in_interval(installation) -> None:
     assert result.output["sign_changes_at_hi"] == 0
 
 
-@pytest.mark.integration
 def test_decide_capability_detects_endpoint_root(installation) -> None:
     adapters, _installed, _store = installation
     decide, _verify = adapters
@@ -368,7 +365,6 @@ def test_decide_capability_detects_endpoint_root(installation) -> None:
     assert result.output["endpoint_root"] is True
 
 
-@pytest.mark.integration
 def test_verify_capability_confirms_positive_decision(installation) -> None:
     adapters, _installed, _store = installation
     decide, verify = adapters
@@ -414,7 +410,6 @@ def test_verify_capability_confirms_positive_decision(installation) -> None:
     assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
 
 
-@pytest.mark.integration
 def test_verify_capability_refutes_false_positive_claim(installation) -> None:
     adapters, _installed, _store = installation
     _decide, verify = adapters

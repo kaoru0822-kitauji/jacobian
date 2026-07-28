@@ -13,7 +13,6 @@ _ARTIFACT_URI = "artifact://sha256/" + "1" * 64
 _CHECKER_URI = "checker://sha256/" + "2" * 64
 
 
-@pytest.mark.contract
 def test_graph_shrink_request_requires_a_registered_checker_and_reducer() -> None:
     with pytest.raises(ValidationError):
         GraphCounterexampleShrinkRequest(
@@ -25,7 +24,6 @@ def test_graph_shrink_request_requires_a_registered_checker_and_reducer() -> Non
         )
 
 
-@pytest.mark.contract
 def test_graph_shrink_contract_cannot_claim_unchecked_local_minimality() -> None:
     with pytest.raises(ValidationError):
         GraphLocalMinimalityScope(
@@ -37,7 +35,6 @@ def test_graph_shrink_contract_cannot_claim_unchecked_local_minimality() -> None
         )
 
 
-@pytest.mark.contract
 def test_accepted_graph_reduction_requires_verification_record() -> None:
     with pytest.raises(ValidationError):
         GraphReductionAttempt(

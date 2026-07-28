@@ -9,8 +9,6 @@ from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_artifact_put_validates_against_registered_json_schema(
     tmp_path: Path,
 ) -> None:
@@ -54,7 +52,6 @@ def test_artifact_put_validates_against_registered_json_schema(
     assert store.get(artifact.artifact_uri).payload == {"value": 1}
 
 
-@pytest.mark.integration
 def test_artifact_put_distinguishes_duplicate_parents_from_missing_descriptors(
     tmp_path: Path,
 ) -> None:

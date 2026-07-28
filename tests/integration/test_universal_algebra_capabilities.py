@@ -60,7 +60,6 @@ def _left_projection_problem() -> dict[str, object]:
     }
 
 
-@pytest.mark.integration
 def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
     tmp_path: Path,
 ) -> None:
@@ -79,7 +78,6 @@ def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
     assert validated.target_law.law_id == "associative"
 
 
-@pytest.mark.integration
 def test_evaluate_laws_returns_exact_truth_and_counterexample(
     tmp_path: Path,
 ) -> None:
@@ -137,7 +135,6 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
     assert verified.output["verification_record_uri"]
 
 
-@pytest.mark.integration
 def test_complete_request_validation_precedes_artifact_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -167,7 +164,6 @@ def test_complete_request_validation_precedes_artifact_writes(
     assert artifact_put_calls == 0
 
 
-@pytest.mark.integration
 def test_countermodel_search_composes_with_independent_law_replay(
     tmp_path: Path,
 ) -> None:
@@ -218,7 +214,6 @@ def test_countermodel_search_composes_with_independent_law_replay(
     assert verified.output["conclusion"] == Conclusion.TRUE.value
 
 
-@pytest.mark.integration
 def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
     tmp_path: Path,
 ) -> None:
@@ -243,7 +238,6 @@ def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
     assert "conclusion" not in search.output
 
 
-@pytest.mark.integration
 def test_countermodel_request_validation_precedes_artifact_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -278,7 +272,6 @@ def test_countermodel_request_validation_precedes_artifact_writes(
     assert artifact_put_calls == 0
 
 
-@pytest.mark.integration
 def test_finite_magma_table_enumeration_is_exact_and_canonical(
     tmp_path: Path,
 ) -> None:
@@ -308,7 +301,6 @@ def test_finite_magma_table_enumeration_is_exact_and_canonical(
     assert set(enumeration.manifest.parents) == set(result.output["table_uris"])
 
 
-@pytest.mark.integration
 def test_finite_magma_table_enumeration_handles_order_one(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path)
 
@@ -324,7 +316,6 @@ def test_finite_magma_table_enumeration_handles_order_one(tmp_path: Path) -> Non
     assert table.payload["table"] == [[0]]
 
 
-@pytest.mark.integration
 def test_finite_magma_table_enumeration_rejects_unsupported_order_before_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

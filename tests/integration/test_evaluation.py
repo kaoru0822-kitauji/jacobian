@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from jacobian.artifacts import ArtifactService
 from jacobian.claims import ClaimValidationService
 from jacobian.contracts.claims import ClaimSpec
@@ -15,8 +13,6 @@ from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
 
-@pytest.mark.integration
-@pytest.mark.contract
 def test_exact_exhaustive_evaluation_remains_unverified(tmp_path: Path) -> None:
     service, claim_uri, candidate_uri, plugin_id = _evaluation_fixture(tmp_path)
 

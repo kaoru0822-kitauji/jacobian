@@ -20,7 +20,6 @@ from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import cadical_provider_runtime
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
 

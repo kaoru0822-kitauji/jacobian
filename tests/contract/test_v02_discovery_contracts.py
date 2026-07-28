@@ -14,7 +14,6 @@ from jacobian.contracts.polytope import (
 )
 
 
-@pytest.mark.contract
 def test_incomplete_enumeration_page_requires_a_progress_cursor() -> None:
     with pytest.raises(ValidationError, match="next_cursor"):
         PluginEnumerationPage(
@@ -24,7 +23,6 @@ def test_incomplete_enumeration_page_requires_a_progress_cursor() -> None:
         )
 
 
-@pytest.mark.contract
 def test_complete_enumeration_page_rejects_a_cursor() -> None:
     with pytest.raises(ValidationError, match="cannot carry next_cursor"):
         PluginEnumerationPage(
@@ -35,7 +33,6 @@ def test_complete_enumeration_page_rejects_a_cursor() -> None:
         )
 
 
-@pytest.mark.contract
 def test_polytope_inputs_require_canonical_exact_rationals() -> None:
     with pytest.raises(ValidationError, match="reduced"):
         FiniteGeneratorSet(
@@ -44,7 +41,6 @@ def test_polytope_inputs_require_canonical_exact_rationals() -> None:
         )
 
 
-@pytest.mark.contract
 def test_polytope_projection_rejects_duplicate_coordinates() -> None:
     with pytest.raises(ValidationError, match="unique"):
         PolytopeSeparateRequest(
@@ -54,7 +50,6 @@ def test_polytope_projection_rejects_duplicate_coordinates() -> None:
         )
 
 
-@pytest.mark.contract
 def test_exhaustive_snapshot_requires_complete_enumerator_report() -> None:
     with pytest.raises(ValidationError, match="complete enumerator"):
         ExperimentSnapshot(
@@ -79,7 +74,6 @@ def test_exhaustive_snapshot_requires_complete_enumerator_report() -> None:
         )
 
 
-@pytest.mark.contract
 def test_terminal_experiment_state_requires_its_matching_stop_reason() -> None:
     with pytest.raises(ValidationError, match="state and stop reason disagree"):
         ExperimentSnapshot(

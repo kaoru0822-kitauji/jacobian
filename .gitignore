@@ -20,6 +20,8 @@ Thumbs.db
 # Python development artifacts
 .coverage
 .coverage.*
+.test_durations*
+.ci/*duration*.json
 coverage.json
 coverage.xml
 .hypothesis/

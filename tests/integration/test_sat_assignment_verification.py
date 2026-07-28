@@ -67,7 +67,6 @@ def _verify(kernel: JacobianKernel, assignment_uri: str):
     )
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     tmp_path: Path,
@@ -109,7 +108,6 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     }
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
     tmp_path: Path,
@@ -127,7 +125,6 @@ def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
     assert result.assurance.verification_record_uri is None
 
 
-@pytest.mark.integration
 def test_sat_assignment_verify_requires_operator_authorized_checker(
     tmp_path: Path,
 ) -> None:
@@ -140,7 +137,6 @@ def test_sat_assignment_verify_requires_operator_authorized_checker(
     }
 
 
-@pytest.mark.integration
 def test_misbound_assignment_artifact_fails_before_checker_dispatch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -173,7 +169,6 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
     assert called is False
 
 
-@pytest.mark.integration
 def test_checker_timeout_cannot_create_a_sat_conclusion(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -194,7 +189,6 @@ def test_checker_timeout_cannot_create_a_sat_conclusion(
     assert result.assurance.verification_record_uri is None
 
 
-@pytest.mark.integration
 def test_checker_error_cannot_create_a_sat_conclusion(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -43,7 +43,6 @@ def _atlas_graph_uri(kernel: JacobianKernel, order: int, limit: int = 2) -> list
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.integration
 def test_compose_complement_returns_computed_graph_artifact(
     tmp_path: Path,
 ) -> None:
@@ -101,7 +100,6 @@ def test_compose_complement_returns_computed_graph_artifact(
     assert result.output["composition_artifact_uri"] in result.artifact_uris
 
 
-@pytest.mark.integration
 def test_compose_disjoint_union_combines_two_graphs(tmp_path: Path) -> None:
     kernel = _kernel_with_composition(tmp_path)
     graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
@@ -133,7 +131,6 @@ def test_compose_disjoint_union_combines_two_graphs(tmp_path: Path) -> None:
     assert right_uri in rel.target_artifact_uris
 
 
-@pytest.mark.integration
 def test_compose_join_adds_all_cross_edges(tmp_path: Path) -> None:
     kernel = _kernel_with_composition(tmp_path)
     graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
@@ -160,7 +157,6 @@ def test_compose_join_adds_all_cross_edges(tmp_path: Path) -> None:
     assert composition.payload["backend"] == "networkx.join"
 
 
-@pytest.mark.integration
 def test_compose_lexicographic_product_doubles_vertex_count(tmp_path: Path) -> None:
     kernel = _kernel_with_composition(tmp_path)
     graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
@@ -185,7 +181,6 @@ def test_compose_lexicographic_product_doubles_vertex_count(tmp_path: Path) -> N
     assert composition.payload["backend"] == "networkx.lexicographic_product"
 
 
-@pytest.mark.integration
 def test_compose_rejects_missing_right_graph_for_binary_operation(
     tmp_path: Path,
 ) -> None:
@@ -208,7 +203,6 @@ def test_compose_rejects_missing_right_graph_for_binary_operation(
     assert result.diagnostics[0].code == "INVALID_COMPOSITION_REQUEST"
 
 
-@pytest.mark.integration
 def test_compose_rejects_right_graph_for_unary_complement(
     tmp_path: Path,
 ) -> None:
@@ -232,7 +226,6 @@ def test_compose_rejects_right_graph_for_unary_complement(
     assert result.diagnostics[0].code == "INVALID_COMPOSITION_REQUEST"
 
 
-@pytest.mark.integration
 def test_compose_rejects_nonexistent_graph_artifact(tmp_path: Path) -> None:
     kernel = _kernel_with_composition(tmp_path)
     fake_uri = "artifact://sha256/" + "0" * 64
@@ -257,7 +250,6 @@ def test_compose_rejects_nonexistent_graph_artifact(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.integration
 def test_enumerate_returns_complete_atlas_catalog_with_boundary(
     tmp_path: Path,
 ) -> None:
@@ -317,7 +309,6 @@ def test_enumerate_returns_complete_atlas_catalog_with_boundary(
         assert entry["graph_uri"] in result.artifact_uris
 
 
-@pytest.mark.integration
 def test_enumerate_paginates_with_limit_and_offset(tmp_path: Path) -> None:
     kernel = _kernel_with_composition(tmp_path)
 
@@ -348,7 +339,6 @@ def test_enumerate_paginates_with_limit_and_offset(tmp_path: Path) -> None:
     assert first_uris.isdisjoint(second_uris)
 
 
-@pytest.mark.integration
 def test_enumerate_rejects_order_outside_backend_boundary(
     tmp_path: Path,
 ) -> None:
@@ -366,7 +356,6 @@ def test_enumerate_rejects_order_outside_backend_boundary(
     assert result.diagnostics[0].code == "INVALID_REQUEST"
 
 
-@pytest.mark.integration
 def test_enumerate_order_zero_returns_single_empty_graph(tmp_path: Path) -> None:
     kernel = _kernel_with_composition(tmp_path)
 

@@ -9,7 +9,6 @@ from jacobian.kernel import JacobianKernel
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
 
-@pytest.mark.integration
 def test_isomorphic_graphs_share_one_canonical_object(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]
@@ -46,7 +45,6 @@ def test_isomorphic_graphs_share_one_canonical_object(tmp_path: Path) -> None:
     assert first_result.result.assurance.verification.value == "UNVERIFIED"
 
 
-@pytest.mark.integration
 def test_nonisomorphic_graphs_have_distinct_canonical_keys(tmp_path: Path) -> None:
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]

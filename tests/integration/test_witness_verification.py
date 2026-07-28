@@ -128,7 +128,6 @@ def _graph_case(
     )
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_checker_failure_does_not_expose_internal_exception_text(
     tmp_path: Path,
@@ -156,7 +155,6 @@ def test_checker_failure_does_not_expose_internal_exception_text(
     assert "secret" not in result.execution.detail
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.parametrize(
     ("checker_entrypoint", "expected_detail"),
@@ -194,7 +192,6 @@ def test_invalid_checker_responses_explain_recovery(
     assert result.execution.detail == expected_detail
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_checker_output_limit_explains_recovery(tmp_path: Path) -> None:
     _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
@@ -216,7 +213,6 @@ def test_checker_output_limit_explains_recovery(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 def test_checker_diagnostic_limit_explains_recovery(tmp_path: Path) -> None:
     _, service, checker_id, claim_uri, candidate_uri, witness_uri, _ = _graph_case(
@@ -239,7 +235,6 @@ def test_checker_diagnostic_limit_explains_recovery(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.integration
 def test_missing_verification_artifact_is_rejected_with_recovery(
     tmp_path: Path,
 ) -> None:
@@ -263,7 +258,6 @@ def test_missing_verification_artifact_is_rejected_with_recovery(
     assert result.assurance.verification is Verification.UNVERIFIED
 
 
-@pytest.mark.integration
 def test_corrupt_verification_artifact_is_an_operational_failure(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -293,7 +287,6 @@ def test_corrupt_verification_artifact_is_an_operational_failure(
     assert "blob digest mismatch" in caplog.text
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_omitted_path_witness_is_independently_verified(tmp_path: Path) -> None:
@@ -313,7 +306,6 @@ def test_omitted_path_witness_is_independently_verified(tmp_path: Path) -> None:
     assert result.verification_record_uri is not None
 
 
-@pytest.mark.integration
 def test_witness_checker_cannot_certify_artifacts_outside_its_request(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -364,7 +356,6 @@ def test_witness_checker_cannot_certify_artifacts_outside_its_request(
         assert "outside its verification request" in result.input.errors[0]
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_valid_witness_rebound_to_another_candidate_is_rejected(
@@ -408,7 +399,6 @@ def test_valid_witness_rebound_to_another_candidate_is_rejected(
     )
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_witness_without_bound_artifact_parents_is_rejected(
@@ -443,7 +433,6 @@ def test_witness_without_bound_artifact_parents_is_rejected(
     assert result.input.status.value == "REJECTED"
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_schema_label_cannot_authorize_an_invalid_candidate(tmp_path: Path) -> None:
@@ -476,7 +465,6 @@ def test_schema_label_cannot_authorize_an_invalid_candidate(tmp_path: Path) -> N
     assert result.input.status.value == "REJECTED"
 
 
-@pytest.mark.integration
 @pytest.mark.subprocess
 @pytest.mark.conformance
 def test_revocation_during_checker_execution_prevents_commit(
