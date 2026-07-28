@@ -7,6 +7,7 @@ from jacobian.contracts.geometry import (
     LinePairRequest,
     PointLineRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.geometry._support import geometry_operation
 from jacobian.domains.geometry.operations import (
     line_intersection,
@@ -24,6 +25,7 @@ LINE_CAPABILITIES = (
         line_predicate(lambda first, second: bool(first.is_parallel(second))),
         "geometry",
         "line",
+        invocation_examples=(example("parallel_horizontal_lines", "Check two horizontal parallel lines.", {"first_line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}}, "second_line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "1", "den": "1"}}}}),),
     ),
     geometry_operation(
         "geometry.lines.decide.perpendicular",
@@ -34,6 +36,7 @@ LINE_CAPABILITIES = (
         line_predicate(lambda first, second: bool(first.is_perpendicular(second))),
         "geometry",
         "line",
+        invocation_examples=(example("perpendicular_axes", "Check perpendicular coordinate axes.", {"first_line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}}, "second_line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}}}}),),
     ),
     geometry_operation(
         "geometry.lines.compute.intersection",
@@ -44,6 +47,7 @@ LINE_CAPABILITIES = (
         line_intersection,
         "geometry",
         "intersection",
+        invocation_examples=(example("crossing_diagonals", "Intersect two crossing lines.", {"first_line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "2", "den": "1"}, "y": {"num": "2", "den": "1"}}}, "second_line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "2", "den": "1"}}, "second": {"x": {"num": "2", "den": "1"}, "y": {"num": "0", "den": "1"}}}}),),
     ),
     geometry_operation(
         "geometry.line.compute.projection",
@@ -54,5 +58,6 @@ LINE_CAPABILITIES = (
         projection,
         "geometry",
         "construction",
+        invocation_examples=(example("projection_to_x_axis", "Project (1,2) onto the x-axis.", {"point": {"x": {"num": "1", "den": "1"}, "y": {"num": "2", "den": "1"}}, "line": {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}}}),),
     ),
 )
