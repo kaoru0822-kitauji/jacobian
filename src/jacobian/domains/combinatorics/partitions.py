@@ -30,7 +30,11 @@ PARTITION_CAPABILITIES = (
         "combinatorics",
         "partition",
         invocation_examples=(
-            example("stirling_first_5_2", "Compute the unsigned Stirling number for n=5, k=2.", {"n": 5, "k": 2}),
+            example(
+                "stirling_first_5_2",
+                "Compute the unsigned Stirling number for n=5, k=2.",
+                {"n": 5, "k": 2},
+            ),
         ),
     ),
     combinatorics_operation(
@@ -43,7 +47,11 @@ PARTITION_CAPABILITIES = (
         "combinatorics",
         "partition",
         invocation_examples=(
-            example("stirling_second_5_2", "Compute the Stirling number for n=5, k=2.", {"n": 5, "k": 2}),
+            example(
+                "stirling_second_5_2",
+                "Compute the Stirling number for n=5, k=2.",
+                {"n": 5, "k": 2},
+            ),
         ),
     ),
     combinatorics_operation(
@@ -69,7 +77,9 @@ PARTITION_CAPABILITIES = (
         "combinatorics",
         "partition",
         invocation_examples=(
-            example("partition_number_6", "Count the additive partitions of 6.", {"n": 6}),
+            example(
+                "partition_number_6", "Count the additive partitions of 6.", {"n": 6}
+            ),
         ),
     ),
     combinatorics_operation(

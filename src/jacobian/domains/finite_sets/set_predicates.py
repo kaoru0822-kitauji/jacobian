@@ -23,7 +23,14 @@ SET_PREDICATE_CAPABILITIES = (
         "finite-set",
         "predicate",
         invocation_examples=(
-            example("subset_1_2_of_1_2_3", "Check a finite-set subset relation.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["1", "2", "3"]}}),
+            example(
+                "subset_1_2_of_1_2_3",
+                "Check a finite-set subset relation.",
+                {
+                    "left": {"elements": ["1", "2"]},
+                    "right": {"elements": ["1", "2", "3"]},
+                },
+            ),
         ),
     ),
     finite_set_operation(
@@ -36,7 +43,14 @@ SET_PREDICATE_CAPABILITIES = (
         "finite-set",
         "predicate",
         invocation_examples=(
-            example("proper_subset_1_2_of_1_2_3", "Check a proper finite-set subset relation.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["1", "2", "3"]}}),
+            example(
+                "proper_subset_1_2_of_1_2_3",
+                "Check a proper finite-set subset relation.",
+                {
+                    "left": {"elements": ["1", "2"]},
+                    "right": {"elements": ["1", "2", "3"]},
+                },
+            ),
         ),
     ),
     finite_set_operation(
@@ -49,7 +63,11 @@ SET_PREDICATE_CAPABILITIES = (
         "finite-set",
         "predicate",
         invocation_examples=(
-            example("disjoint_1_2_and_3_4", "Check whether two finite sets are disjoint.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["3", "4"]}}),
+            example(
+                "disjoint_1_2_and_3_4",
+                "Check whether two finite sets are disjoint.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["3", "4"]}},
+            ),
         ),
     ),
 )

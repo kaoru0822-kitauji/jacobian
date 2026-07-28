@@ -23,7 +23,11 @@ SET_CARDINALITY_CAPABILITIES = (
         "finite-set",
         "counting",
         invocation_examples=(
-            example("left_cardinality_1_2_3", "Count elements in the left finite set.", {"left": {"elements": ["1", "2", "3"]}, "right": {"elements": ["2"]}}),
+            example(
+                "left_cardinality_1_2_3",
+                "Count elements in the left finite set.",
+                {"left": {"elements": ["1", "2", "3"]}, "right": {"elements": ["2"]}},
+            ),
         ),
     ),
     finite_set_operation(
@@ -36,7 +40,11 @@ SET_CARDINALITY_CAPABILITIES = (
         "finite-set",
         "counting",
         invocation_examples=(
-            example("intersection_cardinality_1_2_and_2_3", "Count common elements of two finite sets.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}}),
+            example(
+                "intersection_cardinality_1_2_and_2_3",
+                "Count common elements of two finite sets.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
+            ),
         ),
     ),
     finite_set_operation(
@@ -49,7 +57,11 @@ SET_CARDINALITY_CAPABILITIES = (
         "finite-set",
         "counting",
         invocation_examples=(
-            example("union_cardinality_1_2_and_2_3", "Count elements in the union of two finite sets.", {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}}),
+            example(
+                "union_cardinality_1_2_and_2_3",
+                "Count elements in the union of two finite sets.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["2", "3"]}},
+            ),
         ),
     ),
 )

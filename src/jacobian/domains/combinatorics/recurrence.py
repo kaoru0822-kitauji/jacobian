@@ -43,7 +43,11 @@ RECURRENCE_CAPABILITIES = (
         "fibonacci",
         "recurrence-boundary",
         invocation_examples=(
-            example("fibonacci_pair_8", "Return consecutive Fibonacci values at n=8.", {"n": 8}),
+            example(
+                "fibonacci_pair_8",
+                "Return consecutive Fibonacci values at n=8.",
+                {"n": 8},
+            ),
         ),
     ),
     combinatorics_operation(

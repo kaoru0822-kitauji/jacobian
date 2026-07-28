@@ -33,9 +33,7 @@ COUNTING_CAPABILITIES = (
         factorial,
         "combinatorics",
         "counting",
-        invocation_examples=(
-            example("factorial_5", "Compute 5 factorial.", {"n": 5}),
-        ),
+        invocation_examples=(example("factorial_5", "Compute 5 factorial.", {"n": 5}),),
     ),
     combinatorics_operation(
         "combinatorics.compute.double_factorial",
@@ -103,7 +101,11 @@ COUNTING_CAPABILITIES = (
         "combinatorics",
         "counting",
         invocation_examples=(
-            example("permutations_5_2", "Count ordered selections of 2 from 5.", {"n": 5, "k": 2}),
+            example(
+                "permutations_5_2",
+                "Count ordered selections of 2 from 5.",
+                {"n": 5, "k": 2},
+            ),
         ),
     ),
     combinatorics_operation(
@@ -142,7 +144,11 @@ COUNTING_CAPABILITIES = (
         "combinatorics",
         "counting",
         invocation_examples=(
-            example("central_binomial_4", "Compute the central binomial coefficient for n=4.", {"n": 4}),
+            example(
+                "central_binomial_4",
+                "Compute the central binomial coefficient for n=4.",
+                {"n": 4},
+            ),
         ),
     ),
     combinatorics_operation(
@@ -155,7 +161,11 @@ COUNTING_CAPABILITIES = (
         "combinatorics",
         "counting",
         invocation_examples=(
-            example("compositions_5_2", "Count positive compositions of 5 into 2 parts.", {"n": 5, "k": 2}),
+            example(
+                "compositions_5_2",
+                "Count positive compositions of 5 into 2 parts.",
+                {"n": 5, "k": 2},
+            ),
         ),
     ),
 )
