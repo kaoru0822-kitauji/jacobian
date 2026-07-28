@@ -94,3 +94,36 @@ checker authorization out of plugins and search code.
   unrelated kernel startup and catalog entries remain available.
 - Keep `deep_review.md` local; it is ignored and is not design source material.
 - Keep worked cases in reference scenarios and benchmarks.
+
+## Cursor Cloud specific instructions
+
+This is a Python 3.12 project managed with `uv`; the base image ships Python 3.12
+and Node but not `uv`. The startup update script installs `uv` (to
+`~/.local/bin`, added to `PATH` via `.bashrc`/`.profile`) and runs
+`uv sync --locked --dev`, so dependencies (including the `flint`/`smt` dev-group
+backends `python-flint`, `cvc5`, `z3-solver`) are already installed when a
+session starts. Standard dev, test, lint, and build commands live in the
+`Makefile` (`make help`) and `CONTRIBUTING.md`; use those rather than duplicating
+them.
+
+Non-obvious caveats:
+
+- If a fresh non-login shell can't find `uv`, run `export PATH="$HOME/.local/bin:$PATH"`.
+- Optional backends are absent by default and their capabilities are correctly
+  omitted: `lean.check` prints `lean.check is not installed` on `init`/startup
+  (the pinned Lean 4.31.0 toolchain is not installed), and external solver
+  executables (`cadical`, `drat-trim`, `carcara`) are not on `PATH`. This does
+  not break the kernel, catalog, or the core test suites. Only install Lean/elan
+  or those executables when specifically exercising `lean_runtime` tests or SAT
+  proof-artifact capabilities.
+- `make test-fast` is the quick core loop; `make check` (lint + typecheck +
+  test-fast) is the pre-push gate. Never run bare `uv run pytest` across the whole
+  suite — it mixes `lean_runtime` tests into the xdist pool and pytest rejects it;
+  use the `make test-*` targets instead.
+- Quick end-to-end smoke of the product surface: `uv run jacobian --state-dir .jacobian init`
+  (CLI), or start the MCP server with
+  `uv run jacobian-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --allow-anonymous`
+  (remote transports require `--allow-anonymous` or `--auth-tokens-file`; stdio is
+  the default transport). The runnable
+  `docs/tutorials/first-verified-result.md` script exercises the full
+  find-then-independently-verify flow.
