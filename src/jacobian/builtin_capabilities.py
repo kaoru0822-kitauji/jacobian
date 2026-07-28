@@ -70,6 +70,23 @@ class KnowledgeSearchAdapter:
             read_only=True,
             records_episode=False,
             tags=("memory", "retrieval"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="graph_counterexample_episodes",
+                    description=(
+                        "Search prior graph episodes without changing their "
+                        "recorded assurance."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input=KnowledgeSearchRequest.model_validate(
+                        {
+                            "query": "counterexample",
+                            "domains": ["graph"],
+                            "limit": 5,
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property

@@ -1800,6 +1800,67 @@ class PolynomialMapInverseSynthesizeAdapter:
             input_schema=model_schema(PolynomialMapInverseSynthesisRequest),
             output_schema=model_schema(PolynomialMapInverseSynthesisOutput),
             tags=("polynomial", "map", "inverse", "synthesis", "exact-rational"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="triangular_inverse",
+                    description=(
+                        "Synthesize and independently check the degree-two "
+                        "inverse of (x + y^2, y)."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input=PolynomialMapInverseSynthesisRequest.model_validate(
+                        {
+                            "forward_map": {
+                                "variables": ["x", "y"],
+                                "coordinates": [
+                                    {
+                                        "terms": [
+                                            {
+                                                "coefficient": {
+                                                    "num": "1",
+                                                    "den": "1",
+                                                },
+                                                "exponents": [1, 0],
+                                            },
+                                            {
+                                                "coefficient": {
+                                                    "num": "1",
+                                                    "den": "1",
+                                                },
+                                                "exponents": [0, 2],
+                                            },
+                                        ]
+                                    },
+                                    {
+                                        "terms": [
+                                            {
+                                                "coefficient": {
+                                                    "num": "1",
+                                                    "den": "1",
+                                                },
+                                                "exponents": [0, 1],
+                                            }
+                                        ]
+                                    },
+                                ],
+                            },
+                            "source_variables": ["x", "y"],
+                            "target_variables": ["u", "v"],
+                            "inverse_degree_bound": 2,
+                            "support_mode": "FULL_TOTAL_DEGREE",
+                            "solver": "sympy.solve",
+                            "limits": {
+                                "timeout_ms": 10000,
+                                "max_inverse_degree": 4,
+                                "max_composition_degree": 32,
+                                "max_unknown_coefficients": 64,
+                                "max_coefficient_equations": 512,
+                                "max_residual_terms": 1024,
+                            },
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property
@@ -2324,6 +2385,54 @@ class PolynomialMapInverseVerifyAdapter:
             input_schema=model_schema(PolynomialMapInverseVerifyRequest),
             output_schema=model_schema(PolynomialMapInverseVerifyOutput),
             tags=("polynomial", "map", "inverse", "verification", "exact-rational"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="identity_map_inverse",
+                    description=(
+                        "Independently verify the identity map as its own "
+                        "two-sided inverse over QQ."
+                    ),
+                    mode=CapabilityMode.VERIFY,
+                    input=PolynomialMapInverseVerifyRequest.model_validate(
+                        {
+                            "forward_map": {
+                                "variables": ["x"],
+                                "coordinates": [
+                                    {
+                                        "terms": [
+                                            {
+                                                "coefficient": {
+                                                    "num": "1",
+                                                    "den": "1",
+                                                },
+                                                "exponents": [1],
+                                            }
+                                        ]
+                                    }
+                                ],
+                            },
+                            "inverse_map": {
+                                "variables": ["u"],
+                                "coordinates": [
+                                    {
+                                        "terms": [
+                                            {
+                                                "coefficient": {
+                                                    "num": "1",
+                                                    "den": "1",
+                                                },
+                                                "exponents": [1],
+                                            }
+                                        ]
+                                    }
+                                ],
+                            },
+                            "source_variables": ["x"],
+                            "target_variables": ["u"],
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property

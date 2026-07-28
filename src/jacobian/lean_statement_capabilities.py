@@ -41,6 +41,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderRuntime,
     CapabilityRequest,
@@ -462,6 +463,23 @@ class LeanStatementProposalAdapter:
             input_schema=LeanStatementProposalRequest.model_json_schema(),
             output_schema=LeanStatementProposalOutput.model_json_schema(),
             tags=("lean", "statement", "elaboration", "proposal", "proposition"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="elaborate_true",
+                    description=(
+                        "Elaborate the proposition True in the pinned CORE "
+                        "environment without assessing its truth."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input=LeanStatementProposalRequest.model_validate(
+                        {
+                            "operation": "ELABORATE_PROPOSITION",
+                            "environment": "CORE",
+                            "proposed_statement": "True",
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property
