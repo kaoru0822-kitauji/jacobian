@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pytest import MonkeyPatch
 from tests.helpers.rationals import rational_payload as _q
 
@@ -24,6 +25,8 @@ from jacobian.domains.matrix_lattice.lattice import reduce_lattice_basis
 from jacobian.domains.matrix_lattice.operations import compute_smith_normal_form
 from jacobian.kernel import JacobianKernel
 from jacobian.operations import ComputedSuccess, OperationExecutionFailure
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _qq(rows: list[list[int]]) -> dict[str, object]:

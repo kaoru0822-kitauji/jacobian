@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.schema_validation import check_draft202012_schema
 from jacobian.store import ArtifactStore, StoreError
 
 
@@ -34,7 +35,7 @@ class SchemaValidationError(SchemaRegistryError):
         self.required_field = required_field
 
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=1024)
 def _model_schema_bytes(model: type[BaseModel]) -> bytes:
     """Generate one canonical JSON Schema per Pydantic model and process."""
 
@@ -62,7 +63,7 @@ def _reject_external_references(value: Any) -> None:
             _reject_external_references(nested)
 
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=1024)
 def _validated_schema(canonical_schema: bytes) -> Draft202012Validator:
     """Validate and compile one exact schema definition per process.
 
@@ -75,7 +76,7 @@ def _validated_schema(canonical_schema: bytes) -> Draft202012Validator:
     normalized = loads_strict_json(canonical_schema)
     _reject_external_references(normalized)
     try:
-        Draft202012Validator.check_schema(normalized)
+        check_draft202012_schema(canonical_schema)
     except SchemaError as exc:
         raise SchemaRegistryError("invalid Draft 2020-12 JSON Schema") from exc
     return Draft202012Validator(normalized, format_checker=FormatChecker())

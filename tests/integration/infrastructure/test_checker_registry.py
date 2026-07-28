@@ -96,6 +96,59 @@ def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> No
     ]
 
 
+def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    registry = CheckerRegistry(store)
+    checker = registry.authorize(
+        name="reject-all-v1",
+        entrypoint="jacobian_checkers.reject:check",
+        evidence_kind="WITNESS",
+        format_id="example.witness",
+        format_version="1",
+        claim_schema_uris=(CLAIM_SCHEMA_A,),
+        semantics_uris=(CLAIM_SCHEMA_A,),
+        candidate_schema_uris=(CLAIM_SCHEMA_A,),
+    )
+
+    with (
+        store.transaction(),
+        pytest.raises(
+            CheckerRegistryError,
+            match="policy must be locked before the store transaction",
+        ),
+    ):
+        registry.revoke(checker.checker_id, reason="wrong lock order")
+
+    with (
+        store.transaction(),
+        pytest.raises(
+            CheckerRegistryError,
+            match="policy must be locked before the store transaction",
+        ),
+        registry.verification_guard(
+            checker.checker_id,
+            expected_digest=checker.executable_digest,
+        ),
+    ):
+        pass
+
+    path_backed_registry = CheckerRegistry(store.db_path)
+    with (
+        store.transaction(),
+        pytest.raises(
+            CheckerRegistryError,
+            match="policy must be locked before the store transaction",
+        ),
+    ):
+        path_backed_registry.revoke(checker.checker_id, reason="wrong legacy order")
+
+    with registry.policy_transaction(), store.transaction():
+        registry.revoke(checker.checker_id, reason="ordered policy change")
+
+    with pytest.raises(CheckerRevokedError):
+        registry.require_active(checker.checker_id)
+
+
 def test_concurrent_duplicate_authorize_is_serialized(tmp_path: Path) -> None:
     registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
     barrier = threading.Barrier(8)

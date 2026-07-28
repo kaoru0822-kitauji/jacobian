@@ -10,6 +10,22 @@ This audit records the 2026-07-26 local measurements used to restore a short
 edit-test loop without weakening Jacobian's verification boundary. Timings are
 machine-local observations, not performance gates.
 
+## 2026-07-28 bootstrap follow-up
+
+A later profile found that kernel construction had regressed to 31.6 seconds
+for a fresh core store. The main costs were repeated JSON Schema metaschema
+validation and one durable SQLite transaction per descriptor. Bootstrap now
+reuses exact-schema validation within the process and installs the capability
+portfolio through one store-owned transaction. Ordinary artifact writes retain
+their existing durability boundary.
+
+On the same local host, fresh core construction fell from 31.6 to 13.0 seconds.
+Attaching to a copied core snapshot took 0.79 seconds, and adding authorized
+references to a copied core snapshot took 3.68 seconds. `make test-fast` fell
+from 237.91 seconds wall time to 56.55 seconds while selecting 591 tests; three
+exhaustive cases were explicitly marked `slow` and excluded from that lane.
+These are single-host observations, not timing gates.
+
 ## Measured lanes
 
 | Lane | Selected tests | Observed wall time | Purpose |
@@ -68,8 +84,8 @@ make validate-full
 
 `make test-fast` is the normal edit loop. Use focused integration tests while
 changing stores, adapters, plugins, subprocesses, or checker execution.
-`make check` combines fast Ruff checks with that loop. Dependency and
-dead-code analysis, strict typing, and package builds remain available through
+`make check` combines fast Ruff checks, strict typing, and that loop.
+Dependency and dead-code analysis and package builds remain available through
 `make check-static` but are CI-owned rather than routine local handoff work.
 `make test` runs the complete non-Lean suite, and `make test-lean` keeps the
 memory-heavy backend serial. Neither is a routine pre-push requirement; CI

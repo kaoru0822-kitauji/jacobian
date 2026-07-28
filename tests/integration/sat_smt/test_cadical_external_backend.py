@@ -12,6 +12,7 @@ from jacobian.provider_runtime import CADICAL_VERSION, cadical_provider_runtime
 
 pytestmark = [
     pytest.mark.external_backend,
+    pytest.mark.usefixtures("initialized_kernel_store"),
     pytest.mark.skipif(
         shutil.which("cadical") is None,
         reason="CaDiCaL is not installed",

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
@@ -16,6 +18,8 @@ from jacobian.contracts.geometry import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.geometry import GEOMETRY_BUNDLE
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 ZERO = {"num": "0", "den": "1"}
 ONE = {"num": "1", "den": "1"}

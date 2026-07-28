@@ -1,11 +1,15 @@
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def test_representative_exact_domain_results(tmp_path: Path) -> None:

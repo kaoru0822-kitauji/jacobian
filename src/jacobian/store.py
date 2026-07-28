@@ -7,6 +7,7 @@ import logging
 import os
 import sqlite3
 import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -70,6 +71,30 @@ class StoredArtifact:
     manifest: ArtifactManifest
     payload: Any
     canonical_bytes: bytes
+
+
+class _ConnectionState(threading.local):
+    """Per-thread ownership for one explicit store transaction."""
+
+    def __init__(self) -> None:
+        self.transaction: sqlite3.Connection | None = None
+        self.blob_lock_depth = 0
+
+
+class _ActiveTransactionPaths(threading.local):
+    """Database paths transaction-owned by the current thread."""
+
+    def __init__(self) -> None:
+        self.paths: set[Path] = set()
+
+
+_ACTIVE_TRANSACTION_PATHS = _ActiveTransactionPaths()
+
+
+def transaction_active_for(database_path: str | Path) -> bool:
+    """Whether this thread owns a store transaction for one database."""
+
+    return Path(database_path).resolve() in _ACTIVE_TRANSACTION_PATHS.paths
 
 
 def _sha256(data: bytes) -> str:
@@ -165,7 +190,9 @@ class ArtifactStore:
         self.staging_root = self.root / "staging"
         self.db_path = self.root / "metadata.sqlite3"
         self.blob_lock_path = self.root / ".blob-quota.lock"
+        self.transaction_recovery_path = self.root / ".transaction-recovery"
         self._validated_blobs: dict[str, tuple[int, int, int, int, int]] = {}
+        self._connection_state = _ConnectionState()
         self.blob_root.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
         self._initialize_database()
@@ -177,7 +204,14 @@ class ArtifactStore:
         return connection
 
     @contextmanager
-    def _connection(self) -> Iterator[sqlite3.Connection]:
+    def connection(self) -> Iterator[sqlite3.Connection]:
+        """Yield this thread's transaction connection or one owned connection."""
+
+        transaction = self._connection_state.transaction
+        if transaction is not None:
+            yield transaction
+            return
+
         connection = self._connect()
         try:
             with connection:
@@ -185,8 +219,73 @@ class ArtifactStore:
         finally:
             connection.close()
 
+    @property
+    def transaction_active(self) -> bool:
+        """Whether this thread is inside an explicit store transaction."""
+
+        return self._connection_state.transaction is not None
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Commit related store operations through one SQLite transaction.
+
+        Blob publication remains content-addressed and durable. If metadata
+        rolls back, quota accounting is reconciled against the published blob
+        set before control returns to the caller.
+        """
+
+        if self._connection_state.transaction is not None:
+            raise StoreError("nested artifact store transactions are unsupported")
+
+        with self._exclusive_blob_lock():
+            self._write_transaction_recovery_marker()
+            connection = self._connect()
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                self._connection_state.transaction = connection
+                _ACTIVE_TRANSACTION_PATHS.paths.add(self.db_path)
+                yield
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                self._connection_state.transaction = None
+                _ACTIVE_TRANSACTION_PATHS.paths.discard(self.db_path)
+                connection.close()
+                try:
+                    self._reconcile_blob_quota(force=True)
+                except Exception:
+                    _LOGGER.exception(
+                        "failed to reconcile blob accounting after transaction rollback"
+                    )
+                raise
+            else:
+                self._connection_state.transaction = None
+                _ACTIVE_TRANSACTION_PATHS.paths.discard(self.db_path)
+                connection.close()
+                self._remove_transaction_recovery_marker()
+
+    def _sync_root_directory(self) -> None:
+        if os.name == "nt":  # pragma: no cover - Windows has no directory fsync
+            return
+        descriptor = os.open(self.root, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    def _write_transaction_recovery_marker(self) -> None:
+        with self.transaction_recovery_path.open("wb") as marker:
+            marker.write(b"jacobian artifact transaction in progress\n")
+            marker.flush()
+            os.fsync(marker.fileno())
+        self._sync_root_directory()
+
+    def _remove_transaction_recovery_marker(self) -> None:
+        self.transaction_recovery_path.unlink(missing_ok=True)
+        self._sync_root_directory()
+
     def _initialize_database(self) -> None:
-        with self._exclusive_blob_lock(), self._connection() as connection:
+        with self._exclusive_blob_lock(), self.connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.executescript(
                 """
@@ -281,11 +380,12 @@ class ArtifactStore:
                     total += after.st_size
         return total
 
-    def _reconcile_blob_quota(self) -> None:
+    def _reconcile_blob_quota(self, *, force: bool = False) -> None:
         """Recover quota accounting only after an interrupted blob mutation."""
 
         with self._exclusive_blob_lock():
-            with self._connection() as connection:
+            force = force or self.transaction_recovery_path.exists()
+            with self.connection() as connection:
                 row = connection.execute(
                     """
                     SELECT reconciliation_required
@@ -293,15 +393,24 @@ class ArtifactStore:
                     WHERE id = 0
                     """
                 ).fetchone()
+                if force:
+                    connection.execute(
+                        """
+                        UPDATE blob_quota
+                        SET reconciliation_required = 1
+                        WHERE id = 0
+                        """
+                    )
             if (
                 os.name != "nt"
+                and not force
                 and row is not None
                 and not bool(row["reconciliation_required"])
             ):
                 return
 
             total = self._scan_blob_bytes_committed()
-            with self._connection() as connection:
+            with self.connection() as connection:
                 connection.execute(
                     """
                     INSERT INTO blob_quota (
@@ -316,9 +425,11 @@ class ArtifactStore:
                     """,
                     (total,),
                 )
+            if self.transaction_recovery_path.exists():
+                self._remove_transaction_recovery_marker()
 
     def _blob_bytes_committed(self) -> int:
-        with self._connection() as connection:
+        with self.connection() as connection:
             row = connection.execute(
                 """
                 SELECT size_bytes, reconciliation_required
@@ -340,7 +451,7 @@ class ArtifactStore:
         *,
         reconciliation_required: bool,
     ) -> None:
-        with self._connection() as connection:
+        with self.connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE blob_quota
@@ -354,7 +465,7 @@ class ArtifactStore:
             raise ArtifactIntegrityError("artifact store quota metadata is invalid")
 
     def _mark_blob_quota_reconciled(self) -> None:
-        with self._connection() as connection:
+        with self.connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE blob_quota
@@ -369,11 +480,21 @@ class ArtifactStore:
     def _exclusive_blob_lock(self) -> Iterator[None]:
         """Serialize quota accounting and blob publication across processes."""
 
-        with self.blob_lock_path.open("a+b") as lock_file:
-            _lock_file(lock_file)
+        if self._connection_state.blob_lock_depth:
+            self._connection_state.blob_lock_depth += 1
             try:
                 yield
             finally:
+                self._connection_state.blob_lock_depth -= 1
+            return
+
+        with self.blob_lock_path.open("a+b") as lock_file:
+            _lock_file(lock_file)
+            self._connection_state.blob_lock_depth = 1
+            try:
+                yield
+            finally:
+                self._connection_state.blob_lock_depth = 0
                 _unlock_file(lock_file)
 
     def _write_blob(self, data: bytes) -> str:
@@ -494,7 +615,7 @@ class ArtifactStore:
         return digest
 
     def _artifact_exists(self, artifact_uri: str) -> bool:
-        with self._connection() as connection:
+        with self.connection() as connection:
             row = connection.execute(
                 "SELECT 1 FROM artifacts WHERE artifact_uri = ?",
                 (artifact_uri,),
@@ -634,7 +755,7 @@ class ArtifactStore:
         self._write_blob(canonical_bytes)
         self._write_blob(manifest_bytes)
 
-        with self._connection() as connection:
+        with self.connection() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO artifacts (
@@ -692,7 +813,7 @@ class ArtifactStore:
 
         manifest_digest = _digest_from_uri(artifact_uri)
         committed_references: set[str] = set()
-        with self._connection() as connection:
+        with self.connection() as connection:
             row = connection.execute(
                 "SELECT * FROM artifacts WHERE artifact_uri = ?",
                 (artifact_uri,),
@@ -780,7 +901,7 @@ class ArtifactStore:
     def find_by_object_digest(self, object_digest: str) -> tuple[str, ...]:
         """Return every artifact URI carrying a mathematical object digest."""
 
-        with self._connection() as connection:
+        with self.connection() as connection:
             rows = connection.execute(
                 """
                 SELECT artifact_uri

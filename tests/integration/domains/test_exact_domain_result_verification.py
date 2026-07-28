@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.contracts.capabilities import (
@@ -12,6 +13,8 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _poly(*coefficients_ascending: int) -> dict[str, object]:

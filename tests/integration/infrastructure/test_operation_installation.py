@@ -27,6 +27,8 @@ from jacobian.operations import (
 )
 from jacobian.provider_runtime import known_provider_runtime
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 class _SyntheticRequest(ContractModel):
     value: int = Field(ge=0, le=100)
