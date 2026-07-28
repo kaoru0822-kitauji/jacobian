@@ -23,6 +23,7 @@ SEQUENCE_PREDICATE_CAPABILITIES = (
         decide_arithmetic,
         "sequence",
         "predicate",
+        invocation_examples=(example("arithmetic_sequence", "Recognize an arithmetic sequence.", {"values": ["3", "6", "9", "12"]}),),
     ),
     sequence_operation(
         "sequence.decide.geometric",
@@ -50,6 +51,7 @@ SEQUENCE_PREDICATE_CAPABILITIES = (
         decide_nondecreasing,
         "sequence",
         "predicate",
+        invocation_examples=(example("nondecreasing_sequence", "Check nondecreasing order.", {"values": ["1", "1", "3", "5"]}),),
     ),
     sequence_operation(
         "sequence.decide.strictly_increasing",
@@ -60,5 +62,6 @@ SEQUENCE_PREDICATE_CAPABILITIES = (
         decide_strictly_increasing,
         "sequence",
         "predicate",
+        invocation_examples=(example("strictly_increasing_sequence", "Check strict increase.", {"values": ["1", "2", "4", "7"]}),),
     ),
 )
