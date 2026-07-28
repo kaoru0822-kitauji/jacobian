@@ -64,9 +64,13 @@ make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
+make test-stress
+make test-ordering PYTEST_ARGS=--randomly-seed=17
 make check
 make check-static
 make validate-full
+make docs-linkcheck
+make clean
 ```
 
 `make test-fast` collects only unit, contract, checker, and reference
@@ -76,6 +80,9 @@ seeded stores. Avoid inventing layer-marker filters; directory Make targets own
 suite selection.
 Named contract, checker, MCP, and storage targets
 make common affected areas discoverable without adding another test runner.
+`make test-stress` and `make test-ordering` reproduce the scheduled validation
+property-repeat and ordering-seed lanes using locked `pytest-repeat` and
+`pytest-randomly`.
 `make check` combines fast Ruff, strict typing, and non-integration test
 feedback as the routine local pre-push gate. Developers should push after it and
 let CI own dependency and dead-code analysis, package builds, and exhaustive
@@ -91,7 +98,7 @@ wait on isolated subprocesses. Bare `pytest` stays single-process so focused
 debugging and Lean reproduction do not accidentally start a worker pool. `make test-failed` is the failure-recovery
 shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
 execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
-120-second per-test backstop prevents local deadlocks from hanging indefinitely
+60-second per-test backstop prevents local deadlocks from hanging indefinitely
 and is disabled automatically by pytest-timeout while debugging. Parallel
 workers retain separate `tmp_path` roots; tests that add shared external state
 must coordinate it explicitly.
@@ -165,9 +172,9 @@ matrices are conditional. Maintainer-applied `ci:full` and `ci:lean` labels can
 force all lanes or add Lean respectively; label events re-trigger CI so the
 override applies without an extra push. Overrides are additive only and
 cannot weaken the plan selected from changed paths. A scheduled validation
-workflow separately exercises repeated property/stateful stress, alternate
-ordering seeds, optional providers, and the core performance benchmark outside
-the pull-request critical path.
+workflow separately exercises repeated property stress, alternate ordering
+seeds, optional providers, and the core performance benchmark outside the
+pull-request critical path.
 
 The build lane produces the source distribution and wheel once. Its dependent
 package-validation job downloads that artifact and exercises both installed
@@ -606,18 +613,20 @@ tests/
 ```
 
 Package-local tests are appropriate for focused behavior. Cross-package trust
-tests live in the top-level groups above. Runtime pytest markers currently in
-use are:
+tests live in the top-level groups above. Runtime pytest markers currently in use are:
 
 ```text
 external_backend
 lean_runtime
 slow
 property
-stateful
-benchmark
-agent_eval
+subprocess
+conformance
+differential
 ```
+
+Reserved markers declared for future or out-of-suite selection (no routine
+tests use them yet) are `stateful`, `benchmark`, and `agent_eval`.
 
 Layer markers such as `integration` or `end_to_end` are intentionally not used;
 select those suites by directory through Make targets.

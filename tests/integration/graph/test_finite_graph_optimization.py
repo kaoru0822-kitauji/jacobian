@@ -87,6 +87,13 @@ def _edge_subsets(graph: nx.Graph[str]):
 
 
 def _brute_force_optimum(capability_id: str, graph: nx.Graph[str]) -> int:
+    assert len(graph) <= 6, (
+        f"brute-force oracle is exponential; got {len(graph)} vertices (max 6)"
+    )
+    assert graph.number_of_edges() <= 10, (
+        "brute-force oracle is exponential; "
+        f"got {graph.number_of_edges()} edges (max 10)"
+    )
     if capability_id == "graph.domination.minimum.compute":
         return min(
             len(subset)

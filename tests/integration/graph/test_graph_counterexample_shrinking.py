@@ -4,8 +4,6 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
@@ -157,7 +155,6 @@ def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
     assert "exact single-vertex deletion" in result.output["attempts"][0]["detail"]
 
 
-@pytest.mark.slow
 def test_graph_counterexample_shrink_order_is_deterministic(
     tmp_path: Path, kernel_store_template_with_references: Path
 ) -> None:

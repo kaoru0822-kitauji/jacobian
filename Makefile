@@ -9,7 +9,7 @@ INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
 PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
 
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed duplicate-code npm-test todo-check coverage build check precommit check-static validate-full agent-eval bench-core
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static validate-full agent-eval bench-core clean docs-linkcheck
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -80,6 +80,12 @@ test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_A
 test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) --lf -m "not lean_runtime" $(PYTEST_ARGS)
 
+test-stress: ## Reproduce scheduled property stress (pytest-repeat --count=3).
+	$(UV_RUN) pytest -m "property and not lean_runtime" --count=3 $(PYTEST_ARGS)
+
+test-ordering: ## Reproduce scheduled ordering with PYTEST_ARGS=--randomly-seed=N.
+	$(UV_RUN) pytest -m "not lean_runtime" $(PYTEST_ARGS)
+
 duplicate-code: ## Run the CI duplicate-code detector locally.
 	npx --yes jscpd@5.0.12 --config .jscpd.json .
 
@@ -118,3 +124,14 @@ agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 
 bench-core: ## Run the core performance benchmark script.
 	$(UV_RUN) python benchmarks/benchmark_core.py
+
+clean: ## Remove local caches, build outputs, and coverage artifacts.
+	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build htmlcov
+	rm -f .coverage .coverage.*
+	find src tests benchmarks -type d -name '__pycache__' -prune -exec rm -rf {} +
+	find . -maxdepth 2 -type d -name '*.egg-info' -prune -exec rm -rf {} +
+
+docs-linkcheck: ## Check relative Markdown links in project docs.
+	npx --yes markdown-link-check@3.15.0 \
+		--config .markdown-link-check.json -q \
+		README.md AGENTS.md CONTRIBUTING.md docs

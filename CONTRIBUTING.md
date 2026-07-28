@@ -143,9 +143,11 @@ For documentation-only changes, run:
 ```sh
 git diff --check
 git diff -- AGENTS.md README.md CONTRIBUTING.md docs/
+make docs-linkcheck
 ```
 
-Verify every relative Markdown link before submitting the change.
+Verify every relative Markdown link before submitting the change
+(`make docs-linkcheck` checks project Markdown offline).
 
 ## Releases
 
@@ -170,7 +172,10 @@ Test directories define semantic ownership: `tests/unit`, `tests/contract`,
 `tests/integration` and `tests/end_to_end` form the integration suite. Use
 `make test-core` and `make test-integration` as the canonical entry points.
 Markers describe runtime traits such as `lean_runtime`, `slow`, `subprocess`, or
-`external_backend`; they do not duplicate directory ownership.
+`external_backend`; they do not duplicate directory ownership. Reproduce the
+scheduled validation lanes locally with `make test-stress` and
+`make test-ordering PYTEST_ARGS=--randomly-seed=17` (locked `pytest-repeat` and
+`pytest-randomly` are part of the dev environment).
 
 CI change impact is declared in `.github/ci-impact.json`. Its matching rules are
 additive, so a path may require several suites. Integration timing history is a

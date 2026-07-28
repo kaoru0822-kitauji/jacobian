@@ -145,8 +145,8 @@ Source-to-suite impact is declared in `.github/ci-impact.json` and tested
 against tracked source files. Unknown paths still fail closed. Each CI run
 reports workflow elapsed time (the observable critical path), summed runner
 minutes, and its longest job, making both reviewer latency and compute growth
-visible. Scheduled lanes exercise repeated property/stateful tests, alternate
-orders, optional providers, and the core performance benchmark outside the
+visible. Scheduled lanes exercise repeated property tests, alternate orders,
+optional providers, and the core performance benchmark outside the
 pull-request critical path.
 
 Do not run the complete non-Lean and Lean suites repeatedly during

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
@@ -95,6 +95,7 @@ def test_nesting_beyond_the_configured_limit_is_rejected() -> None:
 
 
 @pytest.mark.property
+@settings(max_examples=100)
 @given(
     numerator=st.integers(min_value=-(10**100), max_value=10**100),
     denominator=st.integers(min_value=1, max_value=10**50),

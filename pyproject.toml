@@ -47,6 +47,8 @@ dev = [
     "pyperf>=2.9,<3",
     "pytest>=8.3,<10",
     "pytest-cov>=6,<8",
+    "pytest-randomly==4.1.0",
+    "pytest-repeat==0.9.4",
     "pytest-rerunfailures>=14,<17",
     "pytest-split==0.11.0",
     "pytest-timeout>=2.4,<3",
@@ -63,7 +65,7 @@ packages = ["src/jacobian", "src/jacobian_checkers"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
-timeout = 120
+timeout = 60
 markers = [
     "property: property-based invariant tests",
     "subprocess: clean-process replay tests",
