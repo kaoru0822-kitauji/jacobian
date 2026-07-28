@@ -64,6 +64,10 @@ class CheckerExecutionError(RuntimeError):
     """An authorized checker failed operationally."""
 
 
+class CheckerExecutionCancelledError(CheckerExecutionError):
+    """An authorized checker was cancelled by its caller."""
+
+
 _CHECKER_OUTPUT_TOO_LARGE = (
     "The checker returned too much data. Retry with a smaller input "
     "and inspect the local checker log if the limit is reached again."
@@ -92,6 +96,7 @@ _CHECKER_TIMEOUT = (
     "The checker did not finish within the allowed time. "
     "Retry with a smaller input and inspect the local checker log if it times out again."
 )
+_CHECKER_CANCELLED = "The checker was cancelled before returning a decision."
 
 
 def _digest_bytes(data: bytes) -> str:
@@ -253,6 +258,8 @@ class VerificationService:
                 cmd=[sys.executable, "-m", "jacobian.checker_worker", entrypoint],
                 timeout=effective_timeout,
             )
+        if completed.cancelled:
+            raise CheckerExecutionCancelledError(_CHECKER_CANCELLED)
         if completed.stdout_exceeded:
             raise CheckerExecutionError(_CHECKER_OUTPUT_TOO_LARGE)
         if completed.stderr_exceeded:
@@ -520,6 +527,12 @@ class VerificationService:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
                 detail=_CHECKER_TIMEOUT,
+                started=started,
+            )
+        except CheckerExecutionCancelledError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.CANCELLED,
+                detail=str(exc),
                 started=started,
             )
         except CheckerExecutableChangedError as exc:
@@ -807,6 +820,12 @@ class VerificationService:
                 detail=_CHECKER_TIMEOUT,
                 started=started,
             )
+        except CheckerExecutionCancelledError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.CANCELLED,
+                detail=str(exc),
+                started=started,
+            )
         except CheckerExecutableChangedError as exc:
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
@@ -1008,6 +1027,12 @@ class VerificationService:
                 detail=_CHECKER_TIMEOUT,
                 started=started,
             )
+        except CheckerExecutionCancelledError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.CANCELLED,
+                detail=str(exc),
+                started=started,
+            )
         except CheckerExecutableChangedError as exc:
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
@@ -1199,6 +1224,12 @@ class VerificationService:
             return self._operational_failure(
                 status=ExecutionStatus.TIMEOUT,
                 detail=_CHECKER_TIMEOUT,
+                started=started,
+            )
+        except CheckerExecutionCancelledError as exc:
+            return self._operational_failure(
+                status=ExecutionStatus.CANCELLED,
+                detail=str(exc),
                 started=started,
             )
         except CheckerExecutableChangedError as exc:

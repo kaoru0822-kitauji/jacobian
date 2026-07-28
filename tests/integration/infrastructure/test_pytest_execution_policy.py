@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parents[2]
+PROJECT_ROOT = Path(__file__).parents[3]
 
 
 def test_parallel_pytest_rejects_selected_lean_runtime_tests() -> None:
@@ -24,6 +24,7 @@ def test_parallel_pytest_rejects_selected_lean_runtime_tests() -> None:
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     assert completed.returncode == 4

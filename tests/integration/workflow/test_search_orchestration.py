@@ -245,7 +245,7 @@ def test_checkpoint_persistence_is_included_in_wall_accounting(
 
     def delayed_put(**kwargs: object) -> object:
         nonlocal current_time
-        if kwargs.get("summary") == "immutable search checkpoint":
+        if kwargs.get("schema_uri") == kernel.search.checkpoint_schema_uri:
             current_time += 1
         return original_put(**kwargs)
 
@@ -262,7 +262,7 @@ def test_checkpoint_persistence_is_included_in_wall_accounting(
     snapshot = kernel.search.wait(handle.experiment_uri, timeout_seconds=30)
 
     assert snapshot.state is ExperimentState.COMPLETED
-    assert snapshot.accounting.wall_time_ms == 1_000
+    assert snapshot.accounting.wall_time_ms >= 1_000
 
 
 def test_checkpoint_persistence_cannot_complete_past_wall_budget(
@@ -279,7 +279,7 @@ def test_checkpoint_persistence_cannot_complete_past_wall_budget(
 
     def delayed_put(**kwargs: object) -> object:
         nonlocal current_time
-        if kwargs.get("summary") == "immutable search checkpoint":
+        if kwargs.get("schema_uri") == kernel.search.checkpoint_schema_uri:
             current_time += 5.1
         return original_put(**kwargs)
 

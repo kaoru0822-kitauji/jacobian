@@ -100,3 +100,35 @@ def test_finite_partition_checker_rejects_unbound_relationship_metadata() -> Non
 
     assert decision["accepted"] is False
     assert "relationship metadata" in decision["detail"]
+
+
+def test_finite_partition_checker_rejects_binding_substitution() -> None:
+    request = _request(
+        cases=[
+            {"case_id": "left", "members": ["a", "b"]},
+            {"case_id": "right", "members": ["c", "d"]},
+        ]
+    )
+    rebound = dict(request["certificate"]["payload"]["bindings"])
+    rebound["scope_digest"] = "sha256:" + "9" * 64
+    request["certificate"]["payload"]["bindings"] = rebound
+
+    decision = check_partition(request)
+
+    assert decision["accepted"] is False
+    assert "bindings" in decision["detail"]
+
+
+def test_finite_partition_checker_rejects_unknown_format() -> None:
+    request = _request(
+        cases=[
+            {"case_id": "left", "members": ["a", "b"]},
+            {"case_id": "right", "members": ["c", "d"]},
+        ]
+    )
+    request["certificate"]["payload"]["format_version"] = "2"
+
+    decision = check_partition(request)
+
+    assert decision["accepted"] is False
+    assert "format" in decision["detail"]

@@ -5,10 +5,14 @@ import json
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
 import pytest
+from mcp.server.auth.settings import AuthSettings
+from pydantic import AnyHttpUrl
+from uvicorn import Config, Server
 
 from jacobian.adapters.mcp.remote import (
     StaticTokenGrant,
@@ -17,6 +21,7 @@ from jacobian.adapters.mcp.remote import (
     TenantKernelRouter,
     load_static_token_file,
 )
+from jacobian.adapters.mcp.server import create_server
 from jacobian.contracts.workspaces import (
     WorkspaceOpenRequest,
     WorkspaceQueryRequest,
@@ -37,10 +42,14 @@ def test_static_tokens_bind_distinct_authenticated_subjects() -> None:
     alpha = asyncio.run(verifier.verify_token("a" * 32))
     beta = asyncio.run(verifier.verify_token("b" * 32))
     unknown = asyncio.run(verifier.verify_token("c" * 32))
+    empty = asyncio.run(verifier.verify_token(""))
+    oversized = asyncio.run(verifier.verify_token("c" * 4096))
 
     assert alpha is not None and alpha.subject == "alpha"
     assert beta is not None and beta.subject == "beta"
     assert unknown is None
+    assert empty is None
+    assert oversized is None
 
 
 def test_remote_configuration_errors_name_the_rule_and_recovery(
@@ -233,49 +242,73 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
                 "tokens": [
                     {"tenant_id": "alpha", "token": "a" * 32},
                     {"tenant_id": "beta", "token": "b" * 32},
+                    {
+                        "tenant_id": "wrong-scope",
+                        "token": "s" * 32,
+                        "scopes": ["jacobian:other"],
+                    },
                 ]
             }
         ),
         encoding="utf-8",
     )
-    with socket.socket() as reserved:
-        reserved.bind(("127.0.0.1", 0))
-        port = int(reserved.getsockname()[1])
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "jacobian.adapters.mcp.server",
-            "--transport",
-            "streamable-http",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(port),
-            "--state-dir",
-            str(tmp_path / "state"),
-            "--auth-tokens-file",
-            str(token_file),
-            "--public-base-url",
-            f"http://127.0.0.1:{port}",
-            "--capability-adapter",
-            "tests.fixtures.capability_functions:create_adapter",
-        ],
-        cwd=Path.cwd(),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        _wait_for_port(port, process)
-        asyncio.run(_remote_tenant_scenario(port))
-    finally:
-        process.terminate()
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = int(listener.getsockname()[1])
+        public_base_url = f"http://127.0.0.1:{port}"
+        mcp_server = create_server(
+            tmp_path / "state",
+            tenant_isolation=True,
+            allow_anonymous=False,
+            token_verifier=StaticTokenVerifier(load_static_token_file(token_file)),
+            auth=AuthSettings(
+                issuer_url=AnyHttpUrl(public_base_url),
+                resource_server_url=AnyHttpUrl(f"{public_base_url}/mcp"),
+                required_scopes=["jacobian:use"],
+            ),
+            capability_adapter_entrypoints=(
+                "tests.fixtures.capability_functions:create_adapter",
+            ),
+        )
+        http_server = Server(
+            Config(
+                mcp_server.streamable_http_app(),
+                host="127.0.0.1",
+                port=port,
+                log_level="warning",
+            )
+        )
+        server_thread = threading.Thread(
+            target=http_server.run,
+            kwargs={"sockets": [listener]},
+            daemon=True,
+        )
+        server_thread.start()
         try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
+            _wait_for_server(http_server, server_thread)
+            asyncio.run(_remote_auth_rejections(port))
+            asyncio.run(_remote_tenant_scenario(port))
+        finally:
+            http_server.should_exit = True
+            server_thread.join(timeout=10)
+            assert not server_thread.is_alive()
+
+
+async def _remote_auth_rejections(port: int) -> None:
+    import httpx2
+
+    url = f"http://127.0.0.1:{port}/mcp"
+    async with httpx2.AsyncClient() as client:
+        unauthenticated = await client.post(url, json={})
+        wrong_scope = await client.post(
+            url,
+            json={},
+            headers={"Authorization": f"Bearer {'s' * 32}"},
+        )
+
+    assert unauthenticated.status_code == 401
+    assert wrong_scope.status_code == 403
 
 
 async def _remote_tenant_scenario(port: int) -> None:
@@ -327,15 +360,15 @@ async def _remote_tenant_scenario(port: int) -> None:
     assert await invoke("b" * 32, create=False) == 0
 
 
-def _wait_for_port(port: int, process: subprocess.Popen[str]) -> None:
+def _wait_for_server(
+    http_server: Server,
+    server_thread: threading.Thread,
+) -> None:
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
-        if process.poll() is not None:
-            stderr = process.stderr.read() if process.stderr is not None else ""
-            raise AssertionError(f"remote MCP server exited early: {stderr}")
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
-                return
-        except OSError:
-            time.sleep(0.1)
+        if not server_thread.is_alive():
+            raise AssertionError("remote MCP server exited early")
+        if http_server.started:
+            return
+        time.sleep(0.1)
     raise AssertionError("remote MCP server did not start")

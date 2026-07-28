@@ -16,10 +16,12 @@ _FORBIDDEN_PREFIXES = (
 
 @pytest.mark.conformance
 def test_independent_checkers_do_not_import_search_implementations() -> None:
-    checker_root = Path("src/jacobian_checkers")
+    checker_root = Path(__file__).parents[2] / "src" / "jacobian_checkers"
+    source_paths = sorted(checker_root.glob("*.py"))
+    assert source_paths, f"no checker sources found below {checker_root}"
     violations: list[str] = []
 
-    for source_path in sorted(checker_root.glob("*.py")):
+    for source_path in source_paths:
         tree = ast.parse(source_path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             imported: tuple[str, ...] = ()

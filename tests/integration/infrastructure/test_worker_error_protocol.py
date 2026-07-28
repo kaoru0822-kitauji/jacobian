@@ -44,6 +44,7 @@ def test_source_changes_cross_worker_boundary_as_typed_codes(
         input=b"{}",
         capture_output=True,
         check=False,
+        timeout=10,
     )
     response = loads_strict_json(completed.stdout)
 
@@ -83,6 +84,7 @@ def test_worker_code_cannot_self_report_a_source_change(
         input=b"{}",
         capture_output=True,
         check=False,
+        timeout=10,
     )
     response = loads_strict_json(completed.stdout)
 
