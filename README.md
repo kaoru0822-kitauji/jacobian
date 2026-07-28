@@ -232,8 +232,8 @@ output cannot become `VERIFIED` without a successful `lean.check`. See the
 <details>
 <summary><strong>macOS and Z3</strong></summary>
 
-The locked environment uses `z3-solver` 4.16.0.0. Its upstream macOS wheels
-target macOS 15 or newer on Apple silicon and Intel. On an older release, `uv`
+The locked environment uses `z3-solver` 5.0.0.0. Its upstream macOS wheels
+target macOS 13 or newer on Apple silicon and Intel. On an older release, `uv`
 falls back to a source build that requires CMake, `make`, and a C++20 compiler.
 
 Install the Xcode Command Line Tools and CMake before retrying `uv sync --dev`.
@@ -249,7 +249,7 @@ make --version
 ```
 
 See the
-[`z3-solver` 4.16.0.0 files on PyPI](https://pypi.org/project/z3-solver/4.16.0.0/#files)
+[`z3-solver` 5.0.0.0 files on PyPI](https://pypi.org/project/z3-solver/5.0.0.0/#files)
 for the upstream wheel tags.
 
 </details>
