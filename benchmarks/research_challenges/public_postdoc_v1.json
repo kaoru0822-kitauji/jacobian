@@ -1,0 +1,752 @@
+{
+  "schema_version": "1",
+  "suite_id": "jacobian.public_postdoc",
+  "suite_version": "1",
+  "title": "Public postdoctoral and research-frontier diagnostics for Jacobian",
+  "purpose": "PUBLIC_ANSWER_VISIBLE_DIAGNOSTIC",
+  "scored": false,
+  "knowledge_cutoff": "2026-07-27",
+  "portfolio_snapshot": {
+    "catalog_version": "1",
+    "catalog_digest": "sha256:86eb9b98078e5c2960b8fe4ad5c627938944a1a741482b89c9bf2855c6a59fd1",
+    "capability_count": 253,
+    "captured_at": "2026-07-27"
+  },
+  "source_inventory": {
+    "local_lead_file": "Math conjecture resources - Resources.tsv",
+    "sha256": "8ba22660e79d39d16020187edf7bf3a603160951ca8d940dad8bd1ba83d572ab",
+    "row_count_including_header": 707,
+    "redistribution": "NOT_REDISTRIBUTED_REFERENCE_ONLY",
+    "selection_method": "The local TSV was used only as a lead inventory. Candidate claims were rechecked against primary papers, formal artifacts, or author-maintained repositories; cases were then selected for research-level mathematical depth, explicit evaluator evidence, and coverage of current Jacobian strengths and boundaries."
+  },
+  "cases": [
+    {
+      "challenge_id": "jcb-postdoc-001",
+      "title": "Exact verification of the three-variable Keller-map collision",
+      "tier": "CLOSURE_CANDIDATE",
+      "domains": [
+        "commutative algebra",
+        "polynomial maps",
+        "exact rational computation"
+      ],
+      "research_context": "A recently announced explicit three-variable polynomial map supplies a finite disproof witness for the characteristic-zero Jacobian conjecture. This reproduction isolates the two exact obligations that Jacobian should already handle well.",
+      "problem_statement": "Over Q, define F=(F1,F2,F3) by F1=(1+2xy)^3 z+4y^2(1+2xy)(2+3xy), F2=y+3x(1+2xy)^2 z+12xy^2(2+3xy), and F3=-x+3x^2y+x^3z. Prove by exact computation that det(JF)=1. Then prove that p=(1,-3/4,13/4) and q=(-1,3/4,13/4) are distinct but F(p)=F(q)=(-1/8,0,0). State precisely what these finite checks establish and what additional authority would be required to label the result VERIFIED.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to solve this problem. Over Q let F1=(1+2xy)^3 z+4y^2(1+2xy)(2+3xy), F2=y+3x(1+2xy)^2 z+12xy^2(2+3xy), and F3=-x+3x^2y+x^3z. Prove by exact computation that det(JF)=1, and prove that the distinct points p=(1,-3/4,13/4) and q=(-1,3/4,13/4) both map to (-1/8,0,0). Use the most specific mathematical compute and checker capabilities available, report exact outputs and artifact URIs, and keep computation, mathematical conclusion, and independent verification status separate.",
+      "sources": [
+        {
+          "url": "https://github.com/deancureton/jacobian",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "FORMALIZATION",
+          "accessed": "2026-07-27",
+          "revision": "0d4a9212d874226ad81ce5a926becddfa94e6a88",
+          "license": "NO LICENSE DETECTED; REFERENCE ONLY"
+        },
+        {
+          "url": "https://github.com/DrAlexHarrison/jacobian-anatomy",
+          "kind": "CODE_ARTIFACT",
+          "role": "CERTIFICATE",
+          "accessed": "2026-07-27",
+          "revision": "main as inspected 2026-07-27; tagged releases available from the source",
+          "license": "MIT for code; CC BY 4.0 for prose"
+        },
+        {
+          "url": "https://github.com/google-deepmind/formal-conjectures/pull/4474",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "REVIEW",
+          "accessed": "2026-07-27",
+          "revision": "merged 2026-07-26",
+          "license": "Apache-2.0 repository"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "DISPROVED",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "EXACT_COMPUTATION",
+          "FORMAL_PROOF"
+        ],
+        "summary": "The displayed map has constant Jacobian determinant 1 and the two displayed rational points have the same image (-1/8,0,0). This is an explicit non-injectivity witness over Q and hence over characteristic zero; public Lean formalizations establish stronger field-uniform variants."
+      },
+      "jacobian_fit": {
+        "classification": "DIRECT",
+        "relevant_capabilities": [
+          "polynomial.map.compute_jacobian",
+          "polynomial.map.evaluate",
+          "polynomial.map.collision.verify"
+        ],
+        "expected_strength": "The current polynomial-map portfolio can compute the determinant and replay the supplied rational collision exactly.",
+        "known_boundary": "A computed determinant and collision are decisive mathematical evidence, but they are not automatically operator-authorized VERIFIED evidence. The run must not conflate a producer result with an independent checker."
+      },
+      "success_criteria": [
+        "Computes the full Jacobian determinant exactly as 1 rather than using numerical sampling.",
+        "Evaluates both rational points exactly and checks their inequality.",
+        "Uses a collision-specific verifier or explains the available verification boundary.",
+        "Concludes non-injectivity without claiming more assurance than the returned evidence supports."
+      ],
+      "fail_closed_conditions": [
+        "A timeout or polynomial expansion error is not evidence for or against the determinant identity.",
+        "Matching floating-point evaluations are not an exact collision certificate.",
+        "A producer status alone must not be promoted to VERIFIED."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-002",
+      "title": "Written on the Wall II Conjecture 200: a 14-vertex exact counterexample",
+      "tier": "CLOSURE_CANDIDATE",
+      "domains": [
+        "extremal graph theory",
+        "Hamiltonian paths",
+        "exact finite optimization"
+      ],
+      "research_context": "This small graph has a short structural proof and independent finite certificates. It probes whether an agent can combine graph construction, neighborhood invariants, exact maximum induced-tree computation, and a Hamiltonian obstruction.",
+      "problem_statement": "Let G be obtained from K_{6,8}, with parts L={0,1,2,3,4,5} and R={6,7,8,9,10,11,12,13}, by deleting the twelve edges (0,6),(0,8),(1,8),(1,11),(2,7),(2,12),(3,6),(3,11),(4,7),(4,13),(5,12),(5,13). Let tree(G) be the maximum number of vertices in an induced tree and let lambda_avg(G) be the average, over vertices v, of the independence number of the open neighborhood G[N(v)]. Verify exactly that G is connected, tree(G)=ceil(1+lambda_avg(G))=7, and G has no Hamiltonian path.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to solve this problem. Construct G from K_{6,8} with L={0,1,2,3,4,5}, R={6,7,8,9,10,11,12,13}, deleting (0,6),(0,8),(1,8),(1,11),(2,7),(2,12),(3,6),(3,11),(4,7),(4,13),(5,12),(5,13). Let tree(G) be the largest induced-tree order and lambda_avg(G) the average independence number of open neighborhoods. Verify exactly that G is connected, tree(G)=ceil(1+lambda_avg(G))=7, and G has no Hamiltonian path. Expose the maximizing witness and the upper-bound or exhaustive evidence; keep unsupported or incomplete searches as non-conclusions.",
+      "sources": [
+        {
+          "url": "https://github.com/openmikasa/wowii-conjecture-200",
+          "kind": "CODE_ARTIFACT",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "48d1f5c8ca13ba0b6872b87b9c6a5fb193303568",
+          "license": "MIT"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "COUNTEREXAMPLE_EXISTS",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "EXACT_COMPUTATION",
+          "FORMAL_PROOF",
+          "CHECKABLE_CERTIFICATE"
+        ],
+        "summary": "G is connected and bipartite with 36 edges, so all open neighborhoods are independent and lambda_avg=72/14=36/7. Its maximum induced-tree order is 7. A Hamiltonian path is impossible because a bipartite path uses part sizes differing by at most one, whereas the two parts have sizes 6 and 8."
+      },
+      "jacobian_fit": {
+        "classification": "DIRECT",
+        "relevant_capabilities": [
+          "graph.construct.compose",
+          "graph.compute.properties",
+          "graph.compute.neighborhood_independence",
+          "graph.induced_tree.maximum.compute"
+        ],
+        "expected_strength": "The graph is within the bounded exact portfolio and should yield an inspectable maximum induced-tree witness plus neighborhood statistics.",
+        "known_boundary": "The current portfolio has no dedicated Hamiltonian-path decider in the nearby set, so the alternation obstruction may remain an agent-owned proof step. Exact maximum output must expose completeness, not only a lower-bound witness."
+      },
+      "success_criteria": [
+        "Constructs exactly the specified 14-vertex graph.",
+        "Computes lambda_avg as 36/7 and its ceiling expression as 7.",
+        "Returns both a seven-vertex induced tree and exact evidence that no larger one exists.",
+        "Gives the bipartition-size obstruction to a Hamiltonian path."
+      ],
+      "fail_closed_conditions": [
+        "Finding a seven-vertex tree without a complete upper bound establishes only tree(G)>=7.",
+        "A heuristic failure to find a Hamiltonian path is not a proof of nonexistence.",
+        "Any truncated subset enumeration must remain incomplete."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-003",
+      "title": "Equational implication 4155 to 4658: finite countermodel discovery",
+      "tier": "CLOSURE_CANDIDATE",
+      "domains": [
+        "universal algebra",
+        "finite model search",
+        "equational logic"
+      ],
+      "research_context": "A small countermodel tests Jacobian's domain-owned universal-algebra search and law evaluator without requiring the model to know the public operation in advance.",
+      "problem_statement": "In the language of one binary operation ◇, determine whether the identity x◇y=((y◇x)◇x)◇y implies the identity (x◇y)◇y=(y◇x)◇x in all magmas. If not, find an explicit finite countermodel, give its full operation table or a closed formula, and exhibit an assignment refuting the target while the premise holds universally.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to determine whether every magma satisfying x◇y=((y◇x)◇x)◇y must satisfy (x◇y)◇y=(y◇x)◇x. Search for the smallest countermodel you can certify. If one is found, return the complete operation, verify the premise universally, and give a concrete assignment refuting the target. Treat a bounded search with no witness as only a bounded negative result.",
+      "sources": [
+        {
+          "url": "https://github.com/teorth/equational_theories",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "FORMALIZATION",
+          "accessed": "2026-07-27",
+          "revision": "7e276a2d05e84e3eef02432abfd0718e78f7abfa",
+          "license": "Apache-2.0"
+        },
+        {
+          "url": "https://teorth.github.io/equational_theories/",
+          "kind": "PRIMARY_PROBLEM",
+          "role": "STATEMENT",
+          "accessed": "2026-07-27",
+          "revision": "site snapshot corresponding to the inspected 2026-07-27 project",
+          "license": "Apache-2.0 project"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "DISPROVED",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "EXACT_COMPUTATION",
+          "FORMAL_PROOF"
+        ],
+        "summary": "There is a three-element countermodel on Z/3Z with a◇b=2a^2+a+b+2ab mod 3. It satisfies Equation 4155 universally and refutes Equation 4658; the public Equational Theories artifact checks the result in Lean."
+      },
+      "jacobian_fit": {
+        "classification": "DIRECT",
+        "relevant_capabilities": [
+          "universal_algebra.search.countermodel",
+          "universal_algebra.evaluate_laws"
+        ],
+        "expected_strength": "The known countermodel order is within the current bounded search envelope, and the law evaluator can replay both universal satisfaction and target failure.",
+        "known_boundary": "A found model needs a separately inspectable law-evaluation result. Absence at any chosen maximum order proves only nonexistence inside that finite scope."
+      },
+      "success_criteria": [
+        "Finds a finite magma rather than arguing from remembered classification data.",
+        "Verifies the premise for every ordered pair and the target failure for a concrete pair.",
+        "Reports the searched order range and whether minimality was actually established.",
+        "Preserves the distinction between a solver-produced model and independently replayed law evaluation."
+      ],
+      "fail_closed_conditions": [
+        "No model found within a bounded order is not a proof of implication.",
+        "A solver SAT status without a materialized operation and replay is insufficient.",
+        "Minimality may be claimed only if all smaller allowed orders were completely excluded."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-004",
+      "title": "Written on the Wall II Conjecture 194: discover an 18-vertex obstruction",
+      "tier": "COMPOSITIONAL_STRETCH",
+      "domains": [
+        "extremal graph theory",
+        "Hamiltonian paths",
+        "counterexample search"
+      ],
+      "research_context": "Unlike the supplied-witness closure cases, this task asks the agent to discover a compact structured counterexample while using exact graph invariants to guide and check the search.",
+      "problem_statement": "For a connected finite simple graph G, let alpha(G) be its independence number and let l_avg(G) be the average of alpha(G[N(v)]) over all open neighborhoods. Disprove the assertion that alpha(G)<=1+l_avg(G) forces G to have a Hamiltonian path. Produce an explicit graph with at most 20 vertices and prove every part of the counterexample exactly.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to disprove the following assertion: every connected finite simple graph G satisfying alpha(G)<=1+l_avg(G), where l_avg is the average independence number of open neighborhoods, has a Hamiltonian path. Find an explicit counterexample with at most 20 vertices. Return a reproducible graph encoding, exact values of alpha and l_avg, and a rigorous obstruction to a Hamiltonian path. Do not treat failed heuristic path search as a proof.",
+      "sources": [
+        {
+          "url": "https://github.com/google-deepmind/formal-conjectures/pull/4542",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "e37188008aad7c03cadbb460dfdaea9918bf8278",
+          "license": "Apache-2.0"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "COUNTEREXAMPLE_EXISTS",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "EXACT_COMPUTATION",
+          "FORMAL_PROOF"
+        ],
+        "summary": "One 18-vertex witness starts with a clique on 0 through 10, adds vertices 11 through 14 adjacent to every clique vertex, and attaches one leaf to each of 11, 12, and 14. It has alpha=4 and l_avg=3, while three leaves force any putative Hamiltonian path to have at least three endpoints."
+      },
+      "jacobian_fit": {
+        "classification": "PARTIAL",
+        "relevant_capabilities": [
+          "graph.construct.compose",
+          "graph.invariant.independence_number.compute",
+          "graph.compute.neighborhood_independence",
+          "graph.compute.properties"
+        ],
+        "expected_strength": "The installed graph portfolio can certify the premise for a proposed small witness and expose useful invariants during search.",
+        "known_boundary": "Counterexample strategy and the Hamiltonian obstruction remain agent-owned. There is no single workflow capability that should hide the proposed graph, invariant evidence, and obstruction boundary."
+      },
+      "success_criteria": [
+        "Produces a graph of at most 20 vertices with a complete edge description.",
+        "Computes alpha and every local neighborhood contribution exactly.",
+        "Proves connectedness and the premise alpha<=1+l_avg.",
+        "Uses a rigorous graph-theoretic obstruction, such as too many forced path endpoints, to rule out Hamiltonian paths."
+      ],
+      "fail_closed_conditions": [
+        "A graph that merely appears non-Hamiltonian under search is not a counterexample.",
+        "Approximate averages cannot certify the exact premise.",
+        "If invariant computation is incomplete, the conjecture remains undecided for that candidate."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-005",
+      "title": "A three-dimensional quartic counterexample to the Gaussian Moments Conjecture",
+      "tier": "COMPOSITIONAL_STRETCH",
+      "domains": [
+        "probability theory",
+        "complex Gaussian moments",
+        "formal power series"
+      ],
+      "research_context": "This all-exponents identity is far beyond checking finitely many moments. It tests whether an agent can combine exact polynomial algebra with a human-owned generating-function proof and clearly identify the missing symbolic-expectation operation.",
+      "problem_statement": "Let X1,X2,T be independent standard real Gaussian variables, Z=(X1+iX2)/sqrt(2), W=(X1-iX2)/sqrt(2), P=(1+Z)(W-(2+Z)T^2/2), and Q=Z. Prove for every integer m>=1 that E(P^m)=0 and E(QP^m)=m!. Conclude that this is a counterexample to the three-dimensional Gaussian Moments Conjecture. A finite list of checked moments is not a proof.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to prove the following exact all-orders claim. For independent standard real Gaussians X1,X2,T, set Z=(X1+iX2)/sqrt(2), W=(X1-iX2)/sqrt(2), P=(1+Z)(W-(2+Z)T^2/2), and Q=Z. Prove that E(P^m)=0 and E(QP^m)=m! for every m>=1, and explain why this disproves the three-dimensional Gaussian Moments Conjecture. Use exact algebraic capabilities wherever they apply, but explicitly separate finite checks from the symbolic argument valid for all m.",
+      "sources": [
+        {
+          "url": "https://arxiv.org/abs/2607.18186",
+          "kind": "PAPER",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "arXiv:2607.18186v1",
+          "license": "arXiv perpetual non-exclusive license; reference only"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "EXACT_IDENTITY",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "HUMAN_SOLUTION"
+        ],
+        "summary": "For every polynomial A and m>=1, E(A(Z)P^m)=m![z^m]A(z)(1+z)^(m-1). Taking A=1 and A=z gives the two claimed identities. The derivation uses E(W^a R(Z))=a![z^a]R(z), real Gaussian even moments, and the binomial series (1+u)^(-1/2)."
+      },
+      "jacobian_fit": {
+        "classification": "PARTIAL",
+        "relevant_capabilities": [
+          "polynomial.expression.normalize",
+          "polynomial.identity.verify",
+          "probability.finite_distribution.raw_moment.compute"
+        ],
+        "expected_strength": "Polynomial expansion and coefficient simplification can support the derivation and audit low-order instances.",
+        "known_boundary": "The catalog lacks a domain-owned Gaussian expectation or Wick-contraction capability that returns a symbolic all-m identity and proof obligations. Finite moment checks cannot establish the theorem."
+      },
+      "success_criteria": [
+        "Derives an identity valid for arbitrary m rather than extrapolating from samples.",
+        "Justifies the complex Gaussian contraction and the independent real Gaussian even moments.",
+        "Handles the formal binomial series coefficient extraction exactly.",
+        "States which steps were tool-supported and which remain an agent proof."
+      ],
+      "fail_closed_conditions": [
+        "Checking any finite number of m values does not prove the universal statement.",
+        "Numerical integration or simulation is not exact evidence.",
+        "A formal-series manipulation with an unstated branch or convergence claim must be qualified; only coefficientwise formal use is needed."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-006",
+      "title": "Written on the Wall II Conjecture 59 at portfolio scale limits",
+      "tier": "COMPOSITIONAL_STRETCH",
+      "domains": [
+        "extremal graph theory",
+        "degree-sequence algorithms",
+        "structural certificates"
+      ],
+      "research_context": "The explicit graph is much larger than current bounded exact graph inputs, but its invariants admit short structural proofs. This probes whether the agent can avoid forcing a large instance through an unsupported contract and instead compose small exact calculations with transparent mathematics.",
+      "problem_statement": "Let B have bipartition X={x_0,...,x_11}, Y={y_0,...,y_11}, with x_i adjacent to y_j iff (j-i) mod 12 belongs to {0,1,2,3,4,5,6}. Let H be the disjoint union of B and 98 isolated vertices, and let G be the cone over H. Here r(G) is the Havel-Hakimi residue, b(G) the maximum order of an induced bipartite subgraph, and f(G) the maximum order of an induced forest. Prove r(G)=101, b(G)=122, f(G)=111, and hence f(G)<ceil(sqrt(r(G)b(G))).",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to verify this structured counterexample. Let B be the 7-regular bipartite graph on X={x_0,...,x_11}, Y={y_0,...,y_11}, where x_i y_j is an edge iff (j-i) mod 12 is in {0,1,2,3,4,5,6}. Add 98 isolated vertices and take the cone to obtain G. Prove exactly that the Havel-Hakimi residue r(G)=101, the maximum induced-bipartite order b(G)=122, and the maximum induced-forest order f(G)=111; conclude f(G)<ceil(sqrt(r(G)b(G))). If an installed graph contract cannot accept 123 vertices, do not bypass its bounds or turn that failure into a conclusion: use transparent structural reductions and say what remains independently unchecked.",
+      "sources": [
+        {
+          "url": "https://github.com/QDKStorm/wowii59-counterexample",
+          "kind": "CODE_ARTIFACT",
+          "role": "CERTIFICATE",
+          "accessed": "2026-07-27",
+          "revision": "2887c1992120acef0334f34987de96aebe415805",
+          "license": "Apache-2.0"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "COUNTEREXAMPLE_EXISTS",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "CHECKABLE_CERTIFICATE",
+          "FORMAL_PROOF"
+        ],
+        "summary": "The 123-vertex graph has degree sequence [122,8^24,1^98], r=101, b=122, and f=111. Thus r*b=12322=111^2+1, so the conjectured lower bound is 112. The artifact gives a structural verifier and a partial Lean certificate with an explicit trust boundary."
+      },
+      "jacobian_fit": {
+        "classification": "PARTIAL",
+        "relevant_capabilities": [
+          "graph.construct.compose",
+          "graph.induced_forest.maximum.compute",
+          "graph.induced_bipartite.maximum.compute",
+          "integer.compute.floor_square_root"
+        ],
+        "expected_strength": "Small core calculations and the final exact integer inequality overlap existing capabilities.",
+        "known_boundary": "Current graph contracts have bounded vertex envelopes below the full 123-vertex instance. The decisive proof must use visible structural lemmas, not pretend a rejected or truncated invocation certified the full graph."
+      },
+      "success_criteria": [
+        "Reconstructs the graph definition and degree sequence without enumerating 123-vertex subsets.",
+        "Proves each of r=101, b=122, and f=111 with separate upper and lower bounds.",
+        "Computes 101*122=12322=111^2+1 exactly.",
+        "Reports graph-capability size limits and the remaining checker boundary honestly."
+      ],
+      "fail_closed_conditions": [
+        "A graph input validation failure is not evidence for any invariant.",
+        "An explicit forest of order 111 gives only a lower bound unless the upper bound is proved.",
+        "Partial Lean coverage must not be described as a fully formalized proof of all three invariants."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-007",
+      "title": "Equation 834 does not imply Equation 10: an order-eight scale probe",
+      "tier": "COMPOSITIONAL_STRETCH",
+      "domains": [
+        "universal algebra",
+        "finite model search",
+        "bounded completeness"
+      ],
+      "research_context": "A public order-eight countermodel lies beyond the present countermodel search order. This is a deliberate fail-closed test: the agent should discover and report the bounded-search limit, not infer an implication from failure to find a smaller model.",
+      "problem_statement": "In the language of one binary operation ◇, decide whether x=x◇((y◇x)◇(x◇z)) implies x=x◇(y◇x) in all magmas. Find and certify a finite countermodel if possible. Any negative search must state its exact order bound.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to decide whether the magma identity x=x◇((y◇x)◇(x◇z)) implies x=x◇(y◇x). Search for a finite countermodel and independently replay both laws on any candidate. State the exact searched orders and contract bounds. In particular, do not conclude implication merely because no witness exists inside the available bound.",
+      "sources": [
+        {
+          "url": "https://github.com/teorth/equational_theories/blob/7e276a2d05e84e3eef02432abfd0718e78f7abfa/equational_theories/Z3Counterexamples.lean",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "7e276a2d05e84e3eef02432abfd0718e78f7abfa",
+          "license": "Apache-2.0"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "DISPROVED",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "FORMAL_PROOF"
+        ],
+        "summary": "The Equational Theories project contains a formal order-eight magma countermodel, matrix_834_10, and a Lean theorem that Equation 834 does not imply Equation 10."
+      },
+      "jacobian_fit": {
+        "classification": "PARTIAL",
+        "relevant_capabilities": [
+          "universal_algebra.search.countermodel",
+          "universal_algebra.evaluate_laws"
+        ],
+        "expected_strength": "The search capability should expose its bounded completeness and the law evaluator can check any supplied in-range candidate.",
+        "known_boundary": "The current countermodel search request accepts maximum order 4, while the public witness has order 8. A complete search through order 4 is only a bounded negative result."
+      },
+      "success_criteria": [
+        "Invokes the domain-specific countermodel search with a valid bounded request.",
+        "Reports that the available order bound does not decide the global implication if no witness is found.",
+        "Does not fabricate an order-eight table or claim independent verification without one.",
+        "Identifies higher-order finite model search or externally supplied model replay as the next needed operation."
+      ],
+      "fail_closed_conditions": [
+        "No countermodel through order 4 does not imply the target law.",
+        "TIMEOUT, ERROR, or validation rejection are non-conclusions.",
+        "The public oracle must not be smuggled into the model prompt."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-008",
+      "title": "Density of dead ends in square-free base-b digit walks",
+      "tier": "CAPABILITY_GAP_PROBE",
+      "domains": [
+        "analytic number theory",
+        "sieve methods",
+        "Euler products"
+      ],
+      "research_context": "The result combines local congruence counting, inclusion-exclusion, and a uniform asymptotic. It probes a missing analytic-number-theory layer rather than a one-off integer predicate.",
+      "problem_statement": "Fix b>=2. Call a positive integer n a base-b square-free dead end if n is square-free but bn+d is not square-free for every digit d in {0,...,b-1}. Prove that the counting function D_b(X) has a natural density and derive an explicit inclusion-exclusion Euler-product formula for its leading constant, with a quantitative error term.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to solve this research problem. Fix an integer base b>=2. A positive integer n is a square-free dead end if n is square-free but every child bn+d, d=0,...,b-1, is nonsquare-free. Prove that D_b(X)=#{n<=X:n is a dead end} has a natural density. Derive an explicit inclusion-exclusion Euler-product formula for the density in terms of local residue obstructions modulo p^2, and obtain a quantitative asymptotic error term. Use exact modular and square-freeness capabilities where useful, but do not present finite enumeration as a proof of density.",
+      "sources": [
+        {
+          "url": "https://github.com/AxiomMath/dead-ends",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "FORMALIZATION",
+          "accessed": "2026-07-27",
+          "revision": "80fc9124841a1f37a167d227d00780479d04f701",
+          "license": "MIT"
+        },
+        {
+          "url": "https://arxiv.org/abs/2602.05095",
+          "kind": "PAPER",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "arXiv:2602.05095v2",
+          "license": "arXiv license; reference only"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "EXACT_IDENTITY",
+        "evidence_class": [
+          "FORMAL_PROOF",
+          "HUMAN_SOLUTION"
+        ],
+        "summary": "Writing D_b={0,...,b-1}, the density is sum over S subset D_b of (-1)^|S| times the Euler product over primes p of (1-nu_{p,b}(S)/p^2), where nu counts residues n mod p^2 for which p^2 divides n or at least one bn+d with d in S. The source obtains D_b(X)=c_dead(b)X+O_b(X/sqrt(log X))."
+      },
+      "jacobian_fit": {
+        "classification": "MISSING",
+        "relevant_capabilities": [
+          "integer.decide.squarefree",
+          "integer.compute.mobius",
+          "modular.solve.chinese_remainder"
+        ],
+        "expected_strength": "Existing exact arithmetic can inspect local factors, small bases, and finite prefixes.",
+        "known_boundary": "The portfolio lacks a sieve/asymptotic-density capability with explicit hypotheses, local-to-global provenance, convergence obligations, and quantitative error terms."
+      },
+      "success_criteria": [
+        "Defines the local obstruction count nu_{p,b}(S) precisely.",
+        "Derives the inclusion-exclusion Euler product and justifies convergence.",
+        "Proves an asymptotic rather than estimating the density numerically.",
+        "Makes the analytic theorem or missing backend boundary explicit."
+      ],
+      "fail_closed_conditions": [
+        "A stable-looking empirical frequency is not proof of a natural density.",
+        "A truncated Euler product must not be reported as the exact constant.",
+        "Finite square-free decisions do not discharge the uniform sieve error."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-009",
+      "title": "Irreducible vertices in positive-definite weighted tree lattices",
+      "tier": "CAPABILITY_GAP_PROBE",
+      "domains": [
+        "lattice theory",
+        "low-dimensional topology",
+        "positive-definite forms"
+      ],
+      "research_context": "This unpublished expert problem requires a structural argument about decompositions in an integral lattice. It is suitable for testing theorem-level reasoning and highlights the absence of lattice-element decomposition and irreducibility capabilities.",
+      "problem_statement": "Let T be a finite tree with integer vertex weights w. Let L(T) be the free abelian group on V(T) with bilinear form u·u=w(u), u·v=-1 for adjacent distinct vertices, and u·v=0 otherwise. Assume the form is positive definite and that there exists exactly one vertex v with w(v)<d(v). Prove that some vertex u is irreducible in L(T): there are no nonzero a,b in L(T) with u=a+b and a·b>=0.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to prove this theorem. Let T be a finite integer-weighted tree. On the free abelian group L(T) generated by its vertices, define u·u=w(u), u·v=-1 when u and v are adjacent, and 0 for distinct nonadjacent vertices. Assume the form is positive definite and there exists exactly one vertex v with w(v)<d(v). Prove that T contains a vertex u that is irreducible in L(T), meaning there do not exist nonzero a,b with u=a+b and a·b>=0. Use exact matrix or lattice capabilities for supporting lemmas, but provide a general proof rather than finite experiments.",
+      "sources": [
+        {
+          "url": "https://1stproof.org/second-batch.html",
+          "kind": "PRIMARY_PROBLEM",
+          "role": "STATEMENT",
+          "accessed": "2026-07-27",
+          "revision": "Second Batch, Problem 6, accessed 2026-07-27",
+          "license": "UNKNOWN; REFERENCE ONLY"
+        },
+        {
+          "url": "https://github.com/1stproof/batch-2/blob/77b4e4b466e958759882302179e7e94d7392a8e7/batch-2-raw-outputs/Batch2Problems/problems.json",
+          "kind": "BENCHMARK",
+          "role": "STATEMENT",
+          "accessed": "2026-07-27",
+          "revision": "77b4e4b466e958759882302179e7e94d7392a8e7",
+          "license": "UNKNOWN; REFERENCE ONLY"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "PROVED",
+        "evidence_class": [
+          "HUMAN_SOLUTION"
+        ],
+        "summary": "The First Proof release includes the selected problem, a reference solution, and expert review artifacts. Those answer-visible materials are evaluator-only and are not included in the prompt."
+      },
+      "jacobian_fit": {
+        "classification": "MISSING",
+        "relevant_capabilities": [
+          "matrix.determinant.compute",
+          "matrix.rank.compute",
+          "matrix.inverse.compute"
+        ],
+        "expected_strength": "Exact matrix operations can verify positive definiteness consequences for concrete examples and audit algebraic subclaims.",
+        "known_boundary": "There is no domain-owned weighted-tree lattice artifact, irreducibility predicate, decomposition search, or general proof-producing checker. Generic matrix calculations do not expose the theorem's semantic objects."
+      },
+      "success_criteria": [
+        "Gives a proof for arbitrary finite weighted trees under the stated hypotheses.",
+        "Uses positive definiteness and the unique bad vertex condition at explicit logical points.",
+        "Proves nonexistence of a forbidden decomposition for at least one vertex.",
+        "Does not mistake checks on sampled trees for the theorem."
+      ],
+      "fail_closed_conditions": [
+        "Testing bounded coefficient decompositions is not a proof of irreducibility without a proven bound.",
+        "Positive determinant alone is not positive definiteness in arbitrary dimension.",
+        "A recalled answer without a reconstructible argument is not accepted."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-010",
+      "title": "Bandeira Matrix AM-GM Open Problem 0.2(a)",
+      "tier": "CAPABILITY_GAP_PROBE",
+      "domains": [
+        "matrix analysis",
+        "semidefinite optimization",
+        "certificate verification"
+      ],
+      "research_context": "The conjectured spectral-norm inequality was refuted only through a large rational certificate. It is a strong test of exact PSD semantics, compressed witnesses, and independently checkable optimization duality.",
+      "problem_statement": "For positive semidefinite matrices A1,...,An of the same size, determine whether ||(1/n!) sum_{sigma in S_n} A_{sigma(1)}...A_{sigma(n)}|| <= ||(A1+...+An)/n||^n always holds, where ||·|| is the spectral norm. Prove the inequality or give an exact counterexample with a checkable certificate.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to settle this problem: for positive semidefinite matrices A1,...,An, is the spectral norm of (1/n!) times the sum over all permutations of A_{sigma(1)}...A_{sigma(n)} at most ||(A1+...+An)/n||^n? Either prove it or produce an exact counterexample. Any counterexample must include exact PSD evidence and an independently checkable inequality or separation certificate; floating-point eigenvalues alone are not sufficient.",
+      "sources": [
+        {
+          "url": "https://github.com/Oxelra-AI/Bandeira-0.2a-open-source",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "CERTIFICATE",
+          "accessed": "2026-07-27",
+          "revision": "c41373447abfadabc30afeebc3c4de74e1ccf8dc",
+          "license": "MIT"
+        },
+        {
+          "url": "https://oxelra.com/en/results/",
+          "kind": "PRIMARY_PROBLEM",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "result page accessed 2026-07-27",
+          "license": "Reference only"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "DISPROVED",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "CHECKABLE_CERTIFICATE",
+          "FORMAL_PROOF"
+        ],
+        "summary": "The inequality is false for n=5. The public artifact supplies a large exact rational Farkas-style certificate using six 31-by-31 PSD blocks and a Lean-checked arithmetic layer; it documents an external equivalence boundary between the certificate and the original matrix inequality."
+      },
+      "jacobian_fit": {
+        "classification": "MISSING",
+        "relevant_capabilities": [
+          "matrix.characteristic_polynomial.compute",
+          "matrix.determinant.compute",
+          "optimization.linear.rational_optimum.compute"
+        ],
+        "expected_strength": "Exact rational arithmetic and linear optimization may audit fragments of a supplied certificate.",
+        "known_boundary": "The portfolio lacks exact PSD-cone certificates, spectral-norm inequality semantics, large sparse certificate artifacts, and an operator-authorized checker binding a rational separation witness to this exact claim."
+      },
+      "success_criteria": [
+        "States a mathematically exact counterexample or proof.",
+        "Separately certifies PSD inputs and strict violation of the normalized inequality.",
+        "Exposes the certificate format and the equivalence bridge to the original claim.",
+        "Does not promote numerical SDP output directly to VERIFIED."
+      ],
+      "fail_closed_conditions": [
+        "Floating-point PSD and norm estimates cannot certify a strict exact counterexample.",
+        "An optimizer status is not an independently checked mathematical conclusion.",
+        "A Lean-checked arithmetic certificate does not cover an externally assumed semantic equivalence unless that bridge is also verified."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-011",
+      "title": "A planar counterexample to the bunkbed conjecture",
+      "tier": "CAPABILITY_GAP_PROBE",
+      "domains": [
+        "percolation theory",
+        "probabilistic combinatorics",
+        "large graph certificates"
+      ],
+      "research_context": "The first planar counterexample is an explicit graph with thousands of vertices. It tests whether Jacobian can represent probabilistic graph events and verify a compressed exact witness without pretending current small-graph tools scale to it.",
+      "problem_statement": "For a finite graph G and a set T of posts, form two copies of G, add vertical edges between the two copies of each vertex in T, and independently retain each horizontal edge with probability p. The bunkbed conjecture asserts that for vertices u,v, the probability that (u,0) connects to (v,0) is at least the probability that (u,0) connects to (v,1). Construct an explicit planar counterexample and prove the strict reverse inequality exactly.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to construct and rigorously verify a planar counterexample to the bunkbed conjecture. In the bunkbed graph, vertical edges at a specified post set T are present and each horizontal edge is independently open with probability p; the conjecture compares P((u,0)↔(v,0)) with P((u,0)↔(v,1)). Return a reproducible planar graph and parameters with a strict reverse inequality, plus exact or interval-certified probability evidence. If current graph or probability contracts cannot represent the instance, expose that boundary and do not infer a conclusion from simulation.",
+      "sources": [
+        {
+          "url": "https://arxiv.org/abs/2410.02545",
+          "kind": "PAPER",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "arXiv:2410.02545v1",
+          "license": "arXiv license; reference only"
+        },
+        {
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12184427/",
+          "kind": "PEER_REVIEWED_PAPER",
+          "role": "REVIEW",
+          "accessed": "2026-07-27",
+          "revision": "peer-reviewed version accessed 2026-07-27",
+          "license": "Open-access article terms shown by PMC"
+        },
+        {
+          "url": "https://github.com/Kroneckera/bunkbed-counterexample",
+          "kind": "CODE_ARTIFACT",
+          "role": "CERTIFICATE",
+          "accessed": "2026-07-27",
+          "revision": "fbeeccaab53b49ce2d676f1d7537d32152c7068e",
+          "license": "MIT"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "DISPROVED",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "PEER_REVIEW",
+          "CHECKABLE_CERTIFICATE"
+        ],
+        "summary": "The public construction gives a planar counterexample with 7,222 vertices, together with code and rigorous probability bounds establishing the reversed connectivity inequality."
+      },
+      "jacobian_fit": {
+        "classification": "MISSING",
+        "relevant_capabilities": [
+          "graph.compute.properties",
+          "graph.construct.compose"
+        ],
+        "expected_strength": "Existing graph operations can clarify small gadgets and exact structural properties.",
+        "known_boundary": "The portfolio lacks bunkbed/percolation event artifacts, exact or rigorous-interval network reliability, planar compressed-construction certificates, and scale support for a 7,222-vertex witness."
+      },
+      "success_criteria": [
+        "Provides a reproducible finite graph, post set, endpoints, and probability parameter.",
+        "Certifies planarity and the exact semantics of the random model.",
+        "Proves a strict probability reversal with controlled exact or interval error.",
+        "Keeps simulation, analytic bounds, and independent verification distinct."
+      ],
+      "fail_closed_conditions": [
+        "Monte Carlo estimates do not establish a strict counterexample.",
+        "Failure to load a 7,222-vertex graph is not evidence about the conjecture.",
+        "An interval comparison is conclusive only if the two certified intervals are strictly separated."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    },
+    {
+      "challenge_id": "jcb-postdoc-012",
+      "title": "A counterexample to Anderson's quasi-completeness conjecture",
+      "tier": "CAPABILITY_GAP_PROBE",
+      "domains": [
+        "commutative algebra",
+        "Noetherian local rings",
+        "formal proof"
+      ],
+      "research_context": "The public resolution requires a long formal construction in local algebra. It is a deliberate theorem-scale probe for semantic algebraic artifacts, theorem retrieval, and proof-state support rather than generic symbolic computation.",
+      "problem_statement": "For a Noetherian local ring (R,m), call R quasi-complete if for every descending sequence of ideals A_n and every k there is s with A_s contained in (intersection_n A_n)+m^k. Call R weakly quasi-complete if this is required only when the intersection is zero. Construct a Noetherian local ring that is weakly quasi-complete but not quasi-complete, and prove both properties.",
+      "prompt": "Use Jacobian MCP, and do not use web search or external knowledge retrieval, to resolve Anderson's conjecture by constructing a Noetherian local ring (R,m) that is weakly quasi-complete but not quasi-complete. Here quasi-complete means: for every descending ideal sequence A_n and every k, some A_s is contained in (intersection_n A_n)+m^k; weakly quasi-complete restricts this to sequences with zero intersection. Give an explicit construction and prove Noetherianity, locality, weak quasi-completeness, and failure of quasi-completeness. Use formal-proof capabilities if applicable, and expose any imported theorem or unchecked semantic boundary.",
+      "sources": [
+        {
+          "url": "https://github.com/frenzymath/Anderson-Conjecture",
+          "kind": "FORMAL_ARTIFACT",
+          "role": "FORMALIZATION",
+          "accessed": "2026-07-27",
+          "revision": "b8bd37b72ced46bb2d52fef583b8656a29019d3c",
+          "license": "Apache-2.0"
+        },
+        {
+          "url": "https://arxiv.org/abs/2604.03789",
+          "kind": "PAPER",
+          "role": "ORACLE",
+          "accessed": "2026-07-27",
+          "revision": "arXiv:2604.03789v2",
+          "license": "arXiv license; reference only"
+        }
+      ],
+      "oracle": {
+        "answer_visible": true,
+        "expected_conclusion": "COUNTEREXAMPLE_EXISTS",
+        "evidence_class": [
+          "EXPLICIT_WITNESS",
+          "FORMAL_PROOF",
+          "HUMAN_SOLUTION"
+        ],
+        "summary": "The public project constructs a weakly quasi-complete Noetherian local ring that is not quasi-complete and supplies a large Lean formalization. The construction and proof are evaluator-visible but intentionally omitted from this prompt."
+      },
+      "jacobian_fit": {
+        "classification": "MISSING",
+        "relevant_capabilities": [
+          "lean.declaration.search",
+          "lean.check",
+          "lean.retrieve.premises"
+        ],
+        "expected_strength": "Lean retrieval and checking can inspect a supplied formal development or support local proof obligations.",
+        "known_boundary": "The mathematical portfolio lacks typed local-ring completions, descending ideal sequences, adic topology, and a domain checker. General Lean access is not a substitute for those semantic capabilities."
+      },
+      "success_criteria": [
+        "Gives an explicit ring rather than only asserting existence.",
+        "Proves Noetherianity and locality for the exact construction.",
+        "Proves the weak property for all zero-intersection descending sequences.",
+        "Exhibits a descending sequence and k witnessing failure of quasi-completeness."
+      ],
+      "fail_closed_conditions": [
+        "A formal repository reference without a reconstructed argument is not a solution under the no-web prompt.",
+        "Checking selected ideal sequences does not prove weak quasi-completeness.",
+        "A Lean build failure, timeout, or unavailable dependency is not evidence against the theorem."
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE"
+    }
+  ]
+}
