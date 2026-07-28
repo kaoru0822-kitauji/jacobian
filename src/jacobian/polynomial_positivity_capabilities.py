@@ -175,26 +175,24 @@ def install_polynomial_positivity_capabilities(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact rational polynomial interval strict positivity checker",
-                    entrypoint="jacobian_checkers.polynomial_positivity:check_positivity",
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="polynomial.interval_sturm_positivity_replay",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(decision_schema_uri,),
-                    reason="bundled independent Sturm-sequence positivity checker",
-                ),
-                authorize=True,
-            )
-            .checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational polynomial interval strict positivity checker",
+                entrypoint="jacobian_checkers.polynomial_positivity:check_positivity",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.interval_sturm_positivity_replay",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(decision_schema_uri,),
+                reason="bundled independent Sturm-sequence positivity checker",
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = PolynomialPositivityInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,

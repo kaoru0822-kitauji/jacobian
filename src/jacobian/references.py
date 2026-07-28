@@ -21,6 +21,14 @@ from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 
+REFERENCE_INSTALLATION_DOMAINS = frozenset(
+    {
+        "jacobian.graph-paths",
+        "jacobian.integer-matrices",
+        "jacobian.erdos-straus",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ReferenceInstallation:
@@ -695,7 +703,7 @@ class ReferenceInstaller:
                     ),
                     reason="bundled reference checker",
                 ),
-                authorize=True,
+                authorize=not self.checkers.bind_existing_when_omitted,
             )
             .require_checker_id()
         )

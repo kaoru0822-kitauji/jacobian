@@ -74,6 +74,7 @@ from jacobian.graph_shrinking import (
     GraphShrinkingInstallation,
     install_graph_shrinking,
 )
+from jacobian.implementation import cached_package_digests
 from jacobian.lean import LeanService
 from jacobian.lean_declarations import (
     LeanDeclarationService,
@@ -163,6 +164,7 @@ from jacobian.provider_runtime import (
     sympy_polynomial_normalization_provider_runtime,
 )
 from jacobian.references import (
+    REFERENCE_INSTALLATION_DOMAINS,
     LeanCheckerInstallation,
     PolytopeCheckerInstallation,
     ReferenceInstallation,
@@ -213,13 +215,28 @@ class JacobianKernel:
         root: str | Path,
         *,
         install_references: bool = False,
+        hydrate_authorized: bool = False,
         capability_adapter_entrypoints: tuple[str, ...] = (),
         capability_exclusions: frozenset[str] = frozenset(),
         capability_policy: CapabilityPolicy | None = None,
     ) -> None:
+        """Compose services over ``root``.
+
+        ``install_references`` authorizes bundled reference checkers and
+        installs reference plugins. ``hydrate_authorized`` reconstitutes
+        process-local verify adapters from checkers already authorized in the
+        store without writing new authorization. The two flags are mutually
+        exclusive.
+        """
+
+        if install_references and hydrate_authorized:
+            raise ValueError(
+                "install_references and hydrate_authorized are mutually exclusive"
+            )
         self.store = ArtifactStore(root)
         self._initialize(
             install_references=install_references,
+            hydrate_authorized=hydrate_authorized,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
             capability_exclusions=capability_exclusions,
             capability_policy=capability_policy,
@@ -229,6 +246,7 @@ class JacobianKernel:
         self,
         *,
         install_references: bool,
+        hydrate_authorized: bool,
         capability_adapter_entrypoints: tuple[str, ...],
         capability_exclusions: frozenset[str],
         capability_policy: CapabilityPolicy | None,
@@ -279,6 +297,7 @@ class JacobianKernel:
         self.workspaces = WorkspaceService(self.store, self.schemas)
         self.plugins = PluginRegistry(self.store)
         self.checkers = CheckerRegistry(self.store)
+        self.checkers.bind_existing_when_omitted = hydrate_authorized
         self.claims = ClaimValidationService(
             self.store,
             self.schemas,
@@ -385,7 +404,11 @@ class JacobianKernel:
             self.memory,
             policy=capability_policy,
         )
-        with self.checkers.policy_transaction(), self.store.transaction():
+        with (
+            self.checkers.policy_transaction(),
+            self.store.transaction(),
+            cached_package_digests(),
+        ):
             self._install_capability_portfolio(
                 install_references=install_references,
                 capability_adapter_entrypoints=capability_adapter_entrypoints,
@@ -667,7 +690,10 @@ class JacobianKernel:
         for universal_algebra_adapter in universal_algebra_adapters:
             self.register_capability(universal_algebra_adapter)
         self._install_resource_capabilities(install_references)
-        if install_references:
+        if install_references or (
+            self.checkers.bind_existing_when_omitted
+            and self.plugins.has_any_domain(REFERENCE_INSTALLATION_DOMAINS)
+        ):
             self._install_authorized_references()
         for entrypoint in capability_adapter_entrypoints:
             self.register_capability(load_capability_adapter(entrypoint, self))

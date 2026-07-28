@@ -14,6 +14,8 @@ from jacobian.capabilities import (
     CapabilityAdapter,
     CapabilityInvocationError,
 )
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -152,22 +154,27 @@ def install_finite_coverage(
         )
         canonicalizer_uris[canonicalizer_id] = stored.artifact_uri
 
-    checker_id = None
-    if authorize_checker:
-        checker_id = checkers.authorize(
-            name="finite exactly-once paged coverage checker",
-            entrypoint="jacobian_checkers.finite_coverage:check_finite_coverage",
-            evidence_kind=EvidenceKind.CERTIFICATE,
-            format_id="finite.coverage",
-            format_version="1",
-            claim_schema_uris=(claim_schema_uri,),
-            semantics_uris=(semantics_uri,),
-            candidate_schema_uris=(archive_schema_uri,),
-            reason=(
-                "operator requested independent standard-library replay of every "
-                "canonical scope and archive item"
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="finite exactly-once paged coverage checker",
+                entrypoint=("jacobian_checkers.finite_coverage:check_finite_coverage"),
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="finite.coverage",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(archive_schema_uri,),
+                reason=(
+                    "operator requested independent standard-library replay of "
+                    "every canonical scope and archive item"
+                ),
             ),
-        ).checker_id
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = FiniteCoverageInstallation(
         semantics_uri=semantics_uri,
         canonicalizer_schema_uri=canonicalizer_schema_uri,

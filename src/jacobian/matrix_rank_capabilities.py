@@ -9,6 +9,8 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
+from jacobian.checker_installation import CheckerInstaller
+from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -21,6 +23,7 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
     CapabilityScope,
 )
+from jacobian.contracts.checkers import EvidenceKind
 from jacobian.contracts.evidence import EvidenceBindings, WitnessEnvelope, WitnessRole
 from jacobian.contracts.matrices import (
     ExactRationalMatrix,
@@ -56,19 +59,26 @@ def install_matrix_rank_checker(
     witness_schema_uri = schemas.register_model(
         name="jacobian.witness-envelope", version="1", model=WitnessEnvelope
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = checkers.authorize(
-            name="exact rational rank recomputation checker",
-            entrypoint="jacobian_checkers.rational_determinants:check_rational_rank",
-            evidence_kind="WITNESS",
-            format_id="matrix.rational_rank",
-            format_version="1",
-            claim_schema_uris=(matrices.matrix_schema_uri,),
-            semantics_uris=(matrices.semantics_uri,),
-            candidate_schema_uris=(matrices.rank_schema_uri,),
-            reason="bundled standard-library exact rational row reduction",
-        ).checker_id
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact rational rank recomputation checker",
+                entrypoint=(
+                    "jacobian_checkers.rational_determinants:check_rational_rank"
+                ),
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="matrix.rational_rank",
+                format_version="1",
+                claim_schema_uris=(matrices.matrix_schema_uri,),
+                semantics_uris=(matrices.semantics_uri,),
+                candidate_schema_uris=(matrices.rank_schema_uri,),
+                reason="bundled standard-library exact rational row reduction",
+            ),
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = MatrixRankCheckerInstallation(witness_schema_uri, checker_id)
     if checker_id is None:
         return None, installation

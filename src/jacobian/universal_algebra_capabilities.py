@@ -152,28 +152,24 @@ def install_universal_algebra_capabilities(
         version="1",
         schema=model_schema(CertificateEnvelope),
     )
-    evaluation_checker_id = None
-    if authorize_checker:
-        evaluation_checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="exact finite magma law evaluation replay checker",
-                    entrypoint=(
-                        "jacobian_checkers.universal_algebra:check_law_evaluation"
-                    ),
-                    evidence_kind=EvidenceKind.CERTIFICATE,
-                    format_id="universal_algebra.law_evaluation",
-                    format_version="1",
-                    claim_schema_uris=(claim_schema_uri,),
-                    semantics_uris=(semantics_uri,),
-                    candidate_schema_uris=(evaluation_schema_uri,),
-                    reason="bundled independent finite table evaluator",
-                ),
-                authorize=True,
-            )
-            .checker_id
+    evaluation_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact finite magma law evaluation replay checker",
+                entrypoint=("jacobian_checkers.universal_algebra:check_law_evaluation"),
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="universal_algebra.law_evaluation",
+                format_version="1",
+                claim_schema_uris=(claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(evaluation_schema_uri,),
+                reason="bundled independent finite table evaluator",
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = UniversalAlgebraInstallation(
         semantics_uri=semantics_uri,
         magma_schema_uri=magma_schema_uri,

@@ -68,33 +68,31 @@ def install_polynomial_expression_checker(
         version="1",
         model=WitnessEnvelope,
     )
-    checker_id = None
-    if authorize_checker:
-        checker_id = (
-            CheckerInstaller(checkers)
-            .install(
-                CheckerOperation(
-                    name="typed rational polynomial normalization replay checker",
-                    entrypoint=(
-                        "jacobian_checkers.polynomial_expressions:"
-                        "check_polynomial_expression_normalization"
-                    ),
-                    evidence_kind=EvidenceKind.WITNESS,
-                    format_id="polynomial.expression_normalization",
-                    format_version="1",
-                    claim_schema_uris=(expressions.installation.expression_schema_uri,),
-                    semantics_uris=(expressions.installation.semantics_uri,),
-                    candidate_schema_uris=(
-                        expressions.installation.normalization_schema_uri,
-                    ),
-                    reason=(
-                        "bundled independent exact typed-AST expansion and coefficient checker"
-                    ),
+    checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="typed rational polynomial normalization replay checker",
+                entrypoint=(
+                    "jacobian_checkers.polynomial_expressions:"
+                    "check_polynomial_expression_normalization"
                 ),
-                authorize=True,
-            )
-            .checker_id
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="polynomial.expression_normalization",
+                format_version="1",
+                claim_schema_uris=(expressions.installation.expression_schema_uri,),
+                semantics_uris=(expressions.installation.semantics_uri,),
+                candidate_schema_uris=(
+                    expressions.installation.normalization_schema_uri,
+                ),
+                reason=(
+                    "bundled independent exact typed-AST expansion and coefficient checker"
+                ),
+            ),
+            authorize=authorize_checker,
         )
+        .checker_id
+    )
     installation = PolynomialExpressionCheckerInstallation(
         witness_schema_uri=witness_schema_uri,
         checker_id=checker_id,

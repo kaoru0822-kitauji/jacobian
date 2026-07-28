@@ -273,6 +273,26 @@ class PluginRegistry:
                 raise PluginRegistryError("installed plugin snapshot mismatch")
         return manifest
 
+    def has_any_domain(
+        self, domain_ids: frozenset[str] | set[str] | tuple[str, ...]
+    ) -> bool:
+        """Return whether any installed plugin matches one of ``domain_ids``."""
+
+        if not domain_ids:
+            return False
+        ordered = tuple(sorted(domain_ids))
+        placeholders = ", ".join("?" for _ in ordered)
+        with self.store.connection() as connection:
+            row = connection.execute(
+                f"""
+                SELECT 1 FROM installed_plugins
+                WHERE domain_id IN ({placeholders})
+                LIMIT 1
+                """,
+                ordered,
+            ).fetchone()
+        return row is not None
+
     def get(self, plugin_id: str) -> PluginManifest:
         """Return an installed manifest without resolving executable code."""
 

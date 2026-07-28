@@ -182,15 +182,19 @@ def install_exact_domain_verification(
         witness_schema_uri=witness_schema_uri,
         provider_runtimes=installed.provider_runtimes,
     )
-    if not authorize:
+    if not any(
+        checker_id is not None for checker_id in installation.checker_ids.values()
+    ):
         return (), installation
     polynomial_declarations = tuple(
         _installed_declaration(polynomial, declaration, installation)
         for declaration in POLYNOMIAL_EXACT_REPLAY_CHECKERS
+        if installation.checker_ids.get(declaration.capability_id) is not None
     )
     matrix_declarations = tuple(
         _installed_declaration(matrix, declaration, installation)
         for declaration in MATRIX_EXACT_REPLAY_CHECKERS
+        if installation.checker_ids.get(declaration.capability_id) is not None
     )
     graph_declarations = tuple(
         _installed_declaration(
@@ -202,6 +206,7 @@ def install_exact_domain_verification(
             graph=graph,
             graph_invariants=graph_invariants,
         )
+        if installation.checker_ids.get(declaration.capability_id) is not None
     )
     graph_adapters: tuple[CapabilityAdapter, ...] = tuple(
         ExactDomainResultVerificationAdapter(
@@ -219,8 +224,9 @@ def install_exact_domain_verification(
         )
         for declaration in graph_declarations
     )
-    return (
-        (
+    adapters: list[CapabilityAdapter] = []
+    if polynomial_declarations:
+        adapters.append(
             ExactDomainResultVerificationAdapter(
                 capability_id="polynomial.result.verify",
                 title="Verify an exact polynomial result",
@@ -236,7 +242,10 @@ def install_exact_domain_verification(
                 declarations=polynomial_declarations,
                 witness_schema_uri=witness_schema_uri,
                 provider_runtime=installation.provider_runtimes["python-flint"],
-            ),
+            )
+        )
+    if matrix_declarations:
+        adapters.append(
             ExactDomainResultVerificationAdapter(
                 capability_id="matrix.result.verify",
                 title="Verify an exact matrix result",
@@ -252,11 +261,10 @@ def install_exact_domain_verification(
                 declarations=matrix_declarations,
                 witness_schema_uri=witness_schema_uri,
                 provider_runtime=installation.provider_runtimes["python-flint"],
-            ),
-            *graph_adapters,
-        ),
-        installation,
-    )
+            )
+        )
+    adapters.extend(graph_adapters)
+    return tuple(adapters), installation
 
 
 def _verification_metadata(
