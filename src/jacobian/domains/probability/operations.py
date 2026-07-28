@@ -8,6 +8,7 @@ from jacobian.contracts.validated_analysis import (
     FiniteRawMomentRequest,
     FiniteRawMomentResult,
 )
+from jacobian.domains._examples import example
 from jacobian.operations import (
     ComputedOperation,
     ComputedOutcome,
@@ -65,6 +66,19 @@ FINITE_MOMENT_CAPABILITIES = (
         implementation=_raw_moment,
         relation_id="probability.finite_distribution.raw_moment.relation",
         tags=("probability", "moment", "finite", "exact", "python-flint"),
+        invocation_examples=(
+            example(
+                "fair_bit_second_moment",
+                "Compute the second raw moment of a fair distribution on 0 and 1.",
+                {
+                    "atoms": [
+                        {"value": {"num": "0", "den": "1"}, "probability": {"num": "1", "den": "2"}},
+                        {"value": {"num": "1", "den": "1"}, "probability": {"num": "1", "den": "2"}},
+                    ],
+                    "order": 2,
+                },
+            ),
+        ),
     ),
 )
 
