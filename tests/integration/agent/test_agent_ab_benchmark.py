@@ -3,12 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import runpy
 import shutil
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from benchmarks import agent_ab as benchmark
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -37,10 +37,6 @@ def _kernel_from_template(
     state_dir = tmp_path / name
     shutil.copytree(template, state_dir)
     return state_dir, JacobianKernel(state_dir, install_references=install_references)
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-BENCHMARK = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "agent_ab.py"))
 
 
 def _report(
@@ -363,7 +359,9 @@ def _polynomial_normalization_report(
 
 
 def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
-    schema_path = PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
+    schema_path = (
+        benchmark.PROJECT_ROOT / "benchmarks" / "ab_cases" / "sat-report.schema.json"
+    )
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     description = schema["properties"]["evidence_uri"]["description"]
 
@@ -372,14 +370,14 @@ def test_ab_sat_report_contract_identifies_the_producer_evidence_uri() -> None:
     assert "never the verifier's witness_uri or certificate_uri" in description
     assert (
         "Do not substitute the verifier's witness_uri"
-        in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+        in benchmark.SAT_TREATMENT_INSTRUCTIONS
     )
-    assert "named assignment map returned" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
-    assert "pre-canonical variable order" in BENCHMARK["SAT_TREATMENT_INSTRUCTIONS"]
+    assert "named assignment map returned" in benchmark.SAT_TREATMENT_INSTRUCTIONS
+    assert "pre-canonical variable order" in benchmark.SAT_TREATMENT_INSTRUCTIONS
 
 
 def test_ab_smt_task_selects_its_own_control_and_treatment_instructions() -> None:
-    select = cast(Any, BENCHMARK["_condition_instructions"])
+    select = benchmark._condition_instructions
 
     control = select("smt_unsat_proof", "control")
     treatment = select("smt_unsat_proof", "treatment")
@@ -394,7 +392,7 @@ def test_ab_smt_task_selects_its_own_control_and_treatment_instructions() -> Non
 def test_autonomous_discovery_prompt_exposes_the_toolbox_without_leaking_a_path() -> (
     None
 ):
-    instructions = BENCHMARK["AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS"]
+    instructions = benchmark.AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS
     normalized = " ".join(instructions.split())
 
     assert (
@@ -408,8 +406,8 @@ def test_autonomous_discovery_prompt_exposes_the_toolbox_without_leaking_a_path(
 
 
 def test_autonomous_discovery_case_is_visible_in_the_bounded_dispatch_plan() -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    build_plan = cast(Any, BENCHMARK["build_dispatch_plan"])
+    load_cases = benchmark.load_cases
+    build_plan = benchmark.build_dispatch_plan
     cases = load_cases(["GRAPH-DISCOVERY-AB-001"])
 
     plan = build_plan(
@@ -513,7 +511,7 @@ def test_ab_smt_scorer_preserves_rejected_holey_proof(
             "artifact_uris": list(rejected.artifact_uris),
         },
     ]
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
 
     score = score_report(
         case,
@@ -530,7 +528,7 @@ def test_ab_smt_scorer_preserves_rejected_holey_proof(
 
 
 def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> None:
-    parse_transcript = cast(Any, BENCHMARK["parse_transcript"])
+    parse_transcript = benchmark.parse_transcript
     transcript = tmp_path / "transcript.jsonl"
     transcript.write_text(
         "\n".join(
@@ -587,7 +585,7 @@ def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> N
 def test_ab_transcript_parser_counts_completed_capability_rejections(
     tmp_path: Path,
 ) -> None:
-    parse_transcript = cast(Any, BENCHMARK["parse_transcript"])
+    parse_transcript = benchmark.parse_transcript
     transcript = tmp_path / "transcript.jsonl"
     response = {
         "capability_id": "lean.check",
@@ -632,7 +630,7 @@ def test_ab_transcript_parser_counts_completed_capability_rejections(
 
 
 def test_ab_transcript_parser_counts_structured_mcp_errors(tmp_path: Path) -> None:
-    parse_transcript = cast(Any, BENCHMARK["parse_transcript"])
+    parse_transcript = benchmark.parse_transcript
     transcript = tmp_path / "transcript.jsonl"
     transcript.write_text(
         json.dumps(
@@ -674,8 +672,8 @@ def test_ab_transcript_parser_counts_structured_mcp_errors(tmp_path: Path) -> No
 def test_ab_scorer_accepts_control_and_durable_treatment(
     tmp_path: Path, kernel_store_template_with_references: Path
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["ERDOS-STRAUS-AB-001"])[0]
 
     control = score_report(
@@ -774,7 +772,7 @@ def test_ab_scorer_accepts_control_and_durable_treatment(
 
 
 def test_ab_summary_reports_paired_deltas() -> None:
-    summarize_pairs = cast(Any, BENCHMARK["summarize_pairs"])
+    summarize_pairs = benchmark.summarize_pairs
     results = [
         {
             "case_id": "C",
@@ -810,7 +808,7 @@ def test_agent_eval_is_plan_only_without_explicit_execute(
     monkeypatch: Any,
     capsys: Any,
 ) -> None:
-    main = cast(Any, BENCHMARK["main"])
+    main = benchmark.main
 
     def unexpected_run(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("plan mode started a model evaluation")
@@ -827,14 +825,14 @@ def test_agent_eval_is_plan_only_without_explicit_execute(
 
 
 def test_agent_eval_requires_explicit_case_selection() -> None:
-    main = cast(Any, BENCHMARK["main"])
+    main = benchmark.main
 
     with pytest.raises(SystemExit):
         main([])
 
 
 def test_agent_eval_requires_sufficient_manual_run_budget(tmp_path: Path) -> None:
-    main = cast(Any, BENCHMARK["main"])
+    main = benchmark.main
     case_path = _write_private_case(tmp_path)
 
     with pytest.raises(SystemExit):
@@ -853,7 +851,7 @@ def test_agent_eval_plan_counts_each_lean_capability_condition(
     tmp_path: Path,
     capsys: Any,
 ) -> None:
-    main = cast(Any, BENCHMARK["main"])
+    main = benchmark.main
     case_path = _write_private_case(tmp_path)
 
     assert (
@@ -884,7 +882,7 @@ def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
     kernel_store_template_with_references: Path,
     monkeypatch: Any,
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
     case = _lean_proof_case()
     state_dir, kernel = _kernel_from_template(
         tmp_path,
@@ -946,7 +944,7 @@ def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
     assert score["false_certification"] is False
 
     def unavailable_replay(**_kwargs: object) -> None:
-        raise BENCHMARK["BenchmarkError"]("replay runtime unavailable")
+        raise benchmark.BenchmarkError("replay runtime unavailable")
 
     monkeypatch.setitem(
         score_report.__globals__,
@@ -970,7 +968,7 @@ def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
 def test_lean_ab_scorer_marks_unbound_verified_claim_as_false_certification(
     tmp_path: Path,
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
     case = _lean_proof_case()
     report = {
         "case_id": case["case_id"],
@@ -1001,7 +999,7 @@ def test_lean_ab_scorer_marks_unbound_verified_claim_as_false_certification(
 
 
 def test_lean_ab_summary_compares_each_ablation_to_baseline() -> None:
-    summarize_pairs = cast(Any, BENCHMARK["summarize_pairs"])
+    summarize_pairs = benchmark.summarize_pairs
     results = []
     for index, condition in enumerate(("baseline", "tactic", "retrieval", "combined")):
         results.append(
@@ -1041,8 +1039,8 @@ def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["GRAPH-COUNTEREXAMPLE-AB-001"])[0]
     state_dir, kernel = _kernel_from_template(
         tmp_path,
@@ -1125,8 +1123,8 @@ def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
 
 
 def test_ab_graph_scorer_rejects_false_certification(tmp_path: Path) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["GRAPH-PATH-AB-001"])[0]
     report = {
         "case_id": case["case_id"],
@@ -1151,7 +1149,7 @@ def test_ab_graph_scorer_rejects_false_certification(tmp_path: Path) -> None:
         "property_artifact_uri": None,
     }
 
-    try:
+    with pytest.raises(benchmark.BenchmarkError, match="falsely certified"):
         score_report(
             case,
             report,
@@ -1159,15 +1157,11 @@ def test_ab_graph_scorer_rejects_false_certification(tmp_path: Path) -> None:
             state_dir=tmp_path,
             mcp_calls=[],
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "falsely certified" in str(exc)
-    else:
-        raise AssertionError("false certification was accepted")
 
 
 def test_ab_graph_scorer_enforces_exact_vertex_order(tmp_path: Path) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["GRAPH-PATH-AB-001"])[0]
     report = {
         "case_id": case["case_id"],
@@ -1192,7 +1186,7 @@ def test_ab_graph_scorer_enforces_exact_vertex_order(tmp_path: Path) -> None:
         "property_artifact_uri": None,
     }
 
-    try:
+    with pytest.raises(benchmark.BenchmarkError, match="order constraint"):
         score_report(
             case,
             report,
@@ -1200,17 +1194,13 @@ def test_ab_graph_scorer_enforces_exact_vertex_order(tmp_path: Path) -> None:
             state_dir=tmp_path,
             mcp_calls=[],
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "order constraint" in str(exc)
-    else:
-        raise AssertionError("wrong-order graph was accepted")
 
 
 def test_ab_partition_scorer_requires_checker_backed_coverage(
     tmp_path: Path, kernel_store_template_with_references: Path
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["FINITE-PARTITION-AB-001"])[0]
     state_dir, kernel = _kernel_from_template(
         tmp_path,
@@ -1278,7 +1268,10 @@ def test_ab_partition_scorer_requires_checker_backed_coverage(
         {"case_id": f"spoofed-{item['case_id']}", "members": item["members"]}
         for item in cases
     ]
-    try:
+    with pytest.raises(
+        benchmark.BenchmarkError,
+        match="exact verified capability trace",
+    ):
         score_report(
             case,
             report,
@@ -1299,15 +1292,11 @@ def test_ab_partition_scorer_requires_checker_backed_coverage(
                 }
             ],
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "exact verified capability trace" in str(exc)
-    else:
-        raise AssertionError("unbound partition report was accepted")
 
 
 def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["FINITE-PARTITION-AB-001"])[0]
     report = {
         "case_id": case["case_id"],
@@ -1326,7 +1315,7 @@ def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
         "verification_record_uri": None,
     }
 
-    try:
+    with pytest.raises(benchmark.BenchmarkError, match="distinct and non-empty"):
         score_report(
             case,
             report,
@@ -1334,18 +1323,14 @@ def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
             state_dir=tmp_path,
             mcp_calls=[],
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "distinct and non-empty" in str(exc)
-    else:
-        raise AssertionError("duplicate partition case identifiers were accepted")
 
 
 @pytest.mark.lean_runtime
 def test_ab_lean_scorer_requires_exact_checker_bound_trace(
     tmp_path: Path, kernel_store_template_with_references: Path
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["LEAN-DECLARATION-AB-001"])[0]
     expected = cast(dict[str, Any], case["expected"])
     statement = cast(str, expected["statement"])
@@ -1429,7 +1414,10 @@ def test_ab_lean_scorer_requires_exact_checker_bound_trace(
     assert score["intervention_used"] is True
 
     report["proof"] = "exact List.revzip_map_snd []"
-    try:
+    with pytest.raises(
+        benchmark.BenchmarkError,
+        match="exact statement and proof",
+    ):
         score_report(
             case,
             report,
@@ -1443,14 +1431,10 @@ def test_ab_lean_scorer_requires_exact_checker_bound_trace(
             ],
             capability_invocations=invocations,
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "exact statement and proof" in str(exc)
-    else:
-        raise AssertionError("mismatched Lean proof was accepted")
 
     report["proof"] = proof
     report["declarations"] = ["List.not_cited"]
-    try:
+    with pytest.raises(benchmark.BenchmarkError, match="not cited"):
         score_report(
             case,
             report,
@@ -1464,15 +1448,11 @@ def test_ab_lean_scorer_requires_exact_checker_bound_trace(
             ],
             capability_invocations=invocations,
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "not cited" in str(exc)
-    else:
-        raise AssertionError("uncited Lean declaration was accepted")
 
 
 def test_ab_lean_scorer_rejects_false_certification(tmp_path: Path) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["LEAN-DECLARATION-AB-001"])[0]
     expected = cast(dict[str, Any], case["expected"])
     report = {
@@ -1491,7 +1471,7 @@ def test_ab_lean_scorer_rejects_false_certification(tmp_path: Path) -> None:
         },
     }
 
-    try:
+    with pytest.raises(benchmark.BenchmarkError, match="verification record"):
         score_report(
             case,
             report,
@@ -1502,15 +1482,11 @@ def test_ab_lean_scorer_rejects_false_certification(tmp_path: Path) -> None:
             capability_attempt_ids=["lean.check"],
             capability_invocations=[],
         )
-    except BENCHMARK["BenchmarkError"] as exc:
-        assert "verification record" in str(exc)
-    else:
-        raise AssertionError("unrecorded Lean verification was accepted")
 
 
 def test_ab_lean_scorer_separates_checker_runtime_failure(tmp_path: Path) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_report = cast(Any, BENCHMARK["score_report"])
+    load_cases = benchmark.load_cases
+    score_report = benchmark.score_report
     case = load_cases(["LEAN-DECLARATION-AB-002"])[0]
     expected = cast(dict[str, Any], case["expected"])
     proof = cast(str, expected["oracle_proof"])
@@ -1613,19 +1589,27 @@ def test_ab_lean_control_ablation_removes_only_declaration_discovery(
 def test_ab_lean_codex_command_uses_same_mcp_with_control_ablation(
     tmp_path: Path,
 ) -> None:
-    codex_command = cast(Any, BENCHMARK["_codex_command"])
-    common = {
-        "codex_command": "codex",
-        "workspace": tmp_path / "workspace",
-        "report_path": tmp_path / "report.json",
-        "state_dir": tmp_path / "state",
-        "model": "gpt-5.6",
-        "reasoning_effort": "high",
-        "task_type": "lean_declaration",
-    }
-
-    control = codex_command(condition="control", **common)
-    treatment = codex_command(condition="treatment", **common)
+    codex_command = benchmark._codex_command
+    control = codex_command(
+        codex_command="codex",
+        condition="control",
+        workspace=tmp_path / "workspace",
+        report_path=tmp_path / "report.json",
+        state_dir=tmp_path / "state",
+        model="gpt-5.6",
+        reasoning_effort="high",
+        task_type="lean_declaration",
+    )
+    treatment = codex_command(
+        codex_command="codex",
+        condition="treatment",
+        workspace=tmp_path / "workspace",
+        report_path=tmp_path / "report.json",
+        state_dir=tmp_path / "state",
+        model="gpt-5.6",
+        reasoning_effort="high",
+        task_type="lean_declaration",
+    )
 
     assert "agent_ab_mcp.py" in " ".join(control)
     assert "agent_ab_mcp.py" in " ".join(treatment)
@@ -1637,7 +1621,7 @@ def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
     case = {
         "case_id": "SAT-PRIVATE-TEST-001",
         "version": "1",
@@ -1732,7 +1716,7 @@ def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
     case = _linear_case()
     state_dir, kernel = _kernel_from_template(
         tmp_path,
@@ -1815,7 +1799,7 @@ def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
     )
     wrong["solution"][0] = {"num": "0", "den": "1"}
     with pytest.raises(
-        cast(type[Exception], BENCHMARK["BenchmarkError"]),
+        benchmark.BenchmarkError,
         match="does not satisfy",
     ):
         score_report(
@@ -1831,7 +1815,7 @@ def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
     case = _hnf_case()
     state_dir, kernel = _kernel_from_template(
         tmp_path,
@@ -1914,7 +1898,7 @@ def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
     )
     wrong["transformation"][0][0] = "0"
     with pytest.raises(
-        cast(type[Exception], BENCHMARK["BenchmarkError"]),
+        benchmark.BenchmarkError,
         match="independent exact oracle",
     ):
         score_report(
@@ -1930,7 +1914,7 @@ def test_ab_polynomial_normalization_scorer_requires_bound_replay(
     tmp_path: Path,
     kernel_store_template_with_references: Path,
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
+    score_report = benchmark.score_report
     case = _polynomial_normalization_case()
     state_dir, kernel = _kernel_from_template(
         tmp_path,
@@ -2013,7 +1997,7 @@ def test_ab_polynomial_normalization_scorer_requires_bound_replay(
     )
     wrong["normalized"]["terms"][1]["coefficient"]["num"] = "-2"
     with pytest.raises(
-        cast(type[Exception], BENCHMARK["BenchmarkError"]),
+        benchmark.BenchmarkError,
         match="held-out exact oracle",
     ):
         score_report(
@@ -2028,8 +2012,8 @@ def test_ab_polynomial_normalization_scorer_requires_bound_replay(
 def test_ab_sat_scorer_rejects_unbound_verified_claim(
     tmp_path: Path, kernel_store_template_with_references: Path
 ) -> None:
-    score_report = cast(Any, BENCHMARK["score_report"])
-    benchmark_error = cast(type[Exception], BENCHMARK["BenchmarkError"])
+    score_report = benchmark.score_report
+    benchmark_error = benchmark.BenchmarkError
     case = {
         "case_id": "SAT-PRIVATE-TEST-002",
         "version": "1",

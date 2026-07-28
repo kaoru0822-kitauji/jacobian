@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import json
-import runpy
 import shutil
 from pathlib import Path
-from typing import Any, cast
 
 import pytest
+from benchmarks import agent_mcp as benchmark
 
-from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
+from jacobian.contracts.capabilities import (
+    CapabilityMode,
+    CapabilityRequest,
+    CapabilityResult,
+)
 from jacobian.contracts.evidence import WitnessRole
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-BENCHMARK = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "agent_mcp.py"))
 
 
 def _feedback() -> dict[str, list[str]]:
@@ -33,7 +33,7 @@ def _invoke(
     payload: dict[str, object],
     *,
     mode: CapabilityMode = CapabilityMode.EXPLORE,
-):
+) -> CapabilityResult:
     return kernel.capabilities.invoke(
         CapabilityRequest(capability_id=capability_id, mode=mode, input=payload)
     )
@@ -42,7 +42,7 @@ def _invoke(
 def test_graph_capability_scorer_checks_multi_call_artifacts(
     tmp_path: Path,
 ) -> None:
-    case = BENCHMARK["load_cases"](["GRAPH-ATLAS-PATH-001"])[0]
+    case = benchmark.load_cases(["GRAPH-ATLAS-PATH-001"])[0]
     kernel = JacobianKernel(tmp_path, install_references=True)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
@@ -76,7 +76,7 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
         "feedback": _feedback(),
     }
 
-    score = BENCHMARK["score_run"](
+    score = benchmark.score_run(
         case,
         report,
         state_dir=tmp_path,
@@ -116,10 +116,10 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
     assert score["case_id"] == case["case_id"]
 
     with pytest.raises(
-        BENCHMARK["BenchmarkError"],
+        benchmark.BenchmarkError,
         match="successful search-to-property artifact flow",
     ):
-        BENCHMARK["score_run"](
+        benchmark.score_run(
             case,
             report,
             state_dir=tmp_path,
@@ -133,7 +133,7 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
 
 
 def test_transcript_parser_counts_completed_mcp_calls_once(tmp_path: Path) -> None:
-    parse_transcript = cast(Any, BENCHMARK["parse_transcript"])
+    parse_transcript = benchmark.parse_transcript
     transcript = tmp_path / "transcript.jsonl"
     events = [
         {
@@ -249,8 +249,8 @@ def test_transcript_parser_counts_completed_mcp_calls_once(tmp_path: Path) -> No
 def test_known_answer_scorer_replays_durable_witness_bindings(
     tmp_path: Path,
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_run = cast(Any, BENCHMARK["score_run"])
+    load_cases = benchmark.load_cases
+    score_run = benchmark.score_run
     case = next(case for case in load_cases(["PATH-CLOSURE-001"]) if case["case_id"])
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]
@@ -385,8 +385,8 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
 def test_known_answer_scorer_accepts_verified_positive_witness(
     tmp_path: Path,
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_run = cast(Any, BENCHMARK["score_run"])
+    load_cases = benchmark.load_cases
+    score_run = benchmark.score_run
     case = next(case for case in load_cases(["GRAPH-BIP-TRUE-001"]) if case["case_id"])
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["graph_paths"]
@@ -500,8 +500,8 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
 def test_known_answer_scorer_accepts_bound_lean_certificate(
     tmp_path: Path,
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_run = cast(Any, BENCHMARK["score_run"])
+    load_cases = benchmark.load_cases
+    score_run = benchmark.score_run
     case = next(
         case for case in load_cases(["LEAN-NAT-INDUCTION-001"]) if case["case_id"]
     )
@@ -546,8 +546,8 @@ def test_known_answer_scorer_accepts_bound_lean_certificate(
 def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     tmp_path: Path,
 ) -> None:
-    load_cases = cast(Any, BENCHMARK["load_cases"])
-    score_run = cast(Any, BENCHMARK["score_run"])
+    load_cases = benchmark.load_cases
+    score_run = benchmark.score_run
     case = next(case for case in load_cases(["ERDOS-STRAUS-001"]) if case["case_id"])
     kernel = JacobianKernel(tmp_path, install_references=True)
     reference = kernel.references["erdos_straus"]
