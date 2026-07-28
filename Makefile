@@ -5,7 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 
-.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed test-durations build check check-static validate-full agent-eval
+.PHONY: help setup hooks fix lint lint-full typecheck test test-fast test-contracts test-checkers test-mcp test-storage test-lean test-failed test-durations example-coverage build check check-static validate-full agent-eval
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -68,6 +68,9 @@ test-durations: ## Refresh committed integration shard timings for pytest-split.
 		-m "(integration or end_to_end) and not lean_runtime" \
 		--store-durations --clean-durations --durations-path .test_durations \
 		$(PYTEST_ARGS)
+
+example-coverage: ## Generate capability invocation-example coverage reports.
+	$(UV_RUN) python scripts/capability_example_coverage.py
 
 build: ## Build Python source and wheel distributions.
 	uv build
