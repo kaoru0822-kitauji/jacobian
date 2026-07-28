@@ -101,6 +101,7 @@ def initialized_kernel_store_with_references(
 def kernel(tmp_path: Path, initialized_kernel_store: None) -> JacobianKernel:
     """Attach a kernel to a per-test copy of the core descriptor snapshot."""
 
+    _ = initialized_kernel_store
     return JacobianKernel(tmp_path)
 
 
@@ -111,6 +112,7 @@ def kernel_with_references(
 ) -> JacobianKernel:
     """Attach a kernel to a per-test copy that already has authorized references."""
 
+    _ = initialized_kernel_store_with_references
     return JacobianKernel(tmp_path, install_references=True)
 
 
