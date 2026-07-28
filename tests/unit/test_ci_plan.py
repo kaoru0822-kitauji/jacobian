@@ -9,7 +9,7 @@ import pytest
 
 PLANNER = Path(__file__).parents[2] / ".github" / "scripts" / "classify-ci-paths"
 VALIDATOR = Path(__file__).parents[2] / ".github" / "scripts" / "validate-ci-plan"
-OWNERSHIP = Path(__file__).parents[2] / ".github" / "ci-ownership.json"
+OWNERSHIP = Path(__file__).parents[2] / ".github" / "ci-impact.json"
 
 BOOLEAN_KEYS = (
     "run-python",
@@ -102,6 +102,8 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ("tests/integration/test_lean.py",),
             _expected_plan(
                 "selective",
+                "run-python",
+                "run-integration",
                 "run-lean",
                 "run-static",
             ),
@@ -313,7 +315,11 @@ def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:
 def test_ownership_manifest_names_only_supported_suites() -> None:
     manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
     suites = set(manifest["suites"])
+    rule_names = [rule["name"] for rule in manifest["rules"]]
 
+    assert manifest["version"] == 2
     assert len(suites) == len(manifest["suites"])
+    assert len(rule_names) == len(set(rule_names))
     assert all(set(rule["suites"]) <= suites for rule in manifest["rules"])
+    assert manifest["fallback"]["name"] == "unclassified-fail-closed"
     assert set(manifest["fallback"]["suites"]) == suites
