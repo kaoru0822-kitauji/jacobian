@@ -13,6 +13,17 @@ TEST_ROOTS = {
     "end_to_end",
 }
 LAYER_MARKERS = {"contract", "integration", "end_to_end"}
+INTEGRATION_DOMAINS = {
+    "agent",
+    "domains",
+    "graph",
+    "infrastructure",
+    "lean",
+    "matrix",
+    "polynomial",
+    "sat_smt",
+    "workflow",
+}
 
 
 def test_every_test_module_has_semantic_directory_ownership() -> None:
@@ -42,3 +53,15 @@ def test_layer_ownership_is_not_duplicated_in_markers() -> None:
                 violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
 
     assert violations == []
+
+
+def test_integration_tests_have_domain_ownership() -> None:
+    integration_root = ROOT / "tests" / "integration"
+    root_modules = sorted(path.name for path in integration_root.glob("test_*.py"))
+    domains = {
+        path.relative_to(integration_root).parts[0]
+        for path in integration_root.rglob("test_*.py")
+    }
+
+    assert root_modules == []
+    assert domains == INTEGRATION_DOMAINS

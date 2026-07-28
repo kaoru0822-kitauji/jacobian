@@ -57,11 +57,13 @@ from jacobian.eval_graph_oracle import (
     compute_properties,
     normalize_graph,
 )
-from jacobian.eval_telemetry import parse_agent_transcript as parse_transcript
+from jacobian.eval_telemetry import parse_agent_transcript
 from jacobian.kernel import JacobianKernel
 from jacobian.sat import install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
+
+parse_transcript = parse_agent_transcript
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASES_ROOT = Path(__file__).with_name("ab_cases")
@@ -650,7 +652,7 @@ def _reported_hnf_matrix(
     if not isinstance(entries, list):
         raise BenchmarkError(f"HNF report omitted {field}")
     try:
-        return ExactIntegerMatrix(entries=entries)
+        return ExactIntegerMatrix.model_validate({"entries": entries})
     except ValueError as exc:
         raise BenchmarkError(f"HNF report contains an invalid {field}") from exc
 

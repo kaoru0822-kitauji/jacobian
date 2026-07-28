@@ -6,7 +6,7 @@ on:
       pytest-selector:
         description: One pytest file or node ID to run
         required: true
-        default: tests/integration/test_mcp_adapter.py
+        default: tests/integration/infrastructure/test_mcp_adapter.py
         type: string
       keyword:
         description: Optional pytest -k expression
