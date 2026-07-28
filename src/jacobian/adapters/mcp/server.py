@@ -694,15 +694,14 @@ def create_server(
         response: dict[str, Any] = {
             "kind": "capability",
             "view": view,
-            "full_descriptor_available": view == "COMPACT",
             "policy_profile": capability_catalog.policy_profile,
             "policy_digest": capability_catalog.policy_digest,
             "capability": _capability_descriptor_view(descriptor, view=view),
             "invocations": [
                 {
+                    "name": example.name,
                     **(
                         {
-                            "name": example.name,
                             "description": example.description,
                         }
                         if view == "FULL"
