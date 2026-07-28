@@ -35,6 +35,7 @@ from jacobian.contracts.linear import (
     LinearRationalSolutionFindRequest,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.flint_linear_worker import (
     FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL,
     FLINT_LINEAR_WORKER_PROTOCOL,
@@ -208,6 +209,7 @@ class PythonFlintRationalSolutionFindAdapter:
                 "witness",
                 "python-flint",
             ),
+            invocation_examples=(example("one_by_one_system", "Find the solution of x=1 over QQ.", {"system": {"variables": ["x"], "coefficients": {"entries": [[{"num": "1", "den": "1"}]]}, "rhs": [{"num": "1", "den": "1"}]}}),),
         )
 
     @property
