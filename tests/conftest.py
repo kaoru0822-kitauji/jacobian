@@ -60,10 +60,12 @@ def kernel_store_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.fixture(scope="session")
 def kernel_store_template_with_references(
     tmp_path_factory: pytest.TempPathFactory,
+    kernel_store_template: Path,
 ) -> Path:
     """Build an immutable store that already has authorized references installed."""
 
     template = tmp_path_factory.mktemp("kernel-store-template-with-references")
+    shutil.copytree(kernel_store_template, template, dirs_exist_ok=True)
     kernel = JacobianKernel(template, install_references=True)
     del kernel
     _freeze_kernel_store(template)

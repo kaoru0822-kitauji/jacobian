@@ -34,3 +34,12 @@ repos:
     rev: v1.7.12
     hooks:
       - id: actionlint
+
+  - repo: local
+    hooks:
+      - id: jacobian-pre-push
+        name: Jacobian pre-push checks
+        entry: make check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

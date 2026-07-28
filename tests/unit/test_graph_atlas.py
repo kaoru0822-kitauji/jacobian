@@ -30,6 +30,7 @@ def test_graph_atlas_is_built_once_and_cached_as_frozen_graphs(
     assert all(nx.is_frozen(graph) for graph in first)
 
 
+@pytest.mark.slow
 def test_gallai_edmonds_barrier_certifies_every_graph_through_order_seven() -> None:
     for indexed_graph in nx.graph_atlas_g():
         graph = nx.relabel_nodes(

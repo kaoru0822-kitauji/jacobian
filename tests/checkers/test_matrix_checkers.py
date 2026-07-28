@@ -228,6 +228,7 @@ def test_maximizer_witness_checker_rejects_nonmaximal_bound_candidate() -> None:
     assert decision["accepted"] is False
 
 
+@pytest.mark.slow
 def test_maximizer_witness_checker_replays_all_65536_matrices() -> None:
     matrix = {
         "rows": 4,

@@ -30,6 +30,8 @@ from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _service(tmp_path: Path) -> CapabilityService:
     store = ArtifactStore(tmp_path)

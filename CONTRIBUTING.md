@@ -23,11 +23,12 @@ make setup
 make test-fast
 ```
 
-`make test-fast` is the short non-integration feedback loop. Run `make check`
-before pushing; it performs fast Ruff and non-integration test checks. Push
-after that check and let CI own dependency and dead-code analysis, strict
-typing, package builds, the full Python matrix, integration, end-to-end,
-coverage, and real-Lean validation. `make check-static` reproduces the
+`make test-fast` is the short non-integration feedback loop; it excludes tests
+explicitly marked `slow`. Run `make check` before pushing; it performs fast
+Ruff, strict typing, and non-integration test checks. Push after that check and
+let CI own dependency and dead-code analysis, package builds, the full Python
+matrix, integration, end-to-end, coverage, and real-Lean validation.
+`make check-static` reproduces the
 CI-owned static and package checks when a focused change needs them.
 `make validate-full` is the broadest local Python, Lean, static, and package
 validation target. It does not reproduce CI's Python 3.13 compatibility,
@@ -48,8 +49,10 @@ make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k inducti
 ```
 
 Run `make hooks` once to install the repository's formatting, syntax, secret,
-and large-file checks. `make fix` applies Ruff's safe lint fixes followed by
-formatting.
+and large-file checks plus the `make check` pre-push gate. Hooks remain
+bypassable for exceptional cases with Git's standard `--no-verify` option.
+`make fix` applies Ruff's safe lint fixes followed by formatting. `make
+precommit` applies those fixes and then runs the routine handoff checks.
 
 On macOS, read the
 [Z3 installation note](README.md#macos-and-z3) before troubleshooting a

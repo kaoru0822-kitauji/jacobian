@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import platform
-import sqlite3
 import sysconfig
 from dataclasses import dataclass
 
@@ -74,14 +73,8 @@ class PluginRegistry:
         )
         self._initialize_database()
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.store.db_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
-
     def _initialize_database(self) -> None:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS installed_plugins (
@@ -239,8 +232,9 @@ class PluginRegistry:
             summary="sealed plugin registry snapshot",
         )
 
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
+        with self.store.connection() as connection:
+            if not self.store.transaction_active:
+                connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """
                 INSERT OR IGNORE INTO installed_plugins (
@@ -282,7 +276,7 @@ class PluginRegistry:
     def get(self, plugin_id: str) -> PluginManifest:
         """Return an installed manifest without resolving executable code."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             installed = connection.execute(
                 "SELECT 1 FROM installed_plugins WHERE plugin_id = ?",
                 (plugin_id,),
@@ -301,7 +295,7 @@ class PluginRegistry:
     def snapshot_uri(self, plugin_id: str) -> str:
         """Return the immutable installation snapshot URI without importing code."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             row = connection.execute(
                 """
                 SELECT registry_snapshot_uri

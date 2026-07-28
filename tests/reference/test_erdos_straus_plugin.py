@@ -32,6 +32,7 @@ def test_validate_bounded_range() -> None:
     assert validate_candidate(_candidate(2, 10_001))
 
 
+@pytest.mark.slow
 def test_evaluate_finds_every_decomposition_through_1000() -> None:
     response = evaluate_capability(
         {

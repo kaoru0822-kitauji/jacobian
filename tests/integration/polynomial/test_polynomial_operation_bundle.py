@@ -12,6 +12,8 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _polynomial(
     variables: list[str],

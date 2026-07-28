@@ -14,11 +14,112 @@ import pytest
 from jacobian.canonical import CanonicalizationError
 from jacobian.store import (
     ArtifactIntegrityError,
+    ArtifactNotFoundError,
     ArtifactStore,
     StoreError,
     StoreLimitError,
     StoreLimits,
 )
+
+
+def test_transaction_commits_multiple_descriptors_together(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+
+    with store.transaction():
+        first = store.register_descriptor(
+            kind="schema",
+            name="example.first",
+            version="1",
+            definition={"type": "object"},
+        )
+        second = store.register_descriptor(
+            kind="semantics",
+            name="example.second",
+            version="1",
+            definition={"description": "second"},
+        )
+
+    assert (
+        store.get_descriptor(first, expected_kind="schema")["name"] == "example.first"
+    )
+    assert (
+        store.get_descriptor(second, expected_kind="semantics")["name"]
+        == "example.second"
+    )
+    assert not store.transaction_recovery_path.exists()
+
+
+def test_transactions_serialize_across_store_instances(tmp_path: Path) -> None:
+    first = ArtifactStore(tmp_path)
+    second = ArtifactStore(tmp_path)
+    writer_started = threading.Event()
+    writer_entered = threading.Event()
+
+    def write_from_second_store() -> None:
+        writer_started.set()
+        with second.transaction():
+            writer_entered.set()
+            second.register_descriptor(
+                kind="schema",
+                name="example.concurrent",
+                version="1",
+                definition={"type": "object"},
+            )
+
+    writer = threading.Thread(target=write_from_second_store)
+    with first.transaction():
+        first.register_descriptor(
+            kind="schema",
+            name="example.serialized",
+            version="1",
+            definition={"type": "object"},
+        )
+        writer.start()
+        assert writer_started.wait(timeout=5)
+        assert not writer_entered.wait(timeout=0.1)
+
+    writer.join(timeout=5)
+    assert not writer.is_alive()
+    assert writer_entered.is_set()
+
+
+def test_transaction_rolls_back_metadata_and_recovers_blob_accounting(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    descriptor_uri = ""
+
+    with pytest.raises(RuntimeError, match="abort bootstrap"), store.transaction():
+        descriptor_uri = store.register_descriptor(
+            kind="schema",
+            name="example.rolled-back",
+            version="1",
+            definition={"type": "object"},
+        )
+        raise RuntimeError("abort bootstrap")
+
+    with pytest.raises(ArtifactNotFoundError):
+        store.get_descriptor(descriptor_uri, expected_kind="schema")
+
+    stored_blob_bytes = sum(
+        blob.stat().st_size
+        for prefix in store.blob_root.iterdir()
+        if prefix.is_dir()
+        for blob in prefix.iterdir()
+        if blob.is_file()
+    )
+    assert store._blob_bytes_committed() == stored_blob_bytes
+
+    committed = store.register_descriptor(
+        kind="schema",
+        name="example.after-rollback",
+        version="1",
+        definition={"type": "object"},
+    )
+    assert (
+        store.get_descriptor(committed, expected_kind="schema")["name"]
+        == "example.after-rollback"
+    )
 
 
 @pytest.mark.conformance
@@ -482,6 +583,48 @@ store._write_blob(sys.argv[2].encode("ascii"))
 
     assert reopened._blob_bytes_committed() == len(data)
     assert reopened._read_blob(digest) == data
+
+
+def test_store_open_recovers_process_death_during_store_transaction(
+    tmp_path: Path,
+) -> None:
+    ArtifactStore(tmp_path)
+    script = """
+import os
+import sys
+from jacobian.store import ArtifactStore
+
+store = ArtifactStore(sys.argv[1])
+with store.transaction():
+    store.register_descriptor(
+        kind="schema",
+        name="crashed.transaction",
+        version="1",
+        definition={"type": "object", "description": "published before crash"},
+    )
+    os._exit(0)
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert (tmp_path / ".transaction-recovery").is_file()
+
+    reopened = ArtifactStore(tmp_path)
+    stored_blob_bytes = sum(
+        blob.stat().st_size
+        for prefix in reopened.blob_root.iterdir()
+        if prefix.is_dir()
+        for blob in prefix.iterdir()
+        if blob.is_file()
+    )
+
+    assert reopened._blob_bytes_committed() == stored_blob_bytes
+    assert not reopened.transaction_recovery_path.exists()
 
 
 @pytest.mark.skipif(

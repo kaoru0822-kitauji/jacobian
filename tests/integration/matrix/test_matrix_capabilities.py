@@ -22,6 +22,8 @@ from jacobian.matrix_determinant_capabilities import (
     install_matrix_determinant_checker,
 )
 
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+
 
 def _rational(value: int | Fraction) -> dict[str, str]:
     exact = Fraction(value)

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _graph(

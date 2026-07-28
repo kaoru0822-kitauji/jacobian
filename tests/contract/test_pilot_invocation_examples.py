@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
 _ROOT = Path(__file__).parents[2]
 _PILOT = _ROOT / "benchmarks" / "example_cases" / "pilot.json"
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 _REQUIRED_CAPABILITIES = {
     "finite.coverage.verify",

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.evidence import (
@@ -13,6 +15,8 @@ from jacobian.contracts.evidence import (
 )
 from jacobian.kernel import JacobianKernel
 from jacobian.store import StoredArtifact
+
+pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
 
 
 def _witness_schema_uri(kernel: JacobianKernel) -> str:

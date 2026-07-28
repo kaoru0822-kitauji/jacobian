@@ -38,6 +38,7 @@ from jacobian.contracts.memory import ResearchEpisode
 from jacobian.contracts.results import Coverage, Execution, ExecutionStatus
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.memory import ResearchMemory
+from jacobian.schema_validation import check_draft202012_schema
 from jacobian.store import ArtifactStore, StoreError
 
 if TYPE_CHECKING:
@@ -738,11 +739,11 @@ def load_capability_adapter(
     return cast(CapabilityAdapter, adapter)
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=1024)
 def _compiled_validator(canonical_schema: bytes) -> Draft202012Validator:
     normalized = loads_strict_json(canonical_schema)
     try:
-        Draft202012Validator.check_schema(normalized)
+        check_draft202012_schema(canonical_schema)
     except SchemaError as exc:
         raise CapabilityError("capability JSON Schema is invalid") from exc
     return Draft202012Validator(normalized)

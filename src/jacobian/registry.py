@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import sqlite3
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -23,6 +24,7 @@ from jacobian.provider_runtime import (
     ProviderRuntimeError,
     require_provider_runtime_unchanged,
 )
+from jacobian.store import ArtifactStore, transaction_active_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +47,13 @@ class CheckerExecutableChangedError(CheckerRegistryError):
 
 class CheckerCompatibilityError(CheckerRegistryError):
     """The checker is not authorized for the requested evidence bindings."""
+
+
+class _PolicyLockState(threading.local):
+    """Per-thread nesting state for the cross-process policy lock."""
+
+    def __init__(self) -> None:
+        self.depth = 0
 
 
 def compute_entrypoint_digest(entrypoint: str) -> str:
@@ -77,22 +86,51 @@ def _require_runtime_unchanged(runtime: CapabilityProviderRuntime | None) -> Non
 class CheckerRegistry:
     """Persist operator authorization, compatibility, audit, and revocation."""
 
-    def __init__(self, database_path: str | Path) -> None:
-        self.database_path = Path(database_path)
+    def __init__(self, database: str | Path | ArtifactStore) -> None:
+        if isinstance(database, ArtifactStore):
+            self._store: ArtifactStore | None = database
+            self.database_path = database.db_path
+        else:
+            self._store = None
+            self.database_path = Path(database)
         self.policy_lock_path = self.database_path.with_name(
             self.database_path.name + ".checker-policy.lock"
         )
+        self._policy_lock_state = _PolicyLockState()
         self._initialize_database()
 
     @contextmanager
-    def _exclusive_policy_lock(self) -> Iterator[None]:
-        self.policy_lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.policy_lock_path.open("a+b") as lock_file:
-            _lock_file(lock_file)
+    def policy_transaction(self) -> Iterator[None]:
+        """Hold checker policy authority across related durable writes."""
+
+        if self._policy_lock_state.depth:
+            self._policy_lock_state.depth += 1
             try:
                 yield
             finally:
+                self._policy_lock_state.depth -= 1
+            return
+        if transaction_active_for(self.database_path):
+            raise CheckerRegistryError(
+                "checker policy must be locked before the store transaction"
+            )
+
+        self.policy_lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.policy_lock_path.open("a+b") as lock_file:
+            _lock_file(lock_file)
+            self._policy_lock_state.depth = 1
+            try:
+                yield
+            finally:
+                self._policy_lock_state.depth = 0
                 _unlock_file(lock_file)
+
+    @contextmanager
+    def _policy_write_lock(self) -> Iterator[None]:
+        """Acquire policy before SQLite or reuse an existing outer lock."""
+
+        with self.policy_transaction():
+            yield
 
     @contextmanager
     def verification_guard(
@@ -103,7 +141,7 @@ class CheckerRegistry:
     ) -> Iterator[CheckerRegistration]:
         """Prevent revocation while a verified record is committed."""
 
-        with self._exclusive_policy_lock():
+        with self._policy_write_lock():
             registration = self.require_active(checker_id)
             if registration.executable_digest != expected_digest:
                 raise CheckerExecutableChangedError(
@@ -112,14 +150,24 @@ class CheckerRegistry:
                 )
             yield registration
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        if self._store is not None:
+            with self._store.connection() as connection:
+                yield connection
+            return
+
         connection = sqlite3.connect(self.database_path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _initialize_database(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS checkers (
@@ -196,7 +244,7 @@ class CheckerRegistry:
             registration.model_dump(mode="json", exclude_none=True)
         )
 
-        with self._exclusive_policy_lock(), self._connect() as connection:
+        with self._policy_write_lock(), self._connection() as connection:
             existing = connection.execute(
                 """
                 SELECT registration_json, authorized, executable_digest
@@ -246,7 +294,7 @@ class CheckerRegistry:
     def get(self, checker_id: str) -> CheckerRegistration:
         """Return a checker registration, including its revocation state."""
 
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """
                 SELECT registration_json, authorized, executable_digest
@@ -389,7 +437,7 @@ class CheckerRegistry:
     ) -> CheckerRegistration:
         """Select the unique active checker compatible with an evidence format."""
 
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 "SELECT checker_id FROM checkers WHERE authorized = 1"
             ).fetchall()
@@ -427,7 +475,7 @@ class CheckerRegistry:
     def revoke(self, checker_id: str, *, reason: str) -> None:
         """Block new verification while preserving historical records."""
 
-        with self._exclusive_policy_lock(), self._connect() as connection:
+        with self._policy_write_lock(), self._connection() as connection:
             row = connection.execute(
                 "SELECT authorized FROM checkers WHERE checker_id = ?",
                 (checker_id,),
@@ -456,7 +504,7 @@ class CheckerRegistry:
     def audit_log(self, checker_id: str) -> tuple[CheckerAuditEvent, ...]:
         """Return ordered authorization and revocation events."""
 
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT sequence, checker_id, action, reason, recorded_at

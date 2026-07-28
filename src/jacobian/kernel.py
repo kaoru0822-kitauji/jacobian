@@ -217,10 +217,27 @@ class JacobianKernel:
         capability_exclusions: frozenset[str] = frozenset(),
         capability_policy: CapabilityPolicy | None = None,
     ) -> None:
+        self.store = ArtifactStore(root)
+        self._initialize(
+            install_references=install_references,
+            capability_adapter_entrypoints=capability_adapter_entrypoints,
+            capability_exclusions=capability_exclusions,
+            capability_policy=capability_policy,
+        )
+
+    def _initialize(
+        self,
+        *,
+        install_references: bool,
+        capability_adapter_entrypoints: tuple[str, ...],
+        capability_exclusions: frozenset[str],
+        capability_policy: CapabilityPolicy | None,
+    ) -> None:
+        """Assemble foundational services, then install the portfolio atomically."""
+
         # Construction-time exclusions support controlled portfolio ablations.
         # They are not a runtime authorization or access-control mechanism.
         self._capability_exclusions = capability_exclusions
-        self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
         self.operation_installer = OperationInstaller(
@@ -261,7 +278,7 @@ class JacobianKernel:
         self.memory = ResearchMemory(self.store, self.schemas)
         self.workspaces = WorkspaceService(self.store, self.schemas)
         self.plugins = PluginRegistry(self.store)
-        self.checkers = CheckerRegistry(self.store.db_path)
+        self.checkers = CheckerRegistry(self.store)
         self.claims = ClaimValidationService(
             self.store,
             self.schemas,
@@ -368,6 +385,22 @@ class JacobianKernel:
             self.memory,
             policy=capability_policy,
         )
+        with self.checkers.policy_transaction(), self.store.transaction():
+            self._install_capability_portfolio(
+                install_references=install_references,
+                capability_adapter_entrypoints=capability_adapter_entrypoints,
+                claim_decomposition_adapters=claim_decomposition_adapters,
+            )
+
+    def _install_capability_portfolio(
+        self,
+        *,
+        install_references: bool,
+        capability_adapter_entrypoints: tuple[str, ...],
+        claim_decomposition_adapters: tuple[CapabilityAdapter, ...],
+    ) -> None:
+        """Install capability descriptors and optional checker authority."""
+
         self.register_capability(SatCnfMaterializationAdapter(self.sat))
         self.sat_assignment_checker: SatAssignmentCheckerInstallation
         sat_assignment_adapter, self.sat_assignment_checker = (
