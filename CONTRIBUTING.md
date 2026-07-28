@@ -64,8 +64,8 @@ dispatched Python Debug and Lean Debug workflows reproduce one pytest file or
 node in a prepared remote environment when the relevant local runtime is
 impractical.
 
-CI classifies pull requests through the tested source-to-suite ownership
-manifest in `.github/ci-ownership.json`. Documentation-only changes skip
+CI classifies pull requests through the tested source-to-suite impact
+manifest in `.github/ci-impact.json`. Documentation-only changes skip
 Python, npm, Lean, static, package, security, and duplicate-code lanes.
 Documentation plus npm or npm-only changes run npm packaging without the
 Python and Lean lanes. Unknown paths fail closed to all functional lanes.
@@ -76,10 +76,9 @@ add real-Lean validation to an otherwise isolated plan. These overrides only
 add work; labels cannot reduce the fail-closed path classification.
 Pull requests run the canonical Python version. Merge-queue groups and pushes
 to `main` additionally run supported-version compatibility and combined
-coverage as exhaustive gates. Refresh committed integration shard timings with
-`make test-durations` after substantial suite-shape changes.
-When integration timings materially change, run `make test-durations` and
-commit the refreshed `.test_durations` file with the affected tests.
+coverage as exhaustive gates. Successful `main` runs publish fresh integration
+shard timings. Timing history is not committed, and missing or invalid history
+falls back to equal-weight sharding.
 
 For a quick local feedback loop, skip the integration and end-to-end layers:
 
@@ -151,3 +150,17 @@ Keep each change focused on one outcome. Explain the problem, the resulting
 behavior or contract, any compatibility impact, and the validation performed.
 Link a relevant issue when one exists. Include screenshots only when rendered
 layout or diagrams materially change.
+
+## Test ownership and selection
+
+Test directories define semantic ownership: `tests/unit`, `tests/contract`,
+`tests/checkers`, and `tests/reference` form the core suite, while
+`tests/integration` and `tests/end_to_end` form the integration suite. Use
+`make test-core` and `make test-integration` as the canonical entry points.
+Markers describe runtime traits such as `lean_runtime`, `slow`, `subprocess`, or
+`external_backend`; they do not duplicate directory ownership.
+
+CI change impact is declared in `.github/ci-impact.json`. Its matching rules are
+additive, so a path may require several suites. Integration timing history is a
+scheduling hint produced by successful `main` runs; it is not committed state,
+and missing or invalid history falls back to equal-weight sharding.

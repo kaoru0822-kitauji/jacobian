@@ -1,5 +1,9 @@
 # Test-suite cost audit
 
+> **Historical baseline.** Counts and timings below describe the audit snapshot,
+> not current mutable scheduling state. CI timing hints now come from successful
+> `main` artifacts and may be absent without affecting test selection.
+
 [Documentation home](../index.md)
 
 This audit records the 2026-07-26 local measurements used to restore a short
@@ -121,7 +125,7 @@ and Lean debug workflows provide
 remote reproduction without rerunning unrelated matrices. On the measured
 host, the resulting `make check` completed 256 selected tests in 8.36 seconds.
 
-Source-to-suite ownership is declared in `.github/ci-ownership.json` and tested
+Source-to-suite impact is declared in `.github/ci-impact.json` and tested
 against tracked source files. Unknown paths still fail closed. Each CI run
 reports workflow elapsed time (the observable critical path), summed runner
 minutes, and its longest job, making both reviewer latency and compute growth
@@ -140,11 +144,10 @@ parallel and were not on the measured critical path. Consolidating them would
 increase workflow coupling without materially shortening feedback, so this
 audit leaves them unchanged.
 
-Committed `.test_durations` feeds `pytest-split`'s least-duration algorithm for
-the three integration shards. Refresh with `make test-durations` after large
-suite-shape changes; CI metrics report max/min shard skew and remind
-maintainers when it exceeds 1.5x. Unknown tests receive the recorded average
-duration until the next refresh.
+An ephemeral timing artifact feeds `pytest-split`'s least-duration algorithm
+for the four integration shards. Successful `main` runs publish fresh history;
+missing or invalid history falls back to equal weighting. CI metrics report
+max/min shard skew and flag ratios above 1.5x.
 
 Do not stack a local duration refresh, full integration profiling, and focused
 module debugging on the same host at once. That contention recreates the
