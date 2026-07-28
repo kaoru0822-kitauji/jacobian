@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.polynomials import univariate_term as _term
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -17,13 +18,6 @@ from jacobian.kernel import JacobianKernel
 from jacobian.verification import CheckerExecutionError
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
-
-
-def _term(coefficient: int, exponent: int) -> dict[str, Any]:
-    return {
-        "coefficient": {"num": str(coefficient), "den": "1"},
-        "exponents": [exponent],
-    }
 
 
 def _input(value: int) -> dict[str, Any]:

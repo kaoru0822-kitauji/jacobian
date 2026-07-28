@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests.helpers.rationals import rational_payload as _q
+
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -10,10 +12,6 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.kernel import JacobianKernel
-
-
-def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
-    return {"num": str(numerator), "den": str(denominator)}
 
 
 def _poly(*coefficients_ascending: int) -> dict[str, object]:

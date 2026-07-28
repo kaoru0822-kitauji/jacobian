@@ -1,32 +1,14 @@
 from __future__ import annotations
 
 import copy
-import hashlib
-import json
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import artifact_uri as _uri
+from tests.helpers.artifacts import json_digest as _digest
+from tests.helpers.rationals import rational_payload as _rational
 
 from jacobian_checkers.exact_geometry import check_exact_geometry
-
-
-def _uri(character: str) -> str:
-    return "artifact://sha256/" + character * 64
-
-
-def _digest(value: object) -> str:
-    encoded = json.dumps(
-        value,
-        allow_nan=False,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode()
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
-
-
-def _rational(numerator: int, denominator: int = 1) -> dict[str, str]:
-    return {"num": str(numerator), "den": str(denominator)}
 
 
 def _point(x: int, y: int) -> dict[str, dict[str, str]]:

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.contracts.capabilities import (
@@ -21,10 +22,6 @@ from jacobian.linear_capabilities import (
 )
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
-
-
-def _q(num: int, den: int = 1) -> dict[str, str]:
-    return {"num": str(num), "den": str(den)}
 
 
 def _system(coefficients: list[list[int]], rhs: list[int]) -> dict[str, Any]:

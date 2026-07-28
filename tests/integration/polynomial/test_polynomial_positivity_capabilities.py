@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.polynomials import univariate_term as _term
 
 from jacobian.artifacts import ArtifactService
 from jacobian.contracts.capabilities import (
@@ -26,13 +27,6 @@ from jacobian_checkers.polynomial_positivity import check_positivity
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _term(coefficient: int, exponent: int) -> dict[str, Any]:
-    return {
-        "coefficient": {"num": str(coefficient), "den": "1"},
-        "exponents": [exponent],
-    }
 
 
 def _polynomial(variable: str, terms: list[dict[str, Any]]) -> dict[str, Any]:

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.rationals import rational_payload as _q
 
 import jacobian.provider_runtime as provider_runtime
 from jacobian.bounded_process import BoundedProcessResult
@@ -27,10 +28,6 @@ from jacobian.linear_capabilities import install_linear_rational_solution_checke
 from jacobian.provider_runtime import PYTHON_FLINT_VERSION
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
-
-
-def _q(num: int, den: int = 1) -> dict[str, str]:
-    return {"num": str(num), "den": str(den)}
 
 
 def _system(

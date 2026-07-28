@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import sha256_file as _sha256_file
 
 import jacobian_checkers.smt
 from jacobian.contracts.capabilities import (
@@ -32,10 +32,6 @@ pytestmark = [
 _FIXTURES = Path(__file__).parents[2] / "fixtures" / "smt"
 _PROBLEM = (_FIXTURES / "qf_uf_equality_unsat.smt2").read_text(encoding="ascii")
 _PROOF = (_FIXTURES / "qf_uf_equality_unsat.alethe").read_bytes()
-
-
-def _sha256_file(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _fake_carcara(tmp_path: Path, body: str) -> Path:

@@ -4,12 +4,9 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import artifact_uri as _uri
 
 from jacobian_checkers.polynomial_maps import check_map_inverse
-
-
-def _uri(digit: str) -> str:
-    return "artifact://sha256/" + digit * 64
 
 
 def _term(coefficient: str, exponents: list[int]) -> dict[str, Any]:

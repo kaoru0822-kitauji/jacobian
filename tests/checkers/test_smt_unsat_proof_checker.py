@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import sha256_file as _sha256_file
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -27,10 +28,6 @@ _FIXTURES = Path(__file__).parents[1] / "fixtures" / "smt"
 _QF_UF_PROBLEM = (_FIXTURES / "qf_uf_equality_unsat.smt2").read_text(encoding="ascii")
 _QF_UF_PROOF = (_FIXTURES / "qf_uf_equality_unsat.alethe").read_bytes()
 ProofRequestFactory = Callable[..., dict[str, Any]]
-
-
-def _sha256_file(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _producer() -> CapabilityProviderRuntime:

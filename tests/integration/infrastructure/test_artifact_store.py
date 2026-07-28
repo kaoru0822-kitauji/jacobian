@@ -5,7 +5,6 @@ import sqlite3
 import subprocess
 import sys
 import threading
-import time
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -276,6 +275,7 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     )
     first_accounting = threading.Event()
     release_first = threading.Event()
+    second_started = threading.Event()
     call_lock = threading.Lock()
     accounting_calls = 0
     original_accounting = store._blob_bytes_committed
@@ -293,21 +293,24 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     monkeypatch.setattr(store, "_blob_bytes_committed", paused_accounting)
     outcomes: list[Any] = []
 
-    def commit(data: bytes) -> None:
+    def commit(data: bytes, *, started: threading.Event | None = None) -> None:
+        if started is not None:
+            started.set()
         try:
             outcomes.append(store._write_blob(data))
         except Exception as exc:
             outcomes.append(exc)
 
     first = threading.Thread(target=commit, args=(b"a" * 600,))
-    second = threading.Thread(target=commit, args=(b"b" * 600,))
+    second = threading.Thread(
+        target=commit,
+        args=(b"b" * 600,),
+        kwargs={"started": second_started},
+    )
     first.start()
     assert first_accounting.wait(timeout=1)
     second.start()
-    time.sleep(0.1)
-
-    with call_lock:
-        assert accounting_calls == 1
+    assert second_started.wait(timeout=1)
 
     release_first.set()
     first.join(timeout=2)
@@ -315,6 +318,8 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
 
     assert not first.is_alive()
     assert not second.is_alive()
+    with call_lock:
+        assert accounting_calls == 2
     assert sum(isinstance(outcome, str) for outcome in outcomes) == 1
     assert sum(isinstance(outcome, StoreLimitError) for outcome in outcomes) == 1
 
