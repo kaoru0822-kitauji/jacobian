@@ -201,7 +201,7 @@ jobs:
       - if: needs.plan.outputs.run-security == 'true'
         run: make security-audit
 
-  validate-agents-md:
+  validate-built-package:
     name: Validate Built Package
     needs: [plan, build]
     if: needs.plan.outputs.run-build == 'true'
@@ -791,7 +791,7 @@ jobs:
       - plan
       - lint
       - security-audit
-      - validate-agents-md
+      - validate-built-package
       - core-test
       - integration-test
       - compatibility-test
