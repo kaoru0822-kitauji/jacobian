@@ -44,6 +44,7 @@ RATIONAL_CAPABILITIES = (
         reciprocal,
         "rational",
         "exact",
+        invocation_examples=(example("reciprocal_two_thirds", "Compute the reciprocal of two thirds.", {"value": {"num": "2", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.negation",
@@ -54,6 +55,7 @@ RATIONAL_CAPABILITIES = (
         negation,
         "rational",
         "exact",
+        invocation_examples=(example("negation_two_thirds", "Negate two thirds.", {"value": {"num": "2", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.absolute_value",
@@ -64,6 +66,7 @@ RATIONAL_CAPABILITIES = (
         rational_absolute_value,
         "rational",
         "exact",
+        invocation_examples=(example("absolute_value_negative_three_halves", "Compute the absolute value of negative three halves.", {"value": {"num": "-3", "den": "2"}}),),
     ),
     arithmetic_operation(
         "rational.compute.sum",
@@ -91,6 +94,7 @@ RATIONAL_CAPABILITIES = (
         difference,
         "rational",
         "exact",
+        invocation_examples=(example("three_fourths_minus_one_sixth", "Subtract one sixth from three fourths.", {"left": {"num": "3", "den": "4"}, "right": {"num": "1", "den": "6"}}),),
     ),
     arithmetic_operation(
         "rational.compute.product",
@@ -101,6 +105,7 @@ RATIONAL_CAPABILITIES = (
         product,
         "rational",
         "exact",
+        invocation_examples=(example("two_thirds_times_three_fifths", "Multiply two thirds by three fifths.", {"left": {"num": "2", "den": "3"}, "right": {"num": "3", "den": "5"}}),),
     ),
     arithmetic_operation(
         "rational.compute.quotient",
@@ -111,6 +116,7 @@ RATIONAL_CAPABILITIES = (
         quotient,
         "rational",
         "exact",
+        invocation_examples=(example("three_fourths_divided_by_two_thirds", "Divide three fourths by two thirds.", {"left": {"num": "3", "den": "4"}, "right": {"num": "2", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.minimum",
@@ -121,6 +127,7 @@ RATIONAL_CAPABILITIES = (
         minimum,
         "rational",
         "order",
+        invocation_examples=(example("minimum_one_half_two_thirds", "Find the lesser of one half and two thirds.", {"left": {"num": "1", "den": "2"}, "right": {"num": "2", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.maximum",
@@ -131,6 +138,7 @@ RATIONAL_CAPABILITIES = (
         maximum,
         "rational",
         "order",
+        invocation_examples=(example("maximum_one_half_two_thirds", "Find the greater of one half and two thirds.", {"left": {"num": "1", "den": "2"}, "right": {"num": "2", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.floor",
@@ -141,6 +149,7 @@ RATIONAL_CAPABILITIES = (
         floor,
         "rational",
         "rounding",
+        invocation_examples=(example("floor_seven_thirds", "Compute the floor of seven thirds.", {"value": {"num": "7", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.ceiling",
@@ -151,6 +160,7 @@ RATIONAL_CAPABILITIES = (
         ceiling,
         "rational",
         "rounding",
+        invocation_examples=(example("ceiling_seven_thirds", "Compute the ceiling of seven thirds.", {"value": {"num": "7", "den": "3"}}),),
     ),
     arithmetic_operation(
         "rational.compute.continued_fraction",
@@ -178,6 +188,7 @@ RATIONAL_CAPABILITIES = (
         equal,
         "rational",
         "predicate",
+        invocation_examples=(example("equal_two_fourths_one_half", "Check equality of two equivalent rationals.", {"left": {"num": "2", "den": "4"}, "right": {"num": "1", "den": "2"}}),),
     ),
     arithmetic_operation(
         "rational.decide.less_than",
@@ -188,5 +199,6 @@ RATIONAL_CAPABILITIES = (
         less_than,
         "rational",
         "predicate",
+        invocation_examples=(example("less_than_one_half_two_thirds", "Check whether one half is less than two thirds.", {"left": {"num": "1", "den": "2"}, "right": {"num": "2", "den": "3"}}),),
     ),
 )
