@@ -62,6 +62,14 @@ Timeout, process failure, excessive output, a malformed worker response, or a
 runtime identity change produces no normalization artifact and no mathematical
 conclusion.
 
+The capability normalizes one concrete bounded expression. Any finite
+collection of such results remains finite evidence and does not verify an
+identity parameterized over all exponents or orders. If the conservative
+expanded-term bound exceeds the hard limit, the diagnostic reports
+`EXPANSION_TERM_BUDGET_EXCEEDED`, marks the same input non-retryable, exposes no
+checker payload, and states that increasing the exponent or size under the same
+full-expansion approach is not a universal-proof path.
+
 ## Independent verification
 
 With bundled references enabled,

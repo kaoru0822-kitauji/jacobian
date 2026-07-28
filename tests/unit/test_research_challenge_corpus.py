@@ -73,3 +73,33 @@ def test_public_postdoc_case_ids_and_tier_mix_are_stable() -> None:
         "COMPOSITIONAL_STRETCH": 4,
         "CAPABILITY_GAP_PROBE": 5,
     }
+
+
+def test_magma_implication_oracle_replays_the_minimal_order_two_model() -> None:
+    suite = _read_json(SUITE_PATH)
+    case = next(
+        item for item in suite["cases"] if item["challenge_id"] == "jcb-postdoc-003"
+    )
+    table = ((0, 1), (0, 1))
+
+    def operation(left: int, right: int) -> int:
+        return table[left][right]
+
+    for left in range(2):
+        for right in range(2):
+            assert operation(left, right) == operation(
+                operation(operation(right, left), left),
+                right,
+            )
+    assert operation(operation(0, 1), 1) != operation(operation(1, 0), 0)
+
+    def singleton_operation(left: int, right: int) -> int:
+        assert left == right == 0
+        return 0
+
+    assert singleton_operation(singleton_operation(0, 0), 0) == singleton_operation(
+        singleton_operation(0, 0),
+        0,
+    )
+    assert "two-element" in case["oracle"]["summary"]
+    assert "order one" in " ".join(case["success_criteria"]).lower()

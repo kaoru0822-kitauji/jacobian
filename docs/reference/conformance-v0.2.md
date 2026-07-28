@@ -13,9 +13,10 @@ output are untrusted unless an authorized checker accepts their bound evidence.
 The agent-facing MCP surface consists of `capability.describe` and
 `capability.invoke`. Operation names in this document, such as
 `witness.verify`, are capability IDs rather than additional top-level MCP
-tools. Clients inspect an installed capability's exact schema with
-`capability.describe`, then pass that ID and a schema-valid payload to
-`capability.invoke`.
+tools. Clients inspect an installed capability's validation-equivalent compact
+input schema with `capability.describe`, or request `view = FULL` for the
+complete descriptor and output schema, then pass that ID and a schema-valid
+payload to `capability.invoke`.
 
 ## Result invariants
 

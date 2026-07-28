@@ -183,7 +183,9 @@ class SympyPolynomialExpressionNormalizeAdapter:
             description=(
                 "Convert one bounded, versioned QQ-polynomial AST to canonical "
                 "sparse coefficients without parsing or evaluating user strings. "
-                "Verify the full expression relation separately."
+                "This is one concrete-expression outcome: finitely many "
+                "normalizations do not verify an identity parameterized over all "
+                "orders. Verify each full expression relation separately."
             ),
             provider="jacobian.sympy",
             provider_runtime=runtime,
@@ -255,9 +257,12 @@ class SympyPolynomialExpressionNormalizeAdapter:
                             f"expanded term upper bound at most {budget_error.limit}"
                         ),
                         hint=(
-                            "Keep the expression factored and use an operation that "
-                            "does not require full sparse expansion, or split the "
-                            "calculation into smaller exact polynomial expressions."
+                            "Do not increase the exponent or expression size using "
+                            "the same full-expansion approach. Keep the expression "
+                            "factored, use an operation that does not require full "
+                            "sparse expansion, or split the calculation into smaller "
+                            "exact expressions. Finite normalizations cannot prove "
+                            "an all-orders claim."
                         ),
                         details={
                             "limit": budget_error.limit,
@@ -267,6 +272,11 @@ class SympyPolynomialExpressionNormalizeAdapter:
                             "bound_kind": "CONSERVATIVE_UPPER_BOUND",
                             "requested_exponent": budget_error.requested_exponent,
                             "retryable_with_same_input": False,
+                            "mathematical_scope": "ONE_CONCRETE_TYPED_EXPRESSION",
+                            "supports_universal_claim": False,
+                            "larger_same_family_full_expansions_expected_to_help": (
+                                False
+                            ),
                             "alternatives": [
                                 "use a factored symbolic operation",
                                 "split the expression before normalization",

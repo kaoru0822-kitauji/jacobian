@@ -186,7 +186,7 @@
           "EXACT_COMPUTATION",
           "FORMAL_PROOF"
         ],
-        "summary": "There is a three-element countermodel on Z/3Z with a◇b=2a^2+a+b+2ab mod 3. It satisfies Equation 4155 universally and refutes Equation 4658; the public Equational Theories artifact checks the result in Lean."
+        "summary": "The smallest countermodel is the two-element magma with a◇b=b, whose table is [[0,1],[0,1]]. The premise holds universally, while the target fails at x=0,y=1. Complete exclusion of the unique order-one magma establishes minimality."
       },
       "jacobian_fit": {
         "classification": "DIRECT",
@@ -194,13 +194,13 @@
           "universal_algebra.search.countermodel",
           "universal_algebra.evaluate_laws"
         ],
-        "expected_strength": "The known countermodel order is within the current bounded search envelope, and the law evaluator can replay both universal satisfaction and target failure.",
+        "expected_strength": "Complete fixed-order search excludes order one and finds the two-element right-projection magma; the law evaluator can replay both universal satisfaction and target failure.",
         "known_boundary": "A found model needs a separately inspectable law-evaluation result. Absence at any chosen maximum order proves only nonexistence inside that finite scope."
       },
       "success_criteria": [
         "Finds a finite magma rather than arguing from remembered classification data.",
         "Verifies the premise for every ordered pair and the target failure for a concrete pair.",
-        "Reports the searched order range and whether minimality was actually established.",
+        "Establishes minimality by completely excluding order one before replaying the order-two countermodel.",
         "Preserves the distinction between a solver-produced model and independently replayed law evaluation."
       ],
       "fail_closed_conditions": [

@@ -117,16 +117,23 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
     assert result.output["checker_id"] == (
         kernel.universal_algebra.evaluation_checker_id
     )
+    assert result.output["verification_handoff"] == {
+        "capability_id": "certificate.verify",
+        "mode": "VERIFY",
+        "payload": {
+            "certificate_uri": result.output["certificate_uri"],
+            "checker_id": result.output["checker_id"],
+            "timeout_seconds": 150,
+        },
+    }
     assert "conclusion" not in result.output
 
+    handoff = result.output["verification_handoff"]
     verified = kernel.capabilities.invoke(
         CapabilityRequest(
-            capability_id="certificate.verify",
-            mode=CapabilityMode.VERIFY,
-            input={
-                "certificate_uri": result.output["certificate_uri"],
-                "checker_id": result.output["checker_id"],
-            },
+            capability_id=handoff["capability_id"],
+            mode=CapabilityMode(handoff["mode"]),
+            input=handoff["payload"],
         )
     )
 

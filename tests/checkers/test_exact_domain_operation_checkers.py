@@ -399,6 +399,31 @@ def test_exact_domain_checker_rejects_changed_flint_runtime(
     assert "runtime is unavailable" in decision["detail"]
 
 
+def test_graph_checker_reports_its_actual_exhaustive_replay_method() -> None:
+    checker, checker_request = _CASES[-1]
+
+    decision = checker(checker_request)
+
+    assert decision["accepted"] is True
+    assert decision["detail"] == (
+        "independent finite-subset exhaustive replay accepted "
+        "graph.induced_tree.maximum.compute"
+    )
+    assert "FLINT" not in decision["detail"]
+
+
+def test_graph_checker_does_not_require_the_unrelated_flint_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checker, checker_request = _CASES[-1]
+    monkeypatch.setattr(checker_module.flint, "__version__", "unexpected")
+
+    decision = checker(checker_request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
 def test_square_free_checker_normalizes_flint_factors_to_monic_contract() -> None:
     checker_request = _request(
         "polynomial.compute.square_free_decomposition",

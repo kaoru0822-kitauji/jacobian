@@ -138,14 +138,31 @@ with the same filters and limit to continue. Results report `matched_on` and
 or mathematical strategy. Start with five results, inspect only the strongest
 one or two relevant contracts, then search again only when useful.
 
-Call `capability.describe` again with only one returned `capability_id` to
-inspect its complete input and output schemas, supported modes, provider
-identity, availability, checker requirements, and descriptor-owned invocation
+Call `capability.describe` again with one returned `capability_id` to receive
+the default `COMPACT` exact projection. It includes the complete
+validation-equivalent input schema (annotation/default and discriminator
+routing metadata are omitted), a concise output-schema summary, provider
+identity and availability, supported modes, and descriptor-owned invocation
 examples:
 
 ```json
 {"capability_id": "universal_algebra.search.countermodel"}
 ```
+
+Use `view: "FULL"` when complete output schema, provider configuration,
+licensing, or other audit metadata is required:
+
+```json
+{
+  "capability_id": "universal_algebra.search.countermodel",
+  "view": "FULL"
+}
+```
+
+Once a domain-owned producer fits the outcome, invoke it before separately
+searching for a checker. Follow the checker, certificate, and verification
+fields in the producer result rather than guessing that a generic verifier
+accepts its artifact.
 
 Published invocation examples are validated against the descriptor schema when
 the capability is installed. Domain-owned examples may additionally be

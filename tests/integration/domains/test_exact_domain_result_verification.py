@@ -210,6 +210,11 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     assert verified.output["operation_id"] == "graph.induced_tree.maximum.compute"
     assert verified.output["verification_record_uri"] is not None
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.execution.detail == (
+        "independent finite-subset exhaustive replay accepted "
+        "graph.induced_tree.maximum.compute"
+    )
+    assert "FLINT" not in verified.execution.detail
 
     result_artifact = kernel.store.get(result_uri)
     false_payload = dict(result_artifact.payload)
