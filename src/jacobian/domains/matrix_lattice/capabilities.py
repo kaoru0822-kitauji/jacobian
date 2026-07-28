@@ -22,6 +22,7 @@ from jacobian.contracts.matrix_operations import (
     SquareRationalMatrixRequest,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.domains.matrix_lattice.operations import (
     compute_adjugate,
     compute_characteristic_polynomial,
@@ -50,6 +51,7 @@ def matrix_operation(
     operation: Callable[[Any], ContractModel],
     relation_id: str,
     *tags: str,
+    invocation_examples: tuple = (),
 ) -> ComputedOperation[Any, Any]:
     def implementation(request: ContractModel) -> ComputedOutcome[Any]:
         try:
@@ -89,6 +91,7 @@ def matrix_operation(
         implementation=implementation,
         relation_id=relation_id,
         tags=tags,
+        invocation_examples=invocation_examples,
     )
 
 
@@ -104,6 +107,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "linear-system",
         "exact-rational",
+        invocation_examples=(example("solve_identity_system", "Solve a 2x2 identity linear system.", {"matrix": {"entries": [[{"num": "1", "den": "1"}, {"num": "0", "den": "1"}], [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}]]}, "rhs": [{"num": "3", "den": "1"}, {"num": "4", "den": "1"}]}),),
     ),
     matrix_operation(
         "matrix.adjugate.compute",
@@ -116,6 +120,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "adjugate",
         "exact-integer",
+        invocation_examples=(example("adjugate_two_by_two", "Compute the adjugate of a 2x2 integer matrix.", {"matrix": {"entries": [["1", "2"], ["3", "4"]]}}),),
     ),
     matrix_operation(
         "matrix.inverse.compute",
@@ -128,6 +133,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "inverse",
         "exact-rational",
+        invocation_examples=(example("inverse_two_by_two", "Compute the inverse of a nonsingular 2x2 integer matrix.", {"matrix": {"entries": [["1", "2"], ["3", "4"]]}}),),
     ),
     matrix_operation(
         "matrix.trace.compute",
@@ -140,6 +146,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "trace",
         "exact-integer",
+        invocation_examples=(example("trace_two_by_two", "Compute the trace of a 2x2 integer matrix.", {"matrix": {"entries": [["1", "2"], ["3", "4"]]}}),),
     ),
     matrix_operation(
         "matrix.normal_form.rref.compute",
@@ -152,6 +159,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "rref",
         "exact-rational",
+        invocation_examples=(example("rref_two_by_two", "Compute RREF of a rational matrix.", {"matrix": {"entries": [[{"num": "1", "den": "1"}, {"num": "2", "den": "1"}], [{"num": "2", "den": "1"}, {"num": "4", "den": "1"}]]}}),),
     ),
     matrix_operation(
         "matrix.nullspace.compute",
@@ -164,6 +172,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "nullspace",
         "exact-rational",
+        invocation_examples=(example("nullspace_two_by_two", "Compute a nullspace basis for a dependent matrix.", {"matrix": {"entries": [[{"num": "1", "den": "1"}, {"num": "2", "den": "1"}], [{"num": "2", "den": "1"}, {"num": "4", "den": "1"}]]}}),),
     ),
     matrix_operation(
         "matrix.characteristic_polynomial.compute",
@@ -176,6 +185,7 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "characteristic-polynomial",
         "exact-rational",
+        invocation_examples=(example("characteristic_two_by_two", "Compute the characteristic polynomial of a 2x2 matrix.", {"matrix": {"entries": [[{"num": "1", "den": "1"}, {"num": "2", "den": "1"}], [{"num": "3", "den": "1"}, {"num": "4", "den": "1"}]]}}),),
     ),
     matrix_operation(
         "matrix.normal_form.smith.compute",
@@ -191,5 +201,6 @@ MATRIX_CAPABILITIES = (
         "matrix",
         "smith-normal-form",
         "exact-integer",
+        invocation_examples=(example("smith_two_by_two", "Compute the Smith normal form of a 2x2 integer matrix.", {"matrix": {"entries": [["2", "4"], ["6", "8"]]}}),),
     ),
 )
