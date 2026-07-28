@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.rationals import rational_payload as _q
 
 import jacobian.provider_runtime as provider_runtime
 from jacobian.bounded_process import BoundedProcessResult
@@ -25,10 +26,6 @@ from jacobian.polynomial_expression_capabilities import (
 )
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
-
-
-def _q(num: int | str, den: int | str = 1) -> dict[str, str]:
-    return {"num": str(num), "den": str(den)}
 
 
 def _variable(name: str) -> dict[str, Any]:

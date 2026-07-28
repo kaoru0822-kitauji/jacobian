@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from pytest import MonkeyPatch
+from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.contracts.capabilities import (
@@ -23,10 +24,6 @@ from jacobian.domains.matrix_lattice.lattice import reduce_lattice_basis
 from jacobian.domains.matrix_lattice.operations import compute_smith_normal_form
 from jacobian.kernel import JacobianKernel
 from jacobian.operations import ComputedSuccess, OperationExecutionFailure
-
-
-def _q(value: int, denominator: int = 1) -> dict[str, str]:
-    return {"num": str(value), "den": str(denominator)}
 
 
 def _qq(rows: list[list[int]]) -> dict[str, object]:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.helpers.polynomials import univariate_term as _term
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -11,13 +12,6 @@ from jacobian.contracts.capabilities import (
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
-
-
-def _term(coefficient: int, exponent: int) -> dict[str, object]:
-    return {
-        "coefficient": {"num": str(coefficient), "den": "1"},
-        "exponents": [exponent],
-    }
 
 
 def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(

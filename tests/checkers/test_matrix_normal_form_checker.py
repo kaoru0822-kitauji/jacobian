@@ -1,28 +1,13 @@
 from __future__ import annotations
 
 import copy
-import hashlib
-import json
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import artifact_uri as _uri
+from tests.helpers.artifacts import json_digest as _digest
 
 from jacobian_checkers.matrix_normal_forms import check_hermite_normal_form
-
-
-def _uri(character: str) -> str:
-    return "artifact://sha256/" + character * 64
-
-
-def _digest(value: object) -> str:
-    encoded = json.dumps(
-        value,
-        allow_nan=False,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode()
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def _matrix(entries: list[list[int | str]]) -> dict[str, Any]:

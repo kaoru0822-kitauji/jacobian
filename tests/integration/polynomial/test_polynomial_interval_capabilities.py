@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.polynomials import univariate_term as _term
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
@@ -21,13 +22,6 @@ from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
-
-
-def _term(coefficient: int, exponent: int) -> dict[str, Any]:
-    return {
-        "coefficient": {"num": str(coefficient), "den": "1"},
-        "exponents": [exponent],
-    }
 
 
 def _polynomial(variable: str, terms: list[dict[str, Any]]) -> dict[str, Any]:

@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from tests.helpers.artifacts import artifact_uri as _uri
 
 from jacobian.contracts.shrinking import ShrinkResult
 from jacobian.contracts.witness_search import (
     PluginWitnessResponse,
     WitnessFindResult,
 )
-
-
-def _uri(fill: str) -> str:
-    return "artifact://sha256/" + fill * 64
 
 
 def _digest(fill: str) -> str:

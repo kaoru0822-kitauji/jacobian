@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import sha256_file as _sha256_file
 
 import jacobian_checkers.sat
 from jacobian.contracts.capabilities import (
@@ -28,10 +28,6 @@ from jacobian.verification import CheckerExecutionError, _environment_digest
 pytestmark = [
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
-
-
-def _sha256_file(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _fake_drat_trim(tmp_path: Path, body: str) -> Path:

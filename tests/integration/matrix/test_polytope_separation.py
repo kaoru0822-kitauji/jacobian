@@ -5,22 +5,13 @@ import math
 from pathlib import Path
 
 import pytest
+from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
-
-
-def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
-    divisor = math.gcd(numerator, denominator)
-    numerator //= divisor
-    denominator //= divisor
-    if denominator < 0:
-        numerator = -numerator
-        denominator = -denominator
-    return {"num": str(numerator), "den": str(denominator)}
 
 
 def _simplex(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests.helpers.artifacts import artifact_uri as _uri
+
 from jacobian.contracts.matrix_operations import (
     IntegerMatrixRequest,
     RationalMatrixRequest,
@@ -17,10 +19,6 @@ from jacobian.contracts.results import ContractModel
 from jacobian.exact_domain_checkers import install_exact_domain_checkers
 from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.registry import CheckerRegistry
-
-
-def _uri(character: str) -> str:
-    return "artifact://sha256/" + character * 64
 
 
 def _installed(

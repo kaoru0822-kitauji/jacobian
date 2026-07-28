@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import sha256_file as _sha256_file
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -25,10 +26,6 @@ from jacobian_checkers.sat import check_unsat_proof
 
 _DEFAULT_PROOF = b"-1 0\n0\n"
 ProofRequestFactory = Callable[[bytes], dict[str, Any]]
-
-
-def _sha256_file(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _producer() -> CapabilityProviderRuntime:

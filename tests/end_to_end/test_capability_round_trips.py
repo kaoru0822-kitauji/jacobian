@@ -8,16 +8,13 @@ from typing import Any
 
 import pytest
 from mcp import Client
+from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.adapters.mcp.server import create_server
 
 pytestmark = [
     pytest.mark.usefixtures("initialized_kernel_store_with_references"),
 ]
-
-
-def _q(value: int) -> dict[str, str]:
-    return {"num": str(value), "den": "1"}
 
 
 def _polynomial(*coefficients_ascending: int) -> dict[str, object]:
