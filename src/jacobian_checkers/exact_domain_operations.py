@@ -311,9 +311,11 @@ def _run(
     operation_id: str,
     witness_format: str,
     replay: Callable[[dict[str, Any], dict[str, Any]], bool],
+    replay_method: str = "Python-FLINT replay",
+    requires_python_flint: bool = True,
 ) -> dict[str, Any]:
     try:
-        if (
+        if requires_python_flint and (
             flint.__version__ != _PYTHON_FLINT_VERSION
             or flint.__FLINT_VERSION__ != _FLINT_VERSION
         ):
@@ -324,8 +326,10 @@ def _run(
             witness_format=witness_format,
         )
         if not replay(source, result):
-            return _reject("declared result does not match independent FLINT replay")
-        return _accept(f"independent Python-FLINT replay accepted {operation_id}")
+            return _reject(
+                f"declared result does not match independent {replay_method}"
+            )
+        return _accept(f"independent {replay_method} accepted {operation_id}")
     except (KeyError, TypeError, ValueError, ZeroDivisionError, OverflowError):
         return _reject("malformed, unsupported, or mismatched checker request")
 
@@ -739,6 +743,8 @@ def check_graph_induced_tree_maximum(request: dict[str, Any]) -> dict[str, Any]:
         operation_id="graph.induced_tree.maximum.compute",
         witness_format="graph.induced-tree.maximum.exhaustive-replay",
         replay=_induced_tree_maximum,
+        replay_method="finite-subset exhaustive replay",
+        requires_python_flint=False,
     )
 
 

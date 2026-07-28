@@ -42,17 +42,24 @@ Discovery:
 - Ranking is deterministic retrieval over published IDs, titles, descriptions, and
   tags. Match fields and terms are returned; results are candidates, not
   recommendations.
-- Search repeatedly across concepts or domains and compose any number of capabilities.
-  Jacobian does not prescribe a mathematical workflow.
+- Once a domain-owned match fits the required outcome, inspect only the strongest one
+  or two candidates. Search again when none fits. Invoke a producer before looking
+  for its checker, then follow the checker, certificate, and verification fields in
+  the producer result instead of guessing a generic verifier.
+- Compose capabilities as the investigation requires; Jacobian does not prescribe a
+  mathematical workflow.
 
 Exact inspection:
-- Pass only `capability_id` to receive the complete descriptor, schemas, provider
-  identity, and validated invocation examples.
+- Pass `capability_id` for the default COMPACT projection: complete input schema,
+  concise output/runtime summary, and validated invocation examples.
+- Add `view="FULL"` only when complete output schema, provider configuration, or
+  audit metadata is needed.
 
 Examples:
 - `{"query":"find a counterexample to associativity","domain":"universal_algebra","mode":"EXPLORE","limit":5}`
 - `{"query":"verify a polynomial identity","mode":"VERIFY","limit":5}`
 - `{"capability_id":"polynomial.compute.gcd"}`
+- `{"capability_id":"polynomial.compute.gcd","view":"FULL"}`
 """
 
 CAPABILITY_INVOKE_DESCRIPTION = """\
@@ -102,11 +109,15 @@ filters and limit when a discovery result is truncated. Start with `limit=5`; in
 only the strongest one or two relevant candidates before broadening or paging.
 
 Search as many outcomes, concepts, or domains as useful. For any candidate, call
-`capability.describe(capability_id=...)` with only its exact ID, then follow the
-returned input schema or validated invocation example. Compose `capability.invoke`
-calls in whatever sequence the mathematical investigation requires. Inspect
-execution, scope, completeness, relationships, obligations, assurance, diagnostics,
-and artifacts as separate result dimensions.
+`capability.describe(capability_id=...)` for a compact exact contract, then follow
+the returned input schema or validated invocation example. Request `view="FULL"`
+only when complete output schema or provider audit metadata is needed. Once one
+domain-owned outcome fits, invoke it before searching for a checker; follow the
+checker, certificate, and verification fields returned by the producer instead of
+guessing a generic verifier. Compose `capability.invoke` calls in whatever sequence
+the mathematical investigation requires. Inspect execution, scope, completeness,
+relationships, obligations, assurance, diagnostics, and artifacts as separate
+result dimensions.
 
 `capability://catalog` is the complete machine-readable installed inventory.
 `capability.describe` is the agent-oriented discovery and exact-inspection surface.
@@ -125,6 +136,11 @@ Execution status is not a mathematical conclusion. `COMPLETED` bounded execution
 still have partial or unknown completeness and open obligations. A timeout,
 cancellation, error, incomplete enumeration, or failure to find a witness is a
 non-conclusion.
+
+A finite collection of concrete parameter checks remains finite evidence and cannot
+establish an all-parameters or all-orders claim. A hard expression-growth diagnostic
+also remains a non-conclusion; increasing the size of the same full-expansion family
+does not turn that bounded operation into a symbolic proof.
 
 ## Artifacts and workspaces
 

@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
@@ -141,6 +141,83 @@ def _capability_inspection_extensions(
     return extensions
 
 
+def _compact_json_schema(value: Any) -> Any:
+    """Drop annotation-only prose while preserving validation semantics."""
+
+    if isinstance(value, dict):
+        return {
+            key: _compact_json_schema(item)
+            for key, item in value.items()
+            if key
+            not in {
+                "$comment",
+                "default",
+                "deprecated",
+                "description",
+                "discriminator",
+                "examples",
+                "readOnly",
+                "title",
+                "writeOnly",
+            }
+        }
+    if isinstance(value, list):
+        return [_compact_json_schema(item) for item in value]
+    return value
+
+
+def _output_schema_summary(schema: dict[str, Any]) -> dict[str, Any]:
+    properties = schema.get("properties")
+    summary: dict[str, Any] = {
+        "type": schema.get("type"),
+        "required": schema.get("required", []),
+        "property_names": (sorted(properties) if isinstance(properties, dict) else []),
+    }
+    if "$ref" in schema:
+        summary["$ref"] = schema["$ref"]
+    if "oneOf" in schema:
+        summary["one_of_variants"] = len(schema["oneOf"])
+    if "anyOf" in schema:
+        summary["any_of_variants"] = len(schema["anyOf"])
+    return summary
+
+
+def _capability_descriptor_view(
+    descriptor: CapabilityDescriptor,
+    *,
+    view: Literal["COMPACT", "FULL"],
+) -> dict[str, Any]:
+    if view == "FULL":
+        return descriptor.model_dump(mode="json")
+    runtime = descriptor.provider_runtime
+    runtime_summary = (
+        runtime.model_dump(
+            mode="json",
+            exclude_none=True,
+            include={
+                "availability",
+                "version",
+                "digest",
+                "checker_ids",
+                "diagnostic",
+            },
+        )
+        if runtime is not None
+        else None
+    )
+    return {
+        "capability_id": descriptor.capability_id,
+        "version": descriptor.version,
+        "title": descriptor.title,
+        "description": descriptor.description,
+        "provider": descriptor.provider,
+        "provider_runtime": runtime_summary,
+        "modes": [mode.value for mode in descriptor.modes],
+        "input_schema": _compact_json_schema(descriptor.input_schema),
+        "output_schema_summary": _output_schema_summary(descriptor.output_schema),
+    }
+
+
 WORKSPACE_TOOL_NAMES = frozenset(
     {"workspace.open", "workspace.write", "workspace.query"}
 )
@@ -253,6 +330,17 @@ def _capability_discovery_response(
             "tool": "capability.describe",
             "argument": "capability_id",
             "choose_from": "matches[].capability_id",
+        },
+        "routing_guidance": {
+            "inspect_candidates": (
+                "Inspect only the strongest one or two domain-relevant matches; "
+                "search again only when none fits the required outcome."
+            ),
+            "verification_handoff": (
+                "Invoke the selected producer before searching for a checker; "
+                "follow checker, certificate, and verification fields returned by "
+                "the producer result instead of guessing a generic verifier."
+            ),
         },
         "response_byte_limit": CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT,
         "truncation_reason": None,
@@ -546,6 +634,17 @@ def create_server(
                 ),
             ),
         ] = None,
+        view: Annotated[
+            Literal["COMPACT", "FULL"],
+            Field(
+                description=(
+                    "Exact-lookup projection. COMPACT is the agent-facing default "
+                    "with the complete input schema and a concise output/runtime "
+                    "summary. FULL returns the complete installed descriptor for "
+                    "audit or client generation. Omit for discovery."
+                )
+            ),
+        ] = "COMPACT",
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_kernel = _kernel(ctx)
@@ -594,13 +693,21 @@ def create_server(
             }
         response: dict[str, Any] = {
             "kind": "capability",
+            "view": view,
+            "full_descriptor_available": view == "COMPACT",
             "policy_profile": capability_catalog.policy_profile,
             "policy_digest": capability_catalog.policy_digest,
-            "capability": descriptor.model_dump(mode="json"),
+            "capability": _capability_descriptor_view(descriptor, view=view),
             "invocations": [
                 {
-                    "name": example.name,
-                    "description": example.description,
+                    **(
+                        {
+                            "name": example.name,
+                            "description": example.description,
+                        }
+                        if view == "FULL"
+                        else {}
+                    ),
                     "tool": "capability.invoke",
                     "arguments": {
                         "capability_id": descriptor.capability_id,

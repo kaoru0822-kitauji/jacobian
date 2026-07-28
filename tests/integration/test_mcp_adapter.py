@@ -18,6 +18,7 @@ from jacobian.adapters.mcp.server import (
     create_server,
 )
 from jacobian.capabilities import CapabilityPolicy
+from jacobian.contracts.capabilities import CapabilityDescriptor
 
 CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}
 MCP_TOOL_NAMES = CAPABILITY_TOOL_NAMES | WORKSPACE_TOOL_NAMES
@@ -68,6 +69,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 "mode",
                 "limit",
                 "cursor",
+                "view",
             }
             assert describe_schema["additionalProperties"] is False
             assert (
@@ -116,6 +118,14 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 "argument": "capability_id",
                 "choose_from": "matches[].capability_id",
             }
+            assert discovery["routing_guidance"]["inspect_candidates"] == (
+                "Inspect only the strongest one or two domain-relevant matches; "
+                "search again only when none fits the required outcome."
+            )
+            assert (
+                "producer result"
+                in discovery["routing_guidance"]["verification_handoff"]
+            )
 
             catalog_result = await client.read_resource("capability://catalog")
             catalog = json.loads(catalog_result.contents[0].text)
@@ -130,9 +140,10 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             if "lean.check" in capability_ids:
                 lean_result = await client.call_tool(
                     "capability.describe",
-                    {"capability_id": "lean.check"},
+                    {"capability_id": "lean.check", "view": "FULL"},
                 )
                 lean_contract = json.loads(lean_result.content[0].text)
+                assert lean_contract["view"] == "FULL"
                 lean_runtime = lean_contract["capability"]["provider_runtime"]
                 assert lean_runtime["install_tier"] == "T3"
                 assert (
@@ -461,10 +472,14 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                 "capability.describe", {"capability_id": "knowledge.search"}
             )
             contract = json.loads(described.content[0].text)
+            assert contract["view"] == "COMPACT"
             assert contract["capability"]["capability_id"] == "knowledge.search"
             assert contract["capability"]["provider_runtime"]["digest"].startswith(
                 "sha256:"
             )
+            assert "configuration" not in contract["capability"]["provider_runtime"]
+            assert "output_schema" not in contract["capability"]
+            assert "output_schema_summary" in contract["capability"]
 
             result = await client.call_tool(
                 "capability.invoke",
@@ -478,7 +493,7 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert response["execution"]["status"] == "COMPLETED"
             assert response["assurance"]["level"] == "COMPUTED"
             runtime = contract["capability"]["provider_runtime"]
-            assert response["provider"] == runtime["provider"]
+            assert response["provider"] == contract["capability"]["provider"]
             assert response["provider_digest"] == runtime["digest"]
 
             unknown = await client.call_tool(
@@ -492,6 +507,53 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             unknown_result = json.loads(unknown.content[0].text)
             assert unknown.is_error is False
             assert unknown_result["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.integration
+def test_mcp_exact_description_defaults_to_compact_with_full_audit_view(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+            compact_result = await client.call_tool(
+                "capability.describe",
+                {"capability_id": "polynomial.expression.normalize"},
+            )
+            full_result = await client.call_tool(
+                "capability.describe",
+                {
+                    "capability_id": "polynomial.expression.normalize",
+                    "view": "FULL",
+                },
+            )
+            compact = json.loads(compact_result.content[0].text)
+            full = json.loads(full_result.content[0].text)
+
+            assert compact["view"] == "COMPACT"
+            assert compact["full_descriptor_available"] is True
+            assert compact["capability"]["input_schema"]["type"] == "object"
+            assert compact["invocations"]
+            assert full["view"] == "FULL"
+            assert full["full_descriptor_available"] is False
+            assert "output_schema" in full["capability"]
+            assert "configuration" in full["capability"]["provider_runtime"]
+            CapabilityDescriptor.model_validate(full["capability"])
+            payload = compact["invocations"][0]["arguments"]["payload"]
+            compact_validator = Draft202012Validator(
+                compact["capability"]["input_schema"]
+            )
+            full_validator = Draft202012Validator(full["capability"]["input_schema"])
+            assert compact_validator.is_valid(payload)
+            assert full_validator.is_valid(payload)
+            assert not compact_validator.is_valid({})
+            assert not full_validator.is_valid({})
+            assert len(compact_result.content[0].text) * 2 < len(
+                full_result.content[0].text
+            )
 
     asyncio.run(scenario())
 

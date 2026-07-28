@@ -110,6 +110,9 @@ def test_expansion_term_budget_failure_is_specific_and_non_retryable(
         "bound_kind": "CONSERVATIVE_UPPER_BOUND",
         "requested_exponent": 4,
         "retryable_with_same_input": False,
+        "mathematical_scope": "ONE_CONCRETE_TYPED_EXPRESSION",
+        "supports_universal_claim": False,
+        "larger_same_family_full_expansions_expected_to_help": False,
         "alternatives": [
             "use a factored symbolic operation",
             "split the expression before normalization",
@@ -119,6 +122,9 @@ def test_expansion_term_budget_failure_is_specific_and_non_retryable(
         "checker_input_available": False,
     }
     assert result.artifact_uris == ()
+    assert "Finite normalizations cannot prove an all-orders claim" in (
+        diagnostic.hint or ""
+    )
 
 
 def _difference_of_squares_plus_half_x() -> dict[str, Any]:

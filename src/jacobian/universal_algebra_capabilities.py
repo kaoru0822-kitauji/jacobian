@@ -52,10 +52,12 @@ from jacobian.contracts.universal_algebra import (
     MagmaLawCoverage,
     MagmaLawEvaluationRecord,
     MagmaTerm,
+    UniversalAlgebraCertificateVerificationPayload,
     UniversalAlgebraCountermodelSearchOutput,
     UniversalAlgebraCountermodelSearchRequest,
     UniversalAlgebraEvaluationOutput,
     UniversalAlgebraEvaluationRequest,
+    UniversalAlgebraVerificationHandoff,
 )
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
@@ -321,6 +323,16 @@ class UniversalAlgebraEvaluateLawsAdapter:
             certificate_uri=certificate_artifact.artifact_uri,
             checker_id=self.resources.installation.evaluation_checker_id,
             records=records,
+            verification_handoff=(
+                UniversalAlgebraVerificationHandoff(
+                    payload=UniversalAlgebraCertificateVerificationPayload(
+                        certificate_uri=certificate_artifact.artifact_uri,
+                        checker_id=self.resources.installation.evaluation_checker_id,
+                    )
+                )
+                if self.resources.installation.evaluation_checker_id is not None
+                else None
+            ),
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
