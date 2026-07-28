@@ -33,6 +33,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderRuntime,
     CapabilityRequest,
@@ -577,6 +578,23 @@ class LeanProofStateAdapter:
             input_schema=LeanProofStateRequest.model_json_schema(),
             output_schema=LeanProofStateOutput.model_json_schema(),
             tags=("lean", "proof-state", "tactic", "exploration"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="close_true_with_trivial",
+                    description=(
+                        "Apply trivial to a replayable proof state for True; "
+                        "a completed transition still requires lean.check."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input=LeanProofStateRequest.model_validate(
+                        {
+                            "environment": "CORE",
+                            "statement": "True",
+                            "tactic": "trivial",
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
         )
 
     @property

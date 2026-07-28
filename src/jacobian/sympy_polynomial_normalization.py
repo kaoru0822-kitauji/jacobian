@@ -19,6 +19,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
@@ -195,6 +196,29 @@ class SympyPolynomialExpressionNormalizeAdapter:
                 "typed-expression",
                 "exact-rational",
                 "sympy",
+            ),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="combine_like_terms",
+                    description=(
+                        "Normalize x + x to canonical sparse coefficients over QQ."
+                    ),
+                    mode=CapabilityMode.EXPLORE,
+                    input=PolynomialExpressionNormalizeRequest.model_validate(
+                        {
+                            "expression": {
+                                "variables": ["x"],
+                                "expression": {
+                                    "kind": "add",
+                                    "operands": [
+                                        {"kind": "variable", "name": "x"},
+                                        {"kind": "variable", "name": "x"},
+                                    ],
+                                },
+                            }
+                        }
+                    ).model_dump(mode="json"),
+                ),
             ),
         )
 

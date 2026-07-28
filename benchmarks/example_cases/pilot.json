@@ -1,0 +1,127 @@
+{
+  "pilot_version": "1",
+  "human_review": "REQUIRED",
+  "cases": [
+    {
+      "capability_id": "graph.compute.properties",
+      "valid_case": "path_property_batch",
+      "invalid_or_boundary_case": "unsupported_invariant",
+      "public_example": null,
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_graph_capabilities.py",
+      "validation": ["SCHEMA", "EXECUTION", "THIRD_PARTY_NETWORKX"]
+    },
+    {
+      "capability_id": "graph.invariant.diameter.compute",
+      "valid_case": "three_vertex_path",
+      "invalid_or_boundary_case": "disconnected_not_applicable",
+      "public_example": null,
+      "status": "KNOWN_REGRESSION",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_graph_invariant_domain.py",
+      "notes": "The specialized capability still returns diameter=-1 for a disconnected graph; do not publish this boundary as valid NOT_APPLICABLE behavior.",
+      "validation": ["SCHEMA", "EXECUTION", "THIRD_PARTY_NETWORKX"]
+    },
+    {
+      "capability_id": "polynomial.identity.verify",
+      "valid_case": "zero_identity",
+      "invalid_or_boundary_case": "different_coefficients_verify_false",
+      "public_example": "zero_identity",
+      "status": "PILOT",
+      "origin": "DIRECT_INVOCATION",
+      "source": "tests/integration/test_polynomial_capabilities.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_VERIFIER", "THIRD_PARTY_SYMPY"]
+    },
+    {
+      "capability_id": "polynomial.expression.normalize",
+      "valid_case": "combine_like_terms",
+      "invalid_or_boundary_case": "unsupported_ast_node",
+      "public_example": "combine_like_terms",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_polynomial_expression_normalization.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_VERIFIER", "THIRD_PARTY_SYMPY"]
+    },
+    {
+      "capability_id": "polynomial.expression_normalization.verify",
+      "valid_case": "verify_full_ast_relation",
+      "invalid_or_boundary_case": "tampered_coefficient",
+      "public_example": null,
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_polynomial_expression_normalization.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_VERIFIER"]
+    },
+    {
+      "capability_id": "polynomial.map.inverse.candidate_synthesize",
+      "valid_case": "triangular_inverse",
+      "invalid_or_boundary_case": "zero_timeout",
+      "public_example": "triangular_inverse",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_polynomial_map_inverse_synthesize.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_VERIFIER", "THIRD_PARTY_SYMPY"]
+    },
+    {
+      "capability_id": "polynomial.map.inverse.verify",
+      "valid_case": "identity_map_inverse",
+      "invalid_or_boundary_case": "perturbed_inverse_verifies_false",
+      "public_example": "identity_map_inverse",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_polynomial_map_inverse_verify.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_VERIFIER", "THIRD_PARTY_SYMPY"]
+    },
+    {
+      "capability_id": "finite.coverage.verify",
+      "valid_case": "two_page_exact_coverage",
+      "invalid_or_boundary_case": "omission_and_duplicate",
+      "public_example": "two_page_exact_coverage",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_finite_coverage_capability.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_VERIFIER", "THIRD_PARTY_EXHAUSTIVE"]
+    },
+    {
+      "capability_id": "lean.statement.propose",
+      "valid_case": "elaborate_true",
+      "invalid_or_boundary_case": "unknown_declaration",
+      "public_example": "elaborate_true",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_lean_statement_capabilities.py",
+      "validation": ["SCHEMA", "EXECUTION", "THIRD_PARTY_LEAN"]
+    },
+    {
+      "capability_id": "lean.proof_state.apply_tactic",
+      "valid_case": "close_true_with_trivial",
+      "invalid_or_boundary_case": "unknown_tactic",
+      "public_example": "close_true_with_trivial",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_lean_replayable_state_capability.py",
+      "validation": ["SCHEMA", "EXECUTION", "THIRD_PARTY_LEAN"]
+    },
+    {
+      "capability_id": "knowledge.search",
+      "valid_case": "graph_counterexample_episodes",
+      "invalid_or_boundary_case": "no_matches",
+      "public_example": "graph_counterexample_episodes",
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_capability_service.py",
+      "validation": ["SCHEMA", "EXECUTION"]
+    },
+    {
+      "capability_id": "search.enumerate",
+      "valid_case": "bounded_fixture_enumeration",
+      "invalid_or_boundary_case": "unsupported_verify_mode",
+      "public_example": null,
+      "status": "PILOT",
+      "origin": "ADAPTED_INVOCATION",
+      "source": "tests/integration/test_enumeration_experiments.py",
+      "validation": ["SCHEMA", "EXECUTION", "INTERNAL_ACCOUNTING"]
+    }
+  ]
+}
