@@ -32,6 +32,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         prefix_sums,
         "sequence",
         "transform",
+        invocation_examples=(example("prefix_sums_1_2_3", "Compute prefix sums of 1, 2, and 3.", {"values": ["1", "2", "3"]}),),
     ),
     sequence_operation(
         "sequence.compute.first_differences",
@@ -59,6 +60,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         prefix_products,
         "sequence",
         "transform",
+        invocation_examples=(example("prefix_products_2_3_4", "Compute prefix products of 2, 3, and 4.", {"values": ["2", "3", "4"]}),),
     ),
     sequence_operation(
         "sequence.compute.prefix_minima",
@@ -69,6 +71,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         prefix_minima,
         "sequence",
         "transform",
+        invocation_examples=(example("prefix_minima_3_1_2", "Compute prefix minima of 3, 1, and 2.", {"values": ["3", "1", "2"]}),),
     ),
     sequence_operation(
         "sequence.compute.prefix_maxima",
@@ -79,6 +82,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         prefix_maxima,
         "sequence",
         "transform",
+        invocation_examples=(example("prefix_maxima_1_3_2", "Compute prefix maxima of 1, 3, and 2.", {"values": ["1", "3", "2"]}),),
     ),
     sequence_operation(
         "sequence.compute.prefix_gcds",
@@ -106,6 +110,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         prefix_lcms,
         "sequence",
         "divisibility",
+        invocation_examples=(example("prefix_lcms_2_3_4", "Compute prefix lcms of 2, 3, and 4.", {"values": ["2", "3", "4"]}),),
     ),
     sequence_operation(
         "sequence.compute.second_differences",
@@ -116,6 +121,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         second_differences,
         "sequence",
         "transform",
+        invocation_examples=(example("second_differences_squares", "Compute second differences of consecutive squares.", {"values": ["1", "4", "9", "16"]}),),
     ),
     sequence_operation(
         "sequence.transform.sorted_unique",
@@ -126,6 +132,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         sorted_unique,
         "sequence",
         "transform",
+        invocation_examples=(example("sorted_unique_3_1_3_2", "Sort and deduplicate a sequence.", {"values": ["3", "1", "3", "2"]}),),
     ),
     sequence_operation(
         "sequence.transform.sort",
@@ -136,6 +143,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         sort_sequence,
         "sequence",
         "transform",
+        invocation_examples=(example("sort_3_1_2", "Sort an integer sequence.", {"values": ["3", "1", "2"]}),),
     ),
     sequence_operation(
         "sequence.transform.reverse",
@@ -146,6 +154,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         reverse_sequence,
         "sequence",
         "transform",
+        invocation_examples=(example("reverse_1_2_3", "Reverse an integer sequence.", {"values": ["1", "2", "3"]}),),
     ),
     sequence_operation(
         "sequence.transform.parities",
@@ -156,6 +165,7 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         parities,
         "sequence",
         "transform",
+        invocation_examples=(example("parities_1_2_3", "Compute parities of 1, 2, and 3.", {"values": ["1", "2", "3"]}),),
     ),
     sequence_operation(
         "sequence.transform.signs",
@@ -166,5 +176,6 @@ SEQUENCE_TRANSFORM_CAPABILITIES = (
         signs,
         "sequence",
         "transform",
+        invocation_examples=(example("signs_negative_zero_positive", "Compute signs of negative, zero, and positive values.", {"values": ["-2", "0", "5"]}),),
     ),
 )
