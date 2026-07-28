@@ -165,9 +165,9 @@ def test_public_seam_reports_valid_multivariate_result_as_unsupported(
 
 
 def test_induced_tree_result_is_domain_bound_and_independently_replayed(
-    kernel,
+    kernel_with_references,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.compute",
             input={
@@ -191,7 +191,7 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     assert computed.output["optimum_value"] == 3
     result_uri = computed.artifact_uris[1]
 
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.verify",
             mode=CapabilityMode.VERIFY,
@@ -210,7 +210,7 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     )
     assert "FLINT" not in verified.execution.detail
 
-    result_artifact = kernel.store.get(result_uri)
+    result_artifact = kernel_with_references.store.get(result_uri)
     false_payload = dict(result_artifact.payload)
     false_payload.update(
         {
@@ -221,14 +221,14 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
             "witness_vertices": ["a", "b", "c", "d"],
         }
     )
-    false_result = kernel.artifacts.put(
+    false_result = kernel_with_references.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
         payload=false_payload,
         summary="adversarial false maximum induced-tree result",
     )
-    rejected = kernel.capabilities.invoke(
+    rejected = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.verify",
             mode=CapabilityMode.VERIFY,
@@ -242,9 +242,9 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
 
 
 def test_maximum_matching_result_uses_independent_tutte_berge_replay(
-    kernel,
+    kernel_with_references,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.compute",
             input={
@@ -261,7 +261,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     )
     result_uri = computed.artifact_uris[1]
 
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
             mode=CapabilityMode.VERIFY,
@@ -282,7 +282,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     )
     runtime = next(
         descriptor.provider_runtime
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in kernel_with_references.capabilities.catalog().capabilities
         if descriptor.capability_id == "graph.invariant.maximum_matching.verify"
     )
     assert runtime is not None
@@ -291,8 +291,8 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         component["provider"] for component in runtime.configuration["components"]
     } == {"jacobian.graph-exact-checker-source"}
 
-    result_artifact = kernel.store.get(result_uri)
-    false_result = kernel.artifacts.put(
+    result_artifact = kernel_with_references.store.get(result_uri)
+    false_result = kernel_with_references.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
@@ -306,7 +306,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         },
         summary="adversarial feasible but nonmaximum matching result",
     )
-    rejected = kernel.capabilities.invoke(
+    rejected = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
             mode=CapabilityMode.VERIFY,

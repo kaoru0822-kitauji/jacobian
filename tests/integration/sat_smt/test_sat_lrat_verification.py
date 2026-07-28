@@ -17,11 +17,6 @@ pytestmark = [
 ]
 
 
-@pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
-
-
 def _verify(kernel: JacobianKernel, cnf_uri: str, proof: bytes, **extra: object):
     return kernel.capabilities.invoke(
         CapabilityRequest(
@@ -37,17 +32,19 @@ def _verify(kernel: JacobianKernel, cnf_uri: str, proof: bytes, **extra: object)
 
 
 def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
-    kernel,
+    kernel_with_references,
 ) -> None:
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+    cnf = kernel_with_references.sat.put_cnf(
+        variable_names=("x",), clauses=((-1,), (1,))
+    )
 
-    result = _verify(kernel, cnf.artifact_uri, b"3 0 1 2 0\n")
+    result = _verify(kernel_with_references, cnf.artifact_uri, b"3 0 1 2 0\n")
 
     assert result.output["status"] == "VERIFIED_UNSAT"
     assert result.output["conclusion"] == "TRUE"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["verification_record_uri"] is not None
-    proof = kernel.store.get(result.output["proof_uri"])
+    proof = kernel_with_references.store.get(result.output["proof_uri"])
     assert proof.manifest.parents == (cnf.artifact_uri,)
     assert (
         proof.payload["cnf"]["variable_map_digest"]
@@ -68,35 +65,45 @@ def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
         b"3 0 1 2",  # truncated framing
     ),
 )
-def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(kernel, proof) -> None:
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(
+    kernel_with_references, proof
+) -> None:
+    cnf = kernel_with_references.sat.put_cnf(
+        variable_names=("x",), clauses=((-1,), (1,))
+    )
 
-    result = _verify(kernel, cnf.artifact_uri, proof)
+    result = _verify(kernel_with_references, cnf.artifact_uri, proof)
 
     assert result.output["status"] == "REJECTED"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
 
 
-def test_negative_rat_hint_is_explicitly_unsupported(kernel) -> None:
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+def test_negative_rat_hint_is_explicitly_unsupported(kernel_with_references) -> None:
+    cnf = kernel_with_references.sat.put_cnf(
+        variable_names=("x",), clauses=((-1,), (1,))
+    )
 
-    result = _verify(kernel, cnf.artifact_uri, b"3 0 -1 2 0\n")
+    result = _verify(kernel_with_references, cnf.artifact_uri, b"3 0 -1 2 0\n")
 
     assert result.output["status"] == "UNSUPPORTED"
     assert result.output["conclusion"] == "UNKNOWN"
 
 
-def test_timeout_and_cancellation_are_fail_closed(kernel) -> None:
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((-1,), (1,)))
+def test_timeout_and_cancellation_are_fail_closed(kernel_with_references) -> None:
+    cnf = kernel_with_references.sat.put_cnf(
+        variable_names=("x",), clauses=((-1,), (1,))
+    )
 
     timed_out = _verify(
-        kernel,
+        kernel_with_references,
         cnf.artifact_uri,
         b"3 0 1 2 0\n",
         limits={"timeout_ms": 0},
     )
-    cancelled = _verify(kernel, cnf.artifact_uri, b"3 0 1 2 0\n", cancelled=True)
+    cancelled = _verify(
+        kernel_with_references, cnf.artifact_uri, b"3 0 1 2 0\n", cancelled=True
+    )
 
     assert timed_out.output["status"] == "TIMEOUT"
     assert timed_out.output["conclusion"] == "UNKNOWN"

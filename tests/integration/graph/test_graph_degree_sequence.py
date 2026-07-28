@@ -9,10 +9,10 @@ from jacobian.contracts.results import Conclusion
 
 
 def test_degree_sequence_realization_materializes_replayable_graph(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.realize.degree_sequence",
             input={"degree_sequence": [2, 2, 1, 1]},
@@ -23,7 +23,7 @@ def test_degree_sequence_realization_materializes_replayable_graph(
     assert result.output["conclusion"] == "GRAPHICAL"
     assert result.output["graph_uri"] in result.artifact_uris
     assert result.output["certificate_uri"] in result.artifact_uris
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,
@@ -38,10 +38,10 @@ def test_degree_sequence_realization_materializes_replayable_graph(
 
 
 def test_degree_sequence_non_graphical_result_has_replayable_obstruction(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.realize.degree_sequence",
             input={"degree_sequence": [3, 3, 1, 1]},
@@ -56,7 +56,7 @@ def test_degree_sequence_non_graphical_result_has_replayable_obstruction(
         "lhs": 6,
         "rhs": 4,
     }
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,

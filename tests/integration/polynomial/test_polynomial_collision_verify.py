@@ -39,10 +39,10 @@ def _request(image: int) -> CapabilityRequest:
 
 
 def test_direct_collision_verifier_promotes_only_independent_replay(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(_request(1))
+    result = kernel_with_references.capabilities.invoke(_request(1))
 
     assert result.output["collision_verified"] is True
     assert result.output["conclusion"] == "FALSE"
@@ -59,7 +59,7 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
     relationship = result.relationships[0]
     assert relationship.status is CapabilityRelationshipStatus.VERIFIED
     assert relationship.verification_record_uri == record_uri
-    record = kernel.store.get(record_uri).payload
+    record = kernel_with_references.store.get(record_uri).payload
     assert record["relation_id"] == relationship.relation_id
     assert tuple(record["relationship_source_artifact_uris"]) == (
         relationship.source_artifact_uris
@@ -72,10 +72,10 @@ def test_direct_collision_verifier_promotes_only_independent_replay(
 
 
 def test_direct_collision_verifier_fails_closed_for_wrong_image(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(_request(2))
+    result = kernel_with_references.capabilities.invoke(_request(2))
 
     assert result.output["collision_verified"] is False
     assert result.output["conclusion"] == "UNKNOWN"

@@ -27,9 +27,10 @@ def test_parallel_pytest_rejects_selected_lean_runtime_tests() -> None:
         timeout=30,
     )
 
+    combined = f"{completed.stdout}\n{completed.stderr}"
     assert completed.returncode == 4
-    assert "Lean runtime tests cannot run under pytest-xdist" in completed.stderr
-    assert "make test-lean" in completed.stderr
+    assert "Lean runtime tests cannot run under pytest-xdist" in combined
+    assert "make test-lean" in combined
 
 
 def test_parallel_pytest_rejects_lean_runtime_execution_under_xdist_workers() -> None:

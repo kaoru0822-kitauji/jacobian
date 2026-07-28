@@ -657,10 +657,9 @@ def test_collision_rejects_evaluations_from_different_maps(kernel) -> None:
 
 
 def test_collision_validates_evaluation_dimensions_before_artifact_writes(
-    kernel_with_references,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = kernel_with_references
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -814,13 +813,12 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(kernel) -> None:
     ],
 )
 def test_complete_request_validation_precedes_artifact_writes(
-    kernel_with_references,
+    kernel,
     monkeypatch: pytest.MonkeyPatch,
     capability_id: str,
     payload: dict[str, Any],
     diagnostic_code: str,
 ) -> None:
-    kernel = kernel_with_references
     artifact_put_calls = 0
     original_put = kernel.artifacts.put
 

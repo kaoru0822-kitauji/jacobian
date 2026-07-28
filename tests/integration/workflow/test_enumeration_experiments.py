@@ -26,11 +26,6 @@ from jacobian.kernel import JacobianKernel
 from jacobian.store import StoreError
 
 
-@pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
-
-
 def _claim(
     kernel: JacobianKernel,
     *,
@@ -143,16 +138,16 @@ def test_unknown_experiment_error_explains_recovery(
 
 
 def test_graph_enumeration_deduplicates_isomorphic_candidates(
-    kernel,
+    kernel_with_references,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="graph_paths",
         predicate="is_bipartite",
         parameters={},
     )
 
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -165,7 +160,7 @@ def test_graph_enumeration_deduplicates_isomorphic_candidates(
             ),
         )
     )
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=90,
     )
@@ -184,17 +179,17 @@ def test_graph_enumeration_deduplicates_isomorphic_candidates(
     assert snapshot.accounting.evaluated_candidates == 6
     assert snapshot.scope_uri is not None
     assert snapshot.archive_uri is not None
-    scope = kernel.store.get(snapshot.scope_uri)
+    scope = kernel_with_references.store.get(snapshot.scope_uri)
     assert scope.payload["enumerator_scope"]["arc_rule"] == (
         "v_i_to_v_j_only_when_i_less_than_j"
     )
-    archive = kernel.store.get(snapshot.archive_uri)
+    archive = kernel_with_references.store.get(snapshot.archive_uri)
     assert set(archive.manifest.parents) == {
         snapshot.scope_uri,
         *snapshot.archive_page_uris,
     }
     for page_uri in snapshot.archive_page_uris:
-        page = kernel.store.get(page_uri)
+        page = kernel_with_references.store.get(page_uri)
         assert set(page.manifest.parents) == {
             *page.payload["candidate_uris"],
             *page.payload["evaluation_uris"],
@@ -202,19 +197,19 @@ def test_graph_enumeration_deduplicates_isomorphic_candidates(
 
 
 def test_experiment_metadata_uses_registered_schema_validation(
-    kernel,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
     validated_schema_uris: list[str] = []
     validated_semantics_uris: list[str] = []
-    original_validate = kernel.schemas.validate
-    original_get_descriptor = kernel.store.get_descriptor
+    original_validate = kernel_with_references.schemas.validate
+    original_get_descriptor = kernel_with_references.store.get_descriptor
 
     def record_validation(schema_uri: str, payload: object) -> object:
         validated_schema_uris.append(schema_uri)
@@ -232,13 +227,13 @@ def test_experiment_metadata_uses_registered_schema_validation(
             expected_kind=expected_kind,
         )
 
-    monkeypatch.setattr(kernel.schemas, "validate", record_validation)
+    monkeypatch.setattr(kernel_with_references.schemas, "validate", record_validation)
     monkeypatch.setattr(
-        kernel.store,
+        kernel_with_references.store,
         "get_descriptor",
         record_descriptor_validation,
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -250,26 +245,40 @@ def test_experiment_metadata_uses_registered_schema_validation(
             ),
         )
     )
-    snapshot = kernel.experiments.wait(handle.experiment_uri, timeout_seconds=30)
+    snapshot = kernel_with_references.experiments.wait(
+        handle.experiment_uri, timeout_seconds=30
+    )
 
     assert snapshot.state == ExperimentState.COMPLETED
-    assert kernel.experiments.scope_schema_uri in validated_schema_uris
-    assert kernel.experiments.evaluation_schema_uri in validated_schema_uris
-    assert kernel.experiments.archive_page_schema_uri in validated_schema_uris
-    assert kernel.experiments.archive_manifest_schema_uri in validated_schema_uris
-    assert kernel.references["matrices"].semantics_uri in validated_semantics_uris
+    assert kernel_with_references.experiments.scope_schema_uri in validated_schema_uris
+    assert (
+        kernel_with_references.experiments.evaluation_schema_uri
+        in validated_schema_uris
+    )
+    assert (
+        kernel_with_references.experiments.archive_page_schema_uri
+        in validated_schema_uris
+    )
+    assert (
+        kernel_with_references.experiments.archive_manifest_schema_uri
+        in validated_schema_uris
+    )
+    assert (
+        kernel_with_references.references["matrices"].semantics_uri
+        in validated_semantics_uris
+    )
 
 
 def test_matrix_enumeration_uses_the_same_experiment_contract(
-    kernel,
+    kernel_with_references,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -282,7 +291,7 @@ def test_matrix_enumeration_uses_the_same_experiment_contract(
         )
     )
 
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=45,
     )
@@ -296,16 +305,16 @@ def test_matrix_enumeration_uses_the_same_experiment_contract(
 
 
 def test_enumeration_pages_respect_evaluator_batch_limit(
-    kernel,
+    kernel_with_references,
 ) -> None:
-    kernel.evaluation.max_batch_size = 2
+    kernel_with_references.evaluation.max_batch_size = 2
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -318,7 +327,9 @@ def test_enumeration_pages_respect_evaluator_batch_limit(
         )
     )
 
-    snapshot = kernel.experiments.wait(handle.experiment_uri, timeout_seconds=30)
+    snapshot = kernel_with_references.experiments.wait(
+        handle.experiment_uri, timeout_seconds=30
+    )
 
     assert snapshot.state is ExperimentState.COMPLETED
     assert snapshot.stop_reason is EnumerationStopReason.COMPLETE
@@ -327,25 +338,25 @@ def test_enumeration_pages_respect_evaluator_batch_limit(
     assert snapshot.accounting.pages == 2
     assert snapshot.scope_uri is not None
     assert snapshot.archive_uri is not None
-    archive = kernel.store.get(snapshot.archive_uri)
+    archive = kernel_with_references.store.get(snapshot.archive_uri)
     assert set(archive.manifest.parents) == {
         snapshot.scope_uri,
         snapshot.archive_page_uris[-1],
     }
-    second_page = kernel.store.get(snapshot.archive_page_uris[-1])
+    second_page = kernel_with_references.store.get(snapshot.archive_page_uris[-1])
     assert snapshot.archive_page_uris[0] in second_page.manifest.parents
 
 
 def test_cancellation_never_becomes_an_exhaustive_conclusion(
-    kernel,
+    kernel_with_references,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -358,8 +369,8 @@ def test_cancellation_never_becomes_an_exhaustive_conclusion(
         )
     )
 
-    cancelled = kernel.experiments.cancel(handle.experiment_uri)
-    snapshot = kernel.experiments.wait(
+    cancelled = kernel_with_references.experiments.cancel(handle.experiment_uri)
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=30,
     )
@@ -373,15 +384,15 @@ def test_cancellation_never_becomes_an_exhaustive_conclusion(
 
 
 def test_candidate_limit_never_becomes_exhaustive_coverage(
-    kernel,
+    kernel_with_references,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -394,7 +405,7 @@ def test_candidate_limit_never_becomes_exhaustive_coverage(
         )
     )
 
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=45,
     )
@@ -408,17 +419,17 @@ def test_candidate_limit_never_becomes_exhaustive_coverage(
 
 
 def test_quotient_search_requires_a_domain_canonicalizer(
-    kernel,
+    kernel_with_references,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
 
     with pytest.raises(ExperimentError, match="Canonicalizer"):
-        kernel.experiments.start_enumeration(
+        kernel_with_references.experiments.start_enumeration(
             SearchEnumerateRequest(
                 claim_uri=claim_uri,
                 plugin_id=plugin_id,
@@ -434,15 +445,15 @@ def test_quotient_search_requires_a_domain_canonicalizer(
 
 
 def test_cancelling_a_terminal_experiment_does_not_change_it(
-    kernel,
+    kernel_with_references,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -454,13 +465,13 @@ def test_cancelling_a_terminal_experiment_does_not_change_it(
             ),
         )
     )
-    completed = kernel.experiments.wait(
+    completed = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=45,
     )
 
-    cancelled = kernel.experiments.cancel(handle.experiment_uri)
-    after = kernel.experiments.inspect(handle.experiment_uri)
+    cancelled = kernel_with_references.experiments.cancel(handle.experiment_uri)
+    after = kernel_with_references.experiments.inspect(handle.experiment_uri)
 
     assert completed.state == ExperimentState.COMPLETED
     assert cancelled.accepted is False
@@ -468,18 +479,18 @@ def test_cancelling_a_terminal_experiment_does_not_change_it(
 
 
 def test_enumerator_candidate_is_validated_before_archival(
-    kernel,
+    kernel_with_references,
 ) -> None:
     plugin_id = _install_matrix_enumerator_plugin(
-        kernel,
+        kernel_with_references,
         entrypoint="tests.fixtures.plugin_functions:enumerate_invalid_candidate",
     )
     claim_uri = _matrix_claim_for_plugin(
-        kernel,
+        kernel_with_references,
         plugin_id=plugin_id,
     )
 
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -491,7 +502,7 @@ def test_enumerator_candidate_is_validated_before_archival(
             ),
         )
     )
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=45,
     )
@@ -506,17 +517,17 @@ def test_enumerator_candidate_is_validated_before_archival(
 
 @pytest.mark.subprocess
 def test_enumerator_timeout_remains_a_bounded_nonconclusion(
-    kernel,
+    kernel_with_references,
 ) -> None:
     plugin_id = _install_matrix_enumerator_plugin(
-        kernel,
+        kernel_with_references,
         entrypoint="tests.fixtures.plugin_functions:wait_forever",
     )
     claim_uri = _matrix_claim_for_plugin(
-        kernel,
+        kernel_with_references,
         plugin_id=plugin_id,
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -533,9 +544,11 @@ def test_enumerator_timeout_remains_a_bounded_nonconclusion(
         TimeoutError,
         match="Inspect it or wait again with a larger timeout",
     ):
-        kernel.experiments.wait(handle.experiment_uri, timeout_seconds=0)
+        kernel_with_references.experiments.wait(
+            handle.experiment_uri, timeout_seconds=0
+        )
 
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=15,
     )
@@ -549,18 +562,18 @@ def test_enumerator_timeout_remains_a_bounded_nonconclusion(
 
 @pytest.mark.subprocess
 def test_evaluator_timeout_prevents_complete_enumeration_result(
-    kernel,
+    kernel_with_references,
 ) -> None:
     plugin_id = _install_matrix_enumerator_plugin(
-        kernel,
+        kernel_with_references,
         entrypoint="jacobian.plugins.matrices:enumerate_candidates_capability",
         evaluator_entrypoint="tests.fixtures.plugin_functions:wait_forever",
     )
     claim_uri = _matrix_claim_for_plugin(
-        kernel,
+        kernel_with_references,
         plugin_id=plugin_id,
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -573,7 +586,7 @@ def test_evaluator_timeout_prevents_complete_enumeration_result(
         )
     )
 
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=15,
     )
@@ -586,11 +599,11 @@ def test_evaluator_timeout_prevents_complete_enumeration_result(
 
 
 def test_rejected_evaluation_batch_fails_enumeration(
-    kernel,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
@@ -609,8 +622,10 @@ def test_rejected_evaluation_batch_fails_enumeration(
             seed=0,
         )
 
-    monkeypatch.setattr(kernel.evaluation, "evaluate_batch", reject_batch)
-    handle = kernel.experiments.start_enumeration(
+    monkeypatch.setattr(
+        kernel_with_references.evaluation, "evaluate_batch", reject_batch
+    )
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -623,7 +638,9 @@ def test_rejected_evaluation_batch_fails_enumeration(
         )
     )
 
-    snapshot = kernel.experiments.wait(handle.experiment_uri, timeout_seconds=15)
+    snapshot = kernel_with_references.experiments.wait(
+        handle.experiment_uri, timeout_seconds=15
+    )
 
     assert snapshot.state == ExperimentState.ERROR
     assert snapshot.stop_reason == EnumerationStopReason.ERROR
@@ -635,17 +652,17 @@ def test_rejected_evaluation_batch_fails_enumeration(
 
 
 def test_terminal_archive_failure_marks_enumeration_error(
-    kernel,
+    kernel_with_references,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     claim_uri, plugin_id = _claim(
-        kernel,
+        kernel_with_references,
         reference_name="matrices",
         predicate="is_nonsingular",
         parameters={},
     )
-    original_put = kernel.experiments._put_internal_artifact
+    original_put = kernel_with_references.experiments._put_internal_artifact
 
     def fail_terminal_archive(**kwargs: object) -> object:
         if kwargs.get("summary") == "enumeration archive manifest":
@@ -653,11 +670,11 @@ def test_terminal_archive_failure_marks_enumeration_error(
         return original_put(**kwargs)
 
     monkeypatch.setattr(
-        kernel.experiments,
+        kernel_with_references.experiments,
         "_put_internal_artifact",
         fail_terminal_archive,
     )
-    handle = kernel.experiments.start_enumeration(
+    handle = kernel_with_references.experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
             plugin_id=plugin_id,
@@ -670,7 +687,7 @@ def test_terminal_archive_failure_marks_enumeration_error(
         )
     )
 
-    snapshot = kernel.experiments.wait(
+    snapshot = kernel_with_references.experiments.wait(
         handle.experiment_uri,
         timeout_seconds=15,
     )

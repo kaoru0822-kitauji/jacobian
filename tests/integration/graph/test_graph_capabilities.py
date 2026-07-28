@@ -13,10 +13,10 @@ from jacobian.contracts.results import ExecutionStatus
 
 
 def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    constructed = kernel.capabilities.invoke(
+    constructed = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.explicit",
             input={
@@ -33,13 +33,13 @@ def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
         "edges": [["a", "b"], ["b", "c"]],
     }
     graph_uri = constructed.output["graph_uri"]
-    stored = kernel.store.get(graph_uri)
+    stored = kernel_with_references.store.get(graph_uri)
     assert stored.payload == constructed.output["graph"]
-    assert stored.manifest.schema_uri == kernel.graph.graph_schema_uri
-    assert stored.manifest.semantics_uri == kernel.graph.semantics_uri
+    assert stored.manifest.schema_uri == kernel_with_references.graph.graph_schema_uri
+    assert stored.manifest.semantics_uri == kernel_with_references.graph.semantics_uri
     assert stored.manifest.object_digest == constructed.output["graph_object_digest"]
 
-    properties = kernel.capabilities.invoke(
+    properties = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             input={"graph_uri": graph_uri, "properties": ["order", "tree"]},
@@ -60,11 +60,11 @@ def test_explicit_graph_construction_canonicalizes_and_feeds_graph_capabilities(
     ],
 )
 def test_explicit_graph_construction_fails_before_artifact_writes(
-    kernel,
+    kernel_with_references,
     input_payload: dict[str, object],
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.explicit",
             input=input_payload,
@@ -78,10 +78,10 @@ def test_explicit_graph_construction_fails_before_artifact_writes(
 
 
 def test_graph_atlas_search_is_bounded_complete_and_replayable(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -109,7 +109,7 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
 
     for candidate in result.output["candidates"]:
         graph_uri = candidate["graph_uri"]
-        graph = kernel.store.get(graph_uri)
+        graph = kernel_with_references.store.get(graph_uri)
         assert candidate["graph"] == graph.payload
         assert graph.payload["graph_schema_version"] == "1"
         assert len(graph.payload["vertices"]) == 5
@@ -117,17 +117,17 @@ def test_graph_atlas_search_is_bounded_complete_and_replayable(
         assert candidate["properties"]["triangle_count"] == 0
         assert candidate["properties"]["independence_number"] == 3
 
-    scope = kernel.store.get(result.scope.artifact_uri)
+    scope = kernel_with_references.store.get(result.scope.artifact_uri)
     assert scope.payload["source"] == "networkx.graph_atlas_g"
     assert scope.payload["order"] == 5
     assert scope.payload["enumerated_count"] > 0
 
 
 def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -149,10 +149,10 @@ def test_graph_atlas_search_reports_no_match_without_a_truth_claim(
 
 
 def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    invalid_range = kernel.capabilities.invoke(
+    invalid_range = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -169,7 +169,7 @@ def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
     assert invalid_range.diagnostics[0].path == "constraints/minimum_edges"
     assert invalid_range.episode_uri is None
 
-    missing_graph = kernel.capabilities.invoke(
+    missing_graph = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             input={
@@ -184,9 +184,9 @@ def test_graph_capabilities_return_actionable_parameter_and_artifact_errors(
 
 
 def test_graph_property_batch_materializes_exact_computed_artifact(
-    kernel,
+    kernel_with_references,
 ) -> None:
-    searched = kernel.capabilities.invoke(
+    searched = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -198,7 +198,7 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     )
     graph_uri = searched.output["candidates"][0]["graph_uri"]
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             mode=CapabilityMode.EXPLORE,
@@ -267,7 +267,9 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
     assert set(relationship.target_artifact_uris[1:]) == {
         binding["artifact_uri"] for binding in result.output["results"]
     }
-    property_artifact = kernel.store.get(result.output["property_artifact_uri"])
+    property_artifact = kernel_with_references.store.get(
+        result.output["property_artifact_uri"]
+    )
     assert set(property_artifact.manifest.parents) == {
         graph_uri,
         *(binding["artifact_uri"] for binding in result.output["results"]),
@@ -283,7 +285,7 @@ def test_graph_property_batch_materializes_exact_computed_artifact(
         "triangle_count",
     ]
     for binding in result.output["results"]:
-        invariant_artifact = kernel.store.get(binding["artifact_uri"])
+        invariant_artifact = kernel_with_references.store.get(binding["artifact_uri"])
         assert invariant_artifact.manifest.parents == (graph_uri,)
         assert invariant_artifact.payload["result"] == binding["result"]
 

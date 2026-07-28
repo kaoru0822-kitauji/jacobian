@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from jacobian.contracts.capabilities import (
     CapabilityMode,
     CapabilityRequest,
@@ -13,11 +11,6 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.kernel import JacobianKernel
 
 pytestmark = []
-
-
-@pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
 
 
 def _encode(kernel: JacobianKernel) -> CapabilityResult:
@@ -54,12 +47,12 @@ def test_graph_coloring_encoding_is_canonical_and_inspectable(
 
 
 def test_graph_coloring_encoding_replays_through_generic_certificate_verifier(
-    kernel,
+    kernel_with_references,
 ) -> None:
-    encoded = _encode(kernel)
+    encoded = _encode(kernel_with_references)
 
     assert encoded.output["checker_id"] is not None
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,

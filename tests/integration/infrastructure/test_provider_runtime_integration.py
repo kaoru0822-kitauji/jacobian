@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from jacobian.capabilities import CapabilityError
@@ -21,6 +23,7 @@ from jacobian.domains.graph_optimization.bundle import GRAPH_OPTIMIZATION_BUNDLE
 from jacobian.domains.graph_optimization.invariant_bundle import (
     GRAPH_INVARIANT_BUNDLE,
 )
+from jacobian.kernel import JacobianKernel
 from jacobian.provider_measurements import _cold_install_spec
 
 
@@ -131,9 +134,11 @@ def test_graph_domain_runtime_identities_bind_every_executed_backend() -> None:
 
 
 def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
-    kernel,
+    tmp_path: Path,
+    initialized_kernel_store_with_references: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _ = initialized_kernel_store_with_references
     unavailable = CapabilityProviderRuntime(
         provider="jacobian.lean4",
         availability=CapabilityProviderAvailability.UNAVAILABLE,
@@ -146,6 +151,8 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
         "jacobian.kernel.lean_provider_runtime",
         lambda **_kwargs: unavailable,
     )
+
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
 
     assert kernel.lean is None
     assert kernel.lean_proof_edit is None

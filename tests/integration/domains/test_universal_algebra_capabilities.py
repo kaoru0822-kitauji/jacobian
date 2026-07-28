@@ -57,11 +57,11 @@ def _left_projection_problem() -> dict[str, object]:
 
 
 def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
-    kernel,
+    kernel_with_references,
 ) -> None:
     descriptors = {
         descriptor.capability_id: descriptor
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in kernel_with_references.capabilities.catalog().capabilities
     }
     descriptor = descriptors["universal_algebra.search.countermodel"]
 
@@ -74,10 +74,10 @@ def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
 
 
 def test_evaluate_laws_returns_exact_truth_and_counterexample(
-    kernel,
+    kernel_with_references,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.evaluate_laws",
             input={"problem": _left_projection_problem()},
@@ -109,7 +109,7 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
     }
     assert result.output["certificate_uri"] in result.artifact_uris
     assert result.output["checker_id"] == (
-        kernel.universal_algebra.evaluation_checker_id
+        kernel_with_references.universal_algebra.evaluation_checker_id
     )
     assert result.output["verification_handoff"] == {
         "capability_id": "certificate.verify",
@@ -123,7 +123,7 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
     assert "conclusion" not in result.output
 
     handoff = result.output["verification_handoff"]
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id=handoff["capability_id"],
             mode=CapabilityMode(handoff["mode"]),
@@ -165,11 +165,11 @@ def test_complete_request_validation_precedes_artifact_writes(
 
 
 def test_countermodel_search_composes_with_independent_law_replay(
-    kernel,
+    kernel_with_references,
 ) -> None:
     laws = _left_projection_problem()["laws"]
 
-    search = kernel.capabilities.invoke(
+    search = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.search.countermodel",
             input={
@@ -186,7 +186,7 @@ def test_countermodel_search_composes_with_independent_law_replay(
     assert search.output["target_record"]["holds"] is False
     assert all(record["holds"] for record in search.output["source_records"])
 
-    evaluation = kernel.capabilities.invoke(
+    evaluation = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.evaluate_laws",
             input={
@@ -198,7 +198,7 @@ def test_countermodel_search_composes_with_independent_law_replay(
             },
         )
     )
-    verified = kernel.capabilities.invoke(
+    verified = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,
