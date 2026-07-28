@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.contracts.linear import (
     LinearRationalInconsistencyArtifact,
@@ -11,10 +12,6 @@ from jacobian.contracts.linear import (
     LinearRationalSystem,
 )
 from jacobian.provider_runtime import known_provider_runtime
-
-
-def _q(num: int, den: int = 1) -> dict[str, str]:
-    return {"num": str(num), "den": str(den)}
 
 
 def _system() -> dict[str, object]:

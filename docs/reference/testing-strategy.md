@@ -2,6 +2,29 @@
 
 [Documentation home](../index.md)
 
+## Ownership model
+
+The suite separates five concerns that previously overlapped:
+
+| Concern | Authority |
+| --- | --- |
+| Semantic ownership | Test directories |
+| Runtime traits | Pytest markers |
+| Change impact | `.github/ci-impact.json` |
+| Canonical execution | Make targets |
+| Shard scheduling | Ephemeral integration timing artifact |
+
+A test's directory answers what kind of behavior it owns. A marker answers how
+that test must run. The CI impact manifest maps changed paths to every affected
+suite, with additive matches and a fail-closed fallback. Make targets keep local
+and hosted execution aligned. Timing data affects scheduling only: successful
+`main` runs publish it, consumers validate it, and any absence or corruption
+falls back to equal weighting without changing which tests run.
+
+The canonical local commands are `make test-core`, `make test-integration`,
+`make test-lean`, and `make test`. `make test-fast` is the sequential core
+feedback loop.
+
 ## Purpose
 
 Jacobian is a mathematical capability toolbox with a fail-closed verification
@@ -34,14 +57,13 @@ The current local development entry points are:
 ```sh
 make test-fast
 make test-failed
-make test TESTS=tests/integration/test_mcp_adapter.py
-make test TESTS=tests/integration/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
+make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-contracts
 make test-checkers
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
-make test-lean TESTS=tests/integration/test_lean.py PYTEST_ARGS="-k induction"
-make test-durations
+make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
 make check
 make check-static
 make validate-full
@@ -87,10 +109,10 @@ expanding the fast loop.
 Pull-request CI divides the non-Lean suite into two semantic lanes on the
 canonical Python version. The `core` lane contains unit, contract, checker, and
 reference tests. The `integration` lane contains integration and end-to-end
-tests, split across three runners with committed `pytest-split` timings
-(`.test_durations`, algorithm `least_duration`). Refresh those timings with
-`make test-durations` after substantial suite-shape changes; unknown tests
-receive the recorded average duration. Each shard then uses xdist's live
+tests, split across four runners with an ephemeral `pytest-split` timing
+artifact (algorithm `least_duration`). Successful `main` runs publish fresh
+history; missing or invalid history falls back to equal weighting. Each shard
+then uses xdist's live
 `worksteal` scheduler with at most four workers. Merge-queue groups and pushes
 to `main` additionally run the second supported Python version as an exhaustive
 compatibility lane and enable combined coverage. A shared test setup action
@@ -123,7 +145,7 @@ Measured costs and lane policy are recorded in the
 [test-suite cost audit](../contributing/test-suite-cost-audit.md).
 
 For pull requests, a tested path planner reads
-[`.github/ci-ownership.json`](../../.github/ci-ownership.json) and makes
+[`.github/ci-impact.json`](../../.github/ci-impact.json) and makes
 independent core Python, integration Python, Lean, npm, static, build,
 security, and duplicate-code decisions. Documentation-only and npm-only changes
 stay narrow. Ordinary capability source stays on core + integration + static +

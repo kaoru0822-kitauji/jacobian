@@ -30,7 +30,6 @@ class _OrderedPair(BaseModel):
         return self
 
 
-@pytest.mark.contract
 def test_cached_model_schema_returns_independent_copies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -50,7 +49,6 @@ def test_cached_model_schema_returns_independent_copies(
     assert second["title"] == "_CachedSchemaModel"
 
 
-@pytest.mark.contract
 def test_external_dynamic_reference_is_rejected(tmp_path: Path) -> None:
     registry = SchemaRegistry(ArtifactStore(tmp_path))
 
@@ -62,7 +60,6 @@ def test_external_dynamic_reference_is_rejected(tmp_path: Path) -> None:
         )
 
 
-@pytest.mark.contract
 def test_schema_validator_cache_is_bound_to_canonical_schema(
     tmp_path: Path,
 ) -> None:
@@ -83,7 +80,6 @@ def test_schema_validator_cache_is_bound_to_canonical_schema(
         registry.validate(string_schema, {"value": 1})
 
 
-@pytest.mark.contract
 def test_model_backed_schema_applies_cross_field_contracts(
     tmp_path: Path,
 ) -> None:

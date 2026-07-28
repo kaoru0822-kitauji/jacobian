@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from tests.helpers.artifacts import artifact_uri as _uri
 
 from jacobian.contracts.shrinking import ShrinkResult
 from jacobian.contracts.witness_search import (
     PluginWitnessResponse,
     WitnessFindResult,
 )
-
-
-def _uri(fill: str) -> str:
-    return "artifact://sha256/" + fill * 64
 
 
 def _digest(fill: str) -> str:
@@ -40,7 +37,6 @@ def _verified_result(*, evidence_uri: str) -> dict[str, object]:
     }
 
 
-@pytest.mark.contract
 def test_none_certified_requires_the_named_certificate_to_be_verified() -> None:
     named_certificate = _uri("f")
     other_evidence = _uri("1")
@@ -58,7 +54,6 @@ def test_none_certified_requires_the_named_certificate_to_be_verified() -> None:
         )
 
 
-@pytest.mark.contract
 def test_plugin_may_only_propose_none_certified_with_a_certificate() -> None:
     with pytest.raises(ValidationError):
         PluginWitnessResponse.model_validate(
@@ -80,7 +75,6 @@ def test_plugin_may_only_propose_none_certified_with_a_certificate() -> None:
     assert proposed.certificate_uri == _uri("7")
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize("minimality", ["ONE_STEP", "BOUNDED_GLOBAL", "PROVED_GLOBAL"])
 def test_v01_rejects_unsupported_minimality_claims(minimality: str) -> None:
     final_target = _uri("5")

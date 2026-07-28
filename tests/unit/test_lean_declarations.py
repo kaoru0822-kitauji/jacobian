@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -91,7 +90,8 @@ class RecordingSession:
     closed: bool = False
     active: int = 0
     max_active: int = 0
-    request_delay: float = 0.0
+    request_started: threading.Event | None = None
+    release_request: threading.Event | None = None
     after_request: Any = None
     activity_lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -107,8 +107,10 @@ class RecordingSession:
             self.max_active = max(self.max_active, self.active)
         try:
             self.requests.append(payload)
-            if self.request_delay:
-                time.sleep(self.request_delay)
+            if self.request_started is not None:
+                self.request_started.set()
+            if self.release_request is not None:
+                assert self.release_request.wait(timeout=2)
             response = self.responses.pop(0)
             if isinstance(response, LeanDeclarationBackendError):
                 raise response
@@ -442,24 +444,40 @@ def test_subprocess_backend_reuses_one_pinned_session_per_environment(
 def test_subprocess_backend_serializes_concurrent_session_requests(
     tmp_path: Path,
 ) -> None:
+    request_started = threading.Event()
+    release_request = threading.Event()
     session = RecordingSession(
         responses=[
             {"operation": "search", "declarations": []},
             {"operation": "search", "declarations": []},
         ],
-        request_delay=0.05,
+        request_started=request_started,
+        release_request=release_request,
     )
     backend, _ = _recording_backend(tmp_path, [session])
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        results = list(
-            executor.map(
-                lambda _: backend.query(
-                    LeanEnvironment.CORE,
-                    {"operation": "search"},
-                ),
-                range(2),
+        first = executor.submit(
+            backend.query,
+            LeanEnvironment.CORE,
+            {"operation": "search"},
+        )
+        assert request_started.wait(timeout=1)
+        second_started = threading.Event()
+
+        def query_second() -> dict[str, Any]:
+            second_started.set()
+            return backend.query(
+                LeanEnvironment.CORE,
+                {"operation": "search"},
             )
+
+        second = executor.submit(query_second)
+        assert second_started.wait(timeout=1)
+        release_request.set()
+        results = (
+            first.result(timeout=2),
+            second.result(timeout=2),
         )
 
     assert len(results) == 2

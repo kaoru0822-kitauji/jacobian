@@ -20,6 +20,9 @@ jobs:
     name: Plan CI
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
     outputs:
       classification: ${{ steps.classify.outputs.classification }}
       run-python: ${{ steps.classify.outputs.run-python }}
@@ -38,6 +41,19 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Prepare integration timing hint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .github/scripts/manage-test-timings prepare
+          --output .ci/test-durations.json
+      - name: Share integration timing hint
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: integration-test-durations-input
+          path: .ci/test-durations.json
+          include-hidden-files: true
+          retention-days: 1
       - id: classify
         name: Classify changed paths
         env:
@@ -109,7 +125,7 @@ jobs:
             pyproject.toml
             uv.lock
       - if: needs.plan.outputs.run-static == 'true'
-        run: uv sync --frozen --dev
+        run: uv sync --locked --dev
       - if: needs.plan.outputs.run-static == 'true'
         run: make lint-full
       - if: needs.plan.outputs.run-static == 'true'
@@ -141,7 +157,7 @@ jobs:
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv sync --frozen --dev
+      - run: uv sync --locked --dev
       - run: make security-audit
 
   validate-agents-md:
@@ -177,15 +193,15 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: >-
-          uv run --frozen pytest
-          -m "not integration and not end_to_end and not lean_runtime"
-          --junitxml=pytest.xml
-          ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
-          --durations=10
+      - run: make test-core
+        env:
+          PYTEST_ARGS: >-
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
+            --durations=10
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
           name: junit-core-3.12
@@ -194,7 +210,7 @@ jobs:
           retention-days: 7
       - if: needs.plan.outputs.run-coverage == 'true'
         run: mv .coverage .coverage.core
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
         with:
           name: coverage-data-core
@@ -203,7 +219,7 @@ jobs:
 
   integration-test:
     name: >-
-      Tests (integration ${{ matrix.shard }} of 3,
+      Tests (integration ${{ matrix.shard }} of 4,
       Python 3.12)
     needs: plan
     if: needs.plan.outputs.run-integration == 'true'
@@ -212,25 +228,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download integration timing hint
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: integration-test-durations-input
+          path: .ci
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: >-
-          uv run --frozen pytest
-          -m "(integration or end_to_end) and not lean_runtime"
-          --splits 3
-          --group ${{ matrix.shard }}
-          --splitting-algorithm least_duration
-          --durations-path .test_durations
-          --junitxml=pytest.xml
-          ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
-          --durations=10
+      - run: make test-integration
+        env:
+          PYTEST_ARGS: >-
+            --splits 4
+            --group ${{ matrix.shard }}
+            --splitting-algorithm least_duration
+            --durations-path .ci/test-durations.json
+            --store-durations
+            --clean-durations
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
+            --durations=10
+      - name: Upload integration shard timings
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: integration-duration-shard-${{ matrix.shard }}
+          path: .ci/test-durations.json
+          include-hidden-files: true
+          retention-days: 1
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
           name: >-
@@ -240,12 +270,44 @@ jobs:
           retention-days: 7
       - if: needs.plan.outputs.run-coverage == 'true'
         run: mv .coverage .coverage.integration-${{ matrix.shard }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
         with:
           name: coverage-data-integration-${{ matrix.shard }}
           path: .coverage.integration-${{ matrix.shard }}
           include-hidden-files: true
+
+  publish-test-durations:
+    name: Publish integration test durations
+    if: github.ref == 'refs/heads/main'
+    needs: integration-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download shard timings
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: integration-duration-shard-*
+          path: .ci/shards
+      - name: Merge shard timings
+        run: >-
+          .github/scripts/manage-test-timings merge
+          --input .ci/shards/integration-duration-shard-1/test-durations.json
+          --input .ci/shards/integration-duration-shard-2/test-durations.json
+          --input .ci/shards/integration-duration-shard-3/test-durations.json
+          --input .ci/shards/integration-duration-shard-4/test-durations.json
+          --output .ci/integration-test-durations.json
+          --source-sha "${{ github.sha }}"
+          --python-version "3.12"
+          --pytest-split-version "0.11.0"
+      - name: Publish timing hint
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: integration-test-durations
+          path: .ci/integration-test-durations.json
+          include-hidden-files: true
+          retention-days: 90
 
   compatibility-test:
     name: Exhaustive compatibility (Python 3.13)
@@ -258,14 +320,12 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.13"
-      - run: >-
-          uv run --frozen pytest
-          -m "not lean_runtime"
-          --junitxml=pytest.xml
-          --durations=10
+      - run: make test
+        env:
+          PYTEST_ARGS: --junitxml=pytest.xml --durations=10
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
           name: junit-compatibility-3.13
@@ -394,7 +454,7 @@ jobs:
             pyproject.toml
             uv.lock
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv sync --frozen --dev
+        run: uv sync --locked --dev
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         if: needs.plan.outputs.run-coverage == 'true'
         with:
@@ -402,12 +462,12 @@ jobs:
           path: coverage-data
           merge-multiple: true
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage combine coverage-data
+        run: uv run --locked coverage combine coverage-data
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage report --fail-under=50 | tee coverage-report.txt
+        run: uv run --locked coverage report --fail-under=50 | tee coverage-report.txt
         shell: bash -o pipefail {0}
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: uv run --frozen coverage xml
+        run: uv run --locked coverage xml
       - name: Post coverage summary to PR
         if: >-
           needs.plan.outputs.run-coverage == 'true' &&
@@ -451,7 +511,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: needs.plan.outputs.run-coverage == 'true'
         with:
           name: coverage-3.12
@@ -568,12 +628,12 @@ jobs:
             echo ""
             echo "Build cache: setup-uv (enabled), dependency cache keyed on pyproject.toml + uv.lock"
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: needs.plan.outputs.run-build == 'true'
         with:
           name: dist
           path: dist/
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: >-
           ${{
             !cancelled() &&
@@ -622,7 +682,7 @@ jobs:
         run: |
           .github/scripts/summarize-ci-timings ci-jobs.json | tee ci-timings.md
           cat ci-timings.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-timings
           path: ci-timings.md

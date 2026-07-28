@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import copy
-import hashlib
-import json
 from collections.abc import Callable
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import artifact_uri as _uri
+from tests.helpers.artifacts import canonical_digest as _digest
+from tests.helpers.rationals import rational_payload as _q
 
 import jacobian_checkers.exact_domain_operations as checker_module
 from jacobian_checkers.exact_domain_operations import (
@@ -20,29 +21,6 @@ from jacobian_checkers.exact_domain_operations import (
     check_polynomial_resultant,
     check_polynomial_square_free,
 )
-
-
-def _uri(character: str) -> str:
-    return "artifact://sha256/" + character * 64
-
-
-def _digest(value: object) -> str:
-    return (
-        "sha256:"
-        + hashlib.sha256(
-            json.dumps(
-                value,
-                allow_nan=False,
-                ensure_ascii=False,
-                separators=(",", ":"),
-                sort_keys=True,
-            ).encode()
-        ).hexdigest()
-    )
-
-
-def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
-    return {"num": str(numerator), "den": str(denominator)}
 
 
 def _poly(*coefficients_ascending: int) -> dict[str, Any]:

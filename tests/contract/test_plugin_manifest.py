@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from jacobian.contracts.plugins import PluginManifest
 
 
-@pytest.mark.contract
 @pytest.mark.conformance
 def test_plugin_manifest_cannot_declare_trusted_checkers() -> None:
     digest = "a" * 64

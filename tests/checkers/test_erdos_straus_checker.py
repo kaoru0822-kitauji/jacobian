@@ -50,7 +50,6 @@ def _request(
     }
 
 
-@pytest.mark.contract
 def test_checker_accepts_complete_exact_table() -> None:
     decision = check_decomposition_table(
         _request(
@@ -67,7 +66,6 @@ def test_checker_accepts_complete_exact_table() -> None:
     assert decision["coverage"] == "EXHAUSTIVE"
 
 
-@pytest.mark.contract
 @pytest.mark.parametrize(
     "table",
     [
@@ -97,7 +95,6 @@ def test_checker_rejects_incomplete_invalid_or_duplicate_table(
     assert decision["conclusion"] == "UNKNOWN"
 
 
-@pytest.mark.contract
 def test_checker_rejects_range_substitution() -> None:
     request = _request(
         [

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 from copy import deepcopy
 from typing import Any
 
 import pytest
+from tests.helpers.artifacts import canonical_digest as _digest
 
-from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
     CapabilityProviderAvailability,
@@ -30,10 +29,6 @@ _SEMANTICS_URI = "artifact://sha256/" + "5" * 64
 _CNF_OBJECT_DIGEST = "sha256:" + "a" * 64
 _ASSIGNMENT_OBJECT_DIGEST = "sha256:" + "b" * 64
 _SEMANTICS_DIGEST = "sha256:" + "c" * 64
-
-
-def _digest(value: object) -> str:
-    return "sha256:" + hashlib.sha256(canonicalize_json(value)).hexdigest()
 
 
 def _producer() -> CapabilityProviderRuntime:

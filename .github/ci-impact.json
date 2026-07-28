@@ -1,0 +1,99 @@
+{
+  "version": 2,
+  "suites": [
+    "core",
+    "integration",
+    "lean",
+    "npm",
+    "static",
+    "build",
+    "security",
+    "duplicate"
+  ],
+  "rules": [
+    {
+      "name": "documentation",
+      "patterns": ["docs/**", "*.md", ".github/ISSUE_TEMPLATE/**", ".github/CODEOWNERS"],
+      "suites": []
+    },
+    {
+      "name": "npm-package",
+      "patterns": ["npm/**"],
+      "suites": ["npm"]
+    },
+    {
+      "name": "lean-runtime",
+      "patterns": ["lean/**"],
+      "suites": ["lean"]
+    },
+    {
+      "name": "lean-python-tests",
+      "patterns": [
+        "tests/integration/lean/test_lean.py",
+        "tests/integration/lean/test_lean_proof_edit.py",
+        "tests/integration/lean/test_lean_exploration_capabilities.py"
+      ],
+      "suites": ["lean", "static"]
+    },
+    {
+      "name": "python-core-tests",
+      "patterns": ["tests/unit/**", "tests/contract/**", "tests/checkers/**", "tests/reference/**"],
+      "suites": ["core", "static"]
+    },
+    {
+      "name": "python-integration-tests",
+      "patterns": ["tests/integration/**", "tests/end_to_end/**"],
+      "suites": ["integration", "static"]
+    },
+    {
+      "name": "verification-boundary",
+      "patterns": [
+        "src/jacobian/kernel.py",
+        "src/jacobian/contracts/**",
+        "src/jacobian/artifacts.py",
+        "src/jacobian/checker_artifacts.py",
+        "src/jacobian/registry.py",
+        "src/jacobian/schema_registry.py",
+        "src/jacobian/plugins/registry.py"
+      ],
+      "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+    },
+    {
+      "name": "lean-python-adapter",
+      "patterns": ["src/jacobian/lean*.py", "src/jacobian/**/*lean*.py"],
+      "suites": ["core", "integration", "lean", "static", "build"]
+    },
+    {
+      "name": "npm-facing-adapter",
+      "patterns": ["src/jacobian/adapters/mcp/**"],
+      "suites": ["core", "integration", "npm", "static", "build"]
+    },
+    {
+      "name": "python-source",
+      "patterns": ["src/jacobian/**", "src/jacobian_checkers/**"],
+      "suites": ["core", "integration", "static", "build"]
+    },
+    {
+      "name": "ci-and-packaging",
+      "patterns": [
+        ".github/actions/**",
+        ".github/scripts/**",
+        ".github/workflows/**",
+        ".github/ci-impact.json",
+        "pyproject.toml",
+        "uv.lock",
+        "Makefile"
+      ],
+      "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+    },
+    {
+      "name": "repository-policy",
+      "patterns": ["AGENTS.md", ".pre-commit-config.yaml", ".jscpd.json"],
+      "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+    }
+  ],
+  "fallback": {
+    "name": "unclassified-fail-closed",
+    "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+  }
+}

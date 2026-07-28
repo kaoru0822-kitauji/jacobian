@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from jacobian_checkers.graph_paths import (
     check_odd_cycle,
     check_path_enumeration,
@@ -9,7 +7,6 @@ from jacobian_checkers.graph_paths import (
 )
 
 
-@pytest.mark.contract
 def test_odd_cycle_checker_rejects_even_cycle() -> None:
     decision = check_odd_cycle(
         _graph_witness_request(
@@ -24,7 +21,6 @@ def test_odd_cycle_checker_rejects_even_cycle() -> None:
     assert decision["accepted"] is False
 
 
-@pytest.mark.contract
 def test_two_coloring_checker_requires_every_vertex() -> None:
     decision = check_two_coloring(
         _graph_witness_request(
@@ -39,7 +35,6 @@ def test_two_coloring_checker_requires_every_vertex() -> None:
     assert decision["accepted"] is False
 
 
-@pytest.mark.contract
 def test_two_coloring_checker_rejects_boolean_colors() -> None:
     decision = check_two_coloring(
         _graph_witness_request(
@@ -54,7 +49,6 @@ def test_two_coloring_checker_rejects_boolean_colors() -> None:
     assert decision["accepted"] is False
 
 
-@pytest.mark.contract
 def test_path_enumeration_continues_through_intermediate_terminal() -> None:
     bindings = {
         "claim_digest": "sha256:" + "a" * 64,

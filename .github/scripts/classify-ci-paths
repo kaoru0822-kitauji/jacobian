@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Map changed repository paths to CI suites using the ownership manifest."""
+"""Map changed repository paths to suites using the CI impact manifest."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-MANIFEST = ROOT / ".github" / "ci-ownership.json"
+MANIFEST = ROOT / ".github" / "ci-impact.json"
 
 
 def load_manifest() -> dict[str, Any]:
@@ -18,12 +18,18 @@ def load_manifest() -> dict[str, Any]:
         return json.load(handle)
 
 
-def suites_for_path(path: str, manifest: dict[str, Any]) -> tuple[str, set[str]]:
+def suites_for_path(path: str, manifest: dict[str, Any]) -> tuple[set[str], set[str]]:
+    matching_rules: list[dict[str, Any]] = []
     for rule in manifest["rules"]:
         if any(fnmatchcase(path, pattern) for pattern in rule["patterns"]):
-            return rule["owner"], set(rule["suites"])
+            matching_rules.append(rule)
+    if matching_rules:
+        return (
+            {str(rule["name"]) for rule in matching_rules},
+            {str(suite) for rule in matching_rules for suite in rule["suites"]},
+        )
     fallback = manifest["fallback"]
-    return fallback["owner"], set(fallback["suites"])
+    return {str(fallback["name"])}, set(fallback["suites"])
 
 
 def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[str, str]:
@@ -37,8 +43,8 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
         suites = all_suites
     else:
         for path in paths:
-            owner, owned_suites = suites_for_path(path, manifest)
-            owners.add(owner)
+            path_owners, owned_suites = suites_for_path(path, manifest)
+            owners.update(path_owners)
             suites.update(owned_suites)
 
     if force_lean:
