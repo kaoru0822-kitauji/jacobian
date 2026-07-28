@@ -51,7 +51,7 @@ PYTHON_FLINT_LLL_CONFIGURATION = {
     "relation": "L=T*A",
 }
 SYMPY_VERSION = "1.14.0"
-Z3_SOLVER_VERSION = "4.16.0.0"
+Z3_SOLVER_VERSION = "5.0.0.0"
 
 
 class ProviderRuntimeError(RuntimeError):
