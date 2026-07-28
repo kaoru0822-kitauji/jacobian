@@ -45,7 +45,7 @@ jobs:
 
           started=$SECONDS
           set +e
-          uv run --frozen pytest "${args[@]}"
+          uv run --locked pytest "${args[@]}"
           status=$?
           set -e
           echo "| Selected Lean tests | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"

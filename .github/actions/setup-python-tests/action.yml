@@ -21,7 +21,7 @@ runs:
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}
-      run: uv sync --frozen --dev
+      run: uv sync --locked --dev
     - name: Require the requested Python version
       shell: bash
       env:
