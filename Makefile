@@ -88,7 +88,7 @@ npm-test: ## Run the npm package tests and dry-run pack.
 	npm pack --dry-run --prefix npm
 
 todo-check: ## Fail on TODO comments that do not reference an issue.
-	@violations="$$(rg --pcre2 -n 'TODO(?!\(#\d+\))' --type py src/ tests/ || true)"; \
+	@violations="$$(rg -n 'TODO' --type py src/ tests/ | rg -v 'TODO\(#\d+\)' || true)"; \
 	if [ -n "$$violations" ]; then \
 	  printf '%s\n' "$$violations"; \
 	  echo "TODO comments must reference an issue, e.g. TODO(#123)." >&2; \
