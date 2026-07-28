@@ -206,6 +206,7 @@ class BoundedSearchOperation[
     obligation: Callable[[RequestT, ResultT], ContractModel]
     incomplete_basis: str
     tags: tuple[str, ...] = ()
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
     invalid_request: CapabilityDiagnostic | None = None
     version: str = "1"
 
