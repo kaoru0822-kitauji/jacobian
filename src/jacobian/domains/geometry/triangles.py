@@ -20,6 +20,7 @@ TRIANGLE_CAPABILITIES = (
         orientation,
         "geometry",
         "orientation",
+        invocation_examples=(example("counterclockwise_triangle", "Compute orientation of a counterclockwise triangle.", {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}, "third": {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}}}),),
     ),
     geometry_operation(
         "geometry.triangle.compute.centroid",
@@ -30,6 +31,7 @@ TRIANGLE_CAPABILITIES = (
         centroid,
         "geometry",
         "construction",
+        invocation_examples=(example("right_triangle_centroid", "Construct the centroid of a right triangle.", {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "2", "den": "1"}, "y": {"num": "0", "den": "1"}}, "third": {"x": {"num": "0", "den": "1"}, "y": {"num": "2", "den": "1"}}}),),
     ),
     geometry_operation(
         "geometry.triangle.compute.circumcircle",
