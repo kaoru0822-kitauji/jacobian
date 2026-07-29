@@ -5,7 +5,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.contracts.capabilities import CapabilityDiagnostic
+from jacobian.contracts.capabilities import (
+    CapabilityDiagnostic,
+    CapabilityInvocationExample,
+)
 from jacobian.contracts.matrix_operations import (
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
@@ -51,7 +54,7 @@ def matrix_operation(
     operation: Callable[[Any], ContractModel],
     relation_id: str,
     *tags: str,
-    invocation_examples: tuple = (),
+    invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
 ) -> ComputedOperation[Any, Any]:
     def implementation(request: ContractModel) -> ComputedOutcome[Any]:
         try:
