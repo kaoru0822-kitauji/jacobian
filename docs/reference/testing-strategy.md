@@ -81,15 +81,19 @@ suite selection.
 Named contract, checker, MCP, and storage targets
 make common affected areas discoverable without adding another test runner.
 `make test-stress` and `make test-ordering` reproduce the scheduled validation
-property-repeat and ordering-seed lanes using locked `pytest-repeat` and
-`pytest-randomly`.
+lanes using locked `pytest-repeat` and `pytest-randomly`. The stress lane
+repeats contract and checker tests, including the marked property tests; the
+ordering lane exercises the non-Lean suite under a fixed seed.
 CI integration shards use one fixed `pytest-randomly` seed from
 `.github/ci-config.json`. Every shard must collect tests in the same order
 before `pytest-split` partitions them; otherwise independently randomized
 collections can overlap or omit tests. The merged timing artifact rejects
 duplicate node IDs instead of concealing such an overlap.
-`make check` combines fast Ruff, strict typing, and non-integration test
-feedback as the routine local pre-push gate. Developers should push after it and
+`make check` combines fast Ruff, strict typing, and unit test
+feedback as the routine local pre-push gate. The installed hook's `make check`
+also runs the unit-only fast lane; use `make pre-push-full` when all fast core
+tests should run before pushing. Developers should push after the chosen local
+gate and
 let CI own dependency and dead-code analysis, package builds, and exhaustive
 validation. `make check-static` reproduces those CI-owned static and package
 checks when relevant.

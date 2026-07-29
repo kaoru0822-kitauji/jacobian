@@ -84,9 +84,13 @@ make validate-full
 
 `make test-fast` is the normal edit loop. Use focused integration tests while
 changing stores, adapters, plugins, subprocesses, or checker execution.
-`make check` combines fast Ruff checks, strict typing, and that loop.
+`make check` combines fast Ruff checks, strict typing, and the unit-only loop;
+use `make test-fast` for the full sequential core edit loop.
 Dependency and dead-code analysis and package builds remain available through
 `make check-static` but are CI-owned rather than routine local handoff work.
+The installed pre-push hook uses `make check` for the fast Ruff, mypy, and
+unit-only gate; `make pre-push-full` adds the sequential core tests when
+needed.
 `make test` runs the complete non-Lean suite, and `make test-lean` keeps the
 memory-heavy backend serial. Neither is a routine pre-push requirement; CI
 owns exhaustive validation.
