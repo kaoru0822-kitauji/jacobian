@@ -80,6 +80,29 @@ def test_schema_validator_cache_is_bound_to_canonical_schema(
         registry.validate(string_schema, {"value": 1})
 
 
+def test_registered_schema_resolves_from_immutable_local_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    registry = SchemaRegistry(store)
+    schema_uri = registry.register(
+        name="local-cache",
+        version="1",
+        schema={"type": "object"},
+    )
+
+    first = registry.resolve(schema_uri)
+    first["type"] = "array"
+
+    def unexpected_store_read(*_args: object, **_kwargs: object) -> dict[str, object]:
+        pytest.fail("registered schema was read from the store again")
+
+    monkeypatch.setattr(store, "get_descriptor", unexpected_store_read)
+
+    assert registry.resolve(schema_uri) == {"type": "object"}
+
+
 def test_model_backed_schema_applies_cross_field_contracts(
     tmp_path: Path,
 ) -> None:

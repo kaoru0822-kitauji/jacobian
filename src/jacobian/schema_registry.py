@@ -88,19 +88,27 @@ class SchemaRegistry:
     def __init__(self, store: ArtifactStore) -> None:
         self.store = store
         self._model_contracts: dict[str, type[BaseModel]] = {}
+        self._schema_bytes: dict[str, bytes] = {}
+        self._registrations: dict[tuple[str, str, bytes], str] = {}
 
     def register(self, *, name: str, version: str, schema: dict[str, Any]) -> str:
         """Register a schema after rejecting unsupported external references."""
 
         canonical_schema = canonicalize_json(schema)
-        normalized = loads_strict_json(canonical_schema)
         _validated_schema(canonical_schema)
-        return self.store.register_descriptor(
+        registration = (name, version, canonical_schema)
+        cached_uri = self._registrations.get(registration)
+        if cached_uri is not None:
+            return cached_uri
+        schema_uri = self.store.register_descriptor(
             kind="schema",
             name=name,
             version=version,
-            definition=normalized,
+            definition=loads_strict_json(canonical_schema),
         )
+        self._registrations[registration] = schema_uri
+        self._schema_bytes[schema_uri] = canonical_schema
+        return schema_uri
 
     def register_model(
         self,
@@ -133,6 +141,9 @@ class SchemaRegistry:
     def resolve(self, schema_uri: str) -> dict[str, Any]:
         """Load a previously registered schema definition."""
 
+        cached_schema = self._schema_bytes.get(schema_uri)
+        if cached_schema is not None:
+            return cast(dict[str, Any], loads_strict_json(cached_schema))
         try:
             descriptor = self.store.get_descriptor(
                 schema_uri,
@@ -144,7 +155,10 @@ class SchemaRegistry:
         if not isinstance(definition, dict):
             raise SchemaRegistryError("schema descriptor has no object definition")
         _reject_external_references(definition)
-        return definition
+        canonical_schema = canonicalize_json(definition)
+        _validated_schema(canonical_schema)
+        self._schema_bytes[schema_uri] = canonical_schema
+        return cast(dict[str, Any], loads_strict_json(canonical_schema))
 
     def validate(self, schema_uri: str, payload: Any) -> Any:
         """Validate and canonically normalize a payload."""
