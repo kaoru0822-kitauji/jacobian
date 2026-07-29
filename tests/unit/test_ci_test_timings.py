@@ -2,31 +2,13 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / ".github" / "scripts" / "manage-test-timings"
-
-
-def run_script(
-    *args: str,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
-        cwd=ROOT,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+from tests.helpers.ci import run_ci_script
 
 
 def plan_outputs() -> dict[str, str]:
-    result = run_script("emit-plan-outputs")
+    result = run_ci_script("manage-test-timings", "emit-plan-outputs")
     assert result.returncode == 0, result.stderr
     return dict(
         line.split("=", 1) for line in result.stdout.splitlines() if "=" in line
@@ -49,7 +31,9 @@ def test_prepare_falls_back_to_equal_weighting_without_github_context(
     env.pop("GITHUB_REPOSITORY", None)
     env.pop("GH_TOKEN", None)
 
-    result = run_script("prepare", "--output", str(output), env=env)
+    result = run_ci_script(
+        "manage-test-timings", "prepare", "--output", output, env=env
+    )
 
     assert result.returncode == 0
     assert json.loads(output.read_text(encoding="utf-8")) == {}
@@ -68,7 +52,8 @@ def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> No
         inputs.extend(["--input", str(path)])
     output = tmp_path / "integration-test-durations.json"
 
-    result = run_script(
+    result = run_ci_script(
+        "manage-test-timings",
         "merge",
         *inputs,
         "--output",
@@ -102,7 +87,8 @@ def test_merge_defaults_pytest_split_version_from_pyproject(tmp_path: Path) -> N
         )
         inputs.extend(["--input", str(path)])
 
-    result = run_script(
+    result = run_ci_script(
+        "manage-test-timings",
         "merge",
         *inputs,
         "--output",
@@ -125,7 +111,8 @@ def test_emit_plan_outputs_exposes_ci_config_ssot() -> None:
     assert outputs["pytest-randomly-shard-seed"] == "0"
     assert outputs["pytest-split-version"]
     assert (
-        run_script("node-version", "npm").stdout.strip() == outputs["node-version-npm"]
+        run_ci_script("manage-test-timings", "node-version", "npm").stdout.strip()
+        == outputs["node-version-npm"]
     )
 
 
@@ -142,7 +129,8 @@ def test_merge_rejects_duplicate_node_ids(tmp_path: Path) -> None:
         )
         inputs.extend(["--input", str(path)])
 
-    result = run_script(
+    result = run_ci_script(
+        "manage-test-timings",
         "merge",
         *inputs,
         "--output",

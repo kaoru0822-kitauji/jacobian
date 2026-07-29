@@ -211,6 +211,12 @@ Use pyperf's ordinary CLI flags to select a faster development run or write raw
 JSON. These measurements are baselines only; no timing threshold is a v0.2
 release gate.
 
+The scheduled core benchmark job downloads the previous successful `main` run
+when available and publishes a report-only comparison using a ±20% change
+threshold. A reported regression is a prompt to investigate, not a CI failure;
+benchmark runs share hosted-worker noise and the comparison is intentionally
+separate from correctness validation.
+
 ## Bounded-discovery benchmarks
 
 Measure:

@@ -61,6 +61,7 @@ make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
 make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-contracts
 make test-checkers
+make test-subprocess
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
@@ -646,6 +647,9 @@ Layer markers such as `integration` or `end_to_end` are intentionally not used;
 select those suites by directory through Make targets.
 Markers are selection tools, not excuses for leaving required tests out of
 release validation.
+The `subprocess` marker has a dedicated `make test-subprocess` selection lane
+for clean-process replay tests. It does not serialize unrelated tests under
+xdist.
 
 Use real clocks only when time itself is under test. Otherwise inject a clock,
 random source, executor, or backend at a public seam. Use temporary real SQLite
