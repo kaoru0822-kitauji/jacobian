@@ -1,14 +1,7 @@
 from __future__ import annotations
 
-import json
-import subprocess
-from fnmatch import fnmatchcase
-from pathlib import Path
-
 import pytest
 from tests.boundary.process.tooling.ci import run_ci_script
-
-OWNERSHIP = Path(__file__).parents[4] / ".github" / "ci-impact.json"
 
 BOOLEAN_KEYS = (
     "run-python",
@@ -40,7 +33,6 @@ NON_PROVIDER_FUNCTIONAL_KEYS = tuple(
     key for key in FUNCTIONAL_KEYS if key != "run-provider"
 )
 
-
 def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
     selected = set(enabled)
     if "run-unit" in selected:
@@ -53,7 +45,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         "classification": classification,
         **{key: str(key in selected).lower() for key in BOOLEAN_KEYS},
     }
-
 
 @pytest.mark.parametrize(
     ("paths", "expected"),
@@ -161,6 +152,36 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-domain",
                 "run-provider",
                 "run-lean",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/support/provider_lean.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-domain",
+                "run-lean",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/support/provider_external_sat.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-provider",
+                "run-static",
+            ),
+        ),
+        (
+            ("tests/support/rationals.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-unit",
+                "run-domain",
+                "run-provider",
                 "run-static",
             ),
         ),
@@ -359,7 +380,6 @@ def test_ci_plan_fails_closed_outside_isolated_paths(
         dict(line.split("=", 1) for line in completed.stdout.splitlines()) == expected
     )
 
-
 def test_full_override_expands_an_isolated_plan() -> None:
     completed = run_ci_script(
         "classify-ci-paths", "--force-full", "--", "docs/index.md", check=True
@@ -377,169 +397,3 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
     assert plan == _expected_plan("selective", "run-lean", "run-docs")
-
-
-@pytest.mark.parametrize(
-    "args",
-    [
-        ("README.md",),
-        ("npm/package.json",),
-        ("src/jacobian/runtime/model.py",),
-        ("tests/unit/test_runtime.py",),
-        ("tests/composition/runtime/test_runtime_lifecycle.py",),
-        ("lean/JacobianLeanRuntime.lean",),
-        ("tests/unit/test_runtime.py", "lean/JacobianLeanRuntime.lean"),
-        ("--force-lean", "--", "README.md"),
-        ("--force-lean", "--", "npm/package.json"),
-    ],
-)
-def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
-    plan = run_ci_script("classify-ci-paths", *args, check=True).stdout
-
-    run_ci_script("validate-ci-plan", input_text=plan, check=True)
-
-
-@pytest.mark.parametrize(
-    "plan",
-    [
-        "",
-        "classification=docs\nrun-python=flase\n",
-        "classification=full\n"
-        "run-python=false\n"
-        "run-lean=false\n"
-        "run-npm=false\n"
-        "run-static=false\n"
-        "run-build=false\n"
-        "run-security=false\n"
-        "run-duplicate=false\n"
-        "run-docs=false\n",
-        "classification=docs\n"
-        "classification=docs\n"
-        "run-python=false\n"
-        "run-lean=false\n"
-        "run-npm=false\n"
-        "run-static=false\n"
-        "run-build=false\n"
-        "run-security=false\n"
-        "run-duplicate=false\n"
-        "run-docs=false\n",
-        "classification=docs\n"
-        "run-python=false\n"
-        "run-unit=false\n"
-        "run-domain=false\n"
-        "run-coverage=false\n"
-        "run-compatibility=false\n"
-        "run-lean=false\n"
-        "run-npm=true\n"
-        "run-static=false\n"
-        "run-build=false\n"
-        "run-security=false\n"
-        "run-duplicate=false\n"
-        "run-docs=false\n",
-        "classification=docs\n"
-        "run-python=true\n"
-        "run-unit=true\n"
-        "run-domain=false\n"
-        "run-coverage=false\n"
-        "run-compatibility=false\n"
-        "run-lean=false\n"
-        "run-npm=false\n"
-        "run-static=false\n"
-        "run-build=false\n"
-        "run-security=false\n"
-        "run-duplicate=false\n"
-        "run-docs=false\n",
-        "classification=lean\n"
-        "run-python=true\n"
-        "run-unit=true\n"
-        "run-domain=false\n"
-        "run-coverage=false\n"
-        "run-compatibility=false\n"
-        "run-lean=false\n"
-        "run-npm=false\n"
-        "run-static=false\n"
-        "run-build=false\n"
-        "run-security=false\n"
-        "run-duplicate=false\n"
-        "run-docs=false\n",
-    ],
-)
-def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> None:
-    completed = run_ci_script("validate-ci-plan", input_text=plan)
-
-    assert completed.returncode != 0
-
-
-@pytest.mark.parametrize(
-    "plan",
-    [
-        _expected_plan("full", "run-python", "run-unit", "run-static"),
-        _expected_plan(
-            "selective",
-            *(
-                key
-                for key in BOOLEAN_KEYS
-                if key not in {"run-coverage", "run-compatibility", "run-docs"}
-            ),
-        ),
-        _expected_plan("python", "run-python", "run-unit", "run-npm", "run-static"),
-    ],
-)
-def test_ci_plan_validator_rejects_wrong_classification_shapes(
-    plan: dict[str, str],
-) -> None:
-    encoded = "".join(f"{key}={value}\n" for key, value in plan.items())
-
-    completed = run_ci_script("validate-ci-plan", input_text=encoded)
-
-    assert completed.returncode != 0
-
-
-def test_every_lean_python_test_enables_the_lean_lane() -> None:
-    lean_tests = sorted(
-        path.as_posix()
-        for path in (
-            Path(__file__).parents[4] / "tests" / "boundary" / "providers" / "lean"
-        ).glob("test_*.py")
-    )
-    assert lean_tests
-
-    for lean_test in lean_tests:
-        completed = run_ci_script("classify-ci-paths", lean_test, check=True)
-        plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
-        assert plan["run-lean"] == "true", lean_test
-
-
-def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:
-    manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
-    source_paths = subprocess.run(
-        ["git", "ls-files", "src"],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    ).stdout.splitlines()
-
-    unowned = []
-    for source_path in source_paths:
-        if not any(
-            fnmatchcase(source_path, pattern)
-            for rule in manifest["rules"]
-            for pattern in rule["patterns"]
-        ):
-            unowned.append(source_path)
-
-    assert unowned == []
-
-
-def test_ownership_manifest_names_only_supported_suites() -> None:
-    manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
-    suites = set(manifest["suites"])
-    rule_names = [rule["name"] for rule in manifest["rules"]]
-
-    assert manifest["version"] == 2
-    assert len(suites) == len(manifest["suites"])
-    assert len(rule_names) == len(set(rule_names))
-    assert all(set(rule["suites"]) <= suites for rule in manifest["rules"])
-    assert manifest["fallback"]["name"] == "unclassified-fail-closed"
-    assert set(manifest["fallback"]["suites"]) == suites

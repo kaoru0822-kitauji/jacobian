@@ -338,9 +338,15 @@
       ]
     },
     {
-      "name": "test-support",
+      "name": "generic-test-support",
       "patterns": [
-        "tests/support/**",
+        "tests/support/__init__.py",
+        "tests/support/_agent_ab_support.py",
+        "tests/support/commands.py",
+        "tests/support/domains.py",
+        "tests/support/providers.py",
+        "tests/support/services.py",
+        "tests/support/state.py",
         "tests/conftest.py"
       ],
       "suites": [
@@ -354,6 +360,43 @@
         "provider",
         "e2e",
         "lean",
+        "static"
+      ]
+    },
+    {
+      "name": "rational-test-support",
+      "patterns": [
+        "tests/support/rationals.py"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "provider",
+        "e2e",
+        "static"
+      ]
+    },
+    {
+      "name": "lean-readiness-test-support",
+      "patterns": [
+        "tests/support/provider_lean.py"
+      ],
+      "suites": [
+        "composition",
+        "e2e",
+        "lean",
+        "static"
+      ]
+    },
+    {
+      "name": "external-sat-readiness-test-support",
+      "patterns": [
+        "tests/support/provider_external_sat.py"
+      ],
+      "suites": [
+        "provider",
         "static"
       ]
     },
