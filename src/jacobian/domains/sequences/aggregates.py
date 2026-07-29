@@ -27,7 +27,13 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_sum,
         "sequence",
         "exact",
-        invocation_examples=(example("sum_1_2_3", "Sum the sequence 1, 2, and 3.", {"values": ["1", "2", "3"]}),),
+        invocation_examples=(
+            example(
+                "sum_1_2_3",
+                "Sum the sequence 1, 2, and 3.",
+                {"values": ["1", "2", "3"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.product",
@@ -38,7 +44,13 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_product,
         "sequence",
         "exact",
-        invocation_examples=(example("product_2_3_4", "Multiply the sequence 2, 3, and 4.", {"values": ["2", "3", "4"]}),),
+        invocation_examples=(
+            example(
+                "product_2_3_4",
+                "Multiply the sequence 2, 3, and 4.",
+                {"values": ["2", "3", "4"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.gcd",
@@ -49,7 +61,11 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_gcd,
         "sequence",
         "divisibility",
-        invocation_examples=(example("gcd_12_18", "Compute the gcd of 12 and 18.", {"values": ["12", "18"]}),),
+        invocation_examples=(
+            example(
+                "gcd_12_18", "Compute the gcd of 12 and 18.", {"values": ["12", "18"]}
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.lcm",
@@ -60,7 +76,9 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_lcm,
         "sequence",
         "divisibility",
-        invocation_examples=(example("lcm_4_6", "Compute the lcm of 4 and 6.", {"values": ["4", "6"]}),),
+        invocation_examples=(
+            example("lcm_4_6", "Compute the lcm of 4 and 6.", {"values": ["4", "6"]}),
+        ),
     ),
     sequence_operation(
         "sequence.compute.minimum",
@@ -71,7 +89,13 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_minimum,
         "sequence",
         "order",
-        invocation_examples=(example("minimum_3_1_2", "Find the minimum of 3, 1, and 2.", {"values": ["3", "1", "2"]}),),
+        invocation_examples=(
+            example(
+                "minimum_3_1_2",
+                "Find the minimum of 3, 1, and 2.",
+                {"values": ["3", "1", "2"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.maximum",
@@ -82,7 +106,13 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_maximum,
         "sequence",
         "order",
-        invocation_examples=(example("maximum_1_3_2", "Find the maximum of 1, 3, and 2.", {"values": ["1", "3", "2"]}),),
+        invocation_examples=(
+            example(
+                "maximum_1_3_2",
+                "Find the maximum of 1, 3, and 2.",
+                {"values": ["1", "3", "2"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.range",
@@ -93,7 +123,13 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_range,
         "sequence",
         "statistic",
-        invocation_examples=(example("range_1_4_2", "Compute the range of 1, 4, and 2.", {"values": ["1", "4", "2"]}),),
+        invocation_examples=(
+            example(
+                "range_1_4_2",
+                "Compute the range of 1, 4, and 2.",
+                {"values": ["1", "4", "2"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.distinct_count",
@@ -104,6 +140,12 @@ SEQUENCE_AGGREGATE_CAPABILITIES = (
         sequence_distinct_count,
         "sequence",
         "counting",
-        invocation_examples=(example("distinct_count_1_2_1", "Count distinct values in 1, 2, and 1.", {"values": ["1", "2", "1"]}),),
+        invocation_examples=(
+            example(
+                "distinct_count_1_2_1",
+                "Count distinct values in 1, 2, and 1.",
+                {"values": ["1", "2", "1"]},
+            ),
+        ),
     ),
 )
