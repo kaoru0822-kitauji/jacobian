@@ -26,7 +26,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityPolicy, CapabilityPolicyProfile
 from jacobian.eval_telemetry import parse_agent_transcript
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CHALLENGE_ROOT = Path(__file__).with_name("research_challenges")
@@ -125,12 +125,15 @@ def _run_text(command: Sequence[str]) -> str:
 
 
 def _portfolio_snapshot(policy: CapabilityPolicy) -> dict[str, Any]:
-    with TemporaryDirectory(prefix="jacobian-frontier-catalog-") as state_root:
-        catalog = JacobianKernel(
+    with (
+        TemporaryDirectory(prefix="jacobian-frontier-catalog-") as state_root,
+        create_runtime(
             Path(state_root),
-            install_references=True,
+            checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
             capability_policy=policy,
-        ).capabilities.catalog()
+        ) as runtime,
+    ):
+        catalog = runtime.core.capabilities.catalog()
     catalog_payload = {
         "catalog_version": catalog.catalog_version,
         "capabilities": [

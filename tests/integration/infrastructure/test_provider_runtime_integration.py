@@ -23,8 +23,8 @@ from jacobian.domains.graph_optimization.bundle import GRAPH_OPTIMIZATION_BUNDLE
 from jacobian.domains.graph_optimization.invariant_bundle import (
     GRAPH_INVARIANT_BUNDLE,
 )
-from jacobian.kernel import JacobianKernel
 from jacobian.provider_measurements import _cold_install_spec
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 
 class UnavailableAdapter:
@@ -52,10 +52,11 @@ class UnavailableAdapter:
 
 
 def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
-    kernel,
+    runtime,
 ) -> None:
     descriptors = {
-        item.capability_id: item for item in kernel.capabilities.catalog().capabilities
+        item.capability_id: item
+        for item in runtime.core.capabilities.catalog().capabilities
     }
 
     assert descriptors
@@ -83,7 +84,7 @@ def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
         for operation in bundle.capabilities
     }
     assert built_in_ids <= descriptors.keys()
-    assert set(kernel.domain_bundles) == {
+    assert set(runtime.portfolio.domain_bundles) == {
         bundle.domain_id for bundle in BUILTIN_DOMAIN_BUNDLES
     }
     assert {
@@ -95,14 +96,14 @@ def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
 
 
 def test_unavailable_adapter_is_rejected_before_catalog_advertisement(
-    kernel,
+    runtime,
 ) -> None:
 
     with pytest.raises(CapabilityError, match="is unavailable"):
-        kernel.register_capability(UnavailableAdapter())
+        runtime.core.capabilities.register(UnavailableAdapter())
 
     assert "fixture.unavailable" not in {
-        item.capability_id for item in kernel.capabilities.catalog().capabilities
+        item.capability_id for item in runtime.core.capabilities.catalog().capabilities
     }
 
 
@@ -135,10 +136,10 @@ def test_graph_domain_runtime_identities_bind_every_executed_backend() -> None:
 
 def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
     tmp_path: Path,
-    initialized_kernel_store_with_references: None,
+    initialized_runtime_store_with_references: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _ = initialized_kernel_store_with_references
+    _ = initialized_runtime_store_with_references
     unavailable = CapabilityProviderRuntime(
         provider="jacobian.lean4",
         availability=CapabilityProviderAvailability.UNAVAILABLE,
@@ -148,16 +149,18 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
         diagnostic="The pinned Lean runtime is unavailable.",
     )
     monkeypatch.setattr(
-        "jacobian.kernel.lean_provider_runtime",
+        "jacobian.portfolio.assembler.lean_provider_runtime",
         lambda **_kwargs: unavailable,
     )
 
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
 
-    assert kernel.lean is None
-    assert kernel.lean_proof_edit is None
+    assert runtime.portfolio.lean is None
+    assert runtime.portfolio.lean_proof_edit is None
     capability_ids = {
-        item.capability_id for item in kernel.capabilities.catalog().capabilities
+        item.capability_id for item in runtime.core.capabilities.catalog().capabilities
     }
     assert {
         "lean.check",
@@ -169,15 +172,15 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
 
 
 def test_invocation_binds_descriptor_runtime_to_result_provenance(
-    kernel,
+    runtime,
 ) -> None:
     descriptor = next(
         item
-        for item in kernel.capabilities.catalog().capabilities
+        for item in runtime.core.capabilities.catalog().capabilities
         if item.capability_id == "polynomial.map.evaluate"
     )
     # Invalid input is intentional: provenance must also survive failed execution.
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=descriptor.capability_id,
             mode=CapabilityMode.EXPLORE,

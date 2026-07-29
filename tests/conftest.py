@@ -1,24 +1,20 @@
 """Suite-wide pytest conventions."""
 
-import gc
 import os
 import shutil
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from filelock import FileLock
 
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 
-def _freeze_kernel_store(root: Path) -> None:
+def _freeze_runtime_store(root: Path) -> None:
     """Checkpoint the template database and remove its volatile WAL files."""
-
-    # sqlite3 connection context managers finish transactions but do not close
-    # connections. Kernel construction creates reference cycles containing
-    # connections, so make their finalization deterministic before copytree
-    # observes WAL/SHM paths that can disappear during a copy.
-    gc.collect()
 
     database = root / "metadata.sqlite3"
     connection = sqlite3.connect(database, timeout=30)
@@ -26,12 +22,12 @@ def _freeze_kernel_store(root: Path) -> None:
         checkpoint = connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         if checkpoint is None or checkpoint[0] != 0:
             raise RuntimeError(
-                f"could not checkpoint kernel store template: {checkpoint!r}"
+                f"could not checkpoint runtime store template: {checkpoint!r}"
             )
         journal_mode = connection.execute("PRAGMA journal_mode = DELETE").fetchone()
         if journal_mode is None or journal_mode[0].casefold() != "delete":
             raise RuntimeError(
-                "could not switch kernel store template to a stable journal mode"
+                "could not switch runtime store template to a stable journal mode"
             )
     finally:
         connection.close()
@@ -43,77 +39,154 @@ def _freeze_kernel_store(root: Path) -> None:
     remaining = [path.name for path in volatile_paths if path.exists()]
     if remaining:
         raise RuntimeError(
-            f"kernel store template still has volatile SQLite files: {remaining}"
+            f"runtime store template still has volatile SQLite files: {remaining}"
         )
 
 
-@pytest.fixture(scope="session")
-def kernel_store_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Build immutable core descriptors once per pytest worker."""
+def _shared_worker_template(
+    tmp_path_factory: pytest.TempPathFactory,
+    request: pytest.FixtureRequest,
+    name: str,
+) -> tuple[Path, FileLock] | None:
+    """Return one xdist-run-scoped template path and its construction lock."""
 
-    template = tmp_path_factory.mktemp("kernel-store-template")
-    kernel = JacobianKernel(template)
-    del kernel
-    _freeze_kernel_store(template)
+    worker = getattr(request.config, "workerinput", None)
+    if not isinstance(worker, dict):
+        return None
+    run_id = worker.get("testrunuid")
+    if not isinstance(run_id, str) or not run_id:
+        raise RuntimeError("xdist worker did not provide a test-run identity")
+    root = tmp_path_factory.getbasetemp().parent / f"{name}-{run_id}"
+    return root, FileLock(root.with_suffix(".lock"))
+
+
+@pytest.fixture(scope="session")
+def runtime_store_template(
+    tmp_path_factory: pytest.TempPathFactory,
+    request: pytest.FixtureRequest,
+) -> Path:
+    """Build immutable core descriptors once per test run."""
+
+    shared = _shared_worker_template(
+        tmp_path_factory,
+        request,
+        "runtime-store-template",
+    )
+    if shared is None:
+        template = tmp_path_factory.mktemp("runtime-store-template")
+        runtime = create_runtime(template)
+        runtime.close()
+        _freeze_runtime_store(template)
+        return template
+
+    template, lock = shared
+    ready = template / ".ready"
+    with lock:
+        if not ready.exists():
+            if template.exists():
+                raise RuntimeError(
+                    f"incomplete shared runtime template exists at {template}"
+                )
+            runtime = create_runtime(template)
+            runtime.close()
+            _freeze_runtime_store(template)
+            ready.touch()
     return template
 
 
 @pytest.fixture(scope="session")
-def kernel_store_template_with_references(
+def runtime_store_template_with_references(
     tmp_path_factory: pytest.TempPathFactory,
-    kernel_store_template: Path,
+    request: pytest.FixtureRequest,
+    runtime_store_template: Path,
 ) -> Path:
-    """Build an immutable store that already has authorized references installed."""
+    """Build one test-run store with authorized references installed."""
 
-    template = tmp_path_factory.mktemp("kernel-store-template-with-references")
-    shutil.copytree(kernel_store_template, template, dirs_exist_ok=True)
-    kernel = JacobianKernel(template, install_references=True)
-    del kernel
-    _freeze_kernel_store(template)
+    shared = _shared_worker_template(
+        tmp_path_factory,
+        request,
+        "runtime-store-template-with-references",
+    )
+    if shared is None:
+        template = tmp_path_factory.mktemp("runtime-store-template-with-references")
+        shutil.copytree(runtime_store_template, template, dirs_exist_ok=True)
+        runtime = create_runtime(
+            template,
+            checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+        )
+        runtime.close()
+        _freeze_runtime_store(template)
+        return template
+
+    template, lock = shared
+    ready = template / ".ready"
+    with lock:
+        if not ready.exists():
+            if template.exists():
+                raise RuntimeError(
+                    f"incomplete shared reference template exists at {template}"
+                )
+            shutil.copytree(runtime_store_template, template)
+            runtime = create_runtime(
+                template,
+                checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+            )
+            runtime.close()
+            _freeze_runtime_store(template)
+            ready.touch()
     return template
 
 
 @pytest.fixture
-def initialized_kernel_store(
+def initialized_runtime_store(
     tmp_path: Path,
-    kernel_store_template: Path,
+    runtime_store_template: Path,
 ) -> None:
     """Seed an isolated test root with the process's core descriptor snapshot."""
 
-    shutil.copytree(kernel_store_template, tmp_path, dirs_exist_ok=True)
+    shutil.copytree(runtime_store_template, tmp_path, dirs_exist_ok=True)
 
 
 @pytest.fixture
-def initialized_kernel_store_with_references(
+def initialized_runtime_store_with_references(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     """Seed an isolated test root that already includes authorized references."""
 
     shutil.copytree(
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         tmp_path,
         dirs_exist_ok=True,
     )
 
 
 @pytest.fixture
-def kernel(tmp_path: Path, initialized_kernel_store: None) -> JacobianKernel:
-    """Attach a kernel to a per-test copy of the core descriptor snapshot."""
+def runtime(
+    tmp_path: Path, initialized_runtime_store: None
+) -> Iterator[JacobianRuntime]:
+    """Attach a runtime to a per-test copy of the core descriptor snapshot."""
 
-    _ = initialized_kernel_store
-    return JacobianKernel(tmp_path)
+    _ = initialized_runtime_store
+    runtime = create_runtime(tmp_path)
+    yield runtime
+    runtime.close()
 
 
 @pytest.fixture
-def kernel_with_references(
+def runtime_with_references(
     tmp_path: Path,
-    initialized_kernel_store_with_references: None,
-) -> JacobianKernel:
-    """Attach a kernel to a per-test copy that already has authorized references."""
+    initialized_runtime_store_with_references: None,
+) -> Iterator[JacobianRuntime]:
+    """Attach a runtime to a per-test copy that already has authorized references."""
 
-    _ = initialized_kernel_store_with_references
-    return JacobianKernel(tmp_path, hydrate_authorized=True)
+    _ = initialized_runtime_store_with_references
+    runtime = create_runtime(
+        tmp_path,
+        checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING,
+    )
+    yield runtime
+    runtime.close()
 
 
 @pytest.hookimpl(trylast=True)

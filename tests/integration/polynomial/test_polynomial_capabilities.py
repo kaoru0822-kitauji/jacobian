@@ -91,17 +91,17 @@ def _identity_input(
 
 
 def test_polynomial_identity_descriptor_example_is_directly_invocable(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
+    runtime = runtime_with_references
     descriptors = {
         descriptor.capability_id: descriptor
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
     descriptor = descriptors["polynomial.identity.verify"]
     example = descriptor.invocation_examples[0]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=descriptor.capability_id,
             mode=example.mode,
@@ -113,11 +113,11 @@ def test_polynomial_identity_descriptor_example_is_directly_invocable(
 
 
 def test_polynomial_identity_verifies_equal_coefficients(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
             mode=CapabilityMode.VERIFY,
@@ -133,14 +133,14 @@ def test_polynomial_identity_verifies_equal_coefficients(
     assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
     assert result.output["left_uri"] != result.output["right_uri"]
 
-    semantics_uri = kernel.polynomial.identity_semantics_uri
-    assert semantics_uri != kernel.polynomial.semantics_uri
-    semantics = kernel.store.get(semantics_uri)
+    semantics_uri = runtime.portfolio.polynomial.identity_semantics_uri
+    assert semantics_uri != runtime.portfolio.polynomial.semantics_uri
+    semantics = runtime.core.store.get(semantics_uri)
     assert semantics.payload["name"] == "jacobian.sparse-rational-polynomial-ring"
     for output_key in ("left_uri", "right_uri", "claim_uri", "certificate_uri"):
-        artifact = kernel.store.get(result.output[output_key])
+        artifact = runtime.core.store.get(result.output[output_key])
         assert artifact.manifest.semantics_uri == semantics_uri
-    record = kernel.store.get(result.output["verification_record_uri"])
+    record = runtime.core.store.get(result.output["verification_record_uri"])
     assert (
         record.payload["bindings"]["semantics_digest"]
         == semantics.manifest.object_digest
@@ -152,10 +152,10 @@ def test_polynomial_identity_verifies_equal_coefficients(
         result.output["right_uri"]
     ]
     assert record.payload["obligation_uri"] is None
-    checker = kernel.checkers.get(result.output["checker_id"])
+    checker = runtime.core.checkers.get(result.output["checker_id"])
     assert checker.semantics_uris == (semantics_uri,)
 
-    rejected = kernel.verification.verify_certificate(
+    rejected = runtime.services.verification.verify_certificate(
         certificate_uri=result.output["certificate_uri"],
         checker_id=result.output["checker_id"],
         supporting_artifact_uris=(result.output["claim_uri"],),
@@ -165,10 +165,10 @@ def test_polynomial_identity_verifies_equal_coefficients(
     assert rejected.verification_record_uri is None
 
 
-def test_polynomial_identity_verifies_a_difference(kernel_with_references) -> None:
+def test_polynomial_identity_verifies_a_difference(runtime_with_references) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
             mode=CapabilityMode.VERIFY,
@@ -181,17 +181,17 @@ def test_polynomial_identity_verifies_a_difference(kernel_with_references) -> No
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.assurance.verification_record_uri is not None
     assert result.relationships == ()
-    record = kernel.store.get(result.output["verification_record_uri"])
+    record = runtime.core.store.get(result.output["verification_record_uri"])
     assert record.payload["conclusion"] == Conclusion.FALSE.value
     assert record.payload["relation_id"] is None
 
 
 def test_polynomial_identity_duplicate_terms_return_actionable_recovery(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
             mode=CapabilityMode.VERIFY,
@@ -220,14 +220,14 @@ def test_polynomial_identity_duplicate_terms_return_actionable_recovery(
 
 
 def test_polynomial_identity_preserves_checker_rejection_as_unknown(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
-    checker_id = kernel.polynomial.identity_checker_id
+    runtime = runtime_with_references
+    checker_id = runtime.portfolio.polynomial.identity_checker_id
     assert checker_id is not None
-    kernel.checkers.revoke(checker_id, reason="exercise fail-closed projection")
+    runtime.core.checkers.revoke(checker_id, reason="exercise fail-closed projection")
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.identity.verify",
             mode=CapabilityMode.VERIFY,
@@ -244,9 +244,9 @@ def test_polynomial_identity_preserves_checker_rejection_as_unknown(
 
 
 def test_jacobian_canonically_omits_zero_partial_derivatives(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
+    runtime = runtime_with_references
     x, y = symbols("x y")
     polynomial_map = {
         "map_schema_version": "1",
@@ -258,7 +258,7 @@ def test_jacobian_canonically_omits_zero_partial_derivatives(
         ],
     }
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.compute_jacobian",
             input={"map": polynomial_map},
@@ -278,9 +278,9 @@ def test_jacobian_canonically_omits_zero_partial_derivatives(
 
 
 def test_jacobian_represents_derived_exponents_above_the_source_limit(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
+    runtime = runtime_with_references
     x, y = symbols("x y")
     polynomial_map = {
         "map_schema_version": "1",
@@ -292,7 +292,7 @@ def test_jacobian_represents_derived_exponents_above_the_source_limit(
         ],
     }
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.compute_jacobian",
             input={"map": polynomial_map},
@@ -308,7 +308,7 @@ def test_jacobian_represents_derived_exponents_above_the_source_limit(
             }
         ]
     }
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,
@@ -322,12 +322,12 @@ def test_jacobian_represents_derived_exponents_above_the_source_limit(
 
 
 def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
+    runtime = runtime_with_references
     polynomial_map = _jacobian_counterexample_map()
 
-    jacobian = kernel.capabilities.invoke(
+    jacobian = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.compute_jacobian",
             input={"map": polynomial_map},
@@ -347,10 +347,13 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     assert jacobian.output["backend"] == "sympy"
     assert jacobian.output["backend_version"]
     assert jacobian.output["certificate_uri"] in jacobian.artifact_uris
-    assert jacobian.output["checker_id"] == kernel.polynomial.jacobian_checker_id
+    assert (
+        jacobian.output["checker_id"]
+        == runtime.portfolio.polynomial.jacobian_checker_id
+    )
     assert "conclusion" not in jacobian.output
 
-    verified_jacobian = kernel.capabilities.invoke(
+    verified_jacobian = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,
@@ -365,7 +368,7 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     assert verified_jacobian.output["conclusion"] == Conclusion.TRUE.value
     assert verified_jacobian.output["verification_record_uri"]
 
-    first_evaluation = kernel.capabilities.invoke(
+    first_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={
@@ -374,7 +377,7 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
             },
         )
     )
-    second_evaluation = kernel.capabilities.invoke(
+    second_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={
@@ -383,7 +386,7 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
             },
         )
     )
-    collision = kernel.capabilities.invoke(
+    collision = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision_witness",
             input={
@@ -414,10 +417,13 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
         ]
     )
     assert collision.output["witness_uri"] in collision.artifact_uris
-    assert collision.output["checker_id"] == kernel.polynomial.collision_checker_id
+    assert (
+        collision.output["checker_id"]
+        == runtime.portfolio.polynomial.collision_checker_id
+    )
     assert "conclusion" not in collision.output
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="witness.verify",
             mode=CapabilityMode.VERIFY,
@@ -436,10 +442,10 @@ def test_polynomial_jacobian_and_collision_reproduce_public_counterexample(
     assert verified.output["verification_record_uri"]
 
 
-def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> None:
-    kernel = kernel_with_references
+def test_collision_checker_rejects_a_forged_image(runtime_with_references) -> None:
+    runtime = runtime_with_references
     polynomial_map = _jacobian_counterexample_map()
-    first_evaluation = kernel.capabilities.invoke(
+    first_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={
@@ -448,7 +454,7 @@ def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> Non
             },
         )
     )
-    second_evaluation = kernel.capabilities.invoke(
+    second_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={
@@ -457,7 +463,7 @@ def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> Non
             },
         )
     )
-    collision = kernel.capabilities.invoke(
+    collision = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision_witness",
             input={
@@ -470,7 +476,7 @@ def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> Non
     candidate_uri = collision.output["candidate_uri"]
     witness_uri = collision.output["witness_uri"]
     assert witness_uri is not None
-    witness_artifact = kernel.store.get(witness_uri)
+    witness_artifact = runtime.core.store.get(witness_uri)
     original = WitnessEnvelope.model_validate(witness_artifact.payload)
     forged_payload = deepcopy(original.payload)
     forged_payload["image"][0] = {"num": "0", "den": "1"}
@@ -483,15 +489,15 @@ def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> Non
         ),
         payload=forged_payload,
     )
-    forged_artifact = kernel.store.put(
-        schema_uri=kernel.polynomial.witness_schema_uri,
-        semantics_uri=kernel.polynomial.semantics_uri,
+    forged_artifact = runtime.core.store.put(
+        schema_uri=runtime.portfolio.polynomial.witness_schema_uri,
+        semantics_uri=runtime.portfolio.polynomial.semantics_uri,
         payload=forged.model_dump(mode="json"),
         parents=(claim_uri, candidate_uri),
         summary="forged collision witness",
     )
 
-    rejected = kernel.capabilities.invoke(
+    rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="witness.verify",
             mode=CapabilityMode.VERIFY,
@@ -499,7 +505,7 @@ def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> Non
                 "claim_uri": claim_uri,
                 "candidate_uri": candidate_uri,
                 "witness_uri": forged_artifact.artifact_uri,
-                "checker_id": kernel.polynomial.collision_checker_id,
+                "checker_id": runtime.portfolio.polynomial.collision_checker_id,
             },
         )
     )
@@ -511,9 +517,9 @@ def test_collision_checker_rejects_a_forged_image(kernel_with_references) -> Non
 
 
 def test_collision_comparison_does_not_promote_forged_evaluations(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
+    runtime = runtime_with_references
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -521,16 +527,16 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
         "variables": ["x"],
         "coordinates": [_poly_payload(Poly(x, x, domain="QQ"))],
     }
-    first_evaluation = kernel.capabilities.invoke(
+    first_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={"map": identity_map, "point": _point(0)},
         )
     )
     map_uri = first_evaluation.output["map_uri"]
-    forged_evaluation = kernel.artifacts.put(
-        schema_uri=kernel.polynomial.evaluation_schema_uri,
-        semantics_uri=kernel.polynomial.semantics_uri,
+    forged_evaluation = runtime.core.artifacts.put(
+        schema_uri=runtime.portfolio.polynomial.evaluation_schema_uri,
+        semantics_uri=runtime.portfolio.polynomial.semantics_uri,
         payload={
             "evaluation_schema_version": "1",
             "map_uri": map_uri,
@@ -542,7 +548,7 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
         parents=(map_uri,),
     )
 
-    candidate = kernel.capabilities.invoke(
+    candidate = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision_witness",
             input={
@@ -556,7 +562,7 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
     assert candidate.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert candidate.output["verification"] == Verification.UNVERIFIED.value
 
-    rejected = kernel.capabilities.invoke(
+    rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="witness.verify",
             mode=CapabilityMode.VERIFY,
@@ -575,9 +581,9 @@ def test_collision_comparison_does_not_promote_forged_evaluations(
 
 
 def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    kernel = kernel_with_references
+    runtime = runtime_with_references
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -586,19 +592,19 @@ def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
         "coordinates": [_poly_payload(Poly(x, x, domain="QQ"))],
     }
 
-    first_evaluation = kernel.capabilities.invoke(
+    first_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={"map": identity_map, "point": _point(0)},
         )
     )
-    second_evaluation = kernel.capabilities.invoke(
+    second_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={"map": identity_map, "point": _point(1)},
         )
     )
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision_witness",
             input={
@@ -615,7 +621,7 @@ def test_noncollision_is_computed_evidence_without_witness_or_conclusion(
     assert "conclusion" not in result.output
 
 
-def test_collision_rejects_evaluations_from_different_maps(kernel) -> None:
+def test_collision_rejects_evaluations_from_different_maps(runtime) -> None:
     x = symbols("x")
     identity_map = {
         "map_schema_version": "1",
@@ -629,20 +635,20 @@ def test_collision_rejects_evaluations_from_different_maps(kernel) -> None:
         "variables": ["x"],
         "coordinates": [_poly_payload(Poly(x**2, x, domain="QQ"))],
     }
-    first_evaluation = kernel.capabilities.invoke(
+    first_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={"map": identity_map, "point": _point(1)},
         )
     )
-    second_evaluation = kernel.capabilities.invoke(
+    second_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={"map": square_map, "point": _point(1)},
         )
     )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision_witness",
             input={
@@ -657,7 +663,7 @@ def test_collision_rejects_evaluations_from_different_maps(kernel) -> None:
 
 
 def test_collision_validates_evaluation_dimensions_before_artifact_writes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     x = symbols("x")
@@ -667,16 +673,16 @@ def test_collision_validates_evaluation_dimensions_before_artifact_writes(
         "variables": ["x"],
         "coordinates": [_poly_payload(Poly(x, x, domain="QQ"))],
     }
-    first_evaluation = kernel.capabilities.invoke(
+    first_evaluation = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={"map": identity_map, "point": _point(1)},
         )
     )
     map_uri = first_evaluation.output["map_uri"]
-    incompatible_evaluation = kernel.artifacts.put(
-        schema_uri=kernel.polynomial.evaluation_schema_uri,
-        semantics_uri=kernel.polynomial.semantics_uri,
+    incompatible_evaluation = runtime.core.artifacts.put(
+        schema_uri=runtime.portfolio.polynomial.evaluation_schema_uri,
+        semantics_uri=runtime.portfolio.polynomial.semantics_uri,
         payload={
             "evaluation_schema_version": "1",
             "map_uri": map_uri,
@@ -688,16 +694,16 @@ def test_collision_validates_evaluation_dimensions_before_artifact_writes(
         parents=(map_uri,),
     )
     artifact_put_calls = 0
-    original_put = kernel.artifacts.put
+    original_put = runtime.core.artifacts.put
 
     def recording_put(*args: Any, **kwargs: Any) -> Any:
         nonlocal artifact_put_calls
         artifact_put_calls += 1
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision_witness",
             input={
@@ -712,10 +718,10 @@ def test_collision_validates_evaluation_dimensions_before_artifact_writes(
     assert artifact_put_calls == 0
 
 
-def test_polynomial_map_evaluation_is_exact_and_materialized(kernel) -> None:
+def test_polynomial_map_evaluation_is_exact_and_materialized(runtime) -> None:
     polynomial_map = _jacobian_counterexample_map()
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.evaluate",
             input={
@@ -813,23 +819,23 @@ def test_polynomial_map_evaluation_is_exact_and_materialized(kernel) -> None:
     ],
 )
 def test_complete_request_validation_precedes_artifact_writes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
     capability_id: str,
     payload: dict[str, Any],
     diagnostic_code: str,
 ) -> None:
     artifact_put_calls = 0
-    original_put = kernel.artifacts.put
+    original_put = runtime.core.artifacts.put
 
     def recording_put(*args: Any, **kwargs: Any) -> Any:
         nonlocal artifact_put_calls
         artifact_put_calls += 1
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(capability_id=capability_id, input=payload)
     )
 

@@ -1,4 +1,4 @@
-"""Jacobian verification kernel."""
+"""Jacobian mathematical capability runtime."""
 
 from importlib.metadata import PackageNotFoundError, version
 

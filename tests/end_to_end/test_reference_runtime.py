@@ -12,19 +12,19 @@ from jacobian.contracts.evidence import (
     CertificateEnvelope,
     EvidenceBindings,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def test_graph_search_witness_and_independent_replay(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    reference = kernel.references["graph_paths"]
-    claim = kernel.artifacts.put(
+    reference = runtime.portfolio.references["graph_paths"]
+    claim = runtime.core.artifacts.put(
         schema_uri=reference.claim_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -42,7 +42,7 @@ def test_graph_search_witness_and_independent_replay(
             "correspondence_status": "HUMAN_REVIEWED",
         },
     )
-    candidate = kernel.artifacts.put(
+    candidate = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -64,7 +64,7 @@ def test_graph_search_witness_and_independent_replay(
         },
     )
 
-    evaluation = kernel.evaluation.evaluate_batch(
+    evaluation = runtime.services.evaluation.evaluate_batch(
         claim_uri=claim.artifact_uri,
         candidate_uris=(candidate.artifact_uri,),
         plugin_id=reference.plugin_id,
@@ -75,7 +75,7 @@ def test_graph_search_witness_and_independent_replay(
     assert evaluation.items[0].result.conclusion.value == "FALSE"
     assert evaluation.items[0].result.assurance.verification.value == "UNVERIFIED"
 
-    found = kernel.witnesses.find(
+    found = runtime.services.witnesses.find(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
@@ -83,7 +83,7 @@ def test_graph_search_witness_and_independent_replay(
         wall_seconds=30,
     )
     assert found.witness_uri is not None
-    verified = kernel.verification.verify_witness(
+    verified = runtime.services.verification.verify_witness(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         witness_uri=found.witness_uri,
@@ -99,14 +99,14 @@ def test_graph_search_witness_and_independent_replay(
             "-c",
             (
                 "import json,sys;"
-                "from jacobian.kernel import JacobianKernel;"
-                "kernel=JacobianKernel(sys.argv[1],install_references=True);"
-                "result=kernel.verification.verify_witness("
+                "from jacobian.runtime import CheckerAuthorityMode, create_runtime;"
+                "runtime=create_runtime(sys.argv[1],checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED);"
+                "result=runtime.services.verification.verify_witness("
                 "claim_uri=sys.argv[2],candidate_uri=sys.argv[3],"
                 "witness_uri=sys.argv[4],checker_id=sys.argv[5]);"
                 "print(json.dumps(result.model_dump(mode='json'),sort_keys=True))"
             ),
-            str(kernel.store.root),
+            str(runtime.core.store.root),
             claim.artifact_uri,
             candidate.artifact_uri,
             found.witness_uri,
@@ -122,9 +122,9 @@ def test_graph_search_witness_and_independent_replay(
     assert replayed["assurance"]["verification"] == "VERIFIED"
 
 
-def test_matrix_kernel_witness_and_independent_replay(kernel) -> None:
-    reference = kernel.references["matrices"]
-    claim = kernel.artifacts.put(
+def test_matrix_kernel_witness_and_independent_replay(runtime) -> None:
+    reference = runtime.portfolio.references["matrices"]
+    claim = runtime.core.artifacts.put(
         schema_uri=reference.claim_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -142,7 +142,7 @@ def test_matrix_kernel_witness_and_independent_replay(kernel) -> None:
             "correspondence_status": "HUMAN_REVIEWED",
         },
     )
-    candidate = kernel.artifacts.put(
+    candidate = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -152,7 +152,7 @@ def test_matrix_kernel_witness_and_independent_replay(kernel) -> None:
         },
     )
 
-    found = kernel.witnesses.find(
+    found = runtime.services.witnesses.find(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
@@ -160,7 +160,7 @@ def test_matrix_kernel_witness_and_independent_replay(kernel) -> None:
         wall_seconds=30,
     )
     assert found.witness_uri is not None
-    verified = kernel.verification.verify_witness(
+    verified = runtime.services.verification.verify_witness(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         witness_uri=found.witness_uri,
@@ -173,10 +173,10 @@ def test_matrix_kernel_witness_and_independent_replay(kernel) -> None:
 
 
 def test_erdos_straus_range_witness_and_independent_replay(
-    kernel,
+    runtime,
 ) -> None:
-    reference = kernel.references["erdos_straus"]
-    claim = kernel.artifacts.put(
+    reference = runtime.portfolio.references["erdos_straus"]
+    claim = runtime.core.artifacts.put(
         schema_uri=reference.claim_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -194,13 +194,13 @@ def test_erdos_straus_range_witness_and_independent_replay(
             "correspondence_status": "HUMAN_REVIEWED",
         },
     )
-    candidate = kernel.artifacts.put(
+    candidate = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={"lower_bound": 2, "upper_bound": 1000},
     )
 
-    found = kernel.witnesses.find(
+    found = runtime.services.witnesses.find(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
@@ -208,7 +208,7 @@ def test_erdos_straus_range_witness_and_independent_replay(
         wall_seconds=30,
     )
     assert found.witness_uri is not None
-    verified = kernel.verification.verify_witness(
+    verified = runtime.services.verification.verify_witness(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         witness_uri=found.witness_uri,
@@ -221,9 +221,9 @@ def test_erdos_straus_range_witness_and_independent_replay(
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
-    reference = kernel.references["matrices"]
-    claim = kernel.artifacts.put(
+def test_matrix_maxdet_certificate_replays_full_scope(runtime) -> None:
+    reference = runtime.portfolio.references["matrices"]
+    claim = runtime.core.artifacts.put(
         schema_uri=reference.claim_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -247,7 +247,7 @@ def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
             "correspondence_status": "HUMAN_REVIEWED",
         },
     )
-    candidate = kernel.artifacts.put(
+    candidate = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -260,7 +260,7 @@ def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
             ],
         },
     )
-    found = kernel.witnesses.find(
+    found = runtime.services.witnesses.find(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         plugin_id=reference.plugin_id,
@@ -268,7 +268,7 @@ def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
         wall_seconds=30,
     )
     assert found.witness_uri is not None
-    verified_witness = kernel.verification.verify_witness(
+    verified_witness = runtime.services.verification.verify_witness(
         claim_uri=claim.artifact_uri,
         candidate_uri=candidate.artifact_uri,
         witness_uri=found.witness_uri,
@@ -286,7 +286,7 @@ def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
         format_version="1",
         bindings=EvidenceBindings(
             claim_digest=claim.object_digest,
-            semantics_digest=kernel.store.get(
+            semantics_digest=runtime.core.store.get(
                 reference.semantics_uri
             ).manifest.object_digest,
             candidate_digest=candidate.object_digest,
@@ -296,14 +296,14 @@ def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
         ),
         payload=payload,
     )
-    stored = kernel.store.put(
+    stored = runtime.core.store.put(
         schema_uri=reference.certificate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload=certificate.model_dump(mode="json"),
         parents=(claim.artifact_uri, candidate.artifact_uri),
     )
 
-    verified = kernel.verification.verify_certificate(
+    verified = runtime.services.verification.verify_certificate(
         certificate_uri=stored.artifact_uri
     )
 
@@ -312,9 +312,9 @@ def test_matrix_maxdet_certificate_replays_full_scope(kernel) -> None:
     assert verified.assurance.verification.value == "VERIFIED"
 
 
-def test_graph_counterexample_shrinks_to_the_odd_cycle(kernel) -> None:
-    reference = kernel.references["graph_paths"]
-    claim = kernel.artifacts.put(
+def test_graph_counterexample_shrinks_to_the_odd_cycle(runtime) -> None:
+    reference = runtime.portfolio.references["graph_paths"]
+    claim = runtime.core.artifacts.put(
         schema_uri=reference.claim_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -329,7 +329,7 @@ def test_graph_counterexample_shrinks_to_the_odd_cycle(kernel) -> None:
             "correspondence_status": "HUMAN_REVIEWED",
         },
     )
-    candidate = kernel.artifacts.put(
+    candidate = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -338,7 +338,7 @@ def test_graph_counterexample_shrinks_to_the_odd_cycle(kernel) -> None:
         },
     )
 
-    shrunk = kernel.shrinking.run(
+    shrunk = runtime.services.shrinking.run(
         target_kind="candidate",
         target_uri=candidate.artifact_uri,
         claim_uri=claim.artifact_uri,
@@ -351,7 +351,7 @@ def test_graph_counterexample_shrinks_to_the_odd_cycle(kernel) -> None:
         evaluation_budget=20,
     )
 
-    final = kernel.store.get(shrunk.final_target_uri).payload
+    final = runtime.core.store.get(shrunk.final_target_uri).payload
     assert set(final["vertices"]) == {"a", "b", "c"}
     assert shrunk.minimality.value == "NONE"
     assert shrunk.result.assurance.verification.value == "VERIFIED"

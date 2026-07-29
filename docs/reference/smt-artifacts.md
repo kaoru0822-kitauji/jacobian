@@ -28,8 +28,8 @@ producer contract and public reproduction cases run in CI.
 
 ## Registered descriptors
 
-`JacobianKernel.smt.installation` exposes the content-addressed descriptor URIs
-registered by the current kernel:
+`JacobianRuntime.core.smt.installation` exposes the content-addressed descriptor
+URIs registered by the current runtime:
 
 | Descriptor | Registered name and version | Purpose |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ registered by the current kernel:
 
 The schemas are model backed. Their closed structural and cross-field
 invariants also apply when a payload is submitted through `artifact.put`.
-Kernel construction registers the artifact boundary even when cvc5 is absent;
+Runtime construction registers the artifact boundary even when cvc5 is absent;
 only the producer capability is conditional.
 
 ## Pinned SMT-LIB profile
@@ -199,7 +199,7 @@ Acceptance requires exit zero, exact stdout `valid` plus one LF, empty stderr,
 bounded output and time, and an unchanged runtime digest. In particular,
 `holey` is rejected even though Carcara returns exit zero for that status.
 
-Acceptance creates the ordinary kernel `VerificationRecord` and permits
+Acceptance creates the ordinary runtime `VerificationRecord` and permits
 `VERIFIED_UNSAT` with conclusion `TRUE`. Rejection reports `UNKNOWN`; it does
 not establish satisfiability. Carcara is an independently implemented
 proof checker, not a formally verified checker, so this profile narrows the

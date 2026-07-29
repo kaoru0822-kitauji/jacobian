@@ -56,7 +56,6 @@ Exact inspection:
 - Request `view="CONTRACT"` once a capability fits and before invoking it. CONTRACT
   adds the validation-equivalent input schema, runtime identity, related operations,
   and validated invocation examples.
-- `view="COMPACT"` remains a compatibility alias for the previous contract projection.
 - Add `view="FULL"` only when complete output schema, provider configuration, licensing,
   or audit metadata is needed.
 - Every exact response states the scope rule: repeated bounded invocations remain
@@ -127,8 +126,7 @@ only the strongest one or two relevant candidates before broadening or paging.
 Search as many outcomes, concepts, or domains as useful. For any candidate, call
 `capability.describe(capability_id=...)` for the small exact SUMMARY. Once the
 outcome fits, request `view="CONTRACT"` and follow its validation-equivalent input
-schema or validated invocation example. `view="COMPACT"` is the compatibility alias
-for the previous contract projection. Request `view="FULL"` only when complete output
+schema or validated invocation example. Request `view="FULL"` only when complete output
 schema or provider audit metadata is needed. Once one domain-owned outcome fits,
 invoke it before searching for a checker; follow the checker, certificate, and
 verification fields returned by the producer instead of guessing a generic verifier.

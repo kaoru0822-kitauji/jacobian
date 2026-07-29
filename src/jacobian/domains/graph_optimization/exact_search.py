@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import importlib
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
-
-import networkx as nx
 
 from jacobian.contracts.graph_coloring import ChromaticGraph
 from jacobian.contracts.graph_optimization import (
@@ -21,16 +18,11 @@ from jacobian.contracts.graph_optimization import (
     OptimizationSearchStep,
     OptimizationTermination,
 )
+from jacobian.domains.graph_optimization._providers import Z3_LOADER
 
 ThresholdRelation = Literal["AT_MOST", "AT_LEAST"]
 type VertexWitness = tuple[str, ...]
 type EdgeWitness = tuple[tuple[str, str], ...]
-
-
-def _z3() -> Any:
-    """Load the optional solver only while executing a solver-backed operation."""
-
-    return importlib.import_module("z3")
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +36,7 @@ class _SearchResult[WitnessT: (VertexWitness, EdgeWitness)]:
     termination: OptimizationTermination
 
 
-def _canonical_edges(graph: nx.Graph[str]) -> tuple[tuple[str, str], ...]:
+def _canonical_edges(graph: Any) -> tuple[tuple[str, str], ...]:
     return tuple(
         sorted(
             (left, right) if left < right else (right, left)
@@ -66,7 +58,7 @@ def _search_thresholds[WitnessT: (VertexWitness, EdgeWitness)](
     budget: GraphOptimizationBudget,
     solve: Callable[[int, int], tuple[object, WitnessT]],
 ) -> _SearchResult[WitnessT]:
-    z3 = _z3()
+    z3 = Z3_LOADER.get()
     incumbent_value = len(incumbent)
     relation: ThresholdRelation = "AT_MOST" if direction == "MINIMUM" else "AT_LEAST"
     thresholds = (
@@ -164,7 +156,7 @@ def _vertex_model(
     solver: Any,
     variables: dict[str, Any],
 ) -> tuple[str, ...]:
-    z3 = _z3()
+    z3 = Z3_LOADER.get()
     model = solver.model()
     return tuple(
         sorted(
@@ -176,10 +168,12 @@ def _vertex_model(
 
 
 def solve_domination(
-    graph: nx.Graph[str],
+    graph: Any,
     source: ChromaticGraph,
     budget: GraphOptimizationBudget,
 ) -> GraphDominationMinimumOutput:
+    import networkx as nx
+
     vertices = tuple(source.vertices)
     if not vertices:
         return GraphDominationMinimumOutput(
@@ -197,7 +191,7 @@ def solve_domination(
     incumbent = tuple(sorted(nx.dominating_set(graph)))
 
     def solve(bound: int, timeout_ms: int) -> tuple[object, VertexWitness]:
-        z3 = _z3()
+        z3 = Z3_LOADER.get()
         solver = z3.Solver()
         solver.set(timeout=max(1, timeout_ms))
         selected = {
@@ -239,10 +233,12 @@ def solve_domination(
 
 
 def solve_minimum_maximal_matching(
-    graph: nx.Graph[str],
+    graph: Any,
     source: ChromaticGraph,
     budget: GraphOptimizationBudget,
 ) -> GraphMinimumMaximalMatchingOutput:
+    import networkx as nx
+
     vertices = tuple(source.vertices)
     edges = _canonical_edges(graph)
     incumbent = tuple(
@@ -263,7 +259,7 @@ def solve_minimum_maximal_matching(
         )
 
     def solve(bound: int, timeout_ms: int) -> tuple[object, EdgeWitness]:
-        z3 = _z3()
+        z3 = Z3_LOADER.get()
         solver = z3.Solver()
         solver.set(timeout=max(1, timeout_ms))
         chosen = {edge: z3.Bool(f"match_{index}") for index, edge in enumerate(edges)}
@@ -317,11 +313,13 @@ def solve_minimum_maximal_matching(
 
 def _maximum_vertex_search(
     *,
-    graph: nx.Graph[str],
+    graph: Any,
     source: ChromaticGraph,
     budget: GraphOptimizationBudget,
     kind: Literal["FOREST", "TREE", "BIPARTITE"],
 ) -> _SearchResult[VertexWitness]:
+    import networkx as nx
+
     vertices = tuple(source.vertices)
     if not vertices:
         return _SearchResult(True, (), 0, 0, 0, (), "SPECIAL_CASE")
@@ -347,7 +345,7 @@ def _maximum_vertex_search(
     edges = _canonical_edges(graph)
 
     def solve(bound: int, timeout_ms: int) -> tuple[object, VertexWitness]:
-        z3 = _z3()
+        z3 = Z3_LOADER.get()
         solver = z3.Solver()
         solver.set(timeout=max(1, timeout_ms))
         selected = {
@@ -411,7 +409,7 @@ def _maximum_vertex_search(
 
 
 def solve_induced_forest(
-    graph: nx.Graph[str],
+    graph: Any,
     source: ChromaticGraph,
     budget: GraphOptimizationBudget,
 ) -> GraphInducedForestMaximumOutput:
@@ -433,7 +431,7 @@ def solve_induced_forest(
 
 
 def solve_induced_tree(
-    graph: nx.Graph[str],
+    graph: Any,
     source: ChromaticGraph,
     budget: GraphOptimizationBudget,
 ) -> GraphInducedTreeMaximumOutput:
@@ -455,7 +453,7 @@ def solve_induced_tree(
 
 
 def solve_induced_bipartite(
-    graph: nx.Graph[str],
+    graph: Any,
     source: ChromaticGraph,
     budget: GraphOptimizationBudget,
 ) -> GraphInducedBipartiteMaximumOutput:

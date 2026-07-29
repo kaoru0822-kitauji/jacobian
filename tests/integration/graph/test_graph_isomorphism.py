@@ -7,18 +7,18 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def _graph_uri(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     *,
     vertices: list[str],
     edges: list[list[str]],
 ) -> str:
-    return kernel.artifacts.put(
-        schema_uri=kernel.graph.graph_schema_uri,
-        semantics_uri=kernel.graph.semantics_uri,
+    return runtime.core.artifacts.put(
+        schema_uri=runtime.portfolio.graph.graph_schema_uri,
+        semantics_uri=runtime.portfolio.graph.semantics_uri,
         payload={
             "graph_schema_version": "1",
             "vertices": vertices,
@@ -29,16 +29,16 @@ def _graph_uri(
 
 
 def _input(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     mapping: dict[str, str],
 ) -> dict[str, object]:
     left_graph_uri = _graph_uri(
-        kernel,
+        runtime,
         vertices=["a", "b", "c"],
         edges=[["a", "b"], ["b", "c"]],
     )
     right_graph_uri = _graph_uri(
-        kernel,
+        runtime,
         vertices=["x", "y", "z"],
         edges=[["x", "z"], ["y", "z"]],
     )
@@ -49,13 +49,13 @@ def _input(
     }
 
 
-def test_graph_isomorphism_verifies_a_valid_bijection(kernel_with_references) -> None:
+def test_graph_isomorphism_verifies_a_valid_bijection(runtime_with_references) -> None:
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.isomorphism.verify",
             mode=CapabilityMode.VERIFY,
-            input=_input(kernel_with_references, {"a": "x", "b": "z", "c": "y"}),
+            input=_input(runtime_with_references, {"a": "x", "b": "z", "c": "y"}),
         )
     )
 
@@ -73,13 +73,13 @@ def test_graph_isomorphism_verifies_a_valid_bijection(kernel_with_references) ->
     assert result.output["verification_record_uri"] in result.artifact_uris
 
 
-def test_graph_isomorphism_verifies_a_negative_result(kernel_with_references) -> None:
+def test_graph_isomorphism_verifies_a_negative_result(runtime_with_references) -> None:
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.isomorphism.verify",
             mode=CapabilityMode.VERIFY,
-            input=_input(kernel_with_references, {"a": "x", "b": "y", "c": "z"}),
+            input=_input(runtime_with_references, {"a": "x", "b": "y", "c": "z"}),
         )
     )
 
@@ -93,16 +93,16 @@ def test_graph_isomorphism_verifies_a_negative_result(kernel_with_references) ->
 
 
 def test_graph_isomorphism_keeps_checker_rejection_unknown(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    checker_id = kernel_with_references.graph_isomorphism.checker_id
+    checker_id = runtime_with_references.portfolio.graph_isomorphism.checker_id
     assert checker_id is not None
-    request_input = _input(kernel_with_references, {"a": "x", "b": "z", "c": "y"})
-    kernel_with_references.checkers.revoke(
+    request_input = _input(runtime_with_references, {"a": "x", "b": "z", "c": "y"})
+    runtime_with_references.core.checkers.revoke(
         checker_id, reason="force fail-closed integration case"
     )
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.isomorphism.verify",
             mode=CapabilityMode.VERIFY,
@@ -122,9 +122,9 @@ def test_graph_isomorphism_keeps_checker_rejection_unknown(
 
 
 def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    searched = kernel_with_references.capabilities.invoke(
+    searched = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             mode=CapabilityMode.EXPLORE,
@@ -135,7 +135,7 @@ def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
     graph_uri = candidate["graph_uri"]
     vertices = candidate["graph"]["vertices"]
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.isomorphism.verify",
             mode=CapabilityMode.VERIFY,
@@ -151,7 +151,7 @@ def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
     assert result.output["left_graph_uri"] == graph_uri
     assert result.output["right_graph_uri"] == graph_uri
     assert graph_uri in result.artifact_uris
-    pair = kernel_with_references.store.get(result.output["graph_pair_uri"])
+    pair = runtime_with_references.core.store.get(result.output["graph_pair_uri"])
     assert pair.manifest.parents == (graph_uri,)
     assert any(
         relationship.relation_id == "graph.relation.pair-scope"
@@ -161,20 +161,20 @@ def test_graph_isomorphism_accepts_graph_atlas_artifact_handoff(
 
 
 def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
     left_graph_uri = _graph_uri(
-        kernel_with_references,
+        runtime_with_references,
         vertices=["c", "a", "b"],
         edges=[["b", "c"], ["a", "b"]],
     )
     right_graph_uri = _graph_uri(
-        kernel_with_references,
+        runtime_with_references,
         vertices=["z", "x", "y"],
         edges=[["y", "z"], ["x", "y"]],
     )
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.isomorphism.verify",
             mode=CapabilityMode.VERIFY,
@@ -187,17 +187,19 @@ def test_graph_isomorphism_accepts_valid_unsorted_graph_artifacts(
     )
 
     assert result.output["conclusion"] == "TRUE"
-    record = kernel_with_references.store.get(result.output["verification_record_uri"])
+    record = runtime_with_references.core.store.get(
+        result.output["verification_record_uri"]
+    )
     assert left_graph_uri in record.manifest.parents
     assert right_graph_uri in record.manifest.parents
 
 
 def test_graph_isomorphism_rejects_incompatible_graph_artifact(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    wrong_artifact = kernel_with_references.artifacts.put(
-        schema_uri=kernel_with_references.graph.scope_schema_uri,
-        semantics_uri=kernel_with_references.graph.semantics_uri,
+    wrong_artifact = runtime_with_references.core.artifacts.put(
+        schema_uri=runtime_with_references.portfolio.graph.scope_schema_uri,
+        semantics_uri=runtime_with_references.portfolio.graph.semantics_uri,
         payload={
             "scope_schema_version": "1",
             "source": "networkx.graph_atlas_g",
@@ -207,12 +209,12 @@ def test_graph_isomorphism_rejects_incompatible_graph_artifact(
         },
     )
     right_graph_uri = _graph_uri(
-        kernel_with_references,
+        runtime_with_references,
         vertices=["x"],
         edges=[],
     )
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.isomorphism.verify",
             mode=CapabilityMode.VERIFY,
@@ -230,10 +232,10 @@ def test_graph_isomorphism_rejects_incompatible_graph_artifact(
 
 
 def test_graph_isomorphism_is_unavailable_without_reference_checkers(
-    kernel,
+    runtime,
 ) -> None:
 
     assert "graph.isomorphism.verify" not in {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }

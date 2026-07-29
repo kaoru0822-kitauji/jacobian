@@ -39,10 +39,10 @@ def _request(exponent: int) -> CapabilityRequest:
 
 
 def test_collision_search_returns_first_deterministic_candidate(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(_request(2))
+    result = runtime.core.capabilities.invoke(_request(2))
 
     assert result.output["found"] is True
     assert result.output["grid_point_count"] == 3
@@ -57,10 +57,10 @@ def test_collision_search_returns_first_deterministic_candidate(
 
 
 def test_collision_search_reports_partial_grid_after_early_collision(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(_request(0))
+    result = runtime.core.capabilities.invoke(_request(0))
 
     assert result.output["found"] is True
     assert result.output["grid_point_count"] == 3
@@ -101,10 +101,10 @@ def test_collision_search_reports_partial_grid_after_early_collision(
 
 
 def test_collision_search_reports_exact_completed_not_found_scope(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(_request(1))
+    result = runtime.core.capabilities.invoke(_request(1))
 
     assert result.output["found"] is False
     assert result.output["examined_point_count"] == 3
@@ -122,18 +122,18 @@ def test_collision_search_reports_exact_completed_not_found_scope(
 
 
 def test_collision_search_validates_grid_bound_before_artifact_writes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     artifact_put_calls = 0
-    original_put = kernel.artifacts.put
+    original_put = runtime.core.artifacts.put
 
     def recording_put(*args: Any, **kwargs: Any) -> Any:
         nonlocal artifact_put_calls
         artifact_put_calls += 1
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
     variables = ["w", "x", "y", "z"]
     polynomial_map = {
         "variables": variables,
@@ -152,7 +152,7 @@ def test_collision_search_validates_grid_bound_before_artifact_writes(
         ],
     }
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.collision.search",
             input={

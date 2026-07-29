@@ -15,21 +15,25 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 
-def _kernel_from_template(
+def _runtime_from_template(
     tmp_path: Path,
     template: Path,
     *,
     name: str = "state",
-    install_references: bool = True,
-) -> tuple[Path, JacobianKernel]:
+    checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.INSTALL_BUNDLED,
+) -> tuple[Path, JacobianRuntime]:
     """Copy the reference store template into a sibling state directory."""
 
     state_dir = tmp_path / name
     shutil.copytree(template, state_dir)
-    return state_dir, JacobianKernel(state_dir, install_references=install_references)
+    return state_dir, create_runtime(
+        state_dir,
+        checker_authority=checker_authority,
+    )
 
 
 def _report(

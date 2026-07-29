@@ -22,11 +22,12 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.linear_capabilities import install_linear_rational_solution_checker
 from jacobian.provider_runtime import PYTHON_FLINT_VERSION
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
 
 
 def _system(
@@ -45,32 +46,32 @@ def _system(
     }
 
 
-def _kernel_with_linear_checker(root: Path) -> JacobianKernel:
-    kernel = JacobianKernel(root)
+def _runtime_with_linear_checker(root: Path) -> JacobianRuntime:
+    runtime = create_runtime(root)
     adapter, _installation = install_linear_rational_solution_checker(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
-        kernel.linear,
-        kernel.verification,
-        kernel.checkers,
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
+        runtime.core.linear,
+        runtime.services.verification,
+        runtime.core.checkers,
         authorize_checker=True,
     )
     assert adapter is not None
-    kernel.register_capability(adapter)
-    return kernel
+    runtime.core.capabilities.register(adapter)
+    return runtime
 
 
 def test_python_flint_find_returns_one_exact_unverified_solution(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     assert (
-        kernel.python_flint_runtime.availability
+        runtime.portfolio.python_flint_runtime.availability
         is CapabilityProviderAvailability.AVAILABLE
     )
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {
             "system": _system([[2, 1], [1, -1]], [5, 1]),
@@ -87,7 +88,7 @@ def test_python_flint_find_returns_one_exact_unverified_solution(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.relationships[0].relation_id == "linear.relation.satisfies"
 
-    resolved = kernel.linear.resolve_solution(result.output["solution_uri"])
+    resolved = runtime.core.linear.resolve_solution(result.output["solution_uri"])
     assert resolved.solution.system.system_artifact_uri == result.output["system_uri"]
     assert result.output["system_uri"] in resolved.artifact.manifest.parents
 
@@ -95,8 +96,8 @@ def test_python_flint_find_returns_one_exact_unverified_solution(
 def test_python_flint_runtime_is_exact_optional_distribution_identity(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    runtime = kernel.python_flint_runtime
+    runtime = create_runtime(tmp_path)
+    runtime = runtime.portfolio.python_flint_runtime
 
     assert runtime.version == PYTHON_FLINT_VERSION
     assert runtime.install_tier is CapabilityInstallTier.T1
@@ -137,7 +138,7 @@ def test_python_flint_runtime_rejects_an_unpinned_binding_version(
 
 def test_verifier_authorization_is_separate_from_provider_availability(
     tmp_path: Path,
-    kernel_store_template: Path,
+    runtime_store_template: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     unavailable = CapabilityProviderRuntime(
@@ -149,26 +150,28 @@ def test_verifier_authorization_is_separate_from_provider_availability(
         diagnostic="optional provider unavailable for test",
     )
     monkeypatch.setattr(
-        "jacobian.kernel.python_flint_provider_runtime",
+        "jacobian.portfolio.assembler.python_flint_provider_runtime",
         lambda: unavailable,
     )
 
     default_root = tmp_path / "default"
     authorized_root = tmp_path / "authorized"
-    shutil.copytree(kernel_store_template, default_root)
-    shutil.copytree(kernel_store_template, authorized_root)
-    default = JacobianKernel(default_root)
+    shutil.copytree(runtime_store_template, default_root)
+    shutil.copytree(runtime_store_template, authorized_root)
+    default = create_runtime(default_root)
     default_ids = {
         descriptor.capability_id
-        for descriptor in default.capabilities.catalog().capabilities
+        for descriptor in default.core.capabilities.catalog().capabilities
     }
     assert "linear.rational_solution.find" not in default_ids
     assert "linear.rational_solution.verify" not in default_ids
 
-    authorized = JacobianKernel(authorized_root, install_references=True)
+    authorized = create_runtime(
+        authorized_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     authorized_ids = {
         descriptor.capability_id
-        for descriptor in authorized.capabilities.catalog().capabilities
+        for descriptor in authorized.core.capabilities.catalog().capabilities
     }
     assert "linear.rational_solution.find" not in authorized_ids
     assert "linear.rational_solution.verify" in authorized_ids
@@ -177,9 +180,9 @@ def test_verifier_authorization_is_separate_from_provider_availability(
 def test_python_flint_find_handles_underdetermined_system_deterministically(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {
             "system": _system([[1, 1, 1], [2, -1, 1]], [3, 2]),
@@ -193,9 +196,9 @@ def test_python_flint_find_handles_underdetermined_system_deterministically(
 
 
 def test_not_found_is_not_an_inconsistency_conclusion(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {
             "system": _system([[1, 1], [1, 1]], [2, 3]),
@@ -215,9 +218,9 @@ def test_not_found_is_not_an_inconsistency_conclusion(tmp_path: Path) -> None:
 def test_independent_checker_verifies_and_rejects_bound_solutions(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_linear_checker(tmp_path)
+    runtime = _runtime_with_linear_checker(tmp_path)
     found = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {
             "system": _system([[2, 1], [1, -1]], [5, 1]),
@@ -226,7 +229,7 @@ def test_independent_checker_verifies_and_rejects_bound_solutions(
         mode=CapabilityMode.EXPLORE,
     )
     accepted = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.verify",
         {"solution_uri": found.output["solution_uri"]},
         mode=CapabilityMode.VERIFY,
@@ -236,14 +239,14 @@ def test_independent_checker_verifies_and_rejects_bound_solutions(
     assert accepted.output["verification_record_uri"].startswith("artifact://sha256/")
     assert accepted.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
-    wrong = kernel.linear.put_solution(
+    wrong = runtime.core.linear.put_solution(
         system_uri=found.output["system_uri"],
         values=(_q(0), _q(0)),
-        producer=kernel.python_flint_runtime,
+        producer=runtime.portfolio.python_flint_runtime,
         resource_budget={"wall_seconds": 5},
     )
     rejected = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.verify",
         {"solution_uri": wrong.artifact_uri},
         mode=CapabilityMode.VERIFY,
@@ -257,7 +260,7 @@ def test_python_flint_timeout_is_operational_not_mathematical(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     monkeypatch.setattr(
         "jacobian.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -270,7 +273,7 @@ def test_python_flint_timeout_is_operational_not_mathematical(
         ),
     )
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {
             "system": _system([[1]], [1]),
@@ -314,10 +317,10 @@ def test_python_flint_worker_gets_only_fixed_environment_and_exact_budget(
             timed_out=False,
         )
 
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     monkeypatch.setattr("jacobian.flint_linear.run_bounded_process", fake_worker)
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {
             "system": _system([[1]], [1]),
@@ -342,8 +345,8 @@ def test_python_flint_discards_output_if_runtime_identity_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    original_runtime = kernel.python_flint_runtime
+    runtime = create_runtime(tmp_path)
+    original_runtime = runtime.portfolio.python_flint_runtime
     changed_runtime = original_runtime.model_copy(
         update={"digest": "sha256:" + "f" * 64}
     )
@@ -375,7 +378,7 @@ def test_python_flint_discards_output_if_runtime_identity_changes(
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {"system": _system([[1]], [1])},
         mode=CapabilityMode.EXPLORE,
@@ -392,7 +395,7 @@ def test_invalid_worker_protocol_fails_without_solution_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     monkeypatch.setattr(
         "jacobian.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -405,7 +408,7 @@ def test_invalid_worker_protocol_fails_without_solution_evidence(
         ),
     )
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {"system": _system([[1]], [1])},
         mode=CapabilityMode.EXPLORE,
@@ -421,9 +424,9 @@ def test_linear_checker_timeout_is_operational_not_mathematical(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = _kernel_with_linear_checker(tmp_path)
+    runtime = _runtime_with_linear_checker(tmp_path)
     found = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.find",
         {"system": _system([[1]], [1])},
         mode=CapabilityMode.EXPLORE,
@@ -441,7 +444,7 @@ def test_linear_checker_timeout_is_operational_not_mathematical(
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_solution.verify",
         {"solution_uri": found.output["solution_uri"]},
         mode=CapabilityMode.VERIFY,

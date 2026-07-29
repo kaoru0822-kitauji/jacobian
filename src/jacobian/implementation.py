@@ -169,7 +169,7 @@ def package_source_digest(entrypoint: str) -> str:
     helper modules and data files from changing an authorized implementation.
     Bytecode caches are excluded because workers execute measured source.
 
-    Callers may enter :func:`cached_package_digests` during a kernel attach so
+    Callers may enter :func:`cached_package_digests` during a runtime attach so
     repeated authorizations of the same package reuse one digest without
     suppressing later on-disk package edits outside that scope.
     """

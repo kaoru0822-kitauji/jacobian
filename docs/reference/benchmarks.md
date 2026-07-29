@@ -2,7 +2,7 @@
 
 [Documentation home](../index.md)
 
-Benchmarks validate the generic kernel; they do not define its public API.
+Benchmarks validate the generic runtime; they do not define its public API.
 
 This document defines pass/fail mathematical workloads. Operational speed and
 resource measurements are specified in
@@ -29,7 +29,7 @@ difficult to diagnose and too easy to contaminate through public solutions.
 
 A single domain can accidentally bake its own assumptions into apparently
 generic interfaces. The benchmark portfolio therefore includes structurally
-different domains and representations. This is evidence about kernel
+different domains and representations. This is evidence about runtime
 generality and agent composition, not a gate on which experimental
 capabilities may be installed.
 
@@ -52,7 +52,7 @@ The matrix benchmark family uses integer-matrix candidates, kernel-vector
 witnesses, and finite determinant certificates. `MAT-KERNEL-001` and
 `MAT-MAXDET3-001` are the initial public cases.
 
-It should test that the kernel does not assume:
+It should test that the runtime does not assume:
 
 - candidates are graphs;
 - semantic closure means path enumeration;

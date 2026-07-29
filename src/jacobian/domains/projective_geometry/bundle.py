@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import sympy
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.projective_geometry.arrangements import (
     PROJECTIVE_LINE_ARRANGEMENT_CAPABILITY,
 )
 from jacobian.operations import DomainBundle, DomainDiagnostics, DomainSemantics
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
 PROJECTIVE_GEOMETRY_BUNDLE = DomainBundle(
     domain_id="projective_geometry",
@@ -33,7 +31,7 @@ PROJECTIVE_GEOMETRY_BUNDLE = DomainBundle(
         "jacobian.sympy",
         features=("exact-rational-projective-incidence",),
     ),
-    backend_version=sympy.__version__,
+    backend_version=SYMPY_VERSION,
     capabilities=(PROJECTIVE_LINE_ARRANGEMENT_CAPABILITY,),
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(

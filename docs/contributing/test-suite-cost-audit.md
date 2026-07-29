@@ -12,7 +12,7 @@ machine-local observations, not performance gates.
 
 ## 2026-07-28 bootstrap follow-up
 
-A later profile found that kernel construction had regressed to 31.6 seconds
+A later profile found that runtime construction had regressed to 31.6 seconds
 for a fresh core store. The main costs were repeated JSON Schema metaschema
 validation and one durable SQLite transaction per descriptor. Bootstrap now
 reuses exact-schema validation within the process and installs the capability
@@ -58,7 +58,7 @@ seconds together.
 ## Findings
 
 Most elapsed time is setup and boundary coverage, not repeated assertions.
-Fresh `JacobianKernel` construction took roughly 2.4 to 3.3 seconds without
+Fresh `JacobianRuntime` construction took roughly 2.4 to 3.3 seconds without
 reference installation and 3.3 to 4.9 seconds with it. Integration tests
 intentionally pay for real schema registration, artifact writes, SQLite and
 filesystem behavior, checker subprocesses, plugin isolation, and provider
@@ -66,12 +66,12 @@ discovery. The slow Lean cases separately cover Mathlib discovery, real replay,
 premise retrieval, declaration indexes, tampering, and evaluation traces.
 
 Those costs protect different invariants. Do not reduce them by globally
-disabling durable writes, sharing a mutable kernel between isolation tests,
+disabling durable writes, sharing a mutable runtime between isolation tests,
 replacing real filesystems with in-memory substitutes, or deleting
 trust-boundary attacks.
 
 One direct DRAT-trim checker module did repeat unrelated product setup. Each
-parameter case constructed the full kernel even though it needed only SAT
+parameter case constructed the full runtime even though it needed only SAT
 artifact schemas and a request envelope. A module-scoped minimal real artifact
 store now reuses immutable content-addressed artifacts while constructing an
 isolated request value for each case. All attack cases remain. This reduced the
@@ -122,7 +122,7 @@ consume it.
 
 ## Follow-up opportunities
 
-- Profile kernel startup as a product concern before changing its durability
+- Profile runtime startup as a product concern before changing its durability
   or registration model.
 - Reuse module fixtures only where inputs remain isolated and the shared state
   is immutable.
@@ -189,17 +189,17 @@ pull-request wall-time problem the lane split exists to avoid: routine
 `make check`, exhaustive merge-queue validation, and scheduled
 stress/performance work must remain separate executions.
 
-Portfolio smoke that constructs a full kernel lives under
+Portfolio smoke that constructs a full runtime lives under
 `tests/integration/` rather than `tests/unit/`, so `make test-fast` stays free
-of multi-second kernel startups. Modules that need authorized references opt
-into `initialized_kernel_store_with_references` instead of rebuilding that
+of multi-second runtime startups. Modules that need authorized references opt
+into `initialized_runtime_store_with_references` instead of rebuilding that
 install on every case.
 
-Attaching `JacobianKernel(tmp_path)` after the store fixture is intentional, not
+Attaching `create_runtime(tmp_path)` after the store fixture is intentional, not
 a double bootstrap: the session template pays fresh construction once per worker,
 `copytree` seeds each test root in milliseconds, and attach reuses content-
-addressed descriptors in well under a second. Prefer the `kernel` /
-`kernel_with_references` fixtures for that attach step; do not remove the store
+addressed descriptors in well under a second. Prefer the `runtime` /
+`runtime_with_references` fixtures for that attach step; do not remove the store
 fixtures to "avoid double construction."
 
 Suite infrastructure checks for the store templates themselves also live under
@@ -208,25 +208,25 @@ setup work and must not run in the routine fast lane.
 
 Measured fixture anti-patterns that were fixed after the ownership merge:
 
-- Plugin registry tests constructed `JacobianKernel(tmp_path / "state")` while
+- Plugin registry tests constructed `create_runtime(tmp_path / "state")` while
   the module fixture seeded `tmp_path`, so the template copy was unused. They
   now use a `plugin_kernel` fixture that copies the template into `state`.
 - Finite-graph oracle cases paid a ~40s first-call Z3/solver startup on one
   parametrized node. Warmup now runs once inside the module-scoped
   `oracle_kernel` fixture; remaining cases stay sub-second to low single digits.
 - SAT public reproductions and CLI enumeration that need authorized references
-  seed from `initialized_kernel_store_with_references` instead of an empty
+  seed from `initialized_runtime_store_with_references` instead of an empty
   root.
 - Agent A/B and graph-shrinking cases that need a sibling state directory (not
-  `tmp_path` itself) copy `kernel_store_template_with_references` into that
+  `tmp_path` itself) copy `runtime_store_template_with_references` into that
   directory instead of building an empty store and reinstalling references.
 - Graph atlas search remains expensive (~90s measured) but already lives in
   the integration lane; no decorative `slow` marker was added until a suite
   actually excludes that marker.
-- Graph counterexample shrinking and agent A/B scorers built kernels under
+- Graph counterexample shrinking and agent A/B scorers built runtimes under
   `tmp_path / "state"` (or sibling roots) while the module fixture only seeded
   `tmp_path`, so template reuse never applied. Helpers now copy the reference
   template into those subdirectories before construction.
 - On a quiet host after these moves, `make test-fast` completed 519 selected
-  tests in about 19 seconds with no `JacobianKernel` constructions left under
+  tests in about 19 seconds with no `create_runtime` constructions left under
   `tests/unit`, `tests/contract`, or `tests/checkers`.

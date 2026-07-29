@@ -91,5 +91,5 @@ certificate evidence.
 
 The capability adds one request subtype, one result model, and one operation to
 the existing number-theory bundle. Existing factorization request/result
-contracts, worker operations, capability IDs, provider runtime, and kernel
+contracts, worker operations, capability IDs, provider runtime, and runtime
 installation paths are unchanged.

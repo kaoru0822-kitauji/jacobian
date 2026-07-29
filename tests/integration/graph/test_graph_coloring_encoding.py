@@ -8,13 +8,13 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = []
 
 
-def _encode(kernel: JacobianKernel) -> CapabilityResult:
-    return kernel.capabilities.invoke(
+def _encode(runtime: JacobianRuntime) -> CapabilityResult:
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.coloring.encode_k_cnf",
             input={
@@ -29,10 +29,10 @@ def _encode(kernel: JacobianKernel) -> CapabilityResult:
 
 
 def test_graph_coloring_encoding_is_canonical_and_inspectable(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = _encode(kernel)
+    result = _encode(runtime)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["graph"] == {
@@ -47,12 +47,12 @@ def test_graph_coloring_encoding_is_canonical_and_inspectable(
 
 
 def test_graph_coloring_encoding_replays_through_generic_certificate_verifier(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    encoded = _encode(kernel_with_references)
+    encoded = _encode(runtime_with_references)
 
     assert encoded.output["checker_id"] is not None
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,

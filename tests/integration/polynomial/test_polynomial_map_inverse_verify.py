@@ -11,13 +11,13 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import Conclusion, ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 from jacobian_checkers.polynomial_maps import check_map_inverse
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def _term(coefficient: int, exponents: list[int]) -> dict[str, Any]:
@@ -63,9 +63,11 @@ def _request(forward: dict[str, Any], inverse: dict[str, Any]) -> CapabilityRequ
     )
 
 
-def _checker_request(kernel: JacobianKernel, output: dict[str, Any]) -> dict[str, Any]:
+def _checker_request(
+    runtime: JacobianRuntime, output: dict[str, Any]
+) -> dict[str, Any]:
     def artifact(uri: str) -> dict[str, Any]:
-        stored = kernel.store.get(uri)
+        stored = runtime.core.store.get(uri)
         return {"artifact_uri": uri, "payload": deepcopy(stored.payload)}
 
     certificate = artifact(output["certificate_uri"])
@@ -89,10 +91,10 @@ def _checker_request(kernel: JacobianKernel, output: dict[str, Any]) -> dict[str
     }
 
 
-def test_two_sided_triangular_inverse_is_verified(kernel) -> None:
+def test_two_sided_triangular_inverse_is_verified(runtime) -> None:
     forward, inverse = _triangular_maps()
 
-    result = kernel.capabilities.invoke(_request(forward, inverse))
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
 
     assert result.output["inverse_verified"] is True
     assert result.output["conclusion"] == Conclusion.TRUE.value
@@ -100,7 +102,7 @@ def test_two_sided_triangular_inverse_is_verified(kernel) -> None:
     assert result.output["verification_record_uri"] is not None
     assert len(result.output["inverse_after_forward_checker_records"]) == 2
     assert len(result.output["forward_after_inverse_checker_records"]) == 2
-    residuals = kernel.store.get(result.output["residuals_uri"]).payload
+    residuals = runtime.core.store.get(result.output["residuals_uri"]).payload
     assert residuals["domain"] == "QQ"
     assert residuals["source_variables"] == ["x", "y"]
     assert residuals["target_variables"] == ["u", "v"]
@@ -109,7 +111,7 @@ def test_two_sided_triangular_inverse_is_verified(kernel) -> None:
 
 
 def test_overlapping_variable_names_use_simultaneous_composition(
-    kernel,
+    runtime,
 ) -> None:
     forward = {
         "map_schema_version": "1",
@@ -130,7 +132,7 @@ def test_overlapping_variable_names_use_simultaneous_composition(
         ],
     }
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.inverse.verify",
             mode=CapabilityMode.VERIFY,
@@ -149,7 +151,7 @@ def test_overlapping_variable_names_use_simultaneous_composition(
 
 
 def test_unrepresentable_composition_is_rejected_before_artifacts(
-    kernel,
+    runtime,
 ) -> None:
     high_degree = {
         "map_schema_version": "1",
@@ -168,7 +170,7 @@ def test_unrepresentable_composition_is_rejected_before_artifacts(
         },
     )
 
-    result = kernel.capabilities.invoke(request)
+    result = runtime.core.capabilities.invoke(request)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["error"]["code"] == "INVALID_POLYNOMIAL_MAP_INVERSE_REQUEST"
@@ -176,25 +178,25 @@ def test_unrepresentable_composition_is_rejected_before_artifacts(
 
 
 def test_perturbed_inverse_coefficient_is_verified_false(
-    kernel,
+    runtime,
 ) -> None:
     forward, inverse = _triangular_maps()
     inverse["coordinates"][0]["terms"][1]["coefficient"]["num"] = "-2"
 
-    result = kernel.capabilities.invoke(_request(forward, inverse))
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
 
     assert result.output["inverse_verified"] is False
     assert result.output["conclusion"] == Conclusion.FALSE.value
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
-    residuals = kernel.store.get(result.output["residuals_uri"]).payload
+    residuals = runtime.core.store.get(result.output["residuals_uri"]).payload
     assert any(item["terms"] for item in residuals["inverse_after_forward"])
     assert any(item["terms"] for item in residuals["forward_after_inverse"])
 
 
-def test_checker_rejects_residual_coefficient_tampering(kernel) -> None:
+def test_checker_rejects_residual_coefficient_tampering(runtime) -> None:
     forward, inverse = _triangular_maps()
-    result = kernel.capabilities.invoke(_request(forward, inverse))
-    checker_request = _checker_request(kernel, result.output)
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
+    checker_request = _checker_request(runtime, result.output)
     checker_request["candidate"]["payload"]["inverse_after_forward"][0] = {
         "terms": [_term(1, [0, 0])]
     }
@@ -213,11 +215,11 @@ def test_checker_rejects_residual_coefficient_tampering(kernel) -> None:
     ),
 )
 def test_one_declared_identity_direction_never_verifies(
-    kernel, zero_direction: str, nonzero_direction: str
+    runtime, zero_direction: str, nonzero_direction: str
 ) -> None:
     forward, inverse = _triangular_maps()
-    result = kernel.capabilities.invoke(_request(forward, inverse))
-    checker_request = _checker_request(kernel, result.output)
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
+    checker_request = _checker_request(runtime, result.output)
     residuals = checker_request["candidate"]["payload"]
     residuals[zero_direction] = [{"terms": []}, {"terms": []}]
     residuals[nonzero_direction] = [
@@ -232,10 +234,10 @@ def test_one_declared_identity_direction_never_verifies(
 
 
 @pytest.mark.parametrize("tamper", ("domain", "source_order", "target_order"))
-def test_checker_rejects_domain_and_order_substitution(kernel, tamper: str) -> None:
+def test_checker_rejects_domain_and_order_substitution(runtime, tamper: str) -> None:
     forward, inverse = _triangular_maps()
-    result = kernel.capabilities.invoke(_request(forward, inverse))
-    checker_request = _checker_request(kernel, result.output)
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
+    checker_request = _checker_request(runtime, result.output)
     if tamper == "domain":
         checker_request["scope"]["payload"]["domain"] = "ZZ"
     elif tamper == "source_order":
@@ -250,10 +252,10 @@ def test_checker_rejects_domain_and_order_substitution(kernel, tamper: str) -> N
 
 
 @pytest.mark.parametrize("source", ("scope", "inverse"))
-def test_checker_rejects_source_map_coefficient_tampering(kernel, source: str) -> None:
+def test_checker_rejects_source_map_coefficient_tampering(runtime, source: str) -> None:
     forward, inverse = _triangular_maps()
-    result = kernel.capabilities.invoke(_request(forward, inverse))
-    checker_request = _checker_request(kernel, result.output)
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
+    checker_request = _checker_request(runtime, result.output)
     artifact = (
         checker_request["scope"]
         if source == "scope"
@@ -274,10 +276,10 @@ def test_checker_rejects_source_map_coefficient_tampering(kernel, source: str) -
         "forward_after_inverse_checker_records",
     ),
 )
-def test_checker_rejects_incomplete_checker_record_family(kernel, family: str) -> None:
+def test_checker_rejects_incomplete_checker_record_family(runtime, family: str) -> None:
     forward, inverse = _triangular_maps()
-    result = kernel.capabilities.invoke(_request(forward, inverse))
-    checker_request = _checker_request(kernel, result.output)
+    result = runtime.core.capabilities.invoke(_request(forward, inverse))
+    checker_request = _checker_request(runtime, result.output)
     checker_request["candidate"]["payload"][family] = checker_request["candidate"][
         "payload"
     ][family][:-1]

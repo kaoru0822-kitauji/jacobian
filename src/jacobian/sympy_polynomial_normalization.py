@@ -41,11 +41,11 @@ from jacobian.contracts.polynomials import (
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.polynomial_expressions import PolynomialExpressionArtifactService
 from jacobian.provider_runtime import (
+    SYMPY_POLYNOMIAL_WORKER_PROTOCOL,
     SYMPY_VERSION,
     sympy_polynomial_normalization_provider_runtime,
 )
 from jacobian.schema_registry import model_schema
-from jacobian.sympy_polynomial_worker import SYMPY_POLYNOMIAL_WORKER_PROTOCOL
 
 SYMPY_NORMALIZATION_STDOUT_LIMIT = 2_000_000
 SYMPY_NORMALIZATION_STDERR_LIMIT = 64_000

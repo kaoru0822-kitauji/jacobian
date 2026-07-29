@@ -31,9 +31,9 @@ def _claim(
 
 
 def test_atomic_capability_catalog_includes_required_and_excludes_composite_operations(
-    kernel,
+    runtime,
 ) -> None:
-    catalog = kernel.capabilities.catalog().capabilities
+    catalog = runtime.core.capabilities.catalog().capabilities
     ids = {item.capability_id for item in catalog}
     descriptors = {item.capability_id: item for item in catalog}
 
@@ -70,12 +70,12 @@ def test_atomic_capability_catalog_includes_required_and_excludes_composite_oper
 
 
 def test_atomic_capabilities_preserve_stage_assurance_and_checker_boundary(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    reference = kernel_with_references.references["graph_paths"]
+    reference = runtime_with_references.portfolio.references["graph_paths"]
 
     claim = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "artifact.put",
         {
             "schema_uri": reference.claim_schema_uri,
@@ -86,7 +86,7 @@ def test_atomic_capabilities_preserve_stage_assurance_and_checker_boundary(
     )
     claim_uri = claim.output["artifact_uri"]
     candidate = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "artifact.put",
         {
             "schema_uri": reference.candidate_schema_uri,
@@ -101,12 +101,12 @@ def test_atomic_capabilities_preserve_stage_assurance_and_checker_boundary(
     )
     candidate_uri = candidate.output["artifact_uri"]
     validation = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "claim.validate",
         {"claim_uri": claim_uri, "plugin_id": reference.plugin_id},
     )
     evaluation = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "evaluate.batch",
         {
             "claim_uri": claim_uri,
@@ -118,7 +118,7 @@ def test_atomic_capabilities_preserve_stage_assurance_and_checker_boundary(
         },
     )
     found = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "witness.find",
         {
             "claim_uri": claim_uri,
@@ -131,7 +131,7 @@ def test_atomic_capabilities_preserve_stage_assurance_and_checker_boundary(
     witness_uri = found.output["witness_uri"]
     assert witness_uri is not None
     verified = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "witness.verify",
         {
             "claim_uri": claim_uri,
@@ -161,12 +161,12 @@ def test_atomic_capabilities_preserve_stage_assurance_and_checker_boundary(
 
 
 def test_claim_validation_exposes_an_invalid_claim_without_composing_a_workflow(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    reference = kernel_with_references.references["graph_paths"]
+    reference = runtime_with_references.portfolio.references["graph_paths"]
 
     claim = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "artifact.put",
         {
             "schema_uri": reference.claim_schema_uri,
@@ -175,7 +175,7 @@ def test_claim_validation_exposes_an_invalid_claim_without_composing_a_workflow(
         },
     )
     validation = _invoke(
-        kernel_with_references,
+        runtime_with_references,
         "claim.validate",
         {"claim_uri": claim.output["artifact_uri"], "plugin_id": reference.plugin_id},
     )

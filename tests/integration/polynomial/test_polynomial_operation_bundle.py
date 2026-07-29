@@ -33,13 +33,13 @@ def _polynomial(
 
 
 def test_polynomial_bundle_installs_and_computes_exact_invariants(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
 
     installed_ids = {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
     assert {
         "polynomial.compute.gcd",
@@ -50,7 +50,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     } <= installed_ids
 
     gcd_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.gcd",
         {
             "left": _polynomial(["x"], [(2, 1, 1), (0, -1, 1)]),
@@ -72,7 +72,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     }
 
     resultant_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.resultant",
         {
             "left": _polynomial(
@@ -99,7 +99,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     }
 
     discriminant_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.discriminant",
         {
             "polynomial": _polynomial(
@@ -115,7 +115,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     }
 
     square_free_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.square_free_decomposition",
         {
             "polynomial": _polynomial(
@@ -156,7 +156,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     )
 
     groebner_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.groebner_basis.compute",
         {
             "generators": [
@@ -195,7 +195,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
         "normalization": "REDUCED_MONIC",
     }
     assert len(groebner_result.artifact_uris) == 3
-    obligation = kernel.store.get(groebner_result.artifact_uris[2])
+    obligation = runtime.core.store.get(groebner_result.artifact_uris[2])
     assert obligation.payload["verification_status"] == "UNVERIFIED"
     assert obligation.manifest.parents == tuple(
         sorted(
@@ -215,8 +215,8 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert len(result.artifact_uris) == 2
-        input_artifact = kernel.store.get(result.artifact_uris[0])
-        output_artifact = kernel.store.get(result.artifact_uris[1])
+        input_artifact = runtime.core.store.get(result.artifact_uris[0])
+        output_artifact = runtime.core.store.get(result.artifact_uris[1])
         assert output_artifact.manifest.parents == (input_artifact.artifact_uri,)
         assert result.relationships[0].source_artifact_uris == (
             input_artifact.artifact_uri,
@@ -226,7 +226,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
         )
 
     invalid_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.gcd",
         {
             "left": _polynomial(["x"], [(1, 1, 1)]),
@@ -240,7 +240,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     assert invalid_result.episode_uri is None
 
     zero_multiplier_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.gcd",
         {
             "left": _polynomial(["x"], [(1, 1, 1), (0, -1, 1)]),
@@ -267,7 +267,7 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
     )
 
     timeout_result = _invoke(
-        kernel,
+        runtime,
         "polynomial.groebner_basis.compute",
         {
             "generators": [_polynomial(["x"], [(2, 1, 1), (0, 1, 1)])],
@@ -285,24 +285,24 @@ def test_polynomial_bundle_installs_and_computes_exact_invariants(
 
 
 def test_polynomial_output_budget_failure_is_explicit_and_writes_no_artifacts(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     artifact_writes: list[object] = []
-    original_put = cast(Any, kernel.artifacts.put)
+    original_put = cast(Any, runtime.core.artifacts.put)
 
     def recording_put(*args: object, **kwargs: object) -> object:
         artifact_writes.append((args, kwargs))
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
     monkeypatch.setattr(
         "jacobian.domains.polynomial.operations._MAX_OUTPUT_TERMS",
         0,
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.compute.gcd",
         {
             "left": _polynomial(["x"], [(2, 1, 1), (0, -1, 1)]),
@@ -319,11 +319,11 @@ def test_polynomial_output_budget_failure_is_explicit_and_writes_no_artifacts(
 
 
 def test_groebner_result_budget_failure_crosses_worker_protocol(
-    kernel,
+    runtime,
 ) -> None:
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.groebner_basis.compute",
         {
             "generators": [

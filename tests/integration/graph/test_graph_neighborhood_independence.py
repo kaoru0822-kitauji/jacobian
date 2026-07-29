@@ -41,16 +41,16 @@ def _wowii_200_graph() -> dict[str, object]:
 
 
 def test_neighborhood_independence_reproduces_wowii_200_invariant(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    graph = kernel_with_references.artifacts.put(
-        schema_uri=kernel_with_references.graph.graph_schema_uri,
-        semantics_uri=kernel_with_references.graph.semantics_uri,
+    graph = runtime_with_references.core.artifacts.put(
+        schema_uri=runtime_with_references.portfolio.graph.graph_schema_uri,
+        semantics_uri=runtime_with_references.portfolio.graph.semantics_uri,
         payload=_wowii_200_graph(),
         summary="WOWII Conjecture 200 public counterexample graph",
     )
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.neighborhood_independence",
             input={"graph_uri": graph.artifact_uri},
@@ -68,11 +68,11 @@ def test_neighborhood_independence_reproduces_wowii_200_invariant(
     assert result.output["certificate_uri"] in result.artifact_uris
     assert (
         result.output["checker_id"]
-        == kernel_with_references.graph.neighborhood_checker_id
+        == runtime_with_references.portfolio.graph.neighborhood_checker_id
     )
     assert "conclusion" not in result.output
 
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,

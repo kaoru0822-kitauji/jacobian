@@ -40,6 +40,7 @@ from jacobian.contracts.workspaces import (
     WorkspaceWriteRequest,
     WorkspaceWriteResult,
 )
+from jacobian.experiment_runtime import open_experiment_database
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
 
@@ -113,10 +114,7 @@ class WorkspaceService:
         self._initialize_database()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.store.db_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        return open_experiment_database(self.store.db_path)
 
     def _initialize_database(self) -> None:
         with self._connect() as connection:

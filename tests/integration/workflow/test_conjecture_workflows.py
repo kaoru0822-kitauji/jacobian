@@ -24,27 +24,27 @@ from jacobian.contracts.evidence import (
 from jacobian.contracts.plugins import PluginManifest
 from jacobian.contracts.results import ExecutionStatus, Verification
 from jacobian.contracts.search import SearchBudget
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
     pytest.mark.conformance,
-    pytest.mark.usefixtures("initialized_kernel_store"),
+    pytest.mark.usefixtures("initialized_runtime_store"),
 ]
 
 
 def _install_hypothesis_plugin(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     *,
     transformer_entrypoint: str = (
         "tests.fixtures.plugin_functions:transform_fixture_hypothesis"
     ),
 ) -> tuple[str, str, str, str]:
-    claim_schema_uri = kernel.schemas.register(
+    claim_schema_uri = runtime.core.schemas.register(
         name="fixture.hypothesis-claim",
         version="1",
         schema=ClaimSpec.model_json_schema(),
     )
-    candidate_schema_uri = kernel.schemas.register(
+    candidate_schema_uri = runtime.core.schemas.register(
         name="fixture.hypothesis-candidate",
         version="1",
         schema={
@@ -54,7 +54,7 @@ def _install_hypothesis_plugin(
             "additionalProperties": False,
         },
     )
-    semantics_uri = kernel.store.register_descriptor(
+    semantics_uri = runtime.core.store.register_descriptor(
         kind="semantics",
         name="fixture.hypothesis-domain",
         version="1",
@@ -70,13 +70,15 @@ def _install_hypothesis_plugin(
     capabilities: dict[str, dict[str, str]] = {}
     for name, entrypoint in entrypoints.items():
         capabilities[name] = {
-            "implementation_uri": kernel.plugins.register_implementation(entrypoint),
+            "implementation_uri": runtime.core.plugins.register_implementation(
+                entrypoint
+            ),
             "entrypoint": entrypoint,
             "version": "1",
         }
-    manifest = kernel.artifacts.put(
-        schema_uri=kernel.reference_installer.manifest_schema_uri,
-        semantics_uri=kernel.reference_installer.manifest_semantics_uri,
+    manifest = runtime.core.artifacts.put(
+        schema_uri=runtime.services.reference_installer.manifest_schema_uri,
+        semantics_uri=runtime.services.reference_installer.manifest_semantics_uri,
         payload=PluginManifest(
             domain_id="fixture.hypothesis-domain",
             domain_version="1",
@@ -86,8 +88,8 @@ def _install_hypothesis_plugin(
             capabilities=capabilities,
         ).model_dump(mode="json"),
     )
-    kernel.plugins.install(manifest.artifact_uri)
-    claim = kernel.artifacts.put(
+    runtime.core.plugins.install(manifest.artifact_uri)
+    claim = runtime.core.artifacts.put(
         schema_uri=claim_schema_uri,
         semantics_uri=semantics_uri,
         payload={
@@ -105,7 +107,7 @@ def _install_hypothesis_plugin(
             "correspondence_status": "UNREVIEWED",
         },
     )
-    checker = kernel.checkers.authorize(
+    checker = runtime.core.checkers.authorize(
         name="fixture-hypothesis-value-v1",
         entrypoint="tests.fixtures.checker_functions:check_fixture_value",
         evidence_kind="WITNESS",
@@ -125,7 +127,7 @@ def _install_hypothesis_plugin(
 
 
 def _verified_counterexample(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     *,
     claim_uri: str,
     plugin_id: str,
@@ -133,13 +135,13 @@ def _verified_counterexample(
     candidate_schema_uri: str,
     witness_role: WitnessRole = WitnessRole.REFUTES_CLAIM,
 ) -> tuple[str, str, str]:
-    manifest = kernel.plugins.get(plugin_id)
-    candidate = kernel.artifacts.put(
+    manifest = runtime.core.plugins.get(plugin_id)
+    candidate = runtime.core.artifacts.put(
         schema_uri=candidate_schema_uri,
         semantics_uri=manifest.semantics_uri,
         payload={"value": 3},
     )
-    found = kernel.witnesses.find(
+    found = runtime.services.witnesses.find(
         claim_uri=claim_uri,
         candidate_uri=candidate.artifact_uri,
         plugin_id=plugin_id,
@@ -147,7 +149,7 @@ def _verified_counterexample(
         wall_seconds=10,
     )
     assert found.witness_uri is not None
-    verified = kernel.verification.verify_witness(
+    verified = runtime.services.verification.verify_witness(
         claim_uri=claim_uri,
         candidate_uri=candidate.artifact_uri,
         witness_uri=found.witness_uri,
@@ -178,20 +180,20 @@ def _falsification(checker_id: str) -> FalsificationPlan:
 
 @pytest.mark.subprocess
 def test_repair_preserves_verified_source_and_falsification_lineage(
-    kernel,
+    runtime,
 ) -> None:
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
-        kernel
+        runtime
     )
     verification_record_uri, witness_uri, _ = _verified_counterexample(
-        kernel,
+        runtime,
         claim_uri=claim_uri,
         plugin_id=plugin_id,
         checker_id=checker_id,
         candidate_schema_uri=candidate_schema_uri,
     )
 
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.REPAIR,
             plugin_id=plugin_id,
@@ -209,7 +211,7 @@ def test_repair_preserves_verified_source_and_falsification_lineage(
     assert hypothesis.verified_counterexamples == 4
     assert hypothesis.search_experiment_uri is not None
     transformation = HypothesisTransformationRecord.model_validate(
-        kernel.store.get(hypothesis.transformation_uri).payload
+        runtime.core.store.get(hypothesis.transformation_uri).payload
     )
     assert transformation.source_uri == claim_uri
     assert transformation.evidence_uris == (
@@ -221,25 +223,27 @@ def test_repair_preserves_verified_source_and_falsification_lineage(
         hypothesis.claim_uri,
         verification_record_uri,
         witness_uri,
-    }.issubset(set(kernel.store.get(hypothesis.transformation_uri).manifest.parents))
+    }.issubset(
+        set(runtime.core.store.get(hypothesis.transformation_uri).manifest.parents)
+    )
 
 
 @pytest.mark.subprocess
 def test_repair_replays_the_exact_verification_record(
-    kernel,
+    runtime,
 ) -> None:
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
-        kernel
+        runtime
     )
     verification_record_uri, _, _ = _verified_counterexample(
-        kernel,
+        runtime,
         claim_uri=claim_uri,
         plugin_id=plugin_id,
         checker_id=checker_id,
         candidate_schema_uri=candidate_schema_uri,
     )
-    genuine = kernel.store.get(verification_record_uri)
-    forged = kernel.store.put(
+    genuine = runtime.core.store.get(verification_record_uri)
+    forged = runtime.core.store.put(
         schema_uri=genuine.manifest.schema_uri,
         semantics_uri=genuine.manifest.semantics_uri,
         payload=genuine.payload,
@@ -247,7 +251,7 @@ def test_repair_replays_the_exact_verification_record(
         summary="caller-authored verification record",
     )
 
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.REPAIR,
             plugin_id=plugin_id,
@@ -261,11 +265,11 @@ def test_repair_replays_the_exact_verification_record(
 
 
 def test_generation_deduplicates_claims_and_reports_unknown_novelty(
-    kernel,
+    runtime,
 ) -> None:
-    claim_uri, plugin_id, _, _ = _install_hypothesis_plugin(kernel)
+    claim_uri, plugin_id, _, _ = _install_hypothesis_plugin(runtime)
 
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.GENERATE,
             plugin_id=plugin_id,
@@ -278,15 +282,15 @@ def test_generation_deduplicates_claims_and_reports_unknown_novelty(
     assert result.hypotheses[0].novelty is NoveltyAssessment.UNKNOWN
     assert result.hypotheses[0].verification is Verification.UNVERIFIED
 
-    generated = kernel.store.get(result.hypotheses[0].claim_uri)
-    reference = kernel.store.put(
+    generated = runtime.core.store.get(result.hypotheses[0].claim_uri)
+    reference = runtime.core.store.put(
         schema_uri=generated.manifest.schema_uri,
         semantics_uri=generated.manifest.semantics_uri,
         payload=generated.payload,
         parents=(generated.artifact_uri,),
         summary="same claim with different lineage",
     )
-    duplicate = kernel.conjectures.run(
+    duplicate = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.GENERATE,
             plugin_id=plugin_id,
@@ -301,41 +305,41 @@ def test_generation_deduplicates_claims_and_reports_unknown_novelty(
 
 @pytest.mark.subprocess
 def test_parameter_generalization_keeps_sampled_region_unverified(
-    kernel,
+    runtime,
 ) -> None:
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
-        kernel
+        runtime
     )
     verification_record_uri, witness_uri, candidate_uri = _verified_counterexample(
-        kernel,
+        runtime,
         claim_uri=claim_uri,
         plugin_id=plugin_id,
         checker_id=checker_id,
         candidate_schema_uri=candidate_schema_uri,
         witness_role=WitnessRole.RESCUES_CANDIDATE,
     )
-    rejected = kernel.conjectures.run(
+    rejected = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.PARAMETER_GENERALIZE,
             plugin_id=plugin_id,
             source_uri=claim_uri,
             verification_record_uri=verification_record_uri,
             constraints={
-                "claim_template": kernel.store.get(claim_uri).payload,
+                "claim_template": runtime.core.store.get(claim_uri).payload,
             },
         )
     )
 
     assert "requires a verified construction candidate" in rejected.detail
 
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.PARAMETER_GENERALIZE,
             plugin_id=plugin_id,
             source_uri=candidate_uri,
             verification_record_uri=verification_record_uri,
             constraints={
-                "claim_template": kernel.store.get(claim_uri).payload,
+                "claim_template": runtime.core.store.get(claim_uri).payload,
             },
         )
     )
@@ -348,7 +352,7 @@ def test_parameter_generalization_keeps_sampled_region_unverified(
     assert region.verification_record_uri is None
     assert result.hypotheses[0].verification is Verification.UNVERIFIED
     transformation = HypothesisTransformationRecord.model_validate(
-        kernel.store.get(result.hypotheses[0].transformation_uri).payload
+        runtime.core.store.get(result.hypotheses[0].transformation_uri).payload
     )
     assert transformation.parameter_region == region
 
@@ -362,29 +366,29 @@ def test_parameter_generalization_keeps_sampled_region_unverified(
 )
 @pytest.mark.subprocess
 def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
-    kernel,
+    runtime,
     region_kind: str,
     expected_evidence: ParameterRegionEvidence,
 ) -> None:
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
-        kernel
+        runtime
     )
     source_record_uri, _, candidate_uri = _verified_counterexample(
-        kernel,
+        runtime,
         claim_uri=claim_uri,
         plugin_id=plugin_id,
         checker_id=checker_id,
         candidate_schema_uri=candidate_schema_uri,
         witness_role=WitnessRole.RESCUES_CANDIDATE,
     )
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.PARAMETER_GENERALIZE,
             plugin_id=plugin_id,
             source_uri=candidate_uri,
             verification_record_uri=source_record_uri,
             constraints={
-                "claim_template": kernel.store.get(claim_uri).payload,
+                "claim_template": runtime.core.store.get(claim_uri).payload,
                 "region_kind": region_kind,
             },
         )
@@ -392,16 +396,16 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
     region = result.hypotheses[0].parameter_region
     assert region is not None
     assert region.subject_uri is not None
-    subject_artifact = kernel.store.get(region.subject_uri)
+    subject_artifact = runtime.core.store.get(region.subject_uri)
     subject = ParameterRegionSubject.model_validate(subject_artifact.payload)
-    target_claim = kernel.store.get(subject.claim_uri)
-    semantics = kernel.store.get(target_claim.manifest.semantics_uri)
-    certificate_schema_uri = kernel.schemas.register(
+    target_claim = runtime.core.store.get(subject.claim_uri)
+    semantics = runtime.core.store.get(target_claim.manifest.semantics_uri)
+    certificate_schema_uri = runtime.core.schemas.register(
         name="fixture.parameter-region-certificate",
         version="1",
         schema=CertificateEnvelope.model_json_schema(),
     )
-    region_checker = kernel.checkers.authorize(
+    region_checker = runtime.core.checkers.authorize(
         name=f"fixture-parameter-region-{region_kind.lower()}-v1",
         entrypoint=(
             "tests.fixtures.checker_functions:check_parameter_region_certificate"
@@ -411,7 +415,9 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
         format_version="1",
         claim_schema_uris=(target_claim.manifest.schema_uri,),
         semantics_uris=(target_claim.manifest.semantics_uri,),
-        candidate_schema_uris=(kernel.conjectures.parameter_region_subject_schema_uri,),
+        candidate_schema_uris=(
+            runtime.services.conjectures.parameter_region_subject_schema_uri,
+        ),
         reason="parameter-region promotion conformance fixture",
     )
     proof = {
@@ -431,18 +437,18 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
         ),
         payload=proof,
     )
-    stored_certificate = kernel.store.put(
+    stored_certificate = runtime.core.store.put(
         schema_uri=certificate_schema_uri,
         semantics_uri=target_claim.manifest.semantics_uri,
         payload=certificate.model_dump(mode="json"),
         parents=(target_claim.artifact_uri, subject_artifact.artifact_uri),
         summary="parameter-region certificate fixture",
     )
-    verified = kernel.verification.verify_certificate(
+    verified = runtime.services.verification.verify_certificate(
         certificate_uri=stored_certificate.artifact_uri
     )
     assert verified.verification_record_uri is not None
-    kernel.checkers.authorize(
+    runtime.core.checkers.authorize(
         name=f"fixture-parameter-region-{region_kind.lower()}-v2",
         entrypoint=(
             "tests.fixtures.checker_functions:check_parameter_region_certificate"
@@ -452,11 +458,13 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
         format_version="1",
         claim_schema_uris=(target_claim.manifest.schema_uri,),
         semantics_uris=(target_claim.manifest.semantics_uri,),
-        candidate_schema_uris=(kernel.conjectures.parameter_region_subject_schema_uri,),
+        candidate_schema_uris=(
+            runtime.services.conjectures.parameter_region_subject_schema_uri,
+        ),
         reason="compatible checker must not change recorded-checker replay",
     )
 
-    promoted = kernel.conjectures.promote_parameter_region(
+    promoted = runtime.services.conjectures.promote_parameter_region(
         subject_uri=subject_artifact.artifact_uri,
         verification_record_uri=verified.verification_record_uri,
     )
@@ -467,14 +475,16 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
     assert promoted.subject_uri == region.subject_uri
     assert promoted.verification_record_uri == verified.verification_record_uri
 
-    substituted_subject = kernel.store.put(
-        schema_uri=kernel.conjectures.parameter_region_subject_schema_uri,
+    substituted_subject = runtime.core.store.put(
+        schema_uri=runtime.services.conjectures.parameter_region_subject_schema_uri,
         semantics_uri=target_claim.manifest.semantics_uri,
         payload=subject.model_dump(mode="json"),
         parents=subject_artifact.manifest.parents,
         summary="same parameter-region payload in a different carrier",
     )
-    substituted_subject_artifact = kernel.store.get(substituted_subject.artifact_uri)
+    substituted_subject_artifact = runtime.core.store.get(
+        substituted_subject.artifact_uri
+    )
     assert (
         substituted_subject_artifact.manifest.object_digest
         == subject_artifact.manifest.object_digest
@@ -484,12 +494,12 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
         ConjectureError,
         match="does not cover this parameter region",
     ):
-        kernel.conjectures.promote_parameter_region(
+        runtime.services.conjectures.promote_parameter_region(
             subject_uri=substituted_subject.artifact_uri,
             verification_record_uri=verified.verification_record_uri,
         )
 
-    kernel.checkers.revoke(
+    runtime.core.checkers.revoke(
         region_checker.checker_id,
         reason="recorded checker revocation must block replay",
     )
@@ -497,7 +507,7 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
         ConjectureError,
         match="Re-run verification with an active checker",
     ):
-        kernel.conjectures.promote_parameter_region(
+        runtime.services.conjectures.promote_parameter_region(
             subject_uri=subject_artifact.artifact_uri,
             verification_record_uri=verified.verification_record_uri,
         )
@@ -505,17 +515,17 @@ def test_parameter_region_promotion_replays_an_exact_authorized_certificate(
 
 @pytest.mark.subprocess
 def test_hypothesis_plugin_cannot_promote_parameter_region(
-    kernel,
+    runtime,
 ) -> None:
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
-        kernel,
+        runtime,
         transformer_entrypoint=(
             "tests.fixtures.plugin_functions:"
             "transform_with_unsupported_region_promotion"
         ),
     )
     verification_record_uri, _, candidate_uri = _verified_counterexample(
-        kernel,
+        runtime,
         claim_uri=claim_uri,
         plugin_id=plugin_id,
         checker_id=checker_id,
@@ -523,14 +533,14 @@ def test_hypothesis_plugin_cannot_promote_parameter_region(
         witness_role=WitnessRole.RESCUES_CANDIDATE,
     )
 
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.PARAMETER_GENERALIZE,
             plugin_id=plugin_id,
             source_uri=candidate_uri,
             verification_record_uri=verification_record_uri,
             constraints={
-                "claim_template": kernel.store.get(claim_uri).payload,
+                "claim_template": runtime.core.store.get(claim_uri).payload,
             },
         )
     )
@@ -544,16 +554,16 @@ def test_hypothesis_plugin_cannot_promote_parameter_region(
 
 @pytest.mark.subprocess
 def test_hypothesis_plugin_cannot_cite_unbound_region_samples(
-    kernel,
+    runtime,
 ) -> None:
     claim_uri, plugin_id, _, _ = _install_hypothesis_plugin(
-        kernel,
+        runtime,
         transformer_entrypoint=(
             "tests.fixtures.plugin_functions:transform_with_unbound_region_sample"
         ),
     )
 
-    result = kernel.conjectures.run(
+    result = runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.GENERATE,
             plugin_id=plugin_id,

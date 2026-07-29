@@ -7,8 +7,6 @@ from fractions import Fraction
 from math import gcd
 from typing import Any, Literal, cast
 
-from sympy import Matrix, Poly, Rational
-
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityInvocationExample,
@@ -65,7 +63,7 @@ def _matrix_digest(
     return f"sha256:{hashlib.sha256(canonicalize_json(payload)).hexdigest()}"
 
 
-def _primitive_kernel(vector: Matrix) -> tuple[Fraction, ...]:
+def _primitive_kernel(vector: Any) -> tuple[Fraction, ...]:
     fractions = tuple(Fraction(value) for value in vector)
     denominator_lcm = 1
     for fraction_value in fractions:
@@ -113,15 +111,17 @@ def _multiplier_polynomial(
 
 
 def _coefficient_matrix(
-    partials: tuple[Poly, Poly, Poly],
+    partials: tuple[Any, Any, Any],
     multiplier_degree: int,
     homogeneous_degree: int,
 ) -> tuple[
     tuple[tuple[int, int, int], ...],
     tuple[tuple[int, int, int], ...],
-    Matrix,
+    Any,
     tuple[tuple[int, int, Any], ...],
 ]:
+    from sympy import Matrix
+
     source_basis = _homogeneous_basis(multiplier_degree)
     target_degree = homogeneous_degree - 1 + multiplier_degree
     target_basis = _homogeneous_basis(target_degree)
@@ -162,6 +162,8 @@ def compute_graded_jacobian_syzygy(request: ContractModel) -> ContractModel:
             "EXPANDED_POLYNOMIAL", "LABELLED_LINEAR_FACTOR_PRODUCT"
         ] = "EXPANDED_POLYNOMIAL"
     else:
+        from sympy import Poly, Rational
+
         assert request.linear_factors is not None
         assert request.linear_factor_variables is not None
         variables = request.linear_factor_variables
@@ -187,7 +189,7 @@ def compute_graded_jacobian_syzygy(request: ContractModel) -> ContractModel:
         source_kind = "LABELLED_LINEAR_FACTOR_PRODUCT"
     source_degree = int(source.total_degree())
     partials = cast(
-        tuple[Poly, Poly, Poly],
+        tuple[Any, Any, Any],
         tuple(source.diff(variable) for variable in source.gens),
     )
     maps: list[GradedJacobianCoefficientMap] = []

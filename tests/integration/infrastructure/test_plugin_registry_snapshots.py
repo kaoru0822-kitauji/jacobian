@@ -16,7 +16,6 @@ from jacobian.contracts.plugins import (
     PluginRegistrySnapshot,
 )
 from jacobian.contracts.search import SearchBudget, SearchRunRequest
-from jacobian.kernel import JacobianKernel
 from jacobian.plugin_conformance import (
     PluginConformanceCheck,
     SyntheticPluginConformanceTarget,
@@ -24,6 +23,8 @@ from jacobian.plugin_conformance import (
     run_plugin_conformance,
 )
 from jacobian.plugins.registry import PluginRegistryError
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
     pytest.mark.conformance,
@@ -31,19 +32,19 @@ pytestmark = [
 
 
 @pytest.fixture
-def plugin_kernel(
+def plugin_runtime(
     tmp_path: Path,
-    kernel_store_template: Path,
-) -> JacobianKernel:
-    """Kernel rooted at ``tmp_path/state`` so plugin packages can live beside it."""
+    runtime_store_template: Path,
+) -> JacobianRuntime:
+    """Runtime rooted at ``tmp_path/state`` so plugin packages can live beside it."""
 
     state = tmp_path / "state"
-    shutil.copytree(kernel_store_template, state)
-    return JacobianKernel(state)
+    shutil.copytree(runtime_store_template, state)
+    return create_runtime(state)
 
 
 def _install_external_plugin(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[str, tuple[str, ...], Path, str]:
@@ -125,17 +126,17 @@ def _install_external_plugin(
     monkeypatch.delitem(sys.modules, "external_plugin", raising=False)
     monkeypatch.delitem(sys.modules, "external_plugin.entry", raising=False)
 
-    claim_schema_uri = kernel.schemas.register(
+    claim_schema_uri = runtime.core.schemas.register(
         name="external-plugin.claim",
         version="1",
         schema=ClaimSpec.model_json_schema(),
     )
-    candidate_schema_uri = kernel.schemas.register(
+    candidate_schema_uri = runtime.core.schemas.register(
         name="external-plugin.candidate",
         version="1",
         schema={"type": "object"},
     )
-    semantics_uri = kernel.store.register_descriptor(
+    semantics_uri = runtime.core.store.register_descriptor(
         kind="semantics",
         name="external-plugin.domain",
         version="1",
@@ -148,13 +149,13 @@ def _install_external_plugin(
         CapabilityName.HYPOTHESIS_TRANSFORMER: "external_plugin.entry:transform",
     }
     implementation_uris = {
-        capability: kernel.plugins.register_implementation(entrypoint)
+        capability: runtime.core.plugins.register_implementation(entrypoint)
         for capability, entrypoint in entrypoints.items()
     }
     assert not marker.exists()
-    manifest = kernel.artifacts.put(
-        schema_uri=kernel.reference_installer.manifest_schema_uri,
-        semantics_uri=kernel.reference_installer.manifest_semantics_uri,
+    manifest = runtime.core.artifacts.put(
+        schema_uri=runtime.services.reference_installer.manifest_schema_uri,
+        semantics_uri=runtime.services.reference_installer.manifest_semantics_uri,
         payload=PluginManifest(
             domain_id="external.plugin",
             domain_version="1",
@@ -171,9 +172,9 @@ def _install_external_plugin(
             },
         ).model_dump(mode="json"),
     )
-    kernel.plugins.install(manifest.artifact_uri)
+    runtime.core.plugins.install(manifest.artifact_uri)
     assert not marker.exists()
-    claim = kernel.artifacts.put(
+    claim = runtime.core.artifacts.put(
         schema_uri=claim_schema_uri,
         semantics_uri=semantics_uri,
         payload={
@@ -206,25 +207,25 @@ def _install_external_plugin(
 @pytest.mark.conformance
 def test_registry_snapshot_binds_contract_source_runtime_and_platform(
     tmp_path: Path,
-    plugin_kernel: JacobianKernel,
+    plugin_runtime: JacobianRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = plugin_kernel
+    runtime = plugin_runtime
     plugin_id, implementation_uris, marker, _ = _install_external_plugin(
-        kernel,
+        runtime,
         tmp_path,
         monkeypatch,
     )
 
-    snapshot_uri = kernel.plugins.snapshot_uri(plugin_id)
-    snapshot = kernel.plugins.snapshot(plugin_id)
-    stored = kernel.store.get(snapshot_uri)
+    snapshot_uri = runtime.core.plugins.snapshot_uri(plugin_id)
+    snapshot = runtime.core.plugins.snapshot(plugin_id)
+    stored = runtime.core.store.get(snapshot_uri)
 
     assert isinstance(snapshot, PluginRegistrySnapshot)
     assert snapshot.plugin_id == plugin_id
     assert (
         snapshot.plugin_manifest_digest
-        == kernel.store.get(plugin_id).manifest.object_digest
+        == runtime.core.store.get(plugin_id).manifest.object_digest
     )
     assert snapshot.capabilities[
         CapabilityName.EVALUATOR
@@ -238,10 +239,10 @@ def test_registry_snapshot_binds_contract_source_runtime_and_platform(
     assert stored.manifest.parents == tuple(sorted((plugin_id, *implementation_uris)))
     assert not marker.exists()
 
-    resolved = kernel.plugins.resolve(plugin_id, CapabilityName.EVALUATOR)
+    resolved = runtime.core.plugins.resolve(plugin_id, CapabilityName.EVALUATOR)
     assert resolved.registry_snapshot_uri == snapshot_uri
     assert not marker.exists()
-    execution = kernel.plugin_executor.run(
+    execution = runtime.services.plugin_executor.run(
         entrypoint=resolved.descriptor.entrypoint,
         implementation_digest=resolved.implementation_digest,
         request={"candidate": {"value": 1}},
@@ -255,12 +256,12 @@ def test_registry_snapshot_binds_contract_source_runtime_and_platform(
 
 def test_registry_snapshot_fails_closed_on_runtime_mismatch(
     tmp_path: Path,
-    plugin_kernel: JacobianKernel,
+    plugin_runtime: JacobianRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = plugin_kernel
-    plugin_id, _, _, _ = _install_external_plugin(kernel, tmp_path, monkeypatch)
-    installed_runtime = kernel.plugins.snapshot(plugin_id).runtime_identity
+    runtime = plugin_runtime
+    plugin_id, _, _, _ = _install_external_plugin(runtime, tmp_path, monkeypatch)
+    installed_runtime = runtime.core.plugins.snapshot(plugin_id).runtime_identity
     incompatible = installed_runtime.model_copy(
         update={"system": installed_runtime.system + "-different"}
     )
@@ -270,18 +271,18 @@ def test_registry_snapshot_fails_closed_on_runtime_mismatch(
         PluginRegistryError,
         match="incompatible with this runtime",
     ):
-        kernel.plugins.resolve(plugin_id, CapabilityName.EVALUATOR)
+        runtime.core.plugins.resolve(plugin_id, CapabilityName.EVALUATOR)
 
 
 @pytest.mark.subprocess
 def test_external_plugin_passes_the_generic_conformance_kit(
     tmp_path: Path,
-    plugin_kernel: JacobianKernel,
+    plugin_runtime: JacobianRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = plugin_kernel
+    runtime = plugin_runtime
     plugin_id, _, _, claim_uri = _install_external_plugin(
-        kernel,
+        runtime,
         tmp_path,
         monkeypatch,
     )
@@ -290,7 +291,7 @@ def test_external_plugin_passes_the_generic_conformance_kit(
     outside = tmp_path / "outside.py"
     outside.write_text("value = 1\n", encoding="utf-8")
     target = SyntheticPluginConformanceTarget(
-        kernel=kernel,
+        runtime=runtime,
         plugin_id=plugin_id,
         search_request=SearchRunRequest(
             idempotency_key="external-conformance-001",
@@ -313,7 +314,7 @@ def test_external_plugin_passes_the_generic_conformance_kit(
     observations = require_plugin_conformance(target)
 
     assert all(observation.passed for observation in observations)
-    with sqlite3.connect(kernel.store.db_path) as connection:
+    with sqlite3.connect(runtime.core.store.db_path) as connection:
         first_run_count = connection.execute(
             "SELECT COUNT(*) FROM search_experiments"
         ).fetchone()
@@ -321,7 +322,7 @@ def test_external_plugin_passes_the_generic_conformance_kit(
     repeated = require_plugin_conformance(target)
 
     assert all(observation.passed for observation in repeated)
-    with sqlite3.connect(kernel.store.db_path) as connection:
+    with sqlite3.connect(runtime.core.store.db_path) as connection:
         second_run_count = connection.execute(
             "SELECT COUNT(*) FROM search_experiments"
         ).fetchone()

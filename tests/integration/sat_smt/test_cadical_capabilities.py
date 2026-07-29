@@ -16,11 +16,12 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import SatAssignmentArtifact, SatProofArtifact
-from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import cadical_provider_runtime
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
+    pytest.mark.usefixtures("initialized_runtime_store_with_references"),
 ]
 
 
@@ -43,35 +44,35 @@ def _fake_cadical(tmp_path: Path, body: str) -> Path:
     return executable
 
 
-def _kernel_with_fake(
+def _runtime_with_fake(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     executable: Path,
     *,
-    install_references: bool = False,
-) -> JacobianKernel:
+    checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.NONE,
+) -> JacobianRuntime:
     unavailable = cadical_provider_runtime(tmp_path / "not-installed")
     monkeypatch.setattr(
-        "jacobian.kernel.cadical_provider_runtime",
+        "jacobian.portfolio.assembler.cadical_provider_runtime",
         lambda *_args, **_kwargs: unavailable,
     )
-    kernel = JacobianKernel(
+    runtime = create_runtime(
         tmp_path / "store",
-        install_references=install_references,
+        checker_authority=checker_authority,
     )
-    runtime = cadical_provider_runtime(executable)
-    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    provider = cadical_provider_runtime(executable)
+    assert provider.availability is CapabilityProviderAvailability.AVAILABLE
     for adapter in install_cadical_capabilities(
-        kernel.sat,
-        runtime,
+        runtime.core.sat,
+        provider,
         executable=executable,
     ):
-        kernel.register_capability(adapter)
-    return kernel
+        runtime.core.capabilities.register(adapter)
+    return runtime
 
 
 def _invoke(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     capability_id: str,
     cnf_uri: str,
     *,
@@ -81,7 +82,7 @@ def _invoke(
     budget: dict[str, int] = {"wall_seconds": wall_seconds}
     if conflicts is not None:
         budget["conflicts"] = conflicts
-    return kernel.capabilities.invoke(
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=capability_id,
             mode=CapabilityMode.EXPLORE,
@@ -106,18 +107,18 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
         "print('v 1 -2 0')\n"
         "raise SystemExit(10)",
     )
-    kernel = _kernel_with_fake(
+    runtime = _runtime_with_fake(
         tmp_path,
         monkeypatch,
         executable,
-        install_references=True,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
     )
-    cnf = kernel.sat.put_cnf(
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("y", "x"),
         clauses=((2,), (-1,)),
     )
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri, conflicts=50)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri, conflicts=50)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "ASSIGNMENT_PRODUCED"
@@ -127,7 +128,7 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.assurance.verification_record_uri is None
     assignment_uri = result.output["assignment_uri"]
-    stored = kernel.store.get(assignment_uri)
+    stored = runtime.core.store.get(assignment_uri)
     assignment = SatAssignmentArtifact.model_validate(stored.payload)
     assert assignment.values == (True, False)
     assert assignment.cnf.cnf_artifact_uri == cnf.artifact_uri
@@ -136,7 +137,7 @@ def test_model_find_materializes_only_an_unverified_bound_assignment(
     assert assignment.producer.provider == "cadical"
     assert stored.manifest.parents == (cnf.artifact_uri,)
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.model.verify",
             mode=CapabilityMode.VERIFY,
@@ -159,13 +160,13 @@ def test_model_find_returns_named_values_after_lexicographic_remapping(
         "print('v 1 2 -3 0')\n"
         "raise SystemExit(10)",
     )
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("n1", "n2", "n10"),
         clauses=((1,), (-2,), (3,)),
     )
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri)
 
     assert result.output["assignment"] == {
         "n1": True,
@@ -189,13 +190,13 @@ def test_proof_find_normalizes_deletions_without_self_verification(
         "print('s UNSATISFIABLE')\n"
         "raise SystemExit(20)",
     )
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("x",),
         clauses=((1,), (-1,)),
     )
 
-    result = _invoke(kernel, "sat.unsat_proof.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.unsat_proof.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "PROOF_PRODUCED"
@@ -204,7 +205,7 @@ def test_proof_find_normalizes_deletions_without_self_verification(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.assurance.verification_record_uri is None
     proof_uri = result.output["proof_uri"]
-    stored = kernel.store.get(proof_uri)
+    stored = runtime.core.store.get(proof_uri)
     proof = SatProofArtifact.model_validate(stored.payload)
     assert proof.raw_bytes() == b"0\n"
     assert "removed 1 operational deletion step(s)" in result.output["detail"]
@@ -228,22 +229,22 @@ def test_cadical_deletion_heavy_proof_replays_in_strict_checker(
         "print('s UNSATISFIABLE')\n"
         "raise SystemExit(20)",
     )
-    kernel = _kernel_with_fake(
+    runtime = _runtime_with_fake(
         tmp_path,
         monkeypatch,
         executable,
-        install_references=True,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
     )
-    cnf = kernel.sat.put_cnf(
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("x", "y"),
         clauses=((1,), (-1,), (2,)),
     )
 
-    produced = _invoke(kernel, "sat.unsat_proof.find", cnf.artifact_uri)
+    produced = _invoke(runtime, "sat.unsat_proof.find", cnf.artifact_uri)
     proof_uri = produced.output["proof_uri"]
-    assert kernel.sat.resolve_proof(proof_uri).proof.raw_bytes() == b"0\n"
+    assert runtime.core.sat.resolve_proof(proof_uri).proof.raw_bytes() == b"0\n"
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.unsat_proof.verify",
             mode=CapabilityMode.VERIFY,
@@ -287,10 +288,10 @@ def test_opposite_or_unknown_solver_status_never_becomes_a_conclusion(
     solver_status: str,
 ) -> None:
     executable = _fake_cadical(tmp_path, body)
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
 
-    result = _invoke(kernel, capability_id, cnf.artifact_uri)
+    result = _invoke(runtime, capability_id, cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == expected_status
@@ -305,11 +306,11 @@ def test_timeout_is_operational_and_materializes_no_solver_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     executable = _fake_cadical(tmp_path, "time.sleep(5)")
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
 
     result = _invoke(
-        kernel,
+        runtime,
         "sat.model.find",
         cnf.artifact_uri,
         wall_seconds=1,
@@ -327,14 +328,14 @@ def test_client_cancellation_terminates_solver_and_materializes_no_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     executable = _fake_cadical(tmp_path, "time.sleep(30)")
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
     cancellation_event = threading.Event()
     cancellation_event.set()
 
     with bounded_process_cancellation(cancellation_event):
         result = _invoke(
-            kernel,
+            runtime,
             "sat.model.find",
             cnf.artifact_uri,
             wall_seconds=150,
@@ -353,13 +354,13 @@ def test_partial_model_fails_closed_without_an_assignment(
         tmp_path,
         "print('s SATISFIABLE')\nprint('v 1 0')\nraise SystemExit(10)",
     )
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("x", "y"),
         clauses=((1, 2),),
     )
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output == {}
@@ -387,10 +388,10 @@ def test_inconsistent_protocol_or_nondocumented_exit_fails_closed(
     expected_code: str,
 ) -> None:
     executable = _fake_cadical(tmp_path, body)
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == expected_code
@@ -406,10 +407,10 @@ def test_excessive_stdout_fails_closed_without_an_assignment(
         "print('x' * 4096)\nraise SystemExit(10)",
     )
     monkeypatch.setattr("jacobian.cadical.CADICAL_STDOUT_LIMIT", 1024)
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "CADICAL_OUTPUT_LIMIT_EXCEEDED"
@@ -427,13 +428,13 @@ def test_oversized_proof_fails_closed_before_reading_or_materialization(
         "raise SystemExit(20)",
     )
     monkeypatch.setattr("jacobian.cadical.CADICAL_PROOF_LIMIT", 8)
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("x",),
         clauses=((1,), (-1,)),
     )
 
-    result = _invoke(kernel, "sat.unsat_proof.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.unsat_proof.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "CADICAL_DURABLE_PROOF_LIMIT_EXCEEDED"
@@ -450,13 +451,13 @@ def test_proof_symlink_is_never_followed_or_materialized(
         "print('s UNSATISFIABLE')\n"
         "raise SystemExit(20)",
     )
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("x",),
         clauses=((1,), (-1,)),
     )
 
-    result = _invoke(kernel, "sat.unsat_proof.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.unsat_proof.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "INVALID_CADICAL_PROOF_FILE"
@@ -471,12 +472,12 @@ def test_runtime_tampering_after_probe_fails_closed(
         tmp_path,
         "print('s SATISFIABLE')\nprint('v 1 0')\nraise SystemExit(10)",
     )
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
     executable.write_text("#!/bin/sh\nexit 10\n", encoding="utf-8")
     executable.chmod(0o755)
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "CADICAL_RUNTIME_CHANGED"
@@ -500,10 +501,10 @@ def test_invocation_environment_does_not_require_the_callers_locale(
     )
     executable.write_text(text, encoding="utf-8")
     executable.chmod(0o755)
-    kernel = _kernel_with_fake(tmp_path, monkeypatch, executable)
-    cnf = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
+    cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
 
-    result = _invoke(kernel, "sat.model.find", cnf.artifact_uri)
+    result = _invoke(runtime, "sat.model.find", cnf.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "ASSIGNMENT_PRODUCED"

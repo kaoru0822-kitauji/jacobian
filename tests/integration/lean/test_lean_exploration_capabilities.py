@@ -9,20 +9,22 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
+    pytest.mark.usefixtures("initialized_runtime_store_with_references"),
 ]
 
 
 def test_apply_tactic_exposes_child_goals_and_replay_source(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.proof_state.apply_tactic",
             input={
@@ -59,9 +61,11 @@ def test_apply_tactic_exposes_child_goals_and_replay_source(tmp_path: Path) -> N
 def test_apply_tactic_returns_structured_failure_without_conclusion(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.proof_state.apply_tactic",
             input={
@@ -83,9 +87,11 @@ def test_apply_tactic_returns_structured_failure_without_conclusion(
 
 
 def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
 
-    suggested = kernel.capabilities.invoke(
+    suggested = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.retrieve.premises",
             input={
@@ -97,7 +103,7 @@ def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> N
         )
     )
 
-    empty = kernel.capabilities.invoke(
+    empty = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.retrieve.premises",
             input={
@@ -128,12 +134,12 @@ def test_retrieve_premises_returns_exact_mathlib_suggestion(tmp_path: Path) -> N
     assert empty.output["exhaustive"] is False
 
 
-def test_kernel_can_ablate_lean_capabilities_without_removing_checker(
+def test_runtime_can_ablate_lean_capabilities_without_removing_checker(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(
+    runtime = create_runtime(
         tmp_path,
-        install_references=True,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
         capability_exclusions=frozenset(
             {
                 "lean.proof_state.apply_tactic",
@@ -143,7 +149,7 @@ def test_kernel_can_ablate_lean_capabilities_without_removing_checker(
     )
     capability_ids = {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
 
     assert "lean.check" in capability_ids

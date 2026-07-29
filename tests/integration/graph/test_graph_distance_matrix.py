@@ -11,8 +11,8 @@ from jacobian.contracts.graph_invariant_operations import GraphDistanceMatrixRes
 from jacobian.contracts.results import ExecutionStatus
 
 
-def _invoke(kernel, vertices: list[str], edges: list[list[str]]):
-    return kernel.capabilities.invoke(
+def _invoke(runtime, vertices: list[str], edges: list[list[str]]):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.compute",
             input={"graph": {"vertices": vertices, "edges": edges}},
@@ -34,9 +34,9 @@ def _result(**changes: object) -> GraphDistanceMatrixResult:
     return GraphDistanceMatrixResult.model_validate(values)
 
 
-def test_distance_matrix_is_complete_canonical_and_lineage_bound(kernel) -> None:
+def test_distance_matrix_is_complete_canonical_and_lineage_bound(runtime) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         ["c", "a", "b"],
         [["a", "b"], ["b", "c"]],
     )
@@ -54,14 +54,14 @@ def test_distance_matrix_is_complete_canonical_and_lineage_bound(kernel) -> None
     }
     assert len(result.artifact_uris) == 2
     input_uri, matrix_uri = result.artifact_uris
-    assert kernel.store.get(matrix_uri).manifest.parents == (input_uri,)
+    assert runtime.core.store.get(matrix_uri).manifest.parents == (input_uri,)
     assert result.relationships[0].relation_id == "graph.distance_matrix.relation"
     assert result.relationships[0].source_artifact_uris == (input_uri,)
     assert result.relationships[0].target_artifact_uris == (matrix_uri,)
 
 
-def test_distance_matrix_represents_disconnected_pairs_with_null(kernel) -> None:
-    result = _invoke(kernel, ["c", "a", "b"], [["a", "b"]])
+def test_distance_matrix_represents_disconnected_pairs_with_null(runtime) -> None:
+    result = _invoke(runtime, ["c", "a", "b"], [["a", "b"]])
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["result"]["vertices"] == ["a", "b", "c"]
@@ -73,9 +73,9 @@ def test_distance_matrix_represents_disconnected_pairs_with_null(kernel) -> None
     assert result.output["result"]["connected"] is False
 
 
-def test_distance_matrix_empty_and_singleton_conventions(kernel) -> None:
-    empty = _invoke(kernel, [], [])
-    singleton = _invoke(kernel, ["only"], [])
+def test_distance_matrix_empty_and_singleton_conventions(runtime) -> None:
+    empty = _invoke(runtime, [], [])
+    singleton = _invoke(runtime, ["only"], [])
 
     assert empty.output["result"]["vertices"] == []
     assert empty.output["result"]["distances"] == []
@@ -85,8 +85,8 @@ def test_distance_matrix_empty_and_singleton_conventions(kernel) -> None:
     assert singleton.output["result"]["connected"] is True
 
 
-def test_distance_matrix_rejects_graph_above_existing_order_bound(kernel) -> None:
-    result = _invoke(kernel, [f"v{index:02d}" for index in range(33)], [])
+def test_distance_matrix_rejects_graph_above_existing_order_bound(runtime) -> None:
+    result = _invoke(runtime, [f"v{index:02d}" for index in range(33)], [])
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.artifact_uris == ()
@@ -129,9 +129,9 @@ def test_distance_matrix_result_rejects_inconsistent_claims(
         _result(**changes)
 
 
-def test_distance_matrix_public_postdoc_graph(kernel) -> None:
+def test_distance_matrix_public_postdoc_graph(runtime) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         ["0", "1", "2", "3", "4", "5"],
         [["0", "3"], ["0", "4"], ["1", "4"], ["2", "4"], ["3", "4"], ["3", "5"]],
     )

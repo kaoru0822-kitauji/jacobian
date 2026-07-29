@@ -8,29 +8,29 @@ from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.polytope import PolytopeSeparateRequest
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def _simplex(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     point: tuple[tuple[int, int], ...],
 ) -> tuple[str, str]:
-    point_artifact = kernel.artifacts.put(
-        schema_uri=kernel.polytope.point_schema_uri,
-        semantics_uri=kernel.polytope.semantics_uri,
+    point_artifact = runtime.core.artifacts.put(
+        schema_uri=runtime.services.polytope.point_schema_uri,
+        semantics_uri=runtime.services.polytope.semantics_uri,
         payload={
             "point_schema_version": "1",
             "coordinates": [_q(*value) for value in point],
         },
     )
-    generators = kernel.artifacts.put(
-        schema_uri=kernel.polytope.generator_set_schema_uri,
-        semantics_uri=kernel.polytope.semantics_uri,
+    generators = runtime.core.artifacts.put(
+        schema_uri=runtime.services.polytope.generator_set_schema_uri,
+        semantics_uri=runtime.services.polytope.semantics_uri,
         payload={
             "generator_set_schema_version": "1",
             "dimension": 3,
@@ -46,22 +46,22 @@ def _simplex(
 
 
 def test_backend_failure_keeps_provider_detail_local(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     import z3
 
     point_uri, generators_uri = _simplex(
-        kernel,
+        runtime,
         ((1, 4), (1, 4), (1, 4)),
     )
 
     def fail_backend(*_args: object, **_kwargs: object) -> None:
         raise z3.Z3Exception("provider=solver internal-id=secret")
 
-    monkeypatch.setattr(kernel.polytope, "_convex_weights", fail_backend)
-    result = kernel.polytope.separate(
+    monkeypatch.setattr(runtime.services.polytope, "_convex_weights", fail_backend)
+    result = runtime.services.polytope.separate(
         PolytopeSeparateRequest(
             point_uri=point_uri,
             generator_set_uri=generators_uri,
@@ -80,15 +80,15 @@ def test_backend_failure_keeps_provider_detail_local(
 
 @pytest.mark.subprocess
 def test_exact_membership_witness_is_independently_replayed(
-    kernel,
+    runtime,
 ) -> None:
-    assert kernel.polytope_checkers is not None
+    assert runtime.portfolio.polytope_checkers is not None
     point_uri, generators_uri = _simplex(
-        kernel,
+        runtime,
         ((1, 4), (1, 4), (1, 4)),
     )
 
-    proposed = kernel.polytope.separate(
+    proposed = runtime.services.polytope.separate(
         PolytopeSeparateRequest(
             point_uri=point_uri,
             generator_set_uri=generators_uri,
@@ -99,11 +99,11 @@ def test_exact_membership_witness_is_independently_replayed(
     assert proposed.witness_uri is not None
     assert proposed.certificate_uri is None
     assert proposed.result.assurance.verification.value == "UNVERIFIED"
-    verified = kernel.verification.verify_witness(
+    verified = runtime.services.verification.verify_witness(
         claim_uri=proposed.claim_uri or "",
         candidate_uri=proposed.effective_point_uri or "",
         witness_uri=proposed.witness_uri,
-        checker_id=kernel.polytope_checkers.witness_checker_id,
+        checker_id=runtime.portfolio.polytope_checkers.witness_checker_id,
     )
     assert verified.conclusion.value == "TRUE"
     assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
@@ -113,14 +113,14 @@ def test_exact_membership_witness_is_independently_replayed(
 
 @pytest.mark.subprocess
 def test_exact_separator_is_generated_then_independently_checked(
-    kernel,
+    runtime,
 ) -> None:
     point_uri, generators_uri = _simplex(
-        kernel,
+        runtime,
         ((1, 2), (1, 2), (1, 2)),
     )
 
-    proposed = kernel.polytope.separate(
+    proposed = runtime.services.polytope.separate(
         PolytopeSeparateRequest(
             point_uri=point_uri,
             generator_set_uri=generators_uri,
@@ -131,7 +131,7 @@ def test_exact_separator_is_generated_then_independently_checked(
     assert proposed.certificate_uri is not None
     assert proposed.witness_uri is None
     assert proposed.result.assurance.verification.value == "UNVERIFIED"
-    certificate = kernel.store.get(proposed.certificate_uri).payload
+    certificate = runtime.core.store.get(proposed.certificate_uri).payload
     payload = certificate["payload"]
     coefficients = [
         int(value["num"]) // int(value["den"]) for value in payload["coefficients"]
@@ -140,7 +140,7 @@ def test_exact_separator_is_generated_then_independently_checked(
     assert math.gcd(*[abs(value) for value in (*coefficients, rhs)]) == 1
     assert payload["margin"] == _q(1, 2)
 
-    verified = kernel.verification.verify_certificate(
+    verified = runtime.services.verification.verify_certificate(
         certificate_uri=proposed.certificate_uri,
     )
     assert verified.conclusion.value == "TRUE"
@@ -150,19 +150,19 @@ def test_exact_separator_is_generated_then_independently_checked(
 
 
 @pytest.mark.subprocess
-def test_separator_payload_tampering_fails_closed(kernel) -> None:
+def test_separator_payload_tampering_fails_closed(runtime) -> None:
     point_uri, generators_uri = _simplex(
-        kernel,
+        runtime,
         ((1, 2), (1, 2), (1, 2)),
     )
-    proposed = kernel.polytope.separate(
+    proposed = runtime.services.polytope.separate(
         PolytopeSeparateRequest(
             point_uri=point_uri,
             generator_set_uri=generators_uri,
         )
     )
     assert proposed.certificate_uri is not None
-    original = kernel.store.get(proposed.certificate_uri)
+    original = runtime.core.store.get(proposed.certificate_uri)
     tampered = dict(original.payload)
     tampered_payload = dict(tampered["payload"])
     tampered_payload["coefficients"] = [_q(0), _q(0), _q(1)]
@@ -170,7 +170,7 @@ def test_separator_payload_tampering_fails_closed(kernel) -> None:
     tampered["payload_digest"] = (
         "sha256:" + hashlib.sha256(canonicalize_json(tampered_payload)).hexdigest()
     )
-    stored = kernel.store.put(
+    stored = runtime.core.store.put(
         schema_uri=original.manifest.schema_uri,
         semantics_uri=original.manifest.semantics_uri,
         payload=tampered,
@@ -178,7 +178,9 @@ def test_separator_payload_tampering_fails_closed(kernel) -> None:
         summary="adversarial separator tampering",
     )
 
-    result = kernel.verification.verify_certificate(certificate_uri=stored.artifact_uri)
+    result = runtime.services.verification.verify_certificate(
+        certificate_uri=stored.artifact_uri
+    )
 
     assert result.input.status.value == "REJECTED"
     assert result.conclusion.value == "UNKNOWN"
@@ -187,19 +189,19 @@ def test_separator_payload_tampering_fails_closed(kernel) -> None:
 
 
 def test_projection_is_explicit_and_bound_to_derived_artifacts(
-    kernel,
+    runtime,
 ) -> None:
-    point = kernel.artifacts.put(
-        schema_uri=kernel.polytope.point_schema_uri,
-        semantics_uri=kernel.polytope.semantics_uri,
+    point = runtime.core.artifacts.put(
+        schema_uri=runtime.services.polytope.point_schema_uri,
+        semantics_uri=runtime.services.polytope.semantics_uri,
         payload={
             "point_schema_version": "1",
             "coordinates": [_q(99), _q(1, 2), _q(1, 2), _q(1, 2)],
         },
     )
-    generators = kernel.artifacts.put(
-        schema_uri=kernel.polytope.generator_set_schema_uri,
-        semantics_uri=kernel.polytope.semantics_uri,
+    generators = runtime.core.artifacts.put(
+        schema_uri=runtime.services.polytope.generator_set_schema_uri,
+        semantics_uri=runtime.services.polytope.semantics_uri,
         payload={
             "generator_set_schema_version": "1",
             "dimension": 4,
@@ -212,7 +214,7 @@ def test_projection_is_explicit_and_bound_to_derived_artifacts(
         },
     )
 
-    proposed = kernel.polytope.separate(
+    proposed = runtime.services.polytope.separate(
         PolytopeSeparateRequest(
             point_uri=point.artifact_uri,
             generator_set_uri=generators.artifact_uri,
@@ -223,7 +225,9 @@ def test_projection_is_explicit_and_bound_to_derived_artifacts(
     assert proposed.status.value == "SEPARATED"
     assert proposed.effective_point_uri != point.artifact_uri
     assert proposed.effective_generator_set_uri != generators.artifact_uri
-    projected_point = kernel.store.get(proposed.effective_point_uri or "")
-    projected_generators = kernel.store.get(proposed.effective_generator_set_uri or "")
+    projected_point = runtime.core.store.get(proposed.effective_point_uri or "")
+    projected_generators = runtime.core.store.get(
+        proposed.effective_generator_set_uri or ""
+    )
     assert projected_point.manifest.parents == (point.artifact_uri,)
     assert projected_generators.manifest.parents == (generators.artifact_uri,)

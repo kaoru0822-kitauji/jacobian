@@ -8,11 +8,11 @@ from benchmarks import agent_ab as benchmark
 from tests.integration.agent._agent_ab_support import (
     _hnf_case,
     _hnf_report,
-    _kernel_from_template,
     _linear_case,
     _linear_report,
     _polynomial_normalization_case,
     _polynomial_normalization_report,
+    _runtime_from_template,
     _sat_producer,
     _sat_report,
 )
@@ -22,22 +22,23 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.sat import SatResourceBudget
+from jacobian.runtime import CheckerAuthorityMode
 
 
 def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     load_cases = benchmark.load_cases
     score_report = benchmark.score_report
     case = load_cases(["GRAPH-COUNTEREXAMPLE-AB-001"])[0]
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
-        install_references=False,
+        checker_authority=CheckerAuthorityMode.NONE,
     )
-    searched = kernel.capabilities.invoke(
+    searched = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             mode=CapabilityMode.EXPLORE,
@@ -56,7 +57,7 @@ def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
     candidate = cast(dict[str, Any], searched.output["candidates"][0])
     graph_uri = cast(str, candidate["graph_uri"])
     requested = cast(list[str], case["expected"]["properties"])
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             mode=CapabilityMode.EXPLORE,
@@ -64,7 +65,7 @@ def test_ab_graph_scorer_accepts_any_valid_witness_and_durable_flow(
         )
     )
     property_uri = cast(str, computed.output["property_artifact_uri"])
-    graph = kernel.store.get(graph_uri).payload
+    graph = runtime.core.store.get(graph_uri).payload
     report = {
         "case_id": case["case_id"],
         "conclusion": "FALSE",
@@ -186,14 +187,14 @@ def test_ab_graph_scorer_enforces_exact_vertex_order(tmp_path: Path) -> None:
 
 
 def test_ab_partition_scorer_requires_checker_backed_coverage(
-    tmp_path: Path, kernel_store_template_with_references: Path
+    tmp_path: Path, runtime_store_template_with_references: Path
 ) -> None:
     load_cases = benchmark.load_cases
     score_report = benchmark.score_report
     case = load_cases(["FINITE-PARTITION-AB-001"])[0]
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
     cases = [
@@ -201,7 +202,7 @@ def test_ab_partition_scorer_requires_checker_backed_coverage(
         {"case_id": "r1", "members": ["1", "4", "7", "10"]},
         {"case_id": "r2", "members": ["2", "5", "8", "11"]},
     ]
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="case.partition.finite",
             mode=CapabilityMode.VERIFY,
@@ -316,7 +317,7 @@ def test_ab_partition_scorer_rejects_duplicate_case_ids(tmp_path: Path) -> None:
 
 def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     score_report = benchmark.score_report
     case = {
@@ -328,22 +329,22 @@ def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
         "clauses": [[1, 2], [-1, 2]],
         "expected": {"status": "SATISFIABLE"},
     }
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
-    cnf = kernel.sat.put_cnf(
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("a", "b"),
         clauses=((1, 2), (-1, 2)),
     )
-    assignment = kernel.sat.put_assignment(
+    assignment = runtime.core.sat.put_assignment(
         cnf_uri=cnf.artifact_uri,
         values=(False, True),
         producer=_sat_producer(),
         resource_budget=SatResourceBudget(wall_seconds=5),
     )
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.model.verify",
             mode=CapabilityMode.VERIFY,
@@ -411,16 +412,16 @@ def test_ab_sat_scorer_requires_ordered_checker_bound_assignment(
 
 def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     score_report = benchmark.score_report
     case = _linear_case()
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
-    found = kernel.capabilities.invoke(
+    found = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="linear.rational_solution.find",
             mode=CapabilityMode.EXPLORE,
@@ -429,7 +430,7 @@ def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
     )
     solution_uri = cast(str, found.output["solution_uri"])
     system_uri = cast(str, found.output["system_uri"])
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="linear.rational_solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -510,16 +511,16 @@ def test_ab_linear_scorer_requires_ordered_checker_bound_solution(
 
 def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     score_report = benchmark.score_report
     case = _hnf_case()
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.normal_form.hermite",
             mode=CapabilityMode.EXPLORE,
@@ -528,7 +529,7 @@ def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
     )
     normal_form_uri = cast(str, computed.output["normal_form_uri"])
     matrix_uri = cast(str, computed.output["matrix_uri"])
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.normal_form.hermite.verify",
             mode=CapabilityMode.VERIFY,
@@ -609,16 +610,16 @@ def test_ab_hnf_scorer_requires_bound_independently_replayed_evidence(
 
 def test_ab_polynomial_normalization_scorer_requires_bound_replay(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     score_report = benchmark.score_report
     case = _polynomial_normalization_case()
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.expression.normalize",
             mode=CapabilityMode.EXPLORE,
@@ -627,7 +628,7 @@ def test_ab_polynomial_normalization_scorer_requires_bound_replay(
     )
     expression_uri = cast(str, computed.output["expression_uri"])
     normalization_uri = cast(str, computed.output["normalization_uri"])
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.expression_normalization.verify",
             mode=CapabilityMode.VERIFY,
@@ -707,7 +708,7 @@ def test_ab_polynomial_normalization_scorer_requires_bound_replay(
 
 
 def test_ab_sat_scorer_rejects_unbound_verified_claim(
-    tmp_path: Path, kernel_store_template_with_references: Path
+    tmp_path: Path, runtime_store_template_with_references: Path
 ) -> None:
     score_report = benchmark.score_report
     benchmark_error = benchmark.BenchmarkError
@@ -720,12 +721,12 @@ def test_ab_sat_scorer_rejects_unbound_verified_claim(
         "clauses": [[1]],
         "expected": {"status": "SATISFIABLE"},
     }
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
-    cnf = kernel.sat.put_cnf(variable_names=("a",), clauses=((1,),))
+    cnf = runtime.core.sat.put_cnf(variable_names=("a",), clauses=((1,),))
     report = _sat_report(
         case_id=str(case["case_id"]),
         cnf_uri=cnf.artifact_uri,
@@ -749,21 +750,21 @@ def test_ab_sat_scorer_rejects_unbound_verified_claim(
 
 def test_ab_distance_composition_scorer_requires_bound_matrix_replay(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     case = benchmark.load_cases(["GRAPH-DISTANCE-COMPOSITION-AB-001"])[0]
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="distance-state",
     )
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.compute",
             input={"graph": case["graph"]},
         )
     )
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.verify",
             mode=CapabilityMode.VERIFY,

@@ -6,7 +6,7 @@
 
 Jacobian is useful only if it changes research behavior, not merely if its APIs
 work. Model-in-the-loop evaluations test whether a model with access to the
-kernel is better at:
+runtime is better at:
 
 - attacking its own candidate with complete semantics;
 - distinguishing evidence from verified results;
@@ -16,7 +16,7 @@ kernel is better at:
 - handing another researcher a compact replayable bundle.
 
 These evaluations are downstream product tests. They do not replace checker
-conformance, and a model's correct answer does not validate the kernel.
+conformance, and a model's correct answer does not validate the runtime.
 
 They evaluate complete portfolios and ablations as well as individual
 capabilities. Prescribed-tool cases test contract usability and conformance,
@@ -446,7 +446,7 @@ calls; this keeps the first-stage descriptor below the 25 KB development
 target. These are dirty-worktree development measurements, not held-out product
 evidence.
 
-Run the kernel condition with:
+Run the runtime condition with:
 
 ```sh
 uv run python benchmarks/agent_mcp.py
@@ -514,7 +514,7 @@ condition's isolated state, then gives both agents the same URI. Its hidden
 oracle brute-forces cases of at most 20 variables. A treatment passes only when
 its report matches that oracle, its producer evidence and verification record
 bind the durable CNF, the transcript contains the ordered find-to-verify
-composition, and a clean kernel independently replays the verifier. Public SAT
+composition, and a clean runtime independently replays the verifier. Public SAT
 reproductions are always marked unscored.
 
 Development pairs may validate the harness or reveal interface problems, but

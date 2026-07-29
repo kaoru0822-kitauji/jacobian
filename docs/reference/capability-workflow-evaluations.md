@@ -392,7 +392,7 @@ compose the applicable producer and verifier. This isolates the value of
 The hidden scorer brute-forced the exact CNF, limited private cases to at most
 20 variables, checked the report against the durable CNF and evidence,
 required an ordered producer-to-verifier invocation trace, and reopened a
-clean kernel to replay the checker. Public SAT reproductions were explicitly
+clean runtime to replay the checker. Public SAT reproductions were explicitly
 unscored.
 
 | Condition | Passed | False certifications | Independent replay | Median seconds | Median input tokens | Median calls | Tool errors |
@@ -487,7 +487,7 @@ IDs, had to compose `smt.unsat_proof.find` with
 `smt.unsat_proof.verify`, and had to preserve rejection rather than treating a
 solver status, zero lexical holes, or proof artifact as verification. The
 hidden scorer checked the durable problem/proof binding, ordered invocation
-trace, expected verifier status, and a clean-kernel replay.
+trace, expected verifier status, and a clean-runtime replay.
 
 | Condition | Passed | False certifications | Clean replay behavior | Median seconds | Median input tokens | Median calls | Tool errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -529,7 +529,7 @@ Control solved each system directly and could report only
 pass the producer's `solution_uri` to the verifier, and report `VERIFIED` only
 with the returned verification-record URI. The hidden scorer checked every
 equation with an independent exact oracle, durable system and vector bindings,
-the ordered invocation trace, and clean-kernel replay.
+the ordered invocation trace, and clean-runtime replay.
 
 | Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -569,7 +569,7 @@ Control computed `H` and `U` directly and could report only
 `normal_form_uri` into the verifier and copy the exact matrices and durable
 URIs. The hidden scorer independently checked `H = U A`, `det(U) = ±1`, every
 FLINT row-HNF condition, artifact bindings, the ordered invocation trace, and
-clean-kernel replay.
+clean-runtime replay.
 
 | Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -604,7 +604,7 @@ Control normalized the expression directly and could report only
 polynomial plus all durable URIs. The hidden scorer independently compared
 every coefficient and exponent to the held-out oracle, checked source and
 candidate bindings, required an ordered compute-to-verify invocation trace,
-and replayed the verification in a clean kernel.
+and replayed the verification in a clean runtime.
 
 | Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

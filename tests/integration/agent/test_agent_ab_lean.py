@@ -6,8 +6,8 @@ from typing import Any, cast
 import pytest
 from benchmarks import agent_ab as benchmark
 from tests.integration.agent._agent_ab_support import (
-    _kernel_from_template,
     _lean_proof_case,
+    _runtime_from_template,
 )
 
 from jacobian.contracts.capabilities import (
@@ -19,18 +19,18 @@ from jacobian.contracts.capabilities import (
 @pytest.mark.lean_runtime
 def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
     monkeypatch: Any,
 ) -> None:
     score_report = benchmark.score_report
     case = _lean_proof_case()
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
     proof = "intro n\nsimp"
-    checked = kernel.capabilities.invoke(
+    checked = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.check",
             mode=CapabilityMode.VERIFY,
@@ -177,7 +177,7 @@ def test_lean_ab_summary_compares_each_ablation_to_baseline() -> None:
 
 @pytest.mark.lean_runtime
 def test_ab_lean_scorer_requires_exact_checker_bound_trace(
-    tmp_path: Path, kernel_store_template_with_references: Path
+    tmp_path: Path, runtime_store_template_with_references: Path
 ) -> None:
     load_cases = benchmark.load_cases
     score_report = benchmark.score_report
@@ -185,12 +185,12 @@ def test_ab_lean_scorer_requires_exact_checker_bound_trace(
     expected = cast(dict[str, Any], case["expected"])
     statement = cast(str, expected["statement"])
     proof = cast(str, expected["oracle_proof"])
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
-    checked = kernel.capabilities.invoke(
+    checked = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.check",
             mode=CapabilityMode.VERIFY,

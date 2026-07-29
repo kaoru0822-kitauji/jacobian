@@ -24,7 +24,7 @@ from jacobian.contracts.search import (
 from jacobian.plugins.registry import PluginRegistryError
 
 if TYPE_CHECKING:
-    from jacobian.kernel import JacobianKernel
+    from jacobian.runtime.model import JacobianRuntime
 
 
 class PluginConformanceCheck(StrEnum):
@@ -49,7 +49,7 @@ class SyntheticPluginConformanceTarget:
     transformer attempts an unsupported verified parameter-region promotion.
     """
 
-    kernel: JacobianKernel
+    runtime: JacobianRuntime
     plugin_id: str
     search_request: SearchRunRequest
     implementation_file: Path
@@ -171,22 +171,24 @@ def _search(
             "budget": budget,
         }
     )
-    handle = target.kernel.search.start(selected)
-    return target.kernel.search.wait(handle.experiment_uri, timeout_seconds=15)
+    handle = target.runtime.services.search.start(selected)
+    return target.runtime.services.search.wait(
+        handle.experiment_uri, timeout_seconds=15
+    )
 
 
 def _check_execution_success(
     target: SyntheticPluginConformanceTarget,
     run_namespace: str,
 ) -> None:
-    target.kernel.plugins.snapshot(target.plugin_id)
+    target.runtime.core.plugins.snapshot(target.plugin_id)
     for capability in (
         CapabilityName.PROPOSER,
         CapabilityName.REFINER,
         CapabilityName.EVALUATOR,
         CapabilityName.HYPOTHESIS_TRANSFORMER,
     ):
-        target.kernel.plugins.resolve(target.plugin_id, capability)
+        target.runtime.core.plugins.resolve(target.plugin_id, capability)
     if target.import_marker is not None and target.import_marker.exists():
         raise AssertionError("plugin discovery imported package code")
 
@@ -260,7 +262,7 @@ def _check_path_attack(
     _run_namespace: str,
 ) -> None:
     _expect_registry_rejection(
-        lambda: target.kernel.plugins.register_implementation("../escape:run"),
+        lambda: target.runtime.core.plugins.register_implementation("../escape:run"),
     )
 
 
@@ -271,7 +273,7 @@ def _check_symlink_attack(
     try:
         target.symlink_path.symlink_to(target.symlink_target)
         _expect_registry_rejection(
-            lambda: target.kernel.plugins.resolve(
+            lambda: target.runtime.core.plugins.resolve(
                 target.plugin_id,
                 CapabilityName.PROPOSER,
             ),
@@ -286,7 +288,7 @@ def _check_evidence_promotion(
     target: SyntheticPluginConformanceTarget,
     _run_namespace: str,
 ) -> None:
-    result = target.kernel.conjectures.run(
+    result = target.runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.GENERATE,
             plugin_id=target.plugin_id,
@@ -312,7 +314,7 @@ def _check_implementation_changed(
     try:
         target.implementation_file.write_bytes(original + b"\n# changed bytes\n")
         _expect_registry_rejection(
-            lambda: target.kernel.plugins.resolve(
+            lambda: target.runtime.core.plugins.resolve(
                 target.plugin_id,
                 CapabilityName.PROPOSER,
             ),

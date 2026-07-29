@@ -11,7 +11,7 @@ def _graph(
     return {"vertices": vertices, "edges": edges}
 
 
-def test_graph_invariant_family_boundaries_and_witnesses(kernel) -> None:
+def test_graph_invariant_family_boundaries_and_witnesses(runtime) -> None:
     triangle_tail = _graph(
         ["a", "b", "c", "d"],
         [["a", "b"], ["b", "c"], ["a", "c"], ["c", "d"]],
@@ -55,14 +55,14 @@ def test_graph_invariant_family_boundaries_and_witnesses(kernel) -> None:
         ),
     )
     for capability_id, graph, expected in cases:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(capability_id=capability_id, input={"graph": graph})
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.output["result"] == expected
         assert len(result.artifact_uris) == 2
 
-    matching = kernel.capabilities.invoke(
+    matching = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.compute",
             input={"graph": triangle_tail},
@@ -81,7 +81,7 @@ def test_graph_invariant_family_boundaries_and_witnesses(kernel) -> None:
     }
     assert matching.capability_version == "2"
 
-    star = kernel.capabilities.invoke(
+    star = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.compute",
             input={
@@ -102,21 +102,21 @@ def test_graph_invariant_family_boundaries_and_witnesses(kernel) -> None:
     }
 
 
-def test_disconnected_and_acyclic_graph_conventions(kernel) -> None:
+def test_disconnected_and_acyclic_graph_conventions(runtime) -> None:
     graph = _graph(["a", "b", "c"], [["a", "b"]])
-    diameter = kernel.capabilities.invoke(
+    diameter = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.diameter.compute",
             input={"graph": graph},
         )
     )
-    girth = kernel.capabilities.invoke(
+    girth = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.girth.compute",
             input={"graph": graph},
         )
     )
-    trees = kernel.capabilities.invoke(
+    trees = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.spanning_tree_count.compute",
             input={"graph": graph},
@@ -138,16 +138,16 @@ def test_disconnected_and_acyclic_graph_conventions(kernel) -> None:
 
 
 def test_radius_uses_explicit_not_applicable_for_disconnected_graph(
-    kernel,
+    runtime,
 ) -> None:
 
-    connected = kernel.capabilities.invoke(
+    connected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.radius.compute",
             input={"graph": _graph(["a", "b", "c"], [["a", "b"], ["b", "c"]])},
         )
     )
-    disconnected = kernel.capabilities.invoke(
+    disconnected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.radius.compute",
             input={"graph": _graph(["a", "b", "c"], [["a", "b"]])},
@@ -174,7 +174,7 @@ def test_radius_uses_explicit_not_applicable_for_disconnected_graph(
 
 
 def test_np_hard_invariants_are_budgeted_and_carry_obligations(
-    kernel,
+    runtime,
 ) -> None:
     cycle = _graph(
         ["a", "b", "c", "d", "e"],
@@ -184,7 +184,7 @@ def test_np_hard_invariants_are_budgeted_and_carry_obligations(
         ("graph.invariant.clique_number.compute", 2),
         ("graph.invariant.independence_number.compute", 2),
     ):
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=capability_id,
                 input={
@@ -202,5 +202,5 @@ def test_np_hard_invariants_are_budgeted_and_carry_obligations(
         assert result.output["optimum_value"] == optimum
         assert len(result.output["witness_vertices"]) == optimum
         assert len(result.artifact_uris) == 3
-        obligation = kernel.store.get(result.obligations[0].obligation_uri)
+        obligation = runtime.core.store.get(result.obligations[0].obligation_uri)
         assert obligation.payload["claimed_value"] == optimum

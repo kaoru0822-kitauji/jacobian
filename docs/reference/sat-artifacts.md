@@ -32,8 +32,8 @@ return `UNKNOWN` and never provide evidence that the formula is satisfiable.
 
 ## Registered descriptors
 
-`JacobianKernel.sat.installation` exposes the content-addressed descriptor URIs
-registered by the current kernel:
+`JacobianRuntime.core.sat.installation` exposes the content-addressed descriptor
+URIs registered by the current runtime:
 
 | Descriptor | Registered name and version | Purpose |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ also requires an available authorized DRAT-trim runtime.
 
 The SAT schemas are model backed. JSON Schema checks their closed structural
 shape, and the same registry validation path also applies the domain
-cross-field invariants before `artifact.put` commits a payload. Kernel
+cross-field invariants before `artifact.put` commits a payload. Runtime
 construction re-registers those model contracts after restart.
 
 ## Canonical CNF
@@ -143,7 +143,7 @@ certificate claim.
 
 ## CaDiCaL exploration
 
-The base kernel probes `cadical` on `PATH`. It installs `sat.model.find` and
+The base runtime probes `cadical` on `PATH`. It installs `sat.model.find` and
 `sat.unsat_proof.find` only when `cadical --version` reports exactly `3.0.1`.
 The runtime record uses install tier T2, license identifier `MIT`, the resolved
 executable path, platform, supported projection and proof formats, and the
@@ -225,7 +225,7 @@ variable ordering, clause ordering, payload, variable-map and DIMACS digests,
 assignment binding, total strict-Boolean vector, evidence bindings, and
 lineage. It returns `TRUE` only after evaluating every clause successfully.
 
-Acceptance creates the ordinary kernel `VerificationRecord` and allows the
+Acceptance creates the ordinary runtime `VerificationRecord` and allows the
 capability result to report `VERIFIED`. Assignment rejection reports
 `UNKNOWN`: it does not establish UNSAT. A malformed or misbound artifact fails
 before checker dispatch. Timeout, checker error, cancellation, and incomplete
@@ -308,7 +308,7 @@ warning, malformed output, excessive output, mutation, cross-CNF replay,
 runtime replacement, timeout, cancellation, or crash yields no mathematical
 conclusion.
 
-Acceptance creates the ordinary kernel `VerificationRecord`, bound to the
+Acceptance creates the ordinary runtime `VerificationRecord`, bound to the
 certificate and all three artifacts, and permits `VERIFIED_UNSAT` with
 conclusion `TRUE`. Rejection reports `UNKNOWN`; it does not establish SAT.
 

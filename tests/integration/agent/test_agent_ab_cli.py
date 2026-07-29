@@ -12,7 +12,7 @@ from jacobian.contracts.capabilities import (
     CapabilityMode,
     CapabilityRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 
 def test_agent_eval_is_plan_only_without_explicit_execute(
@@ -113,13 +113,13 @@ def test_agent_eval_plan_counts_each_lean_capability_condition(
 
 
 @pytest.mark.lean_runtime
-@pytest.mark.usefixtures("initialized_kernel_store_with_references")
+@pytest.mark.usefixtures("initialized_runtime_store_with_references")
 def test_ab_lean_control_ablation_removes_only_declaration_discovery(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(
+    runtime = create_runtime(
         tmp_path,
-        install_references=True,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
         capability_exclusions=frozenset(
             {
                 "lean.declaration.search",
@@ -130,7 +130,7 @@ def test_ab_lean_control_ablation_removes_only_declaration_discovery(
 
     lean_ids = {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
         if descriptor.capability_id.startswith("lean.")
     }
 
@@ -143,7 +143,7 @@ def test_ab_lean_control_ablation_removes_only_declaration_discovery(
         "lean.statement.compare",
         "lean.statement.propose",
     }
-    excluded = kernel.capabilities.invoke(
+    excluded = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.search",
             mode=CapabilityMode.EXPLORE,

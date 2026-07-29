@@ -25,13 +25,13 @@ from jacobian.contracts.number_theory import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
 from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
-from jacobian.kernel import JacobianKernel
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
+from jacobian.runtime import create_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def _service(tmp_path: Path) -> CapabilityService:
@@ -46,10 +46,12 @@ def _service(tmp_path: Path) -> CapabilityService:
     return service
 
 
-def test_kernel_catalog_uses_only_domain_owned_operation_ids(tmp_path: Path) -> None:
+def test_runtime_catalog_uses_only_domain_owned_operation_ids(tmp_path: Path) -> None:
     catalog_ids = {
         descriptor.capability_id
-        for descriptor in JacobianKernel(tmp_path).capabilities.catalog().capabilities
+        for descriptor in create_runtime(tmp_path)
+        .core.capabilities.catalog()
+        .capabilities
     }
 
     assert {

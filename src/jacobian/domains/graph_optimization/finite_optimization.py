@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol, cast
 
-import networkx as nx
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.graph_coloring import ChromaticGraph
 from jacobian.contracts.graph_optimization import (
@@ -47,7 +45,9 @@ class _HasStatus(Protocol):
     termination_reason: str
 
 
-def _valid_witness(graph: nx.Graph[str], result: ContractModel) -> bool:
+def _valid_witness(graph: Any, result: ContractModel) -> bool:
+    import networkx as nx
+
     graph_vertices = set(graph)
     if isinstance(result, GraphDominationMinimumOutput):
         return set(result.witness_vertices) <= graph_vertices and nx.is_dominating_set(
@@ -99,7 +99,7 @@ _INVALID_GRAPH_OPTIMIZATION_REQUEST = CapabilityDiagnostic(
 def _execute[ResultT: ContractModel](
     request: GraphOptimizationRequest,
     solve: Callable[
-        [nx.Graph[str], ChromaticGraph, GraphOptimizationBudget],
+        [Any, ChromaticGraph, GraphOptimizationBudget],
         ResultT,
     ],
 ) -> BoundedSearchOutcome[ResultT]:

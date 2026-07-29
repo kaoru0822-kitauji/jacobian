@@ -15,7 +15,7 @@ from jacobian.contracts.claim_decomposition import (
     LogicalConnective,
     StructuredClaimArtifact,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def _atom(node_id: str, symbol: str | None = None) -> LogicalClaimNode:
@@ -26,17 +26,17 @@ def _atom(node_id: str, symbol: str | None = None) -> LogicalClaimNode:
     )
 
 
-def _store_claim(kernel: JacobianKernel, root: LogicalClaimNode) -> str:
-    stored = kernel.artifacts.put(
-        schema_uri=kernel.claim_decomposition.structured_claim_schema_uri,
-        semantics_uri=kernel.claim_decomposition.semantics_uri,
+def _store_claim(runtime: JacobianRuntime, root: LogicalClaimNode) -> str:
+    stored = runtime.core.artifacts.put(
+        schema_uri=runtime.services.claim_decomposition.structured_claim_schema_uri,
+        semantics_uri=runtime.services.claim_decomposition.semantics_uri,
         payload=StructuredClaimArtifact(root=root).model_dump(mode="json"),
     )
     return stored.artifact_uri
 
 
-def _invoke(kernel: JacobianKernel, capability_id: str, source_uri: str):
-    return kernel.capabilities.invoke(
+def _invoke(runtime: JacobianRuntime, capability_id: str, source_uri: str):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=capability_id,
             input={"source_uri": source_uri},
@@ -45,7 +45,7 @@ def _invoke(kernel: JacobianKernel, capability_id: str, source_uri: str):
 
 
 def test_conjunction_split_preserves_order_grouping_and_reconstructs(
-    kernel,
+    runtime,
 ) -> None:
     nested = LogicalClaimNode(
         node_id="nested",
@@ -58,34 +58,34 @@ def test_conjunction_split_preserves_order_grouping_and_reconstructs(
         children=(_atom("a"), nested),
         source_span=(0, 17),
     )
-    source_uri = _store_claim(kernel, root)
+    source_uri = _store_claim(runtime, root)
 
-    result = _invoke(kernel, "claim.conjunction.split", source_uri)
+    result = _invoke(runtime, "claim.conjunction.split", source_uri)
 
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert [item["node"]["node_id"] for item in result.output["occurrences"]] == [
         "a",
         "nested",
     ]
-    stored = kernel.store.get(result.output["decomposition_uri"])
+    stored = runtime.core.store.get(result.output["decomposition_uri"])
     record = ClaimDecompositionArtifact.model_validate(stored.payload)
     assert reconstruct(record) == root
     assert stored.manifest.parents == (source_uri,)
     assert (
         record.source_binding.object_digest
-        == kernel.store.get(source_uri).manifest.object_digest
+        == runtime.core.store.get(source_uri).manifest.object_digest
     )
 
 
 def test_conjunction_split_preserves_duplicate_subtrees_as_occurrences(
-    kernel,
+    runtime,
 ) -> None:
     root = LogicalClaimNode(
         node_id="root",
         connective=LogicalConnective.CONJUNCTION,
         children=(_atom("left", "A"), _atom("right", "A")),
     )
-    result = _invoke(kernel, "claim.conjunction.split", _store_claim(kernel, root))
+    result = _invoke(runtime, "claim.conjunction.split", _store_claim(runtime, root))
     occurrences = result.output["occurrences"]
     assert [item["position"] for item in occurrences] == [0, 1]
     assert [item["node"]["atom"] for item in occurrences] == [
@@ -95,7 +95,7 @@ def test_conjunction_split_preserves_duplicate_subtrees_as_occurrences(
 
 
 def test_implication_obligations_are_directional_and_reconstruct(
-    kernel,
+    runtime,
 ) -> None:
     consequent = LogicalClaimNode(
         node_id="bc",
@@ -108,27 +108,27 @@ def test_implication_obligations_are_directional_and_reconstruct(
         children=(_atom("a"), consequent),
     )
     result = _invoke(
-        kernel, "claim.implication.obligations", _store_claim(kernel, root)
+        runtime, "claim.implication.obligations", _store_claim(runtime, root)
     )
     assert [item["role"] for item in result.output["occurrences"]] == [
         "ASSUME_ANTECEDENT",
         "PROVE_CONSEQUENT_UNDER_ANTECEDENT",
     ]
     record = ClaimDecompositionArtifact.model_validate(
-        kernel.store.get(result.output["decomposition_uri"]).payload
+        runtime.core.store.get(result.output["decomposition_uri"]).payload
     )
     assert reconstruct(record) == root
 
 
-def test_reconstruction_rejects_tampered_ordered_child(kernel) -> None:
+def test_reconstruction_rejects_tampered_ordered_child(runtime) -> None:
     root = LogicalClaimNode(
         node_id="root",
         connective=LogicalConnective.CONJUNCTION,
         children=(_atom("a"), _atom("b")),
     )
-    result = _invoke(kernel, "claim.conjunction.split", _store_claim(kernel, root))
+    result = _invoke(runtime, "claim.conjunction.split", _store_claim(runtime, root))
     record = ClaimDecompositionArtifact.model_validate(
-        kernel.store.get(result.output["decomposition_uri"]).payload
+        runtime.core.store.get(result.output["decomposition_uri"]).payload
     )
     tampered = record.model_copy(
         update={"occurrences": tuple(reversed(record.occurrences))}
@@ -147,7 +147,7 @@ def test_reconstruction_rejects_tampered_ordered_child(kernel) -> None:
     ],
 )
 def test_unsupported_top_level_connective_is_explicitly_rejected(
-    kernel,
+    runtime,
     capability_id: str,
     connective: LogicalConnective,
 ) -> None:
@@ -160,7 +160,7 @@ def test_unsupported_top_level_connective_is_explicitly_rejected(
         atom={"symbol": "A"} if connective is LogicalConnective.ATOM else None,
         children=children,
     )
-    source_uri = _store_claim(kernel, root)
-    result = _invoke(kernel, capability_id, source_uri)
+    source_uri = _store_claim(runtime, root)
+    result = _invoke(runtime, capability_id, source_uri)
     assert result.execution.status.value == "ERROR"
     assert result.diagnostics[0].code == "UNSUPPORTED_TOP_LEVEL_CONNECTIVE"

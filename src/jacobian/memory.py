@@ -14,6 +14,7 @@ from jacobian.contracts.capabilities import (
     CapabilityMode,
 )
 from jacobian.contracts.memory import MemoryHit, MemorySearchResult, ResearchEpisode
+from jacobian.experiment_runtime import open_experiment_database
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 
@@ -43,9 +44,7 @@ class ResearchMemory:
         self._initialize_database()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.store.db_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return open_experiment_database(self.store.db_path)
 
     def _initialize_database(self) -> None:
         with self._connect() as connection:

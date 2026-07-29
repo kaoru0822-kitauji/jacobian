@@ -101,4 +101,4 @@ formal bindings rather than trusting a caller-supplied evidence label.
   artifact created during a losing cross-process race may remain unreferenced,
   but it is never accepted as branch history.
 - Workspace entries are tenant-isolated through the existing per-subject
-  kernel root.
+  runtime root.

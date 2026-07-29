@@ -16,27 +16,28 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
-    pytest.mark.usefixtures("initialized_kernel_store"),
+    pytest.mark.usefixtures("initialized_runtime_store"),
 ]
 
 
 @pytest.fixture(scope="module")
-def oracle_kernel(
+def oracle_runtime(
     tmp_path_factory: pytest.TempPathFactory,
-    kernel_store_template: Path,
-) -> JacobianKernel:
+    runtime_store_template: Path,
+) -> JacobianRuntime:
     """Reuse the immutable core store snapshot for shared oracle invokes."""
 
     root = tmp_path_factory.mktemp("finite-graph-oracles")
-    shutil.copytree(kernel_store_template, root, dirs_exist_ok=True)
-    kernel = JacobianKernel(root)
+    shutil.copytree(runtime_store_template, root, dirs_exist_ok=True)
+    runtime = create_runtime(root)
     # Pay Z3/solver startup once in fixture setup instead of on the first case.
     warm = nx.relabel_nodes(nx.path_graph(3), lambda vertex: f"v{vertex}")
-    _invoke(kernel, "graph.domination.minimum.compute", warm)
-    return kernel
+    _invoke(runtime, "graph.domination.minimum.compute", warm)
+    return runtime
 
 
 def _payload(graph: nx.Graph[str], **budget: int) -> dict[str, object]:
@@ -55,12 +56,12 @@ def _payload(graph: nx.Graph[str], **budget: int) -> dict[str, object]:
 
 
 def _invoke(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     capability_id: str,
     graph: nx.Graph[str],
     **budget: int,
 ):
-    return kernel.capabilities.invoke(
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=capability_id,
             input=_payload(graph, **budget),
@@ -143,13 +144,13 @@ _ORACLE_CAPABILITIES = (
     ids=("path", "odd-cycle", "complete", "disconnected"),
 )
 def test_graph_optimizer_matches_independent_small_brute_force_oracle(
-    oracle_kernel: JacobianKernel,
+    oracle_runtime: JacobianRuntime,
     capability_id: str,
     graph: nx.Graph[int],
 ) -> None:
     relabeled: nx.Graph[str] = nx.relabel_nodes(graph, lambda vertex: f"v{vertex}")
 
-    result = _invoke(oracle_kernel, capability_id, relabeled)
+    result = _invoke(oracle_runtime, capability_id, relabeled)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "EXACT"
@@ -207,9 +208,9 @@ def test_graph_optimizer_returns_exact_witness_and_open_obligation(
     predicate: str,
 ) -> None:
     relabeled = nx.relabel_nodes(graph, lambda vertex: f"v{vertex}")
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
 
-    result = _invoke(kernel, capability_id, relabeled)
+    result = _invoke(runtime, capability_id, relabeled)
 
     assert result.output["status"] == "EXACT"
     assert result.output["optimum_value"] == optimum
@@ -220,8 +221,8 @@ def test_graph_optimizer_returns_exact_witness_and_open_obligation(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 3
     input_uri, result_uri, obligation_uri = result.artifact_uris
-    assert kernel.store.get(result_uri).manifest.parents == (input_uri,)
-    obligation = kernel.store.get(obligation_uri)
+    assert runtime.core.store.get(result_uri).manifest.parents == (input_uri,)
+    obligation = runtime.core.store.get(obligation_uri)
     assert frozenset(obligation.manifest.parents) == frozenset((input_uri, result_uri))
     assert obligation.payload["predicate"] == predicate
     assert result.obligations[0].obligation_uri == obligation_uri
@@ -244,11 +245,11 @@ def test_graph_optimizer_returns_exact_witness_and_open_obligation(
 def test_solver_call_budget_preserves_incumbent_without_claiming_optimum(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     graph = nx.relabel_nodes(nx.complete_graph(5), lambda vertex: f"v{vertex}")
 
     result = _invoke(
-        kernel,
+        runtime,
         "graph.induced_forest.maximum.compute",
         graph,
         max_solver_calls=1,
@@ -261,7 +262,7 @@ def test_solver_call_budget_preserves_incumbent_without_claiming_optimum(
     assert result.output["upper_bound"] == 4
     assert len(result.output["witness_vertices"]) == 1
     assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
-    obligation = kernel.store.get(result.artifact_uris[2])
+    obligation = runtime.core.store.get(result.artifact_uris[2])
     assert obligation.payload["claimed_value"] is None
 
 
@@ -269,11 +270,11 @@ def test_solver_timeout_preserves_partial_witness_as_non_conclusion(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     graph = nx.path_graph(["a", "b", "c", "d"])
     monkeypatch.setattr(z3.Solver, "check", lambda _solver: z3.unknown)
 
-    result = _invoke(kernel, "graph.domination.minimum.compute", graph)
+    result = _invoke(runtime, "graph.domination.minimum.compute", graph)
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output["status"] == "UNKNOWN"
@@ -329,9 +330,9 @@ def test_invalid_solver_witness_fails_closed_before_artifact_writes(
         return result.model_copy(update=update)
 
     monkeypatch.setattr(finite_optimization, solver_name, invalid_witness)
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     result = _invoke(
-        kernel,
+        runtime,
         capability_id,
         nx.path_graph(["a", "b", "c"]),
     )
@@ -355,8 +356,8 @@ def test_empty_graph_boundary_is_exact_zero(
     tmp_path: Path,
     capability_id: str,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    result = _invoke(kernel, capability_id, nx.Graph())
+    runtime = create_runtime(tmp_path)
+    result = _invoke(runtime, capability_id, nx.Graph())
 
     assert result.output["status"] == "EXACT"
     assert result.output["optimum_value"] == 0
@@ -365,11 +366,11 @@ def test_empty_graph_boundary_is_exact_zero(
 
 
 def test_order_budget_fails_before_artifact_writes(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     graph = nx.relabel_nodes(nx.path_graph(3), lambda vertex: f"v{vertex}")
 
     result = _invoke(
-        kernel,
+        runtime,
         "graph.domination.minimum.compute",
         graph,
         max_order=2,

@@ -57,11 +57,11 @@ def _left_projection_problem() -> dict[str, object]:
 
 
 def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
     descriptors = {
         descriptor.capability_id: descriptor
-        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
     }
     descriptor = descriptors["universal_algebra.search.countermodel"]
 
@@ -74,11 +74,11 @@ def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
 
 
 def test_evaluate_laws_descriptor_example_encodes_idempotence(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
     descriptor = next(
         descriptor
-        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "universal_algebra.evaluate_laws"
     )
     example = descriptor.invocation_examples[0]
@@ -92,7 +92,7 @@ def test_evaluate_laws_descriptor_example_encodes_idempotence(
     }
     assert law["right"] == {"kind": "VARIABLE", "variable": "x"}
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=descriptor.capability_id,
             mode=example.mode,
@@ -112,10 +112,10 @@ def test_evaluate_laws_descriptor_example_encodes_idempotence(
 
 
 def test_evaluate_laws_returns_exact_truth_and_counterexample(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.evaluate_laws",
             input={"problem": _left_projection_problem()},
@@ -147,7 +147,7 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
     }
     assert result.output["certificate_uri"] in result.artifact_uris
     assert result.output["checker_id"] == (
-        kernel_with_references.universal_algebra.evaluation_checker_id
+        runtime_with_references.portfolio.universal_algebra.evaluation_checker_id
     )
     assert result.output["verification_handoff"] == {
         "capability_id": "certificate.verify",
@@ -161,7 +161,7 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
     assert "conclusion" not in result.output
 
     handoff = result.output["verification_handoff"]
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=handoff["capability_id"],
             mode=CapabilityMode(handoff["mode"]),
@@ -175,22 +175,22 @@ def test_evaluate_laws_returns_exact_truth_and_counterexample(
 
 
 def test_complete_request_validation_precedes_artifact_writes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     problem = _left_projection_problem()
     problem["structure"]["table"] = [[0, 0]]
     artifact_put_calls = 0
-    original_put = kernel.artifacts.put
+    original_put = runtime.core.artifacts.put
 
     def recording_put(*args: Any, **kwargs: Any) -> Any:
         nonlocal artifact_put_calls
         artifact_put_calls += 1
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.evaluate_laws",
             input={"problem": problem},
@@ -203,11 +203,11 @@ def test_complete_request_validation_precedes_artifact_writes(
 
 
 def test_countermodel_search_composes_with_independent_law_replay(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
     laws = _left_projection_problem()["laws"]
 
-    search = kernel_with_references.capabilities.invoke(
+    search = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.search.countermodel",
             input={
@@ -224,7 +224,7 @@ def test_countermodel_search_composes_with_independent_law_replay(
     assert search.output["target_record"]["holds"] is False
     assert all(record["holds"] for record in search.output["source_records"])
 
-    evaluation = kernel_with_references.capabilities.invoke(
+    evaluation = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.evaluate_laws",
             input={
@@ -236,7 +236,7 @@ def test_countermodel_search_composes_with_independent_law_replay(
             },
         )
     )
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,
@@ -252,11 +252,11 @@ def test_countermodel_search_composes_with_independent_law_replay(
 
 
 def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
-    kernel,
+    runtime,
 ) -> None:
     laws = _left_projection_problem()["laws"]
 
-    search = kernel.capabilities.invoke(
+    search = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.search.countermodel",
             input={
@@ -275,23 +275,23 @@ def test_countermodel_search_reports_fixed_order_no_witness_without_conclusion(
 
 
 def test_countermodel_request_validation_precedes_artifact_writes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     laws = _left_projection_problem()["laws"]
     duplicate_target = dict(laws[1])
     duplicate_target["law_id"] = laws[0]["law_id"]
     artifact_put_calls = 0
-    original_put = kernel.artifacts.put
+    original_put = runtime.core.artifacts.put
 
     def recording_put(*args: Any, **kwargs: Any) -> Any:
         nonlocal artifact_put_calls
         artifact_put_calls += 1
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="universal_algebra.search.countermodel",
             input={
@@ -308,10 +308,10 @@ def test_countermodel_request_validation_precedes_artifact_writes(
 
 
 def test_finite_magma_table_enumeration_is_exact_and_canonical(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="finite_magma.table.enumerate",
             input={"order": 2},
@@ -325,19 +325,19 @@ def test_finite_magma_table_enumeration_is_exact_and_canonical(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
     table_payloads = [
-        kernel.store.get(uri).payload for uri in result.output["table_uris"]
+        runtime.core.store.get(uri).payload for uri in result.output["table_uris"]
     ]
     assert table_payloads[0]["table"] == [[0, 0], [0, 0]]
     assert table_payloads[-1]["table"] == [[1, 1], [1, 1]]
     assert len({str(payload["table"]) for payload in table_payloads}) == 16
-    enumeration = kernel.store.get(result.output["enumeration_uri"])
+    enumeration = runtime.core.store.get(result.output["enumeration_uri"])
     assert enumeration.payload["table_uris"] == result.output["table_uris"]
     assert set(enumeration.manifest.parents) == set(result.output["table_uris"])
 
 
-def test_finite_magma_table_enumeration_handles_order_one(kernel) -> None:
+def test_finite_magma_table_enumeration_handles_order_one(runtime) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="finite_magma.table.enumerate",
             input={"order": 1},
@@ -345,24 +345,24 @@ def test_finite_magma_table_enumeration_handles_order_one(kernel) -> None:
     )
 
     assert result.output["enumerated_count"] == 1
-    table = kernel.store.get(result.output["table_uris"][0])
+    table = runtime.core.store.get(result.output["table_uris"][0])
     assert table.payload["table"] == [[0]]
 
 
 def test_finite_magma_table_enumeration_rejects_unsupported_order_before_writes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     artifact_put_calls = 0
-    original_put = kernel.artifacts.put
+    original_put = runtime.core.artifacts.put
 
     def recording_put(*args: Any, **kwargs: Any) -> Any:
         nonlocal artifact_put_calls
         artifact_put_calls += 1
         return original_put(*args, **kwargs)
 
-    monkeypatch.setattr(kernel.artifacts, "put", recording_put)
-    result = kernel.capabilities.invoke(
+    monkeypatch.setattr(runtime.core.artifacts, "put", recording_put)
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="finite_magma.table.enumerate",
             input={"order": 3},

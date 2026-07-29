@@ -13,8 +13,8 @@ from jacobian.contracts.workspaces import (
 )
 
 
-def test_workspace_context_handles_a_deep_dependency_chain(kernel) -> None:
-    opened = _open(kernel, key="workspace-open-deep-context-001")
+def test_workspace_context_handles_a_deep_dependency_chain(runtime) -> None:
+    opened = _open(runtime, key="workspace-open-deep-context-001")
     revision_id = opened.revision_id
     previous_card_id: str | None = None
 
@@ -38,7 +38,7 @@ def test_workspace_context_handles_a_deep_dependency_chain(kernel) -> None:
                     dependency_refs=dependency_refs,
                 )
             )
-        written = kernel.workspaces.write(
+        written = runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key=f"workspace-write-deep-{batch_index:03d}",
                 workspace_id=opened.workspace_id,
@@ -51,7 +51,7 @@ def test_workspace_context_handles_a_deep_dependency_chain(kernel) -> None:
         previous_card_id = written.id_map["N63"]
 
     assert previous_card_id is not None
-    context = kernel.workspaces.query(
+    context = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -67,8 +67,8 @@ def test_workspace_context_handles_a_deep_dependency_chain(kernel) -> None:
     assert len(context.context.dependencies) == 1
 
 
-def test_workspace_supersession_handles_a_deep_chain(kernel) -> None:
-    opened = _open(kernel, key="workspace-open-deep-supersession-001")
+def test_workspace_supersession_handles_a_deep_chain(runtime) -> None:
+    opened = _open(runtime, key="workspace-open-deep-supersession-001")
     revision_id = opened.revision_id
     card_ids: list[str] = []
 
@@ -82,7 +82,7 @@ def test_workspace_supersession_handles_a_deep_chain(kernel) -> None:
             )
             for index in range(batch_start, min(batch_start + 64, 1025))
         )
-        written = kernel.workspaces.write(
+        written = runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key=(
                     f"workspace-write-deep-supersession-cards-{batch_start:04d}"
@@ -107,7 +107,7 @@ def test_workspace_supersession_handles_a_deep_chain(kernel) -> None:
             )
             for index in range(batch_start, min(batch_start + 64, 1024))
         )
-        written = kernel.workspaces.write(
+        written = runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key=(
                     f"workspace-write-deep-supersession-marks-{batch_start:04d}"
@@ -120,7 +120,7 @@ def test_workspace_supersession_handles_a_deep_chain(kernel) -> None:
         )
         revision_id = written.revision_id
 
-    context = kernel.workspaces.query(
+    context = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -135,10 +135,10 @@ def test_workspace_supersession_handles_a_deep_chain(kernel) -> None:
 
 
 def test_workspace_context_truncation_and_stale_roots_are_deterministic(
-    kernel,
+    runtime,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-context-budget-001")
-    seeded = kernel.workspaces.write(
+    opened = _open(runtime, key="workspace-open-context-budget-001")
+    seeded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-context-budget-001",
             workspace_id=opened.workspace_id,
@@ -181,7 +181,7 @@ def test_workspace_context_truncation_and_stale_roots_are_deterministic(
             ),
         )
     )
-    marked = kernel.workspaces.write(
+    marked = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-context-roots-001",
             workspace_id=opened.workspace_id,
@@ -204,7 +204,7 @@ def test_workspace_context_truncation_and_stale_roots_are_deterministic(
         )
     )
 
-    result = kernel.workspaces.query(
+    result = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,

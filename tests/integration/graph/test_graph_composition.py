@@ -13,18 +13,19 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
-
-
-def _kernel_with_composition(tmp_path: Path) -> JacobianKernel:
-    """Build a kernel with the bundled composition adapters installed."""
-    return JacobianKernel(tmp_path)
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
-def _atlas_graph_uri(kernel: JacobianKernel, order: int, limit: int = 2) -> list[str]:
-    result = kernel.capabilities.invoke(
+def _runtime_with_composition(tmp_path: Path) -> JacobianRuntime:
+    """Build a runtime with the bundled composition adapters installed."""
+    return create_runtime(tmp_path)
+
+
+def _atlas_graph_uri(runtime: JacobianRuntime, order: int, limit: int = 2) -> list[str]:
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -46,11 +47,11 @@ def _atlas_graph_uri(kernel: JacobianKernel, order: int, limit: int = 2) -> list
 def test_compose_complement_returns_computed_graph_artifact(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_composition(tmp_path)
-    graph_uris = _atlas_graph_uri(kernel, order=3, limit=1)
+    runtime = _runtime_with_composition(tmp_path)
+    graph_uris = _atlas_graph_uri(runtime, order=3, limit=1)
     left_uri = graph_uris[0]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -76,11 +77,11 @@ def test_compose_complement_returns_computed_graph_artifact(
     assert len(payload["edges"]) <= 1
 
     # The result graph artifact is retrievable from the store.
-    stored = kernel.store.get(result.output["result_graph_uri"])
+    stored = runtime.core.store.get(result.output["result_graph_uri"])
     assert stored.payload == payload
 
     # A composition-record artifact was materialized.
-    composition = kernel.store.get(result.output["composition_artifact_uri"])
+    composition = runtime.core.store.get(result.output["composition_artifact_uri"])
     assert composition.payload["operation"] == "COMPLEMENT"
     assert composition.payload["left_graph_uri"] == left_uri
     assert composition.payload["right_graph_uri"] is None
@@ -101,11 +102,11 @@ def test_compose_complement_returns_computed_graph_artifact(
 
 
 def test_compose_disjoint_union_combines_two_graphs(tmp_path: Path) -> None:
-    kernel = _kernel_with_composition(tmp_path)
-    graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
+    runtime = _runtime_with_composition(tmp_path)
+    graph_uris = _atlas_graph_uri(runtime, order=3, limit=2)
     left_uri, right_uri = graph_uris[0], graph_uris[1]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -121,7 +122,7 @@ def test_compose_disjoint_union_combines_two_graphs(tmp_path: Path) -> None:
     assert len(payload["vertices"]) == 6  # 3 + 3
     assert len(payload["edges"]) >= 2  # at least one edge from each
 
-    composition = kernel.store.get(result.output["composition_artifact_uri"])
+    composition = runtime.core.store.get(result.output["composition_artifact_uri"])
     assert composition.payload["operation"] == "DISJOINT_UNION"
     assert composition.payload["right_graph_uri"] == right_uri
     assert composition.payload["backend"] == "networkx.disjoint_union"
@@ -132,11 +133,11 @@ def test_compose_disjoint_union_combines_two_graphs(tmp_path: Path) -> None:
 
 
 def test_compose_join_adds_all_cross_edges(tmp_path: Path) -> None:
-    kernel = _kernel_with_composition(tmp_path)
-    graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
+    runtime = _runtime_with_composition(tmp_path)
+    graph_uris = _atlas_graph_uri(runtime, order=3, limit=2)
     left_uri, right_uri = graph_uris[0], graph_uris[1]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -153,16 +154,16 @@ def test_compose_join_adds_all_cross_edges(tmp_path: Path) -> None:
     # Join = disjoint union + all 3*3 = 9 cross edges, plus original edges.
     assert len(payload["edges"]) >= 9
 
-    composition = kernel.store.get(result.output["composition_artifact_uri"])
+    composition = runtime.core.store.get(result.output["composition_artifact_uri"])
     assert composition.payload["backend"] == "networkx.join"
 
 
 def test_compose_lexicographic_product_doubles_vertex_count(tmp_path: Path) -> None:
-    kernel = _kernel_with_composition(tmp_path)
-    graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
+    runtime = _runtime_with_composition(tmp_path)
+    graph_uris = _atlas_graph_uri(runtime, order=3, limit=2)
     left_uri, right_uri = graph_uris[0], graph_uris[1]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -177,18 +178,18 @@ def test_compose_lexicographic_product_doubles_vertex_count(tmp_path: Path) -> N
     payload = result.output["result_graph"]
     assert len(payload["vertices"]) == 9  # 3 * 3
 
-    composition = kernel.store.get(result.output["composition_artifact_uri"])
+    composition = runtime.core.store.get(result.output["composition_artifact_uri"])
     assert composition.payload["backend"] == "networkx.lexicographic_product"
 
 
 def test_compose_rejects_missing_right_graph_for_binary_operation(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_composition(tmp_path)
-    graph_uris = _atlas_graph_uri(kernel, order=3, limit=1)
+    runtime = _runtime_with_composition(tmp_path)
+    graph_uris = _atlas_graph_uri(runtime, order=3, limit=1)
     left_uri = graph_uris[0]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -206,11 +207,11 @@ def test_compose_rejects_missing_right_graph_for_binary_operation(
 def test_compose_rejects_right_graph_for_unary_complement(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_composition(tmp_path)
-    graph_uris = _atlas_graph_uri(kernel, order=3, limit=2)
+    runtime = _runtime_with_composition(tmp_path)
+    graph_uris = _atlas_graph_uri(runtime, order=3, limit=2)
     left_uri, right_uri = graph_uris[0], graph_uris[1]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -227,10 +228,10 @@ def test_compose_rejects_right_graph_for_unary_complement(
 
 
 def test_compose_rejects_nonexistent_graph_artifact(tmp_path: Path) -> None:
-    kernel = _kernel_with_composition(tmp_path)
+    runtime = _runtime_with_composition(tmp_path)
     fake_uri = "artifact://sha256/" + "0" * 64
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.construct.compose",
             input={
@@ -253,9 +254,9 @@ def test_compose_rejects_nonexistent_graph_artifact(tmp_path: Path) -> None:
 def test_enumerate_returns_complete_atlas_catalog_with_boundary(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_composition(tmp_path)
+    runtime = _runtime_with_composition(tmp_path)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.enumerate.nonisomorphic",
             input={"order": 4, "limit": 100},
@@ -287,11 +288,11 @@ def test_enumerate_returns_complete_atlas_catalog_with_boundary(
         assert len(payload["vertices"]) == 4
         assert entry["order"] == 4
         assert entry["size"] == len(payload["edges"])
-        stored = kernel.store.get(entry["graph_uri"])
+        stored = runtime.core.store.get(entry["graph_uri"])
         assert stored.payload == payload
 
     # The scope artifact records the backend boundary.
-    scope = kernel.store.get(result.output["scope_uri"])
+    scope = runtime.core.store.get(result.output["scope_uri"])
     assert scope.payload["source"] == "networkx.graph_atlas_g"
     assert scope.payload["order"] == 4
     assert scope.payload["enumerated_count"] == 11
@@ -310,15 +311,15 @@ def test_enumerate_returns_complete_atlas_catalog_with_boundary(
 
 
 def test_enumerate_paginates_with_limit_and_offset(tmp_path: Path) -> None:
-    kernel = _kernel_with_composition(tmp_path)
+    runtime = _runtime_with_composition(tmp_path)
 
-    first = kernel.capabilities.invoke(
+    first = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.enumerate.nonisomorphic",
             input={"order": 4, "limit": 3, "offset": 0},
         )
     )
-    second = kernel.capabilities.invoke(
+    second = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.enumerate.nonisomorphic",
             input={"order": 4, "limit": 3, "offset": 3},
@@ -342,9 +343,9 @@ def test_enumerate_paginates_with_limit_and_offset(tmp_path: Path) -> None:
 def test_enumerate_rejects_order_outside_backend_boundary(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_composition(tmp_path)
+    runtime = _runtime_with_composition(tmp_path)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.enumerate.nonisomorphic",
             input={"order": 10},
@@ -357,9 +358,9 @@ def test_enumerate_rejects_order_outside_backend_boundary(
 
 
 def test_enumerate_order_zero_returns_single_empty_graph(tmp_path: Path) -> None:
-    kernel = _kernel_with_composition(tmp_path)
+    runtime = _runtime_with_composition(tmp_path)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.enumerate.nonisomorphic",
             input={"order": 0},

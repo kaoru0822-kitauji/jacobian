@@ -71,13 +71,13 @@ The two reference-plugin corpora include:
 - shrink traces with successful, rejected, duplicate, and cyclic proposals.
 
 The directed-graph/path corpus is one adversarial workload, not the definition
-of the kernel. The second non-graph plugin supplies a different candidate shape,
+of the runtime. The second non-graph plugin supplies a different candidate shape,
 witness representation, and cost profile.
 
 The exact public workloads are defined in the
 [Mathematical scenario catalog](math-scenarios.md).
 
-## Kernel and capability benchmark groups
+## Runtime and capability benchmark groups
 
 ### Canonical encoding and hashing
 
@@ -146,7 +146,7 @@ Measure:
 - cold and warm evaluation-cache behavior;
 - proposed witness persistence by URI.
 
-Report capability-adapter and kernel overhead separately from backend
+Report capability-adapter and runtime overhead separately from backend
 evaluation time. This shows when optimizing Jacobian matters and when domain
 computation dominates.
 
@@ -189,7 +189,7 @@ pass/fail research benchmarks, not performance contests. Track:
 - whether the verified example replays in a clean process;
 - whether shrinking reports an honest minimality level without trusting an
   empty reducer response;
-- whether both domains use the same kernel contracts.
+- whether both domains use the same runtime contracts.
 
 Runtime and resource use may be reported secondarily. Correctness is the gate.
 

@@ -23,15 +23,15 @@ PY = {"x": ZERO, "y": TWO}
 PXY = {"x": TWO, "y": TWO}
 
 
-def test_segment_midpoint_example_is_directly_invocable(kernel) -> None:
+def test_segment_midpoint_example_is_directly_invocable(runtime) -> None:
     descriptor = next(
         descriptor
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "geometry.segment.compute.midpoint"
     )
     example = descriptor.invocation_examples[0]
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=descriptor.capability_id,
             mode=example.mode,
@@ -53,7 +53,7 @@ def test_segment_midpoint_example_is_directly_invocable(kernel) -> None:
 
 
 def test_geometry_capabilities_are_distinct_and_every_contract_completes(
-    kernel,
+    runtime,
 ) -> None:
     line_x = {"first": P0, "second": PX}
     line_y = {"first": P0, "second": PY}
@@ -76,7 +76,7 @@ def test_geometry_capabilities_are_distinct_and_every_contract_completes(
     assert len(ids) == 13
     assert len(ids) == len(set(ids))
     for operation in GEOMETRY_BUNDLE.capabilities:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=operation.capability_id,
                 input=payloads[operation.request_model],
@@ -90,15 +90,15 @@ def test_geometry_capabilities_are_distinct_and_every_contract_completes(
         assert len(result.artifact_uris) == 2
 
 
-def test_geometry_exact_outputs_are_inline_and_materialized(kernel) -> None:
+def test_geometry_exact_outputs_are_inline_and_materialized(runtime) -> None:
 
-    distance = kernel.capabilities.invoke(
+    distance = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="geometry.points.compute.squared_distance",
             input={"first": P0, "second": PXY},
         )
     )
-    circle = kernel.capabilities.invoke(
+    circle = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="geometry.triangle.compute.circumcircle",
             input={"first": P0, "second": PX, "third": PY},
@@ -111,16 +111,16 @@ def test_geometry_exact_outputs_are_inline_and_materialized(kernel) -> None:
         "radius_squared": {"num": "2", "den": "1"},
     }
     assert (
-        kernel.store.get(distance.output["result_uri"]).payload
+        runtime.core.store.get(distance.output["result_uri"]).payload
         == distance.output["result"]
     )
 
 
 def test_convex_hull_returns_segment_endpoints_for_two_points(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="geometry.points.compute.convex_hull",
             input={"points": [PXY, P0]},
@@ -132,11 +132,11 @@ def test_convex_hull_returns_segment_endpoints_for_two_points(
 
 
 def test_convex_hull_returns_extreme_endpoints_for_collinear_points(
-    kernel,
+    runtime,
 ) -> None:
     middle = {"x": ONE, "y": ONE}
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="geometry.points.compute.convex_hull",
             input={"points": [middle, PXY, P0]},
@@ -147,9 +147,9 @@ def test_convex_hull_returns_extreme_endpoints_for_collinear_points(
     assert result.output["result"] == {"points": [P0, PXY]}
 
 
-def test_degenerate_geometry_fails_before_artifact_writes(kernel) -> None:
+def test_degenerate_geometry_fails_before_artifact_writes(runtime) -> None:
 
-    invalid_line = kernel.capabilities.invoke(
+    invalid_line = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="geometry.lines.compute.intersection",
             input={
@@ -158,7 +158,7 @@ def test_degenerate_geometry_fails_before_artifact_writes(kernel) -> None:
             },
         )
     )
-    collinear_circle = kernel.capabilities.invoke(
+    collinear_circle = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="geometry.triangle.compute.circumcircle",
             input={

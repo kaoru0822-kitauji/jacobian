@@ -9,17 +9,18 @@ import pytest
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture(scope="module")
-def kernel(
+def runtime(
     tmp_path_factory: pytest.TempPathFactory,
-    kernel_store_template_with_references,
-) -> JacobianKernel:
+    runtime_store_template_with_references,
+) -> JacobianRuntime:
     root = tmp_path_factory.mktemp("frontier-capabilities")
-    shutil.copytree(kernel_store_template_with_references, root, dirs_exist_ok=True)
-    return JacobianKernel(root, hydrate_authorized=True)
+    shutil.copytree(runtime_store_template_with_references, root, dirs_exist_ok=True)
+    return create_runtime(root, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING)
 
 
 def _q(value: int) -> dict[str, str]:
@@ -44,7 +45,7 @@ def _polynomial(
 
 
 def test_projective_arrangement_materializes_the_nine_line_flat_lattice(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     coefficients = (
         (0, 1, -1),
@@ -57,7 +58,7 @@ def test_projective_arrangement_materializes_the_nine_line_flat_lattice(
         (1, 1, 2),
         (2, -1, -2),
     )
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("geometry.projective_line_arrangement.flats.materialize"),
             input={
@@ -89,7 +90,7 @@ def test_projective_arrangement_materializes_the_nine_line_flat_lattice(
         {"multiplicity": 4, "flat_count": 1},
     ]
     assert result.output["result"]["pair_count_total"] == 36
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("geometry.projective_line_arrangement.flats.verify"),
             mode=CapabilityMode.VERIFY,
@@ -101,9 +102,9 @@ def test_projective_arrangement_materializes_the_nine_line_flat_lattice(
 
 
 def test_projective_arrangement_rejects_projectively_duplicate_lines(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("geometry.projective_line_arrangement.flats.materialize"),
             input={
@@ -120,9 +121,9 @@ def test_projective_arrangement_rejects_projectively_duplicate_lines(
 
 
 def test_arrangement_checker_rejects_schema_valid_forged_normalization(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("geometry.projective_line_arrangement.flats.materialize"),
             input={
@@ -139,8 +140,8 @@ def test_arrangement_checker_rejects_schema_valid_forged_normalization(
         "1",
         "0",
     ]
-    installation = kernel.domain_bundles["projective_geometry"]
-    forged_uri = kernel.artifacts.put(
+    installation = runtime.portfolio.domain_bundles["projective_geometry"]
+    forged_uri = runtime.core.artifacts.put(
         schema_uri=installation.result_schema_uris[
             "geometry.projective_line_arrangement.flats.materialize"
         ],
@@ -149,7 +150,7 @@ def test_arrangement_checker_rejects_schema_valid_forged_normalization(
         parents=(computed.output["input_uri"],),
         summary="schema-valid forged projective normalization",
     ).artifact_uri
-    checked = kernel.capabilities.invoke(
+    checked = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("geometry.projective_line_arrangement.flats.verify"),
             mode=CapabilityMode.VERIFY,
@@ -180,11 +181,11 @@ def test_arrangement_checker_rejects_schema_valid_forged_normalization(
     ],
 )
 def test_hamiltonian_path_decision_has_independent_replay(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     graph: dict[str, object],
     decision: str,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.hamiltonian_path.decide",
             input={"graph": graph},
@@ -193,7 +194,7 @@ def test_hamiltonian_path_decision_has_independent_replay(
     assert computed.execution.status is ExecutionStatus.COMPLETED
     assert computed.output["result"]["decision"] == decision
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.hamiltonian_path.verify",
             mode=CapabilityMode.VERIFY,
@@ -205,9 +206,9 @@ def test_hamiltonian_path_decision_has_independent_replay(
 
 
 def test_graded_jacobian_syzygy_finds_and_verifies_the_first_kernel(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("polynomial.jacobian_syzygy.minimum_degree.compute"),
             input={
@@ -229,7 +230,7 @@ def test_graded_jacobian_syzygy_finds_and_verifies_the_first_kernel(
     assert result["coefficient_map_detail"] == "CERTIFICATES"
     assert all(not item["sparse_entries"] for item in result["degree_maps"])
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("polynomial.jacobian_syzygy.minimum_degree.verify"),
             mode=CapabilityMode.VERIFY,
@@ -241,9 +242,9 @@ def test_graded_jacobian_syzygy_finds_and_verifies_the_first_kernel(
 
 
 def test_syzygy_checker_rejects_schema_valid_forged_evidence(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("polynomial.jacobian_syzygy.minimum_degree.compute"),
             input={
@@ -252,7 +253,7 @@ def test_syzygy_checker_rejects_schema_valid_forged_evidence(
             },
         )
     )
-    installation = kernel.domain_bundles["polynomial"]
+    installation = runtime.portfolio.domain_bundles["polynomial"]
     input_uri = computed.output["input_uri"]
     for name in (
         "map_digest",
@@ -272,7 +273,7 @@ def test_syzygy_checker_rejects_schema_valid_forged_evidence(
             forged["partial_derivatives"][0]["polynomial"]["terms"][0][
                 "coefficient"
             ] = _q(2)
-        forged_uri = kernel.artifacts.put(
+        forged_uri = runtime.core.artifacts.put(
             schema_uri=installation.result_schema_uris[
                 "polynomial.jacobian_syzygy.minimum_degree.compute"
             ],
@@ -282,7 +283,7 @@ def test_syzygy_checker_rejects_schema_valid_forged_evidence(
             summary=f"schema-valid adversarial graded-map result: {name}",
         ).artifact_uri
 
-        checked = kernel.capabilities.invoke(
+        checked = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=("polynomial.jacobian_syzygy.minimum_degree.verify"),
                 mode=CapabilityMode.VERIFY,
@@ -295,9 +296,9 @@ def test_syzygy_checker_rejects_schema_valid_forged_evidence(
 
 
 def test_hamiltonian_checker_rejects_a_forged_negative_decision(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.hamiltonian_path.decide",
             input={
@@ -311,8 +312,8 @@ def test_hamiltonian_checker_rejects_a_forged_negative_decision(
     forged = deepcopy(computed.output["result"])
     forged["decision"] = "DOES_NOT_EXIST"
     forged["path"] = []
-    installation = kernel.domain_bundles["graph_optimization"]
-    forged_uri = kernel.artifacts.put(
+    installation = runtime.portfolio.domain_bundles["graph_optimization"]
+    forged_uri = runtime.core.artifacts.put(
         schema_uri=installation.result_schema_uris["graph.hamiltonian_path.decide"],
         semantics_uri=installation.semantics_uri,
         payload=forged,
@@ -320,7 +321,7 @@ def test_hamiltonian_checker_rejects_a_forged_negative_decision(
         summary="schema-valid forged negative Hamiltonian-path decision",
     ).artifact_uri
 
-    checked = kernel.capabilities.invoke(
+    checked = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.hamiltonian_path.verify",
             mode=CapabilityMode.VERIFY,
@@ -332,8 +333,8 @@ def test_hamiltonian_checker_rejects_a_forged_negative_decision(
     assert checked.output["conclusion"] == "UNKNOWN"
 
 
-def test_sparse_map_detail_is_explicitly_opt_in(kernel: JacobianKernel) -> None:
-    computed = kernel.capabilities.invoke(
+def test_sparse_map_detail_is_explicitly_opt_in(runtime: JacobianRuntime) -> None:
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("polynomial.jacobian_syzygy.minimum_degree.compute"),
             input={
@@ -349,7 +350,7 @@ def test_sparse_map_detail_is_explicitly_opt_in(kernel: JacobianKernel) -> None:
 
 
 def test_nine_line_challenge_mdr_values_are_end_to_end_verified(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     cases = (
         (
@@ -382,7 +383,7 @@ def test_nine_line_challenge_mdr_values_are_end_to_end_verified(
         ),
     )
     for factors, expected_degree in cases:
-        computed = kernel.capabilities.invoke(
+        computed = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=("polynomial.jacobian_syzygy.minimum_degree.compute"),
                 input={
@@ -400,7 +401,7 @@ def test_nine_line_challenge_mdr_values_are_end_to_end_verified(
         )
         assert computed.execution.status is ExecutionStatus.COMPLETED
         assert computed.output["result"]["first_syzygy_degree"] == expected_degree
-        verified = kernel.capabilities.invoke(
+        verified = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=("polynomial.jacobian_syzygy.minimum_degree.verify"),
                 mode=CapabilityMode.VERIFY,

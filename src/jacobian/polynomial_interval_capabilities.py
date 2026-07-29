@@ -30,12 +30,9 @@ import time
 from dataclasses import dataclass
 from fractions import Fraction
 from math import comb
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
-import sympy
 from pydantic import ValidationError
-from sympy import QQ, Poly, Symbol, expand, symbols
-from sympy.polys.polyerrors import PolynomialError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -78,11 +75,38 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.domains._examples import example
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
+from jacobian.providers import LazyLoader
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
+
+if TYPE_CHECKING:
+    from sympy import Symbol
+
+
+class _SympyBackend(NamedTuple):
+    """Heavy SymPy implementation symbols loaded on first capability invocation."""
+
+    QQ: Any
+    Poly: Any
+    expand: Any
+    symbols: Any
+    PolynomialError: type
+
+
+def _load_sympy_backend() -> _SympyBackend:
+    """Construct the pinned SymPy implementation bundle on first use."""
+    from sympy import QQ, Poly, expand, symbols
+    from sympy.polys.polyerrors import PolynomialError
+
+    return _SympyBackend(QQ, Poly, expand, symbols, PolynomialError)
+
+
+_sympy: LazyLoader[_SympyBackend] = LazyLoader(
+    _load_sympy_backend, component_id="jacobian.sympy.polynomial-intervals"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,9 +321,15 @@ class PolynomialIntervalEncloseAdapter:
         started = time.monotonic()
         polynomial = validated.polynomial
         interval = validated.interval
+        sp = _sympy.get()
         try:
             coefficients = _bernstein_coefficients(polynomial, interval)
-        except (PolynomialError, TypeError, ValueError, ZeroDivisionError) as exc:
+        except (
+            cast(type[BaseException], sp.PolynomialError),
+            TypeError,
+            ValueError,
+            ZeroDivisionError,
+        ) as exc:
             raise _interval_error(
                 "POLYNOMIAL_INTERVAL_ENCLOSURE_FAILED",
                 "enclosure_computation",
@@ -318,7 +348,7 @@ class PolynomialIntervalEncloseAdapter:
             bernstein_coefficients=coefficients,
             lo=_rational(min(c.as_fraction() for c in coefficients)),
             hi=_rational(max(c.as_fraction() for c in coefficients)),
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         enclosure_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.installation.enclosure_schema_uri,
@@ -335,7 +365,7 @@ class PolynomialIntervalEncloseAdapter:
             bernstein_coefficients=enclosure.bernstein_coefficients,
             lo=enclosure.lo,
             hi=enclosure.hi,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         checker_hint = (
             "invoke polynomial.interval.enclosure.verify with the authorized "
@@ -454,7 +484,7 @@ class PolynomialIntervalEnclosureVerifyAdapter:
             bernstein_coefficients=validated.claimed_bernstein_coefficients,
             lo=validated.claimed_lo,
             hi=validated.claimed_hi,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         enclosure_artifact = self.resources.artifacts.put(
             schema_uri=installation.enclosure_schema_uri,
@@ -669,16 +699,17 @@ def _bernstein_coefficients(
     b = interval.hi.as_fraction()
     width = b - a
     degree = polynomial.degree
-    generator: Symbol = symbols(polynomial.variable)
+    sp = _sympy.get()
+    generator: Symbol = sp.symbols(polynomial.variable)
     terms = {
-        term.exponents: QQ(int(term.coefficient.num), int(term.coefficient.den))
+        term.exponents: sp.QQ(int(term.coefficient.num), int(term.coefficient.den))
         for term in polynomial.polynomial.terms
     }
-    source = Poly.from_dict(terms, generator, domain=QQ)
-    shifted = Poly(
-        expand(source.as_expr().subs(generator, a + width * generator)),
+    source = sp.Poly.from_dict(terms, generator, domain=sp.QQ)
+    shifted = sp.Poly(
+        sp.expand(source.as_expr().subs(generator, a + width * generator)),
         generator,
-        domain=QQ,
+        domain=sp.QQ,
     )
     power_coefficients = {
         exponent: Fraction(int(coeff.p), int(coeff.q))

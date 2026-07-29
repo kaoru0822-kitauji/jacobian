@@ -81,7 +81,7 @@ slow lane.
 
 `make test-fast` collects only unit, contract, checker, and reference
 directories and excludes `slow` cases under a single process. Prefer the
-function-scoped `kernel` / `kernel_with_references` fixtures when attaching to
+function-scoped `runtime` / `runtime_with_references` fixtures when attaching to
 seeded stores. Avoid inventing layer-marker filters; directory Make targets own
 suite selection.
 Named contract, checker, MCP, and storage targets
@@ -117,16 +117,16 @@ execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
 and is disabled automatically by pytest-timeout while debugging. Parallel
 workers retain separate `tmp_path` roots; tests that add shared external state
 must coordinate it explicitly.
-Workflow tests that repeatedly construct the kernel may opt into
-`initialized_kernel_store`. Each xdist worker builds the core descriptor store
+Workflow tests that repeatedly construct the runtime may opt into
+`initialized_runtime_store`. Each xdist worker builds the core descriptor store
 once, then the fixture physically copies that snapshot into the test's own
 `tmp_path` before construction. SQLite metadata and blobs remain isolated per
-test; no kernel service, process, or mutable database is shared. Prefer the
-function-scoped `kernel` fixture (or `kernel_with_references`) when a test only
-needs to attach to that seeded root; keep explicit `JacobianKernel(tmp_path)`
+test; no runtime service, process, or mutable database is shared. Prefer the
+function-scoped `runtime` fixture (or `runtime_with_references`) when a test only
+needs to attach to that seeded root; keep explicit `create_runtime(tmp_path)`
 for restart, sibling-root, or bootstrap cases. Tests that need authorized
 reference plugins and checkers may instead opt into
-`initialized_kernel_store_with_references`, which copies a second immutable
+`initialized_runtime_store_with_references`, which copies a second immutable
 session snapshot that already includes those installs. Tests whose subject is
 fresh-store bootstrap, quota accounting, migration, or descriptor installation
 must not use either fixture.
@@ -178,7 +178,7 @@ For pull requests, a tested path planner reads
 independent core Python, integration Python, Lean, npm, static, build,
 security, and duplicate-code decisions. Documentation-only changes run only
 the dedicated link checker; npm-only changes stay narrow. Ordinary capability source stays on core + integration + static +
-build without Lean, security, or duplicate-code by default. Verification-kernel
+build without Lean, security, or duplicate-code by default. Verification-runtime
 boundaries, packaging, CI, and unknown paths fail closed to all functional
 lanes. Merge-queue checks and pushes to `main` always use the exhaustive plan,
 which also enables coverage and the second Python version. Stable aggregate
@@ -454,7 +454,7 @@ Required tests:
 - two structurally different plugins use the same generic dispatch path;
 - a disposable synthetic third plugin passes success, declared-failure,
   malformed-output, timeout, package-attack, and unsupported-promotion checks
-  without kernel or MCP changes;
+  without runtime or MCP changes;
 - each conformance-suite run uses fresh invocation identities and executes the
   plugin again rather than reusing prior durable results.
 
@@ -586,7 +586,7 @@ The CLI and MCP layer must be thin enough to test by equivalence:
   metadata and instructions, every tool description/schema/annotation, resources
   and templates, prompts, the operating resource text, and representative browse,
   query, and exact-description results;
-- malformed requests fail before kernel invocation;
+- malformed requests fail before runtime invocation;
 - large artifacts and traces are returned as resource URIs;
 - response-size limits are enforced;
 - cancellation and progress never mutate mathematical conclusions;

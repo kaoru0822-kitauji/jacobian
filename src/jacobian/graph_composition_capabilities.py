@@ -24,9 +24,8 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import networkx as nx
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
@@ -52,10 +51,13 @@ from jacobian.contracts.graph_composition import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
-from jacobian.graph_atlas import graph_atlas_order
+from jacobian.graph_atlas import graph_atlas_order, networkx_loader
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
+
+if TYPE_CHECKING:
+    import networkx as nx
 
 _ARTIFACT_URI_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
 
@@ -239,6 +241,7 @@ class GraphComposeAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        backend_module = networkx_loader.get()
         started = time.monotonic()
         try:
             validated = GraphCompositionRequest.model_validate(request.input)
@@ -281,7 +284,7 @@ class GraphComposeAdapter:
                 right_graph_uri=validated.right_graph_uri,
                 result_graph_uri=result_artifact.artifact_uri,
                 backend=backend,
-                backend_version=nx.__version__,
+                backend_version=backend_module.__version__,
             ).model_dump(),
             parents=(result_artifact.artifact_uri,),
             summary=f"Composition record: {operation}",
@@ -307,7 +310,7 @@ class GraphComposeAdapter:
                 "result_graph": result_payload,
                 "composition_artifact_uri": composition_artifact.artifact_uri,
                 "backend": backend,
-                "backend_version": nx.__version__,
+                "backend_version": backend_module.__version__,
             },
             scope=CapabilityScope(
                 description=(
@@ -443,6 +446,7 @@ class GraphEnumerateNonisomorphicAdapter:
         return self._descriptor
 
     def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        backend_module = networkx_loader.get()
         started = time.monotonic()
         try:
             validated = GraphEnumerationRequest.model_validate(request.input)
@@ -470,7 +474,7 @@ class GraphEnumerateNonisomorphicAdapter:
             semantics_uri=self.resources.semantics_uri,
             payload=GraphEnumerationScopeArtifact(
                 source="networkx.graph_atlas_g",
-                backend_version=nx.__version__,
+                backend_version=backend_module.__version__,
                 order=order,
                 enumerated_count=total_count,
                 backend_boundary=_ENUMERATION_BACKEND_BOUNDARY,
@@ -523,7 +527,7 @@ class GraphEnumerateNonisomorphicAdapter:
                 "truncated": truncated,
                 "scope_uri": scope_artifact.artifact_uri,
                 "backend": "networkx.graph_atlas_g",
-                "backend_version": nx.__version__,
+                "backend_version": backend_module.__version__,
                 "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
             },
             scope=CapabilityScope(
@@ -533,7 +537,7 @@ class GraphEnumerateNonisomorphicAdapter:
                 ),
                 parameters={
                     "source": "networkx.graph_atlas_g",
-                    "backend_version": nx.__version__,
+                    "backend_version": backend_module.__version__,
                     "order": order,
                     "enumerated_count": total_count,
                     "backend_boundary": _ENUMERATION_BACKEND_BOUNDARY,
@@ -586,17 +590,18 @@ def _apply_composition(
     left: nx.Graph[Any],
     right: nx.Graph[Any] | None,
 ) -> nx.Graph[Any]:
+    backend = networkx_loader.get()
     if operation == "DISJOINT_UNION":
         assert right is not None
-        return cast("nx.Graph[Any]", nx.disjoint_union(left, right))
+        return cast("nx.Graph[Any]", backend.disjoint_union(left, right))
     if operation == "JOIN":
         assert right is not None
         return _join(left, right)
     if operation == "COMPLEMENT":
-        return cast("nx.Graph[Any]", nx.complement(left))
+        return cast("nx.Graph[Any]", backend.complement(left))
     if operation == "LEXICOGRAPHIC_PRODUCT":
         assert right is not None
-        return cast("nx.Graph[Any]", nx.lexicographic_product(left, right))
+        return cast("nx.Graph[Any]", backend.lexicographic_product(left, right))
     raise ValueError(f"unsupported composition operation: {operation}")
 
 
@@ -607,7 +612,7 @@ def _join(left: nx.Graph[Any], right: nx.Graph[Any]) -> nx.Graph[Any]:
     the disjoint union of G and H with every vertex of G adjacent to every
     vertex of H.
     """
-    result = cast("nx.Graph[Any]", nx.disjoint_union(left, right))
+    result = cast("nx.Graph[Any]", networkx_loader.get().disjoint_union(left, right))
     left_count = left.number_of_nodes()
     right_count = right.number_of_nodes()
     cross_edges = [
@@ -736,7 +741,7 @@ def _load_graph(
                 hint="Recreate the graph through its owning capability.",
             )
         )
-    graph: nx.Graph[str] = nx.Graph()
+    graph: nx.Graph[str] = networkx_loader.get().Graph()
     graph.add_nodes_from(vertices)
     graph.add_edges_from(normalized_edges)
     return graph

@@ -7,11 +7,11 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
     CapabilityResult,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def invoke_capability(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     capability_id: str,
     payload: dict[str, Any],
     *,
@@ -19,6 +19,6 @@ def invoke_capability(
 ) -> CapabilityResult:
     """Invoke one capability through the public request envelope."""
 
-    return kernel.capabilities.invoke(
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(capability_id=capability_id, mode=mode, input=payload)
     )

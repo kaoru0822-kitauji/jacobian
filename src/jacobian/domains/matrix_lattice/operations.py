@@ -5,9 +5,6 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any
 
-import sympy
-from sympy.matrices.normalforms import smith_normal_form
-
 from jacobian.contracts.matrix_operations import (
     CharacteristicPolynomialResult,
     IntegerMatrixRequest,
@@ -36,7 +33,9 @@ def _rational(value: Any) -> OutputRational:
     )
 
 
-def _qq_matrix(matrix: RationalMatrix) -> sympy.Matrix:
+def _qq_matrix(matrix: RationalMatrix) -> Any:
+    import sympy
+
     return sympy.Matrix(
         [
             [sympy.Rational(int(value.num), int(value.den)) for value in row]
@@ -65,6 +64,8 @@ def compute_rref(request: RationalMatrixRequest) -> RrefResult:
 
 
 def compute_nullspace(request: RationalMatrixRequest) -> NullspaceResult:
+    import sympy
+
     matrix = _qq_matrix(request.matrix)
     reduced, pivots = matrix.rref()
     pivot_columns = tuple(int(column) for column in pivots)
@@ -104,6 +105,9 @@ def compute_characteristic_polynomial(
 def compute_smith_normal_form(
     request: IntegerMatrixRequest,
 ) -> SmithNormalFormResult:
+    import sympy
+    from sympy.matrices.normalforms import smith_normal_form
+
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )
@@ -133,6 +137,8 @@ def compute_smith_normal_form(
 
 
 def compute_inverse(request: IntegerMatrixRequest) -> MatrixInverseResult:
+    import sympy
+
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )
@@ -152,6 +158,8 @@ def compute_inverse(request: IntegerMatrixRequest) -> MatrixInverseResult:
 
 
 def compute_trace(request: IntegerMatrixRequest) -> MatrixTraceResult:
+    import sympy
+
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )
@@ -163,6 +171,8 @@ def compute_trace(request: IntegerMatrixRequest) -> MatrixTraceResult:
 def compute_rational_linear_solve(
     request: RationalLinearSolveRequest,
 ) -> RationalLinearSolveResult:
+    import sympy
+
     source = _qq_matrix(request.matrix)
     rhs = sympy.Matrix(
         [sympy.Rational(int(value.num), int(value.den)) for value in request.rhs]
@@ -176,6 +186,8 @@ def compute_rational_linear_solve(
 
 
 def compute_adjugate(request: IntegerMatrixRequest) -> MatrixAdjugateResult:
+    import sympy
+
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )

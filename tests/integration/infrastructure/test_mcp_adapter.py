@@ -605,13 +605,6 @@ def test_mcp_exact_description_layers_summary_contract_and_full_views(
                     "view": "CONTRACT",
                 },
             )
-            compact_result = await client.call_tool(
-                "capability.describe",
-                {
-                    "capability_id": "polynomial.expression.normalize",
-                    "view": "COMPACT",
-                },
-            )
             full_result = await client.call_tool(
                 "capability.describe",
                 {
@@ -621,7 +614,6 @@ def test_mcp_exact_description_layers_summary_contract_and_full_views(
             )
             summary = json.loads(summary_result.content[0].text)
             contract = json.loads(contract_result.content[0].text)
-            compact = json.loads(compact_result.content[0].text)
             full = json.loads(full_result.content[0].text)
 
             assert summary["view"] == "SUMMARY"
@@ -634,9 +626,6 @@ def test_mcp_exact_description_layers_summary_contract_and_full_views(
             assert contract["view"] == "CONTRACT"
             assert contract["capability"]["input_schema"]["type"] == "object"
             assert contract["invocations"]
-            assert compact["view"] == "COMPACT"
-            assert compact["capability"] == contract["capability"]
-            assert compact["invocations"] == contract["invocations"]
             assert full["view"] == "FULL"
             assert "output_schema" in full["capability"]
             assert "configuration" in full["capability"]["provider_runtime"]

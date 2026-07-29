@@ -30,7 +30,7 @@ def _qq(rows: list[list[int]]) -> dict[str, object]:
     }
 
 
-def test_exact_matrix_domain_results_and_lineage(kernel) -> None:
+def test_exact_matrix_domain_results_and_lineage(runtime) -> None:
     cases = (
         (
             "matrix.inverse.compute",
@@ -128,24 +128,24 @@ def test_exact_matrix_domain_results_and_lineage(kernel) -> None:
     )
 
     for capability_id, payload, expected in cases:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
         assert result.output["result"] == expected
         assert len(result.artifact_uris) == 2
-        source = kernel.store.get(result.artifact_uris[0])
-        produced = kernel.store.get(result.artifact_uris[1])
+        source = runtime.core.store.get(result.artifact_uris[0])
+        produced = runtime.core.store.get(result.artifact_uris[1])
         assert produced.manifest.parents == (source.artifact_uri,)
         assert result.relationships[0].source_artifact_uris == (source.artifact_uri,)
         assert result.relationships[0].target_artifact_uris == (produced.artifact_uri,)
 
 
 def test_invalid_matrix_request_fails_before_operation_artifacts(
-    kernel,
+    runtime,
 ) -> None:
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.characteristic_polynomial.compute",
             input={"matrix": _qq([[1, 2, 3], [4, 5, 6]])},
@@ -157,8 +157,8 @@ def test_invalid_matrix_request_fails_before_operation_artifacts(
     assert result.artifact_uris == ()
 
 
-def test_singular_matrix_inverse_is_not_applicable(kernel) -> None:
-    result = kernel.capabilities.invoke(
+def test_singular_matrix_inverse_is_not_applicable(runtime) -> None:
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.inverse.compute",
             input={
@@ -176,11 +176,11 @@ def test_singular_matrix_inverse_is_not_applicable(kernel) -> None:
 
 
 def test_inverse_accepts_exact_growth_from_maximum_size_input(
-    kernel,
+    runtime,
 ) -> None:
     diagonal = "9" * 256
     determinant = str(int(diagonal) ** 2 - 1)
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.inverse.compute",
             input={
@@ -274,9 +274,9 @@ def test_lll_worker_allows_result_growth_beyond_input_digit_limit() -> None:
     assert largest_output <= MAX_OUTPUT_SCALAR_DIGITS
 
 
-def test_lattice_lll_returns_exact_left_transformation(kernel) -> None:
+def test_lattice_lll_returns_exact_left_transformation(runtime) -> None:
     source = [[4, 1], [1, 3]]
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lattice.basis.reduce",
             input={
@@ -314,7 +314,7 @@ def test_lattice_lll_returns_exact_left_transformation(kernel) -> None:
 
 
 def test_lattice_lll_timeout_retains_no_operation_artifacts(
-    kernel,
+    runtime,
     monkeypatch: MonkeyPatch,
 ) -> None:
     from jacobian.domains.matrix_lattice import lattice
@@ -331,7 +331,7 @@ def test_lattice_lll_timeout_retains_no_operation_artifacts(
             timed_out=True,
         ),
     )
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lattice.basis.reduce",
             input={

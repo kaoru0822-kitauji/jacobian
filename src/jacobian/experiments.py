@@ -131,7 +131,7 @@ class ExperimentService:
         parents: tuple[str, ...] = (),
         summary: str,
     ) -> ArtifactPutResult:
-        """Validate kernel-owned experiment data before committing it."""
+        """Validate runtime-owned experiment data before committing it."""
 
         normalized = self.schemas.validate(schema_uri, payload)
         self.store.get_descriptor(

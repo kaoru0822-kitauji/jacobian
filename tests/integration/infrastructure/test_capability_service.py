@@ -28,9 +28,9 @@ from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
 
 TEST_RUNTIME = CapabilityProviderRuntime(
     provider="tests",
@@ -50,7 +50,7 @@ class ComputedAdapter:
         capability_id="example.double",
         version="1",
         title="Double an integer",
-        description="Small adapter used to prove no MCP or kernel edit is required.",
+        description="Small adapter used to prove no MCP or runtime edit is required.",
         provider="tests",
         provider_runtime=TEST_RUNTIME,
         modes=(CapabilityMode.EXPLORE,),
@@ -293,10 +293,10 @@ class MisboundVerifiedAdapter:
 def test_external_adapter_invocation_is_recorded_and_retrievable(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(ComputedAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(ComputedAdapter())
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.double",
             input={"value": 21},
@@ -306,24 +306,24 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert result.output == {"value": 42}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.episode_uri is not None
-    episode = kernel.store.get(result.episode_uri)
+    episode = runtime.core.store.get(result.episode_uri)
     assert episode.payload["result"]["response_version"] == "2"
     assert episode.payload["result"]["completeness"]["status"] == "NOT_APPLICABLE"
-    hits = kernel.memory.search(query="double computed").hits
+    hits = runtime.core.memory.search(query="double computed").hits
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
 
 
 def test_installed_capability_discovery_is_compact_deterministic_and_transparent(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     schema = {
         "type": "object",
         "properties": {"value": {"type": "integer"}},
         "required": ["value"],
         "additionalProperties": False,
     }
-    kernel.register_capability(
+    runtime.core.capabilities.register(
         DiscoveryAdapter(
             CapabilityDescriptor(
                 capability_id="fixture_algebra.search.countermodel",
@@ -347,7 +347,7 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
             )
         )
     )
-    kernel.register_capability(
+    runtime.core.capabilities.register(
         DiscoveryAdapter(
             CapabilityDescriptor(
                 capability_id="fixture_graph.verify.coloring",
@@ -370,8 +370,8 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
         mode=CapabilityMode.EXPLORE,
         limit=10,
     )
-    first = kernel.capabilities.discover(request)
-    second = kernel.capabilities.discover(request)
+    first = runtime.core.capabilities.discover(request)
+    second = runtime.core.capabilities.discover(request)
 
     assert first == second
     assert [match.capability_id for match in first.matches] == [
@@ -390,9 +390,9 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
 def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
 
-    strong = kernel.capabilities.discover(
+    strong = runtime.core.capabilities.discover(
         CapabilityDiscoveryRequest(
             query="graded Jacobian syzygy minimum degree",
             limit=3,
@@ -405,7 +405,7 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
     assert strong.matches[0].lexical_fit == "STRONG_CANDIDATE"
     assert strong.matches[0].query_coverage_milli == 1000
 
-    weak = kernel.capabilities.discover(
+    weak = runtime.core.capabilities.discover(
         CapabilityDiscoveryRequest(
             query="continuous Gaussian Wick moments all orders",
             limit=3,
@@ -415,7 +415,7 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
     assert weak.portfolio_fit == "ONLY_WEAK_LEXICAL_MATCHES"
     assert all(match.lexical_fit == "WEAK_LEXICAL_MATCH" for match in weak.matches)
 
-    absent = kernel.capabilities.discover(
+    absent = runtime.core.capabilities.discover(
         CapabilityDiscoveryRequest(
             query="quuxonium frobnicator",
             limit=3,
@@ -428,7 +428,7 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
 def test_capability_registration_rejects_an_invalid_invocation_example(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     adapter = DiscoveryAdapter(
         CapabilityDescriptor(
             capability_id="example.invalid-example",
@@ -457,13 +457,13 @@ def test_capability_registration_rejects_an_invalid_invocation_example(
     )
 
     with pytest.raises(CapabilityError, match="invocation example"):
-        kernel.register_capability(adapter)
+        runtime.core.capabilities.register(adapter)
 
 
 def test_knowledge_search_filters_episode_domain_tags_and_failures(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     graph_episode = ResearchEpisode(
         capability_id="graph.compute.properties",
         capability_version="1",
@@ -477,8 +477,8 @@ def test_knowledge_search_filters_episode_domain_tags_and_failures(
         summary="K5 counterexample with a nonplanar obstruction",
         tags=("graph", "counterexample", "failure"),
     )
-    graph_uri = kernel.memory.record(graph_episode)
-    kernel.memory.record(
+    graph_uri = runtime.core.memory.record(graph_episode)
+    runtime.core.memory.record(
         ResearchEpisode(
             capability_id="lean.check",
             capability_version="1",
@@ -491,7 +491,7 @@ def test_knowledge_search_filters_episode_domain_tags_and_failures(
         )
     )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="knowledge.search",
             input={
@@ -531,9 +531,9 @@ def test_knowledge_search_filters_episode_domain_tags_and_failures(
 def test_knowledge_search_reports_snapshot_bounded_partial_results(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     for value in (1, 2):
-        kernel.memory.record(
+        runtime.core.memory.record(
             ResearchEpisode(
                 capability_id="polynomial.factor.compute",
                 capability_version="1",
@@ -546,7 +546,7 @@ def test_knowledge_search_reports_snapshot_bounded_partial_results(
             )
         )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="knowledge.search",
             input={"domains": ["polynomial"], "limit": 1},
@@ -564,9 +564,9 @@ def test_knowledge_search_reports_snapshot_bounded_partial_results(
 
 
 def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="missing.capability",
             input={},
@@ -585,10 +585,10 @@ def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None
 
 
 def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(ComputedAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(ComputedAdapter())
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.double",
             mode=CapabilityMode.VERIFY,
@@ -603,10 +603,10 @@ def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> No
 
 
 def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(ComputedAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(ComputedAdapter())
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.double",
             input={"value": "fixture-secret-value"},
@@ -632,10 +632,10 @@ def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
 def test_adapter_failure_does_not_expose_internal_exception_text(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(CrashingAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(CrashingAdapter())
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.crash",
             input={},
@@ -656,14 +656,14 @@ def test_adapter_failure_does_not_expose_internal_exception_text(
 
 
 def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(ForgedProviderAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(ForgedProviderAdapter())
 
     with pytest.raises(
         CapabilityError,
         match="provider runtime differs from its descriptor",
     ):
-        kernel.capabilities.invoke(
+        runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.forged-provider",
                 input={},
@@ -672,14 +672,14 @@ def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
 
 
 def test_external_adapter_loads_from_an_operator_entrypoint(tmp_path: Path) -> None:
-    kernel = JacobianKernel(
+    runtime = create_runtime(
         tmp_path,
         capability_adapter_entrypoints=(
             "tests.fixtures.capability_functions:create_adapter",
         ),
     )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="fixture.increment",
             input={"value": 4},
@@ -692,11 +692,11 @@ def test_external_adapter_loads_from_an_operator_entrypoint(tmp_path: Path) -> N
 def test_adapter_cannot_promote_without_a_local_verification_record(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(ForgedVerifiedAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(ForgedVerifiedAdapter())
 
     with pytest.raises(CapabilityError, match="verification record"):
-        kernel.capabilities.invoke(
+        runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.forged",
                 mode=CapabilityMode.VERIFY,
@@ -708,11 +708,11 @@ def test_adapter_cannot_promote_without_a_local_verification_record(
 def test_first_class_relationship_endpoints_must_be_exposed(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    kernel.register_capability(OmittedRelationshipArtifactAdapter())
+    runtime = create_runtime(tmp_path)
+    runtime.core.capabilities.register(OmittedRelationshipArtifactAdapter())
 
     with pytest.raises(CapabilityError, match="missing from artifact_uris"):
-        kernel.capabilities.invoke(
+        runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.relationship",
                 input={},
@@ -723,8 +723,10 @@ def test_first_class_relationship_endpoints_must_be_exposed(
 def test_verified_relationship_must_match_checker_selected_endpoints(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    verified = kernel.capabilities.invoke(
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="case.partition.finite",
             mode=CapabilityMode.VERIFY,
@@ -740,7 +742,7 @@ def test_verified_relationship_must_match_checker_selected_endpoints(
     )
     record_uri = verified.assurance.verification_record_uri
     assert record_uri is not None
-    record = kernel.store.get(record_uri)
+    record = runtime.core.store.get(record_uri)
     forged = ForgedRelationshipVerificationAdapter(
         verification_record_uri=record_uri,
         artifact_uris=(*record.manifest.parents, record_uri),
@@ -748,10 +750,10 @@ def test_verified_relationship_must_match_checker_selected_endpoints(
         source_uri=verified.output["claim_uri"],
         target_uri=verified.output["partition_uri"],
     )
-    kernel.register_capability(forged)
+    runtime.core.capabilities.register(forged)
 
     with pytest.raises(CapabilityError, match="endpoints differ"):
-        kernel.capabilities.invoke(
+        runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=forged.descriptor.capability_id,
                 mode=CapabilityMode.VERIFY,
@@ -763,8 +765,10 @@ def test_verified_relationship_must_match_checker_selected_endpoints(
 def test_verified_relationship_must_match_checker_selected_obligation(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    verified = kernel.capabilities.invoke(
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="case.partition.finite",
             mode=CapabilityMode.VERIFY,
@@ -777,7 +781,7 @@ def test_verified_relationship_must_match_checker_selected_obligation(
     )
     record_uri = verified.assurance.verification_record_uri
     assert record_uri is not None
-    record = kernel.store.get(record_uri)
+    record = runtime.core.store.get(record_uri)
     forged = ForgedRelationshipVerificationAdapter(
         verification_record_uri=record_uri,
         artifact_uris=(*record.manifest.parents, record_uri),
@@ -786,10 +790,10 @@ def test_verified_relationship_must_match_checker_selected_obligation(
         target_uri=verified.output["partition_uri"],
         obligation_uris=(verified.output["certificate_uri"],),
     )
-    kernel.register_capability(forged)
+    runtime.core.capabilities.register(forged)
 
     with pytest.raises(CapabilityError, match="obligations differ"):
-        kernel.capabilities.invoke(
+        runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=forged.descriptor.capability_id,
                 mode=CapabilityMode.VERIFY,
@@ -804,9 +808,11 @@ def test_verified_relationship_must_match_checker_selected_obligation(
     reason="Lean is not installed",
 )
 def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.check",
             mode=CapabilityMode.VERIFY,
@@ -831,9 +837,11 @@ def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
 def test_lean_capability_projects_repairable_checker_diagnostics(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.check",
             mode=CapabilityMode.VERIFY,

@@ -54,14 +54,14 @@ distribution RECORD. The Lean probe validates the pinned Lean version and
 commit, resolves and hashes the actual executable, and validates the pinned
 Mathlib checkout before `lean.check` is registered.
 
-If the separately managed Lean runtime is absent or unhealthy, the kernel still
+If the separately managed Lean runtime is absent or unhealthy, the runtime still
 starts, `lean.check` is absent from `capability://catalog`, and no invocation is
 attempted. Explicit operator-installed adapters fail registration instead of
 silently falling back to another provider.
 
 The optional cvc5 Alethe producer follows the same rule. The exact 1.3.4 wheel
 must expose the required SMT-LIB parser and proof APIs and have a hashed RECORD
-manifest. Otherwise `smt.unsat_proof.find` is absent while the base kernel and
+manifest. Otherwise `smt.unsat_proof.find` is absent while the base runtime and
 SMT artifact schemas remain available.
 
 Source-backed adapters can construct metadata without importing their
@@ -107,7 +107,7 @@ or digest-mismatched sidecar leaves the checker capability unavailable.
 Measure the provider selected for one installed capability:
 
 ```sh
-uv run jacobian --no-install-references \
+uv run jacobian --checker-authority NONE \
   provider-measure graph.compute.properties
 ```
 
@@ -123,7 +123,7 @@ Cold install is skipped by default because it performs network and filesystem
 work. Request it explicitly:
 
 ```sh
-uv run jacobian --no-install-references \
+uv run jacobian --checker-authority NONE \
   provider-measure graph.compute.properties --include-cold-install
 ```
 

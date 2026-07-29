@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import platform
 
-import sympy
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.arithmetic.integers import INTEGER_CAPABILITIES
 from jacobian.domains.arithmetic.rationals import RATIONAL_CAPABILITIES
@@ -21,7 +19,7 @@ from jacobian.operations import (
     DomainDiagnostics,
     DomainSemantics,
 )
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
 ARITHMETIC_BUNDLE = DomainBundle(
     domain_id="arithmetic",
@@ -44,9 +42,9 @@ ARITHMETIC_BUNDLE = DomainBundle(
     provider_runtime=known_provider_runtime(
         "jacobian.sympy",
         features=("exact-integer-arithmetic", "exact-rational-arithmetic"),
-        configuration={"sympy_version": sympy.__version__},
+        configuration={"sympy_version": SYMPY_VERSION},
     ),
-    backend_version=f"python-{platform.python_version()};sympy-{sympy.__version__}",
+    backend_version=f"python-{platform.python_version()};sympy-{SYMPY_VERSION}",
     capabilities=(
         *INTEGER_CAPABILITIES,
         *RATIONAL_CAPABILITIES,

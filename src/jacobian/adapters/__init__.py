@@ -1,1 +1,1 @@
-"""Transport adapters for the Jacobian kernel."""
+"""Transport adapters for the Jacobian runtime."""

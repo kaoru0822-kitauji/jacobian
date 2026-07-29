@@ -29,9 +29,9 @@ def _input(value: int) -> dict[str, Any]:
     }
 
 
-def test_solution_capability_verifies_valid_assignment(kernel_with_references) -> None:
+def test_solution_capability_verifies_valid_assignment(runtime_with_references) -> None:
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -52,12 +52,16 @@ def test_solution_capability_verifies_valid_assignment(kernel_with_references) -
         result.relationships[0].verification_record_uri
         == result.assurance.verification_record_uri
     )
-    certificate = kernel_with_references.store.get(result.output["certificate_uri"])
+    certificate = runtime_with_references.core.store.get(
+        result.output["certificate_uri"]
+    )
     assert (
         certificate.payload["payload"]["equation_residuals"]
         == (result.output["equation_residuals"])
     )
-    record = kernel_with_references.store.get(result.output["verification_record_uri"])
+    record = runtime_with_references.core.store.get(
+        result.output["verification_record_uri"]
+    )
     assert result.output["certificate_uri"] in record.manifest.parents
     assert record.payload["relationship_source_artifact_uris"] == [
         result.output["assignment_uri"]
@@ -69,10 +73,10 @@ def test_solution_capability_verifies_valid_assignment(kernel_with_references) -
 
 
 def test_solution_capability_verifies_invalid_assignment(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -85,7 +89,9 @@ def test_solution_capability_verifies_invalid_assignment(
     assert result.output["residuals_assurance"] == "VERIFIED"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.relationships == ()
-    record = kernel_with_references.store.get(result.output["verification_record_uri"])
+    record = runtime_with_references.core.store.get(
+        result.output["verification_record_uri"]
+    )
     assert record.payload["relation_id"] is None
     assert record.payload["relationship_source_artifact_uris"] == []
     assert record.payload["relationship_target_artifact_uris"] == []
@@ -93,15 +99,17 @@ def test_solution_capability_verifies_invalid_assignment(
 
 
 def test_solution_capability_keeps_checker_failure_unknown(
-    kernel_with_references,
+    runtime_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
 
     def fail(**_kwargs: Any):
         raise CheckerExecutionError("deliberate checker failure")
 
-    monkeypatch.setattr(kernel_with_references.verification, "_run_checker", fail)
-    result = kernel_with_references.capabilities.invoke(
+    monkeypatch.setattr(
+        runtime_with_references.services.verification, "_run_checker", fail
+    )
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -119,9 +127,9 @@ def test_solution_capability_keeps_checker_failure_unknown(
 
 
 def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    connection = sqlite3.connect(kernel_with_references.store.db_path)
+    connection = sqlite3.connect(runtime_with_references.core.store.db_path)
     try:
         before = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
     finally:
@@ -129,7 +137,7 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
     invalid = _input(2)
     invalid["assignment"].append({"num": "3", "den": "1"})
 
-    result = kernel_with_references.capabilities.invoke(
+    result = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.system.solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -137,7 +145,7 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
         )
     )
 
-    connection = sqlite3.connect(kernel_with_references.store.db_path)
+    connection = sqlite3.connect(runtime_with_references.core.store.db_path)
     try:
         after = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
     finally:
@@ -149,12 +157,12 @@ def test_solution_capability_rejects_dimension_mismatch_before_artifact_writes(
 
 
 def test_solution_capability_is_only_available_with_checker(
-    kernel,
+    runtime,
 ) -> None:
 
     ids = {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
 
     assert "polynomial.system.solution.verify" not in ids

@@ -58,7 +58,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             _expected_plan("selective", "run-npm", "run-docs"),
         ),
         (
-            ("tests/unit/test_kernel.py",),
+            ("tests/unit/test_runtime.py",),
             _expected_plan(
                 "python-core",
                 "run-python",
@@ -67,7 +67,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/integration/infrastructure/test_kernel.py",),
+            ("tests/integration/infrastructure/test_runtime.py",),
             _expected_plan(
                 "python-integration",
                 "run-python",
@@ -80,7 +80,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             _expected_plan("lean", "run-lean"),
         ),
         (
-            ("tests/unit/test_kernel.py", "lean/JacobianLeanRuntime.lean"),
+            ("tests/unit/test_runtime.py", "lean/JacobianLeanRuntime.lean"),
             _expected_plan(
                 "selective",
                 "run-python",
@@ -91,8 +91,8 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             (
-                "tests/unit/test_kernel.py",
-                "tests/integration/infrastructure/test_kernel.py",
+                "tests/unit/test_runtime.py",
+                "tests/integration/infrastructure/test_runtime.py",
             ),
             _expected_plan(
                 "selective",
@@ -103,7 +103,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("src/jacobian/kernel.py",),
+            ("src/jacobian/runtime/model.py",),
             _expected_plan("full", *FUNCTIONAL_KEYS),
         ),
         (
@@ -338,11 +338,11 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
     [
         ("README.md",),
         ("npm/package.json",),
-        ("src/jacobian/kernel.py",),
-        ("tests/unit/test_kernel.py",),
-        ("tests/integration/infrastructure/test_kernel.py",),
+        ("src/jacobian/runtime/model.py",),
+        ("tests/unit/test_runtime.py",),
+        ("tests/integration/infrastructure/test_runtime.py",),
         ("lean/JacobianLeanRuntime.lean",),
-        ("tests/unit/test_kernel.py", "lean/JacobianLeanRuntime.lean"),
+        ("tests/unit/test_runtime.py", "lean/JacobianLeanRuntime.lean"),
         ("--force-lean", "--", "README.md"),
         ("--force-lean", "--", "npm/package.json"),
     ],

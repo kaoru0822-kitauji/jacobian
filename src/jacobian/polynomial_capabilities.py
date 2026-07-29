@@ -10,12 +10,9 @@ from dataclasses import dataclass
 from itertools import product
 from math import prod as multiply
 from queue import Empty
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-import sympy
 from pydantic import ValidationError
-from sympy import QQ, Matrix, Poly, expand, solve, symbols, sympify
-from sympy.polys.polyerrors import PolynomialError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -98,11 +95,52 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.domains._examples import example
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
+from jacobian.providers import LazyLoader
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 from jacobian.verification import VerificationService
+
+if TYPE_CHECKING:
+    from sympy import Poly
+
+
+class _SympyBackend(NamedTuple):
+    """Heavy SymPy implementation symbols loaded on first capability invocation."""
+
+    QQ: Any
+    Matrix: Any
+    Poly: Any
+    expand: Any
+    solve: Any
+    symbols: Any
+    sympify: Any
+    Rational: Any
+    PolynomialError: type
+
+
+def _load_sympy_backend() -> _SympyBackend:
+    """Construct the pinned SymPy implementation bundle on first use."""
+    from sympy import QQ, Matrix, Poly, Rational, expand, solve, symbols, sympify
+    from sympy.polys.polyerrors import PolynomialError
+
+    return _SympyBackend(
+        QQ,
+        Matrix,
+        Poly,
+        expand,
+        solve,
+        symbols,
+        sympify,
+        Rational,
+        PolynomialError,
+    )
+
+
+_sympy: LazyLoader[_SympyBackend] = LazyLoader(
+    _load_sympy_backend, component_id="jacobian.sympy.polynomial-maps"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -523,7 +561,7 @@ class PolynomialMapEvaluationAdapter:
             evaluation_uri=evaluation_uri,
             point=point.values,
             image=evaluation.image,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -614,22 +652,27 @@ class PolynomialJacobianAdapter:
         started = time.monotonic()
         polynomial_map = validated.map
         polynomial_map, map_uri = _materialize_map(self.resources, polynomial_map)
+        sp = _sympy.get()
         try:
             generators, coordinates = _sympy_map(polynomial_map)
             matrix_polys = tuple(
                 tuple(coordinate.diff(generator) for generator in generators)
                 for coordinate in coordinates
             )
-            determinant = Poly(
-                expand(
-                    Matrix(
+            determinant = sp.Poly(
+                sp.expand(
+                    sp.Matrix(
                         [[entry.as_expr() for entry in row] for row in matrix_polys]
                     ).det()
                 ),
                 *generators,
-                domain=QQ,
+                domain=sp.QQ,
             )
-        except (PolynomialError, TypeError, ValueError) as exc:
+        except (
+            cast(type[BaseException], sp.PolynomialError),
+            TypeError,
+            ValueError,
+        ) as exc:
             raise _polynomial_error(
                 "POLYNOMIAL_JACOBIAN_FAILED",
                 "jacobian_computation",
@@ -643,7 +686,7 @@ class PolynomialJacobianAdapter:
             variable_order=polynomial_map.variables,
             matrix=matrix,
             determinant=_wire_polynomial(determinant),
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         jacobian_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.installation.jacobian_schema_uri,
@@ -700,7 +743,7 @@ class PolynomialJacobianAdapter:
             checker_id=self.resources.installation.jacobian_checker_id,
             matrix=jacobian.matrix,
             determinant=jacobian.determinant,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -1405,7 +1448,8 @@ class PolynomialFactorAdapter:
             payload=validated.polynomial.model_dump(mode="json"),
             summary="univariate sparse rational polynomial",
         )
-        generator = cast(tuple[Any, ...], symbols(validated.variable, seq=True))
+        sp = _sympy.get()
+        generator = cast(tuple[Any, ...], sp.symbols(validated.variable, seq=True))
         polynomial = _sympy_polynomial(validated.polynomial, generator)
         coefficient_value, raw_factors = polynomial.factor_list()
         factors = tuple(
@@ -1415,14 +1459,14 @@ class PolynomialFactorAdapter:
             )
             for factor, multiplicity in raw_factors
         )
-        reconstructed_expression = sympy.Rational(coefficient_value)
+        reconstructed_expression = sp.Rational(coefficient_value)
         for factor, multiplicity in raw_factors:
             reconstructed_expression *= factor.as_expr() ** multiplicity
         reconstructed = _wire_polynomial(
-            Poly(
-                sympy.expand(reconstructed_expression),
+            sp.Poly(
+                sp.expand(reconstructed_expression),
                 *generator,
-                domain=QQ,
+                domain=sp.QQ,
             )
         )
         artifact_payload = PolynomialFactorizationArtifact(
@@ -1431,7 +1475,7 @@ class PolynomialFactorAdapter:
             coefficient=_wire_rational(coefficient_value),
             factors=factors,
             reconstructed=reconstructed,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         factorization = self.resources.artifacts.put(
             schema_uri=self.resources.installation.factorization_schema_uri,
@@ -1447,7 +1491,7 @@ class PolynomialFactorAdapter:
             coefficient=artifact_payload.coefficient,
             factors=factors,
             reconstructed=reconstructed,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -1816,12 +1860,14 @@ def _inverse_solver_worker(
     """Solve one exact coefficient system in an isolated process."""
 
     try:
-        unknowns = symbols(" ".join(unknown_names), seq=True)
+        sp = _sympy.get()
+        unknowns = sp.symbols(" ".join(unknown_names), seq=True)
         locals_by_name = dict(zip(unknown_names, unknowns, strict=True))
         equations = tuple(
-            sympify(expression, locals=locals_by_name) for expression in equation_texts
+            sp.sympify(expression, locals=locals_by_name)
+            for expression in equation_texts
         )
-        solutions = solve(equations, unknowns, dict=True, simplify=False)
+        solutions = sp.solve(equations, unknowns, dict=True, simplify=False)
         serialized = tuple(
             tuple(
                 (name, str(solution.get(symbol, symbol)))
@@ -2100,7 +2146,7 @@ class PolynomialMapInverseSynthesizeAdapter:
         elapsed_ms = max(0, int((time.monotonic() - started) * 1000))
         provenance = PolynomialInverseSolverProvenance(
             solver=validated.solver,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
             timeout_ms=validated.limits.timeout_ms,
             unknown_count=len(unknown_names),
             equation_count=len(equations),
@@ -2293,12 +2339,13 @@ def _inverse_coefficient_system(
     int,
 ]:
     source_generators, forward = _sympy_map(request.forward_map)
-    target_generators = tuple(symbols(request.target_variables))
+    sp = _sympy.get()
+    target_generators = tuple(sp.symbols(request.target_variables))
     flat_names = tuple(name for row in coefficient_names for name in row)
-    unknowns = tuple(symbols(" ".join(flat_names), seq=True))
+    unknowns = tuple(sp.symbols(" ".join(flat_names), seq=True))
     unknown_by_name = dict(zip(flat_names, unknowns, strict=True))
     ansatz = tuple(
-        expand(
+        sp.expand(
             sum(
                 unknown_by_name[name]
                 * multiply(
@@ -2323,7 +2370,7 @@ def _inverse_coefficient_system(
         )
     }
     left = tuple(
-        expand(
+        sp.expand(
             expression.subs(left_substitutions, simultaneous=True)
             - source_generators[index]
         )
@@ -2331,7 +2378,7 @@ def _inverse_coefficient_system(
     )
     right_substitutions = dict(zip(source_generators, ansatz, strict=True))
     right = tuple(
-        expand(
+        sp.expand(
             polynomial.as_expr().subs(right_substitutions, simultaneous=True)
             - target_generators[index]
         )
@@ -2344,7 +2391,7 @@ def _inverse_coefficient_system(
         ("FORWARD_AFTER_INVERSE", target_generators, right),
     ):
         for coordinate, residual in enumerate(residuals):
-            polynomial = Poly(residual, *generators)
+            polynomial = sp.Poly(residual, *generators)
             terms = polynomial.terms()
             residual_term_count += len(terms)
             records.extend(
@@ -2390,12 +2437,13 @@ def _solve_inverse_system(
         return "ERROR", None
     if not raw:
         return "OK", None
+    sp = _sympy.get()
     symbols_by_name = dict(
-        zip(unknown_names, symbols(" ".join(unknown_names), seq=True), strict=True)
+        zip(unknown_names, sp.symbols(" ".join(unknown_names), seq=True), strict=True)
     )
     first = raw[0]
     solution = {
-        symbols_by_name[name]: sympify(value, locals=symbols_by_name)
+        symbols_by_name[name]: sp.sympify(value, locals=symbols_by_name)
         for name, value in first
     }
     return "OK", solution
@@ -2406,15 +2454,16 @@ def _inverse_candidate_map(
     ansatz: tuple[Any, ...],
     solution: dict[Any, Any],
 ) -> RationalPolynomialMap:
-    target_generators = tuple(symbols(request.target_variables))
+    sp = _sympy.get()
+    target_generators = tuple(sp.symbols(request.target_variables))
     return RationalPolynomialMap(
         variables=request.target_variables,
         coordinates=tuple(
             _wire_polynomial(
-                Poly(
-                    expand(expression.subs(solution, simultaneous=True)),
+                sp.Poly(
+                    sp.expand(expression.subs(solution, simultaneous=True)),
                     *target_generators,
-                    domain=QQ,
+                    domain=sp.QQ,
                 )
             )
             for expression in ansatz
@@ -2741,6 +2790,7 @@ def _map_inverse_residuals(
 ]:
     source_generators, forward = _sympy_map(request.forward_map)
     target_generators, inverse = _sympy_map(request.inverse_map)
+    sp = _sympy.get()
 
     def compose_residuals(
         outer: tuple[Poly, ...],
@@ -2754,8 +2804,8 @@ def _map_inverse_residuals(
         }
         return tuple(
             _wire_polynomial(
-                Poly(
-                    expand(
+                sp.Poly(
+                    sp.expand(
                         polynomial.as_expr().subs(
                             substitutions,
                             simultaneous=True,
@@ -2763,7 +2813,7 @@ def _map_inverse_residuals(
                     )
                     - result_generators[index],
                     *result_generators,
-                    domain=QQ,
+                    domain=sp.QQ,
                 )
             )
             for index, polynomial in enumerate(outer)
@@ -2795,9 +2845,10 @@ def _validate_request[RequestModel: ContractModel](
 def _sympy_map(
     polynomial_map: RationalPolynomialMap,
 ) -> tuple[tuple[Any, ...], tuple[Poly, ...]]:
+    sp = _sympy.get()
     generators = cast(
         tuple[Any, ...],
-        symbols(" ".join(polynomial_map.variables), seq=True),
+        sp.symbols(" ".join(polynomial_map.variables), seq=True),
     )
     coordinates = tuple(
         _sympy_polynomial(polynomial, generators)
@@ -2810,14 +2861,15 @@ def _sympy_polynomial(
     polynomial: SparseRationalPolynomial,
     generators: tuple[Any, ...],
 ) -> Poly:
+    sp = _sympy.get()
     terms = {
-        term.exponents: QQ(
+        term.exponents: sp.QQ(
             int(term.coefficient.num),
             int(term.coefficient.den),
         )
         for term in polynomial.terms
     }
-    return Poly.from_dict(terms, generators, domain=QQ)
+    return sp.Poly.from_dict(terms, generators, domain=sp.QQ)
 
 
 def _wire_polynomial(polynomial: Poly) -> SparseRationalPolynomial:
@@ -2834,7 +2886,7 @@ def _wire_polynomial(polynomial: Poly) -> SparseRationalPolynomial:
 
 
 def _wire_rational(value: object) -> CanonicalRational:
-    rational = sympy.Rational(value)
+    rational = _sympy.get().Rational(value)
     return CanonicalRational(num=str(rational.p), den=str(rational.q))
 
 
@@ -2842,10 +2894,11 @@ def _evaluate(
     polynomial_map: RationalPolynomialMap,
     point: RationalPolynomialPoint,
 ) -> tuple[CanonicalRational, ...]:
+    sp = _sympy.get()
     try:
         generators, coordinates = _sympy_map(polynomial_map)
         substitutions = {
-            generator: QQ(
+            generator: sp.QQ(
                 int(value.num),
                 int(value.den),
             )
@@ -2856,7 +2909,12 @@ def _evaluate(
             )
         }
         return tuple(_wire_rational(poly.eval(substitutions)) for poly in coordinates)
-    except (PolynomialError, TypeError, ValueError, ZeroDivisionError) as exc:
+    except (
+        cast(type[BaseException], sp.PolynomialError),
+        TypeError,
+        ValueError,
+        ZeroDivisionError,
+    ) as exc:
         raise _polynomial_error(
             "POLYNOMIAL_EVALUATION_FAILED",
             "evaluation",
@@ -2875,7 +2933,7 @@ def _materialize_evaluation(
         map_uri=map_uri,
         point=point,
         image=image,
-        backend_version=sympy.__version__,
+        backend_version=SYMPY_VERSION,
     )
     artifact = resources.artifacts.put(
         schema_uri=resources.installation.evaluation_schema_uri,

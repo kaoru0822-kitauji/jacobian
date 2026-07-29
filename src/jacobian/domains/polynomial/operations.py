@@ -5,8 +5,6 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any, cast
 
-from sympy import QQ, Poly, Rational, Symbol, discriminant, groebner, resultant
-
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.polynomial_operations import (
     PolynomialBezoutIdentity,
@@ -39,11 +37,15 @@ class PolynomialOutputBudgetError(RuntimeError):
     """A valid computation produced more output than its public contract permits."""
 
 
-def _symbols(variables: tuple[str, ...]) -> tuple[Symbol, ...]:
+def _symbols(variables: tuple[str, ...]) -> tuple[Any, ...]:
+    from sympy import Symbol
+
     return tuple(Symbol(variable) for variable in variables)
 
 
-def _poly(polynomial: RationalPolynomial) -> Poly:
+def _poly(polynomial: RationalPolynomial) -> Any:
+    from sympy import QQ, Poly, Rational
+
     generators = _symbols(polynomial.variables)
     coefficients = {
         term.exponents: Rational(
@@ -60,7 +62,7 @@ def _rational(value: Any) -> CanonicalRational:
     return CanonicalRational(num=str(fraction.numerator), den=str(fraction.denominator))
 
 
-def _wire(poly: Poly, variables: tuple[str, ...]) -> RationalPolynomial:
+def _wire(poly: Any, variables: tuple[str, ...]) -> RationalPolynomial:
     terms = tuple(
         (exponents, coefficient)
         for exponents, coefficient in poly.terms()
@@ -88,6 +90,8 @@ def _invariant_value(
     expression: Any,
     remaining_variables: tuple[str, ...],
 ) -> PolynomialInvariantValue:
+    from sympy import QQ, Poly
+
     if not remaining_variables:
         return PolynomialScalarValue(value=_rational(expression))
     return PolynomialValue(
@@ -117,6 +121,8 @@ def polynomial_resultant(
     request: ContractModel,
 ) -> ContractModel:
     request = cast(PolynomialResultantRequest, request)
+    from sympy import resultant
+
     variables = request.left.variables
     elimination_index = variables.index(request.elimination_variable)
     generator = _symbols(variables)[elimination_index]
@@ -136,6 +142,8 @@ def polynomial_discriminant(
     request: ContractModel,
 ) -> ContractModel:
     request = cast(PolynomialDiscriminantRequest, request)
+    from sympy import discriminant
+
     variables = request.polynomial.variables
     variable_index = variables.index(request.variable)
     generator = _symbols(variables)[variable_index]
@@ -153,6 +161,8 @@ def polynomial_square_free_decomposition(
     request: ContractModel,
 ) -> ContractModel:
     request = cast(PolynomialSquareFreeRequest, request)
+    from sympy import QQ, Poly
+
     source = _poly(request.polynomial)
     coefficient, raw_factors = source.sqf_list()
     canonical_factors = tuple(
@@ -185,6 +195,8 @@ def polynomial_groebner_basis(
     request: PolynomialGroebnerBasisRequest,
 ) -> PolynomialGroebnerBasisResult:
     """Compute one complete reduced basis inside the isolated worker."""
+
+    from sympy import QQ, groebner
 
     variables = request.generators[0].variables
     basis = groebner(

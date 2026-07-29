@@ -159,7 +159,7 @@ def test_exact_checker_composite_runtime_is_remeasured_recursively() -> None:
         require_provider_runtime_unchanged(changed)
 
 
-def test_exact_checker_runtime_requires_rational_polynomial_api(
+def test_exact_checker_runtime_defers_rational_polynomial_api_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     incomplete_flint = SimpleNamespace(
@@ -178,8 +178,15 @@ def test_exact_checker_runtime_requires_rational_polynomial_api(
 
     runtime = provider_runtime.python_flint_exact_checker_provider_runtime(refresh=True)
 
-    assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
-    assert runtime.digest is None
+    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    assert runtime.distribution_required_attributes == (
+        "fmpq",
+        "fmpq_mat",
+        "fmpq_poly",
+        "fmpz",
+        "fmpz_mat",
+        "fmpz_poly",
+    )
 
 
 def test_exact_checker_runtime_rejects_different_linked_flint_version(
@@ -220,7 +227,7 @@ def test_measurement_status_cannot_hide_missing_elapsed_time() -> None:
         ProviderMeasurementSample(status=ProviderMeasurementStatus.SKIPPED)
 
 
-def test_python_distribution_unchanged_check_replays_feature_probe(
+def test_python_distribution_unchanged_check_does_not_import_implementation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime = python_distribution_provider_runtime(
@@ -235,11 +242,9 @@ def test_python_distribution_unchanged_check_replays_feature_probe(
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.distribution_import_name == "pydantic"
     assert runtime.distribution_required_attributes == ("BaseModel",)
-    monkeypatch.setattr(
-        provider_runtime.importlib,
-        "import_module",
-        lambda _name: SimpleNamespace(),
-    )
 
-    with pytest.raises(ProviderRuntimeError, match="installed and healthy"):
-        require_provider_runtime_unchanged(runtime)
+    def fail_import(_name: str) -> object:
+        pytest.fail("distribution identity replay must not import the provider")
+
+    monkeypatch.setattr(provider_runtime.importlib, "import_module", fail_import)
+    require_provider_runtime_unchanged(runtime)

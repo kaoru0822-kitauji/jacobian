@@ -3,14 +3,14 @@ from __future__ import annotations
 import pytest
 
 from jacobian.artifacts import ArtifactValidationError
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = pytest.mark.xdist_group("reference-claim-schemas")
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def _claim_payload(
@@ -37,12 +37,12 @@ def _claim_payload(
 
 
 def test_path_closure_claim_requires_simple_path_semantics(
-    kernel,
+    runtime,
 ) -> None:
-    reference = kernel.references["graph_paths"]
+    reference = runtime.portfolio.references["graph_paths"]
 
     with pytest.raises(ArtifactValidationError, match="simple"):
-        kernel.artifacts.put(
+        runtime.core.artifacts.put(
             schema_uri=reference.claim_schema_uri,
             semantics_uri=reference.semantics_uri,
             payload=_claim_payload(
@@ -54,11 +54,11 @@ def test_path_closure_claim_requires_simple_path_semantics(
         )
 
 
-def test_maxdet_claim_requires_a_bounded_matrix_scope(kernel) -> None:
-    reference = kernel.references["matrices"]
+def test_maxdet_claim_requires_a_bounded_matrix_scope(runtime) -> None:
+    reference = runtime.portfolio.references["matrices"]
 
     with pytest.raises(ArtifactValidationError, match="scope"):
-        kernel.artifacts.put(
+        runtime.core.artifacts.put(
             schema_uri=reference.claim_schema_uri,
             semantics_uri=reference.semantics_uri,
             payload=_claim_payload(
@@ -70,11 +70,11 @@ def test_maxdet_claim_requires_a_bounded_matrix_scope(kernel) -> None:
         )
 
 
-def test_graph_candidate_schema_rejects_incomplete_arc(kernel) -> None:
-    reference = kernel.references["graph_paths"]
+def test_graph_candidate_schema_rejects_incomplete_arc(runtime) -> None:
+    reference = runtime.portfolio.references["graph_paths"]
 
     with pytest.raises(ArtifactValidationError):
-        kernel.artifacts.put(
+        runtime.core.artifacts.put(
             schema_uri=reference.candidate_schema_uri,
             semantics_uri=reference.semantics_uri,
             payload={
@@ -84,11 +84,11 @@ def test_graph_candidate_schema_rejects_incomplete_arc(kernel) -> None:
         )
 
 
-def test_erdos_straus_claim_requires_a_bounded_range(kernel) -> None:
-    reference = kernel.references["erdos_straus"]
+def test_erdos_straus_claim_requires_a_bounded_range(runtime) -> None:
+    reference = runtime.portfolio.references["erdos_straus"]
 
     with pytest.raises(ArtifactValidationError, match="upper_bound"):
-        kernel.artifacts.put(
+        runtime.core.artifacts.put(
             schema_uri=reference.claim_schema_uri,
             semantics_uri=reference.semantics_uri,
             payload=_claim_payload(

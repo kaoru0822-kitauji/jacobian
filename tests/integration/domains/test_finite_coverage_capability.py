@@ -29,11 +29,11 @@ def _request(
 
 
 def test_finite_coverage_verifies_exactly_once_across_pages(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         _request(["alpha", "beta", "gamma"], [["alpha"], ["beta", "gamma"]])
     )
 
@@ -52,16 +52,18 @@ def test_finite_coverage_verifies_exactly_once_across_pages(
     assert result.relationships[0].status is CapabilityRelationshipStatus.VERIFIED
     assert result.obligations[0].status is CapabilityObligationStatus.DISCHARGED
 
-    archive = kernel.store.get(result.output["archive_uri"])
+    archive = runtime.core.store.get(result.output["archive_uri"])
     assert set(result.output["page_uris"]).issubset(set(archive.manifest.parents))
     assert result.output["scope_uri"] in archive.manifest.parents
     assert result.output["canonicalizer_uri"] in archive.manifest.parents
 
 
-def test_finite_coverage_reports_omission_and_duplicate(kernel_with_references) -> None:
+def test_finite_coverage_reports_omission_and_duplicate(
+    runtime_with_references,
+) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         _request(["alpha", "beta", "gamma"], [["alpha", "beta"], ["beta"]])
     )
 
@@ -78,10 +80,10 @@ def test_finite_coverage_reports_omission_and_duplicate(kernel_with_references) 
     assert result.obligations[0].status is CapabilityObligationStatus.OPEN
 
 
-def test_finite_coverage_reports_items_outside_scope(kernel_with_references) -> None:
+def test_finite_coverage_reports_items_outside_scope(runtime_with_references) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         _request(["alpha", "beta"], [["alpha", "beta", "gamma"]])
     )
 
@@ -91,11 +93,11 @@ def test_finite_coverage_reports_items_outside_scope(kernel_with_references) -> 
 
 
 def test_finite_coverage_supports_registered_integer_canonicalizer(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         _request(
             [1, 2, 3],
             [[3], [1, 2]],
@@ -108,11 +110,11 @@ def test_finite_coverage_supports_registered_integer_canonicalizer(
 
 
 def test_finite_coverage_unknown_canonicalizer_reports_precise_schema_error(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(
         _request(
             ["alpha"],
             [["alpha"]],
@@ -131,19 +133,19 @@ def test_finite_coverage_unknown_canonicalizer_reports_precise_schema_error(
 
 
 def test_finite_coverage_rejects_nfc_collisions_in_scope(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
 
-    kernel = kernel_with_references
-    result = kernel.capabilities.invoke(_request(["é", "e\u0301"], [["é"]]))
+    runtime = runtime_with_references
+    result = runtime.core.capabilities.invoke(_request(["é", "e\u0301"], [["é"]]))
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["error"]["code"] == "DUPLICATE_FINITE_SCOPE_KEY"
 
 
-def test_finite_coverage_is_unavailable_without_authorized_checker(kernel) -> None:
+def test_finite_coverage_is_unavailable_without_authorized_checker(runtime) -> None:
 
-    result = kernel.capabilities.invoke(_request(["alpha"], [["alpha"]]))
+    result = runtime.core.capabilities.invoke(_request(["alpha"], [["alpha"]]))
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["error"]["code"] == "UNKNOWN_CAPABILITY"

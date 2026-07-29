@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sympy
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.geometry.lines import LINE_CAPABILITIES
 from jacobian.domains.geometry.points import POINT_CAPABILITIES
@@ -15,7 +13,7 @@ from jacobian.operations import (
     DomainDiagnostics,
     DomainSemantics,
 )
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
 GEOMETRY_BUNDLE = DomainBundle(
     domain_id="geometry",
@@ -33,7 +31,7 @@ GEOMETRY_BUNDLE = DomainBundle(
         "jacobian.sympy",
         features=("exact-rational-geometry",),
     ),
-    backend_version=sympy.__version__,
+    backend_version=SYMPY_VERSION,
     capabilities=(
         *POINT_CAPABILITIES,
         *SEGMENT_CAPABILITIES,

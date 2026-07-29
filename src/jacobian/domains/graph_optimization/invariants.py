@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import importlib
 import math
 import time
 from collections.abc import Callable
 from typing import Any, cast
-
-import networkx as nx
-import sympy
 
 from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
@@ -41,6 +37,7 @@ from jacobian.contracts.graph_optimization import (
 )
 from jacobian.contracts.results import ContractModel
 from jacobian.domains._examples import example
+from jacobian.domains.graph_optimization._providers import Z3_LOADER
 from jacobian.domains.graph_optimization.operations import build_simple_graph
 from jacobian.operations import (
     BoundedSearchIncomplete,
@@ -68,7 +65,7 @@ def _computed[
     title: str,
     description: str,
     result_model: type[ResultT],
-    operation: Callable[[nx.Graph[str]], ResultT],
+    operation: Callable[[Any], ResultT],
     *tags: str,
     version: str = "1",
     invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
@@ -76,8 +73,10 @@ def _computed[
     def implementation(
         request: GraphInvariantRequest,
     ) -> ComputedOutcome[ResultT]:
+        import networkx as nx
+
         try:
-            graph = cast("nx.Graph[str]", build_simple_graph(request.graph))
+            graph = cast(Any, build_simple_graph(request.graph))
             return ComputedSuccess(operation(graph))
         except (ArithmeticError, nx.NetworkXError, TypeError, ValueError) as exc:
             return ComputedNotApplicable(
@@ -104,13 +103,17 @@ def _computed[
     )
 
 
-def _girth(graph: nx.Graph[str]) -> GraphGirthResult:
+def _girth(graph: Any) -> GraphGirthResult:
+    import networkx as nx
+
     value = nx.girth(graph)
     girth = 0 if math.isinf(value) else int(value)
     return GraphGirthResult(girth=girth, has_cycle=girth > 0)
 
 
-def _distance_matrix(graph: nx.Graph[str]) -> GraphDistanceMatrixResult:
+def _distance_matrix(graph: Any) -> GraphDistanceMatrixResult:
+    import networkx as nx
+
     vertices = tuple(sorted(graph.nodes))
     shortest_paths = {
         source: nx.single_source_shortest_path_length(graph, source)
@@ -134,7 +137,9 @@ def _distance_matrix(graph: nx.Graph[str]) -> GraphDistanceMatrixResult:
     )
 
 
-def _diameter(graph: nx.Graph[str]) -> GraphDiameterResult:
+def _diameter(graph: Any) -> GraphDiameterResult:
+    import networkx as nx
+
     if not graph or not nx.is_connected(graph):
         return GraphDiameterResult(
             status="NOT_APPLICABLE",
@@ -150,21 +155,30 @@ def _diameter(graph: nx.Graph[str]) -> GraphDiameterResult:
     )
 
 
-def _edge_connectivity(graph: nx.Graph[str]) -> GraphEdgeConnectivityResult:
+def _edge_connectivity(graph: Any) -> GraphEdgeConnectivityResult:
+    import networkx as nx
+
     value = 0 if len(graph) <= 1 else int(nx.edge_connectivity(graph))
     return GraphEdgeConnectivityResult(edge_connectivity=value)
 
 
-def _vertex_connectivity(graph: nx.Graph[str]) -> GraphVertexConnectivityResult:
+def _vertex_connectivity(graph: Any) -> GraphVertexConnectivityResult:
+    import networkx as nx
+
     value = 0 if len(graph) <= 1 else int(nx.node_connectivity(graph))
     return GraphVertexConnectivityResult(vertex_connectivity=value)
 
 
-def _eulerian(graph: nx.Graph[str]) -> GraphEulerianResult:
+def _eulerian(graph: Any) -> GraphEulerianResult:
+    import networkx as nx
+
     return GraphEulerianResult(is_eulerian=bool(nx.is_eulerian(graph)))
 
 
-def _spanning_tree_count(graph: nx.Graph[str]) -> GraphSpanningTreeCountResult:
+def _spanning_tree_count(graph: Any) -> GraphSpanningTreeCountResult:
+    import networkx as nx
+    import sympy
+
     if not graph:
         return GraphSpanningTreeCountResult(
             spanning_tree_count=0,
@@ -196,7 +210,9 @@ def _spanning_tree_count(graph: nx.Graph[str]) -> GraphSpanningTreeCountResult:
     )
 
 
-def _maximum_matching(graph: nx.Graph[str]) -> GraphMaximumMatchingResult:
+def _maximum_matching(graph: Any) -> GraphMaximumMatchingResult:
+    import networkx as nx
+
     raw = nx.max_weight_matching(graph, maxcardinality=True)
     edges = tuple(
         sorted(
@@ -238,12 +254,16 @@ def _maximum_matching(graph: nx.Graph[str]) -> GraphMaximumMatchingResult:
     )
 
 
-def _triangle_count(graph: nx.Graph[str]) -> GraphTriangleCountResult:
+def _triangle_count(graph: Any) -> GraphTriangleCountResult:
+    import networkx as nx
+
     triangle_counts = cast(dict[str, int], nx.triangles(graph))
     return GraphTriangleCountResult(triangle_count=sum(triangle_counts.values()) // 3)
 
 
-def _radius(graph: nx.Graph[str]) -> GraphRadiusResult:
+def _radius(graph: Any) -> GraphRadiusResult:
+    import networkx as nx
+
     if not graph or not nx.is_connected(graph):
         return GraphRadiusResult(
             status="NOT_APPLICABLE",
@@ -262,8 +282,10 @@ def _radius(graph: nx.Graph[str]) -> GraphRadiusResult:
 def _k_core_execute(
     request: GraphCoreRequest,
 ) -> ComputedOutcome[GraphCoreResult]:
+    import networkx as nx
+
     try:
-        graph = cast("nx.Graph[str]", build_simple_graph(request.graph))
+        graph = cast(Any, build_simple_graph(request.graph))
         core = nx.k_core(graph, k=request.k)
         return ComputedSuccess(
             GraphCoreResult(
@@ -287,8 +309,10 @@ def _maximum_cardinality(
     *,
     independent: bool,
 ) -> GraphCliqueNumberResult | GraphIndependenceNumberResult:
-    z3: Any = importlib.import_module("z3")
-    source = cast("nx.Graph[str]", build_simple_graph(request.graph))
+    import networkx as nx
+
+    z3 = Z3_LOADER.get()
+    source = cast(Any, build_simple_graph(request.graph))
     graph = nx.complement(source) if independent else source
     vertices = tuple(request.graph.vertices)
     result_model = (

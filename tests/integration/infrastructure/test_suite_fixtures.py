@@ -1,14 +1,13 @@
 """Regression coverage for suite-wide fixture snapshots."""
 
-import gc
 import shutil
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from tests.conftest import _freeze_kernel_store
+from tests.conftest import _freeze_runtime_store
 
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.store import ArtifactStore
 
 
@@ -24,10 +23,11 @@ def _copy_and_check_store(
         assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
     finally:
         connection.close()
-    descriptor = ArtifactStore(destination).get_descriptor(
-        descriptor_uri,
-        expected_kind="schema",
-    )
+    with ArtifactStore(destination) as store:
+        descriptor = store.get_descriptor(
+            descriptor_uri,
+            expected_kind="schema",
+        )
     assert descriptor["name"] == "jacobian.research-episode"
 
 
@@ -44,37 +44,28 @@ def _research_episode_schema_uri(root: Path) -> str:
     return str(row[0])
 
 
-def test_kernel_store_freeze_removes_deferred_wal_files(tmp_path: Path) -> None:
+def test_runtime_close_removes_deferred_wal_files(tmp_path: Path) -> None:
     template = tmp_path / "template"
-    gc_was_enabled = gc.isenabled()
-    gc.disable()
+    runtime = create_runtime(template)
+    runtime.close()
+
+    assert not (template / "metadata.sqlite3-wal").exists()
+    assert not (template / "metadata.sqlite3-shm").exists()
+
+    _freeze_runtime_store(template)
+
+    connection = sqlite3.connect(template / "metadata.sqlite3")
     try:
-        kernel = JacobianKernel(template)
-        del kernel
-
-        assert (template / "metadata.sqlite3-wal").exists()
-        assert (template / "metadata.sqlite3-shm").exists()
-
-        _freeze_kernel_store(template)
-
-        assert not (template / "metadata.sqlite3-wal").exists()
-        assert not (template / "metadata.sqlite3-shm").exists()
-        connection = sqlite3.connect(template / "metadata.sqlite3")
-        try:
-            assert connection.execute("PRAGMA journal_mode").fetchone() == ("delete",)
-        finally:
-            connection.close()
+        assert connection.execute("PRAGMA journal_mode").fetchone() == ("delete",)
     finally:
-        gc.collect()
-        if gc_was_enabled:
-            gc.enable()
+        connection.close()
 
 
-def test_kernel_store_template_is_quiescent_and_copyable(
-    kernel_store_template: Path,
+def test_runtime_store_template_is_quiescent_and_copyable(
+    runtime_store_template: Path,
     tmp_path: Path,
 ) -> None:
-    database = kernel_store_template / "metadata.sqlite3"
+    database = runtime_store_template / "metadata.sqlite3"
     assert not database.with_name(f"{database.name}-wal").exists()
     assert not database.with_name(f"{database.name}-shm").exists()
 
@@ -85,13 +76,13 @@ def test_kernel_store_template_is_quiescent_and_copyable(
     finally:
         connection.close()
 
-    descriptor_uri = _research_episode_schema_uri(kernel_store_template)
+    descriptor_uri = _research_episode_schema_uri(runtime_store_template)
     destinations = [tmp_path / f"clone-{index}" for index in range(8)]
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(
                 _copy_and_check_store,
-                kernel_store_template,
+                runtime_store_template,
                 destination,
                 descriptor_uri=descriptor_uri,
             )
@@ -99,14 +90,13 @@ def test_kernel_store_template_is_quiescent_and_copyable(
         ]
         for future in futures:
             future.result(timeout=30)
-    gc.collect()
 
 
-def test_kernel_store_template_with_references_is_quiescent_and_copyable(
-    kernel_store_template_with_references: Path,
+def test_runtime_store_template_with_references_is_quiescent_and_copyable(
+    runtime_store_template_with_references: Path,
     tmp_path: Path,
 ) -> None:
-    database = kernel_store_template_with_references / "metadata.sqlite3"
+    database = runtime_store_template_with_references / "metadata.sqlite3"
     assert not database.with_name(f"{database.name}-wal").exists()
     assert not database.with_name(f"{database.name}-shm").exists()
 
@@ -117,13 +107,18 @@ def test_kernel_store_template_with_references_is_quiescent_and_copyable(
     finally:
         connection.close()
 
-    descriptor_uri = _research_episode_schema_uri(kernel_store_template_with_references)
+    descriptor_uri = _research_episode_schema_uri(
+        runtime_store_template_with_references
+    )
     destination = tmp_path / "clone-with-references"
     _copy_and_check_store(
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         destination,
         descriptor_uri=descriptor_uri,
     )
-    kernel = JacobianKernel(destination, install_references=True)
-    assert "graph_paths" in kernel.references
-    assert "erdos_straus" in kernel.references
+    with create_runtime(
+        destination,
+        checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING,
+    ) as runtime:
+        assert "graph_paths" in runtime.portfolio.references
+        assert "erdos_straus" in runtime.portfolio.references

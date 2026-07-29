@@ -6,10 +6,6 @@ from collections.abc import Callable
 from fractions import Fraction
 from typing import Any, cast
 
-import sympy
-from sympy.geometry import Circle, Line2D, Point2D, Polygon, Segment2D
-from sympy.geometry.util import convex_hull
-
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.geometry import (
     GeometryBooleanResult,
@@ -35,6 +31,8 @@ Compute = Callable[[ContractModel], ContractModel]
 
 
 def _fraction(value: Any) -> Fraction:
+    import sympy
+
     rational = sympy.Rational(value)
     return Fraction(int(rational.p), int(rational.q))
 
@@ -47,26 +45,31 @@ def _wire_rational(value: Any) -> CanonicalRational:
     )
 
 
-def _point(value: RationalPoint2D) -> Point2D:
+def _point(value: RationalPoint2D) -> Any:
+    import sympy
+    from sympy.geometry import Point2D
+
     return Point2D(
         sympy.Rational(int(value.x.num), int(value.x.den)),
         sympy.Rational(int(value.y.num), int(value.y.den)),
     )
 
 
-def _wire_point(value: Point2D) -> RationalPoint2D:
+def _wire_point(value: Any) -> RationalPoint2D:
     return RationalPoint2D(
         x=_wire_rational(value.x),
         y=_wire_rational(value.y),
     )
 
 
-def _pair_points(request: ContractModel) -> tuple[Point2D, Point2D]:
+def _pair_points(request: ContractModel) -> tuple[Any, Any]:
     pair = cast(PointPairRequest, request)
     return _point(pair.first), _point(pair.second)
 
 
-def _line(value: LineRequest) -> Line2D:
+def _line(value: LineRequest) -> Any:
+    from sympy.geometry import Line2D
+
     return Line2D(_point(value.first), _point(value.second))
 
 
@@ -81,6 +84,8 @@ def midpoint(request: ContractModel) -> ContractModel:
 
 
 def collinear(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Point2D
+
     triple = cast(PointTripleRequest, request)
     return GeometryBooleanResult(
         holds=Point2D.is_collinear(
@@ -92,6 +97,8 @@ def collinear(request: ContractModel) -> ContractModel:
 
 
 def concyclic(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Point2D
+
     points = cast(PointQuadrupleRequest, request)
     return GeometryBooleanResult(
         holds=Point2D.is_concyclic(
@@ -104,7 +111,7 @@ def concyclic(request: ContractModel) -> ContractModel:
 
 
 def line_predicate(
-    predicate: Callable[[Line2D, Line2D], bool],
+    predicate: Callable[[Any, Any], bool],
 ) -> Compute:
     def compute(request: ContractModel) -> ContractModel:
         pair = cast(LinePairRequest, request)
@@ -116,6 +123,8 @@ def line_predicate(
 
 
 def line_intersection(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Point2D
+
     pair = cast(LinePairRequest, request)
     first, second = _line(pair.first_line), _line(pair.second_line)
     if first.equals(second):
@@ -130,6 +139,8 @@ def line_intersection(request: ContractModel) -> ContractModel:
 
 
 def projection(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Point2D
+
     value = cast(PointLineRequest, request)
     projected = _line(value.line).projection(_point(value.point))
     if not isinstance(projected, Point2D):
@@ -138,6 +149,8 @@ def projection(request: ContractModel) -> ContractModel:
 
 
 def orientation(request: ContractModel) -> ContractModel:
+    import sympy
+
     triple = cast(PointTripleRequest, request)
     first, second, third = (
         _point(triple.first),
@@ -153,6 +166,8 @@ def orientation(request: ContractModel) -> ContractModel:
 
 
 def centroid(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Point2D
+
     triple = cast(PointTripleRequest, request)
     points = [_point(triple.first), _point(triple.second), _point(triple.third)]
     return GeometryPointResult(
@@ -166,6 +181,8 @@ def centroid(request: ContractModel) -> ContractModel:
 
 
 def circumcircle(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Circle, Point2D
+
     triple = cast(PointTripleRequest, request)
     points = [_point(triple.first), _point(triple.second), _point(triple.third)]
     if Point2D.is_collinear(*points):
@@ -178,12 +195,17 @@ def circumcircle(request: ContractModel) -> ContractModel:
 
 
 def signed_area(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Polygon
+
     polygon = cast(PolygonRequest, request)
     value = Polygon(*(_point(point) for point in polygon.points)).area
     return GeometryRationalResult(value=_wire_rational(value))
 
 
 def convex_hull_points(request: ContractModel) -> ContractModel:
+    from sympy.geometry import Line2D, Point2D, Polygon, Segment2D
+    from sympy.geometry.util import convex_hull
+
     point_set = cast(PointSetRequest, request)
     hull = convex_hull(*(_point(point) for point in point_set.points))
     if isinstance(hull, Point2D):

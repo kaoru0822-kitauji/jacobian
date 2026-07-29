@@ -28,11 +28,11 @@ from jacobian.contracts.results import (
     Method,
     Verification,
 )
-from jacobian.kernel import JacobianKernel
 from jacobian.lean_declarations import (
     LeanDeclarationBackendError,
     LeanSubprocessDeclarationBackend,
 )
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 MATHLIB_OLEAN = (
@@ -52,22 +52,26 @@ pytestmark = [
     pytest.mark.external_backend,
     pytest.mark.lean_runtime,
     pytest.mark.skipif(shutil.which("lean") is None, reason="Lean is not installed"),
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
+    pytest.mark.usefixtures("initialized_runtime_store_with_references"),
 ]
 
 
 def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     indexed_root = tmp_path / "indexed"
     fresh_root = tmp_path / "fresh"
-    shutil.copytree(kernel_store_template_with_references, indexed_root)
-    shutil.copytree(kernel_store_template_with_references, fresh_root)
-    indexed_kernel = JacobianKernel(indexed_root, install_references=True)
-    fresh_kernel = JacobianKernel(fresh_root, install_references=True)
-    indexed = indexed_kernel.lean_declarations
-    fresh = fresh_kernel.lean_declarations
+    shutil.copytree(runtime_store_template_with_references, indexed_root)
+    shutil.copytree(runtime_store_template_with_references, fresh_root)
+    indexed_runtime = create_runtime(
+        indexed_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    fresh_runtime = create_runtime(
+        fresh_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    indexed = indexed_runtime.portfolio.lean_declarations
+    fresh = fresh_runtime.portfolio.lean_declarations
     assert indexed is not None
     assert fresh is not None
     indexed_backend = indexed.backend
@@ -108,9 +112,11 @@ def test_core_declaration_catalog_matches_a_fresh_scan_and_detects_tampering(
 
 
 def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.dependencies",
             mode=CapabilityMode.EXPLORE,
@@ -132,7 +138,7 @@ def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> No
     }
     assert len(result.output["nodes"]) <= 40
     assert result.output["dependency_graph_uri"] in result.artifact_uris
-    artifact = kernel.store.get(result.output["dependency_graph_uri"])
+    artifact = runtime.core.store.get(result.output["dependency_graph_uri"])
     assert artifact.payload["nodes"][0]["name"] == "Nat.add_comm"
     assert artifact.payload["query"]["max_depth"] == 1
 
@@ -145,12 +151,17 @@ def test_core_dependency_graph_is_bounded_and_materialized(tmp_path: Path) -> No
 def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
-    assert kernel.lean_declarations is not None
-    assert kernel.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds == 225
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
+    assert runtime.portfolio.lean_declarations is not None
+    assert (
+        runtime.portfolio.lean_checkers[LeanEnvironment.MATHLIB].checker_timeout_seconds
+        == 225
+    )
 
-    searched = kernel.capabilities.invoke(
+    searched = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.search",
             mode=CapabilityMode.EXPLORE,
@@ -161,7 +172,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
             },
         )
     )
-    inspected = kernel.capabilities.invoke(
+    inspected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.inspect",
             mode=CapabilityMode.EXPLORE,
@@ -180,7 +191,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
         inspected.output["environment_digest"] == searched.output["environment_digest"]
     )
 
-    verified = kernel.lean.verify(
+    verified = runtime.portfolio.lean.verify(
         environment=LeanEnvironment.MATHLIB,
         statement="Irrational (Real.sqrt 2)",
         proof="exact irrational_sqrt_two",
@@ -188,7 +199,7 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
 
     assert verified.result.conclusion is Conclusion.TRUE, verified.result.input.errors
     assert verified.result.assurance.verification is Verification.VERIFIED
-    certificate = kernel.store.get(verified.certificate_uri)
+    certificate = runtime.core.store.get(verified.certificate_uri)
     assert certificate.payload["payload"]["environment"] == "MATHLIB"
     assert certificate.payload["payload"]["allowed_axioms"] == [
         "Classical.choice",
@@ -203,10 +214,12 @@ def test_mathlib_discovery_composes_with_bound_sqrt_two_verification(
 def test_core_lean_induction_proof_creates_bound_verification_record(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
 
-    inspected = kernel.capabilities.invoke(
+    inspected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.inspect",
             mode=CapabilityMode.EXPLORE,
@@ -216,7 +229,7 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
             },
         )
     )
-    outside_profile = kernel.capabilities.invoke(
+    outside_profile = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.declaration.search",
             mode=CapabilityMode.EXPLORE,
@@ -231,7 +244,7 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     assert outside_profile.output["declarations"] == []
     assert outside_profile.output["stop_reason"] == "EXHAUSTED"
 
-    verified = kernel.lean.verify(
+    verified = runtime.portfolio.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=(
             "intro n\n"
@@ -244,8 +257,8 @@ def test_core_lean_induction_proof_creates_bound_verification_record(
     assert verified.result.conclusion is Conclusion.TRUE
     assert verified.result.assurance.verification is Verification.VERIFIED
     assert verified.result.verification_record_uri is not None
-    record = kernel.store.get(verified.result.verification_record_uri)
-    certificate = kernel.store.get(verified.certificate_uri)
+    record = runtime.core.store.get(verified.result.verification_record_uri)
+    certificate = runtime.core.store.get(verified.certificate_uri)
     assert record.payload["evidence_uri"] == verified.certificate_uri
     assert record.payload["bindings"] == certificate.payload["bindings"]
     assert set(certificate.manifest.parents) == {
@@ -267,10 +280,12 @@ def test_core_lean_accepts_single_expression_witness_forms(
     statement: str,
     proof: str,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
 
-    verified = kernel.lean.verify(statement=statement, proof=proof)
+    verified = runtime.portfolio.lean.verify(statement=statement, proof=proof)
 
     assert verified.result.conclusion is Conclusion.TRUE
     assert verified.result.assurance.verification is Verification.VERIFIED
@@ -329,10 +344,12 @@ def test_core_lean_rejects_untrusted_or_invalid_proofs(
     tmp_path: Path,
     proof: str,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
 
-    rejected = kernel.lean.verify(
+    rejected = runtime.portfolio.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=proof,
     )
@@ -347,8 +364,10 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
     calls = 0
 
     def accept(**_: object) -> CheckerDecision:
@@ -366,11 +385,11 @@ def test_lean_reuses_only_an_exact_active_checker_result(
     def unexpected_selector(**_: object) -> object:
         raise AssertionError("Lean must use its explicitly installed checker")
 
-    monkeypatch.setattr(kernel.verification, "_run_checker", accept)
-    monkeypatch.setattr(kernel.checkers, "select_compatible", unexpected_selector)
-    first = kernel.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    repeated = kernel.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    changed = kernel.lean.verify(statement="2 + 2 = 4", proof="rfl")
+    monkeypatch.setattr(runtime.services.verification, "_run_checker", accept)
+    monkeypatch.setattr(runtime.core.checkers, "select_compatible", unexpected_selector)
+    first = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    repeated = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    changed = runtime.portfolio.lean.verify(statement="2 + 2 = 4", proof="rfl")
 
     assert calls == 2
     assert first.cache_hit is False
@@ -385,10 +404,12 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
     monkeypatch.setattr(
-        kernel.verification,
+        runtime.services.verification,
         "_run_checker",
         lambda **_: CheckerDecision(
             accepted=True,
@@ -399,11 +420,11 @@ def test_lean_cache_does_not_reuse_a_revoked_checker_result(
             detail="accepted by test checker",
         ),
     )
-    first = kernel.lean.verify(statement="1 + 1 = 2", proof="rfl")
-    checker_id = kernel.lean_checkers[LeanEnvironment.CORE].checker_id
-    kernel.checkers.revoke(checker_id, reason="cache trust-boundary test")
+    first = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    checker_id = runtime.portfolio.lean_checkers[LeanEnvironment.CORE].checker_id
+    runtime.core.checkers.revoke(checker_id, reason="cache trust-boundary test")
 
-    repeated = kernel.lean.verify(statement="1 + 1 = 2", proof="rfl")
+    repeated = runtime.portfolio.lean.verify(statement="1 + 1 = 2", proof="rfl")
 
     assert first.result.assurance.verification is Verification.VERIFIED
     assert repeated.cache_hit is False
@@ -414,11 +435,13 @@ def test_mathlib_warmup_starts_only_once(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    assert kernel.lean is not None
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    assert runtime.portfolio.lean is not None
     warmed = threading.Event()
-    monkeypatch.setattr(kernel.lean, "_warm_mathlib", warmed.set)
+    monkeypatch.setattr(runtime.portfolio.lean, "_warm_mathlib", warmed.set)
 
-    assert kernel.lean.start_mathlib_warmup() is True
+    assert runtime.portfolio.lean.start_mathlib_warmup() is True
     assert warmed.wait(timeout=2)
-    assert kernel.lean.start_mathlib_warmup() is False
+    assert runtime.portfolio.lean.start_mathlib_warmup() is False

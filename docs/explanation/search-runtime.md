@@ -8,7 +8,7 @@ This document describes the operational design available to long-running search
 capability adapters. Mathematical search semantics remain in domain plugins;
 the runtime owns request acceptance, lifecycle state, persistence, accounting,
 and routing to authorized verification services. It is execution and trust
-policy, not mathematical strategy. The kernel does not prescribe how an agent
+policy, not mathematical strategy. The runtime does not prescribe how an agent
 composes search, evaluation, transformation, or verification capabilities, and
 search output never self-certifies.
 

@@ -9,7 +9,7 @@ only.
 | `agent` | Agent benchmark and evaluation surfaces |
 | `domains` | Cross-cutting mathematical domain bundles |
 | `graph` | Graph capabilities and graph verification workflows |
-| `infrastructure` | Kernel services, plugins, storage, MCP, and workspaces |
+| `infrastructure` | Runtime services, plugins, storage, MCP, and workspaces |
 | `lean` | Lean-backed capabilities and proof editing |
 | `matrix` | Matrix, linear-system, and polytope capabilities |
 | `polynomial` | Polynomial maps, systems, and exact polynomial operations |

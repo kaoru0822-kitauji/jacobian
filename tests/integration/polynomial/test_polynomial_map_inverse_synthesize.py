@@ -9,12 +9,12 @@ import pytest
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def _term(coefficient: int, exponents: list[int]) -> dict[str, Any]:
@@ -67,8 +67,8 @@ def _request(
     )
 
 
-def test_triangular_automorphism_is_found_and_verified(kernel) -> None:
-    result = kernel.capabilities.invoke(_request(degree=2))
+def test_triangular_automorphism_is_found_and_verified(runtime) -> None:
+    result = runtime.core.capabilities.invoke(_request(degree=2))
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "FOUND"
@@ -90,16 +90,16 @@ def test_triangular_automorphism_is_found_and_verified(kernel) -> None:
 
 
 def test_degree_below_required_returns_bounded_no_candidate(
-    kernel,
+    runtime,
 ) -> None:
-    result = kernel.capabilities.invoke(_request(degree=1))
+    result = runtime.core.capabilities.invoke(_request(degree=1))
 
     assert result.output["status"] == "NO_CANDIDATE_WITHIN_ANSATZ"
     assert result.output["candidate_inverse_map"] is None
     assert result.output["noninvertibility_proved"] is False
 
 
-def test_redundant_explicit_ansatz_is_underdetermined(kernel) -> None:
+def test_redundant_explicit_ansatz_is_underdetermined(runtime) -> None:
     identity = {
         "map_schema_version": "1",
         "domain": "QQ",
@@ -127,17 +127,17 @@ def test_redundant_explicit_ansatz_is_underdetermined(kernel) -> None:
         },
     )
 
-    result = kernel.capabilities.invoke(request)
+    result = runtime.core.capabilities.invoke(request)
 
     assert result.output["status"] == "UNDERDETERMINED"
     assert result.output["candidate_inverse_map"] is None
     assert "free parameters" in result.output["verification_failure"]
 
 
-def test_zero_timeout_and_unknown_budget_are_explicit(kernel) -> None:
+def test_zero_timeout_and_unknown_budget_are_explicit(runtime) -> None:
 
-    timeout = kernel.capabilities.invoke(_request(degree=2, timeout_ms=0))
-    exhausted = kernel.capabilities.invoke(_request(degree=2, max_unknowns=1))
+    timeout = runtime.core.capabilities.invoke(_request(degree=2, timeout_ms=0))
+    exhausted = runtime.core.capabilities.invoke(_request(degree=2, max_unknowns=1))
 
     assert timeout.execution.status is ExecutionStatus.TIMEOUT
     assert timeout.output["status"] == "TIMEOUT"
@@ -145,12 +145,12 @@ def test_zero_timeout_and_unknown_budget_are_explicit(kernel) -> None:
 
 
 def test_unknown_solver_is_unsupported_without_truth_claim(
-    kernel,
+    runtime,
 ) -> None:
     payload = deepcopy(_request(degree=2).input)
     payload["solver"] = "unknown.exact_solver"
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.inverse.candidate_synthesize",
             input=payload,
@@ -163,10 +163,10 @@ def test_unknown_solver_is_unsupported_without_truth_claim(
 
 
 def test_full_support_and_coefficient_order_are_deterministic(
-    kernel,
+    runtime,
 ) -> None:
-    first = kernel.capabilities.invoke(_request(degree=2))
-    second = kernel.capabilities.invoke(_request(degree=2))
+    first = runtime.core.capabilities.invoke(_request(degree=2))
+    second = runtime.core.capabilities.invoke(_request(degree=2))
 
     assert first.output["ansatz"] == second.output["ansatz"]
     assert (
@@ -195,14 +195,14 @@ def test_full_support_and_coefficient_order_are_deterministic(
     "mutation",
     ["variable_order", "coefficient_domain"],
 )
-def test_ring_mismatches_fail_closed(kernel, mutation: str) -> None:
+def test_ring_mismatches_fail_closed(runtime, mutation: str) -> None:
     payload = deepcopy(_request(degree=2).input)
     if mutation == "variable_order":
         payload["source_variables"] = ["y", "x"]
     else:
         payload["forward_map"]["domain"] = "RR"
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.inverse.candidate_synthesize",
             input=payload,
@@ -214,12 +214,12 @@ def test_ring_mismatches_fail_closed(kernel, mutation: str) -> None:
 
 
 def test_corrupted_found_candidate_does_not_verify(
-    kernel,
+    runtime,
 ) -> None:
-    synthesized = kernel.capabilities.invoke(_request(degree=2))
+    synthesized = runtime.core.capabilities.invoke(_request(degree=2))
     corrupted = deepcopy(synthesized.output["candidate_inverse_map"])
     corrupted["coordinates"][0]["terms"][1]["coefficient"]["num"] = "-2"
-    checked = kernel.capabilities.invoke(
+    checked = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.inverse.verify",
             mode=CapabilityMode.VERIFY,

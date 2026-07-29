@@ -7,13 +7,13 @@ from jacobian.contracts.results import ExecutionStatus
 
 
 def test_resource_portfolio_has_more_than_one_hundred_atomic_capabilities(
-    kernel,
+    runtime,
 ) -> None:
-    assert len(kernel.capabilities.catalog().capabilities) >= 100
+    assert len(runtime.core.capabilities.catalog().capabilities) >= 100
 
 
 def test_consolidated_domain_results_are_exact_computed_evidence(
-    kernel,
+    runtime,
 ) -> None:
     cases = (
         (
@@ -164,7 +164,7 @@ def test_consolidated_domain_results_are_exact_computed_evidence(
         ),
     )
     for capability_id, payload, expected in cases:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
@@ -173,9 +173,9 @@ def test_consolidated_domain_results_are_exact_computed_evidence(
 
 
 def test_domain_atomic_input_failure_is_not_a_mathematical_conclusion(
-    kernel,
+    runtime,
 ) -> None:
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="number_theory.compute.legendre_symbol",
             input={"a": 2, "prime": 9},

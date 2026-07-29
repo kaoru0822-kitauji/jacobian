@@ -7,12 +7,12 @@ from jacobian.contracts.capabilities import (
     CapabilityMode,
     CapabilityRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def _matrix() -> dict[str, object]:
@@ -29,14 +29,14 @@ def _matrix() -> dict[str, object]:
 
 
 def test_matrix_rank_verify_independently_recomputes_rank(
-    kernel,
+    runtime,
 ) -> None:
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.compute", input={"matrix": _matrix()}
         )
     )
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.verify",
             mode=CapabilityMode.VERIFY,
@@ -48,25 +48,25 @@ def test_matrix_rank_verify_independently_recomputes_rank(
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-def test_matrix_rank_verify_rejects_wrong_rank(kernel) -> None:
-    computed = kernel.capabilities.invoke(
+def test_matrix_rank_verify_rejects_wrong_rank(runtime) -> None:
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.compute", input={"matrix": _matrix()}
         )
     )
     source_uri = computed.output["matrix_uri"]
-    wrong = kernel.artifacts.put(
-        schema_uri=kernel.matrix.rank_schema_uri,
-        semantics_uri=kernel.matrix.semantics_uri,
+    wrong = runtime.core.artifacts.put(
+        schema_uri=runtime.portfolio.matrix.rank_schema_uri,
+        semantics_uri=runtime.portfolio.matrix.semantics_uri,
         payload={
-            **kernel.store.get(computed.output["rank_uri"]).payload,
+            **runtime.core.store.get(computed.output["rank_uri"]).payload,
             "rank": 3,
             "pivot_columns": [0, 1, 2],
         },
         parents=(source_uri,),
         summary="deliberately incorrect rank candidate",
     )
-    rejected = kernel.capabilities.invoke(
+    rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.verify",
             mode=CapabilityMode.VERIFY,

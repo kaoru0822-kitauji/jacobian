@@ -20,10 +20,10 @@ from jacobian.contracts.sat import (
     SatProofArtifact,
     SatResourceBudget,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import create_runtime
 from jacobian.sat import SatArtifactError
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def _producer() -> CapabilityProviderRuntime:
@@ -40,31 +40,31 @@ def _producer() -> CapabilityProviderRuntime:
 
 
 def test_sat_service_materializes_one_identity_for_equivalent_cnf_input(
-    kernel,
+    runtime,
 ) -> None:
 
-    first = kernel.sat.put_cnf(
+    first = runtime.core.sat.put_cnf(
         variable_names=("b", "a"),
         clauses=((1, -2, 1), (2,), (1, -1)),
     )
-    second = kernel.sat.put_cnf(
+    second = runtime.core.sat.put_cnf(
         variable_names=("a", "b"),
         clauses=((1,), (-1, 2), (-1, 2)),
     )
 
     assert first == second
-    stored = kernel.store.get(first.artifact_uri)
+    stored = runtime.core.store.get(first.artifact_uri)
     cnf = CanonicalCnf.model_validate(stored.payload)
     assert cnf.to_dimacs_bytes() == b"p cnf 2 2\n-1 2 0\n1 0\n"
-    assert stored.manifest.schema_uri == kernel.sat.installation.cnf_schema_uri
-    assert stored.manifest.semantics_uri == kernel.sat.installation.semantics_uri
+    assert stored.manifest.schema_uri == runtime.core.sat.installation.cnf_schema_uri
+    assert stored.manifest.semantics_uri == runtime.core.sat.installation.semantics_uri
 
 
 def test_sat_cnf_materialization_capability_exposes_reusable_identity(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.cnf.materialize",
             mode=CapabilityMode.EXPLORE,
@@ -79,10 +79,10 @@ def test_sat_cnf_materialization_capability_exposes_reusable_identity(
     assert result.assurance.level.value == "COMPUTED"
     assert result.completeness.status.value == "NOT_APPLICABLE"
     assert result.output["cnf_uri"] in result.artifact_uris
-    resolved = kernel.sat.resolve_cnf(result.output["cnf_uri"])
+    resolved = runtime.core.sat.resolve_cnf(result.output["cnf_uri"])
     assert resolved.cnf.to_dimacs_bytes() == b"p cnf 2 2\n-1 2 0\n1 0\n"
-    assert result.output["schema_uri"] == kernel.sat.installation.cnf_schema_uri
-    assert result.output["semantics_uri"] == kernel.sat.installation.semantics_uri
+    assert result.output["schema_uri"] == runtime.core.sat.installation.cnf_schema_uri
+    assert result.output["semantics_uri"] == runtime.core.sat.installation.semantics_uri
     assert result.output["variable_map_digest"] == resolved.cnf.variable_map_digest
     assert result.output["dimacs_digest"] == resolved.cnf.dimacs_digest
     assert result.output["caller_order_changed"] is True
@@ -95,10 +95,10 @@ def test_sat_cnf_materialization_capability_exposes_reusable_identity(
 
 
 def test_sat_materialization_makes_lexicographic_name_order_explicit(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.cnf.materialize",
             mode=CapabilityMode.EXPLORE,
@@ -115,12 +115,12 @@ def test_sat_materialization_makes_lexicographic_name_order_explicit(
         {"id": 2, "name": "n10"},
         {"id": 3, "name": "n2"},
     ]
-    resolved = kernel.sat.resolve_cnf(result.output["cnf_uri"])
+    resolved = runtime.core.sat.resolve_cnf(result.output["cnf_uri"])
     assert resolved.cnf.to_dimacs_bytes() == b"p cnf 3 3\n1 0\n2 0\n-3 0\n"
 
 
 def test_sat_cnf_materialization_validates_before_artifact_write(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     called = False
@@ -130,8 +130,8 @@ def test_sat_cnf_materialization_validates_before_artifact_write(
         called = True
         raise AssertionError("invalid request reached artifact write")
 
-    monkeypatch.setattr(kernel.sat, "put_cnf", unexpected_put_cnf)
-    result = kernel.capabilities.invoke(
+    monkeypatch.setattr(runtime.core.sat, "put_cnf", unexpected_put_cnf)
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.cnf.materialize",
             mode=CapabilityMode.EXPLORE,
@@ -150,34 +150,34 @@ def test_sat_cnf_materialization_validates_before_artifact_write(
 def test_model_backed_schema_rejects_noncanonical_generic_artifact_put(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    cnf_result = kernel.sat.put_cnf(
+    runtime = create_runtime(tmp_path)
+    cnf_result = runtime.core.sat.put_cnf(
         variable_names=("a", "b"),
         clauses=((-1, 2), (1,)),
     )
-    payload = kernel.store.get(cnf_result.artifact_uri).payload
+    payload = runtime.core.store.get(cnf_result.artifact_uri).payload
     payload["clauses"] = list(reversed(payload["clauses"]))
 
     with pytest.raises(ArtifactValidationError):
-        kernel.artifacts.put(
-            schema_uri=kernel.sat.installation.cnf_schema_uri,
-            semantics_uri=kernel.sat.installation.semantics_uri,
+        runtime.core.artifacts.put(
+            schema_uri=runtime.core.sat.installation.cnf_schema_uri,
+            semantics_uri=runtime.core.sat.installation.semantics_uri,
             payload=payload,
         )
 
-    restarted = JacobianKernel(tmp_path)
+    restarted = create_runtime(tmp_path)
     with pytest.raises(ArtifactValidationError):
-        restarted.artifacts.put(
-            schema_uri=restarted.sat.installation.cnf_schema_uri,
-            semantics_uri=restarted.sat.installation.semantics_uri,
+        restarted.core.artifacts.put(
+            schema_uri=restarted.core.sat.installation.cnf_schema_uri,
+            semantics_uri=restarted.core.sat.installation.semantics_uri,
             payload=payload,
         )
 
 
 def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
-    kernel,
+    runtime,
 ) -> None:
-    cnf_result = kernel.sat.put_cnf(
+    cnf_result = runtime.core.sat.put_cnf(
         variable_names=("a", "b"),
         clauses=((-1, 2), (1,)),
     )
@@ -186,22 +186,22 @@ def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
         memory_bytes=256 * 1024 * 1024,
         conflicts=10_000,
     )
-    assignment_result = kernel.sat.put_assignment(
+    assignment_result = runtime.core.sat.put_assignment(
         cnf_uri=cnf_result.artifact_uri,
         values=(True, False),
         producer=_producer(),
         resource_budget=budget,
     )
-    proof_result = kernel.sat.put_proof(
+    proof_result = runtime.core.sat.put_proof(
         cnf_uri=cnf_result.artifact_uri,
         proof=b"d -1 2 0\n0\n",
         producer=_producer(),
         resource_budget=budget,
     )
 
-    cnf_artifact = kernel.store.get(cnf_result.artifact_uri)
-    assignment_artifact = kernel.store.get(assignment_result.artifact_uri)
-    proof_artifact = kernel.store.get(proof_result.artifact_uri)
+    cnf_artifact = runtime.core.store.get(cnf_result.artifact_uri)
+    assignment_artifact = runtime.core.store.get(assignment_result.artifact_uri)
+    proof_artifact = runtime.core.store.get(proof_result.artifact_uri)
     assignment = SatAssignmentArtifact.model_validate(assignment_artifact.payload)
     proof = SatProofArtifact.model_validate(proof_artifact.payload)
 
@@ -219,10 +219,10 @@ def test_assignment_and_raw_proof_bind_exact_cnf_identity_and_lineage(
 
 
 def test_sat_service_rejects_a_non_cnf_source_before_writing_evidence(
-    kernel,
+    runtime,
 ) -> None:
-    cnf_result = kernel.sat.put_cnf(variable_names=("x",), clauses=((1,),))
-    assignment_result = kernel.sat.put_assignment(
+    cnf_result = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
+    assignment_result = runtime.core.sat.put_assignment(
         cnf_uri=cnf_result.artifact_uri,
         values=(True,),
         producer=_producer(),
@@ -230,7 +230,7 @@ def test_sat_service_rejects_a_non_cnf_source_before_writing_evidence(
     )
 
     with pytest.raises(SatArtifactError, match="canonical CNF artifact"):
-        kernel.sat.put_proof(
+        runtime.core.sat.put_proof(
             cnf_uri=assignment_result.artifact_uri,
             proof=b"0\n",
             producer=_producer(),

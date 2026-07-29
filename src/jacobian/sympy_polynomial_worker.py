@@ -25,9 +25,10 @@ from jacobian.contracts.polynomials import (
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
-from jacobian.provider_runtime import SYMPY_VERSION
-
-SYMPY_POLYNOMIAL_WORKER_PROTOCOL = "jacobian.sympy-polynomial-normalization/v1"
+from jacobian.provider_runtime import (
+    SYMPY_POLYNOMIAL_WORKER_PROTOCOL,
+    SYMPY_VERSION,
+)
 
 
 def _sympy_expression(

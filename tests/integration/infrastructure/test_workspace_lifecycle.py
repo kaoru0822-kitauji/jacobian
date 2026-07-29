@@ -23,17 +23,17 @@ from jacobian.contracts.workspaces import (
     WorkspaceScratchDraft,
     WorkspaceWriteRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import create_runtime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def test_workspace_marks_close_goals_and_propagate_staleness(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
-    opened = _open(kernel, key="workspace-open-marks-001")
-    seeded = kernel.workspaces.write(
+    runtime = create_runtime(tmp_path)
+    opened = _open(runtime, key="workspace-open-marks-001")
+    seeded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-mark-seed-001",
             workspace_id=opened.workspace_id,
@@ -74,7 +74,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         )
     )
 
-    before_mark = kernel.workspaces.query(
+    before_mark = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -86,7 +86,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         seeded.id_map["G1"]
     ]
 
-    retracted = kernel.workspaces.write(
+    retracted = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-mark-retract-001",
             workspace_id=opened.workspace_id,
@@ -103,7 +103,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         )
     )
 
-    after_retraction = kernel.workspaces.query(
+    after_retraction = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -116,7 +116,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         seeded.id_map["G1"]
     ]
     assert after_retraction.resume.open_goals[0].stale is True
-    stale_frontier = kernel.workspaces.query(
+    stale_frontier = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -128,7 +128,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         seeded.id_map["G1"]
     ]
 
-    marked = kernel.workspaces.write(
+    marked = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-mark-close-001",
             workspace_id=opened.workspace_id,
@@ -149,16 +149,16 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
     assert marked.marks_written == 1
     assert marked.id_map["M1"].startswith("mark://")
     retracted_revision = WorkspaceRevision.model_validate(
-        kernel.store.get(retracted.revision_artifact_uri).payload
+        runtime.core.store.get(retracted.revision_artifact_uri).payload
     )
     revision = WorkspaceRevision.model_validate(
-        kernel.store.get(marked.revision_artifact_uri).payload
+        runtime.core.store.get(marked.revision_artifact_uri).payload
     )
     for stored_revision in (retracted_revision, revision):
         assert {mark.assertion for mark in stored_revision.marks} == {"AGENT_RECORDED"}
         assert {mark.verification for mark in stored_revision.marks} == {"UNVERIFIED"}
 
-    resume = kernel.workspaces.query(
+    resume = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -177,7 +177,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
     assert resume.resume.active_item.stale is True
     assert resume.resume.active_item.stale_due_to_ids == (seeded.id_map["A1"],)
 
-    frontier = kernel.workspaces.query(
+    frontier = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -186,7 +186,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
     )
     assert frontier.frontier == ()
 
-    stale = kernel.workspaces.query(
+    stale = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -198,7 +198,7 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         seeded.id_map["G1"],
     }
 
-    context = kernel.workspaces.query(
+    context = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -219,8 +219,8 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
         seeded.id_map["T1"]
     ]
 
-    restarted = JacobianKernel(tmp_path)
-    replayed = restarted.workspaces.query(
+    restarted = create_runtime(tmp_path)
+    replayed = restarted.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -232,11 +232,11 @@ def test_workspace_marks_close_goals_and_propagate_staleness(
 
 
 def test_workspace_supersession_and_reactivation_are_explicit(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-supersede-001")
-    seeded = kernel.workspaces.write(
+    opened = _open(runtime, key="workspace-open-supersede-001")
+    seeded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-supersede-seed-001",
             workspace_id=opened.workspace_id,
@@ -263,7 +263,7 @@ def test_workspace_supersession_and_reactivation_are_explicit(
         "jacobian.workspaces._now",
         lambda: datetime(2030, 1, 1, tzinfo=UTC),
     )
-    superseded = kernel.workspaces.write(
+    superseded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-supersede-state-001",
             workspace_id=opened.workspace_id,
@@ -289,7 +289,7 @@ def test_workspace_supersession_and_reactivation_are_explicit(
         )
     )
 
-    context = kernel.workspaces.query(
+    context = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -307,7 +307,7 @@ def test_workspace_supersession_and_reactivation_are_explicit(
         "jacobian.workspaces._now",
         lambda: datetime(2020, 1, 1, tzinfo=UTC),
     )
-    reactivated = kernel.workspaces.write(
+    reactivated = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-reactivate-state-001",
             workspace_id=opened.workspace_id,
@@ -323,7 +323,7 @@ def test_workspace_supersession_and_reactivation_are_explicit(
             ),
         )
     )
-    after = kernel.workspaces.query(
+    after = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -339,13 +339,13 @@ def test_workspace_supersession_and_reactivation_are_explicit(
 
 
 def test_workspace_query_uses_one_revision_snapshot(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-query-snapshot-001")
+    opened = _open(runtime, key="workspace-open-query-snapshot-001")
     projection_started = Event()
     continue_projection = Event()
-    original_projection = kernel.workspaces._projection
+    original_projection = runtime.core.workspaces._projection
 
     def paused_projection(
         connection: sqlite3.Connection,
@@ -356,10 +356,10 @@ def test_workspace_query_uses_one_revision_snapshot(
             raise AssertionError("test did not release the paused projection")
         return original_projection(connection, request)
 
-    monkeypatch.setattr(kernel.workspaces, "_projection", paused_projection)
+    monkeypatch.setattr(runtime.core.workspaces, "_projection", paused_projection)
     with ThreadPoolExecutor(max_workers=1) as pool:
         pending = pool.submit(
-            kernel.workspaces.query,
+            runtime.core.workspaces.query,
             WorkspaceQueryRequest(
                 workspace_id=opened.workspace_id,
                 branch_id=opened.branch_id,
@@ -368,7 +368,7 @@ def test_workspace_query_uses_one_revision_snapshot(
             ),
         )
         assert projection_started.wait(timeout=10)
-        advanced = kernel.workspaces.write(
+        advanced = runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key="workspace-write-during-query-001",
                 workspace_id=opened.workspace_id,
@@ -391,8 +391,8 @@ def test_workspace_query_uses_one_revision_snapshot(
     assert snapshotted.resume is not None
     assert snapshotted.resume.open_goals == ()
 
-    monkeypatch.setattr(kernel.workspaces, "_projection", original_projection)
-    latest = kernel.workspaces.query(
+    monkeypatch.setattr(runtime.core.workspaces, "_projection", original_projection)
+    latest = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -407,15 +407,15 @@ def test_workspace_query_uses_one_revision_snapshot(
 
 
 def test_workspace_recent_views_follow_acceptance_order(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-acceptance-order-001")
+    opened = _open(runtime, key="workspace-open-acceptance-order-001")
     monkeypatch.setattr(
         "jacobian.workspaces._now",
         lambda: datetime(2030, 1, 1, tzinfo=UTC),
     )
-    first = kernel.workspaces.write(
+    first = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-acceptance-order-001",
             workspace_id=opened.workspace_id,
@@ -445,7 +445,7 @@ def test_workspace_recent_views_follow_acceptance_order(
         "jacobian.workspaces._now",
         lambda: datetime(2020, 1, 1, tzinfo=UTC),
     )
-    second = kernel.workspaces.write(
+    second = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-acceptance-order-002",
             workspace_id=opened.workspace_id,
@@ -472,7 +472,7 @@ def test_workspace_recent_views_follow_acceptance_order(
         )
     )
 
-    resume = kernel.workspaces.query(
+    resume = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
