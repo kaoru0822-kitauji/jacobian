@@ -36,7 +36,13 @@ INTEGER_CAPABILITIES = (
         absolute_value,
         "integer",
         "exact",
-        invocation_examples=(example("absolute_value_negative_42", "Compute the absolute value of -42.", {"value": "-42"}),),
+        invocation_examples=(
+            example(
+                "absolute_value_negative_42",
+                "Compute the absolute value of -42.",
+                {"value": "-42"},
+            ),
+        ),
     ),
     arithmetic_operation(
         "integer.compute.sign",
@@ -47,7 +53,9 @@ INTEGER_CAPABILITIES = (
         sign,
         "integer",
         "exact",
-        invocation_examples=(example("sign_negative_42", "Compute the sign of -42.", {"value": "-42"}),),
+        invocation_examples=(
+            example("sign_negative_42", "Compute the sign of -42.", {"value": "-42"}),
+        ),
     ),
     arithmetic_operation(
         "integer.compute.decimal_digit_sum",
@@ -58,7 +66,13 @@ INTEGER_CAPABILITIES = (
         decimal_digit_sum,
         "integer",
         "representation",
-        invocation_examples=(example("decimal_digit_sum_12345", "Sum the decimal digits of 12345.", {"value": "12345"}),),
+        invocation_examples=(
+            example(
+                "decimal_digit_sum_12345",
+                "Sum the decimal digits of 12345.",
+                {"value": "12345"},
+            ),
+        ),
     ),
     arithmetic_operation(
         "integer.compute.decimal_digit_count",
@@ -69,7 +83,13 @@ INTEGER_CAPABILITIES = (
         decimal_digit_count,
         "integer",
         "representation",
-        invocation_examples=(example("decimal_digit_count_12345", "Count the decimal digits of 12345.", {"value": "12345"}),),
+        invocation_examples=(
+            example(
+                "decimal_digit_count_12345",
+                "Count the decimal digits of 12345.",
+                {"value": "12345"},
+            ),
+        ),
     ),
     arithmetic_operation(
         "integer.transform.base_digits",
