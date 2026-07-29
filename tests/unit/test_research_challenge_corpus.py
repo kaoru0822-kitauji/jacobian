@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -12,6 +13,8 @@ CORPUS_DIR = REPO_ROOT / "benchmarks" / "research_challenges"
 SCHEMA_PATH = CORPUS_DIR / "public_postdoc.schema.json"
 SUITE_PATH = CORPUS_DIR / "public_postdoc_v1.json"
 FRONTIER_SUITE_PATH = CORPUS_DIR / "public_postdoc_frontier_v1.json"
+FRONTIER_STATUS_SCHEMA_PATH = CORPUS_DIR / "frontier_status.schema.json"
+FRONTIER_STATUS_PATH = CORPUS_DIR / "public_postdoc_frontier_status_v2.json"
 SUITE_PATHS = (SUITE_PATH, FRONTIER_SUITE_PATH)
 PROMPT_PREFIX = (
     "Use Jacobian MCP, and do not use web search or external knowledge retrieval,"
@@ -98,6 +101,47 @@ def test_public_postdoc_frontier_ids_and_tier_mix_are_stable() -> None:
         "COMPOSITIONAL_STRETCH": 2,
         "CAPABILITY_GAP_PROBE": 3,
     }
+
+
+def test_frontier_status_v2_conforms_and_binds_immutable_v1() -> None:
+    schema = _read_json(FRONTIER_STATUS_SCHEMA_PATH)
+    manifest = _read_json(FRONTIER_STATUS_PATH)
+    Draft202012Validator.check_schema(schema)
+    errors = sorted(
+        Draft202012Validator(
+            schema,
+            format_checker=FormatChecker(),
+        ).iter_errors(manifest),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+
+    assert not errors, "\n".join(
+        f"{'/'.join(str(part) for part in error.absolute_path)}: {error.message}"
+        for error in errors
+    )
+    suite_digest = (
+        "sha256:" + hashlib.sha256(FRONTIER_SUITE_PATH.read_bytes()).hexdigest()
+    )
+    assert manifest["source_suite"]["sha256"] == suite_digest
+    assert [case["challenge_id"] for case in manifest["cases"]] == [
+        f"jcb-postdoc-{number:03d}" for number in range(13, 19)
+    ]
+
+
+def test_frontier_status_v2_updates_case_014_without_rewriting_history() -> None:
+    suite = _read_json(FRONTIER_SUITE_PATH)
+    manifest = _read_json(FRONTIER_STATUS_PATH)
+    historical = next(
+        case for case in suite["cases"] if case["challenge_id"] == "jcb-postdoc-014"
+    )
+    current = next(
+        case for case in manifest["cases"] if case["challenge_id"] == "jcb-postdoc-014"
+    )
+
+    assert historical["jacobian_fit"]["classification"] == "MISSING"
+    assert current["historical_fit"] == "MISSING"
+    assert current["current_status"] == "COVERED"
+    assert current["evaluation_status"] == "REGRESSION_COVERED"
 
 
 def test_magma_implication_oracle_replays_the_minimal_order_two_model() -> None:

@@ -81,6 +81,8 @@ LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
 CONDITIONS = ("control", "treatment")
+DEFAULT_CAPABILITY_POLICY_PROFILE = "DEFAULT"
+NO_RETRIEVAL_CAPABILITY_POLICY_PROFILE = "COMPUTE_VERIFY_NO_RETRIEVAL"
 LEAN_DISCOVERY_IDS = frozenset(
     {
         "lean.declaration.search",
@@ -2386,6 +2388,7 @@ def _codex_command(
     report_schema: Path = REPORT_SCHEMA,
     task_type: str | None = None,
     excluded_capability_ids: Sequence[str] = (),
+    capability_policy_profile: str | None = None,
 ) -> list[str]:
     command = [
         codex_command,
@@ -2436,6 +2439,12 @@ def _codex_command(
                 "--state-dir",
                 str(state_dir),
             ]
+        resolved_policy_profile = capability_policy_profile or (
+            DEFAULT_CAPABILITY_POLICY_PROFILE
+            if lean_task
+            else NO_RETRIEVAL_CAPABILITY_POLICY_PROFILE
+        )
+        server_args.extend(["--capability-policy-profile", resolved_policy_profile])
         command.extend(
             [
                 "-c",
@@ -2458,6 +2467,17 @@ def _codex_command(
         command.extend(["--model", model])
     command.append("-")
     return command
+
+
+def _condition_policy_profile(
+    case: Mapping[str, Any],
+    condition: str,
+) -> str | None:
+    if case.get("task_type") in {"lean_declaration", "lean_proof"}:
+        return DEFAULT_CAPABILITY_POLICY_PROFILE
+    if condition == "treatment":
+        return NO_RETRIEVAL_CAPABILITY_POLICY_PROFILE
+    return None
 
 
 def _condition_instructions(task_type: object, condition: str) -> str:
@@ -2624,6 +2644,7 @@ def _run_condition(
         excluded_capability_ids=(
             LEAN_PROOF_CAPABILITY_EXCLUSIONS[condition] if is_lean_proof else ()
         ),
+        capability_policy_profile=_condition_policy_profile(case, condition),
     )
     started = time.monotonic()
     started_at = _timestamp()
@@ -2675,6 +2696,7 @@ def _run_condition(
         "case_id": case["case_id"],
         "case_version": case["version"],
         "condition": condition,
+        "capability_policy_profile": _condition_policy_profile(case, condition),
         "repetition": repetition,
         "started_at": started_at,
         "completed_at": _timestamp(),
@@ -2683,6 +2705,17 @@ def _run_condition(
         "usage": telemetry["usage"],
         "mcp_calls": telemetry["mcp_calls"],
         "mcp_call_count": len(telemetry["mcp_calls"]),
+        "mcp_wire_bytes": telemetry["mcp_wire_bytes"],
+        "mcp_wire_bytes_by_tool": telemetry["mcp_wire_bytes_by_tool"],
+        "mcp_model_visible_bytes": telemetry["mcp_model_visible_bytes"],
+        "mcp_model_visible_bytes_by_tool": telemetry["mcp_model_visible_bytes_by_tool"],
+        "mcp_logical_payload_bytes": telemetry["mcp_logical_payload_bytes"],
+        "mcp_logical_payload_bytes_by_tool": telemetry[
+            "mcp_logical_payload_bytes_by_tool"
+        ],
+        "mcp_logical_payload_observed_calls": telemetry[
+            "mcp_logical_payload_observed_calls"
+        ],
         "tool_error_count": telemetry["tool_error_count"],
         "parameter_error_count": telemetry["parameter_error_count"],
         "capability_rejection_count": telemetry["capability_rejection_count"],
@@ -2867,6 +2900,16 @@ def summarize_pairs(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 - int(control["shell_call_count"]),
                 "mcp_call_delta": int(treatment["mcp_call_count"])
                 - int(control["mcp_call_count"]),
+                "mcp_wire_byte_delta": int(treatment.get("mcp_wire_bytes", 0))
+                - int(control.get("mcp_wire_bytes", 0)),
+                "mcp_model_visible_byte_delta": int(
+                    treatment.get("mcp_model_visible_bytes", 0)
+                )
+                - int(control.get("mcp_model_visible_bytes", 0)),
+                "mcp_logical_payload_byte_delta": int(
+                    treatment.get("mcp_logical_payload_bytes", 0)
+                )
+                - int(control.get("mcp_logical_payload_bytes", 0)),
                 "tool_error_delta": int(treatment.get("tool_error_count", 0))
                 - int(control.get("tool_error_count", 0)),
                 "parameter_error_delta": int(treatment.get("parameter_error_count", 0))
@@ -2943,6 +2986,16 @@ def _lean_comparisons(
                         - int(baseline["mcp_call_count"])
                         - int(baseline["shell_call_count"])
                     ),
+                    "mcp_wire_byte_delta": int(treatment.get("mcp_wire_bytes", 0))
+                    - int(baseline.get("mcp_wire_bytes", 0)),
+                    "mcp_model_visible_byte_delta": int(
+                        treatment.get("mcp_model_visible_bytes", 0)
+                    )
+                    - int(baseline.get("mcp_model_visible_bytes", 0)),
+                    "mcp_logical_payload_byte_delta": int(
+                        treatment.get("mcp_logical_payload_bytes", 0)
+                    )
+                    - int(baseline.get("mcp_logical_payload_bytes", 0)),
                     "parameter_error_delta": int(
                         treatment.get("parameter_error_count", 0)
                     )
@@ -2972,6 +3025,15 @@ def _condition_summary(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             int(result.get("mcp_call_count", 0))
             + int(result.get("shell_call_count", 0))
             for result in results
+        ),
+        "median_mcp_wire_bytes": statistics.median(
+            int(result.get("mcp_wire_bytes", 0)) for result in results
+        ),
+        "median_mcp_model_visible_bytes": statistics.median(
+            int(result.get("mcp_model_visible_bytes", 0)) for result in results
+        ),
+        "median_mcp_logical_payload_bytes": statistics.median(
+            int(result.get("mcp_logical_payload_bytes", 0)) for result in results
         ),
         "tool_error_count": sum(
             int(result.get("tool_error_count", 0)) for result in results
@@ -3058,6 +3120,10 @@ def build_dispatch_plan(
                 "conditions": list(conditions),
                 "repetitions": repetitions,
                 "model_runs": case_run_count,
+                "capability_policy_profiles": {
+                    condition: _condition_policy_profile(case, condition)
+                    for condition in conditions
+                },
             }
         )
     return {
@@ -3154,6 +3220,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         "order_seed": args.order_seed,
         "provider_generation_seed": None,
         "lean_proof_capability_exclusions": LEAN_PROOF_CAPABILITY_EXCLUSIONS,
+        "evaluation_capability_policy_profiles": {
+            str(case["case_id"]): {
+                condition: _condition_policy_profile(case, condition)
+                for condition in (
+                    LEAN_PROOF_CONDITIONS
+                    if case.get("task_type") == "lean_proof"
+                    else CONDITIONS
+                )
+            }
+            for case in cases
+        },
         "public_reproduction_cases_scored": False,
         "dispatch": {
             **plan,

@@ -33,6 +33,10 @@ def test_agent_eval_is_plan_only_without_explicit_execute(
     assert plan["execution_requested"] is False
     assert plan["model_run_count"] == 2
     assert plan["maximum_model_wall_seconds"] == 1200
+    assert plan["cases"][0]["capability_policy_profiles"] == {
+        "control": None,
+        "treatment": "COMPUTE_VERIFY_NO_RETRIEVAL",
+    }
 
 
 def test_agent_eval_requires_explicit_case_selection() -> None:
@@ -183,3 +187,36 @@ def test_ab_lean_codex_command_uses_same_mcp_with_control_ablation(
     assert "agent_ab_mcp.py" in " ".join(treatment)
     assert " ".join(control).count("--exclude-capability") == 2
     assert "--exclude-capability" not in " ".join(treatment)
+    for command in (control, treatment):
+        server_argument = next(
+            item
+            for item in command
+            if item.startswith("mcp_servers.jacobian_local.args=")
+        )
+        server_args = json.loads(server_argument.split("=", 1)[1])
+        assert server_args[-2:] == ["--capability-policy-profile", "DEFAULT"]
+
+
+def test_ab_non_retrieval_treatment_starts_profiled_mcp(
+    tmp_path: Path,
+) -> None:
+    command = benchmark._codex_command(
+        codex_command="codex",
+        condition="treatment",
+        workspace=tmp_path / "workspace",
+        report_path=tmp_path / "report.json",
+        state_dir=tmp_path / "state",
+        model="gpt-5.6",
+        reasoning_effort="xhigh",
+        task_type="graph",
+    )
+
+    assert "jacobian-mcp" in " ".join(command)
+    server_argument = next(
+        item for item in command if item.startswith("mcp_servers.jacobian_local.args=")
+    )
+    server_args = json.loads(server_argument.split("=", 1)[1])
+    assert server_args[-2:] == [
+        "--capability-policy-profile",
+        "COMPUTE_VERIFY_NO_RETRIEVAL",
+    ]

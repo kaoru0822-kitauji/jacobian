@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
-from mcp_types import ToolAnnotations
+from mcp_types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import AnyHttpUrl, Field, StrictInt
 
 from jacobian import __version__
@@ -65,6 +65,10 @@ from jacobian.contracts.workspaces import (
 _LOGGER = logging.getLogger(__name__)
 CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
 CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "COMPACT", "FULL"]
+CapabilityInvocationView = Literal["SUMMARY", "STANDARD", "FULL"]
+CAPABILITY_STANDARD_OUTPUT_BYTE_LIMIT = 8_192
+CAPABILITY_STANDARD_FIELD_BYTE_LIMIT = 2_048
+CAPABILITY_STANDARD_INCLUDED_FIELD_BYTE_LIMIT = 6_144
 _CAPABILITY_SCOPE_RULE = {
     "conclusion_scope": "Only the exact supplied input or claim is covered.",
     "bounded_repetition": (
@@ -73,6 +77,147 @@ _CAPABILITY_SCOPE_RULE = {
         "conclusion."
     ),
 }
+
+
+def _compact_json(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _json_bytes(value: object) -> bytes:
+    return _compact_json(value).encode("utf-8")
+
+
+def _json_digest(value: object) -> str:
+    return f"sha256:{hashlib.sha256(_json_bytes(value)).hexdigest()}"
+
+
+def _json_kind(value: object) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, int | float):
+        return "number"
+    if isinstance(value, list | tuple):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return type(value).__name__
+
+
+def _json_pointer_segment(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def _invocation_text_projection(
+    result: CapabilityResult,
+    *,
+    view: CapabilityInvocationView,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Project model-visible text without changing the canonical result."""
+
+    canonical = result.model_dump(mode="json")
+    canonical_bytes = _json_bytes(canonical)
+    canonical_digest = f"sha256:{hashlib.sha256(canonical_bytes).hexdigest()}"
+    projected = dict(canonical)
+    output = canonical["output"]
+    output_bytes = _json_bytes(output)
+    omitted: list[dict[str, Any]] = []
+
+    if view == "SUMMARY":
+        projected["output"] = {}
+        if output:
+            omitted.append(
+                {
+                    "path": "/output",
+                    "json_type": "object",
+                    "byte_count": len(output_bytes),
+                    "sha256": _json_digest(output),
+                }
+            )
+    elif (
+        view == "STANDARD"
+        and result.episode_uri is not None
+        and len(output_bytes) > CAPABILITY_STANDARD_OUTPUT_BYTE_LIMIT
+    ):
+        included: dict[str, Any] = {}
+        included_bytes = 0
+        for key in sorted(output):
+            value = output[key]
+            value_bytes = _json_bytes(value)
+            is_scalar = not isinstance(value, dict | list | tuple)
+            fits_field = len(value_bytes) <= CAPABILITY_STANDARD_FIELD_BYTE_LIMIT
+            fits_total = (
+                included_bytes + len(value_bytes)
+                <= CAPABILITY_STANDARD_INCLUDED_FIELD_BYTE_LIMIT
+            )
+            if is_scalar or (fits_field and fits_total):
+                included[key] = value
+                included_bytes += len(value_bytes)
+                continue
+            omitted.append(
+                {
+                    "path": f"/output/{_json_pointer_segment(key)}",
+                    "json_type": _json_kind(value),
+                    "byte_count": len(value_bytes),
+                    "sha256": _json_digest(value),
+                }
+            )
+        projected["output"] = included
+
+    output_complete = not omitted
+    projection = {
+        "projection_version": "1",
+        "view": view,
+        "canonical_result_in_structured_content": True,
+        "output_complete": output_complete,
+        "logical_payload_bytes": len(canonical_bytes),
+        "full_result_sha256": canonical_digest,
+        "full_result_episode_uri": result.episode_uri,
+        "omitted_output_fields": omitted,
+    }
+    if not output_complete:
+        projection["recovery"] = (
+            "Read full_result_episode_uri for the durable canonical result, or invoke "
+            'again with view="FULL" when no durable result is available.'
+        )
+    if view != "FULL":
+        projected["mcp_projection"] = projection
+    return projected, projection
+
+
+def _capability_call_tool_result(
+    result: CapabilityResult,
+    *,
+    view: CapabilityInvocationView,
+) -> CallToolResult:
+    canonical = result.model_dump(mode="json")
+    projected, projection = _invocation_text_projection(result, view=view)
+    text = _compact_json(canonical if view == "FULL" else projected)
+    model_visible_bytes = len(text.encode("utf-8"))
+    return CallToolResult(
+        _meta={
+            "jacobian": {
+                "result_view": view,
+                "logical_payload_bytes": projection["logical_payload_bytes"],
+                "model_visible_payload_bytes": model_visible_bytes,
+                "full_result_sha256": projection["full_result_sha256"],
+                "full_result_episode_uri": projection["full_result_episode_uri"],
+                "output_complete": projection["output_complete"],
+            }
+        },
+        content=[TextContent(type="text", text=text)],
+        structured_content=canonical,
+        is_error=False,
+    )
+
 
 _RELATED_CAPABILITIES: dict[str, tuple[tuple[str, str], ...]] = {
     "sat.cnf.materialize": (
@@ -996,16 +1141,18 @@ def create_server(
         capability_id: str,
         payload: dict[str, Any],
         mode: CapabilityMode = CapabilityMode.EXPLORE,
+        view: CapabilityInvocationView = "STANDARD",
         ctx: Context[AppState, Any] | None = None,
-    ) -> CapabilityResult:
+    ) -> Annotated[CallToolResult, CapabilityResult]:
         active_kernel = _kernel(ctx)
-        return await _invoke_capability_attempt(
+        result = await _invoke_capability_attempt(
             active_kernel,
             capability_id=capability_id,
             payload=payload,
             mode=mode,
             ctx=ctx,
         )
+        return _capability_call_tool_result(result, view=view)
 
     @server.tool(
         name="workspace.open",

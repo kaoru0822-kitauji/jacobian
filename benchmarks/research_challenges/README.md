@@ -18,6 +18,16 @@ probabilistic LP evidence, and graph-formalization semantic auditing. It is a
 separate versioned suite so the original twelve-case sample and its recorded
 runs remain stable.
 
+`public_postdoc_frontier_status_v2.json` is the current status and evaluation
+overlay for that immutable v1 input. In particular, the v1 suite's 256-capability
+snapshot and its `MISSING` classification for `jcb-postdoc-014` are historical
+facts, not live portfolio claims. The v2 overlay binds the exact v1 file digest,
+records current default and no-retrieval catalog snapshots, names repository
+regressions, and carries discovery/evaluation gates for unresolved candidates.
+The catalog snapshots describe the pre-manifest environment at their named
+repository commit; provider availability remains installation-specific. Future
+status changes create a new overlay version; they do not rewrite v1.
+
 Each case contains:
 
 - a self-contained mathematical statement and copy-ready prompt;
@@ -61,8 +71,40 @@ held-out comparative evaluation.
 
 ## Running a sample
 
-Select cases from the JSON by `challenge_id` and pass the `prompt` field
-unchanged to the model. Record:
+The dedicated runner validates the suite, passes each `prompt` field unchanged,
+records the selection seed and prompt digest, and starts a fresh local Jacobian
+server under `COMPUTE_VERIFY_NO_RETRIEVAL`. It is plan-only unless model work and
+an explicit process budget are both authorized:
+
+```console
+uv run python benchmarks/research_challenge.py \
+  --challenge jcb-postdoc-014
+
+uv run python benchmarks/research_challenge.py \
+  --sample-size 3 \
+  --seed 17 \
+  --repetitions 2 \
+  --model gpt-5.6 \
+  --reasoning-effort xhigh \
+  --execute \
+  --max-model-runs 6
+```
+
+The same isolated capability profile can be exposed as an independent
+streamable-HTTP evaluation endpoint:
+
+```console
+uv run jacobian-mcp \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8001 \
+  --allow-anonymous \
+  --anonymous-tenant-id public-frontier-evaluation \
+  --capability-policy-profile COMPUTE_VERIFY_NO_RETRIEVAL
+```
+
+Keep that endpoint separate from a default production endpoint: its catalog and
+policy digests are part of the evaluation intervention. The runner records:
 
 - model and reasoning configuration;
 - Jacobian catalog digest and deployment revision;

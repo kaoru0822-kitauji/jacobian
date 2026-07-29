@@ -55,6 +55,18 @@ as an explicit choice, and the requested model-run count must fit within
 `--max-model-runs`. Preparing a case or validating the harness does not
 authorize execution.
 
+General mathematical treatments start Jacobian under the operator-bound
+`COMPUTE_VERIFY_NO_RETRIEVAL` profile. Baselines have no Jacobian server.
+Lean declaration/proof ablations retain `DEFAULT` because retrieval is an
+explicit intervention in those cases. Every dispatch plan and result records
+the selected profile; changing it creates a different treatment.
+
+Public answer-visible Frontier challenges use the separate
+`benchmarks/research_challenge.py` runner documented in
+`benchmarks/research_challenges/README.md`. That runner passes published prompts
+unchanged, withholds evaluator source URLs, enforces no-retrieval, remains
+unscored, and requires the same explicit execution and process budget.
+
 ## Experimental conditions
 
 Each scenario compares at least:
@@ -76,6 +88,12 @@ Hold constant:
 Use multiple seeds and report every run. Do not select the best transcript.
 When model versions change, establish a new baseline rather than combining
 incomparable results.
+
+For MCP cost, report canonical logical payload bytes, model-visible text bytes,
+and serialized wire bytes separately. A compact projection may reduce model
+context while retaining a complete structured result on the wire; only the
+model-visible measure answers that context question. Existing
+`mcp_response_bytes` is a compatibility alias for serialized wire bytes.
 
 A case is either prescribed-tool or autonomous-portfolio. Prescribed-tool
 cases fix the allowed tool set and score contract usability and conformance;
