@@ -472,7 +472,28 @@ class PolynomialMapEvaluationAdapter:
             input_schema=model_schema(PolynomialEvaluationRequest),
             output_schema=model_schema(PolynomialEvaluationOutput),
             tags=("polynomial", "map", "evaluation", "exact-computation"),
-            invocation_examples=(example("identity_at_zero", "Evaluate x at zero.", {"map": {"variables": ["x"], "coordinates": [{"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [1]}]}]}, "point": [{"num": "0", "den": "1"}]}),),
+            invocation_examples=(
+                example(
+                    "identity_at_zero",
+                    "Evaluate x at zero.",
+                    {
+                        "map": {
+                            "variables": ["x"],
+                            "coordinates": [
+                                {
+                                    "terms": [
+                                        {
+                                            "coefficient": {"num": "1", "den": "1"},
+                                            "exponents": [1],
+                                        }
+                                    ]
+                                }
+                            ],
+                        },
+                        "point": [{"num": "0", "den": "1"}],
+                    },
+                ),
+            ),
         )
 
     @property
@@ -556,7 +577,27 @@ class PolynomialJacobianAdapter:
             input_schema=model_schema(PolynomialJacobianRequest),
             output_schema=model_schema(PolynomialJacobianOutput),
             tags=("polynomial", "jacobian", "determinant", "exact-computation"),
-            invocation_examples=(example("identity_jacobian", "Compute the Jacobian of x.", {"map": {"variables": ["x"], "coordinates": [{"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [1]}]}]}}),),
+            invocation_examples=(
+                example(
+                    "identity_jacobian",
+                    "Compute the Jacobian of x.",
+                    {
+                        "map": {
+                            "variables": ["x"],
+                            "coordinates": [
+                                {
+                                    "terms": [
+                                        {
+                                            "coefficient": {"num": "1", "den": "1"},
+                                            "exponents": [1],
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    },
+                ),
+            ),
         )
 
     @property

@@ -160,7 +160,21 @@ RATIONAL_LINEAR_CAPABILITIES = (
             "certificate",
             "bounded",
         ),
-        invocation_examples=(example("one_variable_unit_lp", "Optimize x subject to x=1 and x>=0.", {"program": {"variables": ["x"], "objective": [{"num": "1", "den": "1"}], "coefficients": [[{"num": "1", "den": "1"}]], "rhs": [{"num": "1", "den": "1"}]}, "wall_seconds": 5}),),
+        invocation_examples=(
+            example(
+                "one_variable_unit_lp",
+                "Optimize x subject to x=1 and x>=0.",
+                {
+                    "program": {
+                        "variables": ["x"],
+                        "objective": [{"num": "1", "den": "1"}],
+                        "coefficients": [[{"num": "1", "den": "1"}]],
+                        "rhs": [{"num": "1", "den": "1"}],
+                    },
+                    "wall_seconds": 5,
+                },
+            ),
+        ),
     ),
 )
 
