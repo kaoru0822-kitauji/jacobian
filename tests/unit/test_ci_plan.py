@@ -163,12 +163,25 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-python",
                 "run-core",
                 "run-integration",
+                "run-lean",
                 "run-static",
                 "run-build",
             ),
         ),
         (
             ("src/jacobian/contracts/lean.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-lean",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            ("src/jacobian/contracts/plugins.py",),
             _expected_plan(
                 "selective",
                 "run-python",

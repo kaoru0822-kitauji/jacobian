@@ -9,16 +9,28 @@ import pytest
 
 from jacobian.plugin_execution import PluginExecutor
 
+_HAS_LINUX_PROCESS_IDENTITIES = Path("/proc/self/stat").exists()
 
-def _wait_until_process_exits(pid: int, *, timeout_seconds: float = 2) -> None:
+
+def _wait_until_process_exits(
+    identity: str,
+    *,
+    timeout_seconds: float = 2,
+) -> None:
+    pid_text, expected_start_time = identity.split(":", 1)
+    stat_path = Path(f"/proc/{pid_text}/stat")
     deadline = time.monotonic() + timeout_seconds
     while True:
         try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
+            current_start_time = (
+                stat_path.read_text(encoding="utf-8").rsplit(")", 1)[1].split()[19]
+            )
+        except FileNotFoundError:
+            return
+        if current_start_time != expected_start_time:
             return
         if time.monotonic() >= deadline:
-            pytest.fail(f"descendant process {pid} remained alive")
+            pytest.fail(f"descendant process {pid_text} remained alive")
         time.sleep(0.01)
 
 
@@ -126,6 +138,10 @@ def test_plugin_diagnostic_limit_fails_closed() -> None:
     )
 
 
+@pytest.mark.skipif(
+    not _HAS_LINUX_PROCESS_IDENTITIES,
+    reason="requires non-signaling Linux process identities",
+)
 def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
     marker = tmp_path / "descendant-survived"
     started_marker = tmp_path / "descendant-started"
@@ -144,10 +160,14 @@ def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
 
     assert started_marker.read_text(encoding="utf-8") == "started"
     assert result.status.value == "TIMEOUT"
-    _wait_until_process_exits(int(pid_marker.read_text(encoding="utf-8")))
+    _wait_until_process_exits(pid_marker.read_text(encoding="utf-8"))
     assert not marker.exists()
 
 
+@pytest.mark.skipif(
+    not _HAS_LINUX_PROCESS_IDENTITIES,
+    reason="requires non-signaling Linux process identities",
+)
 def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) -> None:
     marker = tmp_path / "pipe-holder-survived"
     pid_marker = tmp_path / "pipe-holder-pid"
@@ -164,10 +184,14 @@ def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) ->
     assert elapsed < 30
     assert result.status.value == "COMPLETED"
     assert result.output == {"worker": "returned"}
-    _wait_until_process_exits(int(pid_marker.read_text(encoding="utf-8")))
+    _wait_until_process_exits(pid_marker.read_text(encoding="utf-8"))
     assert not marker.exists()
 
 
+@pytest.mark.skipif(
+    not _HAS_LINUX_PROCESS_IDENTITIES,
+    reason="requires non-signaling Linux process identities",
+)
 def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None:
     marker = tmp_path / "detached-descendant-survived"
     pid_marker = tmp_path / "detached-descendant-pid"
@@ -179,7 +203,7 @@ def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None
     )
 
     assert result.status.value == "COMPLETED"
-    _wait_until_process_exits(int(pid_marker.read_text(encoding="utf-8")))
+    _wait_until_process_exits(pid_marker.read_text(encoding="utf-8"))
     assert not marker.exists()
 
 

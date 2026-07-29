@@ -60,6 +60,19 @@
       "suites": ["core", "integration", "lean", "static", "build"]
     },
     {
+      "name": "lean-shared-contracts",
+      "patterns": [
+        "src/jacobian/contracts/capabilities.py",
+        "src/jacobian/contracts/checkers.py",
+        "src/jacobian/contracts/common.py",
+        "src/jacobian/contracts/evidence.py",
+        "src/jacobian/contracts/plugins.py",
+        "src/jacobian/contracts/results.py",
+        "src/jacobian/contracts/verification.py"
+      ],
+      "suites": ["lean"]
+    },
+    {
       "name": "npm-facing-adapter",
       "patterns": ["src/jacobian/adapters/mcp/**"],
       "suites": ["core", "integration", "npm", "static", "build"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, cast
 
@@ -33,6 +34,13 @@ class SchemaValidationError(SchemaRegistryError):
         super().__init__(message)
         self.path = path
         self.required_field = required_field
+
+
+@dataclass(slots=True)
+class _PendingRegistrations:
+    schemas: dict[str, bytes] = field(default_factory=dict)
+    registrations: dict[tuple[str, str, bytes], str] = field(default_factory=dict)
+    model_contracts: dict[str, type[BaseModel]] = field(default_factory=dict)
 
 
 @lru_cache(maxsize=1024)
@@ -90,14 +98,23 @@ class SchemaRegistry:
         self._model_contracts: dict[str, type[BaseModel]] = {}
         self._schema_bytes: dict[str, bytes] = {}
         self._registrations: dict[tuple[str, str, bytes], str] = {}
+        self._pending: dict[int, _PendingRegistrations] = {}
 
     def register(self, *, name: str, version: str, schema: dict[str, Any]) -> str:
         """Register a schema after rejecting unsupported external references."""
 
+        self._reconcile_pending()
         canonical_schema = canonicalize_json(schema)
         _validated_schema(canonical_schema)
         registration = (name, version, canonical_schema)
-        cached_uri = self._registrations.get(registration)
+        transaction_identity = self.store.transaction_identity
+        registrations = self._registrations
+        if transaction_identity is not None:
+            registrations = self._pending.setdefault(
+                transaction_identity,
+                _PendingRegistrations(),
+            ).registrations
+        cached_uri = registrations.get(registration)
         if cached_uri is not None:
             return cached_uri
         schema_uri = self.store.register_descriptor(
@@ -106,8 +123,11 @@ class SchemaRegistry:
             version=version,
             definition=loads_strict_json(canonical_schema),
         )
-        self._registrations[registration] = schema_uri
-        self._schema_bytes[schema_uri] = canonical_schema
+        registrations[registration] = schema_uri
+        if transaction_identity is None:
+            self._schema_bytes[schema_uri] = canonical_schema
+        else:
+            self._pending[transaction_identity].schemas[schema_uri] = canonical_schema
         return schema_uri
 
     def register_model(
@@ -130,20 +150,34 @@ class SchemaRegistry:
             version=version,
             schema=model_schema(model),
         )
-        registered = self._model_contracts.get(schema_uri)
+        transaction_identity = self.store.transaction_identity
+        model_contracts = self._model_contracts
+        if transaction_identity is not None:
+            model_contracts = self._pending[transaction_identity].model_contracts
+        registered = model_contracts.get(schema_uri)
         if registered is not None and registered is not model:
             raise SchemaRegistryError(
                 "one schema URI cannot use multiple model-backed contracts"
             )
-        self._model_contracts[schema_uri] = model
+        model_contracts[schema_uri] = model
         return schema_uri
 
     def resolve(self, schema_uri: str) -> dict[str, Any]:
         """Load a previously registered schema definition."""
 
-        cached_schema = self._schema_bytes.get(schema_uri)
-        if cached_schema is not None:
-            return cast(dict[str, Any], loads_strict_json(cached_schema))
+        self._reconcile_pending()
+        transaction_identity = self.store.transaction_identity
+        if transaction_identity is None:
+            cached_schema = self._schema_bytes.get(schema_uri)
+            if cached_schema is not None:
+                return cast(dict[str, Any], loads_strict_json(cached_schema))
+        else:
+            pending_schema = self._pending.get(
+                transaction_identity,
+                _PendingRegistrations(),
+            ).schemas.get(schema_uri)
+            if pending_schema is not None:
+                return cast(dict[str, Any], loads_strict_json(pending_schema))
         try:
             descriptor = self.store.get_descriptor(
                 schema_uri,
@@ -157,8 +191,25 @@ class SchemaRegistry:
         _reject_external_references(definition)
         canonical_schema = canonicalize_json(definition)
         _validated_schema(canonical_schema)
-        self._schema_bytes[schema_uri] = canonical_schema
+        if transaction_identity is None:
+            self._schema_bytes[schema_uri] = canonical_schema
         return cast(dict[str, Any], loads_strict_json(canonical_schema))
+
+    def _reconcile_pending(self) -> None:
+        active_identity = self.store.transaction_identity
+        for transaction_identity, pending in tuple(self._pending.items()):
+            if transaction_identity == active_identity:
+                continue
+            witness_uri = next(iter(pending.schemas))
+            try:
+                self.store.get_descriptor(witness_uri, expected_kind="schema")
+            except StoreError:
+                del self._pending[transaction_identity]
+                continue
+            self._schema_bytes.update(pending.schemas)
+            self._registrations.update(pending.registrations)
+            self._model_contracts.update(pending.model_contracts)
+            del self._pending[transaction_identity]
 
     def validate(self, schema_uri: str, payload: Any) -> Any:
         """Validate and canonically normalize a payload."""
