@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
-SCRIPT = Path(__file__).parents[2] / ".github" / "scripts" / "summarize-ci-timings"
+from tests.helpers.ci import run_ci_script
 
 
 def test_ci_timing_summary_reports_elapsed_and_runner_minutes(tmp_path: Path) -> None:
@@ -45,13 +44,7 @@ def test_ci_timing_summary_reports_elapsed_and_runner_minutes(tmp_path: Path) ->
     jobs_json = tmp_path / "jobs.json"
     jobs_json.write_text(json.dumps(payload), encoding="utf-8")
 
-    completed = subprocess.run(
-        [SCRIPT, jobs_json],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    completed = run_ci_script("summarize-ci-timings", jobs_json, check=True)
 
     assert "Critical path (workflow elapsed) | 5.0 min" in completed.stdout
     assert "Total runner time | 12.5 min" in completed.stdout

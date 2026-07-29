@@ -6,9 +6,8 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 
 import pytest
+from tests.helpers.ci import run_ci_script
 
-PLANNER = Path(__file__).parents[2] / ".github" / "scripts" / "classify-ci-paths"
-VALIDATOR = Path(__file__).parents[2] / ".github" / "scripts" / "validate-ci-plan"
 OWNERSHIP = Path(__file__).parents[2] / ".github" / "ci-impact.json"
 
 BOOLEAN_KEYS = (
@@ -272,13 +271,7 @@ def test_ci_plan_fails_closed_outside_isolated_paths(
     paths: tuple[str, ...],
     expected: dict[str, str],
 ) -> None:
-    completed = subprocess.run(
-        [PLANNER, *paths],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    completed = run_ci_script("classify-ci-paths", *paths, check=True)
 
     assert (
         dict(line.split("=", 1) for line in completed.stdout.splitlines()) == expected
@@ -286,12 +279,8 @@ def test_ci_plan_fails_closed_outside_isolated_paths(
 
 
 def test_full_override_expands_an_isolated_plan() -> None:
-    completed = subprocess.run(
-        [PLANNER, "--force-full", "--", "docs/index.md"],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    completed = run_ci_script(
+        "classify-ci-paths", "--force-full", "--", "docs/index.md", check=True
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
@@ -300,12 +289,8 @@ def test_full_override_expands_an_isolated_plan() -> None:
 
 
 def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
-    completed = subprocess.run(
-        [PLANNER, "--force-lean", "--", "docs/index.md"],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    completed = run_ci_script(
+        "classify-ci-paths", "--force-lean", "--", "docs/index.md", check=True
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
@@ -327,15 +312,9 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
     ],
 )
 def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
-    plan = subprocess.run(
-        [PLANNER, *args],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    ).stdout
+    plan = run_ci_script("classify-ci-paths", *args, check=True).stdout
 
-    subprocess.run([VALIDATOR], input=plan, check=True, text=True, timeout=30)
+    run_ci_script("validate-ci-plan", input_text=plan, check=True)
 
 
 @pytest.mark.parametrize(
@@ -404,13 +383,7 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
     ],
 )
 def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> None:
-    completed = subprocess.run(
-        [VALIDATOR],
-        input=plan,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    completed = run_ci_script("validate-ci-plan", input_text=plan)
 
     assert completed.returncode != 0
 
@@ -425,13 +398,7 @@ def test_every_lean_python_test_enables_the_lean_lane() -> None:
     assert lean_tests
 
     for lean_test in lean_tests:
-        completed = subprocess.run(
-            [PLANNER, lean_test],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        completed = run_ci_script("classify-ci-paths", lean_test, check=True)
         plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
         assert plan["run-lean"] == "true", lean_test
 
