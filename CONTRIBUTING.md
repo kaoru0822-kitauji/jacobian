@@ -49,6 +49,7 @@ make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
 make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-contracts
 make test-checkers
+make test-subprocess
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
@@ -187,6 +188,9 @@ Markers describe runtime traits such as `lean_runtime`, `slow`, `subprocess`, or
 scheduled validation lanes locally with `make test-stress` and
 `make test-ordering PYTEST_ARGS=--randomly-seed=17` (locked `pytest-repeat` and
 `pytest-randomly` are part of the dev environment).
+Use `make test-subprocess` to run the clean-process replay tests selected by the
+`subprocess` marker. The marker is a selection label; it does not serialize
+unrelated tests under xdist.
 
 CI change impact is declared in `.github/ci-impact.json`. Its matching rules are
 additive, so a path may require several suites. Integration timing history is a
