@@ -7,9 +7,11 @@ import subprocess
 import sys
 import threading
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
+from deploy.smoke_remote import inspect as inspect_remote_deployment
 from mcp.server.auth.settings import AuthSettings
 from pydantic import AnyHttpUrl
 from uvicorn import Config, Server
@@ -282,6 +284,7 @@ def test_token_file_is_strict_and_remote_cli_fails_closed(
 @pytest.mark.subprocess
 def test_authenticated_streamable_http_isolates_tenant_memory(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     token_file = tmp_path / "tokens.json"
     token_file.write_text(
@@ -337,6 +340,19 @@ def test_authenticated_streamable_http_isolates_tenant_memory(
             _wait_for_server(http_server, server_thread)
             asyncio.run(_remote_auth_rejections(port))
             asyncio.run(_remote_tenant_scenario(port))
+            monkeypatch.setenv("JACOBIAN_MCP_BEARER_TOKEN", "a" * 32)
+            report = asyncio.run(
+                inspect_remote_deployment(
+                    url=f"http://127.0.0.1:{port}/mcp",
+                    expected_version=version("jacobian"),
+                    expected_policy_profile="DEFAULT",
+                    required_capabilities={"fixture.increment"},
+                    query="fixture increment",
+                    timeout_seconds=60,
+                )
+            )
+            assert report["server"]["version"] == version("jacobian")
+            assert report["catalog"]["policy_profile"] == "DEFAULT"
         finally:
             http_server.should_exit = True
             server_thread.join(timeout=10)
@@ -347,7 +363,7 @@ async def _remote_auth_rejections(port: int) -> None:
     import httpx2
 
     url = f"http://127.0.0.1:{port}/mcp"
-    async with httpx2.AsyncClient() as client:
+    async with httpx2.AsyncClient(trust_env=False) as client:
         unauthenticated = await client.post(url, json={})
         wrong_scope = await client.post(
             url,

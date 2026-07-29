@@ -30,7 +30,8 @@ still pre-stable:
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current implementation and trust boundaries |
 | What direction is the project taking? | [Product goals](explanation/goals.md) | Rolling goals pursued in parallel |
 | Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
-| What is the supported release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative for `0.2.0a0` |
+| What is the last frozen release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative snapshot for `0.2.0a0`; later pre-stable releases extend it |
+| What is installed now? | [Tool surface](reference/tools.md) and runtime `capability://catalog` | Current interface rules and installation-specific inventory |
 
 ## Tutorials
 
@@ -66,10 +67,14 @@ expectations.
 - [Exact rational linear-system evidence](reference/linear-rational-solutions.md)
 - [Exact rational matrix determinants](reference/matrix-rational-determinant.md)
 - [Graph counterexample shrinking](reference/graph-counterexample-shrinking.md)
+- [Fixed-registry graph invariant batches](reference/graph-invariant-batch.md)
 - [Maximum-matching certificate and verification](reference/graph-maximum-matching.md)
+- [Bounded finite exactly-once coverage](reference/finite-coverage-verification.md)
 - [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
 - [Typed polynomial expression normalization](reference/polynomial-expression-normalization.md)
 - [Polynomial-map inverse verification](reference/polynomial-map-inverse-verification.md)
+- [Lean statement proposal and elaboration](reference/lean-statement-elaboration.md)
+- [Replayable Lean proof-state transitions](reference/lean-replayable-proof-states.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
 - [v0.2 conformance specification](reference/conformance-v0.2.md)
 - [Plugin conformance contract](reference/plugin-conformance.md)
@@ -79,6 +84,7 @@ expectations.
 - [Testing strategy](reference/testing-strategy.md)
 - [Agent evaluation protocol](reference/agent-evaluations.md)
 - [Capability workflow evaluation plan](reference/capability-workflow-evaluations.md)
+- [Capability development handoffs](reference/capability-development-handoffs.md)
 
 ## Explanation
 
@@ -106,6 +112,15 @@ records the formal-first backend research, ordering, installation tradeoffs,
 and evaluation gates used to decide which mathematical slices to build next.
 The [test-suite cost audit](contributing/test-suite-cost-audit.md) records the
 measured test lanes, retained trust-boundary costs, and fast-feedback policy.
+
+Recurring agent work is encoded in the repository-local skills under
+`.agents/skills/`. Start with `develop-math-capabilities` for a complete
+challenge-to-evaluation loop, or select its discovery, producer, checker, or
+evaluation phase skill directly. Use the
+[capability development handoff](reference/capability-development-handoffs.md)
+between phases. For hosted operation, follow
+[Deploy the remote MCP server](how-to/deploy-remote-mcp.md); ignored `tmp/`
+records are evidence from one host, not maintained instructions.
 
 When adding a document, place it according to the reader's need:
 

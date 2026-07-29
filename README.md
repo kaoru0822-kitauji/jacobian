@@ -158,8 +158,9 @@ agent-authored state; workspace entries remain `UNVERIFIED`.
 | [Tool surface](docs/reference/tools.md) | MCP resources, tools, and invocation contracts |
 | [Domain operation library](docs/reference/domain-operation-library.md) | Built-in producer, bounded-search, artifact, and exact-replay contracts |
 | [Provider runtime](docs/reference/provider-runtime.md) | Backend availability, compatibility, and identity |
-| [v0.2 specification](docs/reference/specifications/v0.2.md) | Supported release behavior and conformance |
+| [v0.2 specification](docs/reference/specifications/v0.2.md) | Last frozen release snapshot and conformance baseline |
 | [Testing strategy](docs/reference/testing-strategy.md) | Validation layers, commands, and CI responsibilities |
+| [Capability development handoffs](docs/reference/capability-development-handoffs.md) | Evidence-preserving agent handoffs between discovery, implementation, checking, and evaluation |
 
 Specialized contracts cover
 [SAT artifacts](docs/reference/sat-artifacts.md),
@@ -193,6 +194,20 @@ Remote clients can connect through Streamable HTTP or SSE with bearer-token
 authentication and subject-bound tenant state. See
 [Deploy the remote MCP server](docs/how-to/deploy-remote-mcp.md). Static tokens
 are intended for controlled deployments, not as a hosted identity system.
+
+From a clean clone on a systemd host, the maintained installer can deploy a
+localhost endpoint, a Caddy-managed public domain, or Tailscale Funnel:
+
+```sh
+sudo ./deploy/install.sh
+sudo ./deploy/install.sh --mode domain --domain math.example.org
+sudo ./deploy/install.sh --mode tailscale
+```
+
+Run `./deploy/install.sh --help` or add `--dry-run` to inspect the plan first.
+The public modes require a reviewed Caddy installation; Funnel additionally
+requires a connected Tailscale installation. Authentication is enabled by
+default, and a newly generated bearer token is printed once.
 
 ## Optional backends
 

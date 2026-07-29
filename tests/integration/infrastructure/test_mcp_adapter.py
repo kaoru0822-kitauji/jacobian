@@ -7,6 +7,7 @@ import logging
 import os
 import subprocess
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
 
         async with Client(server, raise_exceptions=True) as client:
             assert client.instructions == server.instructions
+            assert client.server_info.version == version("jacobian")
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
             assert set(tools) == MCP_TOOL_NAMES
@@ -964,3 +966,16 @@ def test_mcp_entrypoint_has_nonstarting_help() -> None:
     assert completed.returncode == 0
     assert "Run the Jacobian MCP server" in completed.stdout
     assert "--tool-profile" not in completed.stdout
+
+
+def test_mcp_entrypoint_reports_distribution_version() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-m", "jacobian.adapters.mcp.server", "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.strip() == f"jacobian-mcp {version('jacobian')}"
