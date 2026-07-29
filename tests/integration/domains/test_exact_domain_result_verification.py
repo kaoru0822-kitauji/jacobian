@@ -474,6 +474,76 @@ def test_prime_factorization_verifier_rejects_incomplete_factor_list(
     assert rejected.output["verification_record_uri"] is None
 
 
+@pytest.mark.parametrize("value", ("1", "72", "12", "30"))
+def test_powerful_number_result_uses_independent_python_flint_replay(
+    kernel_with_references,
+    value: str,
+) -> None:
+    producer_id = "integer.decide.powerful"
+    verifier_id = "integer.powerful.verify"
+    computed = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=producer_id,
+            input={"value": value},
+        )
+    )
+
+    verified = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=verifier_id,
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"
+    assert verified.output["operation_id"] == producer_id
+    assert verified.output["verification_record_uri"] is not None
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.output["verification_record_uri"] in verified.artifact_uris
+
+
+def test_powerful_number_verifier_rejects_schema_valid_wrong_factor_product(
+    kernel_with_references,
+) -> None:
+    computed = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="integer.decide.powerful",
+            input={"value": "72"},
+        )
+    )
+    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
+    false_result = kernel_with_references.artifacts.put(
+        schema_uri=result_artifact.manifest.schema_uri,
+        semantics_uri=result_artifact.manifest.semantics_uri,
+        parents=result_artifact.manifest.parents,
+        payload={
+            "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+            "is_powerful": True,
+            "factors": [
+                {"prime": "2", "power": 2},
+                {"prime": "3", "power": 2},
+            ],
+            "violating_primes": [],
+        },
+        summary="adversarial wrong powerful-number factor product",
+    )
+
+    rejected = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="integer.powerful.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": false_result.artifact_uri},
+        )
+    )
+
+    assert rejected.execution.status is ExecutionStatus.COMPLETED
+    assert rejected.output["status"] == "REJECTED"
+    assert rejected.output["conclusion"] == "UNKNOWN"
+    assert rejected.output["verification_record_uri"] is None
+
+
 def test_operator_can_leave_exact_result_verification_unavailable(
     kernel,
 ) -> None:
