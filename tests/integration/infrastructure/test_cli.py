@@ -106,12 +106,13 @@ def test_cli_missing_input_file_returns_an_actionable_json_error(
     tmp_path: Path,
 ) -> None:
     missing = tmp_path / "missing.json"
+    state_dir = tmp_path / "state"
 
     result = CliRunner().invoke(
         app,
         [
             "--state-dir",
-            str(tmp_path / "state"),
+            str(state_dir),
             "artifact-put",
             "schema://missing",
             "semantics://missing",
@@ -130,6 +131,7 @@ def test_cli_missing_input_file_returns_an_actionable_json_error(
     }
     assert "Traceback" not in result.stderr
     assert str(missing) not in result.stderr
+    assert not state_dir.exists()
 
 
 def test_cli_invalid_json_returns_an_actionable_json_error(tmp_path: Path) -> None:

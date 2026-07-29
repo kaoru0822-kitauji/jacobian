@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from pydantic import ValidationError
@@ -26,7 +26,6 @@ from jacobian.contracts.polytope import PolytopeSeparateRequest
 from jacobian.contracts.search import SearchBudget, SearchRunRequest
 from jacobian.experiments import ExperimentError, ExperimentNotFoundError
 from jacobian.implementation import ImplementationError
-from jacobian.kernel import JacobianKernel
 from jacobian.plugins.registry import PluginRegistryError
 from jacobian.provider_measurements import measure_provider
 from jacobian.references import reference_catalog
@@ -46,6 +45,9 @@ from jacobian.store import (
     StoreLimitError,
 )
 from jacobian.verification import CheckerExecutionError
+
+if TYPE_CHECKING:
+    from jacobian.kernel import JacobianKernel
 
 
 class JacobianGroup(TyperGroup):
@@ -228,8 +230,21 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
 
 
 class CliState:
-    def __init__(self, kernel: JacobianKernel) -> None:
-        self.kernel = kernel
+    def __init__(self, state_dir: Path, *, install_references: bool) -> None:
+        self.state_dir = state_dir
+        self.install_references = install_references
+        self._kernel: JacobianKernel | None = None
+
+    @property
+    def kernel(self) -> JacobianKernel:
+        if self._kernel is None:
+            from jacobian.kernel import JacobianKernel
+
+            self._kernel = JacobianKernel(
+                self.state_dir,
+                install_references=self.install_references,
+            )
+        return self._kernel
 
 
 @app.callback()
@@ -251,10 +266,8 @@ def configure(
     ] = True,
 ) -> None:
     context.obj = CliState(
-        JacobianKernel(
-            state_dir,
-            install_references=install_references,
-        )
+        state_dir,
+        install_references=install_references,
     )
 
 
