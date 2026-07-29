@@ -41,6 +41,8 @@ from jacobian.contracts.number_theory import (
     ModulusRequest,
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
+    PowerfulNumberRequest,
+    PowerfulNumberResult,
     PrimeFactorizationResult,
     PrimePower,
     QuadraticResiduesResult,
@@ -123,6 +125,26 @@ def factorize_primes(request: ContractModel) -> ContractModel:
         for prime, power in sorted(factorint(abs(value)).items())
     )
     return PrimeFactorizationResult(factors=factors)
+
+
+def decide_powerful(request: ContractModel) -> ContractModel:
+    """Decide whether every prime exponent is at least two."""
+    from sympy import factorint
+
+    value = int(cast(PowerfulNumberRequest, request).value)
+    factor_items = sorted(factorint(value).items())
+    factors = tuple(
+        PrimePower(prime=str(prime), power=int(power)) for prime, power in factor_items
+    )
+    violating_primes = tuple(
+        str(prime) for prime, power in factor_items if int(power) < 2
+    )
+    return PowerfulNumberResult(
+        semantics_version="powerful-number.prime-exponents-at-least-two.v1",
+        is_powerful=not violating_primes,
+        factors=factors,
+        violating_primes=violating_primes,
+    )
 
 
 def compute_valuation(request: ContractModel) -> ContractModel:

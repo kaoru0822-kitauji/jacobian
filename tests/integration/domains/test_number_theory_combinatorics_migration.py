@@ -20,6 +20,7 @@ from jacobian.contracts.number_theory import (
     ModularValueRequest,
     NonnegativeIntegerRequest,
     PositiveIntegerRequest,
+    PowerfulNumberResult,
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
@@ -267,6 +268,111 @@ def test_factorization_is_complete_in_an_isolated_bounded_worker(
 
 
 @pytest.mark.parametrize(
+    ("value", "is_powerful", "factors", "violating_primes"),
+    (
+        ("1", True, [], []),
+        ("72", True, [{"prime": "2", "power": 3}, {"prime": "3", "power": 2}], []),
+        (
+            "12",
+            False,
+            [{"prime": "2", "power": 2}, {"prime": "3", "power": 1}],
+            ["3"],
+        ),
+        (
+            "30",
+            False,
+            [
+                {"prime": "2", "power": 1},
+                {"prime": "3", "power": 1},
+                {"prime": "5", "power": 1},
+            ],
+            ["2", "3", "5"],
+        ),
+    ),
+)
+def test_powerful_number_decision_preserves_a_complete_factor_witness(
+    tmp_path: Path,
+    value: str,
+    is_powerful: bool,
+    factors: list[dict[str, object]],
+    violating_primes: list[str],
+) -> None:
+    service = _service(tmp_path)
+    result = service.invoke(
+        CapabilityRequest(
+            capability_id="integer.decide.powerful",
+            input={
+                "value": value,
+                "resource_budget": {"wall_seconds": 10},
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == {
+        "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+        "is_powerful": is_powerful,
+        "factors": factors,
+        "violating_primes": violating_primes,
+    }
+    assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    input_uri, result_uri = result.artifact_uris
+    assert service.store.get(result_uri).manifest.parents == (input_uri,)
+    assert result.relationships[0].source_artifact_uris == (input_uri,)
+    assert result.relationships[0].target_artifact_uris == (result_uri,)
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "-72"])
+def test_powerful_number_rejects_nonpositive_input_before_artifact_writes(
+    tmp_path: Path,
+    value: str,
+) -> None:
+    result = _service(tmp_path).invoke(
+        CapabilityRequest(
+            capability_id="integer.decide.powerful",
+            input={"value": value},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.artifact_uris == ()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {
+            "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+            "is_powerful": False,
+            "factors": [{"prime": "2", "power": 3}],
+            "violating_primes": [],
+        },
+        {
+            "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+            "is_powerful": True,
+            "factors": [{"prime": "2", "power": 1}],
+            "violating_primes": ["2"],
+        },
+        {
+            "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+            "is_powerful": False,
+            "factors": [
+                {"prime": "3", "power": 1},
+                {"prime": "2", "power": 2},
+            ],
+            "violating_primes": ["3"],
+        },
+    ),
+)
+def test_powerful_number_result_rejects_inconsistent_or_noncanonical_witnesses(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        PowerfulNumberResult.model_validate(payload)
+
+
+@pytest.mark.parametrize(
     ("capability_id", "expected"),
     (
         ("integer.decide.squarefree", {"holds": True}),
@@ -340,6 +446,10 @@ def test_factorization_timeout_is_an_artifact_free_non_conclusion(
         (
             "integer.compute.radical",
             {"n": 30, "resource_budget": {"wall_seconds": 1}},
+        ),
+        (
+            "integer.decide.powerful",
+            {"value": "72", "resource_budget": {"wall_seconds": 1}},
         ),
     ),
 )

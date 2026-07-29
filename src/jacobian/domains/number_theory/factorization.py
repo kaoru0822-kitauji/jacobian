@@ -19,6 +19,8 @@ from jacobian.contracts.number_theory import (
     DivisorListResult,
     FactorizationRequest,
     IntegerValueResult,
+    PowerfulNumberRequest,
+    PowerfulNumberResult,
     PrimeFactorizationResult,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
@@ -233,6 +235,26 @@ FACTORIZATION_CAPABILITIES = (
                 "prime_factorization_360",
                 "Factor 360 into prime powers.",
                 {"value": "360"},
+            ),
+        ),
+    ),
+    _operation(
+        capability_id="integer.decide.powerful",
+        title="Decide powerful-number status",
+        description=(
+            "Decide whether every prime exponent of one positive integer is at "
+            "least two, preserving the complete factor witness and every "
+            "violating prime from an isolated, resource-bounded SymPy worker."
+        ),
+        operation="powerful",
+        request_model=PowerfulNumberRequest,
+        result_model=PowerfulNumberResult,
+        tags=("number-theory", "factorization", "predicate"),
+        invocation_examples=(
+            example(
+                "powerful_72",
+                "Decide whether 72 is powerful and inspect its factor witness.",
+                {"value": "72"},
             ),
         ),
     ),
