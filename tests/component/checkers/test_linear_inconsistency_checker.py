@@ -4,7 +4,7 @@ import copy
 from typing import Any
 
 from tests.unit.contracts.artifacts import canonical_digest as _digest
-from tests.unit.contracts.rationals import rational_payload as _q
+from tests.support.rationals import rational_payload as _q
 
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,

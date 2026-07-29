@@ -11,7 +11,7 @@ from tests.support.providers import (
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
     pinned_mathlib_runtime_available,
 )
-from tests.unit.contracts.rationals import rational_payload as _q
+from tests.support.rationals import rational_payload as _q
 
 from jacobian.adapters.mcp.server import create_server
 from jacobian.runtime import CheckerAuthorityMode

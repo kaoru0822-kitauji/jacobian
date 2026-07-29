@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from tests.component.capabilities.capabilities import invoke_capability as _invoke
 from tests.support.services import open_domain_services
-from tests.unit.contracts.rationals import rational_payload as _q
+from tests.support.rationals import rational_payload as _q
 
 import jacobian.provider_runtime as provider_runtime
 from jacobian.bounded_process import BoundedProcessResult

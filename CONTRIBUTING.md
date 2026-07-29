@@ -224,6 +224,11 @@ Reproduce the scheduled validation lanes locally with `make test-stress` and
 `make test-ordering PYTEST_ARGS=--randomly-seed=17` (locked `pytest-repeat` and
 `pytest-randomly` are part of the dev environment).
 
+Tests may reuse concept-specific helpers under `tests/support`, but must not
+import helpers from a sibling semantic lane. Keep fixtures in the narrowest
+directory or module that needs them, and keep support modules to ordinary data
+builders or one stable test concept rather than hidden setup.
+
 CI change impact is declared in `.github/ci-impact.json`. Its matching rules are
 additive, so a path may require several suites. Integration timing history is a
 scheduling hint produced by successful `main` runs; it is not committed state,

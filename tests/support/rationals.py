@@ -1,3 +1,5 @@
+"""Small builders for exact rational payloads used across test lanes."""
+
 from __future__ import annotations
 
 
