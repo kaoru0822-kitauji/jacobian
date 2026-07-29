@@ -1,0 +1,198 @@
+from __future__ import annotations
+
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+
+from tests.support.services import DomainTestServices, open_domain_services
+
+import subprocess
+import sys
+
+from pydantic import ValidationError
+
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityObligationStatus,
+    CapabilityRequest,
+)
+from jacobian.contracts.results import ExecutionStatus
+from jacobian.contracts.validated_analysis import RationalLinearProgramObligation
+from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
+
+
+@pytest.fixture
+def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
+    with open_domain_services(tmp_path / "state", RATIONAL_OPTIMIZATION_BUNDLE) as services:
+        yield services
+
+
+def _rational(num: int, den: int = 1) -> dict[str, str]:
+    return {"num": str(num), "den": str(den)}
+
+
+def test_rational_lp_produces_inspectable_primal_dual_certificate(
+    domain_services: DomainTestServices,
+) -> None:
+    runtime = domain_services
+
+    result = runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="optimization.linear.rational_optimum.compute",
+            input={
+                "program": {
+                    "variables": ["x", "y"],
+                    "objective": [_rational(1), _rational(2)],
+                    "coefficients": [[_rational(1), _rational(1)]],
+                    "rhs": [_rational(1)],
+                },
+                "wall_seconds": 10,
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["status"] == "CERTIFICATE_PRODUCED"
+    assert result.output["conclusion"] == "UNKNOWN"
+    assert result.output["primal_candidate"] == [_rational(1), _rational(0)]
+    assert result.output["dual_candidate"] == [_rational(1)]
+    assert result.output["primal_objective"] == _rational(1)
+    assert result.output["dual_objective"] == _rational(1)
+    assert result.output["primal_residuals"] == [_rational(0)]
+    assert result.output["dual_slacks"] == [_rational(0), _rational(1)]
+    assert result.output["verification"] == "UNVERIFIED"
+    assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert result.obligations[0].status is CapabilityObligationStatus.OPEN
+    obligation = runtime.core.store.get(result.obligations[0].obligation_uri)
+    assert obligation.payload["required_checks"] == [
+        "PRIMAL_FEASIBILITY",
+        "DUAL_FEASIBILITY",
+        "OBJECTIVE_EQUALITY",
+    ]
+
+def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(
+    domain_services: DomainTestServices,
+) -> None:
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="optimization.linear.rational_optimum.compute",
+            input={
+                "program": {
+                    "variables": ["x", "y"],
+                    "objective": [_rational(-1), _rational(3)],
+                    "coefficients": [
+                        [_rational(1), _rational(0)],
+                        [_rational(0), _rational(1)],
+                    ],
+                    "rhs": [_rational(1), _rational(2)],
+                },
+                "wall_seconds": 10,
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["status"] == "CERTIFICATE_PRODUCED"
+    assert result.output["primal_candidate"] == [_rational(1), _rational(2)]
+    assert result.output["dual_candidate"] == [_rational(-1), _rational(3)]
+    assert result.output["primal_objective"] == _rational(5)
+    assert result.output["dual_objective"] == _rational(5)
+    assert result.output["dual_slacks"] == [_rational(0), _rational(0)]
+
+    obligation = domain_services.core.store.get(result.obligations[0].obligation_uri)
+    assert len(obligation.payload["dual_candidate"]) == len(
+        obligation.payload["program"]["coefficients"]
+    )
+
+def test_rational_lp_obligation_rejects_wrong_candidate_dimensions() -> None:
+    program = {
+        "variables": ["x", "y"],
+        "objective": [_rational(1), _rational(1)],
+        "coefficients": [[_rational(1), _rational(1)]],
+        "rhs": [_rational(1)],
+    }
+
+    with pytest.raises(ValidationError, match="primal candidate length"):
+        RationalLinearProgramObligation.model_validate(
+            {
+                "program": program,
+                "status": "CERTIFICATE_PRODUCED",
+                "primal_candidate": [_rational(1)],
+                "dual_candidate": [_rational(1)],
+            }
+        )
+    with pytest.raises(ValidationError, match="dual candidate length"):
+        RationalLinearProgramObligation.model_validate(
+            {
+                "program": program,
+                "status": "CERTIFICATE_PRODUCED",
+                "primal_candidate": [_rational(1), _rational(0)],
+                "dual_candidate": [_rational(1), _rational(0)],
+            }
+        )
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        '{"program":{},"unexpected":true}',
+        (
+            '{"program":{"variables":["x"],'
+            '"objective":[{"num":"01","den":"1"}],'
+            '"coefficients":[[{"num":"1","den":"1"}]],'
+            '"rhs":[{"num":"1","den":"1"}]},"wall_seconds":10}'
+        ),
+        '{"program":{},"program":{},"wall_seconds":10}',
+    ),
+)
+def test_rational_lp_worker_rejects_malformed_protocol(payload: str) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-m",
+            "jacobian.domains.optimization.worker",
+        ],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+
+    assert completed.returncode == 2
+    assert completed.stdout == ""
+    assert completed.stderr == "invalid rational optimization worker request\n"
+
+def test_invalid_rational_lp_never_reaches_backend_worker(
+    domain_services: DomainTestServices,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian.domains.optimization import operations
+
+    def unexpected_worker(
+        _payload: dict[str, object],
+        *,
+        wall_seconds: int,
+    ) -> dict[str, object]:
+        raise AssertionError(f"worker unexpectedly called with {wall_seconds=}")
+
+    monkeypatch.setattr(operations, "_run_worker", unexpected_worker)
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="optimization.linear.rational_optimum.compute",
+            input={
+                "program": {
+                    "variables": ["x", "y"],
+                    "objective": [_rational(1), _rational(2)],
+                    "coefficients": [[_rational(1)]],
+                    "rhs": [_rational(1)],
+                },
+                "wall_seconds": 10,
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_RATIONAL_OPTIMIZATION_REQUEST"
+    assert result.artifact_uris == ()
