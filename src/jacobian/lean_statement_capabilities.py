@@ -60,6 +60,7 @@ from jacobian.contracts.lean_statement import (
     LeanStatementProposalRequest,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.provider_runtime import jacobian_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -673,6 +674,17 @@ class LeanStatementCompareAdapter:
             input_schema=LeanStatementComparisonRequest.model_json_schema(),
             output_schema=LeanStatementComparisonOutput.model_json_schema(),
             tags=("lean", "statement", "comparison", "axiom-set"),
+            invocation_examples=(
+                example(
+                    "core_true_identity",
+                    "Compare identical Lean Core propositions.",
+                    {
+                        "environment": "CORE",
+                        "statement_a": "True",
+                        "statement_b": "True",
+                    },
+                ),
+            ),
         )
 
     @property
