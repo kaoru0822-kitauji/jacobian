@@ -74,7 +74,8 @@ impractical.
 
 CI classifies pull requests through the tested source-to-suite impact
 manifest in `.github/ci-impact.json`. Documentation-only changes skip
-Python, npm, Lean, static, package, security, and duplicate-code lanes.
+Python, npm, Lean, static, package, security, and duplicate-code lanes, but
+run the dedicated `make docs-linkcheck` lane.
 Documentation plus npm or npm-only changes run npm packaging without the
 Python and Lean lanes. Unknown paths fail closed to all functional lanes.
 Required status contexts still complete after checking the plan when their

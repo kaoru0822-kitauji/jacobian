@@ -161,8 +161,8 @@ Measured costs and lane policy are recorded in the
 For pull requests, a tested path planner reads
 [`.github/ci-impact.json`](../../.github/ci-impact.json) and makes
 independent core Python, integration Python, Lean, npm, static, build,
-security, and duplicate-code decisions. Documentation-only and npm-only changes
-stay narrow. Ordinary capability source stays on core + integration + static +
+security, and duplicate-code decisions. Documentation-only changes run only
+the dedicated link checker; npm-only changes stay narrow. Ordinary capability source stays on core + integration + static +
 build without Lean, security, or duplicate-code by default. Verification-kernel
 boundaries, packaging, CI, and unknown paths fail closed to all functional
 lanes. Merge-queue checks and pushes to `main` always use the exhaustive plan,

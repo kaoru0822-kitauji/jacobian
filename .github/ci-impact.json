@@ -8,13 +8,14 @@
     "static",
     "build",
     "security",
-    "duplicate"
+    "duplicate",
+    "docs"
   ],
   "rules": [
     {
       "name": "documentation",
       "patterns": ["docs/**", "*.md", ".github/ISSUE_TEMPLATE/**", ".github/CODEOWNERS"],
-      "suites": []
+      "suites": ["docs"]
     },
     {
       "name": "npm-package",
@@ -106,6 +107,6 @@
   ],
   "fallback": {
     "name": "unclassified-fail-closed",
-    "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+    "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate", "docs"]
   }
 }
