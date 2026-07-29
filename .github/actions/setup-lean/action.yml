@@ -18,6 +18,7 @@ runs:
       with:
         lake-package-directory: lean
         use-mathlib-cache: true
+        build: false
         test: false
         lint: false
     - name: Record Lean setup timing

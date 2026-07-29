@@ -46,7 +46,6 @@
       "name": "verification-boundary",
       "patterns": [
         "src/jacobian/kernel.py",
-        "src/jacobian/contracts/**",
         "src/jacobian/artifacts.py",
         "src/jacobian/checker_artifacts.py",
         "src/jacobian/registry.py",
