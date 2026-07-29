@@ -216,3 +216,34 @@ def test_model_backed_schema_applies_cross_field_contracts(
     }
     with pytest.raises(SchemaValidationError, match="pair must be ordered"):
         registry.validate(schema_uri, {"first": 2, "second": 1})
+
+
+def test_existing_model_schema_reattaches_without_durable_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    installer = SchemaRegistry(store)
+    schema_uri = installer.register_model(
+        name="ordered-pair",
+        version="1",
+        model=_OrderedPair,
+    )
+    runtime_registry = SchemaRegistry(store)
+
+    def unexpected_blob_write(_data: bytes) -> str:
+        pytest.fail("reattaching a model rewrote durable schema content")
+
+    monkeypatch.setattr(store, "_write_blob", unexpected_blob_write)
+
+    assert (
+        runtime_registry.register_model(
+            name="ordered-pair",
+            version="1",
+            model=_OrderedPair,
+        )
+        == schema_uri
+    )
+
+    with pytest.raises(SchemaValidationError, match="pair must be ordered"):
+        runtime_registry.validate(schema_uri, {"first": 2, "second": 1})

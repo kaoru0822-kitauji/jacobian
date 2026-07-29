@@ -91,27 +91,15 @@ jobs:
             echo "$plan_output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-
-  prepare-test-timings:
-    name: Prepare integration timing hint
-    needs: plan
-    if: needs.plan.outputs.run-integration == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Prepare integration timing hint
+        if: steps.classify.outputs.run-integration == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           .github/scripts/manage-test-timings prepare
           --output .ci/test-durations.json
       - name: Share integration timing hint
+        if: steps.classify.outputs.run-integration == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: integration-test-durations-input
@@ -313,7 +301,7 @@ jobs:
     name: >-
       Tests (integration ${{ matrix.shard }} of ${{ needs.plan.outputs.integration-shard-count }},
       Python 3.12)
-    needs: [plan, prepare-test-timings]
+    needs: plan
     if: needs.plan.outputs.run-integration == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -865,7 +853,7 @@ jobs:
           gh api
           "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100"
           --paginate --slurp > ci-jobs.json
-      - name: Report critical path and runner time
+      - name: Report critical span and runner time
         run: |
           .github/scripts/summarize-ci-timings ci-jobs.json | tee ci-timings.md
           cat ci-timings.md >> "$GITHUB_STEP_SUMMARY"

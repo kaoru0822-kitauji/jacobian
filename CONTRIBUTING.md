@@ -103,6 +103,31 @@ coverage as exhaustive gates. Successful `main` runs publish fresh integration
 shard timings. Timing history is not committed, and missing or invalid history
 falls back to equal-weight sharding.
 
+Use `make test-plan BASE=<revision>` to preview the same changed-path routing
+before validation:
+
+| Change | Local handoff | CI adds |
+| --- | --- | --- |
+| Docs only | `make docs-linkcheck` | Documentation |
+| Focused Python | affected target, then `make check` | Planned Python/static/package lanes |
+| Lean runtime | focused `make test-lean`, then `make check` | Lean plus affected lanes |
+| CI, dependencies, or unknown paths | `make check-static` plus affected tests | Fail-closed functional lanes |
+
+Freeze the behavioral tree before the final broad validation. Record its tree
+digest and HEAD SHA in the receipt produced by
+`make validation-receipt COMMAND='make check'`, together with the
+`make test-plan BASE=<revision>` selection and
+checks that actually ran. If the tree changes, discard only evidence invalidated
+by that change and rerun it; do not describe results from an earlier tree as
+final-tree validation.
+
+Parallel agents sharing one checkout must divide path ownership before editing.
+They must not switch branches, stage, commit, clean, or rewrite shared files
+while another agent is working. Integrate their edits first, freeze one tree,
+then run the planned checks through `make validation-receipt` and produce one
+receipt for that exact
+tree. Use isolated worktrees only when the workflow explicitly assigns them.
+
 Keep the local edit loop on directory-owned Make targets rather than inventing
 marker filters:
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.provider_measurements import measure_provider
+from jacobian.provider_runtime import cvc5_provider_runtime
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import JacobianRuntime
 from jacobian.smt import SmtArtifactError
@@ -66,10 +68,17 @@ def _invoke(runtime: JacobianRuntime, text: str, *, logic: str = "QF_UF"):
 def runtime(
     tmp_path_factory: pytest.TempPathFactory,
     runtime_store_template: Path,
-) -> JacobianRuntime:
+) -> Iterator[JacobianRuntime]:
+    provider = cvc5_provider_runtime()
+    if provider.availability is not CapabilityProviderAvailability.AVAILABLE:
+        pytest.skip("the pinned cvc5 runtime is unavailable")
     root = tmp_path_factory.mktemp("cvc5-runtime")
     shutil.copytree(runtime_store_template, root, dirs_exist_ok=True)
-    return create_runtime(root)
+    runtime = create_runtime(root)
+    try:
+        yield runtime
+    finally:
+        runtime.close()
 
 
 def test_pinned_cvc5_capability_is_discoverable(runtime: JacobianRuntime) -> None:

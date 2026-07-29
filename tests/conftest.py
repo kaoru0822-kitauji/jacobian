@@ -10,7 +10,13 @@ import pytest
 from filelock import FileLock
 
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.bootstrap import bootstrap_services
+from jacobian.runtime.config import RuntimeOptions
 from jacobian.runtime.model import JacobianRuntime
+from tests.helpers.runtime import (
+    CapabilityTestServices,
+    open_capability_test_services,
+)
 
 
 def _freeze_runtime_store(root: Path) -> None:
@@ -58,6 +64,29 @@ def _shared_worker_template(
         raise RuntimeError("xdist worker did not provide a test-run identity")
     root = tmp_path_factory.getbasetemp().parent / f"{name}-{run_id}"
     return root, FileLock(root.with_suffix(".lock"))
+
+
+@pytest.fixture(scope="session")
+def core_services_store_template(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """Build only the capability-independent service descriptors once."""
+
+    template = tmp_path_factory.mktemp("core-services-store-template")
+    core = bootstrap_services(template, RuntimeOptions())
+    core.close()
+    _freeze_runtime_store(template)
+    return template
+
+
+@pytest.fixture
+def initialized_core_services_store(
+    tmp_path: Path,
+    core_services_store_template: Path,
+) -> None:
+    """Seed a test root without assembling the mathematical portfolio."""
+
+    shutil.copytree(core_services_store_template, tmp_path, dirs_exist_ok=True)
 
 
 @pytest.fixture(scope="session")
@@ -187,6 +216,27 @@ def runtime_with_references(
     )
     yield runtime
     runtime.close()
+
+
+@pytest.fixture
+def complete_runtime_with_references(
+    runtime_with_references: JacobianRuntime,
+) -> JacobianRuntime:
+    """Name the expensive, fully assembled runtime explicitly at call sites."""
+
+    return runtime_with_references
+
+
+@pytest.fixture
+def capability_core_services(
+    tmp_path: Path,
+    initialized_core_services_store: None,
+) -> Iterator[CapabilityTestServices]:
+    """Open only the services required by capability-service integration tests."""
+
+    _ = initialized_core_services_store
+    with open_capability_test_services(tmp_path) as services:
+        yield services
 
 
 @pytest.hookimpl(trylast=True)

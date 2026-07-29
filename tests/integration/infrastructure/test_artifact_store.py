@@ -191,6 +191,104 @@ def test_artifact_identity_uses_canonical_payload_schema_and_semantics(
     assert store.get(first.artifact_uri).payload == {"weight": {"den": "2", "num": "1"}}
 
 
+def test_repeated_put_validates_without_blob_or_metadata_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    schema = store.register_descriptor(
+        kind="schema",
+        name="example.candidate",
+        version="1",
+        definition={"type": "object"},
+    )
+    semantics = store.register_descriptor(
+        kind="semantics",
+        name="example.meaning",
+        version="1",
+        definition={"description": "meaning"},
+    )
+    expected = store.put(
+        schema_uri=schema,
+        semantics_uri=semantics,
+        payload={"value": "unchanged"},
+        summary="candidate",
+    )
+
+    original_connect = store._connect
+
+    def connect_read_only() -> sqlite3.Connection:
+        connection = original_connect()
+
+        def deny_metadata_writes(
+            action: int,
+            _argument_one: str | None,
+            _argument_two: str | None,
+            _database: str | None,
+            _trigger: str | None,
+        ) -> int:
+            if action in {
+                sqlite3.SQLITE_DELETE,
+                sqlite3.SQLITE_INSERT,
+                sqlite3.SQLITE_UPDATE,
+            }:
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        connection.set_authorizer(deny_metadata_writes)
+        return connection
+
+    monkeypatch.setattr(store, "_connect", connect_read_only)
+
+    def reject_blob_write(_data: bytes) -> str:
+        pytest.fail("an idempotent put must not publish blobs")
+
+    monkeypatch.setattr(store, "_write_blob", reject_blob_write)
+
+    repeated = store.put(
+        schema_uri=schema,
+        semantics_uri=semantics,
+        payload={"value": "unchanged"},
+        summary="candidate",
+    )
+
+    assert repeated == expected
+
+
+def test_repeated_put_rejects_corrupted_committed_blob(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    schema = store.register_descriptor(
+        kind="schema",
+        name="example.candidate",
+        version="1",
+        definition={"type": "object"},
+    )
+    semantics = store.register_descriptor(
+        kind="semantics",
+        name="example.meaning",
+        version="1",
+        definition={"description": "meaning"},
+    )
+    store.put(
+        schema_uri=schema,
+        semantics_uri=semantics,
+        payload={"value": "original"},
+    )
+    payload_path = next(
+        path
+        for path in (tmp_path / "blobs" / "sha256").glob("*/*")
+        if path.read_bytes() == b'{"value":"original"}'
+    )
+    payload_path.write_bytes(b'{"value":"tampered"}')
+
+    with pytest.raises(ArtifactIntegrityError, match="blob digest mismatch"):
+        store.put(
+            schema_uri=schema,
+            semantics_uri=semantics,
+            payload={"value": "original"},
+        )
+
+
 @pytest.mark.conformance
 def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)

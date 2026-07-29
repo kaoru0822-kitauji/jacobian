@@ -150,6 +150,14 @@ class SchemaRegistry:
             version=version,
             schema=model_schema(model),
         )
+        self._bind_model_contract(schema_uri, model)
+        return schema_uri
+
+    def _bind_model_contract(
+        self,
+        schema_uri: str,
+        model: type[BaseModel],
+    ) -> None:
         transaction_identity = self.store.transaction_identity
         model_contracts = self._model_contracts
         if transaction_identity is not None:
@@ -160,7 +168,6 @@ class SchemaRegistry:
                 "one schema URI cannot use multiple model-backed contracts"
             )
         model_contracts[schema_uri] = model
-        return schema_uri
 
     def resolve(self, schema_uri: str) -> dict[str, Any]:
         """Load a previously registered schema definition."""

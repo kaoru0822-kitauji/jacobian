@@ -6,6 +6,10 @@ from typing import Any
 
 import pytest
 from benchmarks import agent_ab as benchmark
+from tests.helpers.provider_runtime import (
+    PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    pinned_mathlib_runtime_available,
+)
 from tests.integration.agent._agent_ab_support import _write_private_case
 
 from jacobian.contracts.capabilities import (
@@ -113,6 +117,10 @@ def test_agent_eval_plan_counts_each_lean_capability_condition(
 
 
 @pytest.mark.lean_runtime
+@pytest.mark.skipif(
+    not pinned_mathlib_runtime_available(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+)
 @pytest.mark.usefixtures("initialized_runtime_store_with_references")
 def test_ab_lean_control_ablation_removes_only_declaration_discovery(
     tmp_path: Path,

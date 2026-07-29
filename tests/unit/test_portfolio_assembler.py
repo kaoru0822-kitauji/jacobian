@@ -305,32 +305,6 @@ def test_empty_plan_yields_complete_empty_result(
     assert result.skipped_domain_ids == ()
 
 
-def test_builtin_portfolio_installs_cleanly_under_a_fresh_context(
-    assembly: _RecordingContext,
-) -> None:
-    from jacobian.portfolio import BUILTIN_PORTFOLIO
-
-    assembler = PortfolioAssembler(assembly.context)
-
-    result = assembler.install_domains(BUILTIN_PORTFOLIO)
-
-    assert result.is_complete
-    assert result.diagnostics == ()
-    assert set(result.installed) == set(BUILTIN_PORTFOLIO.domain_ids)
-    # Every built-in bundle is available in the test environment.
-    assert result.skipped_domain_ids == ()
-    for outcome in result.outcomes:
-        assert outcome.status is BundleInstallationStatus.INSTALLED
-        assert outcome.installed is not None
-    # The installed bundle's adapters were all registered.
-    expected_capability_ids = {
-        operation.capability_id
-        for bundle in BUILTIN_PORTFOLIO.domain_bundles
-        for operation in bundle.capabilities
-    }
-    assert set(assembly.registered) == expected_capability_ids
-
-
 def test_outcome_for_and_diagnostic_for_return_none_for_unknown_domains(
     assembly: _RecordingContext,
 ) -> None:

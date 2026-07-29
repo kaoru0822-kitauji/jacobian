@@ -5,18 +5,23 @@ from typing import Any, cast
 
 import pytest
 from benchmarks import agent_ab as benchmark
+from tests.helpers.provider_runtime import (
+    PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    pinned_mathlib_runtime_available,
+)
 from tests.integration.agent._agent_ab_support import (
     _lean_proof_case,
     _runtime_from_template,
 )
 
-from jacobian.contracts.capabilities import (
-    CapabilityMode,
-    CapabilityRequest,
-)
+from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 
 
 @pytest.mark.lean_runtime
+@pytest.mark.skipif(
+    not pinned_mathlib_runtime_available(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+)
 def test_lean_ab_scorer_accepts_any_exact_replayable_proof(
     tmp_path: Path,
     runtime_store_template_with_references: Path,
@@ -176,8 +181,13 @@ def test_lean_ab_summary_compares_each_ablation_to_baseline() -> None:
 
 
 @pytest.mark.lean_runtime
+@pytest.mark.skipif(
+    not pinned_mathlib_runtime_available(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+)
 def test_ab_lean_scorer_requires_exact_checker_bound_trace(
-    tmp_path: Path, runtime_store_template_with_references: Path
+    tmp_path: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     load_cases = benchmark.load_cases
     score_report = benchmark.score_report
