@@ -382,6 +382,30 @@ def test_finite_convolution_aggregates_all_independent_pairs(
     assert len(result.output["result"]["contributions"]) == 4
 
 
+def test_finite_convolution_rejects_distinct_support_above_result_bound(
+    analysis_runtime: _Runtime,
+) -> None:
+    left_values = tuple(range(17))
+    right_values = tuple(value * 100 for value in range(16))
+    result = analysis_runtime.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="probability.finite_distribution.convolution.compute",
+            input={
+                "left": _distribution(
+                    *((value, 1, 17) for value in left_values),
+                ),
+                "right": _distribution(
+                    *((value, 1, 16) for value in right_values),
+                ),
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_FINITE_PROBABILITY_REQUEST"
+    assert result.artifact_uris == ()
+
+
 def test_incomplete_pushforward_mapping_fails_before_artifact_writes(
     analysis_runtime: _Runtime,
 ) -> None:

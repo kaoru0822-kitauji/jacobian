@@ -111,8 +111,8 @@ def _provider_runtime_key(declaration: ExactReplayCheckerDeclaration) -> str:
 def install_exact_domain_checkers(
     checkers: CheckerRegistry,
     *,
-    polynomial: InstalledDomainBundle,
-    matrix: InstalledDomainBundle,
+    polynomial: InstalledDomainBundle | None = None,
+    matrix: InstalledDomainBundle | None = None,
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
     number_theory: InstalledDomainBundle | None = None,
@@ -137,8 +137,16 @@ def install_exact_domain_checkers(
     checker_ids: dict[str, str | None] = {}
     declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
     for installed, declaration in (
-        *((polynomial, item) for item in POLYNOMIAL_EXACT_REPLAY_CHECKERS),
-        *((matrix, item) for item in MATRIX_EXACT_REPLAY_CHECKERS),
+        *(
+            (polynomial, item)
+            for item in POLYNOMIAL_EXACT_REPLAY_CHECKERS
+            if polynomial is not None
+        ),
+        *(
+            (matrix, item)
+            for item in MATRIX_EXACT_REPLAY_CHECKERS
+            if matrix is not None
+        ),
         *_available_graph_declaration_bundles(
             graph=graph,
             graph_invariants=graph_invariants,
@@ -235,8 +243,8 @@ def install_exact_domain_verification(
     verification: VerificationService,
     checkers: CheckerRegistry,
     *,
-    polynomial: InstalledDomainBundle,
-    matrix: InstalledDomainBundle,
+    polynomial: InstalledDomainBundle | None = None,
+    matrix: InstalledDomainBundle | None = None,
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
     number_theory: InstalledDomainBundle | None = None,
@@ -275,20 +283,28 @@ def install_exact_domain_verification(
         checker_id is not None for checker_id in installation.checker_ids.values()
     ):
         return (), installation
-    all_polynomial_declarations = tuple(
-        _installed_declaration(polynomial, declaration, installation)
-        for declaration in POLYNOMIAL_EXACT_REPLAY_CHECKERS
-        if installation.checker_ids.get(declaration.capability_id) is not None
+    all_polynomial_declarations = (
+        tuple(
+            _installed_declaration(polynomial, declaration, installation)
+            for declaration in POLYNOMIAL_EXACT_REPLAY_CHECKERS
+            if installation.checker_ids.get(declaration.capability_id) is not None
+        )
+        if polynomial is not None
+        else ()
     )
     polynomial_declarations = tuple(
         declaration
         for declaration in all_polynomial_declarations
         if declaration.declaration.verification_capability_id is None
     )
-    matrix_declarations = tuple(
-        _installed_declaration(matrix, declaration, installation)
-        for declaration in MATRIX_EXACT_REPLAY_CHECKERS
-        if installation.checker_ids.get(declaration.capability_id) is not None
+    matrix_declarations = (
+        tuple(
+            _installed_declaration(matrix, declaration, installation)
+            for declaration in MATRIX_EXACT_REPLAY_CHECKERS
+            if installation.checker_ids.get(declaration.capability_id) is not None
+        )
+        if matrix is not None
+        else ()
     )
     graph_declarations = tuple(
         _installed_declaration(

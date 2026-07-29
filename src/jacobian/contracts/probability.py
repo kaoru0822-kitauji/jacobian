@@ -398,6 +398,11 @@ class FiniteConvolutionRequest(ContractModel):
                     left.probability.as_fraction() * right.probability.as_fraction()
                 )
                 aggregated[value] = aggregated.get(value, Fraction()) + probability
+        if len(aggregated) > MAX_FINITE_DISTRIBUTION_ATOMS:
+            raise ValueError(
+                "finite convolution exceeds the "
+                f"{MAX_FINITE_DISTRIBUTION_ATOMS}-atom output bound"
+            )
         for value, probability in aggregated.items():
             _require_bounded_fraction(
                 value,

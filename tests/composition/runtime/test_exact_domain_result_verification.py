@@ -84,6 +84,25 @@ _FAIR_BIT = {
 }
 
 
+def test_probability_verification_installs_without_polynomial_or_matrix_bundles(
+    fresh_complete_runtime,
+) -> None:
+    adapters, installation = install_exact_domain_verification(
+        fresh_complete_runtime.core.store,
+        fresh_complete_runtime.core.schemas,
+        fresh_complete_runtime.core.artifacts,
+        fresh_complete_runtime.services.verification,
+        fresh_complete_runtime.core.checkers,
+        probability=fresh_complete_runtime.portfolio.domain_bundles["probability"],
+        authorize=True,
+    )
+
+    assert [adapter.descriptor.capability_id for adapter in adapters] == [
+        "probability.result.verify"
+    ]
+    assert any(installation.checker_ids.values())
+
+
 @pytest.mark.parametrize(
     ("capability_id", "payload"),
     (

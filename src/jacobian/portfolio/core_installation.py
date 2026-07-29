@@ -220,7 +220,18 @@ class CoreApplicationInstaller:
 
         polynomial = result.domain_bundles.get("polynomial")
         matrix = result.domain_bundles.get("matrix")
-        if polynomial is None or matrix is None:
+        exact_bundles = {
+            "polynomial": polynomial,
+            "matrix": matrix,
+            "graph": result.domain_bundles.get("graph_optimization"),
+            "graph_invariants": result.domain_bundles.get("graph_invariants"),
+            "number_theory": result.domain_bundles.get("number_theory"),
+            "probability": result.domain_bundles.get("probability"),
+            "poset": result.domain_bundles.get("poset"),
+            "projective_geometry": result.domain_bundles.get("projective_geometry"),
+            "topology": result.domain_bundles.get("topology"),
+        }
+        if not any(exact_bundles.values()):
             return
         adapters, result.exact_domain_checkers = install_exact_domain_verification(
             ctx.store,
@@ -230,13 +241,13 @@ class CoreApplicationInstaller:
             ctx.checkers,
             polynomial=polynomial,
             matrix=matrix,
-            graph=result.domain_bundles.get("graph_optimization"),
-            graph_invariants=result.domain_bundles.get("graph_invariants"),
-            number_theory=result.domain_bundles.get("number_theory"),
-            probability=result.domain_bundles.get("probability"),
-            poset=result.domain_bundles.get("poset"),
-            projective_geometry=result.domain_bundles.get("projective_geometry"),
-            topology=result.domain_bundles.get("topology"),
+            graph=exact_bundles["graph"],
+            graph_invariants=exact_bundles["graph_invariants"],
+            number_theory=exact_bundles["number_theory"],
+            probability=exact_bundles["probability"],
+            poset=exact_bundles["poset"],
+            projective_geometry=exact_bundles["projective_geometry"],
+            topology=exact_bundles["topology"],
             authorize=ctx.authorizes_bundled_checkers,
         )
         for adapter in adapters:
