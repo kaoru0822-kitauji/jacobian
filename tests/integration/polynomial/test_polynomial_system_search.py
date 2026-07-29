@@ -35,7 +35,7 @@ def _request(constant: int) -> CapabilityRequest:
 def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) -> None:
     result = create_runtime(
         tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    ).capabilities.invoke(_request(1))
+    ).core.capabilities.invoke(_request(1))
     assert result.output["found"] is True
     assert result.output["assignment"] == [{"num": "-1", "den": "1"}]
     assert result.output["examined_assignment_count"] == 1
@@ -45,7 +45,7 @@ def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) 
 def test_rational_solution_search_reports_completed_bounded_absence(
     tmp_path: Path,
 ) -> None:
-    result = create_runtime(tmp_path).capabilities.invoke(_request(2))
+    result = create_runtime(tmp_path).core.capabilities.invoke(_request(2))
     assert result.output["found"] is False
     assert result.output["examined_assignment_count"] == 3
     assert result.output["grid_assignment_count"] == 3

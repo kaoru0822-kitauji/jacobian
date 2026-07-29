@@ -772,7 +772,7 @@ os._exit(0)
     assert recovered.state == ExperimentState.ERROR
     assert recovered.stop_reason == EnumerationStopReason.ERROR
     assert recovered.coverage.value == "BOUNDED"
-    assert recovered.services.verification.value == "UNVERIFIED"
+    assert recovered.verification.value == "UNVERIFIED"
     assert "ended before completion" in recovered.detail
 
 

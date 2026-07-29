@@ -97,7 +97,7 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     record = VerificationRecord.model_validate(record_artifact.payload)
     assert (
         record.checker_id
-        == runtime_with_references.core.sat_assignment_checker.checker_id
+        == runtime_with_references.portfolio.sat_assignment_checker.checker_id
     )
     assert record.evidence_uri == result.output["witness_uri"]
     assert set(record_artifact.manifest.parents) == {

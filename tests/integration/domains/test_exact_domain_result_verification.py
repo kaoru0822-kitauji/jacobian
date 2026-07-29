@@ -77,10 +77,11 @@ def _computed_gcd(runtime: JacobianRuntime):
 
 def test_public_seam_verifies_exact_producer_result(runtime) -> None:
     adapters = _install_verification(runtime, authorize=True)
-    runtime = adapters[0].descriptor.provider_runtime
-    assert runtime is not None
+    provider_runtime = adapters[0].descriptor.provider_runtime
+    assert provider_runtime is not None
     assert {
-        component["provider"] for component in runtime.configuration["components"]
+        component["provider"]
+        for component in provider_runtime.configuration["components"]
     } == {"jacobian.exact-domain-checker-source", "python-flint"}
     computed = _computed_gcd(runtime)
 
@@ -283,15 +284,16 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         "independent Tutte-Berge barrier replay accepted "
         "graph.invariant.maximum_matching.compute"
     )
-    runtime = next(
+    provider_runtime = next(
         descriptor.provider_runtime
         for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "graph.invariant.maximum_matching.verify"
     )
-    assert runtime is not None
-    assert runtime.provider == "jacobian.graph-exact-checkers"
+    assert provider_runtime is not None
+    assert provider_runtime.provider == "jacobian.graph-exact-checkers"
     assert {
-        component["provider"] for component in runtime.configuration["components"]
+        component["provider"]
+        for component in provider_runtime.configuration["components"]
     } == {"jacobian.graph-exact-checker-source"}
 
     result_artifact = runtime_with_references.core.store.get(result_uri)
@@ -374,13 +376,13 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
     assert verified.output["verification_record_uri"] is not None
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert verified.output["verification_record_uri"] in verified.artifact_uris
-    runtime = next(
+    provider_runtime = next(
         descriptor.provider_runtime
         for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == verifier_id
     )
-    assert runtime is not None
-    assert runtime.provider == "jacobian.graph-exact-checkers"
+    assert provider_runtime is not None
+    assert provider_runtime.provider == "jacobian.graph-exact-checkers"
 
     result_artifact = runtime_with_references.core.store.get(
         computed.output["result_uri"]
@@ -407,7 +409,7 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
 
 
 def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
     graph: dict[str, Any] = {
         "vertices": ["0", "1", "2", "3", "4", "5"],
@@ -420,13 +422,13 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
             ["3", "5"],
         ],
     }
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.compute",
             input={"graph": graph},
         )
     )
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.verify",
             mode=CapabilityMode.VERIFY,
@@ -476,9 +478,11 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
     assert maximum_distance == 2
     assert maximizing_vertices == ["5"]
 
-    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
+    result_artifact = runtime_with_references.core.store.get(
+        computed.output["result_uri"]
+    )
     order = len(result_artifact.payload["vertices"])
-    false_result = kernel_with_references.artifacts.put(
+    false_result = runtime_with_references.core.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
@@ -491,7 +495,7 @@ def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
         },
         summary="adversarial metric-shaped but false graph distance matrix",
     )
-    rejected = kernel_with_references.capabilities.invoke(
+    rejected = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.verify",
             mode=CapabilityMode.VERIFY,
@@ -534,15 +538,16 @@ def test_prime_factorization_result_uses_independent_python_flint_replay(
     assert verified.output["verification_record_uri"] is not None
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert verified.output["verification_record_uri"] in verified.artifact_uris
-    runtime = next(
+    provider_runtime = next(
         descriptor.provider_runtime
         for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == verifier_id
     )
-    assert runtime is not None
-    assert runtime.provider == "jacobian.exact-domain-checkers"
+    assert provider_runtime is not None
+    assert provider_runtime.provider == "jacobian.exact-domain-checkers"
     assert {
-        component["provider"] for component in runtime.configuration["components"]
+        component["provider"]
+        for component in provider_runtime.configuration["components"]
     } == {"jacobian.exact-domain-checker-source", "python-flint"}
 
 

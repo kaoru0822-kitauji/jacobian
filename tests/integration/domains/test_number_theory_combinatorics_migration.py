@@ -49,7 +49,9 @@ def _service(tmp_path: Path) -> CapabilityService:
 def test_runtime_catalog_uses_only_domain_owned_operation_ids(tmp_path: Path) -> None:
     catalog_ids = {
         descriptor.capability_id
-        for descriptor in create_runtime(tmp_path).capabilities.catalog().capabilities
+        for descriptor in create_runtime(tmp_path)
+        .core.capabilities.catalog()
+        .capabilities
     }
 
     assert {

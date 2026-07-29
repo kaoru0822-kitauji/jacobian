@@ -267,13 +267,13 @@ _RELATED_CAPABILITIES: dict[str, tuple[tuple[str, str], ...]] = {
     "polynomial.jacobian_syzygy.minimum_degree.compute": (
         (
             "polynomial.jacobian_syzygy.minimum_degree.verify",
-            "independently rebuild the graded maps, ranks, minors, and first runtime",
+            "independently rebuild the graded maps, ranks, minors, and first kernel",
         ),
     ),
     "polynomial.jacobian_syzygy.minimum_degree.verify": (
         (
             "polynomial.jacobian_syzygy.minimum_degree.compute",
-            "produce the provenance-bound graded rank ledger and runtime witness",
+            "produce the provenance-bound graded rank ledger and kernel witness",
         ),
     ),
     "geometry.projective_line_arrangement.flats.materialize": (
@@ -1816,3 +1816,9 @@ def _experiment_scope_content(runtime: JacobianRuntime, snapshot: Any) -> str:
         ensure_ascii=False,
         sort_keys=True,
     )
+
+
+if __name__ == "__main__":
+    from jacobian.adapters.mcp.cli import main
+
+    main()

@@ -185,8 +185,8 @@ def test_graph_counterexample_shrink_order_is_deterministic(
         ]
 
     assert signature(first_result.output) == signature(second_result.output)
-    assert first.store.get(first_result.output["final_graph_uri"]).payload == (
-        second.store.get(second_result.output["final_graph_uri"]).payload
+    assert first.core.store.get(first_result.output["final_graph_uri"]).payload == (
+        second.core.store.get(second_result.output["final_graph_uri"]).payload
     )
 
 

@@ -2142,7 +2142,7 @@ def _score_lean_record(
     payload = certificate.get("payload") if isinstance(certificate, dict) else None
     if (
         not isinstance(certificate, dict)
-        or certificate.get("certificate_type") != "lean4.runtime"
+        or certificate.get("certificate_type") != "lean4.kernel"
         or not isinstance(payload, dict)
         or payload.get("environment") != environment
         or payload.get("statement") != statement
