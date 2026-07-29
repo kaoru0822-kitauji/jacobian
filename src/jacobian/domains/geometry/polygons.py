@@ -15,6 +15,19 @@ POLYGON_CAPABILITIES = (
         signed_area,
         "geometry",
         "polygon",
-        invocation_examples=(example("unit_square_signed_area", "Compute the signed area of a unit square.", {"points": [{"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}, {"x": {"num": "1", "den": "1"}, "y": {"num": "1", "den": "1"}}, {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}}]}),),
+        invocation_examples=(
+            example(
+                "unit_square_signed_area",
+                "Compute the signed area of a unit square.",
+                {
+                    "points": [
+                        {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}},
+                        {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}},
+                        {"x": {"num": "1", "den": "1"}, "y": {"num": "1", "den": "1"}},
+                        {"x": {"num": "0", "den": "1"}, "y": {"num": "1", "den": "1"}},
+                    ]
+                },
+            ),
+        ),
     ),
 )

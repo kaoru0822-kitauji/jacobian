@@ -15,6 +15,21 @@ SEGMENT_CAPABILITIES = (
         midpoint,
         "geometry",
         "construction",
-        invocation_examples=(example("segment_midpoint", "Construct the midpoint of a unit segment.", {"first": {"x": {"num": "0", "den": "1"}, "y": {"num": "0", "den": "1"}}, "second": {"x": {"num": "1", "den": "1"}, "y": {"num": "0", "den": "1"}}}),),
+        invocation_examples=(
+            example(
+                "segment_midpoint",
+                "Construct the midpoint of a unit segment.",
+                {
+                    "first": {
+                        "x": {"num": "0", "den": "1"},
+                        "y": {"num": "0", "den": "1"},
+                    },
+                    "second": {
+                        "x": {"num": "1", "den": "1"},
+                        "y": {"num": "0", "den": "1"},
+                    },
+                },
+            ),
+        ),
     ),
 )
