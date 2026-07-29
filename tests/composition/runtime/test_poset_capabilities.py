@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -272,6 +273,31 @@ def test_non_graded_poset_omits_ranks(fresh_complete_runtime) -> None:
     )
     assert poset["graded"] is False
     assert poset["ranks"] is None
+
+
+def test_embedded_graded_poset_cannot_omit_canonical_ranks(
+    fresh_complete_runtime,
+) -> None:
+    poset = _materialize(
+        fresh_complete_runtime,
+        {
+            "elements": ["a", "b"],
+            "relation": [{"lower": "a", "upper": "b"}],
+            "interpretation": "COVER_EDGES",
+        },
+    )
+    poset["graded"] = False
+    poset["ranks"] = None
+    from jacobian.contracts.posets import FinitePoset
+
+    with pytest.raises(ValidationError, match="graded metadata"):
+        FinitePoset.model_validate(poset)
+
+    result = _invoke(fresh_complete_runtime, "poset.width.compute", poset)
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_FINITE_POSET_REQUEST"
+    assert result.artifact_uris == ()
 
 
 def test_relabeling_preserves_scalar_poset_outcomes(fresh_complete_runtime) -> None:

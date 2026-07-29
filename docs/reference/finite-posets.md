@@ -66,7 +66,7 @@ matching incidence, and equality of both bounds.
 
 ## Linear-extension count
 
-`poset.linear_extensions.count` supports at most 16 elements. It performs exact
+`poset.linear_extensions.count` supports at most 14 elements. It performs exact
 subset dynamic programming over order ideals and returns every visited ideal
 state, not only the final integer. Each state preserves:
 
@@ -117,7 +117,7 @@ Version 1 uses these fail-closed limits:
 | --- | ---: |
 | Poset carrier | 64 elements |
 | Presented or materialized relation | 4,096 pairs |
-| Linear-extension carrier | 16 elements |
+| Linear-extension carrier | 14 elements |
 | Linear-extension recurrence table | 65,536 ideal states |
 
 The regression suite covers the empty poset, singleton, chains, antichains,

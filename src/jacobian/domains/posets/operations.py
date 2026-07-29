@@ -7,7 +7,6 @@ from typing import Any
 import networkx as nx
 
 from jacobian.contracts.posets import (
-    ElementRank,
     FinitePoset,
     FinitePosetMaterializationResult,
     FinitePosetRequest,
@@ -27,6 +26,7 @@ from jacobian.contracts.posets import (
     PosetRequest,
     PosetWidthResult,
     RelationInterpretation,
+    canonical_poset_ranks,
     finite_poset_digest,
     linear_extension_memo_digest,
 )
@@ -43,37 +43,6 @@ def _presentation_graph(request: FinitePosetRequest) -> nx.DiGraph[str]:
         if pair.lower != pair.upper
     )
     return graph
-
-
-def _rank_entries(
-    elements: tuple[str, ...],
-    covers: tuple[tuple[str, str], ...],
-) -> tuple[ElementRank, ...] | None:
-    predecessors: dict[str, set[str]] = {element: set() for element in elements}
-    successors: dict[str, set[str]] = {element: set() for element in elements}
-    for lower, upper in covers:
-        predecessors[upper].add(lower)
-        successors[lower].add(upper)
-    ranks: dict[str, int] = {}
-    remaining = set(elements)
-    while remaining:
-        ready = sorted(
-            element for element in remaining if predecessors[element].issubset(ranks)
-        )
-        if not ready:
-            raise ValueError("poset cover relation is cyclic")
-        for element in ready:
-            parent_ranks = {ranks[parent] for parent in predecessors[element]}
-            if len(parent_ranks) > 1:
-                return None
-            ranks[element] = 0 if not parent_ranks else next(iter(parent_ranks)) + 1
-            remaining.remove(element)
-    maximal_ranks = {ranks[element] for element in elements if not successors[element]}
-    if len(maximal_ranks) > 1:
-        return None
-    return tuple(
-        ElementRank(element=element, rank=ranks[element]) for element in elements
-    )
 
 
 def _materialized_poset(request: FinitePosetRequest) -> FinitePoset:
@@ -100,7 +69,7 @@ def _materialized_poset(request: FinitePosetRequest) -> FinitePoset:
     maximal = tuple(
         element for element in elements if closure_graph.out_degree(element) == 0
     )
-    ranks = _rank_entries(elements, covers)
+    ranks = canonical_poset_ranks(elements, set(covers))
     order_pairs = tuple(
         OrderedPair(lower=lower, upper=upper) for lower, upper in strict_pairs
     )

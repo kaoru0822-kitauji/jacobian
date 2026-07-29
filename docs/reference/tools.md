@@ -259,7 +259,7 @@ before writing anything, canonicalizes labels and undirected edges, and returns
 the domain-owned simple-graph artifact accepted by graph consumers. Generic
 `artifact.put` still does not authorize graph semantics.
 `graph.induced_tree.maximum.verify` independently exhausts all vertex subsets
-for stored exact producer results of order at most 16. It binds the complete
+for stored exact producer results of order at most 14. It binds the complete
 graph-optimization input and result lineage and does not reuse the producer's
 Z3 search. Larger inputs return an unsupported non-conclusion.
 

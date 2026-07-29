@@ -14,7 +14,7 @@ from jacobian.contracts.results import ContractModel
 
 MAX_POSET_ELEMENTS = 64
 MAX_POSET_RELATIONS = MAX_POSET_ELEMENTS * MAX_POSET_ELEMENTS
-MAX_LINEAR_EXTENSION_ELEMENTS = 16
+MAX_LINEAR_EXTENSION_ELEMENTS = 14
 MAX_LINEAR_EXTENSION_STATES = 1 << MAX_LINEAR_EXTENSION_ELEMENTS
 
 ElementLabel = Annotated[
@@ -102,6 +102,37 @@ def _transitive_reduction(
             if middle not in {lower, upper}
         )
     }
+
+
+def canonical_poset_ranks(
+    elements: tuple[str, ...],
+    covers: set[tuple[str, str]],
+) -> tuple[ElementRank, ...] | None:
+    predecessors: dict[str, set[str]] = {element: set() for element in elements}
+    successors: dict[str, set[str]] = {element: set() for element in elements}
+    for lower, upper in covers:
+        predecessors[upper].add(lower)
+        successors[lower].add(upper)
+    ranks: dict[str, int] = {}
+    remaining = set(elements)
+    while remaining:
+        ready = sorted(
+            element for element in remaining if predecessors[element].issubset(ranks)
+        )
+        if not ready:  # pragma: no cover - validated presentations are acyclic
+            raise ValueError("poset cover relation is cyclic")
+        for element in ready:
+            parent_ranks = {ranks[parent] for parent in predecessors[element]}
+            if len(parent_ranks) > 1:
+                return None
+            ranks[element] = 0 if not parent_ranks else next(iter(parent_ranks)) + 1
+            remaining.remove(element)
+    maximal_ranks = {ranks[element] for element in elements if not successors[element]}
+    if len(maximal_ranks) > 1:
+        return None
+    return tuple(
+        ElementRank(element=element, rank=ranks[element]) for element in elements
+    )
 
 
 def _validated_presentation(
@@ -270,12 +301,15 @@ class FinitePoset(ContractModel):
             or self.maximal_elements != expected_maximal
         ):
             raise ValueError("minimal or maximal elements are incomplete")
-        if self.graded != (self.ranks is not None):
-            raise ValueError("ranks must be present exactly when the poset is graded")
-        if self.ranks is not None:
-            if tuple(rank.element for rank in self.ranks) != self.elements:
+        expected_ranks = canonical_poset_ranks(self.elements, reduction)
+        if self.graded != (expected_ranks is not None):
+            raise ValueError("graded metadata does not match the canonical poset")
+        if self.ranks != expected_ranks:
+            raise ValueError("ranks do not match the canonical poset")
+        if expected_ranks is not None:
+            if tuple(rank.element for rank in expected_ranks) != self.elements:
                 raise ValueError("rank entries must cover the canonical carrier")
-            rank_for = {rank.element: rank.rank for rank in self.ranks}
+            rank_for = {rank.element: rank.rank for rank in expected_ranks}
             if any(rank_for[element] != 0 for element in expected_minimal):
                 raise ValueError("minimal elements must have rank zero")
             if any(
@@ -542,6 +576,7 @@ __all__ = [
     "PresentationPair",
     "ReflexivePairPolicy",
     "RelationInterpretation",
+    "canonical_poset_ranks",
     "finite_poset_digest",
     "linear_extension_memo_digest",
 ]
