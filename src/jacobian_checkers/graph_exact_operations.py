@@ -117,13 +117,11 @@ def _finite_simple_graph(
     return tuple(vertices), normalized_edges, adjacency
 
 
-def _all_sources_eccentricities(
+def _all_sources_distance_rows(
     vertices: tuple[str, ...],
     adjacency: dict[str, set[str]],
-) -> tuple[int, ...] | None:
-    if not vertices:
-        return None
-    eccentricities: list[int] = []
+) -> tuple[tuple[int | None, ...], ...]:
+    rows: list[tuple[int | None, ...]] = []
     for source in vertices:
         distances = {source: 0}
         frontier = deque([source])
@@ -133,9 +131,22 @@ def _all_sources_eccentricities(
                 if neighbor not in distances:
                     distances[neighbor] = distances[current] + 1
                     frontier.append(neighbor)
-        if len(distances) != len(vertices):
+        rows.append(tuple(distances.get(target) for target in vertices))
+    return tuple(rows)
+
+
+def _all_sources_eccentricities(
+    vertices: tuple[str, ...],
+    adjacency: dict[str, set[str]],
+) -> tuple[int, ...] | None:
+    if not vertices:
+        return None
+    eccentricities: list[int] = []
+    for row in _all_sources_distance_rows(vertices, adjacency):
+        finite_row = tuple(distance for distance in row if distance is not None)
+        if len(finite_row) != len(vertices):
             return None
-        eccentricities.append(max(distances.values()))
+        eccentricities.append(max(finite_row))
     return tuple(eccentricities)
 
 
@@ -214,6 +225,93 @@ def check_graph_radius(request: dict[str, Any]) -> dict[str, Any]:
         witness_format="graph.radius.all-sources-bfs-v1",
         replay=_radius,
         replay_method="all-sources breadth-first replay",
+        exhaustive=True,
+    )
+
+
+def _distance_matrix(source: dict[str, Any], result: dict[str, Any]) -> bool:
+    input_vertices, normalized_edges, adjacency = _finite_simple_graph(
+        source,
+        maximum_order=32,
+    )
+    vertices = tuple(sorted(input_vertices))
+    if (
+        set(result)
+        != {
+            "semantics_version",
+            "vertex_ordering",
+            "pair_coverage",
+            "unreachable_representation",
+            "vertices",
+            "distances",
+            "connected",
+        }
+        or result["semantics_version"] != "unweighted-shortest-path-distance-matrix.v1"
+        or result["vertex_ordering"] != "LEXICOGRAPHIC_ASCENDING"
+        or result["pair_coverage"] != "ALL_ORDERED_VERTEX_PAIRS"
+        or result["unreachable_representation"] != "JSON_NULL"
+        or result["vertices"] != list(vertices)
+        or type(result["connected"]) is not bool
+    ):
+        return False
+
+    matrix = result["distances"]
+    order = len(vertices)
+    if (
+        not isinstance(matrix, list)
+        or len(matrix) != order
+        or any(not isinstance(row, list) or len(row) != order for row in matrix)
+    ):
+        return False
+    for source_index, row in enumerate(matrix):
+        for target_index, distance in enumerate(row):
+            if distance is not None and (
+                type(distance) is not int or distance < 0 or distance > 31
+            ):
+                return False
+            if source_index == target_index:
+                if distance != 0:
+                    return False
+            elif distance == 0:
+                return False
+            if distance != matrix[target_index][source_index]:
+                return False
+
+    vertex_indices = {vertex: index for index, vertex in enumerate(vertices)}
+    if any(
+        matrix[vertex_indices[left]][vertex_indices[right]] != 1
+        for left, right in normalized_edges
+    ):
+        return False
+    for source_index in range(order):
+        for intermediate_index in range(order):
+            left = matrix[source_index][intermediate_index]
+            if left is None:
+                continue
+            for target_index in range(order):
+                right = matrix[intermediate_index][target_index]
+                if right is None:
+                    continue
+                direct = matrix[source_index][target_index]
+                if direct is None or direct > left + right:
+                    return False
+
+    expected = _all_sources_distance_rows(vertices, adjacency)
+    expected_connected = bool(vertices) and all(
+        distance is not None for row in expected for distance in row
+    )
+    return matrix == [list(row) for row in expected] and (
+        result["connected"] is expected_connected
+    )
+
+
+def check_graph_distance_matrix(request: dict[str, Any]) -> dict[str, Any]:
+    return _run(
+        request,
+        operation_id="graph.distance_matrix.compute",
+        witness_format="graph.distance-matrix.all-sources-bfs-v1",
+        replay=_distance_matrix,
+        replay_method="all-sources breadth-first distance-matrix replay",
         exhaustive=True,
     )
 
@@ -500,6 +598,7 @@ def check_graph_maximum_matching(request: dict[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "check_graph_diameter",
+    "check_graph_distance_matrix",
     "check_graph_hamiltonian_path",
     "check_graph_induced_tree_maximum",
     "check_graph_maximum_matching",

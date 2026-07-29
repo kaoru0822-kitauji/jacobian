@@ -746,3 +746,118 @@ def test_ab_sat_scorer_rejects_unbound_verified_claim(
             mcp_calls=["capability.invoke"],
             capability_invocations=[],
         )
+
+
+def test_ab_distance_composition_scorer_requires_bound_matrix_replay(
+    tmp_path: Path,
+    kernel_store_template_with_references: Path,
+) -> None:
+    case = benchmark.load_cases(["GRAPH-DISTANCE-COMPOSITION-AB-001"])[0]
+    state_dir, kernel = _kernel_from_template(
+        tmp_path,
+        kernel_store_template_with_references,
+        name="distance-state",
+    )
+    computed = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.distance_matrix.compute",
+            input={"graph": case["graph"]},
+        )
+    )
+    verified = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.distance_matrix.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+    report = {
+        "case_id": case["case_id"],
+        "maximum_degree_vertices": ["4"],
+        "distance_to_set": [
+            {"vertex": "0", "distance": 1},
+            {"vertex": "1", "distance": 1},
+            {"vertex": "2", "distance": 1},
+            {"vertex": "3", "distance": 1},
+            {"vertex": "4", "distance": 0},
+            {"vertex": "5", "distance": 2},
+        ],
+        "maximum_distance_to_set": 2,
+        "maximizing_vertices": ["5"],
+        "assurance": "SELF_CHECKED",
+        "final_verification": "UNVERIFIED",
+        "distance_matrix_uri": computed.output["result_uri"],
+        "verification_record_uri": verified.output["verification_record_uri"],
+        "limitations": ["public answer-visible harness validation"],
+        "feedback": {
+            "reasoning_focus": [],
+            "infrastructure_work": [],
+            "tooling_gaps": [],
+        },
+    }
+    invocations = [
+        {
+            "capability_id": "graph.distance_matrix.compute",
+            "input": {"graph": case["graph"]},
+            "output": computed.output,
+            "artifact_uris": list(computed.artifact_uris),
+            "assurance": computed.assurance.model_dump(mode="json"),
+        },
+        {
+            "capability_id": "graph.distance_matrix.verify",
+            "input": {"result_uri": computed.output["result_uri"]},
+            "output": verified.output,
+            "artifact_uris": list(verified.artifact_uris),
+            "assurance": verified.assurance.model_dump(mode="json"),
+        },
+    ]
+
+    score = benchmark.score_report(
+        case,
+        report,
+        condition="treatment",
+        state_dir=state_dir,
+        mcp_calls=["capability.describe", "capability.invoke", "capability.invoke"],
+        capability_attempt_ids=[
+            "graph.distance_matrix.compute",
+            "graph.distance_matrix.verify",
+        ],
+        capability_invocations=invocations,
+    )
+
+    assert score == {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "independent standard-library distance-to-set oracle",
+            "durable graph and matrix binding",
+            "ordered compute-to-verify trace",
+            "independent checker replay",
+        ],
+    }
+
+    control = {
+        **report,
+        "distance_matrix_uri": None,
+        "verification_record_uri": None,
+    }
+    control_score = benchmark.score_report(
+        case,
+        control,
+        condition="control",
+        state_dir=tmp_path / "unused-control",
+        mcp_calls=["capability.describe"],
+    )
+    assert control_score["passed"] is True
+    assert control_score["replay_success"] is False
+
+    forged = {**report, "maximum_distance_to_set": 3}
+    with pytest.raises(benchmark.BenchmarkError, match="differs from the oracle"):
+        benchmark.score_report(
+            case,
+            forged,
+            condition="treatment",
+            state_dir=state_dir,
+            mcp_calls=["capability.invoke"],
+        )

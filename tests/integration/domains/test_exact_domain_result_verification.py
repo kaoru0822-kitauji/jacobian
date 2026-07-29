@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from tests.helpers.rationals import rational_payload as _q
 
@@ -402,6 +404,106 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
     assert rejected.output["status"] == "REJECTED"
     assert rejected.output["conclusion"] == "UNKNOWN"
     assert rejected.output["verification_record_uri"] is None
+
+
+def test_distance_matrix_result_uses_independent_all_sources_bfs_replay(
+    kernel_with_references,
+) -> None:
+    graph: dict[str, Any] = {
+        "vertices": ["0", "1", "2", "3", "4", "5"],
+        "edges": [
+            ["0", "3"],
+            ["0", "4"],
+            ["1", "4"],
+            ["2", "4"],
+            ["3", "4"],
+            ["3", "5"],
+        ],
+    }
+    computed = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.distance_matrix.compute",
+            input={"graph": graph},
+        )
+    )
+    verified = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.distance_matrix.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+
+    assert computed.assurance.level is CapabilityAssuranceLevel.COMPUTED
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"
+    assert verified.output["operation_id"] == "graph.distance_matrix.compute"
+    assert verified.output["result_uri"] == computed.output["result_uri"]
+    assert verified.output["verification_record_uri"] is not None
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.output["verification_record_uri"] in verified.artifact_uris
+    assert len(verified.artifact_uris) == 4
+
+    matrix = computed.output["result"]["distances"]
+    degree = dict.fromkeys(graph["vertices"], 0)
+    for left, right in graph["edges"]:
+        degree[left] += 1
+        degree[right] += 1
+    maximum_degree = max(degree.values())
+    maximum_degree_vertices = sorted(
+        vertex for vertex, value in degree.items() if value == maximum_degree
+    )
+    matrix_vertices = computed.output["result"]["vertices"]
+    designated_indices = [
+        matrix_vertices.index(vertex) for vertex in maximum_degree_vertices
+    ]
+    distances_to_set = [
+        min(matrix[index][designated] for designated in designated_indices)
+        for index in range(len(matrix_vertices))
+    ]
+    maximum_distance = max(distances_to_set)
+    maximizing_vertices = [
+        vertex
+        for vertex, distance in zip(
+            matrix_vertices,
+            distances_to_set,
+            strict=True,
+        )
+        if distance == maximum_distance
+    ]
+    assert maximum_degree_vertices == ["4"]
+    assert distances_to_set == [1, 1, 1, 1, 0, 2]
+    assert maximum_distance == 2
+    assert maximizing_vertices == ["5"]
+
+    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
+    order = len(result_artifact.payload["vertices"])
+    false_result = kernel_with_references.artifacts.put(
+        schema_uri=result_artifact.manifest.schema_uri,
+        semantics_uri=result_artifact.manifest.semantics_uri,
+        parents=result_artifact.manifest.parents,
+        payload={
+            **result_artifact.payload,
+            "distances": [
+                [0 if source == target else 1 for target in range(order)]
+                for source in range(order)
+            ],
+        },
+        summary="adversarial metric-shaped but false graph distance matrix",
+    )
+    rejected = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.distance_matrix.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": false_result.artifact_uri},
+        )
+    )
+
+    assert rejected.execution.status is ExecutionStatus.COMPLETED
+    assert rejected.output["status"] == "REJECTED"
+    assert rejected.output["conclusion"] == "UNKNOWN"
+    assert rejected.output["verification_record_uri"] is None
+    assert rejected.assurance.level is not CapabilityAssuranceLevel.VERIFIED
 
 
 @pytest.mark.parametrize("value", ("360", "-360", "1", "-1", "101"))

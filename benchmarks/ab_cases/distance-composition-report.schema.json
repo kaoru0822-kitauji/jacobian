@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "maximum_degree_vertices": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "distance_to_set": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "vertex": {
+            "type": "string"
+          },
+          "distance": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          }
+        },
+        "required": [
+          "vertex",
+          "distance"
+        ]
+      }
+    },
+    "maximum_distance_to_set": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 31
+    },
+    "maximizing_vertices": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assurance": {
+      "description": "Assurance for the composed restricted-set conclusion, not for an intermediate distance-matrix artifact. SELF_CHECKED or COMPUTED may be appropriate; the exact distance matrix has its own verification record.",
+      "enum": [
+        "SELF_CHECKED",
+        "COMPUTED",
+        "VERIFIED"
+      ]
+    },
+    "final_verification": {
+      "description": "The composed restricted-set conclusion remains UNVERIFIED even when verification_record_uri certifies the exact distance matrix used as an intermediate.",
+      "enum": [
+        "UNVERIFIED",
+        "VERIFIED"
+      ]
+    },
+    "distance_matrix_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "verification_record_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reasoning_focus": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "infrastructure_work": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tooling_gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "reasoning_focus",
+        "infrastructure_work",
+        "tooling_gaps"
+      ]
+    }
+  },
+  "required": [
+    "case_id",
+    "maximum_degree_vertices",
+    "distance_to_set",
+    "maximum_distance_to_set",
+    "maximizing_vertices",
+    "assurance",
+    "final_verification",
+    "distance_matrix_uri",
+    "verification_record_uri",
+    "limitations",
+    "feedback"
+  ]
+}
