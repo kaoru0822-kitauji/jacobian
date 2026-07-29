@@ -21,10 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Verify release ref
+      - name: Resolve release tag
+        id: release
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
-        run: test "$GITHUB_REF" = "refs/tags/$RELEASE_TAG"
+        run: |
+          test -n "$RELEASE_TAG"
+          echo "sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag }}
@@ -43,7 +47,9 @@ jobs:
           node-version: ${{ steps.node.outputs.node-version }}
           package-manager-cache: false
       - name: Verify release commit
-        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
       - name: Build Python distributions
         run: uv build --out-dir dist/python
       - name: Test and pack npm distribution

@@ -55,5 +55,5 @@ jobs:
         run: >-
           gh workflow run release.yml
           --repo "$GITHUB_REPOSITORY"
-          --ref "$RELEASE_TAG"
+          --ref main
           --field tag="$RELEASE_TAG"
