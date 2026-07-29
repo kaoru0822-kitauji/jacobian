@@ -15,6 +15,7 @@ from jacobian.contracts.matrix_operations import (
     RationalMatrixRequest,
     SquareRationalMatrixRequest,
 )
+from jacobian.contracts.number_theory import FactorizationRequest
 from jacobian.contracts.polynomial_operations import (
     PolynomialDiscriminantRequest,
     PolynomialGcdRequest,
@@ -69,6 +70,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
         "graph.invariant.radius.compute",
         "graph.invariant.maximum_matching.compute",
     )
+    number_theory_ids = ("integer.compute.prime_factorization",)
     projective_ids = ("geometry.projective_line_arrangement.flats.materialize",)
     registry = CheckerRegistry(tmp_path / "checkers.sqlite3")
 
@@ -104,6 +106,11 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
             graph_ids[2:],
             character="8",
         ),
+        number_theory=_installed(
+            (FactorizationRequest,),
+            number_theory_ids,
+            character="6",
+        ),
         projective_geometry=_installed(
             (ProjectiveLineArrangementRequest,),
             projective_ids,
@@ -113,7 +120,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
     )
 
     assert set(installation.checker_ids) == set(
-        polynomial_ids + matrix_ids + graph_ids + projective_ids
+        polynomial_ids + matrix_ids + graph_ids + number_theory_ids + projective_ids
     )
     assert all(installation.checker_ids.values())
     for capability_id, checker_id in installation.checker_ids.items():

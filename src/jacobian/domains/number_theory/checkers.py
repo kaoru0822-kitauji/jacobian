@@ -1,0 +1,37 @@
+"""Independent checker declarations owned by the number-theory domain."""
+
+from jacobian.checker_operations import ExactReplayCheckerDeclaration
+from jacobian.contracts.number_theory import FactorizationRequest
+
+_EXACT_DOMAIN_ENTRYPOINT = "jacobian_checkers.exact_domain_operations"
+
+NUMBER_THEORY_EXACT_REPLAY_CHECKERS = (
+    ExactReplayCheckerDeclaration(
+        "integer.compute.prime_factorization",
+        FactorizationRequest,
+        "check_integer_prime_factorization",
+        "integer.prime-factorization.flint-replay",
+        entrypoint_module=_EXACT_DOMAIN_ENTRYPOINT,
+        replay_method="Python-FLINT prime-factorization replay",
+        reason=(
+            "operator-authorized Python-FLINT checker independent of the "
+            "isolated SymPy factorization producer"
+        ),
+        verification_capability_id="integer.prime_factorization.verify",
+        verification_title="Verify an integer prime factorization",
+        verification_description=(
+            "Independently verify the complete canonical prime-power "
+            "factorization of one stored nonzero integer result."
+        ),
+        verification_tags=(
+            "verification",
+            "exact",
+            "integer",
+            "number-theory",
+            "prime-factorization",
+        ),
+    ),
+)
+
+
+__all__ = ["NUMBER_THEORY_EXACT_REPLAY_CHECKERS"]
