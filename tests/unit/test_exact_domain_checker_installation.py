@@ -65,6 +65,8 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
     graph_ids = (
         "graph.hamiltonian_path.decide",
         "graph.induced_tree.maximum.compute",
+        "graph.invariant.diameter.compute",
+        "graph.invariant.radius.compute",
         "graph.invariant.maximum_matching.compute",
     )
     projective_ids = ("geometry.projective_line_arrangement.flats.materialize",)
@@ -99,7 +101,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
         ),
         graph_invariants=_installed(
             (GraphInvariantRequest,),
-            (graph_ids[2],),
+            graph_ids[2:],
             character="8",
         ),
         projective_geometry=_installed(
@@ -232,7 +234,11 @@ def test_installer_skips_checkers_for_an_unavailable_graph_bundle(
     )
     graph_invariants = _installed(
         (GraphInvariantRequest,),
-        ("graph.invariant.maximum_matching.compute",),
+        (
+            "graph.invariant.diameter.compute",
+            "graph.invariant.radius.compute",
+            "graph.invariant.maximum_matching.compute",
+        ),
         character="8",
     )
 
@@ -248,7 +254,11 @@ def test_installer_skips_checkers_for_an_unavailable_graph_bundle(
         (
             "invariants-only",
             {"graph_invariants": graph_invariants},
-            {"graph.invariant.maximum_matching.compute"},
+            {
+                "graph.invariant.diameter.compute",
+                "graph.invariant.radius.compute",
+                "graph.invariant.maximum_matching.compute",
+            },
         ),
     ):
         registry_path = tmp_path / name / "checkers.sqlite3"

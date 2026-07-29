@@ -562,7 +562,10 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
     _computed(
         "graph.invariant.diameter.compute",
         "Diameter",
-        "Compute the exact diameter, using -1 for a disconnected graph.",
+        (
+            "Compute the exact diameter of a nonempty connected graph; return "
+            "NOT_APPLICABLE without a numeric value otherwise."
+        ),
         GraphDiameterResult,
         _diameter,
         "diameter",

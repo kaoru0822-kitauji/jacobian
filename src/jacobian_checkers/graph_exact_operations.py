@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from functools import cache
 from itertools import combinations, pairwise
@@ -50,6 +51,7 @@ def _run(
     witness_format: str,
     replay_method: str,
     replay: Callable[[dict[str, Any], dict[str, Any]], bool],
+    exhaustive: bool = False,
 ) -> dict[str, Any]:
     try:
         source, result = bound_request(
@@ -61,7 +63,8 @@ def _run(
             return _reject(
                 f"declared result does not match independent {replay_method}"
             )
-        return _accept(f"independent {replay_method} accepted {operation_id}")
+        detail = f"independent {replay_method} accepted {operation_id}"
+        return _accept_exhaustive(detail) if exhaustive else _accept(detail)
     except (KeyError, TypeError, ValueError, OverflowError):
         return _reject("malformed, unsupported, or mismatched checker request")
 
@@ -112,6 +115,107 @@ def _finite_simple_graph(
         adjacency[left].add(right)
         adjacency[right].add(left)
     return tuple(vertices), normalized_edges, adjacency
+
+
+def _all_sources_eccentricities(
+    vertices: tuple[str, ...],
+    adjacency: dict[str, set[str]],
+) -> tuple[int, ...] | None:
+    if not vertices:
+        return None
+    eccentricities: list[int] = []
+    for source in vertices:
+        distances = {source: 0}
+        frontier = deque([source])
+        while frontier:
+            current = frontier.popleft()
+            for neighbor in adjacency[current]:
+                if neighbor not in distances:
+                    distances[neighbor] = distances[current] + 1
+                    frontier.append(neighbor)
+        if len(distances) != len(vertices):
+            return None
+        eccentricities.append(max(distances.values()))
+    return tuple(eccentricities)
+
+
+def _graph_metric(
+    source: dict[str, Any],
+    result: dict[str, Any],
+    *,
+    field: str,
+    inapplicable_detail: str,
+    aggregate: Callable[[tuple[int, ...]], int],
+) -> bool:
+    vertices, _, adjacency = _finite_simple_graph(source, maximum_order=32)
+    if set(result) != {
+        "status",
+        field,
+        "connected",
+        "exactness",
+        "detail",
+    }:
+        return False
+    eccentricities = _all_sources_eccentricities(vertices, adjacency)
+    if eccentricities is None:
+        return (
+            result["status"] == "NOT_APPLICABLE"
+            and result[field] is None
+            and result["connected"] is False
+            and result["exactness"] == "NOT_APPLICABLE"
+            and result["detail"] == inapplicable_detail
+        )
+    claimed = result[field]
+    return (
+        result["status"] == "COMPUTED"
+        and type(claimed) is int
+        and claimed == aggregate(eccentricities)
+        and result["connected"] is True
+        and result["exactness"] == "EXACT"
+        and result["detail"] is None
+    )
+
+
+def _diameter(source: dict[str, Any], result: dict[str, Any]) -> bool:
+    return _graph_metric(
+        source,
+        result,
+        field="diameter",
+        inapplicable_detail="diameter requires a nonempty connected graph",
+        aggregate=max,
+    )
+
+
+def check_graph_diameter(request: dict[str, Any]) -> dict[str, Any]:
+    return _run(
+        request,
+        operation_id="graph.invariant.diameter.compute",
+        witness_format="graph.diameter.all-sources-bfs-v1",
+        replay=_diameter,
+        replay_method="all-sources breadth-first replay",
+        exhaustive=True,
+    )
+
+
+def _radius(source: dict[str, Any], result: dict[str, Any]) -> bool:
+    return _graph_metric(
+        source,
+        result,
+        field="radius",
+        inapplicable_detail="radius requires a nonempty connected graph",
+        aggregate=min,
+    )
+
+
+def check_graph_radius(request: dict[str, Any]) -> dict[str, Any]:
+    return _run(
+        request,
+        operation_id="graph.invariant.radius.compute",
+        witness_format="graph.radius.all-sources-bfs-v1",
+        replay=_radius,
+        replay_method="all-sources breadth-first replay",
+        exhaustive=True,
+    )
 
 
 def _induced_tree_maximum(
@@ -395,7 +499,9 @@ def check_graph_maximum_matching(request: dict[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
+    "check_graph_diameter",
     "check_graph_hamiltonian_path",
     "check_graph_induced_tree_maximum",
     "check_graph_maximum_matching",
+    "check_graph_radius",
 ]

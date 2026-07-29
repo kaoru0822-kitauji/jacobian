@@ -54,6 +54,56 @@ GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS = (
         verification_tags=("verification", "exact", "graph", "induced-tree"),
     ),
     ExactReplayCheckerDeclaration(
+        "graph.invariant.diameter.compute",
+        GraphInvariantRequest,
+        "check_graph_diameter",
+        "graph.diameter.all-sources-bfs-v1",
+        entrypoint_module=_GRAPH_ENTRYPOINT,
+        replay_method="all-sources breadth-first replay",
+        reason=(
+            "operator-authorized standard-library BFS checker independent of "
+            "the NetworkX producer"
+        ),
+        verification_capability_id="graph.invariant.diameter.verify",
+        verification_title="Verify an exact graph diameter",
+        verification_description=(
+            "Independently replay all-source shortest paths to verify one stored "
+            "diameter result, including its disconnected-graph convention."
+        ),
+        verification_tags=(
+            "verification",
+            "exact",
+            "graph",
+            "diameter",
+            "breadth-first-search",
+        ),
+    ),
+    ExactReplayCheckerDeclaration(
+        "graph.invariant.radius.compute",
+        GraphInvariantRequest,
+        "check_graph_radius",
+        "graph.radius.all-sources-bfs-v1",
+        entrypoint_module=_GRAPH_ENTRYPOINT,
+        replay_method="all-sources breadth-first replay",
+        reason=(
+            "operator-authorized standard-library BFS checker independent of "
+            "the NetworkX producer"
+        ),
+        verification_capability_id="graph.invariant.radius.verify",
+        verification_title="Verify an exact graph radius",
+        verification_description=(
+            "Independently replay all-source shortest paths to verify one stored "
+            "radius result, including its disconnected-graph convention."
+        ),
+        verification_tags=(
+            "verification",
+            "exact",
+            "graph",
+            "radius",
+            "breadth-first-search",
+        ),
+    ),
+    ExactReplayCheckerDeclaration(
         "graph.invariant.maximum_matching.compute",
         GraphInvariantRequest,
         "check_graph_maximum_matching",

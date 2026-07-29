@@ -23,8 +23,10 @@ from jacobian_checkers.exact_domain_operations import (
     check_polynomial_square_free,
 )
 from jacobian_checkers.graph_exact_operations import (
+    check_graph_diameter,
     check_graph_induced_tree_maximum,
     check_graph_maximum_matching,
+    check_graph_radius,
 )
 
 
@@ -275,6 +277,48 @@ _CASES: tuple[
         ),
     ),
     (
+        check_graph_diameter,
+        _request(
+            "graph.invariant.diameter.compute",
+            "graph.diameter.all-sources-bfs-v1",
+            {
+                "graph": {
+                    "graph_schema_version": "1",
+                    "vertices": ["a", "b", "c", "d"],
+                    "edges": [["a", "b"], ["b", "c"], ["c", "d"]],
+                }
+            },
+            {
+                "status": "COMPUTED",
+                "diameter": 3,
+                "connected": True,
+                "exactness": "EXACT",
+                "detail": None,
+            },
+        ),
+    ),
+    (
+        check_graph_radius,
+        _request(
+            "graph.invariant.radius.compute",
+            "graph.radius.all-sources-bfs-v1",
+            {
+                "graph": {
+                    "graph_schema_version": "1",
+                    "vertices": ["a", "b", "c", "d"],
+                    "edges": [["a", "b"], ["b", "c"], ["c", "d"]],
+                }
+            },
+            {
+                "status": "COMPUTED",
+                "radius": 2,
+                "connected": True,
+                "exactness": "EXACT",
+                "detail": None,
+            },
+        ),
+    ),
+    (
         check_graph_induced_tree_maximum,
         _request(
             "graph.induced_tree.maximum.compute",
@@ -480,6 +524,186 @@ import jacobian_checkers.graph_exact_operations
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize(
+    ("checker", "operation_id", "witness_format", "result"),
+    (
+        (
+            check_graph_diameter,
+            "graph.invariant.diameter.compute",
+            "graph.diameter.all-sources-bfs-v1",
+            {
+                "status": "NOT_APPLICABLE",
+                "diameter": None,
+                "connected": False,
+                "exactness": "NOT_APPLICABLE",
+                "detail": "diameter requires a nonempty connected graph",
+            },
+        ),
+        (
+            check_graph_radius,
+            "graph.invariant.radius.compute",
+            "graph.radius.all-sources-bfs-v1",
+            {
+                "status": "NOT_APPLICABLE",
+                "radius": None,
+                "connected": False,
+                "exactness": "NOT_APPLICABLE",
+                "detail": "radius requires a nonempty connected graph",
+            },
+        ),
+    ),
+)
+@pytest.mark.parametrize(
+    "graph",
+    (
+        {
+            "graph_schema_version": "1",
+            "vertices": [],
+            "edges": [],
+        },
+        {
+            "graph_schema_version": "1",
+            "vertices": ["a", "b", "c"],
+            "edges": [["a", "b"]],
+        },
+    ),
+    ids=("empty", "disconnected"),
+)
+def test_graph_metric_checker_accepts_exact_inapplicable_boundary(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    operation_id: str,
+    witness_format: str,
+    result: dict[str, Any],
+    graph: dict[str, Any],
+) -> None:
+    checker_request = _request(
+        operation_id,
+        witness_format,
+        {"graph": graph},
+        result,
+    )
+
+    decision = checker(checker_request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
+@pytest.mark.parametrize(
+    ("checker", "operation_id", "witness_format", "field"),
+    (
+        (
+            check_graph_diameter,
+            "graph.invariant.diameter.compute",
+            "graph.diameter.all-sources-bfs-v1",
+            "diameter",
+        ),
+        (
+            check_graph_radius,
+            "graph.invariant.radius.compute",
+            "graph.radius.all-sources-bfs-v1",
+            "radius",
+        ),
+    ),
+)
+def test_graph_metric_checker_accepts_singleton_zero(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    operation_id: str,
+    witness_format: str,
+    field: str,
+) -> None:
+    checker_request = _request(
+        operation_id,
+        witness_format,
+        {
+            "graph": {
+                "graph_schema_version": "1",
+                "vertices": ["only"],
+                "edges": [],
+            }
+        },
+        {
+            "status": "COMPUTED",
+            field: 0,
+            "connected": True,
+            "exactness": "EXACT",
+            "detail": None,
+        },
+    )
+
+    assert checker(checker_request)["accepted"] is True
+
+
+@pytest.mark.parametrize(
+    ("checker", "operation_id", "witness_format", "field"),
+    (
+        (
+            check_graph_diameter,
+            "graph.invariant.diameter.compute",
+            "graph.diameter.all-sources-bfs-v1",
+            "diameter",
+        ),
+        (
+            check_graph_radius,
+            "graph.invariant.radius.compute",
+            "graph.radius.all-sources-bfs-v1",
+            "radius",
+        ),
+    ),
+)
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda result, field: result.update({field: 0}),
+        lambda result, field: result.update(status="NOT_APPLICABLE"),
+        lambda result, field: result.update(connected=False),
+        lambda result, field: result.update(exactness="NOT_APPLICABLE"),
+        lambda result, field: result.update(detail="forged"),
+    ),
+    ids=(
+        "wrong-value",
+        "wrong-status",
+        "wrong-connectivity",
+        "wrong-exactness",
+        "detail",
+    ),
+)
+def test_graph_metric_checker_rejects_forged_connected_result(
+    checker: Callable[[dict[str, Any]], dict[str, Any]],
+    operation_id: str,
+    witness_format: str,
+    field: str,
+    mutation: Callable[[dict[str, Any], str], object],
+) -> None:
+    checker_request = _request(
+        operation_id,
+        witness_format,
+        {
+            "graph": {
+                "graph_schema_version": "1",
+                "vertices": ["a", "b", "c", "d"],
+                "edges": [["a", "b"], ["b", "c"], ["c", "d"]],
+            }
+        },
+        {
+            "status": "COMPUTED",
+            field: 3 if field == "diameter" else 2,
+            "connected": True,
+            "exactness": "EXACT",
+            "detail": None,
+        },
+    )
+    mutation(checker_request["candidate"]["payload"], field)
+    checker_request["candidate"]["payload_digest"] = _digest(
+        checker_request["candidate"]["payload"]
+    )
+
+    decision = checker(checker_request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
 
 
 @pytest.mark.parametrize(
