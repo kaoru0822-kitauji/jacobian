@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, model_validator
 
@@ -17,6 +17,72 @@ from jacobian.contracts.results import ContractModel
 
 class GraphInvariantRequest(ContractModel):
     graph: ChromaticGraph
+
+
+GraphDistance = Annotated[StrictInt, Field(ge=0, le=31)] | None
+GraphDistanceRow = Annotated[
+    tuple[GraphDistance, ...],
+    Field(max_length=32),
+]
+
+
+class GraphDistanceMatrixResult(ContractModel):
+    """All exact unweighted shortest-path distances in canonical vertex order."""
+
+    semantics_version: Literal["unweighted-shortest-path-distance-matrix.v1"]
+    vertex_ordering: Literal["LEXICOGRAPHIC_ASCENDING"]
+    pair_coverage: Literal["ALL_ORDERED_VERTEX_PAIRS"]
+    unreachable_representation: Literal["JSON_NULL"]
+    vertices: tuple[GraphVertex, ...] = Field(max_length=32)
+    distances: tuple[GraphDistanceRow, ...] = Field(max_length=32)
+    connected: StrictBool
+
+    @model_validator(mode="after")
+    def bind_complete_metric(self) -> Self:
+        order = len(self.vertices)
+        if (
+            tuple(sorted(self.vertices)) != self.vertices
+            or len(set(self.vertices)) != order
+        ):
+            raise ValueError("distance-matrix vertices must be unique and sorted")
+        if len(self.distances) != order or any(
+            len(row) != order for row in self.distances
+        ):
+            raise ValueError("distance matrix must be square on the declared vertices")
+
+        for source in range(order):
+            for target in range(order):
+                distance = self.distances[source][target]
+                if source == target:
+                    if distance != 0:
+                        raise ValueError("distance-matrix diagonal must be zero")
+                elif distance == 0:
+                    raise ValueError("off-diagonal distances must be positive or null")
+                if distance != self.distances[target][source]:
+                    raise ValueError("undirected distance matrix must be symmetric")
+
+        for source in range(order):
+            for intermediate in range(order):
+                left = self.distances[source][intermediate]
+                if left is None:
+                    continue
+                for target in range(order):
+                    right = self.distances[intermediate][target]
+                    if right is None:
+                        continue
+                    direct = self.distances[source][target]
+                    if direct is None or direct > left + right:
+                        raise ValueError(
+                            "finite distances must satisfy component closure and "
+                            "the triangle inequality"
+                        )
+
+        expected_connected = order > 0 and all(
+            distance is not None for row in self.distances for distance in row
+        )
+        if self.connected != expected_connected:
+            raise ValueError("connected must match all-pairs finite reachability")
+        return self
 
 
 class GraphGirthResult(ContractModel):

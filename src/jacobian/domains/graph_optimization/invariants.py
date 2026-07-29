@@ -21,6 +21,7 @@ from jacobian.contracts.graph_invariant_operations import (
     GraphCoreRequest,
     GraphCoreResult,
     GraphDiameterResult,
+    GraphDistanceMatrixResult,
     GraphEdgeConnectivityResult,
     GraphEulerianResult,
     GraphGirthResult,
@@ -107,6 +108,30 @@ def _girth(graph: nx.Graph[str]) -> GraphGirthResult:
     value = nx.girth(graph)
     girth = 0 if math.isinf(value) else int(value)
     return GraphGirthResult(girth=girth, has_cycle=girth > 0)
+
+
+def _distance_matrix(graph: nx.Graph[str]) -> GraphDistanceMatrixResult:
+    vertices = tuple(sorted(graph.nodes))
+    shortest_paths = {
+        source: nx.single_source_shortest_path_length(graph, source)
+        for source in vertices
+    }
+    distances = tuple(
+        tuple(shortest_paths[source].get(target) for target in vertices)
+        for source in vertices
+    )
+    connected = bool(vertices) and all(
+        distance is not None for row in distances for distance in row
+    )
+    return GraphDistanceMatrixResult(
+        semantics_version="unweighted-shortest-path-distance-matrix.v1",
+        vertex_ordering="LEXICOGRAPHIC_ASCENDING",
+        pair_coverage="ALL_ORDERED_VERTEX_PAIRS",
+        unreachable_representation="JSON_NULL",
+        vertices=vertices,
+        distances=distances,
+        connected=connected,
+    )
 
 
 def _diameter(graph: nx.Graph[str]) -> GraphDiameterResult:
@@ -471,6 +496,31 @@ BOUNDED_GRAPH_INVARIANT_CAPABILITIES = (
 )
 
 EXACT_GRAPH_INVARIANT_CAPABILITIES = (
+    _computed(
+        "graph.distance_matrix.compute",
+        "All-pairs distance matrix",
+        (
+            "Compute every exact unweighted shortest-path distance in a bounded "
+            "finite simple graph, using JSON null for unreachable vertex pairs."
+        ),
+        GraphDistanceMatrixResult,
+        _distance_matrix,
+        "distance",
+        "matrix",
+        "exact",
+        invocation_examples=(
+            example(
+                "path_three_distance_matrix",
+                "Compute all ordered-pair distances in a three-vertex path.",
+                {
+                    "graph": {
+                        "vertices": ["c", "a", "b"],
+                        "edges": [["a", "b"], ["b", "c"]],
+                    }
+                },
+            ),
+        ),
+    ),
     _computed(
         "graph.invariant.triangle_count.compute",
         "Triangle count",
