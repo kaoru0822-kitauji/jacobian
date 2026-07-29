@@ -62,6 +62,7 @@ from jacobian.contracts.graph_invariants import (
 )
 from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.graph_atlas import graph_atlas_order
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
@@ -549,6 +550,13 @@ class GraphAtlasSearchAdapter:
                 "additionalProperties": False,
             },
             tags=("graph", "construction", "bounded-search"),
+            invocation_examples=(
+                example(
+                    "empty_graph_search",
+                    "Find the order-zero graph in the atlas.",
+                    {"order": 0, "constraints": {}, "limit": 1},
+                ),
+            ),
         )
 
     @property
@@ -836,6 +844,13 @@ class GraphDegreeSequenceAdapter:
                 "degree-sequence",
                 "construction",
                 "counterexample",
+            ),
+            invocation_examples=(
+                example(
+                    "triangle_degree_sequence",
+                    "Realize the degree sequence of a triangle.",
+                    {"degree_sequence": [2, 2, 2]},
+                ),
             ),
         )
 

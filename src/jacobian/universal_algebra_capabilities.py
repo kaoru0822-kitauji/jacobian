@@ -59,6 +59,7 @@ from jacobian.contracts.universal_algebra import (
     UniversalAlgebraEvaluationRequest,
     UniversalAlgebraVerificationHandoff,
 )
+from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -617,6 +618,13 @@ class FiniteMagmaTableEnumerateAdapter:
             input_schema=model_schema(FiniteMagmaTableEnumerationRequest),
             output_schema=model_schema(FiniteMagmaTableEnumerationOutput),
             tags=("universal-algebra", "finite-model", "enumeration"),
+            invocation_examples=(
+                example(
+                    "order_one",
+                    "Enumerate the unique binary table of order one.",
+                    {"order": 1},
+                ),
+            ),
         )
 
     @property
