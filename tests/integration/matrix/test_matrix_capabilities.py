@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from fractions import Fraction
 from itertools import permutations
 from pathlib import Path
@@ -9,6 +12,7 @@ from typing import Any
 
 import pytest
 import sympy
+from tests.helpers.domain_installation import open_domain_test_services
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -17,13 +21,13 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.matrix_capabilities import MatrixInstallation, install_matrix_capabilities
 from jacobian.matrix_determinant_capabilities import (
     install_matrix_determinant_checker,
 )
-from jacobian.runtime import create_runtime
-from jacobian.runtime.model import JacobianRuntime
-
-pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
+from jacobian.runtime import CheckerAuthorityMode
+from jacobian.runtime.services import CoreServices
+from jacobian.verification import VerificationService
 
 
 def _rational(value: int | Fraction) -> dict[str, str]:
@@ -54,20 +58,61 @@ def _reference_determinant(rows: list[list[Fraction]]) -> Fraction:
     return total
 
 
-def _runtime_with_determinant_checker(root: Path) -> JacobianRuntime:
-    runtime = create_runtime(root)
-    adapter, _installation = install_matrix_determinant_checker(
-        runtime.core.store,
-        runtime.core.schemas,
-        runtime.core.artifacts,
-        runtime.portfolio.matrix,
-        runtime.services.verification,
-        runtime.core.checkers,
-        authorize_checker=True,
+@dataclass(frozen=True, slots=True)
+class _MatrixRuntime:
+    core: CoreServices
+    matrix: MatrixInstallation
+    verification: VerificationService
+
+
+@contextmanager
+def _open_matrix_runtime(
+    root: Path,
+    *,
+    install_checker: bool,
+) -> Iterator[_MatrixRuntime]:
+    authority = (
+        CheckerAuthorityMode.INSTALL_BUNDLED
+        if install_checker
+        else CheckerAuthorityMode.NONE
     )
-    assert adapter is not None
-    runtime.core.capabilities.register(adapter)
-    return runtime
+    with open_domain_test_services(root, checker_authority=authority) as services:
+        adapters, matrix = install_matrix_capabilities(
+            services.core.store,
+            services.core.schemas,
+            services.core.artifacts,
+        )
+        for adapter in adapters:
+            services.installation.register_capability(adapter)
+        if install_checker:
+            adapter, _installation = install_matrix_determinant_checker(
+                services.core.store,
+                services.core.schemas,
+                services.core.artifacts,
+                matrix,
+                services.installation.verification,
+                services.core.checkers,
+                authorize_checker=True,
+            )
+            assert adapter is not None
+            services.installation.register_capability(adapter)
+        yield _MatrixRuntime(
+            core=services.core,
+            matrix=matrix,
+            verification=services.installation.verification,
+        )
+
+
+@pytest.fixture
+def matrix_services(tmp_path: Path) -> Iterator[_MatrixRuntime]:
+    with _open_matrix_runtime(tmp_path, install_checker=False) as services:
+        yield services
+
+
+@pytest.fixture
+def matrix_checker_services(tmp_path: Path) -> Iterator[_MatrixRuntime]:
+    with _open_matrix_runtime(tmp_path, install_checker=True) as services:
+        yield services
 
 
 @pytest.mark.parametrize(
@@ -84,10 +129,11 @@ def _runtime_with_determinant_checker(root: Path) -> JacobianRuntime:
     ],
 )
 def test_matrix_determinant_compute_is_exact_and_unverified(
-    runtime,
+    matrix_services: _MatrixRuntime,
     rows: list[list[int | Fraction]],
     expected: Fraction,
 ) -> None:
+    runtime = matrix_services
 
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -108,9 +154,9 @@ def test_matrix_determinant_compute_is_exact_and_unverified(
 
 
 def test_matrix_determinant_verify_independently_recomputes_exact_value(
-    tmp_path: Path,
+    matrix_checker_services: _MatrixRuntime,
 ) -> None:
-    runtime = _runtime_with_determinant_checker(tmp_path)
+    runtime = matrix_checker_services
     computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
@@ -141,8 +187,10 @@ def test_matrix_determinant_verify_independently_recomputes_exact_value(
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> None:
-    runtime = _runtime_with_determinant_checker(tmp_path)
+def test_matrix_determinant_verify_rejects_wrong_bound_value(
+    matrix_checker_services: _MatrixRuntime,
+) -> None:
+    runtime = matrix_checker_services
     computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
@@ -151,8 +199,8 @@ def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> 
     )
     source_uri = computed.output["matrix_uri"]
     wrong = runtime.core.artifacts.put(
-        schema_uri=runtime.portfolio.matrix.determinant_schema_uri,
-        semantics_uri=runtime.portfolio.matrix.semantics_uri,
+        schema_uri=runtime.matrix.determinant_schema_uri,
+        semantics_uri=runtime.matrix.semantics_uri,
         payload={
             **runtime.core.store.get(computed.output["determinant_uri"]).payload,
             "determinant": _rational(2),
@@ -177,10 +225,10 @@ def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> 
 
 
 def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
-    tmp_path: Path,
+    matrix_checker_services: _MatrixRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = _runtime_with_determinant_checker(tmp_path)
+    runtime = matrix_checker_services
     computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
@@ -188,7 +236,7 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
         )
     )
     monkeypatch.setattr(
-        runtime.services.verification,
+        runtime.verification,
         "_run_checker",
         lambda **_kwargs: (_ for _ in ()).throw(
             subprocess.TimeoutExpired("determinant-checker", 1)
@@ -211,8 +259,9 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
 
 
 def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
-    runtime,
+    matrix_services: _MatrixRuntime,
 ) -> None:
+    runtime = matrix_services
 
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -240,7 +289,10 @@ def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
     assert rank_artifact.payload["backend_version"] == sympy.__version__
 
 
-def test_matrix_determinant_rejects_rectangular_input(runtime) -> None:
+def test_matrix_determinant_rejects_rectangular_input(
+    matrix_services: _MatrixRuntime,
+) -> None:
+    runtime = matrix_services
 
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -255,8 +307,9 @@ def test_matrix_determinant_rejects_rectangular_input(runtime) -> None:
 
 @pytest.mark.differential
 def test_matrix_determinant_matches_independent_bounded_oracle(
-    runtime,
+    matrix_services: _MatrixRuntime,
 ) -> None:
+    runtime = matrix_services
     random = Random(20260726)
 
     for size in range(1, 5):
@@ -280,7 +333,10 @@ def test_matrix_determinant_matches_independent_bounded_oracle(
             )
 
 
-def test_matrix_capabilities_report_sympy_provider_identity(runtime) -> None:
+def test_matrix_capabilities_report_sympy_provider_identity(
+    matrix_services: _MatrixRuntime,
+) -> None:
+    runtime = matrix_services
     descriptors = {
         descriptor.capability_id: descriptor
         for descriptor in runtime.core.capabilities.catalog().capabilities

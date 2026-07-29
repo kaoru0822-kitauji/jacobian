@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import os
 import shutil
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import pytest
 from tests.helpers.capabilities import invoke_capability as _invoke
+from tests.helpers.domain_installation import open_domain_test_services
 from tests.helpers.rationals import rational_payload as _q
 
 import jacobian.provider_runtime as provider_runtime
@@ -22,12 +26,11 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.flint_linear import install_python_flint_linear_capability
 from jacobian.linear_capabilities import install_linear_rational_solution_checker
 from jacobian.provider_runtime import PYTHON_FLINT_VERSION
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
-from jacobian.runtime.model import JacobianRuntime
-
-pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
+from jacobian.runtime.services import CoreServices
 
 
 def _system(
@@ -46,28 +49,63 @@ def _system(
     }
 
 
-def _runtime_with_linear_checker(root: Path) -> JacobianRuntime:
-    runtime = create_runtime(root)
-    adapter, _installation = install_linear_rational_solution_checker(
-        runtime.core.store,
-        runtime.core.schemas,
-        runtime.core.artifacts,
-        runtime.core.linear,
-        runtime.services.verification,
-        runtime.core.checkers,
-        authorize_checker=True,
+@dataclass(frozen=True, slots=True)
+class _LinearRuntime:
+    core: CoreServices
+    provider_runtime: CapabilityProviderRuntime
+
+
+@contextmanager
+def _open_linear_runtime(
+    root: Path,
+    *,
+    install_checker: bool,
+) -> Iterator[_LinearRuntime]:
+    authority = (
+        CheckerAuthorityMode.INSTALL_BUNDLED
+        if install_checker
+        else CheckerAuthorityMode.NONE
     )
-    assert adapter is not None
-    runtime.core.capabilities.register(adapter)
-    return runtime
+    with open_domain_test_services(root, checker_authority=authority) as services:
+        runtime = provider_runtime.python_flint_provider_runtime()
+        producer = install_python_flint_linear_capability(
+            services.core.linear,
+            runtime,
+        )
+        services.installation.register_capability(producer)
+        if install_checker:
+            adapter, _installation = install_linear_rational_solution_checker(
+                services.core.store,
+                services.core.schemas,
+                services.core.artifacts,
+                services.core.linear,
+                services.installation.verification,
+                services.core.checkers,
+                authorize_checker=True,
+            )
+            assert adapter is not None
+            services.installation.register_capability(adapter)
+        yield _LinearRuntime(core=services.core, provider_runtime=runtime)
+
+
+@pytest.fixture
+def linear_services(tmp_path: Path) -> Iterator[_LinearRuntime]:
+    with _open_linear_runtime(tmp_path, install_checker=False) as services:
+        yield services
+
+
+@pytest.fixture
+def linear_checker_services(tmp_path: Path) -> Iterator[_LinearRuntime]:
+    with _open_linear_runtime(tmp_path, install_checker=True) as services:
+        yield services
 
 
 def test_python_flint_find_returns_one_exact_unverified_solution(
-    tmp_path: Path,
+    linear_services: _LinearRuntime,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = linear_services
     assert (
-        runtime.portfolio.python_flint_runtime.availability
+        runtime.provider_runtime.availability
         is CapabilityProviderAvailability.AVAILABLE
     )
     result = _invoke(
@@ -93,11 +131,8 @@ def test_python_flint_find_returns_one_exact_unverified_solution(
     assert result.output["system_uri"] in resolved.artifact.manifest.parents
 
 
-def test_python_flint_runtime_is_exact_optional_distribution_identity(
-    tmp_path: Path,
-) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime = runtime.portfolio.python_flint_runtime
+def test_python_flint_runtime_is_exact_optional_distribution_identity() -> None:
+    runtime = provider_runtime.python_flint_provider_runtime()
 
     assert runtime.version == PYTHON_FLINT_VERSION
     assert runtime.install_tier is CapabilityInstallTier.T1
@@ -150,7 +185,7 @@ def test_verifier_authorization_is_separate_from_provider_availability(
         diagnostic="optional provider unavailable for test",
     )
     monkeypatch.setattr(
-        "jacobian.portfolio.assembler.python_flint_provider_runtime",
+        "jacobian.portfolio.provider_resolution.python_flint_provider_runtime",
         lambda: unavailable,
     )
 
@@ -158,29 +193,30 @@ def test_verifier_authorization_is_separate_from_provider_availability(
     authorized_root = tmp_path / "authorized"
     shutil.copytree(runtime_store_template, default_root)
     shutil.copytree(runtime_store_template, authorized_root)
-    default = create_runtime(default_root)
-    default_ids = {
-        descriptor.capability_id
-        for descriptor in default.core.capabilities.catalog().capabilities
-    }
+    with create_runtime(default_root) as default:
+        default_ids = {
+            descriptor.capability_id
+            for descriptor in default.core.capabilities.catalog().capabilities
+        }
     assert "linear.rational_solution.find" not in default_ids
     assert "linear.rational_solution.verify" not in default_ids
 
-    authorized = create_runtime(
-        authorized_root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    )
-    authorized_ids = {
-        descriptor.capability_id
-        for descriptor in authorized.core.capabilities.catalog().capabilities
-    }
+    with create_runtime(
+        authorized_root,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+    ) as authorized:
+        authorized_ids = {
+            descriptor.capability_id
+            for descriptor in authorized.core.capabilities.catalog().capabilities
+        }
     assert "linear.rational_solution.find" not in authorized_ids
     assert "linear.rational_solution.verify" in authorized_ids
 
 
 def test_python_flint_find_handles_underdetermined_system_deterministically(
-    tmp_path: Path,
+    linear_services: _LinearRuntime,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = linear_services
     result = _invoke(
         runtime,
         "linear.rational_solution.find",
@@ -195,8 +231,10 @@ def test_python_flint_find_handles_underdetermined_system_deterministically(
     assert result.output["solution"] == [_q(5, 3), _q(4, 3), _q(0)]
 
 
-def test_not_found_is_not_an_inconsistency_conclusion(tmp_path: Path) -> None:
-    runtime = create_runtime(tmp_path)
+def test_not_found_is_not_an_inconsistency_conclusion(
+    linear_services: _LinearRuntime,
+) -> None:
+    runtime = linear_services
     result = _invoke(
         runtime,
         "linear.rational_solution.find",
@@ -216,9 +254,9 @@ def test_not_found_is_not_an_inconsistency_conclusion(tmp_path: Path) -> None:
 
 
 def test_independent_checker_verifies_and_rejects_bound_solutions(
-    tmp_path: Path,
+    linear_checker_services: _LinearRuntime,
 ) -> None:
-    runtime = _runtime_with_linear_checker(tmp_path)
+    runtime = linear_checker_services
     found = _invoke(
         runtime,
         "linear.rational_solution.find",
@@ -242,7 +280,7 @@ def test_independent_checker_verifies_and_rejects_bound_solutions(
     wrong = runtime.core.linear.put_solution(
         system_uri=found.output["system_uri"],
         values=(_q(0), _q(0)),
-        producer=runtime.portfolio.python_flint_runtime,
+        producer=runtime.provider_runtime,
         resource_budget={"wall_seconds": 5},
     )
     rejected = _invoke(
@@ -257,10 +295,10 @@ def test_independent_checker_verifies_and_rejects_bound_solutions(
 
 
 def test_python_flint_timeout_is_operational_not_mathematical(
-    tmp_path: Path,
+    linear_services: _LinearRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = linear_services
     monkeypatch.setattr(
         "jacobian.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -289,9 +327,10 @@ def test_python_flint_timeout_is_operational_not_mathematical(
 
 
 def test_python_flint_worker_gets_only_fixed_environment_and_exact_budget(
-    tmp_path: Path,
+    linear_services: _LinearRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    runtime = linear_services
     monkeypatch.setenv("JACOBIAN_LINEAR_SECRET", "must-not-propagate")
     observed: dict[str, Any] = {}
 
@@ -317,7 +356,6 @@ def test_python_flint_worker_gets_only_fixed_environment_and_exact_budget(
             timed_out=False,
         )
 
-    runtime = create_runtime(tmp_path)
     monkeypatch.setattr("jacobian.flint_linear.run_bounded_process", fake_worker)
     result = _invoke(
         runtime,
@@ -342,11 +380,11 @@ def test_python_flint_worker_gets_only_fixed_environment_and_exact_budget(
 
 
 def test_python_flint_discards_output_if_runtime_identity_changes(
-    tmp_path: Path,
+    linear_services: _LinearRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = create_runtime(tmp_path)
-    original_runtime = runtime.portfolio.python_flint_runtime
+    runtime = linear_services
+    original_runtime = runtime.provider_runtime
     changed_runtime = original_runtime.model_copy(
         update={"digest": "sha256:" + "f" * 64}
     )
@@ -392,10 +430,10 @@ def test_python_flint_discards_output_if_runtime_identity_changes(
 
 
 def test_invalid_worker_protocol_fails_without_solution_evidence(
-    tmp_path: Path,
+    linear_services: _LinearRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = linear_services
     monkeypatch.setattr(
         "jacobian.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -421,10 +459,10 @@ def test_invalid_worker_protocol_fails_without_solution_evidence(
 
 
 def test_linear_checker_timeout_is_operational_not_mathematical(
-    tmp_path: Path,
+    linear_checker_services: _LinearRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = _runtime_with_linear_checker(tmp_path)
+    runtime = linear_checker_services
     found = _invoke(
         runtime,
         "linear.rational_solution.find",

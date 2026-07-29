@@ -149,7 +149,7 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
         diagnostic="The pinned Lean runtime is unavailable.",
     )
     monkeypatch.setattr(
-        "jacobian.portfolio.assembler.lean_provider_runtime",
+        "jacobian.portfolio.provider_resolution.lean_provider_runtime",
         lambda **_kwargs: unavailable,
     )
 

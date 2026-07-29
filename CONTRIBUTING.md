@@ -30,7 +30,10 @@ excludes tests explicitly marked `slow`. `make test-unit-fast` is the smaller
 unit-only lane used by the pre-push `make check`; contract, checker, and
 reference tests remain available through their focused targets and CI. `make
 test-core` runs the same core directories with default xdist parallelism and
-includes `slow` cases; CI's core lane uses that target. Run `make check` before
+includes `slow` cases; CI's core lane uses that target. Outside CI, `make test`
+and `make test-integration` require `TESTS=<file-or-node>` so their
+innocent-looking names cannot accidentally start the exhaustive integration
+lane. Run `make check` before
 pushing; it performs fast Ruff, strict typing, and `test-unit-fast`. Push after
 that check and let CI own
 path-planned validation: static analysis, package builds, planned Python lanes,
@@ -47,8 +50,8 @@ measured costs and reasoning behind these lanes are recorded in the
 Tests can be narrowed without learning another wrapper:
 
 ```sh
-make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
-make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
+make test-integration TESTS=tests/integration/infrastructure/test_mcp_adapter.py
+make test-integration TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
 make test-contracts
 make test-checkers
 make test-subprocess
@@ -79,7 +82,11 @@ source-build failure from `uv sync --dev`.
 Use focused tests while implementing. Run `make check` before pushing and wait
 for green CI checks before merge. Run broad local validation only when changing
 CI itself, debugging an environment-specific failure, or when CI is
-unavailable; use `make validate-full` for that exceptional path and rely on CI
+unavailable. `make test-integration-all` and `make validate-full` are explicit
+exception paths, not routine confidence gates. Before either, verify that no
+other pytest or delegated-agent validation is running on the host. Never assign
+an exhaustive suite to a parallel agent sharing the checkout. Use
+`make validate-full` for the exceptional path and rely on CI
 for its additional lanes. Report only checks that actually ran. The manually
 dispatched Python Debug and Lean Debug workflows reproduce one pytest file or
 node in a prepared remote environment when the relevant local runtime is
@@ -104,7 +111,15 @@ shard timings. Timing history is not committed, and missing or invalid history
 falls back to equal-weight sharding.
 
 Use `make test-plan BASE=<revision>` to preview the same changed-path routing
-before validation:
+before validation. For an added or modified leaf Python module, the planner
+selects test files that directly import that module when no production module
+imports it. Changes to test files select those files directly. Maintained
+non-Python mappings may be declared in `.github/local-test-ownership.json`;
+selectors there may be pytest files or nodes. This narrowing is deliberately
+conservative: deletes, renames, untracked files, transitive production imports,
+shared infrastructure, unknown paths, invalid manifests, and import parse
+failures retain the owning suite commands. The focused selection is an edit-loop
+aid; `make check` and CI remain the handoff gates.
 
 | Change | Local handoff | CI adds |
 | --- | --- | --- |

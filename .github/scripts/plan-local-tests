@@ -4,16 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import ast
+import fnmatch
+import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[2]
 CLASSIFIER = ROOT / ".github" / "scripts" / "classify-ci-paths"
+OWNERSHIP = ROOT / ".github" / "local-test-ownership.json"
 
 COMMANDS = {
     "core": "make test-core",
-    "integration": "make test-integration",
+    "integration": "make test-integration-all",
     "lean": "make test-lean",
     "npm": "make npm-test",
     "static": "make check-static",
@@ -22,6 +28,18 @@ COMMANDS = {
     "duplicate": "make duplicate-code",
     "docs": "make docs-linkcheck",
 }
+
+HIGH_IMPACT_PATHS = {
+    "src/jacobian/__init__.py",
+    "tests/conftest.py",
+    "pyproject.toml",
+    "uv.lock",
+}
+
+
+class Change(NamedTuple):
+    status: str
+    path: str
 
 
 def git_paths(*args: str) -> list[str]:
@@ -35,20 +53,232 @@ def git_paths(*args: str) -> list[str]:
     return [path for path in result.stdout.splitlines() if path]
 
 
-def changed_paths(base: str) -> list[str]:
+def git_changes(*args: str) -> list[Change]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    changes: list[Change] = []
+    for line in result.stdout.splitlines():
+        status, *paths = line.split("\t")
+        if not paths:
+            continue
+        # A rename/copy has two paths. Retain both and its non-exact status so
+        # focused selection fails closed even when only one side still exists.
+        changes.extend(Change(status[0], path) for path in paths)
+    return changes
+
+
+def changed_entries(base: str) -> list[Change]:
     subprocess.run(
         ["git", "rev-parse", "--verify", f"{base}^{{commit}}"],
         cwd=ROOT,
         check=True,
         capture_output=True,
     )
-    paths = {
-        *git_paths("diff", "--name-only", f"{base}..HEAD"),
-        *git_paths("diff", "--name-only"),
-        *git_paths("diff", "--cached", "--name-only"),
-        *git_paths("ls-files", "--others", "--exclude-standard"),
+    entries = {
+        *git_changes("diff", "--name-status", f"{base}..HEAD"),
+        *git_changes("diff", "--name-status"),
+        *git_changes("diff", "--cached", "--name-status"),
+        *(
+            Change("?", path)
+            for path in git_paths("ls-files", "--others", "--exclude-standard")
+        ),
     }
-    return sorted(paths)
+    return sorted(entries, key=lambda entry: (entry.path, entry.status))
+
+
+def source_module(path: str) -> str | None:
+    source = Path(path)
+    try:
+        relative = source.relative_to("src")
+    except ValueError:
+        return None
+    if relative.suffix != ".py":
+        return None
+    parts = list(relative.with_suffix("").parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(parts)
+
+
+def imports(path: Path) -> set[str] | None:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, SyntaxError, UnicodeError):
+        return None
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module
+            if node.level:
+                try:
+                    relative = path.relative_to(ROOT / "src")
+                except ValueError:
+                    continue
+                module_parts = list(relative.with_suffix("").parts)
+                package_parts = (
+                    module_parts
+                    if module_parts[-1] == "__init__"
+                    else module_parts[:-1]
+                )
+                drop = node.level - 1
+                if drop > len(package_parts):
+                    return None
+                resolved = package_parts[: len(package_parts) - drop]
+                if module:
+                    resolved.extend(module.split("."))
+                module = ".".join(resolved)
+            if module:
+                imported.add(module)
+                imported.update(
+                    f"{module}.{alias.name}"
+                    for alias in node.names
+                    if alias.name != "*"
+                )
+    return imported
+
+
+def directly_imports(imported: set[str], module: str) -> bool:
+    return any(
+        imported_module == module or imported_module.startswith(f"{module}.")
+        for imported_module in imported
+    )
+
+
+def test_files() -> list[Path]:
+    return sorted((ROOT / "tests").rglob("test_*.py"))
+
+
+def source_files() -> list[Path]:
+    return sorted((ROOT / "src").rglob("*.py"))
+
+
+def ownership_overrides() -> dict[str, list[str]] | None:
+    try:
+        data = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
+        mappings = data["overrides"]
+        if (
+            data.get("version") != 1
+            or not isinstance(mappings, dict)
+            or not all(
+                isinstance(pattern, str)
+                and isinstance(nodes, list)
+                and nodes
+                and all(isinstance(node, str) for node in nodes)
+                for pattern, nodes in mappings.items()
+            )
+        ):
+            return None
+        return mappings
+    except FileNotFoundError:
+        return {}
+    except (KeyError, OSError, TypeError, ValueError):
+        return None
+
+
+def exact_tests(entries: list[Change]) -> tuple[list[str], str | None]:
+    """Return focused pytest selectors, or a reason selection is ambiguous."""
+    if not entries:
+        return [], None
+    overrides = ownership_overrides()
+    if overrides is None:
+        return [], ".github/local-test-ownership.json: invalid manifest"
+    selected: set[str] = set()
+    parsed_tests: dict[Path, set[str]] = {}
+    parsed_sources: dict[Path, set[str]] = {}
+
+    for entry in entries:
+        path = entry.path
+        if entry.status not in {"A", "M"}:
+            return [], f"{path}: {entry.status} changes are not exact"
+        if (
+            path in HIGH_IMPACT_PATHS
+            or path.startswith(".github/")
+            or path.endswith("/conftest.py")
+        ):
+            return [], f"{path}: shared infrastructure has broad impact"
+
+        override_nodes = {
+            node
+            for pattern, nodes in overrides.items()
+            if fnmatch.fnmatchcase(path, pattern)
+            for node in nodes
+        }
+        if override_nodes:
+            if any(
+                not node.startswith("tests/")
+                or not (ROOT / node.split("::", 1)[0]).is_file()
+                for node in override_nodes
+            ):
+                return [], f"{path}: ownership override is not a test selector"
+            selected.update(override_nodes)
+            continue
+
+        if path.startswith("tests/") and path.endswith(".py"):
+            if Path(path).name.startswith("test_"):
+                selected.add(path)
+                continue
+            return [], f"{path}: test support code has broad impact"
+
+        module = source_module(path)
+        if module is None:
+            return [], f"{path}: no exact Python ownership evidence"
+
+        source_path = ROOT / path
+        if not source_path.is_file():
+            return [], f"{path}: source is unavailable"
+
+        for candidate in source_files():
+            if candidate == source_path:
+                continue
+            imported = parsed_sources.get(candidate)
+            if imported is None:
+                imported = imports(candidate)
+                if imported is None:
+                    return [], f"{candidate.relative_to(ROOT)}: import scan failed"
+                parsed_sources[candidate] = imported
+            if directly_imports(imported, module):
+                return [], (
+                    f"{path}: imported by {candidate.relative_to(ROOT)}; "
+                    "transitive impact is ambiguous"
+                )
+
+        direct = set()
+        for candidate in test_files():
+            imported = parsed_tests.get(candidate)
+            if imported is None:
+                imported = imports(candidate)
+                if imported is None:
+                    return [], f"{candidate.relative_to(ROOT)}: import scan failed"
+                parsed_tests[candidate] = imported
+            if directly_imports(imported, module):
+                direct.add(candidate.relative_to(ROOT).as_posix())
+        if not direct:
+            return [], f"{path}: no direct importing tests"
+        selected.update(direct)
+
+    return sorted(selected), None
+
+
+def focused_commands(tests: list[str]) -> list[str]:
+    lean = [
+        test
+        for test in tests
+        if "lean_runtime" in (ROOT / test.split("::", 1)[0]).read_text(encoding="utf-8")
+    ]
+    ordinary = [test for test in tests if test not in lean]
+    commands = []
+    if ordinary:
+        commands.append(f"make test TESTS={shlex.quote(' '.join(ordinary))}")
+    if lean:
+        commands.append(f"make test-lean TESTS={shlex.quote(' '.join(lean))}")
+    return commands
 
 
 def classify(paths: list[str]) -> dict[str, str]:
@@ -70,11 +300,13 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        paths = changed_paths(args.base)
+        entries = changed_entries(args.base)
     except subprocess.CalledProcessError:
         parser.error(f"base is not a commit: {args.base}")
+    paths = sorted({entry.path for entry in entries})
     plan = classify(paths)
     lanes = [suite for suite in COMMANDS if plan.get(f"run-{suite}") == "true"]
+    tests, fallback = exact_tests(entries)
 
     print(f"base: {args.base}")
     print(f"classification: {plan['classification']}")
@@ -84,8 +316,22 @@ def main() -> None:
     print("lanes:")
     for lane in lanes:
         print(f"  {lane}")
+    print("selection:")
+    if tests:
+        print("  focused")
+        for test in tests:
+            print(f"  {test}")
+    elif fallback:
+        print(f"  suite fallback ({fallback})")
+    else:
+        print("  none")
     print("commands:")
+    focused_lanes = {"core", "integration", "lean"} if tests else set()
+    for command in focused_commands(tests):
+        print(f"  {command}")
     for lane in lanes:
+        if lane in focused_lanes:
+            continue
         print(f"  {COMMANDS[lane]}")
 
 

@@ -20,7 +20,16 @@ PYTEST_CORE_XDIST_ARGS := -n auto --maxprocesses=4 --dist=loadgroup
 # memory contention while retaining useful parallel feedback.
 PYTEST_SUBPROCESS_XDIST_ARGS := -n auto --maxprocesses=2 --dist=worksteal
 
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-plan validation-receipt test-fast test-unit-fast test-subprocess test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-plan validation-receipt test-fast test-unit-fast test-subprocess test-core test-integration test-integration-all test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck deploy-check
+
+define require_test_scope
+	@if [ -z "$(strip $(TESTS))" ] && [ -z "$(CI)" ] && [ "$(EXHAUSTIVE)" != "1" ]; then \
+		echo "Refusing an exhaustive local test run." >&2; \
+		echo "Use TESTS=<file-or-node> while iterating; CI owns the exhaustive lane." >&2; \
+		echo "For an intentional local exception, use $(1)." >&2; \
+		exit 2; \
+	fi
+endef
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -54,7 +63,8 @@ security-audit: ## Audit dependencies for known vulnerabilities.
 typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
 
-test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
+test: ## Run selected tests; exhaustive execution requires CI or EXHAUSTIVE=1.
+	$(call require_test_scope,make validate-full)
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" $(TESTS) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-plan: ## Print local validation selected for BASE..HEAD and working changes.
@@ -78,9 +88,13 @@ test-core: ## Parallel core suites (same paths as test-fast, uses xdist by defau
 	$(UV_RUN) pytest $(PYTEST_CORE_XDIST_ARGS) -m "not lean_runtime" \
 		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
-test-integration: ## Run the directory-owned integration suites.
+test-integration: ## Run selected integration tests; TESTS is required locally.
+	$(call require_test_scope,make test-integration-all)
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
 		$(if $(TESTS),$(TESTS),$(INTEGRATION_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+
+test-integration-all: EXHAUSTIVE=1
+test-integration-all: test-integration ## Intentionally run all integration/end-to-end tests locally.
 
 test-contracts: ## Run contract tests.
 	$(UV_RUN) pytest -n 0 tests/contract $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
@@ -149,7 +163,8 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck todo-check build ## Run CI-owned static checks plus a local package build.
 
-validate-full: lint-full typecheck test test-lean build ## Run the broad local subset; CI also owns Python 3.13, coverage, security, duplicate, and npm.
+validate-full: EXHAUSTIVE=1
+validate-full: lint-full typecheck test test-lean build ## Intentionally run the broad local subset when CI is unavailable.
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

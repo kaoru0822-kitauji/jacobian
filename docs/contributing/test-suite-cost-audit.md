@@ -40,6 +40,31 @@ parallel targets retain `worksteal`. A global `loadscope` policy was rejected:
 it groups every module whether or not it shares expensive setup and produced
 worse balancing in a controlled run.
 
+## 2026-07-29 compatibility-lane decision
+
+The exhaustive `main` run
+[30453823340](https://github.com/morluto/jacobian/actions/runs/30453823340)
+at tree `e4b8fd2673bc7f404edc4c8489dd0f0e4d264071` measured the Python
+3.13 compatibility job at 8 minutes 29 seconds. Pytest accounted for 490.16
+seconds of that job; checkout and environment setup before pytest took about
+11 seconds. The JUnit report attributed 39.8 aggregate case-seconds to the 783
+core cases and 914.7 aggregate case-seconds to the 771 integration and
+end-to-end cases. Aggregate case time can exceed wall time because xdist runs
+cases concurrently.
+
+The same run's four Python 3.12 integration shards had a 1.10x max/min wall-time
+ratio. Nearby pull-request and post-merge runs measured 1.19x and 1.14x,
+respectively, so the duration-fed shard allocation was not the source of the
+critical span.
+
+Keep Python 3.13 compatibility as one exhaustive job. Splitting it into one core
+job and one integration job would duplicate checkout, environment setup, and
+artifact handling while leaving roughly 96 percent of the measured test work
+on the integration side; it would not materially shorten the critical span.
+Any future change must benchmark actual Python 3.13 integration sharding and
+report both critical-span improvement and added runner time before changing
+the workflow.
+
 ## Measured lanes
 
 | Lane | Selected tests | Observed wall time | Purpose |
@@ -190,6 +215,14 @@ module debugging on the same host at once. That contention recreates the
 pull-request wall-time problem the lane split exists to avoid: routine
 `make check`, exhaustive merge-queue validation, and scheduled
 stress/performance work must remain separate executions.
+
+The Make interface enforces that boundary: outside CI, `make test` and
+`make test-integration` require an explicit `TESTS=<file-or-node>` selection.
+`make test-integration-all` and `make validate-full` are deliberately named
+escape hatches for CI outages and environment-specific reproduction. Before
+using either, inspect the host for existing pytest processes; delegated broad
+runs contend for CPU, SQLite locks, durable filesystem operations, and
+subprocess capacity, producing misleading 30- and 60-second timeout failures.
 
 Portfolio smoke that constructs a full runtime lives under
 `tests/integration/` rather than `tests/unit/`, so `make test-fast` stays free

@@ -53,7 +53,7 @@ def _runtime_with_fake(
 ) -> JacobianRuntime:
     unavailable = cadical_provider_runtime(tmp_path / "not-installed")
     monkeypatch.setattr(
-        "jacobian.portfolio.assembler.cadical_provider_runtime",
+        "jacobian.portfolio.provider_resolution.cadical_provider_runtime",
         lambda *_args, **_kwargs: unavailable,
     )
     runtime = create_runtime(

@@ -37,9 +37,9 @@ from jacobian.operations import (
 )
 from jacobian.portfolio import (
     PROVIDER_UNAVAILABLE,
-    PortfolioAssembler,
     PortfolioPlan,
 )
+from jacobian.portfolio.domain_installation import DomainBundleInstaller
 from jacobian.portfolio.result import (
     BundleInstallationStatus,
     PortfolioInstallationResult,
@@ -170,10 +170,10 @@ def assembly(tmp_path: Path) -> Iterator[_RecordingContext]:
 def test_install_domains_installs_every_available_bundle_and_registers_adapters(
     assembly: _RecordingContext,
 ) -> None:
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     plan = PortfolioPlan(domain_bundles=(_synthetic_bundle(domain_id="alpha"),))
 
-    result = assembler.install_domains(plan)
+    result = assembler.install(plan)
 
     assert isinstance(result, PortfolioInstallationResult)
     assert result.is_complete
@@ -195,7 +195,7 @@ def test_install_domains_installs_every_available_bundle_and_registers_adapters(
 def test_install_domains_preserves_declaration_order_across_bundles(
     assembly: _RecordingContext,
 ) -> None:
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     plan = PortfolioPlan(
         domain_bundles=(
             _synthetic_bundle(domain_id="alpha"),
@@ -203,7 +203,7 @@ def test_install_domains_preserves_declaration_order_across_bundles(
         )
     )
 
-    result = assembler.install_domains(plan)
+    result = assembler.install(plan)
 
     assert result.installed_domain_ids == ("alpha", "beta")
     assert [outcome.domain_id for outcome in result.outcomes] == ["alpha", "beta"]
@@ -213,7 +213,7 @@ def test_install_domains_preserves_declaration_order_across_bundles(
 def test_unavailable_provider_is_skipped_with_typed_diagnostic(
     assembly: _RecordingContext,
 ) -> None:
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     plan = PortfolioPlan(
         domain_bundles=(
             _synthetic_bundle(domain_id="alpha"),
@@ -224,7 +224,7 @@ def test_unavailable_provider_is_skipped_with_typed_diagnostic(
         )
     )
 
-    result = assembler.install_domains(plan)
+    result = assembler.install(plan)
 
     assert not result.is_complete
     assert set(result.installed) == {"alpha"}
@@ -252,7 +252,7 @@ def test_unavailable_provider_does_not_block_subsequent_bundles(
 ) -> None:
     """An unavailable optional provider removes only its own bundle."""
 
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     plan = PortfolioPlan(
         domain_bundles=(
             _synthetic_bundle(domain_id="alpha"),
@@ -264,7 +264,7 @@ def test_unavailable_provider_does_not_block_subsequent_bundles(
         )
     )
 
-    result = assembler.install_domains(plan)
+    result = assembler.install(plan)
 
     assert set(result.installed) == {"alpha", "gamma"}
     assert result.installed_domain_ids == ("alpha", "gamma")
@@ -278,12 +278,12 @@ def test_unavailable_provider_does_not_block_subsequent_bundles(
 def test_install_domains_validates_the_plan_before_installing(
     assembly: _RecordingContext,
 ) -> None:
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     bundle = _synthetic_bundle(domain_id="alpha")
     plan = PortfolioPlan(domain_bundles=(bundle, bundle))
 
     with pytest.raises(ValueError, match="duplicate domain bundles"):
-        assembler.install_domains(plan)
+        assembler.install(plan)
 
     # Nothing was installed because validation failed before the loop.
     assert assembly.registered == []
@@ -292,10 +292,10 @@ def test_install_domains_validates_the_plan_before_installing(
 def test_empty_plan_yields_complete_empty_result(
     assembly: _RecordingContext,
 ) -> None:
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     plan = PortfolioPlan(domain_bundles=())
 
-    result = assembler.install_domains(plan)
+    result = assembler.install(plan)
 
     assert result.is_complete
     assert result.installed == {}
@@ -308,10 +308,10 @@ def test_empty_plan_yields_complete_empty_result(
 def test_outcome_for_and_diagnostic_for_return_none_for_unknown_domains(
     assembly: _RecordingContext,
 ) -> None:
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     plan = PortfolioPlan(domain_bundles=(_synthetic_bundle(domain_id="alpha"),))
 
-    result = assembler.install_domains(plan)
+    result = assembler.install(plan)
 
     assert result.outcome_for("absent") is None
     assert result.diagnostic_for("absent") is None
@@ -327,7 +327,7 @@ def test_install_failure_propagates_without_silent_partial_portfolio(
     enclosing transaction rolls back the partial portfolio atomically.
     """
 
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     broken = _synthetic_bundle(domain_id="broken", capabilities=())
     plan = PortfolioPlan(
         domain_bundles=(
@@ -338,7 +338,7 @@ def test_install_failure_propagates_without_silent_partial_portfolio(
     )
 
     with pytest.raises(ValueError, match="must not be empty"):
-        assembler.install_domains(plan)
+        assembler.install(plan)
 
     # The earlier bundle's adapter registration happened in-memory only and the
     # caller is expected to roll back its enclosing transaction; the assembler
@@ -354,7 +354,7 @@ def test_duplicate_capability_id_within_a_bundle_propagates(
     The assembler must propagate that defect rather than recording a skip.
     """
 
-    assembler = PortfolioAssembler(assembly.context)
+    assembler = DomainBundleInstaller(assembly.context)
     base = _synthetic_bundle(domain_id="alpha")
     duplicate = replace(
         base.capabilities[0],
@@ -363,6 +363,6 @@ def test_duplicate_capability_id_within_a_bundle_propagates(
     bundle = replace(base, capabilities=(base.capabilities[0], duplicate))
 
     with pytest.raises(ValueError, match="duplicate capability ID"):
-        assembler.install_domains(PortfolioPlan(domain_bundles=(bundle,)))
+        assembler.install(PortfolioPlan(domain_bundles=(bundle,)))
 
     assert assembly.registered == []

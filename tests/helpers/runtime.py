@@ -25,12 +25,12 @@ class CapabilityTestServices:
 @contextmanager
 def open_capability_test_services(
     root: Path,
+    *,
+    checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.NONE,
 ) -> Iterator[CapabilityTestServices]:
     """Open a capability service graph without assembling the built-in portfolio."""
 
-    options = RuntimeOptions(
-        checker_authority=CheckerAuthorityMode.NONE,
-    )
+    options = RuntimeOptions(checker_authority=checker_authority)
     core = bootstrap_services(root, options)
     try:
         installation = InstallationContext(

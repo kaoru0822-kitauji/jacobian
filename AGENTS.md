@@ -156,8 +156,21 @@ Non-obvious caveats:
   unit-only pre-push test lane, and `make check` combines it with lint and
   typecheck. Never run bare `uv run pytest` across the whole
   suite — it mixes `lean_runtime` tests into the xdist pool and pytest rejects it;
-  use the `make test-*` targets instead. Parallel xdist is enabled by Make
-  targets (`test`, `test-core`, `test-integration`), not by global pytest addopts.
+  use a focused `make test-* TESTS=<file-or-node>` target instead. Outside CI,
+  `make test` and `make test-integration` reject an omitted `TESTS`; the explicit
+  `test-integration-all` and `validate-full` escape hatches are only for CI
+  outages or environment-specific reproduction.
+- Only the coordinating agent may start an exhaustive test lane. Never delegate
+  one to a parallel agent sharing the host. Before an exceptional broad run,
+  inspect active processes for pytest jobs from this checkout and stop or wait
+  for them; concurrent runtime/store/subprocess suites turn the 60-second test
+  timeout into a host-contention detector rather than useful failure evidence.
+- SQLite is one visible contention point, but not the sole cause: full-runtime
+  construction also performs durable filesystem publication, subprocess
+  startup, schema registration, and CPU-heavy capability setup. A timeout
+  observed in `PRAGMA`, `fsync`, `os.link`, or process startup under concurrent
+  suites must be reproduced with the owning focused test before it is treated
+  as a product defect.
 - Quick end-to-end smoke of the product surface: `uv run jacobian --state-dir .jacobian init`
   (CLI), or start the MCP server with
   `uv run jacobian-mcp --transport streamable-http --host 127.0.0.1 --port 8000 --allow-anonymous`
