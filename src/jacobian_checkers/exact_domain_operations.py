@@ -202,9 +202,9 @@ def _run(
         return _reject("malformed, unsupported, or mismatched checker request")
 
 
-def _prime_factorization(source: dict[str, Any], result: dict[str, Any]) -> bool:
-    if set(source) != {"value", "resource_budget"} or set(result) != {"factors"}:
-        return False
+def _factorization_value(source: dict[str, Any], *, positive: bool) -> int:
+    if set(source) != {"value", "resource_budget"}:
+        raise ValueError("factorization source is malformed")
     budget = source["resource_budget"]
     if (
         not isinstance(budget, dict)
@@ -212,38 +212,53 @@ def _prime_factorization(source: dict[str, Any], result: dict[str, Any]) -> bool
         or type(budget["wall_seconds"]) is not int
         or not 1 <= budget["wall_seconds"] <= 30
     ):
-        return False
+        raise ValueError("factorization budget is malformed")
     value = _integer(source["value"])
-    if value == 0:
-        return False
-    factors = result["factors"]
-    if not isinstance(factors, list) or len(factors) > 256:
-        return False
+    if (positive and value < 1) or (not positive and value == 0):
+        raise ValueError("factorization source is outside the operation domain")
+    return value
 
-    target = abs(value)
+
+def _factorization_witness(
+    target: int,
+    factors: object,
+) -> list[tuple[int, int]]:
+    if not isinstance(factors, list) or len(factors) > 256:
+        raise ValueError("factorization witness is malformed")
+
     product = 1
     parsed: list[tuple[int, int]] = []
     previous_prime = 1
     for factor in factors:
         if not isinstance(factor, dict) or set(factor) != {"prime", "power"}:
-            return False
+            raise ValueError("prime-power entry is malformed")
         prime = _integer(factor["prime"])
         power = factor["power"]
         if prime <= previous_prime or type(power) is not int or not 1 <= power <= 1_000:
-            return False
+            raise ValueError("prime-power entry is noncanonical")
         for _ in range(power):
             if product > target // prime:
-                return False
+                raise ValueError("prime-power product exceeds the source")
             product *= prime
         parsed.append((prime, power))
         previous_prime = prime
     if product != target:
-        return False
+        raise ValueError("prime-power product does not equal the source")
 
     replayed = [
         (int(prime), int(power)) for prime, power in flint.fmpz(target).factor()
     ]
-    return parsed == replayed
+    if parsed != replayed:
+        raise ValueError("factorization differs from Python-FLINT replay")
+    return parsed
+
+
+def _prime_factorization(source: dict[str, Any], result: dict[str, Any]) -> bool:
+    if set(result) != {"factors"}:
+        return False
+    value = _factorization_value(source, positive=False)
+    _factorization_witness(abs(value), result["factors"])
+    return True
 
 
 def check_integer_prime_factorization(
@@ -254,6 +269,39 @@ def check_integer_prime_factorization(
         operation_id="integer.compute.prime_factorization",
         witness_format="integer.prime-factorization.flint-replay",
         replay=_prime_factorization,
+    )
+
+
+def _powerful_number(source: dict[str, Any], result: dict[str, Any]) -> bool:
+    if set(result) != {
+        "semantics_version",
+        "is_powerful",
+        "factors",
+        "violating_primes",
+    }:
+        return False
+    if (
+        result["semantics_version"] != "powerful-number.prime-exponents-at-least-two.v1"
+        or type(result["is_powerful"]) is not bool
+    ):
+        return False
+
+    value = _factorization_value(source, positive=True)
+    factors = _factorization_witness(value, result["factors"])
+    expected_violations = [str(prime) for prime, power in factors if power < 2]
+    expected_is_powerful = not expected_violations
+    return (
+        result["violating_primes"] == expected_violations
+        and result["is_powerful"] is expected_is_powerful
+    )
+
+
+def check_integer_powerful_number(request: dict[str, Any]) -> dict[str, Any]:
+    return _run(
+        request,
+        operation_id="integer.decide.powerful",
+        witness_format="integer.powerful.flint-replay",
+        replay=_powerful_number,
     )
 
 
@@ -565,6 +613,7 @@ def check_matrix_smith_normal_form(request: dict[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
+    "check_integer_powerful_number",
     "check_integer_prime_factorization",
     "check_matrix_characteristic_polynomial",
     "check_matrix_nullspace",

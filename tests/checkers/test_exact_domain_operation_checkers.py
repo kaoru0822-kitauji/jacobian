@@ -13,6 +13,7 @@ from tests.helpers.rationals import rational_payload as _q
 
 import jacobian_checkers.exact_domain_operations as checker_module
 from jacobian_checkers.exact_domain_operations import (
+    check_integer_powerful_number,
     check_integer_prime_factorization,
     check_matrix_characteristic_polynomial,
     check_matrix_nullspace,
@@ -292,6 +293,28 @@ _CASES: tuple[
                     {"prime": "3", "power": 2},
                     {"prime": "5", "power": 1},
                 ]
+            },
+        ),
+    ),
+    (
+        check_integer_powerful_number,
+        _request(
+            "integer.decide.powerful",
+            "integer.powerful.flint-replay",
+            {
+                "value": "72",
+                "resource_budget": {"wall_seconds": 5},
+            },
+            {
+                "semantics_version": (
+                    "powerful-number.prime-exponents-at-least-two.v1"
+                ),
+                "is_powerful": True,
+                "factors": [
+                    {"prime": "2", "power": 3},
+                    {"prime": "3", "power": 2},
+                ],
+                "violating_primes": [],
             },
         ),
     ),
@@ -635,6 +658,137 @@ def test_prime_factorization_checker_rejects_zero_source() -> None:
     )
 
     assert check_integer_prime_factorization(checker_request)["accepted"] is False
+
+
+@pytest.mark.parametrize(
+    ("value", "result"),
+    (
+        (
+            "1",
+            {
+                "semantics_version": (
+                    "powerful-number.prime-exponents-at-least-two.v1"
+                ),
+                "is_powerful": True,
+                "factors": [],
+                "violating_primes": [],
+            },
+        ),
+        (
+            "72",
+            {
+                "semantics_version": (
+                    "powerful-number.prime-exponents-at-least-two.v1"
+                ),
+                "is_powerful": True,
+                "factors": [
+                    {"prime": "2", "power": 3},
+                    {"prime": "3", "power": 2},
+                ],
+                "violating_primes": [],
+            },
+        ),
+        (
+            "12",
+            {
+                "semantics_version": (
+                    "powerful-number.prime-exponents-at-least-two.v1"
+                ),
+                "is_powerful": False,
+                "factors": [
+                    {"prime": "2", "power": 2},
+                    {"prime": "3", "power": 1},
+                ],
+                "violating_primes": ["3"],
+            },
+        ),
+    ),
+)
+def test_powerful_number_checker_accepts_exact_decisions(
+    value: str,
+    result: dict[str, object],
+) -> None:
+    checker_request = _request(
+        "integer.decide.powerful",
+        "integer.powerful.flint-replay",
+        {"value": value, "resource_budget": {"wall_seconds": 5}},
+        result,
+    )
+
+    decision = check_integer_powerful_number(checker_request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda result: result.update(is_powerful=False),
+        lambda result: result["violating_primes"].append("2"),
+        lambda result: result["factors"].pop(),
+        lambda result: result.update(
+            is_powerful=False,
+            factors=[
+                {"prime": "2", "power": 1},
+                {"prime": "6", "power": 2},
+            ],
+            violating_primes=["2"],
+        ),
+        lambda result: result.update(semantics_version="powerful-number.v2"),
+        lambda result: result["factors"].reverse(),
+    ),
+    ids=(
+        "wrong-decision",
+        "wrong-violations",
+        "incomplete-factorization",
+        "composite-factor-base",
+        "wrong-semantics",
+        "noncanonical-factor-order",
+    ),
+)
+def test_powerful_number_checker_rejects_false_or_rebound_results(
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    checker_request = _request(
+        "integer.decide.powerful",
+        "integer.powerful.flint-replay",
+        {"value": "72", "resource_budget": {"wall_seconds": 5}},
+        {
+            "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+            "is_powerful": True,
+            "factors": [
+                {"prime": "2", "power": 3},
+                {"prime": "3", "power": 2},
+            ],
+            "violating_primes": [],
+        },
+    )
+    result = checker_request["candidate"]["payload"]
+    mutate(result)
+    checker_request["candidate"]["payload_digest"] = _digest(result)
+
+    decision = check_integer_powerful_number(checker_request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize("value", ("0", "-72"))
+def test_powerful_number_checker_rejects_nonpositive_source(value: str) -> None:
+    checker_request = _request(
+        "integer.decide.powerful",
+        "integer.powerful.flint-replay",
+        {"value": value, "resource_budget": {"wall_seconds": 5}},
+        {
+            "semantics_version": "powerful-number.prime-exponents-at-least-two.v1",
+            "is_powerful": True,
+            "factors": [],
+            "violating_primes": [],
+        },
+    )
+
+    assert check_integer_powerful_number(checker_request)["accepted"] is False
 
 
 @pytest.mark.parametrize(

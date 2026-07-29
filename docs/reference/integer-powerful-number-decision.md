@@ -43,8 +43,32 @@ A timeout, resource exhaustion, malformed worker response, cancellation, or
 worker error is a non-conclusion and never becomes `false`.
 
 Successful execution has `COMPLETE` completeness for the single input and
-`COMPUTED` assurance. The producer does not verify itself. An independent
-replay checker remains a separate implementation and authorization obligation.
+`COMPUTED` assurance. The producer does not verify itself.
+
+## Independent verification
+
+The operator-authorized `integer.powerful.verify` capability accepts the
+stored result URI and independently replays the exact claim with Python-FLINT.
+The checker imports neither SymPy nor the producer or worker modules. A
+successful replay creates a verification record and may promote that exact
+stored result to `VERIFIED`.
+
+The checker fails closed unless all of these obligations hold:
+
+| Obligation | Independent check |
+| --- | --- |
+| Artifact binding | Bind the exact input, result, semantics, schemas, lineage, witness envelope, and checker identity. |
+| Input domain | Require the canonical positive decimal and exact bounded producer-budget shape. |
+| Result fields | Require the exact semantics version, strict boolean, factor list, and violating-prime list. |
+| Complete factorization | Reconstruct the input product and compare every canonical prime power with Python-FLINT factorization. |
+| Predicate | Recompute whether every independently replayed exponent is at least two. |
+| Violations | Require exactly the ascending prime bases whose replayed exponent is below two. |
+| Runtime | Require the operator-authorized checker source and pinned Python-FLINT/FLINT runtime. |
+
+A malformed, substituted, incomplete, noncanonical, or mathematically false
+candidate is `REJECTED` with conclusion `UNKNOWN`; it is never converted into
+a contrary theorem. Checker unavailability, timeout, cancellation, or error is
+also non-conclusive.
 
 ## Public reproduction and limits
 

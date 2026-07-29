@@ -15,7 +15,10 @@ from jacobian.contracts.matrix_operations import (
     RationalMatrixRequest,
     SquareRationalMatrixRequest,
 )
-from jacobian.contracts.number_theory import FactorizationRequest
+from jacobian.contracts.number_theory import (
+    FactorizationRequest,
+    PowerfulNumberRequest,
+)
 from jacobian.contracts.polynomial_operations import (
     PolynomialDiscriminantRequest,
     PolynomialGcdRequest,
@@ -70,7 +73,10 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
         "graph.invariant.radius.compute",
         "graph.invariant.maximum_matching.compute",
     )
-    number_theory_ids = ("integer.compute.prime_factorization",)
+    number_theory_ids = (
+        "integer.compute.prime_factorization",
+        "integer.decide.powerful",
+    )
     projective_ids = ("geometry.projective_line_arrangement.flats.materialize",)
     registry = CheckerRegistry(tmp_path / "checkers.sqlite3")
 
@@ -107,7 +113,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
             character="8",
         ),
         number_theory=_installed(
-            (FactorizationRequest,),
+            (FactorizationRequest, PowerfulNumberRequest),
             number_theory_ids,
             character="6",
         ),
