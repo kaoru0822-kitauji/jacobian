@@ -14,6 +14,20 @@ from jacobian.kernel import JacobianKernel
 
 pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
 
+_MATHLIB_OLEAN = (
+    Path(__file__).resolve().parents[3]
+    / "lean"
+    / ".lake"
+    / "packages"
+    / "mathlib"
+    / ".lake"
+    / "build"
+    / "lib"
+    / "lean"
+    / "Mathlib.olean"
+)
+_LEAN_AVAILABLE = shutil.which("lean") is not None and _MATHLIB_OLEAN.is_file()
+
 
 def _feedback() -> dict[str, list[str]]:
     return {
@@ -28,7 +42,7 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
     tmp_path: Path,
 ) -> None:
     case = benchmark.load_cases(["GRAPH-ATLAS-PATH-001"])[0]
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
     searched = kernel.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
@@ -237,7 +251,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["PATH-CLOSURE-001"]) if case["case_id"])
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
     reference = kernel.references["graph_paths"]
     claim = _invoke(
         kernel,
@@ -373,7 +387,7 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["GRAPH-BIP-TRUE-001"]) if case["case_id"])
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
     reference = kernel.references["graph_paths"]
     claim = _invoke(
         kernel,
@@ -479,18 +493,19 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
 
 
 @pytest.mark.skipif(
-    shutil.which("lean") is None,
-    reason="Lean is not installed",
+    not _LEAN_AVAILABLE,
+    reason="the pinned Lean/Mathlib runtime is not installed",
 )
 def test_known_answer_scorer_accepts_bound_lean_certificate(
     tmp_path: Path,
+    initialized_kernel_store_with_references: None,
 ) -> None:
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(
         case for case in load_cases(["LEAN-NAT-INDUCTION-001"]) if case["case_id"]
     )
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
     assert kernel.lean is not None
     verified = kernel.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
@@ -534,7 +549,7 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["ERDOS-STRAUS-001"]) if case["case_id"])
-    kernel = JacobianKernel(tmp_path, install_references=True)
+    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
     reference = kernel.references["erdos_straus"]
     claim = _invoke(
         kernel,

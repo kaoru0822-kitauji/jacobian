@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -61,8 +62,13 @@ def _invoke(kernel: JacobianKernel, text: str, *, logic: str = "QF_UF"):
 
 
 @pytest.fixture(scope="module")
-def kernel(tmp_path_factory: pytest.TempPathFactory) -> JacobianKernel:
-    return JacobianKernel(tmp_path_factory.mktemp("cvc5-kernel"))
+def kernel(
+    tmp_path_factory: pytest.TempPathFactory,
+    kernel_store_template: Path,
+) -> JacobianKernel:
+    root = tmp_path_factory.mktemp("cvc5-kernel")
+    shutil.copytree(kernel_store_template, root, dirs_exist_ok=True)
+    return JacobianKernel(root)
 
 
 def test_pinned_cvc5_capability_is_discoverable(kernel: JacobianKernel) -> None:
@@ -271,6 +277,7 @@ def test_worker_timeout_fails_without_solver_conclusion(
 
 def test_missing_optional_cvc5_leaves_artifact_boundary_but_no_capability(
     tmp_path: Path,
+    initialized_kernel_store: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     unavailable = CapabilityProviderRuntime(

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from jacobian.artifacts import ArtifactService
@@ -288,9 +286,9 @@ def test_unique_domain_ids() -> None:
     assert len(domain_ids) == len(set(domain_ids)), f"duplicates: {domain_ids}"
 
 
-@pytest.fixture
-def service(tmp_path: Path) -> CapabilityService:
-    store = ArtifactStore(tmp_path)
+@pytest.fixture(scope="module")
+def service(tmp_path_factory: pytest.TempPathFactory) -> CapabilityService:
+    store = ArtifactStore(tmp_path_factory.mktemp("domain-bundles"))
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     service = CapabilityService(store, ResearchMemory(store, schemas))
