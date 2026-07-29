@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from pytest import MonkeyPatch
+from collections.abc import Iterator
+from pathlib import Path
+
+from pytest import MonkeyPatch, fixture
+from tests.helpers.domain_installation import (
+    DomainTestServices,
+    open_domain_test_services,
+)
 from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.bounded_process import BoundedProcessResult
@@ -17,10 +24,18 @@ from jacobian.contracts.matrix_operations import (
     SquareIntegerMatrixRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.domains.matrix_lattice.bundle import MATRIX_BUNDLE
 from jacobian.domains.matrix_lattice.capabilities import matrix_operation
 from jacobian.domains.matrix_lattice.lattice import reduce_lattice_basis
+from jacobian.domains.matrix_lattice.lattice_bundle import LATTICE_BUNDLE
 from jacobian.domains.matrix_lattice.operations import compute_smith_normal_form
 from jacobian.operations import ComputedSuccess, OperationExecutionFailure
+
+
+@fixture
+def matrix_domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
+    with open_domain_test_services(tmp_path, MATRIX_BUNDLE, LATTICE_BUNDLE) as services:
+        yield services
 
 
 def _qq(rows: list[list[int]]) -> dict[str, object]:
@@ -30,7 +45,10 @@ def _qq(rows: list[list[int]]) -> dict[str, object]:
     }
 
 
-def test_exact_matrix_domain_results_and_lineage(runtime) -> None:
+def test_exact_matrix_domain_results_and_lineage(
+    matrix_domain_services: DomainTestServices,
+) -> None:
+    runtime = matrix_domain_services
     cases = (
         (
             "matrix.inverse.compute",
@@ -143,8 +161,9 @@ def test_exact_matrix_domain_results_and_lineage(runtime) -> None:
 
 
 def test_invalid_matrix_request_fails_before_operation_artifacts(
-    runtime,
+    matrix_domain_services: DomainTestServices,
 ) -> None:
+    runtime = matrix_domain_services
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.characteristic_polynomial.compute",
@@ -157,7 +176,10 @@ def test_invalid_matrix_request_fails_before_operation_artifacts(
     assert result.artifact_uris == ()
 
 
-def test_singular_matrix_inverse_is_not_applicable(runtime) -> None:
+def test_singular_matrix_inverse_is_not_applicable(
+    matrix_domain_services: DomainTestServices,
+) -> None:
+    runtime = matrix_domain_services
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.inverse.compute",
@@ -176,8 +198,9 @@ def test_singular_matrix_inverse_is_not_applicable(runtime) -> None:
 
 
 def test_inverse_accepts_exact_growth_from_maximum_size_input(
-    runtime,
+    matrix_domain_services: DomainTestServices,
 ) -> None:
+    runtime = matrix_domain_services
     diagonal = "9" * 256
     determinant = str(int(diagonal) ** 2 - 1)
     result = runtime.core.capabilities.invoke(
@@ -274,7 +297,10 @@ def test_lll_worker_allows_result_growth_beyond_input_digit_limit() -> None:
     assert largest_output <= MAX_OUTPUT_SCALAR_DIGITS
 
 
-def test_lattice_lll_returns_exact_left_transformation(runtime) -> None:
+def test_lattice_lll_returns_exact_left_transformation(
+    matrix_domain_services: DomainTestServices,
+) -> None:
+    runtime = matrix_domain_services
     source = [[4, 1], [1, 3]]
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -314,9 +340,10 @@ def test_lattice_lll_returns_exact_left_transformation(runtime) -> None:
 
 
 def test_lattice_lll_timeout_retains_no_operation_artifacts(
-    runtime,
+    matrix_domain_services: DomainTestServices,
     monkeypatch: MonkeyPatch,
 ) -> None:
+    runtime = matrix_domain_services
     from jacobian.domains.matrix_lattice import lattice
 
     monkeypatch.setattr(

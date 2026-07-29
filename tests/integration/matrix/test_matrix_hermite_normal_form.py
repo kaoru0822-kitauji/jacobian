@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from tests.helpers.capabilities import invoke_capability as _invoke
+from tests.helpers.domain_installation import open_domain_test_services
 
 import jacobian.provider_runtime as provider_runtime
 from jacobian.bounded_process import BoundedProcessResult
@@ -16,38 +20,76 @@ from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
     CapabilityMode,
     CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.flint_hnf import install_python_flint_hnf_capability
 from jacobian.matrix_normal_form_capabilities import (
     install_matrix_normal_form_checker,
 )
-from jacobian.runtime import create_runtime
-from jacobian.runtime.model import JacobianRuntime
-
-pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
+from jacobian.runtime import CheckerAuthorityMode
+from jacobian.runtime.services import CoreServices
 
 
 def _matrix(entries: list[list[int | str]]) -> dict[str, Any]:
     return {"entries": [[str(value) for value in row] for row in entries]}
 
 
-def _runtime_with_checker(root: Path) -> JacobianRuntime:
-    runtime = create_runtime(root)
-    adapter, _installation = install_matrix_normal_form_checker(
-        runtime.core.store,
-        runtime.core.schemas,
-        runtime.core.artifacts,
-        runtime.core.matrix_normal_forms,
-        runtime.services.verification,
-        runtime.core.checkers,
-        authorize_checker=True,
+@dataclass(frozen=True, slots=True)
+class _HnfRuntime:
+    core: CoreServices
+    provider_runtime: CapabilityProviderRuntime
+
+
+@contextmanager
+def _open_hnf_runtime(
+    root: Path,
+    *,
+    install_checker: bool,
+) -> Iterator[_HnfRuntime]:
+    authority = (
+        CheckerAuthorityMode.INSTALL_BUNDLED
+        if install_checker
+        else CheckerAuthorityMode.NONE
     )
-    assert adapter is not None
-    runtime.core.capabilities.register(adapter)
-    return runtime
+    with open_domain_test_services(root, checker_authority=authority) as services:
+        runtime = provider_runtime.python_flint_hnf_provider_runtime()
+        producer = install_python_flint_hnf_capability(
+            services.core.matrix_normal_forms,
+            runtime,
+        )
+        services.installation.register_capability(producer)
+        if install_checker:
+            adapter, _installation = install_matrix_normal_form_checker(
+                services.core.store,
+                services.core.schemas,
+                services.core.artifacts,
+                services.core.matrix_normal_forms,
+                services.installation.verification,
+                services.core.checkers,
+                authorize_checker=True,
+            )
+            assert adapter is not None
+            services.installation.register_capability(adapter)
+        yield _HnfRuntime(core=services.core, provider_runtime=runtime)
 
 
-def test_python_flint_produces_bound_rectangular_row_hnf(runtime) -> None:
+@pytest.fixture
+def hnf_services(tmp_path: Path) -> Iterator[_HnfRuntime]:
+    with _open_hnf_runtime(tmp_path, install_checker=False) as services:
+        yield services
+
+
+@pytest.fixture
+def hnf_checker_services(tmp_path: Path) -> Iterator[_HnfRuntime]:
+    with _open_hnf_runtime(tmp_path, install_checker=True) as services:
+        yield services
+
+
+def test_python_flint_produces_bound_rectangular_row_hnf(
+    hnf_services: _HnfRuntime,
+) -> None:
+    runtime = hnf_services
     result = _invoke(
         runtime,
         "matrix.normal_form.hermite",
@@ -84,8 +126,8 @@ def test_python_flint_produces_bound_rectangular_row_hnf(runtime) -> None:
     assert result.output["matrix_uri"] in resolved.artifact.manifest.parents
 
 
-def test_hnf_runtime_has_a_distinct_exact_operation_profile(tmp_path: Path) -> None:
-    runtime = create_runtime(tmp_path).portfolio.python_flint_hnf_runtime
+def test_hnf_runtime_has_a_distinct_exact_operation_profile() -> None:
+    runtime = provider_runtime.python_flint_hnf_provider_runtime()
 
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.version == "0.9.0"
@@ -137,9 +179,10 @@ def test_hnf_runtime_rejects_a_different_linked_flint_version(
     ids=("noncanonical_integer", "ragged_rows", "digit_limit"),
 )
 def test_hnf_rejects_inputs_outside_the_exact_matrix_contract(
-    runtime,
+    hnf_services: _HnfRuntime,
     entries: list[list[str]],
 ) -> None:
+    runtime = hnf_services
 
     result = _invoke(
         runtime,
@@ -155,8 +198,10 @@ def test_hnf_rejects_inputs_outside_the_exact_matrix_contract(
     }
 
 
-def test_independent_checker_verifies_full_hnf_relation(tmp_path: Path) -> None:
-    runtime = _runtime_with_checker(tmp_path)
+def test_independent_checker_verifies_full_hnf_relation(
+    hnf_checker_services: _HnfRuntime,
+) -> None:
+    runtime = hnf_checker_services
     computed = _invoke(
         runtime,
         "matrix.normal_form.hermite",
@@ -199,12 +244,12 @@ def test_independent_checker_verifies_full_hnf_relation(tmp_path: Path) -> None:
     ids=("broken_relation", "nonunimodular_transform", "not_row_hnf"),
 )
 def test_checker_rejects_each_independent_hnf_obligation(
-    tmp_path: Path,
+    hnf_checker_services: _HnfRuntime,
     source: list[list[int]],
     normal_form: list[list[int]],
     transformation: list[list[int]],
 ) -> None:
-    runtime = _runtime_with_checker(tmp_path)
+    runtime = hnf_checker_services
     matrix_uri = runtime.core.matrix_normal_forms.put_matrix(
         _matrix(source)
     ).artifact_uri
@@ -212,7 +257,7 @@ def test_checker_rejects_each_independent_hnf_obligation(
         matrix_uri=matrix_uri,
         normal_form=[[str(value) for value in row] for row in normal_form],
         transformation=[[str(value) for value in row] for row in transformation],
-        producer=runtime.portfolio.python_flint_hnf_runtime,
+        producer=runtime.provider_runtime,
         resource_budget={"wall_seconds": 5},
     )
 
@@ -231,9 +276,10 @@ def test_checker_rejects_each_independent_hnf_obligation(
 
 
 def test_python_flint_hnf_timeout_is_operational(
-    runtime,
+    hnf_services: _HnfRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    runtime = hnf_services
     monkeypatch.setattr(
         "jacobian.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -261,9 +307,10 @@ def test_python_flint_hnf_timeout_is_operational(
 
 
 def test_hnf_worker_gets_only_fixed_environment_and_budget(
-    runtime,
+    hnf_services: _HnfRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    runtime = hnf_services
     monkeypatch.setenv("JACOBIAN_HNF_SECRET", "must-not-propagate")
     observed: dict[str, Any] = {}
 
@@ -315,10 +362,11 @@ def test_hnf_worker_gets_only_fixed_environment_and_budget(
 
 
 def test_hnf_output_is_discarded_if_runtime_identity_changes(
-    runtime,
+    hnf_services: _HnfRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    original = runtime.portfolio.python_flint_hnf_runtime
+    runtime = hnf_services
+    original = runtime.provider_runtime
     changed = original.model_copy(update={"digest": "sha256:" + "f" * 64})
     observations = iter((original, changed))
     monkeypatch.setattr(
@@ -361,9 +409,10 @@ def test_hnf_output_is_discarded_if_runtime_identity_changes(
 
 
 def test_invalid_worker_protocol_retains_no_hnf_evidence(
-    runtime,
+    hnf_services: _HnfRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    runtime = hnf_services
     monkeypatch.setattr(
         "jacobian.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
@@ -390,10 +439,10 @@ def test_invalid_worker_protocol_retains_no_hnf_evidence(
 
 
 def test_hnf_checker_timeout_is_operational(
-    tmp_path: Path,
+    hnf_checker_services: _HnfRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime = _runtime_with_checker(tmp_path)
+    runtime = hnf_checker_services
     computed = _invoke(
         runtime,
         "matrix.normal_form.hermite",

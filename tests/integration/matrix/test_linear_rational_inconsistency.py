@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import pytest
 from tests.helpers.capabilities import invoke_capability as _invoke
+from tests.helpers.domain_installation import open_domain_test_services
 from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.bounded_process import BoundedProcessResult
@@ -13,15 +17,16 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityMode,
     CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.flint_linear import install_python_flint_inconsistency_capability
 from jacobian.linear_capabilities import (
     install_linear_rational_inconsistency_checker,
 )
-from jacobian.runtime import create_runtime
-from jacobian.runtime.model import JacobianRuntime
-
-pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
+from jacobian.provider_runtime import python_flint_provider_runtime
+from jacobian.runtime import CheckerAuthorityMode
+from jacobian.runtime.services import CoreServices
 
 
 def _system(coefficients: list[list[int]], rhs: list[int]) -> dict[str, Any]:
@@ -34,27 +39,59 @@ def _system(coefficients: list[list[int]], rhs: list[int]) -> dict[str, Any]:
     }
 
 
-def _runtime_with_checker(root: Path) -> JacobianRuntime:
-    runtime = create_runtime(root)
-    adapter, _installation = install_linear_rational_inconsistency_checker(
-        runtime.core.store,
-        runtime.core.schemas,
-        runtime.core.artifacts,
-        runtime.core.linear,
-        runtime.services.verification,
-        runtime.core.checkers,
-        authorize_checker=True,
+@dataclass(frozen=True, slots=True)
+class _LinearRuntime:
+    core: CoreServices
+    provider_runtime: CapabilityProviderRuntime
+
+
+@contextmanager
+def _open_runtime(root: Path, *, install_checker: bool) -> Iterator[_LinearRuntime]:
+    authority = (
+        CheckerAuthorityMode.INSTALL_BUNDLED
+        if install_checker
+        else CheckerAuthorityMode.NONE
     )
-    assert adapter is not None
-    runtime.core.capabilities.register(adapter)
-    return runtime
+    with open_domain_test_services(root, checker_authority=authority) as services:
+        runtime = python_flint_provider_runtime()
+        producer = install_python_flint_inconsistency_capability(
+            services.core.linear,
+            runtime,
+        )
+        services.installation.register_capability(producer)
+        if install_checker:
+            adapter, _installation = install_linear_rational_inconsistency_checker(
+                services.core.store,
+                services.core.schemas,
+                services.core.artifacts,
+                services.core.linear,
+                services.installation.verification,
+                services.core.checkers,
+                authorize_checker=True,
+            )
+            assert adapter is not None
+            services.installation.register_capability(adapter)
+        yield _LinearRuntime(core=services.core, provider_runtime=runtime)
+
+
+@pytest.fixture
+def linear_services(tmp_path: Path) -> Iterator[_LinearRuntime]:
+    with _open_runtime(tmp_path, install_checker=False) as services:
+        yield services
+
+
+@pytest.fixture
+def linear_checker_services(tmp_path: Path) -> Iterator[_LinearRuntime]:
+    with _open_runtime(tmp_path, install_checker=True) as services:
+        yield services
 
 
 def test_python_flint_finds_normalized_unverified_inconsistency_witness(
-    runtime,
+    linear_services: _LinearRuntime,
 ) -> None:
+    runtime = linear_services
     assert (
-        runtime.portfolio.python_flint_runtime.availability
+        runtime.provider_runtime.availability
         is CapabilityProviderAvailability.AVAILABLE
     )
     result = _invoke(
@@ -87,7 +124,10 @@ def test_python_flint_finds_normalized_unverified_inconsistency_witness(
     assert result.output["system_uri"] in resolved.artifact.manifest.parents
 
 
-def test_no_certificate_is_not_a_consistency_conclusion(runtime) -> None:
+def test_no_certificate_is_not_a_consistency_conclusion(
+    linear_services: _LinearRuntime,
+) -> None:
+    runtime = linear_services
     result = _invoke(
         runtime,
         "linear.rational_inconsistency.find",
@@ -102,8 +142,10 @@ def test_no_certificate_is_not_a_consistency_conclusion(runtime) -> None:
     assert result.completeness.status is CapabilityCompletenessStatus.UNKNOWN
 
 
-def test_independent_checker_verifies_inconsistency(tmp_path: Path) -> None:
-    runtime = _runtime_with_checker(tmp_path)
+def test_independent_checker_verifies_inconsistency(
+    linear_checker_services: _LinearRuntime,
+) -> None:
+    runtime = linear_checker_services
     found = _invoke(
         runtime,
         "linear.rational_inconsistency.find",
@@ -125,9 +167,10 @@ def test_independent_checker_verifies_inconsistency(tmp_path: Path) -> None:
 
 
 def test_inconsistency_timeout_retains_no_certificate(
-    runtime,
+    linear_services: _LinearRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    runtime = linear_services
     monkeypatch.setattr(
         "jacobian.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(

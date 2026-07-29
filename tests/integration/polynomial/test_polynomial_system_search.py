@@ -1,11 +1,17 @@
 from pathlib import Path
 
-import pytest
+from tests.helpers.domain_installation import open_domain_test_services
 
-from jacobian.contracts.capabilities import CapabilityAssuranceLevel, CapabilityRequest
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
-
-pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityRequest,
+    CapabilityResult,
+)
+from jacobian.polynomial_system_capabilities import (
+    install_polynomial_system_capabilities,
+)
+from jacobian.polynomial_system_search import PolynomialSystemRationalSearchAdapter
+from jacobian.runtime import CheckerAuthorityMode
 
 
 def _request(constant: int) -> CapabilityRequest:
@@ -32,10 +38,41 @@ def _request(constant: int) -> CapabilityRequest:
     )
 
 
+def _invoke_search(
+    root: Path,
+    *,
+    checker_authority: CheckerAuthorityMode,
+    constant: int,
+) -> CapabilityResult:
+    with open_domain_test_services(
+        root,
+        checker_authority=checker_authority,
+    ) as services:
+        checker, installation = install_polynomial_system_capabilities(
+            services.core.store,
+            services.core.schemas,
+            services.core.artifacts,
+            services.installation.verification,
+            services.core.checkers,
+            authorize_checker=services.installation.authorizes_bundled_checkers,
+        )
+        if checker is not None:
+            services.installation.register_capability(checker)
+        services.installation.register_capability(
+            PolynomialSystemRationalSearchAdapter(
+                services.core.artifacts,
+                installation,
+            )
+        )
+        return services.core.capabilities.invoke(_request(constant))
+
+
 def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) -> None:
-    result = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    ).core.capabilities.invoke(_request(1))
+    result = _invoke_search(
+        tmp_path,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+        constant=1,
+    )
     assert result.output["found"] is True
     assert result.output["assignment"] == [{"num": "-1", "den": "1"}]
     assert result.output["examined_assignment_count"] == 1
@@ -45,7 +82,11 @@ def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) 
 def test_rational_solution_search_reports_completed_bounded_absence(
     tmp_path: Path,
 ) -> None:
-    result = create_runtime(tmp_path).core.capabilities.invoke(_request(2))
+    result = _invoke_search(
+        tmp_path,
+        checker_authority=CheckerAuthorityMode.NONE,
+        constant=2,
+    )
     assert result.output["found"] is False
     assert result.output["examined_assignment_count"] == 3
     assert result.output["grid_assignment_count"] == 3
