@@ -34,6 +34,7 @@ from jacobian.contracts.results import (
     ResultEnvelope,
     Verification,
 )
+from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
@@ -272,6 +273,16 @@ class FinitePartitionAdapter:
                 "additionalProperties": False,
             },
             tags=("cases", "finite", "coverage", "verification"),
+            invocation_examples=(
+                example(
+                    "singleton_partition",
+                    "Partition a singleton universe into one case.",
+                    {
+                        "universe": ["a"],
+                        "cases": [{"case_id": "all", "members": ["a"]}],
+                    },
+                ),
+            ),
         )
 
     @property
