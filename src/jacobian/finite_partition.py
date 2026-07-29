@@ -273,7 +273,16 @@ class FinitePartitionAdapter:
                 "additionalProperties": False,
             },
             tags=("cases", "finite", "coverage", "verification"),
-            invocation_examples=(example("singleton_partition", "Partition a singleton universe into one case.", {"universe": ["a"], "cases": [{"case_id": "all", "members": ["a"]}]}),),
+            invocation_examples=(
+                example(
+                    "singleton_partition",
+                    "Partition a singleton universe into one case.",
+                    {
+                        "universe": ["a"],
+                        "cases": [{"case_id": "all", "members": ["a"]}],
+                    },
+                ),
+            ),
         )
 
     @property
