@@ -45,6 +45,9 @@ DIVISIBILITY_CAPABILITIES = (
         compute_gcd,
         "number-theory",
         "divisibility",
+        invocation_examples=(
+            example("gcd_84_30", "Compute gcd(84, 30).", {"left": "84", "right": "30"}),
+        ),
     ),
     number_theory_operation(
         "integer.compute.lcm",
@@ -55,6 +58,9 @@ DIVISIBILITY_CAPABILITIES = (
         compute_lcm,
         "number-theory",
         "divisibility",
+        invocation_examples=(
+            example("lcm_12_18", "Compute lcm(12, 18).", {"left": "12", "right": "18"}),
+        ),
     ),
     number_theory_operation(
         "integer.compute.extended_gcd",
@@ -82,6 +88,13 @@ DIVISIBILITY_CAPABILITIES = (
         compute_valuation,
         "number-theory",
         "valuation",
+        invocation_examples=(
+            example(
+                "valuation_40_at_2",
+                "Compute the 2-adic valuation of 40.",
+                {"value": "40", "prime": "2"},
+            ),
+        ),
     ),
     number_theory_operation(
         "integer.compute.divisor_count",
@@ -92,6 +105,11 @@ DIVISIBILITY_CAPABILITIES = (
         compute_divisor_count,
         "number-theory",
         "divisibility",
+        invocation_examples=(
+            example(
+                "divisor_count_36", "Count the positive divisors of 36.", {"n": 36}
+            ),
+        ),
     ),
     number_theory_operation(
         "integer.compute.divisor_sum",
@@ -102,6 +120,9 @@ DIVISIBILITY_CAPABILITIES = (
         compute_divisor_sum,
         "number-theory",
         "divisibility",
+        invocation_examples=(
+            example("divisor_sum_12", "Sum the positive divisors of 12.", {"n": 12}),
+        ),
     ),
     number_theory_operation(
         "integer.compute.aliquot_sum",
@@ -112,6 +133,9 @@ DIVISIBILITY_CAPABILITIES = (
         compute_aliquot_sum,
         "number-theory",
         "divisibility",
+        invocation_examples=(
+            example("aliquot_sum_12", "Compute the aliquot sum of 12.", {"n": 12}),
+        ),
     ),
     number_theory_operation(
         "integer.decide.coprime",
@@ -122,6 +146,13 @@ DIVISIBILITY_CAPABILITIES = (
         decide_coprime,
         "number-theory",
         "predicate",
+        invocation_examples=(
+            example(
+                "coprime_14_25",
+                "Check whether 14 and 25 are coprime.",
+                {"left": "14", "right": "25"},
+            ),
+        ),
     ),
     number_theory_operation(
         "integer.decide.divides",
@@ -132,6 +163,13 @@ DIVISIBILITY_CAPABILITIES = (
         decide_divides,
         "number-theory",
         "predicate",
+        invocation_examples=(
+            example(
+                "divides_6_42",
+                "Check whether 6 divides 42.",
+                {"divisor": "6", "dividend": "42"},
+            ),
+        ),
     ),
     number_theory_operation(
         "integer.decide.even",
@@ -142,6 +180,9 @@ DIVISIBILITY_CAPABILITIES = (
         decide_even,
         "integer",
         "predicate",
+        invocation_examples=(
+            example("even_42", "Check whether 42 is even.", {"value": "42"}),
+        ),
     ),
     number_theory_operation(
         "integer.decide.odd",
@@ -152,6 +193,9 @@ DIVISIBILITY_CAPABILITIES = (
         decide_odd,
         "integer",
         "predicate",
+        invocation_examples=(
+            example("odd_41", "Check whether 41 is odd.", {"value": "41"}),
+        ),
     ),
     number_theory_operation(
         "integer.decide.square",
@@ -162,6 +206,9 @@ DIVISIBILITY_CAPABILITIES = (
         decide_square,
         "number-theory",
         "predicate",
+        invocation_examples=(
+            example("square_144", "Check whether 144 is a perfect square.", {"n": 144}),
+        ),
     ),
     number_theory_operation(
         "integer.decide.perfect",
@@ -172,6 +219,9 @@ DIVISIBILITY_CAPABILITIES = (
         decide_perfect,
         "number-theory",
         "predicate",
+        invocation_examples=(
+            example("perfect_28", "Check whether 28 is perfect.", {"n": 28}),
+        ),
     ),
     number_theory_operation(
         "integer.decide.abundant",
@@ -182,6 +232,9 @@ DIVISIBILITY_CAPABILITIES = (
         decide_abundant,
         "number-theory",
         "predicate",
+        invocation_examples=(
+            example("abundant_12", "Check whether 12 is abundant.", {"n": 12}),
+        ),
     ),
     number_theory_operation(
         "integer.decide.deficient",
@@ -192,5 +245,8 @@ DIVISIBILITY_CAPABILITIES = (
         decide_deficient,
         "number-theory",
         "predicate",
+        invocation_examples=(
+            example("deficient_10", "Check whether 10 is deficient.", {"n": 10}),
+        ),
     ),
 )

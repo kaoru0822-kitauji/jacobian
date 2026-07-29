@@ -53,6 +53,13 @@ MODULAR_CAPABILITIES = (
         compute_modular_inverse,
         "number-theory",
         "modular",
+        invocation_examples=(
+            example(
+                "inverse_3_mod_11",
+                "Compute the inverse of 3 modulo 11.",
+                {"value": "3", "modulus": 11},
+            ),
+        ),
     ),
     number_theory_operation(
         "modular.compute.multiplicative_order",
@@ -63,6 +70,13 @@ MODULAR_CAPABILITIES = (
         compute_multiplicative_order,
         "number-theory",
         "modular",
+        invocation_examples=(
+            example(
+                "multiplicative_order_2_mod_7",
+                "Compute the multiplicative order of 2 modulo 7.",
+                {"value": "2", "modulus": 7},
+            ),
+        ),
     ),
     number_theory_operation(
         "modular.enumerate.quadratic_residues",
