@@ -57,7 +57,7 @@ def render(payload: Any) -> str:
         "",
         "| Metric | Value |",
         "| --- | ---: |",
-        f"| Critical path (workflow elapsed) | {critical_minutes:.1f} min |",
+        f"| Critical span | {critical_minutes:.1f} min |",
         f"| Total runner time | {total_minutes:.1f} min |",
         f"| Longest job | {longest_name} ({longest_seconds / 60:.1f} min) |",
         f"| Completed jobs | {len(rows)} |",

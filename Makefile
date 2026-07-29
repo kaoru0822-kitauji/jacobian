@@ -3,6 +3,8 @@
 UV_RUN := uv run --locked
 PYTEST_ARGS ?=
 TESTS ?=
+COMMAND ?= make check
+RECEIPT ?= /tmp/jacobian-validation-receipt.json
 EVAL_ARGS ?=
 ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
@@ -18,7 +20,7 @@ PYTEST_CORE_XDIST_ARGS := -n auto --maxprocesses=4 --dist=loadgroup
 # memory contention while retaining useful parallel feedback.
 PYTEST_SUBPROCESS_XDIST_ARGS := -n auto --maxprocesses=2 --dist=worksteal
 
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-unit-fast test-subprocess test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-plan validation-receipt test-fast test-unit-fast test-subprocess test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -54,6 +56,13 @@ typecheck: ## Run strict static type checking.
 
 test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" $(TESTS) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+
+test-plan: ## Print local validation selected for BASE..HEAD and working changes.
+	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-plan BASE=origin/main)" >&2; exit 2; }
+	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"
+
+validation-receipt: ## Run COMMAND and bind its result to the exact working tree.
+	@$(UV_RUN) python .github/scripts/validation-receipt --output "$(RECEIPT)" -- $(COMMAND)
 
 test-fast: ## Sequential core edit loop (unit/contract/checkers/reference, no xdist).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" \

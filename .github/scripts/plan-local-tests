@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Print the CI lanes and local commands implied by repository changes."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+CLASSIFIER = ROOT / ".github" / "scripts" / "classify-ci-paths"
+
+COMMANDS = {
+    "core": "make test-core",
+    "integration": "make test-integration",
+    "lean": "make test-lean",
+    "npm": "make npm-test",
+    "static": "make check-static",
+    "build": "make build",
+    "security": "make security-audit",
+    "duplicate": "make duplicate-code",
+    "docs": "make docs-linkcheck",
+}
+
+
+def git_paths(*args: str) -> list[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return [path for path in result.stdout.splitlines() if path]
+
+
+def changed_paths(base: str) -> list[str]:
+    subprocess.run(
+        ["git", "rev-parse", "--verify", f"{base}^{{commit}}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    paths = {
+        *git_paths("diff", "--name-only", f"{base}..HEAD"),
+        *git_paths("diff", "--name-only"),
+        *git_paths("diff", "--cached", "--name-only"),
+        *git_paths("ls-files", "--others", "--exclude-standard"),
+    }
+    return sorted(paths)
+
+
+def classify(paths: list[str]) -> dict[str, str]:
+    if not paths:
+        return {"classification": "clean"}
+    result = subprocess.run(
+        [sys.executable, str(CLASSIFIER), "--", *paths],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return dict(line.split("=", 1) for line in result.stdout.splitlines())
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", required=True, help="Base commit or ref.")
+    args = parser.parse_args()
+
+    try:
+        paths = changed_paths(args.base)
+    except subprocess.CalledProcessError:
+        parser.error(f"base is not a commit: {args.base}")
+    plan = classify(paths)
+    lanes = [suite for suite in COMMANDS if plan.get(f"run-{suite}") == "true"]
+
+    print(f"base: {args.base}")
+    print(f"classification: {plan['classification']}")
+    print("paths:")
+    for path in paths:
+        print(f"  {path}")
+    print("lanes:")
+    for lane in lanes:
+        print(f"  {lane}")
+    print("commands:")
+    for lane in lanes:
+        print(f"  {COMMANDS[lane]}")
+
+
+if __name__ == "__main__":
+    main()

@@ -80,6 +80,12 @@ checker authorization out of plugins and search code.
 
 ## Repository Gotchas
 
+- Before final validation, use `make test-plan BASE=<revision>`, freeze the exact
+  tree, and run the selected gate through `make validation-receipt
+  COMMAND='<command>'` so the receipt is tied to its tree digest and HEAD SHA. In
+  a shared checkout, agents must own disjoint paths and must not switch
+  branches, stage, commit, clean, or rewrite shared files until their work is
+  integrated.
 - Jacobian is pre-stable. Release specifications capture supported snapshots;
   they do not order capability research.
 - Validate the complete Pydantic request model before computation or artifact

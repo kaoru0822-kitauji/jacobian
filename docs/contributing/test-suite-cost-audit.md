@@ -160,12 +160,14 @@ remote reproduction without rerunning unrelated matrices. On the measured
 host, the resulting `make check` completed 256 selected tests in 8.36 seconds.
 
 Source-to-suite impact is declared in `.github/ci-impact.json` and tested
-against tracked source files. Unknown paths still fail closed. Each CI run
-reports workflow elapsed time (the observable critical path), summed runner
-minutes, and its longest job, making both reviewer latency and compute growth
-visible. Scheduled lanes exercise repeated property tests, alternate orders,
-optional providers, and the core performance benchmark outside the
-pull-request critical path.
+against tracked source files. Unknown paths still fail closed. Each measured CI
+run reports its critical span, summed runner minutes, and longest job, making
+both reviewer latency and compute growth visible. The critical span is the
+interval from the earliest reported job start to the latest reported job end;
+it is not a dependency-graph reconstruction or the full workflow elapsed time.
+Scheduled lanes exercise repeated property tests, alternate orders, optional
+providers, and the core performance benchmark outside the pull-request
+critical span.
 
 Do not run the complete non-Lean and Lean suites repeatedly during
 implementation and then immediately repeat them in pull-request CI. Use
@@ -174,7 +176,7 @@ pass on the final tree. Run `make validate-full` locally only when CI is
 unavailable or an environment-specific failure needs reproduction.
 
 Some short CI jobs still overlap in setup or packaging work, but they run in
-parallel and were not on the measured critical path. Consolidating them would
+parallel and were not on the measured critical span. Consolidating them would
 increase workflow coupling without materially shortening feedback, so this
 audit leaves them unchanged.
 

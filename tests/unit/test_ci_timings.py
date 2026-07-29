@@ -46,7 +46,7 @@ def test_ci_timing_summary_reports_elapsed_and_runner_minutes(tmp_path: Path) ->
 
     completed = run_ci_script("summarize-ci-timings", jobs_json, check=True)
 
-    assert "Critical path (workflow elapsed) | 5.0 min" in completed.stdout
+    assert "Critical span | 5.0 min" in completed.stdout
     assert "Total runner time | 12.5 min" in completed.stdout
     assert "Tests (integration 1 of 4, Python 3.12) (4.0 min)" in completed.stdout
     assert "Integration shard skew (max/min) | 2.00x" in completed.stdout

@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Run a command and write a receipt bound to the full Git working tree."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def git(*args: str, check: bool = True) -> bytes:
+    return subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        check=check,
+        capture_output=True,
+    ).stdout
+
+
+def _add_file(digest: Any, label: bytes, path: str) -> None:
+    encoded = os.fsencode(path)
+    digest.update(label)
+    digest.update(len(encoded).to_bytes(8, "big"))
+    digest.update(encoded)
+    target = ROOT / path
+    if target.is_symlink():
+        content = os.fsencode(target.readlink())
+        kind = b"symlink"
+    elif target.is_file():
+        content = target.read_bytes()
+        kind = b"file"
+    else:
+        content = b""
+        kind = b"missing"
+    digest.update(kind)
+    digest.update(len(content).to_bytes(8, "big"))
+    digest.update(content)
+
+
+def tree_state() -> dict[str, object]:
+    digest = hashlib.sha256()
+    head = git("rev-parse", "HEAD").decode().strip()
+    status = git("status", "--porcelain=v1", "-z")
+    unstaged = [
+        os.fsdecode(path)
+        for path in git("diff", "--name-only", "-z").split(b"\0")
+        if path
+    ]
+    untracked = [
+        os.fsdecode(path)
+        for path in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0")
+        if path
+    ]
+
+    digest.update(b"HEAD\0" + head.encode() + b"\0")
+    # Index entries bind staged modes and content-addressed blob identities.
+    index = git("ls-files", "--stage", "-z")
+    digest.update(b"index\0")
+    digest.update(len(index).to_bytes(8, "big"))
+    digest.update(index)
+    for path in unstaged:
+        _add_file(digest, b"worktree\0", path)
+    for path in untracked:
+        _add_file(digest, b"untracked\0", path)
+
+    return {
+        "head": head,
+        "dirty": bool(status),
+        "digest": f"sha256:{digest.hexdigest()}",
+    }
+
+
+def make_receipt(
+    command: list[str],
+    exit_code: int,
+    before: dict[str, object],
+    after: dict[str, object],
+    *,
+    started_at: str,
+    finished_at: str,
+    duration_seconds: float,
+) -> dict[str, object]:
+    exact_tree = before["digest"] == after["digest"]
+    return {
+        "version": 1,
+        "command": command,
+        "exit_code": exit_code,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "duration_seconds": duration_seconds,
+        "head": after["head"],
+        "dirty": after["dirty"],
+        "tree_digest": after["digest"],
+        "tree_unchanged_during_validation": exact_tree,
+        "head_matches_validated_tree": exact_tree and not bool(after["dirty"]),
+    }
+
+
+def output_path(raw_path: Path, parser: argparse.ArgumentParser) -> Path:
+    path = raw_path.resolve()
+    try:
+        relative = path.relative_to(ROOT)
+    except ValueError:
+        return path
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--quiet", "--", str(relative)],
+        cwd=ROOT,
+        check=False,
+    )
+    if ignored.returncode != 0:
+        parser.error("receipt output inside the repository must be ignored")
+    return path
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("command", nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    if not command:
+        parser.error("a command is required after --")
+    destination = output_path(args.output, parser)
+
+    before = tree_state()
+    started_at = datetime.now(UTC).isoformat()
+    started = time.monotonic()
+    completed = subprocess.run(command, cwd=ROOT, check=False)
+    duration_seconds = time.monotonic() - started
+    finished_at = datetime.now(UTC).isoformat()
+    after = tree_state()
+    receipt = make_receipt(
+        command,
+        completed.returncode,
+        before,
+        after,
+        started_at=started_at,
+        finished_at=finished_at,
+        duration_seconds=duration_seconds,
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    raise SystemExit(completed.returncode)
+
+
+if __name__ == "__main__":
+    main()
