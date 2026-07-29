@@ -117,4 +117,3 @@ jobs:
           else
             npm publish artifacts/npm/*.tgz --access public --tag alpha
           fi
-          npm dist-tag add "jacobian@$version" alpha
