@@ -41,6 +41,9 @@ from jacobian.domains.graph_optimization.checkers import (
     GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS,
 )
 from jacobian.domains.matrix_lattice.checkers import MATRIX_EXACT_REPLAY_CHECKERS
+from jacobian.domains.number_theory.checkers import (
+    NUMBER_THEORY_EXACT_REPLAY_CHECKERS,
+)
 from jacobian.domains.polynomial.checkers import POLYNOMIAL_EXACT_REPLAY_CHECKERS
 from jacobian.domains.projective_geometry.checkers import (
     PROJECTIVE_GEOMETRY_EXACT_REPLAY_CHECKERS,
@@ -97,6 +100,7 @@ def install_exact_domain_checkers(
     matrix: InstalledDomainBundle,
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
+    number_theory: InstalledDomainBundle | None = None,
     projective_geometry: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> ExactDomainCheckerInstallation:
@@ -117,6 +121,11 @@ def install_exact_domain_checkers(
         *_available_graph_declaration_bundles(
             graph=graph,
             graph_invariants=graph_invariants,
+        ),
+        *(
+            (number_theory, item)
+            for item in NUMBER_THEORY_EXACT_REPLAY_CHECKERS
+            if number_theory is not None
         ),
         *(
             (projective_geometry, item)
@@ -185,6 +194,7 @@ def install_exact_domain_verification(
     matrix: InstalledDomainBundle,
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
+    number_theory: InstalledDomainBundle | None = None,
     projective_geometry: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> tuple[tuple[CapabilityAdapter, ...], ExactDomainCheckerInstallation]:
@@ -196,6 +206,7 @@ def install_exact_domain_verification(
         matrix=matrix,
         graph=graph,
         graph_invariants=graph_invariants,
+        number_theory=number_theory,
         projective_geometry=projective_geometry,
         authorize=authorize,
     )
@@ -240,6 +251,19 @@ def install_exact_domain_verification(
         )
         if installation.checker_ids.get(declaration.capability_id) is not None
     )
+    number_theory_declarations = (
+        tuple(
+            _installed_declaration(
+                number_theory,
+                declaration,
+                installation,
+            )
+            for declaration in NUMBER_THEORY_EXACT_REPLAY_CHECKERS
+            if installation.checker_ids.get(declaration.capability_id) is not None
+        )
+        if number_theory is not None
+        else ()
+    )
     projective_declarations = (
         tuple(
             _installed_declaration(
@@ -260,6 +284,7 @@ def install_exact_domain_verification(
             if declaration.declaration.verification_capability_id is not None
         ),
         *graph_declarations,
+        *number_theory_declarations,
         *projective_declarations,
     )
     dedicated_adapters: tuple[CapabilityAdapter, ...] = tuple(

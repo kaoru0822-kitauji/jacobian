@@ -946,6 +946,7 @@ class JacobianKernel:
         matrix = self.domain_bundles.get("matrix")
         graph = self.domain_bundles.get("graph_optimization")
         graph_invariants = self.domain_bundles.get("graph_invariants")
+        number_theory = self.domain_bundles.get("number_theory")
         projective_geometry = self.domain_bundles.get("projective_geometry")
         if polynomial is None or matrix is None:
             return
@@ -959,6 +960,7 @@ class JacobianKernel:
             matrix=matrix,
             graph=graph,
             graph_invariants=graph_invariants,
+            number_theory=number_theory,
             projective_geometry=projective_geometry,
             authorize=authorize,
         )

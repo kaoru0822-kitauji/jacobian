@@ -13,6 +13,7 @@ from tests.helpers.rationals import rational_payload as _q
 
 import jacobian_checkers.exact_domain_operations as checker_module
 from jacobian_checkers.exact_domain_operations import (
+    check_integer_prime_factorization,
     check_matrix_characteristic_polynomial,
     check_matrix_nullspace,
     check_matrix_rref,
@@ -277,6 +278,24 @@ _CASES: tuple[
         ),
     ),
     (
+        check_integer_prime_factorization,
+        _request(
+            "integer.compute.prime_factorization",
+            "integer.prime-factorization.flint-replay",
+            {
+                "value": "-360",
+                "resource_budget": {"wall_seconds": 5},
+            },
+            {
+                "factors": [
+                    {"prime": "2", "power": 3},
+                    {"prime": "3", "power": 2},
+                    {"prime": "5", "power": 1},
+                ]
+            },
+        ),
+    ),
+    (
         check_graph_diameter,
         _request(
             "graph.invariant.diameter.compute",
@@ -524,6 +543,98 @@ import jacobian_checkers.graph_exact_operations
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize(
+    ("value", "factors"),
+    (
+        ("1", []),
+        ("-1", []),
+        ("2", [{"prime": "2", "power": 1}]),
+        (
+            "-360",
+            [
+                {"prime": "2", "power": 3},
+                {"prime": "3", "power": 2},
+                {"prime": "5", "power": 1},
+            ],
+        ),
+    ),
+)
+def test_prime_factorization_checker_accepts_exact_boundaries(
+    value: str,
+    factors: list[dict[str, object]],
+) -> None:
+    checker_request = _request(
+        "integer.compute.prime_factorization",
+        "integer.prime-factorization.flint-replay",
+        {"value": value, "resource_budget": {"wall_seconds": 5}},
+        {"factors": factors},
+    )
+
+    decision = check_integer_prime_factorization(checker_request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda factors: factors.__setitem__(
+            slice(None),
+            [{"prime": "6", "power": 1}, {"prime": "60", "power": 1}],
+        ),
+        lambda factors: factors.pop(),
+        lambda factors: factors.append({"prime": "5", "power": 1}),
+        lambda factors: factors[0].update(power=2),
+        lambda factors: factors.reverse(),
+        lambda factors: factors[0].update(prime="-2"),
+    ),
+    ids=(
+        "composite-bases",
+        "missing-factor",
+        "duplicate-base",
+        "wrong-power",
+        "noncanonical-order",
+        "negative-base",
+    ),
+)
+def test_prime_factorization_checker_rejects_false_or_noncanonical_factors(
+    mutate: Callable[[list[dict[str, object]]], object],
+) -> None:
+    checker_request = _request(
+        "integer.compute.prime_factorization",
+        "integer.prime-factorization.flint-replay",
+        {"value": "360", "resource_budget": {"wall_seconds": 5}},
+        {
+            "factors": [
+                {"prime": "2", "power": 3},
+                {"prime": "3", "power": 2},
+                {"prime": "5", "power": 1},
+            ]
+        },
+    )
+    mutate(checker_request["candidate"]["payload"]["factors"])
+    checker_request["candidate"]["payload_digest"] = _digest(
+        checker_request["candidate"]["payload"]
+    )
+
+    decision = check_integer_prime_factorization(checker_request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
+
+
+def test_prime_factorization_checker_rejects_zero_source() -> None:
+    checker_request = _request(
+        "integer.compute.prime_factorization",
+        "integer.prime-factorization.flint-replay",
+        {"value": "0", "resource_budget": {"wall_seconds": 5}},
+        {"factors": []},
+    )
+
+    assert check_integer_prime_factorization(checker_request)["accepted"] is False
 
 
 @pytest.mark.parametrize(

@@ -202,6 +202,61 @@ def _run(
         return _reject("malformed, unsupported, or mismatched checker request")
 
 
+def _prime_factorization(source: dict[str, Any], result: dict[str, Any]) -> bool:
+    if set(source) != {"value", "resource_budget"} or set(result) != {"factors"}:
+        return False
+    budget = source["resource_budget"]
+    if (
+        not isinstance(budget, dict)
+        or set(budget) != {"wall_seconds"}
+        or type(budget["wall_seconds"]) is not int
+        or not 1 <= budget["wall_seconds"] <= 30
+    ):
+        return False
+    value = _integer(source["value"])
+    if value == 0:
+        return False
+    factors = result["factors"]
+    if not isinstance(factors, list) or len(factors) > 256:
+        return False
+
+    target = abs(value)
+    product = 1
+    parsed: list[tuple[int, int]] = []
+    previous_prime = 1
+    for factor in factors:
+        if not isinstance(factor, dict) or set(factor) != {"prime", "power"}:
+            return False
+        prime = _integer(factor["prime"])
+        power = factor["power"]
+        if prime <= previous_prime or type(power) is not int or not 1 <= power <= 1_000:
+            return False
+        for _ in range(power):
+            if product > target // prime:
+                return False
+            product *= prime
+        parsed.append((prime, power))
+        previous_prime = prime
+    if product != target:
+        return False
+
+    replayed = [
+        (int(prime), int(power)) for prime, power in flint.fmpz(target).factor()
+    ]
+    return parsed == replayed
+
+
+def check_integer_prime_factorization(
+    request: dict[str, Any],
+) -> dict[str, Any]:
+    return _run(
+        request,
+        operation_id="integer.compute.prime_factorization",
+        witness_format="integer.prime-factorization.flint-replay",
+        replay=_prime_factorization,
+    )
+
+
 def _gcd(source: dict[str, Any], result: dict[str, Any]) -> bool:
     if set(source) != {"left", "right"} or set(result) != {
         "gcd",
@@ -510,6 +565,7 @@ def check_matrix_smith_normal_form(request: dict[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
+    "check_integer_prime_factorization",
     "check_matrix_characteristic_polynomial",
     "check_matrix_nullspace",
     "check_matrix_rref",

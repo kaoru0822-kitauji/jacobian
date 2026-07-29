@@ -402,6 +402,78 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
     assert rejected.output["verification_record_uri"] is None
 
 
+@pytest.mark.parametrize("value", ("360", "-360", "1", "-1", "101"))
+def test_prime_factorization_result_uses_independent_python_flint_replay(
+    kernel_with_references,
+    value: str,
+) -> None:
+    producer_id = "integer.compute.prime_factorization"
+    verifier_id = "integer.prime_factorization.verify"
+    computed = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=producer_id,
+            input={"value": value},
+        )
+    )
+
+    verified = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=verifier_id,
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"
+    assert verified.output["operation_id"] == producer_id
+    assert verified.output["verification_record_uri"] is not None
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.output["verification_record_uri"] in verified.artifact_uris
+    runtime = next(
+        descriptor.provider_runtime
+        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        if descriptor.capability_id == verifier_id
+    )
+    assert runtime is not None
+    assert runtime.provider == "jacobian.exact-domain-checkers"
+    assert {
+        component["provider"] for component in runtime.configuration["components"]
+    } == {"jacobian.exact-domain-checker-source", "python-flint"}
+
+
+def test_prime_factorization_verifier_rejects_incomplete_factor_list(
+    kernel_with_references,
+) -> None:
+    computed = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="integer.compute.prime_factorization",
+            input={"value": "360"},
+        )
+    )
+    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
+    false_result = kernel_with_references.artifacts.put(
+        schema_uri=result_artifact.manifest.schema_uri,
+        semantics_uri=result_artifact.manifest.semantics_uri,
+        parents=result_artifact.manifest.parents,
+        payload={"factors": result_artifact.payload["factors"][:-1]},
+        summary="adversarial incomplete prime factorization result",
+    )
+
+    rejected = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="integer.prime_factorization.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": false_result.artifact_uri},
+        )
+    )
+
+    assert rejected.execution.status is ExecutionStatus.COMPLETED
+    assert rejected.output["status"] == "REJECTED"
+    assert rejected.output["conclusion"] == "UNKNOWN"
+    assert rejected.output["verification_record_uri"] is None
+
+
 def test_operator_can_leave_exact_result_verification_unavailable(
     kernel,
 ) -> None:
