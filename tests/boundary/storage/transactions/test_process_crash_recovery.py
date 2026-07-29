@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from hashlib import sha256
@@ -114,6 +115,10 @@ with store.transaction():
     assert not reopened.transaction_recovery_path.exists()
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows startup intentionally reconciles by scanning the blob tree",
+)
 def test_clean_store_open_does_not_scan_the_blob_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
