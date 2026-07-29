@@ -11,10 +11,12 @@ from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.number_theory import (
     ArithmeticFunctionRequest,
     FactorizationRequest,
+    PowerfulNumberRequest,
 )
 from jacobian.contracts.results import ContractModel
 from jacobian.domains.number_theory.operations import (
     compute_radical,
+    decide_powerful,
     decide_squarefree,
     enumerate_divisors,
     enumerate_proper_divisors,
@@ -30,6 +32,7 @@ _OPERATIONS: dict[
     "divisors": (FactorizationRequest, enumerate_divisors),
     "proper_divisors": (FactorizationRequest, enumerate_proper_divisors),
     "prime_factorization": (FactorizationRequest, factorize_primes),
+    "powerful": (PowerfulNumberRequest, decide_powerful),
     "squarefree": (ArithmeticFunctionRequest, decide_squarefree),
     "radical": (ArithmeticFunctionRequest, compute_radical),
 }

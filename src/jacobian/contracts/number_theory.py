@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, StrictInt, StringConstraints, model_validator
+from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_validator
 
 from jacobian.contracts.results import ContractModel
 
@@ -65,6 +65,16 @@ class FactorizationRequest(ContractModel):
     resource_budget: FactorizationResourceBudget = Field(
         default_factory=FactorizationResourceBudget
     )
+
+
+class PowerfulNumberRequest(FactorizationRequest):
+    """One positive integer for an exact powerful-number decision."""
+
+    @model_validator(mode="after")
+    def require_positive_value(self) -> Self:
+        if int(self.value) < 1:
+            raise ValueError("powerful-number input must be positive")
+        return self
 
 
 class ArithmeticFunctionRequest(ContractModel):
@@ -297,6 +307,39 @@ class PrimeFactorizationResult(ContractModel):
         primes = [factor.prime for factor in self.factors]
         if len(set(primes)) != len(primes):
             raise ValueError("prime factors must be unique")
+        return self
+
+
+class PowerfulNumberResult(ContractModel):
+    """A powerful-number decision with its complete factor witness."""
+
+    semantics_version: Literal["powerful-number.prime-exponents-at-least-two.v1"]
+    is_powerful: StrictBool
+    factors: tuple[PrimePower, ...] = Field(
+        min_length=0,
+        max_length=_MAX_FACTOR_ENTRIES,
+    )
+    violating_primes: tuple[BoundedInteger, ...] = Field(
+        min_length=0,
+        max_length=_MAX_FACTOR_ENTRIES,
+    )
+
+    @model_validator(mode="after")
+    def bind_decision_to_canonical_factor_witness(self) -> Self:
+        primes = [int(factor.prime) for factor in self.factors]
+        if any(prime < 2 for prime in primes):
+            raise ValueError("factor bases must be greater than one")
+        if primes != sorted(set(primes)):
+            raise ValueError("factor bases must be strictly increasing")
+        expected_violations = tuple(
+            factor.prime for factor in self.factors if factor.power < 2
+        )
+        if self.violating_primes != expected_violations:
+            raise ValueError(
+                "violating primes must be exactly the factors with exponent below two"
+            )
+        if self.is_powerful != (not expected_violations):
+            raise ValueError("powerful decision does not match the factor exponents")
         return self
 
 

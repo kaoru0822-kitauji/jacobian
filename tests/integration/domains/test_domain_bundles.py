@@ -45,6 +45,7 @@ from jacobian.contracts.number_theory import (
     ModularValueRequest,
     ModulusRequest,
     PositiveIntegerRequest,
+    PowerfulNumberRequest,
     ValuationRequest,
 )
 from jacobian.contracts.number_theory import (
@@ -133,6 +134,7 @@ EXPECTED_IDS: frozenset[str] = frozenset(
         "integer.decide.odd",
         "integer.decide.perfect",
         "integer.decide.prime",
+        "integer.decide.powerful",
         "integer.decide.square",
         "integer.decide.squarefree",
         "integer.transform.base_digits",
@@ -217,6 +219,10 @@ _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [
     (
         FactorizationRequest,
         {"value": "12", "resource_budget": {"wall_seconds": 5}},
+    ),
+    (
+        PowerfulNumberRequest,
+        {"value": "72", "resource_budget": {"wall_seconds": 5}},
     ),
     (
         ArithmeticFunctionRequest,

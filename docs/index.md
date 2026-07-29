@@ -71,6 +71,7 @@ expectations.
 - [Maximum-matching certificate and verification](reference/graph-maximum-matching.md)
 - [Graph diameter and radius verification](reference/graph-metric-verification.md)
 - [Integer prime-factorization verification](reference/integer-prime-factorization-verification.md)
+- [Powerful-number decision](reference/integer-powerful-number-decision.md)
 - [Bounded finite exactly-once coverage](reference/finite-coverage-verification.md)
 - [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
 - [Typed polynomial expression normalization](reference/polynomial-expression-normalization.md)
