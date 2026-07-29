@@ -355,7 +355,9 @@ def test_carcara_timeout_fails_closed(
         "import time\ntime.sleep(5)",
     )
     _install_runtime_environment(monkeypatch, executable)
-    monkeypatch.setattr("jacobian_checkers.smt.CARCARA_TIMEOUT_SECONDS", 0.1)
+    # Leave enough time for the interpreter to start and create the marker;
+    # timeout still occurs well before the five-second worker sleep.
+    monkeypatch.setattr("jacobian_checkers.smt.CARCARA_TIMEOUT_SECONDS", 1.0)
 
     decision = check_unsat_proof(proof_request_factory())
 

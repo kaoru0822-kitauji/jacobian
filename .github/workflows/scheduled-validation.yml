@@ -22,11 +22,9 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: >-
-          uv run --locked pytest
-          -m "property and not lean_runtime"
-          --count=3
-          --durations=20
+      - run: make test-stress
+        env:
+          PYTEST_ARGS: --durations=20
 
   ordering:
     name: Ordering seed ${{ matrix.seed }}
@@ -41,11 +39,9 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: >-
-          uv run --locked pytest
-          -m "not lean_runtime"
-          --randomly-seed=${{ matrix.seed }}
-          --durations=20
+      - run: make test-ordering
+        env:
+          PYTEST_ARGS: --randomly-seed=${{ matrix.seed }} --durations=20
 
   optional-providers:
     name: Optional provider integration

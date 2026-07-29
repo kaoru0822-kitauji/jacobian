@@ -49,7 +49,6 @@ dev = [
     "pytest-cov>=6,<8",
     "pytest-randomly==4.1.0",
     "pytest-repeat==0.9.4",
-    "pytest-rerunfailures>=14,<17",
     "pytest-split==0.11.0",
     "pytest-timeout>=2.4,<3",
     "pytest-xdist>=3.6,<4",

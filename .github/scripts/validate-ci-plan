@@ -17,9 +17,12 @@ BOOLEAN_KEYS = (
     "run-build",
     "run-security",
     "run-duplicate",
+    "run-docs",
 )
 FUNCTIONAL_KEYS = tuple(
-    key for key in BOOLEAN_KEYS if key not in {"run-coverage", "run-compatibility"}
+    key
+    for key in BOOLEAN_KEYS
+    if key not in {"run-coverage", "run-compatibility", "run-docs"}
 )
 CLASSIFICATIONS = {
     "docs",
@@ -51,8 +54,8 @@ def _only_enabled(plan: dict[str, str], *allowed: str) -> bool:
 def _validate_classification(plan: dict[str, str]) -> None:
     classification = plan["classification"]
     if classification == "docs":
-        if any(plan[key] == "true" for key in BOOLEAN_KEYS):
-            fail("docs CI must disable every lane")
+        if not _only_enabled(plan, "run-docs"):
+            fail("docs CI must enable only run-docs")
         return
     if classification == "npm":
         if not _only_enabled(plan, "run-npm"):

@@ -37,6 +37,7 @@ jobs:
       run-build: ${{ steps.classify.outputs.run-build }}
       run-security: ${{ steps.classify.outputs.run-security }}
       run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
+      run-docs: ${{ steps.classify.outputs.run-docs }}
       integration-shard-count: ${{ steps.shards.outputs.integration-shard-count }}
       integration-shards: ${{ steps.shards.outputs.integration-shards }}
       node-version-jscpd: ${{ steps.shards.outputs.node-version-jscpd }}
@@ -154,6 +155,40 @@ jobs:
         run: make typecheck
       - if: needs.plan.outputs.run-static == 'true'
         run: make todo-check
+
+  docs:
+    name: Documentation
+    needs: plan
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Require a valid documentation plan
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_DOCS: ${{ needs.plan.outputs.run-docs }}
+        run: |
+          case "$PLAN_RESULT" in
+            success) ;;
+            cancelled)
+              echo "Upstream plan was cancelled; treating gate as non-failure"
+              exit 0
+              ;;
+            *)
+              echo "Upstream plan did not succeed: $PLAN_RESULT"
+              exit 1
+              ;;
+          esac
+          case "$RUN_DOCS" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+      - if: needs.plan.outputs.run-docs == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: needs.plan.outputs.run-docs == 'true'
+        run: make docs-linkcheck
 
   security-audit:
     name: Security Audit

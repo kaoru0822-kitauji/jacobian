@@ -23,9 +23,12 @@ BOOLEAN_KEYS = (
     "run-build",
     "run-security",
     "run-duplicate",
+    "run-docs",
 )
 FUNCTIONAL_KEYS = tuple(
-    key for key in BOOLEAN_KEYS if key not in {"run-coverage", "run-compatibility"}
+    key
+    for key in BOOLEAN_KEYS
+    if key not in {"run-coverage", "run-compatibility", "run-docs"}
 )
 
 
@@ -42,7 +45,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ((), _expected_plan("exhaustive", *BOOLEAN_KEYS)),
         (
             ("README.md", "docs/how-to/contribute.md", ".github/CODEOWNERS"),
-            _expected_plan("docs"),
+            _expected_plan("docs", "run-docs"),
         ),
         (
             ("npm/package.json", "npm/npm-packaging.test.mjs"),
@@ -50,7 +53,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             ("docs/index.md", "npm/package.json"),
-            _expected_plan("npm", "run-npm"),
+            _expected_plan("selective", "run-npm", "run-docs"),
         ),
         (
             ("tests/unit/test_kernel.py",),
@@ -188,7 +191,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             ("docs/index.md", "pyproject.toml"),
-            _expected_plan("full", *FUNCTIONAL_KEYS),
+            _expected_plan("full", *FUNCTIONAL_KEYS, "run-docs"),
         ),
         (
             (".github/workflows/ci.yml",),
@@ -196,7 +199,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             ("CONTRIBUTING.md",),
-            _expected_plan("full", *FUNCTIONAL_KEYS),
+            _expected_plan("full", *FUNCTIONAL_KEYS, "run-docs"),
         ),
         (
             ("tests/helpers/capabilities.py",),
@@ -272,7 +275,7 @@ def test_lean_override_only_adds_lean_to_an_isolated_plan() -> None:
     )
 
     plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
-    assert plan == _expected_plan("lean", "run-lean")
+    assert plan == _expected_plan("selective", "run-lean", "run-docs")
 
 
 @pytest.mark.parametrize(
@@ -313,7 +316,8 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         "run-static=false\n"
         "run-build=false\n"
         "run-security=false\n"
-        "run-duplicate=false\n",
+        "run-duplicate=false\n"
+        "run-docs=false\n",
         "classification=docs\n"
         "classification=docs\n"
         "run-python=false\n"
@@ -322,7 +326,8 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         "run-static=false\n"
         "run-build=false\n"
         "run-security=false\n"
-        "run-duplicate=false\n",
+        "run-duplicate=false\n"
+        "run-docs=false\n",
         "classification=docs\n"
         "run-python=false\n"
         "run-core=false\n"
@@ -334,7 +339,8 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         "run-static=false\n"
         "run-build=false\n"
         "run-security=false\n"
-        "run-duplicate=false\n",
+        "run-duplicate=false\n"
+        "run-docs=false\n",
         "classification=docs\n"
         "run-python=true\n"
         "run-core=true\n"
@@ -346,7 +352,8 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         "run-static=false\n"
         "run-build=false\n"
         "run-security=false\n"
-        "run-duplicate=false\n",
+        "run-duplicate=false\n"
+        "run-docs=false\n",
         "classification=lean\n"
         "run-python=true\n"
         "run-core=true\n"
@@ -358,7 +365,8 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
         "run-static=false\n"
         "run-build=false\n"
         "run-security=false\n"
-        "run-duplicate=false\n",
+        "run-duplicate=false\n"
+        "run-docs=false\n",
     ],
 )
 def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> None:

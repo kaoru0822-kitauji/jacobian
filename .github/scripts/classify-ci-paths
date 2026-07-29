@@ -36,6 +36,7 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
     manifest = load_manifest()
     exhaustive = exhaustive or not paths
     all_suites = set(manifest["suites"])
+    code_suites = all_suites - {"docs"}
     suites: set[str] = set()
     owners: set[str] = set()
 
@@ -52,7 +53,9 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
 
     if exhaustive:
         classification = "exhaustive"
-    elif suites == all_suites:
+    elif suites == {"docs"}:
+        classification = "docs"
+    elif suites == code_suites or suites == all_suites:
         classification = "full"
     elif not suites:
         classification = "docs"
@@ -77,7 +80,15 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
         "run-coverage": str(exhaustive and run_core and run_integration).lower(),
         "run-compatibility": str(exhaustive and run_core and run_integration).lower(),
     }
-    for suite in ("lean", "npm", "static", "build", "security", "duplicate"):
+    for suite in (
+        "lean",
+        "npm",
+        "static",
+        "build",
+        "security",
+        "duplicate",
+        "docs",
+    ):
         plan[f"run-{suite}"] = str(suite in suites).lower()
     return plan
 

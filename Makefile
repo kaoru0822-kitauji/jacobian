@@ -7,6 +7,7 @@ EVAL_ARGS ?=
 CORE_TEST_PATHS := tests/unit tests/contract tests/checkers tests/reference
 INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
+# Four workers cap memory and repeated per-worker kernel-template setup.
 PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
 
 .PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static validate-full agent-eval bench-core clean docs-linkcheck
@@ -81,10 +82,10 @@ test-failed: ## Re-run failures from the previous pytest invocation.
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) --lf -m "not lean_runtime" $(PYTEST_ARGS)
 
 test-stress: ## Reproduce scheduled property stress (pytest-repeat --count=3).
-	$(UV_RUN) pytest -m "property and not lean_runtime" --count=3 $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 -m "property and not lean_runtime" --count=3 $(PYTEST_ARGS)
 
 test-ordering: ## Reproduce scheduled ordering with PYTEST_ARGS=--randomly-seed=N.
-	$(UV_RUN) pytest -m "not lean_runtime" $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 -m "not lean_runtime" $(PYTEST_ARGS)
 
 duplicate-code: ## Run the CI duplicate-code detector locally.
 	npx --yes jscpd@5.0.12 --config .jscpd.json .
