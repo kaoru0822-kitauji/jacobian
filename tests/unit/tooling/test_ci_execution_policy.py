@@ -77,6 +77,30 @@ def test_stress_lane_selects_only_property_tests_and_repeats_them() -> None:
     assert "--count=$(STRESS_COUNT)" in stress
 
 
+def test_ordering_lane_dispatches_through_the_semantic_runner() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    ordering = makefile.split("test-ordering:", 1)[1].split("duplicate-code:", 1)[0]
+    workflow = (ROOT / ".github/workflows/scheduled-validation.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ORDERING_LANE is required" in ordering
+    assert "$(MAKE) test-$(ORDERING_LANE)" in ordering
+    assert "uv run --locked pytest" not in ordering
+    assert (
+        "lane: [unit, component, domain, composition, storage, process, mcp, e2e]"
+        in workflow
+    )
+    assert "ORDERING_LANE: ${{ matrix.lane }}" in workflow
+
+
+def test_static_validation_enforces_test_architecture() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "test-architecture:" in makefile
+    assert "check-static: lint-full typecheck test-architecture" in makefile
+
+
 def test_process_and_provider_lanes_have_explicit_resource_policies() -> None:
     import tomllib
 

@@ -141,6 +141,30 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
+            ("src/jacobian/provider_runtime.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-unit",
+                "run-domain",
+                "run-provider",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            ("tests/support/providers.py",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-unit",
+                "run-domain",
+                "run-provider",
+                "run-lean",
+                "run-static",
+            ),
+        ),
+        (
             ("tests/boundary/providers/lean/test_lean_replayable_state_capability.py",),
             _expected_plan(
                 "selective",
@@ -295,6 +319,8 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-python",
                 "run-unit",
                 "run-domain",
+                "run-provider",
+                "run-lean",
                 "run-static",
             ),
         ),
@@ -305,6 +331,8 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-python",
                 "run-unit",
                 "run-domain",
+                "run-provider",
+                "run-lean",
                 "run-static",
             ),
         ),
@@ -438,6 +466,31 @@ def test_ci_plan_output_is_internally_consistent(args: tuple[str, ...]) -> None:
 )
 def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> None:
     completed = run_ci_script("validate-ci-plan", input_text=plan)
+
+    assert completed.returncode != 0
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        _expected_plan("full", "run-python", "run-unit", "run-static"),
+        _expected_plan(
+            "selective",
+            *(
+                key
+                for key in BOOLEAN_KEYS
+                if key not in {"run-coverage", "run-compatibility", "run-docs"}
+            ),
+        ),
+        _expected_plan("python", "run-python", "run-unit", "run-npm", "run-static"),
+    ],
+)
+def test_ci_plan_validator_rejects_wrong_classification_shapes(
+    plan: dict[str, str],
+) -> None:
+    encoded = "".join(f"{key}={value}\n" for key, value in plan.items())
+
+    completed = run_ci_script("validate-ci-plan", input_text=encoded)
 
     assert completed.returncode != 0
 

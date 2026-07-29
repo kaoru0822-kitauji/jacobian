@@ -74,6 +74,20 @@
       ]
     },
     {
+      "name": "optional-provider-sources",
+      "patterns": [
+        "src/jacobian/provider_runtime.py",
+        "src/jacobian/**/*provider*.py",
+        "src/jacobian/cvc5*.py",
+        "src/jacobian/flint*.py",
+        "src/jacobian/**/*cvc5*.py",
+        "src/jacobian/**/*flint*.py"
+      ],
+      "suites": [
+        "provider"
+      ]
+    },
+    {
       "name": "unit-component-tests",
       "patterns": [
         "tests/unit/**",
@@ -337,7 +351,9 @@
         "storage",
         "process",
         "mcp",
+        "provider",
         "e2e",
+        "lean",
         "static"
       ]
     },

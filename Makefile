@@ -16,7 +16,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-plan validation-receipt test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-architecture test-plan validation-receipt test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -49,6 +49,9 @@ security-audit: ## Audit dependencies for known vulnerabilities.
 
 typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
+
+test-architecture: ## Enforce semantic test-layer and provider-import boundaries.
+	$(UV_RUN) python tools/check_test_architecture.py .
 
 test-plan: ## Print local validation selected for BASE..HEAD and working changes.
 	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-plan BASE=origin/main)" >&2; exit 2; }
@@ -116,8 +119,9 @@ test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
 		$(if $(TESTS),$(TESTS),tests) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-ordering: ## Reproduce scheduled ordering (default seed 17; override with PYTEST_ARGS).
-	$(UV_RUN) pytest -n 0 --timeout=120 --timeout-method=thread \
-		$(if $(findstring --randomly-seed,$(PYTEST_ARGS)),,$(ORDERING_DEFAULT_SEED)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+	@test -n "$(ORDERING_LANE)" || { echo "ORDERING_LANE is required" >&2; exit 2; }
+	$(MAKE) test-$(ORDERING_LANE) \
+		PYTEST_ARGS="$(if $(findstring --randomly-seed,$(PYTEST_ARGS)),,$(ORDERING_DEFAULT_SEED)) $(PYTEST_ARGS)"
 
 duplicate-code: ## Run the CI duplicate-code detector locally.
 	npx --yes jscpd@5.0.12 --config .jscpd.json .
@@ -148,7 +152,7 @@ precommit: ## Fix and run every routine local handoff check.
 	$(MAKE) fix
 	$(MAKE) check
 
-check-static: lint-full typecheck todo-check build ## Run CI-owned static checks plus a local package build.
+check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

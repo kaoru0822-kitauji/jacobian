@@ -42,6 +42,11 @@ FUNCTIONAL_KEYS = tuple(
     for key in BOOLEAN_KEYS
     if key not in {"run-coverage", "run-compatibility", "run-docs"}
 )
+FULL_REQUIRED_KEYS = tuple(
+    key
+    for key in BOOLEAN_KEYS
+    if key not in {"run-coverage", "run-compatibility", "run-docs"}
+)
 CLASSIFICATIONS = {
     "docs",
     "npm",
@@ -59,9 +64,7 @@ def fail(message: str) -> None:
 
 def _only_enabled(plan: dict[str, str], *allowed: str) -> bool:
     allowed_set = set(allowed)
-    return all(
-        (plan[key] == "true") == (key in allowed_set) for key in BOOLEAN_KEYS
-    )
+    return all((plan[key] == "true") == (key in allowed_set) for key in BOOLEAN_KEYS)
 
 
 def _validate_classification(plan: dict[str, str]) -> None:
@@ -76,15 +79,23 @@ def _validate_classification(plan: dict[str, str]) -> None:
         if not _only_enabled(plan, "run-lean"):
             fail("lean CI must enable only run-lean")
     elif classification == "python":
-        if plan["run-python"] != "true" or not any(
-            plan[key] == "true" for key in PYTHON_LANES
+        allowed = {"run-python", "run-static", *PYTHON_LANES}
+        if (
+            plan["run-python"] != "true"
+            or not any(plan[key] == "true" for key in PYTHON_LANES)
+            or any(plan[key] == "true" for key in BOOLEAN_KEYS if key not in allowed)
         ):
             fail("python CI must enable a semantic Python lane")
-    elif classification in {"full", "selective", "exhaustive"}:
-        if classification != "exhaustive" and not any(
-            plan[key] == "true" for key in FUNCTIONAL_KEYS
-        ):
-            fail(f"{classification} CI must enable a functional lane")
+    elif classification == "full":
+        if any(plan[key] != "true" for key in FULL_REQUIRED_KEYS):
+            fail("full CI must enable every code lane")
+    elif classification == "selective":
+        if not any(plan[key] == "true" for key in FUNCTIONAL_KEYS):
+            fail("selective CI must enable a functional lane")
+        if all(plan[key] == "true" for key in FULL_REQUIRED_KEYS):
+            fail("selective CI cannot have the full code-lane shape")
+    elif classification == "exhaustive":
+        pass
     else:
         fail(f"unhandled CI classification: {classification}")
 
