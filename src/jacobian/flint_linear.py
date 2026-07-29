@@ -209,7 +209,19 @@ class PythonFlintRationalSolutionFindAdapter:
                 "witness",
                 "python-flint",
             ),
-            invocation_examples=(example("one_by_one_system", "Find the solution of x=1 over QQ.", {"system": {"variables": ["x"], "coefficients": {"entries": [[{"num": "1", "den": "1"}]]}, "rhs": [{"num": "1", "den": "1"}]}}),),
+            invocation_examples=(
+                example(
+                    "one_by_one_system",
+                    "Find the solution of x=1 over QQ.",
+                    {
+                        "system": {
+                            "variables": ["x"],
+                            "coefficients": {"entries": [[{"num": "1", "den": "1"}]]},
+                            "rhs": [{"num": "1", "den": "1"}],
+                        }
+                    },
+                ),
+            ),
         )
 
     @property

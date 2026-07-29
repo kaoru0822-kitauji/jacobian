@@ -161,6 +161,12 @@ LATTICE_CAPABILITIES = (
         implementation=reduce_lattice_basis,
         relation_id="lattice.relation.reduced-basis-of",
         tags=("lattice", "lll", "exact-integer", "bounded", "python-flint"),
-        invocation_examples=(example("unit_basis", "Reduce the one-dimensional unit basis.", {"basis": {"entries": [["1"]]}}),),
+        invocation_examples=(
+            example(
+                "unit_basis",
+                "Reduce the one-dimensional unit basis.",
+                {"basis": {"entries": [["1"]]}},
+            ),
+        ),
     ),
 )

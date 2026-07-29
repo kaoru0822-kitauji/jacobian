@@ -173,7 +173,32 @@ PROJECTIVE_LINE_ARRANGEMENT_CAPABILITY: ComputedOperation[
     "flats",
     "exact",
     relation_id="geometry.projective_line_arrangement.flats.relation",
-    invocation_examples=(example("two_coordinate_lines", "Materialize flats for two coordinate lines.", {"lines": [{"label": "x", "coefficients": [{"num": "1", "den": "1"}, {"num": "0", "den": "1"}, {"num": "0", "den": "1"}]}, {"label": "y", "coefficients": [{"num": "0", "den": "1"}, {"num": "1", "den": "1"}, {"num": "0", "den": "1"}]}]}),),
+    invocation_examples=(
+        example(
+            "two_coordinate_lines",
+            "Materialize flats for two coordinate lines.",
+            {
+                "lines": [
+                    {
+                        "label": "x",
+                        "coefficients": [
+                            {"num": "1", "den": "1"},
+                            {"num": "0", "den": "1"},
+                            {"num": "0", "den": "1"},
+                        ],
+                    },
+                    {
+                        "label": "y",
+                        "coefficients": [
+                            {"num": "0", "den": "1"},
+                            {"num": "1", "den": "1"},
+                            {"num": "0", "den": "1"},
+                        ],
+                    },
+                ]
+            },
+        ),
+    ),
 )
 
 
