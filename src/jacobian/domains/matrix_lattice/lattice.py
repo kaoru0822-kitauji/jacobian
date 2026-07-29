@@ -18,6 +18,7 @@ from jacobian.contracts.matrix_operations import (
     LatticeReductionResult,
 )
 from jacobian.contracts.results import ExecutionStatus
+from jacobian.domains._examples import example
 from jacobian.operations import (
     ComputedOperation,
     ComputedOutcome,
@@ -160,5 +161,12 @@ LATTICE_CAPABILITIES = (
         implementation=reduce_lattice_basis,
         relation_id="lattice.relation.reduced-basis-of",
         tags=("lattice", "lll", "exact-integer", "bounded", "python-flint"),
+        invocation_examples=(
+            example(
+                "unit_basis",
+                "Reduce the one-dimensional unit basis.",
+                {"basis": {"entries": [["1"]]}},
+            ),
+        ),
     ),
 )
