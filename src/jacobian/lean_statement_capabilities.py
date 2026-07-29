@@ -674,7 +674,17 @@ class LeanStatementCompareAdapter:
             input_schema=LeanStatementComparisonRequest.model_json_schema(),
             output_schema=LeanStatementComparisonOutput.model_json_schema(),
             tags=("lean", "statement", "comparison", "axiom-set"),
-            invocation_examples=(example("core_true_identity", "Compare identical Lean Core propositions.", {"environment": "CORE", "statement_a": "True", "statement_b": "True"}),),
+            invocation_examples=(
+                example(
+                    "core_true_identity",
+                    "Compare identical Lean Core propositions.",
+                    {
+                        "environment": "CORE",
+                        "statement_a": "True",
+                        "statement_b": "True",
+                    },
+                ),
+            ),
         )
 
     @property
