@@ -83,6 +83,7 @@ class _ConnectionState(threading.local):
     def __init__(self) -> None:
         self.transaction: sqlite3.Connection | None = None
         self.blob_lock_depth = 0
+        self.pending_sync_directories: set[Path] = set()
 
 
 class _ActiveTransactionPaths(threading.local):
@@ -198,6 +199,7 @@ class ArtifactStore:
         self._validated_blobs: dict[str, tuple[int, int, int, int, int]] = {}
         self._connection_state = _ConnectionState()
         self._closed = False
+        self._recovery_required = False
         self.blob_root.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
         self._initialize_database()
@@ -205,9 +207,18 @@ class ArtifactStore:
     def _connect(self) -> sqlite3.Connection:
         if self._closed:
             raise StoreClosedError("artifact store is closed")
+        if self._recovery_required:
+            raise StoreError(
+                "artifact store requires recovery by a fresh ArtifactStore instance"
+            )
         connection = sqlite3.connect(self.db_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA synchronous = FULL")
+        except BaseException:
+            connection.close()
+            raise
         return connection
 
     def close(self) -> None:
@@ -217,6 +228,9 @@ class ArtifactStore:
             return
         if self.transaction_active:
             raise StoreError("cannot close an artifact store during a transaction")
+        if self._recovery_required:
+            self._closed = True
+            return
         connection = self._connect()
         try:
             checkpoint = connection.execute(
@@ -276,44 +290,150 @@ class ArtifactStore:
 
         if self._closed:
             raise StoreClosedError("artifact store is closed")
+        if self._recovery_required:
+            raise StoreError(
+                "artifact store requires recovery by a fresh ArtifactStore instance"
+            )
         if self._connection_state.transaction is not None:
             raise StoreError("nested artifact store transactions are unsupported")
 
         with self._exclusive_blob_lock():
-            self._write_transaction_recovery_marker()
-            connection = self._connect()
+            try:
+                if self.transaction_recovery_path.exists():
+                    self._reconcile_blob_quota(force=True)
+                self._write_transaction_recovery_marker()
+                connection = self._connect()
+            except BaseException:
+                self._recovery_required = True
+                raise
             try:
                 connection.execute("BEGIN IMMEDIATE")
                 self._connection_state.transaction = connection
                 _ACTIVE_TRANSACTION_PATHS.paths.add(self.db_path)
-                yield
-                connection.commit()
-            except BaseException:
-                connection.rollback()
-                self._connection_state.transaction = None
-                _ACTIVE_TRANSACTION_PATHS.paths.discard(self.db_path)
-                connection.close()
                 try:
-                    self._reconcile_blob_quota(force=True)
-                except Exception:
-                    _LOGGER.exception(
-                        "failed to reconcile blob accounting after transaction rollback"
-                    )
+                    yield
+                except BaseException:
+                    cleanup_error: BaseException | None = None
+                    try:
+                        connection.rollback()
+                    except BaseException as exc:
+                        cleanup_error = exc
+                    if cleanup_error is None:
+                        try:
+                            self._flush_transaction_directories()
+                        except BaseException as exc:
+                            cleanup_error = exc
+                    try:
+                        connection.close()
+                    except BaseException as exc:
+                        cleanup_error = cleanup_error or exc
+                    finally:
+                        self._clear_transaction_state()
+                    if cleanup_error is not None:
+                        self._recovery_required = True
+                        raise StoreError(
+                            "artifact transaction cleanup was not durable; "
+                            "reopen the store to recover"
+                        ) from cleanup_error
+                    try:
+                        self._reconcile_blob_quota(force=True)
+                    except BaseException:
+                        self._recovery_required = True
+                        raise
+                    raise
+                else:
+                    try:
+                        self._flush_transaction_directories()
+                        connection.commit()
+                        connection.close()
+                    except BaseException as exc:
+                        self._recovery_required = True
+                        try:
+                            connection.close()
+                        except BaseException:
+                            _LOGGER.exception(
+                                "failed to close an uncertain artifact transaction"
+                            )
+                        raise StoreError(
+                            "artifact transaction commit was not durable; "
+                            "reopen the store to recover"
+                        ) from exc
+                    finally:
+                        self._clear_transaction_state()
+                    try:
+                        self._remove_transaction_recovery_marker()
+                    except BaseException:
+                        self._recovery_required = True
+                        raise
+            except BaseException:
+                if self._connection_state.transaction is not None:
+                    try:
+                        connection.close()
+                    except BaseException:
+                        _LOGGER.exception(
+                            "failed to close artifact transaction during setup cleanup"
+                        )
+                    self._clear_transaction_state()
+                elif (
+                    self.transaction_recovery_path.exists()
+                    and not self._recovery_required
+                ):
+                    try:
+                        connection.close()
+                    except BaseException:
+                        _LOGGER.exception(
+                            "failed to close artifact transaction after setup failure"
+                        )
+                    self._recovery_required = True
                 raise
-            else:
-                self._connection_state.transaction = None
-                _ACTIVE_TRANSACTION_PATHS.paths.discard(self.db_path)
-                connection.close()
-                self._remove_transaction_recovery_marker()
 
-    def _sync_root_directory(self) -> None:
+    def _clear_transaction_state(self) -> None:
+        """Release process-local ownership even when durable cleanup fails."""
+
+        self._connection_state.transaction = None
+        self._connection_state.pending_sync_directories.clear()
+        _ACTIVE_TRANSACTION_PATHS.paths.discard(self.db_path)
+
+    def _sync_directory(self, path: Path) -> None:
         if os.name == "nt":  # pragma: no cover - Windows has no directory fsync
             return
-        descriptor = os.open(self.root, os.O_RDONLY)
+        descriptor = os.open(path, os.O_RDONLY)
         try:
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
+
+    def _sync_root_directory(self) -> None:
+        self._sync_directory(self.root)
+
+    def _sync_blob_publication_directories(
+        self,
+        prefix: Path,
+        *,
+        prefix_created: bool,
+    ) -> None:
+        directories = self._connection_state.pending_sync_directories
+        if self.transaction_active:
+            directories.add(prefix)
+            if prefix_created:
+                directories.add(self.blob_root)
+            return
+
+        self._sync_directory(prefix)
+        if prefix_created:
+            self._sync_directory(self.blob_root)
+
+    def _flush_transaction_directories(self) -> None:
+        """Make published blob names durable before committing their metadata."""
+
+        directories = self._connection_state.pending_sync_directories
+        for directory in sorted(
+            directories,
+            key=lambda path: (len(path.parts), str(path)),
+            reverse=True,
+        ):
+            self._sync_directory(directory)
+        directories.clear()
 
     def _write_transaction_recovery_marker(self) -> None:
         with self.transaction_recovery_path.open("wb") as marker:
@@ -329,6 +449,7 @@ class ArtifactStore:
     def _initialize_database(self) -> None:
         with self._exclusive_blob_lock(), self.connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
+            connection.execute("PRAGMA synchronous = FULL")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS artifacts (
@@ -385,11 +506,13 @@ class ArtifactStore:
             raise ArtifactIntegrityError(f"invalid blob digest: {digest!r}")
         return self.blob_root / hex_digest[:2] / hex_digest[2:]
 
-    def _scan_blob_bytes_committed(self) -> int:
+    def _scan_blob_bytes_committed(self) -> tuple[int, set[Path]]:
         total = 0
+        observed_prefixes: set[Path] = set()
         for prefix in self.blob_root.iterdir():
             if not prefix.is_dir() or prefix.is_symlink():
                 continue
+            observed_prefixes.add(prefix)
             for blob in prefix.iterdir():
                 if blob.is_file() and not blob.is_symlink():
                     digest = f"sha256:{prefix.name}{blob.name}"
@@ -420,7 +543,7 @@ class ArtifactStore:
                         )
                     self._validated_blobs[digest] = after_signature
                     total += after.st_size
-        return total
+        return total, observed_prefixes
 
     def _reconcile_blob_quota(self, *, force: bool = False) -> None:
         """Recover quota accounting only after an interrupted blob mutation."""
@@ -451,7 +574,10 @@ class ArtifactStore:
             ):
                 return
 
-            total = self._scan_blob_bytes_committed()
+            total, observed_prefixes = self._scan_blob_bytes_committed()
+            for prefix in sorted(observed_prefixes, key=str):
+                self._sync_directory(prefix)
+            self._sync_directory(self.blob_root)
             with self.connection() as connection:
                 connection.execute(
                     """
@@ -553,18 +679,14 @@ class ArtifactStore:
         digest = _sha256(data)
         target = self._blob_path(digest)
         with self._exclusive_blob_lock():
+            if not self.transaction_active and self.transaction_recovery_path.exists():
+                self._reconcile_blob_quota(force=True)
             prefix_created = not target.parent.exists()
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.parent.is_symlink() or not target.parent.is_dir():
                 raise ArtifactIntegrityError(
                     f"blob prefix is not a local directory for {digest}"
                 )
-            if prefix_created and os.name != "nt":
-                blob_root_descriptor = os.open(self.blob_root, os.O_RDONLY)
-                try:
-                    os.fsync(blob_root_descriptor)
-                finally:
-                    os.close(blob_root_descriptor)
             if target.exists():
                 if target.is_symlink() or not target.is_file():
                     raise ArtifactIntegrityError(
@@ -626,12 +748,10 @@ class ArtifactStore:
                         raise ArtifactIntegrityError(
                             f"concurrent blob does not match digest {digest}"
                         ) from exc
-                if os.name != "nt":
-                    directory_descriptor = os.open(target.parent, os.O_RDONLY)
-                    try:
-                        os.fsync(directory_descriptor)
-                    finally:
-                        os.close(directory_descriptor)
+                self._sync_blob_publication_directories(
+                    target.parent,
+                    prefix_created=prefix_created,
+                )
             finally:
                 temporary.unlink(missing_ok=True)
                 if reserved and not published:
