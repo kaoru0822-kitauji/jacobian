@@ -297,6 +297,43 @@ def _vector_rank(vectors: Sequence[Sequence[int]], *, prime: int) -> int:
     return _rank(rows, columns=len(vectors), prime=prime)
 
 
+class _IncrementalVectorBasis:
+    def __init__(self, *, dimension: int, prime: int) -> None:
+        self._prime = prime
+        self._rows: dict[int, list[int]] = {}
+        self._dimension = dimension
+
+    def add(self, vector: Sequence[int]) -> bool:
+        reduced = [value % self._prime for value in vector]
+        if len(reduced) != self._dimension:
+            raise ValueError("basis vector has the wrong dimension")
+        for existing_pivot, row in self._rows.items():
+            factor = reduced[existing_pivot]
+            if factor:
+                reduced = [
+                    (value - factor * basis_value) % self._prime
+                    for value, basis_value in zip(reduced, row, strict=True)
+                ]
+        new_pivot = next(
+            (index for index, value in enumerate(reduced) if value),
+            None,
+        )
+        if new_pivot is None:
+            return False
+        inverse = pow(reduced[new_pivot], -1, self._prime)
+        reduced = [value * inverse % self._prime for value in reduced]
+        for existing_pivot, row in tuple(self._rows.items()):
+            factor = row[new_pivot]
+            if factor:
+                self._rows[existing_pivot] = [
+                    (value - factor * basis_value) % self._prime
+                    for value, basis_value in zip(row, reduced, strict=True)
+                ]
+        self._rows[new_pivot] = reduced
+        self._rows = dict(sorted(self._rows.items()))
+        return True
+
+
 def _column_basis(
     matrix: Sequence[Sequence[int]],
     *,
@@ -307,13 +344,11 @@ def _column_basis(
         return ()
     row_count = len(matrix)
     selected: list[tuple[int, ...]] = []
-    rank = 0
+    basis = _IncrementalVectorBasis(dimension=row_count, prime=prime)
     for column in range(columns):
         vector = tuple(matrix[row][column] % prime for row in range(row_count))
-        candidate_rank = _vector_rank((*selected, vector), prime=prime)
-        if candidate_rank > rank:
+        if basis.add(vector):
             selected.append(vector)
-            rank = candidate_rank
     return tuple(selected)
 
 
@@ -323,16 +358,15 @@ def _quotient_basis(
     *,
     prime: int,
 ) -> tuple[tuple[int, ...], ...]:
-    selected = [tuple(vector) for vector in boundaries]
-    rank = _vector_rank(selected, prime=prime)
+    dimension = len(cycles[0]) if cycles else (len(boundaries[0]) if boundaries else 0)
+    basis = _IncrementalVectorBasis(dimension=dimension, prime=prime)
+    for boundary in boundaries:
+        basis.add(boundary)
     quotient: list[tuple[int, ...]] = []
     for cycle in cycles:
         vector = tuple(cycle)
-        candidate_rank = _vector_rank((*selected, vector), prime=prime)
-        if candidate_rank > rank:
-            selected.append(vector)
+        if basis.add(vector):
             quotient.append(vector)
-            rank = candidate_rank
     return tuple(quotient)
 
 
