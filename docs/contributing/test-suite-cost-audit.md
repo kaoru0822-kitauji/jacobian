@@ -21,24 +21,25 @@ their existing durability boundary.
 
 On the same local host, fresh core construction fell from 31.6 to 13.0 seconds.
 Attaching to a copied core snapshot took 0.79 seconds, and adding authorized
-references to a copied core snapshot took 3.68 seconds. `make test-fast` fell
-from 237.91 seconds wall time to 56.55 seconds while selecting 591 tests; three
-exhaustive cases were explicitly marked `slow` and excluded from that lane.
+references to a copied core snapshot took 3.68 seconds. The pre-topology edit
+lane fell from 237.91 seconds wall time to 56.55 seconds while selecting 591
+tests; three exhaustive cases were excluded from that baseline.
 These are single-host observations, not timing gates.
 
 ## 2026-07-29 core scheduler follow-up
 
-The core lane was benchmarked in three alternating, same-seed pairs with four
+The pre-topology core lane was benchmarked in three alternating, same-seed pairs with four
 workers. Targeted `loadgroup` scheduling, with only the reference claim schema
 module grouped around its expensive shared fixture, had a 45.5-second median
 wall time. The existing `worksteal` scheduler had a 46.9-second median. Host
 noise was material, so this is a small scheduling improvement rather than a
 performance guarantee.
 
-`make test-core` therefore uses `loadgroup`, while integration and general
-parallel targets retain `worksteal`. A global `loadscope` policy was rejected:
-it groups every module whether or not it shares expensive setup and produced
-worse balancing in a controlled run.
+That historical `core`/`integration` split has since been replaced by semantic
+lanes. The current topology uses sequential unit and storage/Lean lanes,
+`worksteal` for component, domain, process, and MCP lanes, and at most two
+workers for composition and provider boundaries. A single scheduler cannot
+express those incompatible resource limits.
 
 ## 2026-07-29 compatibility-lane decision
 
@@ -52,26 +53,23 @@ core cases and 914.7 aggregate case-seconds to the 771 integration and
 end-to-end cases. Aggregate case time can exceed wall time because xdist runs
 cases concurrently.
 
-The same run's four Python 3.12 integration shards had a 1.10x max/min wall-time
+The same run's four Python 3.12 pre-topology integration shards had a 1.10x max/min wall-time
 ratio. Nearby pull-request and post-merge runs measured 1.19x and 1.14x,
 respectively, so the duration-fed shard allocation was not the source of the
 critical span.
 
-Keep Python 3.13 compatibility as one exhaustive job. Splitting it into one core
-job and one integration job would duplicate checkout, environment setup, and
-artifact handling while leaving roughly 96 percent of the measured test work
-on the integration side; it would not materially shorten the critical span.
-Any future change must benchmark actual Python 3.13 integration sharding and
-report both critical-span improvement and added runner time before changing
-the workflow.
+That historical exhaustive compatibility job has been replaced by a small
+Python 3.13 import/API compatibility smoke. Full correctness lanes remain on
+the canonical Python version; expanding compatibility again requires measured
+critical-span and runner-cost evidence.
 
 ## Measured lanes
 
 | Lane | Selected tests | Observed wall time | Purpose |
 | --- | ---: | ---: | --- |
 | Unfiltered `uv run pytest` | 546 | 372.48 s | Diagnostic baseline; mixes Lean into the general xdist pool |
-| `make test-fast`, before this audit | 246 | 43.92 s | Non-integration edit loop |
-| `make test-fast`, after fixture reuse | 246 | 6.55 s | Non-integration edit loop |
+| Pre-topology edit loop, before this audit | 246 | 43.92 s | Non-domain baseline |
+| Pre-topology edit loop, after fixture reuse | 246 | 6.55 s | Non-domain baseline |
 | Integration, excluding end-to-end and Lean | 275 | 218.88 s | Real stores, subprocesses, adapters, and capability composition |
 | End-to-end | 5 | 33.84 s | Distinct complete mathematical workflows |
 | `make test-lean` | 20 | 218.26 s | Serial pinned Lean and Mathlib coverage |
@@ -102,48 +100,40 @@ store now reuses immutable content-addressed artifacts while constructing an
 isolated request value for each case. All attack cases remain. This reduced the
 fast lane by about 85 percent, from 43.92 to 6.55 seconds.
 
-Pull requests use stable core and integration/end-to-end lanes on the canonical
-Python version. The integration lane is divided with pinned `pytest-split`
-using committed test durations; xdist's `worksteal` scheduler balances each
-shard across its runner's four CPUs. The merge queue adds the second supported
-Python version and combined coverage, so exhaustive work remains a merge gate
-without multiplying every review run.
+Pull requests now use separate semantic lanes on the canonical Python version.
+Domain shards may use validated `pytest-split` timing; xdist's `worksteal`
+balances compatible shards. Storage, process, provider, Lean, and e2e work
+retain dedicated resource lanes. The merge queue adds compatibility, coverage,
+ordering, stress, and performance evidence without mixing incompatible jobs.
 
 ## Development policy
 
 Use the cheapest lane that preserves the boundary being changed:
 
 ```sh
-make test-fast
-make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
-make test
+make test-unit
+make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
+make test-composition
+make test-e2e
 make test-lean
-make validate-full
+make test-all-ci
 ```
 
-`make test-fast` is the normal edit loop. Use focused integration tests while
-changing stores, adapters, plugins, subprocesses, or checker execution.
-`make check` combines fast Ruff checks, strict typing, and the unit-only loop;
-use `make test-fast` for the full sequential core edit loop.
+Use focused component, domain, composition, or boundary tests while changing
+stores, adapters, plugins, subprocesses, or checker execution. `make check`
+combines Ruff, strict typing, and the unit lane for the routine local handoff.
 Dependency and dead-code analysis and package builds remain available through
 `make check-static` but are CI-owned rather than routine local handoff work.
-The installed pre-push hook uses `make check` for the fast Ruff, mypy, and
-unit-only gate; `make pre-push-full` adds the sequential core tests when
-needed.
-`make test` runs the complete non-Lean suite, and `make test-lean` keeps the
-memory-heavy backend serial. Neither is a routine pre-push requirement; CI
-owns exhaustive validation.
-`make validate-full` combines the broad local Python, Lean, static, and package
-checks when CI is unavailable or an environment-specific failure requires it.
-Python 3.13 compatibility, combined coverage, security, duplicate-code, and npm
-validation remain separate CI lanes. Do not use unfiltered `uv run pytest` as
-the default handoff command because it mixes Lean into the general parallel
-pool.
+The installed pre-push hook runs only `make lint typecheck`; affected tests and
+CI own correctness lanes. `make test-all-ci` is the explicit exceptional local
+reproduction of every semantic lane. Python 3.13 compatibility, combined
+coverage, security, duplicate-code, and npm validation remain separate CI
+lanes. Do not use unfiltered `uv run pytest` as the default handoff command:
+semantic lanes keep incompatible resources in separate invocations.
 
 The Lean suite runs serially on one prepared runner. This avoids concurrent
-multi-gigabyte Mathlib processes, collects every `lean_runtime` test without a
-file allowlist, and keeps the pinned toolchain setup attached to the tests that
-consume it.
+multi-gigabyte Mathlib processes and keeps the pinned toolchain setup attached
+to the tests that consume it.
 
 ## Follow-up opportunities
 
@@ -152,7 +142,7 @@ consume it.
 - Reuse module fixtures only where inputs remain isolated and the shared state
   is immutable.
 - Track lane wall times periodically; investigate changes before adding a
-  blanket `slow` marker or weakening required coverage.
+  blanket cost marker or weakening required coverage.
 - Move backend combinations to a slower lane only when the pull-request lane
   still exercises every affected trust boundary.
 
@@ -175,14 +165,14 @@ unrelated host load, and exhaustive local validation is deliberately not the
 routine loop. Keep the stable four-worker cap and revisit it only with
 controlled repeated measurements on local and CI runners.
 
-The actionable redundancy was procedural. The routine `make check` lane now
-contains only fast Ruff and non-integration tests; named contract, checker, MCP,
-and storage targets expose common focused checks. CI skips heavy Python and
-Lean lanes for documentation-only and npm-only changes, uses explicit suite
-ownership for known paths, and fails closed for unknown ones. Focused Python
-and Lean debug workflows provide
-remote reproduction without rerunning unrelated matrices. On the measured
-host, the resulting `make check` completed 256 selected tests in 8.36 seconds.
+The actionable redundancy was procedural. `make check` now combines Ruff,
+mypy, and the unit lane, while semantic targets expose focused component,
+domain, composition, storage, process, MCP, provider, Lean, and e2e checks. CI
+skips heavy lanes for documentation-only and npm-only changes, uses explicit
+suite ownership for known paths, and fails closed for unknown ones. Focused
+Python and Lean debug workflows provide remote reproduction without rerunning
+unrelated matrices. On the measured host, the resulting `make check` completed
+256 selected tests in 8.36 seconds.
 
 Source-to-suite impact is declared in `.github/ci-impact.json` and tested
 against tracked source files. Unknown paths still fail closed. Each measured CI
@@ -194,21 +184,21 @@ Scheduled lanes exercise repeated property tests, alternate orders, optional
 providers, and the core performance benchmark outside the pull-request
 critical span.
 
-Do not run the complete non-Lean and Lean suites repeatedly during
-implementation and then immediately repeat them in pull-request CI. Use
-`make check` plus the affected focused target, and let CI provide one exhaustive
-pass on the final tree. Run `make validate-full` locally only when CI is
-unavailable or an environment-specific failure needs reproduction.
+Do not run every semantic lane repeatedly during implementation and then
+immediately repeat them in pull-request CI. Use `make check` plus the affected
+focused target, and let CI provide one exhaustive pass on the final tree. Run
+`make test-all-ci` locally only when CI is unavailable or an
+environment-specific failure needs reproduction.
 
 Some short CI jobs still overlap in setup or packaging work, but they run in
 parallel and were not on the measured critical span. Consolidating them would
 increase workflow coupling without materially shortening feedback, so this
 audit leaves them unchanged.
 
-An ephemeral timing artifact feeds `pytest-split`'s least-duration algorithm
-for the four integration shards. Successful `main` runs publish fresh history;
-missing or invalid history falls back to equal weighting. CI metrics report
-max/min shard skew and flag ratios above 1.5x.
+An ephemeral timing artifact feeds domain sharding only. Successful `main` runs
+publish fresh history; missing or invalid history falls back to equal weighting.
+Storage, process, provider, Lean, and e2e lanes retain their own resource
+topology rather than being mixed to equalize aggregate duration.
 
 Do not stack a local duration refresh, full integration profiling, and focused
 module debugging on the same host at once. That contention recreates the
@@ -216,52 +206,32 @@ pull-request wall-time problem the lane split exists to avoid: routine
 `make check`, exhaustive merge-queue validation, and scheduled
 stress/performance work must remain separate executions.
 
-The Make interface enforces that boundary: outside CI, `make test` and
-`make test-integration` require an explicit `TESTS=<file-or-node>` selection.
-`make test-integration-all` and `make validate-full` are deliberately named
-escape hatches for CI outages and environment-specific reproduction. Before
-using either, inspect the host for existing pytest processes; delegated broad
-runs contend for CPU, SQLite locks, durable filesystem operations, and
-subprocess capacity, producing misleading 30- and 60-second timeout failures.
+The fixture boundary is now explicit. Unit tests receive value fixtures only;
+component tests own one real service; domain tests receive `domain_services`
+with explicit bundles; composition tests opt into visibly expensive
+`fresh_complete_runtime`, `attached_complete_runtime`, or
+`authorized_complete_runtime`; and boundary tests own durable stores,
+checker/process servers, MCP transports, and provider environments. Immutable
+templates are built in a temporary sibling and atomically renamed before tests
+copy their own state. No mutable runtime, registry, connection, or workspace is
+shared between tests.
 
-Portfolio smoke that constructs a full runtime lives under
-`tests/integration/` rather than `tests/unit/`, so `make test-fast` stays free
-of multi-second runtime startups. Modules that need authorized references opt
-into `initialized_runtime_store_with_references` instead of rebuilding that
-install on every case.
 
-Attaching `create_runtime(tmp_path)` after the store fixture is intentional, not
-a double bootstrap: the session template pays fresh construction once per worker,
-`copytree` seeds each test root in milliseconds, and attach reuses content-
-addressed descriptors in well under a second. Prefer the `runtime` /
-`runtime_with_references` fixtures for that attach step; do not remove the store
-fixtures to "avoid double construction."
+## 2026-07-29 topology cost controls
 
-Suite infrastructure checks for the store templates themselves also live under
-`tests/integration/`: building and freezing those snapshots is multi-second
-setup work and must not run in the routine fast lane.
+The semantic lanes make the resource boundary explicit:
 
-Measured fixture anti-patterns that were fixed after the ownership merge:
+- Python 3.13 runs a small import/API compatibility smoke instead of duplicating
+  the complete suite.
+- Makefile edits no longer route to unrelated Lean or npm jobs.
+- The pre-push hook runs only Ruff and mypy; affected tests and CI own
+  correctness lanes.
+- Scheduled benchmark comparisons use a 25% noise allowance and fail on a
+  classified regression.
+- The global signal timeout is gone. Lane runners supply deadlines, and native
+  or external work belongs in killable process boundaries.
+- Stress selects the explicitly marked property tests; its repetition count is
+  visible as STRESS_COUNT.
 
-- Plugin registry tests constructed `create_runtime(tmp_path / "state")` while
-  the module fixture seeded `tmp_path`, so the template copy was unused. They
-  now use a `plugin_kernel` fixture that copies the template into `state`.
-- Finite-graph oracle cases paid a ~40s first-call Z3/solver startup on one
-  parametrized node. Warmup now runs once inside the module-scoped
-  `oracle_kernel` fixture; remaining cases stay sub-second to low single digits.
-- SAT public reproductions and CLI enumeration that need authorized references
-  seed from `initialized_runtime_store_with_references` instead of an empty
-  root.
-- Agent A/B and graph-shrinking cases that need a sibling state directory (not
-  `tmp_path` itself) copy `runtime_store_template_with_references` into that
-  directory instead of building an empty store and reinstalling references.
-- Graph atlas search remains expensive (~90s measured) but already lives in
-  the integration lane; no decorative `slow` marker was added until a suite
-  actually excludes that marker.
-- Graph counterexample shrinking and agent A/B scorers built runtimes under
-  `tmp_path / "state"` (or sibling roots) while the module fixture only seeded
-  `tmp_path`, so template reuse never applied. Helpers now copy the reference
-  template into those subdirectories before construction.
-- On a quiet host after these moves, `make test-fast` completed 519 selected
-  tests in about 19 seconds with no `create_runtime` constructions left under
-  `tests/unit`, `tests/contract`, or `tests/checkers`.
+These controls complement the historical measurements above. They do not turn
+machine-local timing into a correctness assertion.

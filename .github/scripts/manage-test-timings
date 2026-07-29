@@ -18,13 +18,13 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / ".github" / "ci-config.json"
-ARTIFACT_NAME = "integration-test-durations"
-ARTIFACT_FILE = "integration-test-durations.json"
+ARTIFACT_NAME = "domain-test-durations"
+ARTIFACT_FILE = "domain-test-durations.json"
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ENTRIES = 10_000
 MAX_CANDIDATES = 5
 HTTP_TIMEOUT_SECONDS = 10
-TEST_ROOTS = ("tests/integration/", "tests/end_to_end/")
+TEST_ROOTS = ("tests/domain/",)
 
 
 class CrossOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -59,17 +59,17 @@ class CrossOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
-def integration_shard_count() -> int:
-    return int(ci_config()["integration_shard_count"])
+def domain_shard_count() -> int:
+    return int(ci_config()["domain_shard_count"])
 
 
 def ci_config() -> dict[str, Any]:
     payload = json.loads(CONFIG.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("ci-config.json must contain a JSON object")
-    count = payload.get("integration_shard_count")
+    count = payload.get("domain_shard_count")
     if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-        raise ValueError("integration_shard_count must be a positive integer")
+        raise ValueError("domain_shard_count must be a positive integer")
     for key in ("node_version_jscpd", "node_version_npm"):
         value = payload.get(key)
         if not isinstance(value, str) or not value:
@@ -102,9 +102,9 @@ def emit_plan_outputs() -> None:
     """Print GitHub Actions outputs for shard, Node, and pytest-split pins."""
 
     config = ci_config()
-    count = int(config["integration_shard_count"])
-    print(f"integration-shard-count={count}")
-    print(f"integration-shards={json.dumps(list(range(1, count + 1)))}")
+    count = int(config["domain_shard_count"])
+    print(f"domain-shard-count={count}")
+    print(f"domain-shards={json.dumps(list(range(1, count + 1)))}")
     print(f"node-version-jscpd={config['node_version_jscpd']}")
     print(f"node-version-npm={config['node_version_npm']}")
     print(f"pytest-randomly-shard-seed={config['pytest_randomly_shard_seed']}")
@@ -201,8 +201,8 @@ def artifact_durations(
         raise ValueError("timing artifact payload must be a JSON object")
     if (
         payload.get("version") != 1
-        or payload.get("suite") != "integration"
-        or payload.get("shard_count") != integration_shard_count()
+        or payload.get("suite") != "domain"
+        or payload.get("shard_count") != domain_shard_count()
     ):
         raise ValueError("timing artifact metadata is incompatible")
     return validate_durations(payload.get("durations"), ARTIFACT_FILE)
@@ -242,7 +242,7 @@ def prepare(output: Path) -> None:
             ) as exc:
                 artifact_id = artifact.get("id", "unknown")
                 warning(
-                    "rejected integration timing artifact "
+                    "rejected domain timing artifact "
                     f"{artifact_id}: {type(exc).__name__}"
                 )
                 continue
@@ -250,7 +250,7 @@ def prepare(output: Path) -> None:
                 break
         if durations is None:
             raise ValueError(
-                "no valid successful main-branch timing artifact is available"
+                "no valid successful main-branch domain timing artifact is available"
             )
     except (
         IndexError,
@@ -260,7 +260,7 @@ def prepare(output: Path) -> None:
         ValueError,
         zipfile.BadZipFile,
     ) as exc:
-        warning(f"{exc}; integration shards will use equal weighting")
+        warning(f"{exc}; domain shards will use equal weighting")
         durations = {}
     write_durations(output, durations)
 
@@ -272,7 +272,7 @@ def merge(
     python_version: str,
     pytest_split_version: str,
 ) -> None:
-    shard_count = integration_shard_count()
+    shard_count = domain_shard_count()
     if len(inputs) != shard_count:
         raise ValueError(
             f"expected {shard_count} shard timing files, received {len(inputs)}"
@@ -289,7 +289,7 @@ def merge(
 
     envelope = {
         "version": 1,
-        "suite": "integration",
+        "suite": "domain",
         "source_sha": source_sha,
         "generated_at": datetime.now(UTC).isoformat(),
         "python_version": python_version,

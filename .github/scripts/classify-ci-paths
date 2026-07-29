@@ -51,11 +51,15 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
     if force_lean:
         suites.add("lean")
 
+    run_unit = bool({"unit", "component"} & suites)
+    run_domain = bool(
+        {"domain", "composition", "storage", "process", "mcp", "e2e"} & suites
+    )
     if exhaustive:
         classification = "exhaustive"
     elif suites == {"docs"}:
         classification = "docs"
-    elif suites == code_suites or suites == all_suites:
+    elif suites in (code_suites, all_suites):
         classification = "full"
     elif not suites:
         classification = "docs"
@@ -63,25 +67,50 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
         classification = "npm"
     elif suites == {"lean"}:
         classification = "lean"
-    elif suites <= {"core", "static"} and "core" in suites:
-        classification = "python-core"
-    elif suites <= {"integration", "static"} and "integration" in suites:
-        classification = "python-integration"
+    elif (
+        suites <= {"unit", "component", "static"} and run_unit and not run_domain
+    ) or (
+        suites
+        <= {
+            "domain",
+            "composition",
+            "storage",
+            "process",
+            "mcp",
+            "e2e",
+            "static",
+        }
+        and run_domain
+        and not run_unit
+    ):
+        classification = "python"
     else:
         classification = "selective"
 
-    run_core = "core" in suites
-    run_integration = "integration" in suites
+    # Existing impact rules identify broad Python ownership. Expand that
+    # ownership into the semantic resource lanes; each lane still executes
+    # through its own topology runner and timeout.
+    semantic_lanes = {
+        "run-unit": run_unit,
+        "run-component": run_unit,
+        "run-domain": run_domain,
+        "run-composition": run_domain,
+        "run-storage": run_domain,
+        "run-process": run_domain,
+        "run-mcp": run_domain,
+        "run-provider": "provider" in suites,
+        "run-e2e": run_domain,
+    }
     plan: dict[str, str] = {
         "classification": classification,
-        "run-python": str(run_core or run_integration).lower(),
-        "run-core": str(run_core).lower(),
-        "run-integration": str(run_integration).lower(),
-        "run-coverage": str(exhaustive and run_core and run_integration).lower(),
-        "run-compatibility": str(exhaustive and run_core and run_integration).lower(),
+        "run-python": str(run_unit or run_domain or ("provider" in suites)).lower(),
+        **{key: str(value).lower() for key, value in semantic_lanes.items()},
+        "run-coverage": str(exhaustive and run_unit and run_domain).lower(),
+        "run-compatibility": str(exhaustive and run_unit and run_domain).lower(),
     }
     for suite in (
         "lean",
+        "provider",
         "npm",
         "static",
         "build",
@@ -100,7 +129,7 @@ def main() -> None:
         "--force-exhaustive",
         dest="exhaustive",
         action="store_true",
-        help="Run every suite, including coverage and compatibility.",
+        help="Run every configured lane, including coverage and compatibility.",
     )
     parser.add_argument("--force-lean", action="store_true")
     parser.add_argument("paths", nargs="*")

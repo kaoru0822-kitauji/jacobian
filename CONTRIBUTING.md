@@ -22,42 +22,36 @@ commands aligned:
 
 ```sh
 make setup
-make test-fast
+make test-unit
+make test-component
 ```
 
-`make test-fast` is the short sequential non-integration feedback loop; it
-excludes tests explicitly marked `slow`. `make test-unit-fast` is the smaller
-unit-only lane used by the pre-push `make check`; contract, checker, and
-reference tests remain available through their focused targets and CI. `make
-test-core` runs the same core directories with default xdist parallelism and
-includes `slow` cases; CI's core lane uses that target. Outside CI, `make test`
-and `make test-integration` require `TESTS=<file-or-node>` so their
-innocent-looking names cannot accidentally start the exhaustive integration
-lane. Run `make check` before
-pushing; it performs fast Ruff, strict typing, and `test-unit-fast`. Push after
-that check and let CI own
-path-planned validation: static analysis, package builds, planned Python lanes,
-and Lean/npm/security/duplicate-code when the impact manifest selects them.
-Coverage and Python 3.13 compatibility run only on exhaustive plans (merge
-queue and `main`). `make check-static` reproduces CI's static checks plus a
-local package build when a focused change needs them. `make validate-full` is
-the broadest local Python, Lean, static, and package validation target. It does
-not reproduce CI's Python 3.13 compatibility, combined coverage, security,
-duplicate-code, or npm lanes (`make security-audit`, `make duplicate-code`, and
-`make npm-test` cover those locally). Run `make help` for focused commands. The
-measured costs and reasoning behind these lanes are recorded in the
+The suite is split into semantic lanes. Use the narrowest lane that proves the
+behavior: `unit` for pure contracts and models, `component` for one real
+service, `domain` for explicitly installed mathematical bundles,
+`composition` for complete runtime wiring, and the `storage`, `process`,
+`mcp`, `provider`, `lean`, and `e2e` lanes for their named boundaries. Each
+target accepts a pytest file or node through `TESTS=<file-or-node>` and extra
+pytest options through `PYTEST_ARGS`. `make check` runs Ruff, mypy, and the
+unit lane; it is a useful local handoff, but the pre-push hook intentionally
+runs only `make lint typecheck` so it stays below the interactive feedback
+budget. CI owns path-planned correctness lanes and optional environments.
+
+`make check-static` adds dependency/dead-code checks and a package build when a
+focused change needs them. `make test-all-ci` is the explicit exceptional local
+reproduction of every semantic lane. Run `make help` for the complete command
+index. The measured costs and reasoning behind these lanes are recorded in the
 [test-suite cost audit](docs/contributing/test-suite-cost-audit.md).
 Tests can be narrowed without learning another wrapper:
 
 ```sh
-make test-integration TESTS=tests/integration/infrastructure/test_mcp_adapter.py
-make test-integration TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
-make test-contracts
-make test-checkers
-make test-subprocess
+make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
+make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py PYTEST_ARGS="-k schema -n 0"
+make test-unit TESTS=tests/unit/contracts/test_result_envelope.py
+make test-process TESTS=tests/boundary/process/search/test_shrinking.py
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
-make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
+make test-lean TESTS=tests/boundary/providers/lean/test_lean_repl_runtime.py PYTEST_ARGS="-k induction"
 ```
 
 All Makefile pytest targets print their ten slowest tests by default. Set
@@ -66,12 +60,10 @@ value such as `PYTEST_DIAGNOSTIC_ARGS=--durations=25` while investigating a
 regression.
 
 Run `make hooks` once to install commit-time formatting, syntax, secret,
-large-file, dead-code, and actionlint hooks plus the fast `make check`
-pre-push gate. `make check` runs Ruff, mypy, and the unit-only fast lane;
-contract, checker, and reference suites remain in CI. Use
-`make pre-push-full` when a local push also needs the sequential core tests.
-Hooks remain bypassable for exceptional cases with Git's standard
-`--no-verify` option.
+large-file, dead-code, and actionlint hooks plus the static `make lint typecheck`
+pre-push gate. Use `make check` when you also want the unit lane locally. Hooks
+remain bypassable for exceptional cases with Git's standard `--no-verify`
+option.
 `make fix` applies Ruff's safe lint fixes followed by formatting. `make
 precommit` applies those fixes and then runs the routine handoff checks.
 
@@ -79,15 +71,14 @@ On macOS, read the
 [Z3 installation note](README.md#macos-and-z3) before troubleshooting a
 source-build failure from `uv sync --dev`.
 
-Use focused tests while implementing. Run `make check` before pushing and wait
-for green CI checks before merge. Run broad local validation only when changing
-CI itself, debugging an environment-specific failure, or when CI is
-unavailable. `make test-integration-all` and `make validate-full` are explicit
-exception paths, not routine confidence gates. Before either, verify that no
-other pytest or delegated-agent validation is running on the host. Never assign
-an exhaustive suite to a parallel agent sharing the checkout. Use
-`make validate-full` for the exceptional path and rely on CI
-for its additional lanes. Report only checks that actually ran. The manually
+Use focused tests while implementing. Run `make check` (or the affected
+semantic target) and wait for green CI checks before merge. Run broad local
+validation only when changing CI itself, debugging an environment-specific
+failure, or when CI is unavailable. `make test-all-ci` is an explicit exception
+path, not a routine confidence gate. Before it, verify that no other pytest or
+delegated-agent validation is running on the host. Never assign an exhaustive
+suite to a parallel agent sharing the checkout. Report only checks that
+actually ran. The manually
 dispatched Python Debug and Lean Debug workflows reproduce one pytest file or
 node in a prepared remote environment when the relevant local runtime is
 impractical.
@@ -147,18 +138,17 @@ Keep the local edit loop on directory-owned Make targets rather than inventing
 marker filters:
 
 ```sh
-make test-fast
-make test-core
-make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
+make test-unit
+make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
+make test-domain TESTS=tests/domain/graph/test_graph_invariant_domain.py
 ```
 
-Ownership is by test directory, not by `integration` / `end_to_end` markers.
-Tests marked `lean_runtime` run serially through `make test-lean`; keep them out
-of the normal xdist pool because Mathlib processes can retain several
-gigabytes. CI installs the pinned Lean toolchain and Mathlib cache in a
-dedicated pair of serial lanes on separate runners.
+Ownership is by test directory. Lean tests live in the serial `lean` boundary
+lane; keep them out of the normal xdist pools because Mathlib processes can
+retain several gigabytes. CI installs the pinned Lean toolchain and Mathlib
+cache in a dedicated runner.
 Use `uv run --locked pytest --lf` after a failure, `uv run --locked pytest -n 0`
-while debugging, and `make check` before pushing. Use
+while debugging, and `make check` before handoff. Use
 `make test-lean TESTS=path/to/test.py` for
 a deliberately focused local Lean reproduction, or dispatch the remote Lean
 debug workflow from GitHub Actions when local Lean is impractical. Use
@@ -225,18 +215,14 @@ layout or diagrams materially change.
 
 ## Test ownership and selection
 
-Test directories define semantic ownership: `tests/unit`, `tests/contract`,
-`tests/checkers`, and `tests/reference` form the core suite, while
-`tests/integration` and `tests/end_to_end` form the integration suite. Use
-`make test-core` and `make test-integration` as the canonical entry points.
-Markers describe runtime traits such as `lean_runtime`, `slow`, `subprocess`, or
-`external_backend`; they do not duplicate directory ownership. Reproduce the
-scheduled validation lanes locally with `make test-stress` and
+Test directories define semantic ownership: `tests/unit`, `tests/component`,
+`tests/domain`, `tests/composition`, `tests/boundary`, and `tests/e2e`. Use the
+matching `make test-*` target as the canonical entry point. Markers are retained
+only when they alter execution: `requires_provider(name)`, `performance`,
+`property`, and `destructive_process`. They do not replace directory ownership.
+Reproduce the scheduled validation lanes locally with `make test-stress` and
 `make test-ordering PYTEST_ARGS=--randomly-seed=17` (locked `pytest-repeat` and
 `pytest-randomly` are part of the dev environment).
-Use `make test-subprocess` to run the clean-process replay tests selected by the
-`subprocess` marker. The marker is a selection label; it does not serialize
-unrelated tests under xdist.
 
 CI change impact is declared in `.github/ci-impact.json`. Its matching rules are
 additive, so a path may require several suites. Integration timing history is a

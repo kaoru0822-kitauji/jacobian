@@ -1,8 +1,15 @@
 {
   "version": 2,
   "suites": [
-    "core",
-    "integration",
+    "unit",
+    "component",
+    "domain",
+    "composition",
+    "storage",
+    "process",
+    "mcp",
+    "provider",
+    "e2e",
     "lean",
     "npm",
     "static",
@@ -14,33 +21,89 @@
   "rules": [
     {
       "name": "documentation",
-      "patterns": ["docs/**", "*.md", ".github/ISSUE_TEMPLATE/**", ".github/CODEOWNERS"],
-      "suites": ["docs"]
+      "patterns": [
+        "docs/**",
+        "*.md",
+        ".github/ISSUE_TEMPLATE/**",
+        ".github/CODEOWNERS"
+      ],
+      "suites": [
+        "docs"
+      ]
     },
     {
       "name": "npm-package",
-      "patterns": ["npm/**"],
-      "suites": ["npm"]
+      "patterns": [
+        "npm/**"
+      ],
+      "suites": [
+        "npm"
+      ]
     },
     {
       "name": "lean-runtime",
-      "patterns": ["lean/**"],
-      "suites": ["lean"]
+      "patterns": [
+        "lean/**"
+      ],
+      "suites": [
+        "lean"
+      ]
     },
     {
       "name": "lean-python-tests",
-      "patterns": ["tests/integration/lean/**"],
-      "suites": ["lean", "static"]
+      "patterns": [
+        "tests/boundary/providers/lean/**"
+      ],
+      "suites": [
+        "lean",
+        "static"
+      ]
     },
     {
-      "name": "python-core-tests",
-      "patterns": ["tests/unit/**", "tests/contract/**", "tests/checkers/**", "tests/reference/**"],
-      "suites": ["core", "static"]
+      "name": "optional-provider-tests",
+      "patterns": [
+        "tests/boundary/providers/cvc5/**",
+        "tests/boundary/providers/external_sat/**",
+        "tests/boundary/providers/flint/**",
+        "tests/boundary/providers/graph/**",
+        "tests/boundary/providers/sympy/**"
+      ],
+      "suites": [
+        "provider",
+        "static"
+      ]
     },
     {
-      "name": "python-integration-tests",
-      "patterns": ["tests/integration/**", "tests/end_to_end/**"],
-      "suites": ["integration", "static"]
+      "name": "unit-component-tests",
+      "patterns": [
+        "tests/unit/**",
+        "tests/component/**"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "static"
+      ]
+    },
+    {
+      "name": "semantic-test-lanes",
+      "patterns": [
+        "tests/domain/**",
+        "tests/composition/**",
+        "tests/boundary/storage/**",
+        "tests/boundary/process/**",
+        "tests/boundary/mcp/**",
+        "tests/e2e/**"
+      ],
+      "suites": [
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static"
+      ]
     },
     {
       "name": "verification-boundary",
@@ -55,12 +118,42 @@
         "src/jacobian/schema_registry.py",
         "src/jacobian/plugins/registry.py"
       ],
-      "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "lean",
+        "npm",
+        "static",
+        "build",
+        "security",
+        "duplicate"
+      ]
     },
     {
       "name": "lean-python-adapter",
-      "patterns": ["src/jacobian/lean*.py", "src/jacobian/**/*lean*.py"],
-      "suites": ["core", "integration", "lean", "static", "build"]
+      "patterns": [
+        "src/jacobian/lean*.py",
+        "src/jacobian/**/*lean*.py"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "lean",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "lean-shared-contracts",
@@ -73,66 +166,219 @@
         "src/jacobian/contracts/results.py",
         "src/jacobian/contracts/verification.py"
       ],
-      "suites": ["lean"]
+      "suites": [
+        "lean"
+      ]
     },
     {
       "name": "npm-facing-adapter",
-      "patterns": ["src/jacobian/adapters/mcp/**"],
-      "suites": ["core", "integration", "npm", "static", "build"]
+      "patterns": [
+        "src/jacobian/adapters/mcp/**"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "npm",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "python-source",
-      "patterns": ["src/jacobian/**", "src/jacobian_checkers/**"],
-      "suites": ["core", "integration", "static", "build"]
+      "patterns": [
+        "src/jacobian/**",
+        "src/jacobian_checkers/**"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "ci-automation",
-      "patterns": [".github/actions/**", ".github/workflows/**"],
-      "suites": ["core", "integration", "static", "build"]
+      "patterns": [
+        ".github/actions/**",
+        ".github/workflows/**"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "ci-scripts",
-      "patterns": [".github/scripts/**"],
-      "suites": ["core", "integration", "static", "build"]
+      "patterns": [
+        ".github/scripts/**"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "ci-plan-config",
-      "patterns": [".github/ci-impact.json", ".github/ci-config.json"],
-      "suites": ["core", "integration", "static", "build"]
+      "patterns": [
+        ".github/ci-impact.json",
+        ".github/ci-config.json"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "makefile",
-      "patterns": ["Makefile"],
-      "suites": ["core", "integration", "lean", "npm", "static", "build"]
+      "patterns": [
+        "Makefile"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static",
+        "build"
+      ]
     },
     {
       "name": "python-packaging",
-      "patterns": ["pyproject.toml", "uv.lock"],
-      "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+      "patterns": [
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "lean",
+        "npm",
+        "static",
+        "build",
+        "security",
+        "duplicate"
+      ]
     },
     {
       "name": "pre-commit",
-      "patterns": [".pre-commit-config.yaml"],
-      "suites": ["static"]
+      "patterns": [
+        ".pre-commit-config.yaml"
+      ],
+      "suites": [
+        "static"
+      ]
     },
     {
       "name": "duplicate-code-policy",
-      "patterns": [".jscpd.json"],
-      "suites": ["duplicate"]
+      "patterns": [
+        ".jscpd.json"
+      ],
+      "suites": [
+        "duplicate"
+      ]
     },
     {
       "name": "test-support",
-      "patterns": ["tests/helpers/**", "tests/conftest.py"],
-      "suites": ["core", "integration", "static"]
+      "patterns": [
+        "tests/support/**",
+        "tests/conftest.py"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static"
+      ]
     },
     {
       "name": "benchmarks",
-      "patterns": ["benchmarks/**"],
-      "suites": ["core", "integration", "static", "build"]
+      "patterns": [
+        "benchmarks/**"
+      ],
+      "suites": [
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "e2e",
+        "static",
+        "build"
+      ]
     }
   ],
   "fallback": {
     "name": "unclassified-fail-closed",
-    "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate", "docs"]
+    "suites": [
+      "unit",
+      "component",
+      "domain",
+      "composition",
+      "storage",
+      "process",
+      "mcp",
+      "provider",
+      "e2e",
+      "lean",
+      "npm",
+      "static",
+      "build",
+      "security",
+      "duplicate",
+      "docs"
+    ]
   }
 }

@@ -4,26 +4,29 @@
 
 ## Ownership model
 
-The suite separates five concerns that previously overlapped:
+The suite separates semantic ownership from execution policy:
 
 | Concern | Authority |
 | --- | --- |
 | Semantic ownership | Test directories |
-| Runtime traits | Pytest markers |
+| Execution-affecting traits | Pytest markers |
 | Change impact | `.github/ci-impact.json` |
 | Canonical execution | Make targets |
-| Shard scheduling | Ephemeral integration timing artifact |
+| Shard scheduling | Ephemeral domain timing artifact |
 
-A test's directory answers what kind of behavior it owns. A marker answers how
-that test must run. The CI impact manifest maps changed paths to every affected
-suite, with additive matches and a fail-closed fallback. Make targets keep local
-and hosted execution aligned. Timing data affects scheduling only: successful
-`main` runs publish it, consumers validate it, and any absence or corruption
-falls back to equal weighting without changing which tests run.
+A test's directory answers what kind of behavior it owns. A marker is retained
+only when it changes execution. The CI impact manifest maps changed paths to
+every affected lane, with additive matches and a fail-closed fallback. Make
+targets keep local and hosted execution aligned. Timing data affects domain
+sharding only: successful `main` runs publish it, consumers validate it, and
+any absence or corruption falls back to equal weighting without changing which
+tests run.
 
-The canonical local commands are `make test-core`, `make test-integration`,
-`make test-lean`, and `make test`. `make test-fast` is the sequential core
-feedback loop.
+The canonical local commands are the semantic targets `make test-unit`,
+`make test-component`, `make test-domain`, `make test-composition`,
+`make test-storage`, `make test-process`, `make test-mcp`, `make test-provider`,
+`make test-lean`, and `make test-e2e`. `make test-all-ci` is an explicit,
+exceptional full local reproduction.
 
 ## Purpose
 
@@ -55,21 +58,22 @@ checker may originate `verification = VERIFIED`.
 The current local development entry points are:
 
 ```sh
-make test-fast
-make test-failed
-make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py
-make test TESTS=tests/integration/infrastructure/test_mcp_adapter.py PYTEST_ARGS="-k schema -n 0"
-make test-contracts
-make test-checkers
-make test-subprocess
+make test-unit
+make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py
+make test-component TESTS=tests/component/capabilities/test_mcp_invocation_projection.py PYTEST_ARGS="-k schema -n 0"
+make test-domain TESTS=tests/domain/graph/test_graph_invariant_domain.py
+make test-composition
 make test-mcp PYTEST_ARGS="-k authentication"
 make test-storage PYTEST_ARGS="-k workspace"
-make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
+make test-process TESTS=tests/boundary/process/search/test_shrinking.py
+make test-provider
+make test-lean TESTS=tests/boundary/providers/lean/test_lean_repl_runtime.py PYTEST_ARGS="-k induction"
+make test-e2e
 make test-stress
 make test-ordering PYTEST_ARGS=--randomly-seed=17
 make check
 make check-static
-make validate-full
+make test-all-ci
 make docs-linkcheck
 make clean
 ```
@@ -77,108 +81,63 @@ make clean
 The Makefile pytest targets emit the ten slowest tests by default so local
 commands provide actionable duration telemetry. Override this with
 `PYTEST_DIAGNOSTIC_ARGS=--durations=0`, or increase the count when profiling a
-slow lane.
+resource-heavy lane.
 
-`make test-fast` collects only unit, contract, checker, and reference
-directories and excludes `slow` cases under a single process. Prefer the
-function-scoped `runtime` / `runtime_with_references` fixtures when attaching to
-seeded stores. Avoid inventing layer-marker filters; directory Make targets own
-suite selection.
-Named contract, checker, MCP, and storage targets
-make common affected areas discoverable without adding another test runner.
-`make test-stress` and `make test-ordering` reproduce the scheduled validation
-lanes using locked `pytest-repeat` and `pytest-randomly`. The stress lane
-repeats contract and checker tests, including the marked property tests; the
-ordering lane exercises the non-Lean suite under a fixed seed.
-CI integration shards use one fixed `pytest-randomly` seed from
+Use the narrowest semantic lane that proves the claim. Unit tests are pure;
+component tests use one real service or adapter; domain tests install only
+named `DomainBundle` values; composition tests cover complete runtime wiring;
+and boundary/e2e tests own persistence, processes, providers, MCP, Lean, and
+complete user workflows. Directory ownership replaces the old catch-all
+integration category.
+`make test-stress` repeats only tests marked `property`, while
+`make test-ordering` reproduces the scheduled ordering seed.
+Domain timing shards use one fixed `pytest-randomly` seed from
 `.github/ci-config.json`. Every shard must collect tests in the same order
 before `pytest-split` partitions them; otherwise independently randomized
 collections can overlap or omit tests. The merged timing artifact rejects
 duplicate node IDs instead of concealing such an overlap.
-`make check` combines fast Ruff, strict typing, and unit test
-feedback as the routine local pre-push gate. The installed hook's `make check`
-also runs the unit-only fast lane; use `make pre-push-full` when all fast core
-tests should run before pushing. Developers should push after the chosen local
-gate and
-let CI own dependency and dead-code analysis, package builds, and exhaustive
-validation. `make check-static` reproduces those CI-owned static and package
-checks when relevant.
-`make validate-full` is the broad local Python, Lean, static, and package
-escape hatch, not a routine handoff requirement. It does not reproduce CI's
-Python 3.13 compatibility, combined coverage, security, duplicate-code, or npm
-lanes. The full Python suite opts into `pytest-xdist` through Make targets
-(`make test`, `make test-core`, `make test-integration`) with work stealing and
-at most four workers because test durations vary substantially and many tests
-wait on isolated subprocesses. Bare `pytest` stays single-process so focused
-debugging and Lean reproduction do not accidentally start a worker pool. `make test-failed` is the failure-recovery
-shortcut. Use `PYTEST_ARGS="-n 0"` for debugger-friendly, single-process
-execution and `PYTEST_ARGS="--durations=25"` when investigating regressions. A
-60-second per-test backstop prevents local deadlocks from hanging indefinitely
-and is disabled automatically by pytest-timeout while debugging. Parallel
-workers retain separate `tmp_path` roots; tests that add shared external state
-must coordinate it explicitly.
-Workflow tests that repeatedly construct the runtime may opt into
-`initialized_runtime_store`. Each xdist worker builds the core descriptor store
-once, then the fixture physically copies that snapshot into the test's own
-`tmp_path` before construction. SQLite metadata and blobs remain isolated per
-test; no runtime service, process, or mutable database is shared. Prefer the
-function-scoped `runtime` fixture (or `runtime_with_references`) when a test only
-needs to attach to that seeded root; keep explicit `create_runtime(tmp_path)`
-for restart, sibling-root, or bootstrap cases. Tests that need authorized
-reference plugins and checkers may instead opt into
-`initialized_runtime_store_with_references`, which copies a second immutable
-session snapshot that already includes those installs. Tests whose subject is
-fresh-store bootstrap, quota accounting, migration, or descriptor installation
-must not use either fixture.
-Tests under `tests/integration/` and `tests/end_to_end/` receive their layer
-marker during collection, preventing a missing module decorator from silently
-expanding the fast loop.
-Pull-request CI divides the non-Lean suite into two semantic lanes on the
-canonical Python version. The `core` lane contains unit, contract, checker, and
-reference tests. The `integration` lane contains integration and end-to-end
-tests, split across four runners with an ephemeral `pytest-split` timing
-artifact (algorithm `least_duration`). Successful `main` runs publish fresh
-history; missing or invalid history falls back to equal weighting. Each shard
-then uses xdist's live
-`worksteal` scheduler with at most four workers. Merge-queue groups and pushes
-to `main` additionally run the second supported Python version as an exhaustive
-compatibility lane and enable combined coverage. A shared test setup action
-selects uv's interpreter explicitly and asserts the active minor version, so
-the local `.python-version` development pin cannot silently collapse
-compatibility coverage onto Python 3.12. Each runner prunes uv's cache for CI
-before the cache is saved and uploads its JUnit report for failure and flake
-analysis.
+`make check` combines Ruff, strict typing, and the unit lane for a local handoff.
+The installed pre-push hook intentionally runs only `make lint typecheck`; the
+affected-test planner and CI own resource-heavy correctness lanes. Use
+`PYTEST_ARGS="-n 0"` for debugger-friendly execution and
+`PYTEST_ARGS="--durations=25"` when investigating regressions. Lane timeouts
+are containment policy, not performance assertions; process and native-backend
+work runs in killable children where a signal-only timeout cannot interrupt it.
+Immutable fixture templates are published by constructing in a temporary
+sibling and atomically renaming the completed directory. Each test receives a
+copied state directory; mutable stores, registries, workspaces, and runtime
+objects are never shared. Composition fixtures make their cost visible through
+names such as `fresh_complete_runtime`, `attached_complete_runtime`, and
+`authorized_complete_runtime`.
 
-Tests marked `lean_runtime` are excluded from the Python lanes and run serially
-on one dedicated runner with pinned Lean and Mathlib caches. Selecting those
-tests under pytest-xdist fails closed with an actionable error that points to
-`make test` and `make test-lean`. Only modules that actually require the pinned
-toolchain belong in the Lean ownership lane; mocked Lean-adapter contract tests
-remain ordinary integration tests and must stub every Lean side channel they
-touch (REPL and typed-goal extraction), not only one entry point. The
-marker-selected Lean run automatically includes new Lean-runtime tests without
-a file allowlist, while serial execution avoids concurrent multi-gigabyte
-Mathlib processes on one machine. A manually dispatched Lean debug workflow
-accepts one pytest node or file selector and provides the same pinned remote
-environment for focused reproduction when local Lean is impractical.
-The Python Debug workflow provides the same focused remote reproduction for
-one ordinary pytest file or node on either supported Python version.
-When coverage is enabled for an exhaustive plan, the Python 3.12 core lane and
-each integration shard write raw coverage data; a dependent job combines the
-core file plus every shard file before enforcing the repository threshold and
-producing the XML report. The shard count is owned by
-[`.github/ci-config.json`](../../.github/ci-config.json). Coverage.py's
-subprocess patch includes plugin and checker workers so clean-process execution
-is not misreported as uncovered.
+Pull-request CI runs separate semantic jobs for unit, component, domain,
+composition, storage, process, MCP, provider, and e2e behavior. Domain shards
+may use validated timing history; storage, process, provider, Lean, and e2e
+remain separate resource lanes. Merge-queue and `main` add compatibility,
+coverage, ordering, stress, and performance evidence. Python 3.13 runs the
+small compatibility smoke target rather than duplicating every correctness
+lane. A manually dispatched debug workflow accepts one pytest node or file for
+focused reproduction.
+
+Optional providers are selected only when the production readiness probe says
+their complete environment is usable (executable, version/toolchain,
+libraries, and capability initialization). A missing provider removes only its
+boundary capabilities.
+
+When coverage is enabled for an exhaustive plan, each compatible Python lane
+writes raw coverage data and a dependent job combines the files before enforcing
+the repository threshold. The shard count and lane policy are owned by
+[`.github/ci-config.json`](../../.github/ci-config.json).
 Measured costs and lane policy are recorded in the
 [test-suite cost audit](../contributing/test-suite-cost-audit.md).
 
 For pull requests, a tested path planner reads
 [`.github/ci-impact.json`](../../.github/ci-impact.json) and makes
-independent core Python, integration Python, Lean, npm, static, build,
+independent semantic Python, Lean, npm, static, build,
 security, and duplicate-code decisions. Documentation-only changes run only
-the dedicated link checker; npm-only changes stay narrow. Ordinary capability source stays on core + integration + static +
-build without Lean, security, or duplicate-code by default. Verification-runtime
+the dedicated link checker; npm-only changes stay narrow. Ordinary capability
+source selects its owning semantic Python lanes plus static and build, without
+Lean, security, or duplicate-code by default. Verification-runtime
 boundaries, packaging, CI, and unknown paths fail closed to all functional
 lanes. Merge-queue checks and pushes to `main` always use the exhaustive plan,
 which also enables coverage and the second Python version. Stable aggregate
@@ -618,38 +577,29 @@ Directory ownership is the source of truth:
 ```text
 tests/
     unit/
-    contract/
-    checkers/
-    reference/
-    integration/
-    end_to_end/
-    helpers/
-    fixtures/
+    component/
+    domain/
+    composition/
+    boundary/
+    e2e/
+    support/
 ```
 
 Package-local tests are appropriate for focused behavior. Cross-package trust
-tests live in the top-level groups above. Runtime pytest markers currently in use are:
+tests live in the top-level groups above. Runtime pytest markers are limited to
+execution-affecting traits:
 
 ```text
-external_backend
-lean_runtime
-slow
+requires_provider(name)
+performance
 property
-subprocess
-conformance
-differential
+destructive_process
 ```
 
-Reserved markers declared for future or out-of-suite selection (no routine
-tests use them yet) are `stateful`, `benchmark`, and `agent_eval`.
-
-Layer markers such as `integration` or `end_to_end` are intentionally not used;
-select those suites by directory through Make targets.
-Markers are selection tools, not excuses for leaving required tests out of
-release validation.
-The `subprocess` marker has a dedicated `make test-subprocess` selection lane
-for clean-process replay tests. It does not serialize unrelated tests under
-xdist.
+Conformance and differential are mathematical evidence categories, not pytest
+execution markers. Place those cases under their owning unit, component,
+domain, boundary, or e2e directory. Directory ownership and the topology
+manifest select tests; markers must not become a second suite taxonomy.
 
 Use real clocks only when time itself is under test. Otherwise inject a clock,
 random source, executor, or backend at a public seam. Use temporary real SQLite
@@ -661,7 +611,7 @@ The initial test stack remains deliberately small:
 
 | Need | Initial tool | Use |
 | --- | --- | --- |
-| Test runner and fixtures | pytest | Public behavior, integration, subprocess, and conformance suites |
+| Test runner and fixtures | pytest | Public behavior, semantic lanes, boundaries, and conformance suites |
 | Generative and stateful testing | Hypothesis | Canonicalization, parser, persistence, lifecycle, and reduction invariants |
 | Language-neutral schema validation | `jsonschema` | Check generated wire contracts independently of Pydantic parsing |
 | Coverage diagnostics | coverage.py through pytest-cov | Find unexercised code; never substitute percentage for behavior coverage |

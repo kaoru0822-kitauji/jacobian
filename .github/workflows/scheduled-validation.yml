@@ -44,7 +44,7 @@ jobs:
           PYTEST_ARGS: --randomly-seed=${{ matrix.seed }} --durations=20
 
   optional-providers:
-    name: Optional provider integration
+    name: Optional provider validation
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -52,11 +52,7 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: >-
-          uv run --locked pytest
-          -n 0
-          -m "external_backend and not lean_runtime"
-          --durations=20
+      - run: make test-provider
 
   performance:
     name: Core performance benchmark
@@ -107,7 +103,6 @@ jobs:
           fi
       - name: Compare with previous benchmark
         if: steps.baseline.outputs.found == 'true'
-        continue-on-error: true
         run: |
           baseline_path="$(find .ci/performance-baseline -type f -name benchmark.json -print -quit)"
           if [ -z "$baseline_path" ]; then
@@ -118,12 +113,17 @@ jobs:
           if ! uv run --locked python benchmarks/compare_core.py \
             --baseline "$baseline_path" \
             --current benchmark.json \
+            --threshold-percent 25 \
             --output benchmark-comparison.md; then
             echo "Benchmark comparison could not be produced." \
               | tee benchmark-comparison.md
             exit 1
           fi
           cat benchmark-comparison.md >> "$GITHUB_STEP_SUMMARY"
+          if grep -q '| REGRESSION |' benchmark-comparison.md; then
+            echo "Core benchmark regression exceeded the 25% noise allowance." >&2
+            exit 1
+          fi
       - name: Record missing benchmark baseline
         if: steps.baseline.outputs.found != 'true'
         run: echo "No previous successful scheduled benchmark was available; this run establishes the artifact baseline." >> "$GITHUB_STEP_SUMMARY"
