@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from copy import deepcopy
 
 import pytest
@@ -12,11 +13,13 @@ from jacobian.kernel import JacobianKernel
 
 
 @pytest.fixture(scope="module")
-def kernel(tmp_path_factory: pytest.TempPathFactory) -> JacobianKernel:
-    return JacobianKernel(
-        tmp_path_factory.mktemp("frontier-capabilities"),
-        install_references=True,
-    )
+def kernel(
+    tmp_path_factory: pytest.TempPathFactory,
+    kernel_store_template_with_references,
+) -> JacobianKernel:
+    root = tmp_path_factory.mktemp("frontier-capabilities")
+    shutil.copytree(kernel_store_template_with_references, root, dirs_exist_ok=True)
+    return JacobianKernel(root, hydrate_authorized=True)
 
 
 def _q(value: int) -> dict[str, str]:

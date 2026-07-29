@@ -4,7 +4,6 @@ import hashlib
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -21,8 +20,9 @@ def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
     return kernel_with_references
 
 
-def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
+def test_graph_search_witness_and_independent_replay(
+    kernel: JacobianKernel,
+) -> None:
     reference = kernel.references["graph_paths"]
     claim = kernel.artifacts.put(
         schema_uri=reference.claim_schema_uri,
@@ -106,7 +106,7 @@ def test_graph_search_witness_and_independent_replay(tmp_path: Path) -> None:
                 "witness_uri=sys.argv[4],checker_id=sys.argv[5]);"
                 "print(json.dumps(result.model_dump(mode='json'),sort_keys=True))"
             ),
-            str(tmp_path),
+            str(kernel.store.root),
             claim.artifact_uri,
             candidate.artifact_uri,
             found.witness_uri,

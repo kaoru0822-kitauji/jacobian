@@ -113,7 +113,8 @@ def test_timeout_and_cancellation_are_fail_closed(kernel_with_references) -> Non
     assert cancelled.execution.status is ExecutionStatus.CANCELLED
 
 
-def test_capability_is_absent_without_operator_authorized_references(tmp_path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=False)
+def test_capability_is_absent_without_operator_authorized_references(
+    kernel: JacobianKernel,
+) -> None:
     ids = {item.capability_id for item in kernel.capabilities.catalog().capabilities}
     assert "sat.lrat.verify" not in ids
