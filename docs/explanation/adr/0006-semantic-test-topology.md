@@ -100,7 +100,7 @@ Architecture checks enforce:
 - root fixtures cannot acquire high-cost resources;
 - configured paths and source-ownership rules resolve to tracked files.
 
-Validation receipts remain bound to the exact git tree and working-tree digest.
+Final validation runs against the selected test topology on the final git tree.
 
 ## Consequences
 

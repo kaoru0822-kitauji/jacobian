@@ -631,8 +631,8 @@ The evaluated commit and tree were
 `4300dea5feb67f684a207da5ea49caca859ceb74` and
 `0d612340b761afbe574897ef08f937fef07d4291`; the dependency-lock digest was
 `sha256:54726e82160233cb8512641a329ec4d7fbedd4d9308fa5567976c6c0f28fee83`.
-The runner recorded a dirty working tree, so the tree digest, rather than the
-ambient checkout, defines the evaluated source.
+The runner recorded a dirty working tree, so the recorded tree digest, rather
+than the ambient checkout, defines the evaluated source.
 
 Both conditions used the `COMPUTE_VERIFY_NO_RETRIEVAL` policy, digest
 `sha256:3c8655dcbcecf1965b7727a9333e0f6905b5e1dc7b1e750bd9840223292acddf`.
