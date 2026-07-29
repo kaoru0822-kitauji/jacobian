@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from benchmarks import agent_ab as benchmark
 from tests.support._agent_ab_support import _write_private_case
-from tests.support.providers import (
+from tests.support.provider_lean import (
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
     pinned_mathlib_runtime_available,
 )

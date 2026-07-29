@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from tests.support.providers import external_sat_toolchain_available
+from tests.support.provider_external_sat import external_sat_toolchain_available
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,

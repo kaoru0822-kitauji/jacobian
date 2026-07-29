@@ -4,11 +4,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from pytest import MonkeyPatch, fixture
+from tests.support.rationals import rational_payload as _q
 from tests.support.services import (
     DomainTestServices,
     open_domain_services,
 )
-from tests.unit.contracts.rationals import rational_payload as _q
 
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.contracts.capabilities import (

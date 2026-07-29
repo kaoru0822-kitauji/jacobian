@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 
 import pytest
-from tests.support.providers import drat_trim_runtime_available
+from tests.support.provider_external_sat import drat_trim_runtime_available
 
 from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.cadical import install_cadical_capabilities

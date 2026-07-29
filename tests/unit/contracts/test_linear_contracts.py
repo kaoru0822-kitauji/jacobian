@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
-from tests.unit.contracts.rationals import rational_payload as _q
+from tests.support.rationals import rational_payload as _q
 
 from jacobian.contracts.linear import (
     LinearRationalInconsistencyArtifact,

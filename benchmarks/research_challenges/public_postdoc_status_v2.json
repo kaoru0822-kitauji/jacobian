@@ -385,8 +385,8 @@
       "reproduction_assets": [
         "benchmarks/research_challenges/public_postdoc_v1.json#jcb-postdoc-005",
         "benchmarks/research_challenges/public_postdoc_v1.json#jcb-postdoc-011",
-        "tests/domain/analysis/test_validated_analysis_domain.py",
-        "tests/composition/runtime/test_exact_domain_result_verification.py"
+        "tests/domain/probability/test_finite_probability.py",
+        "tests/composition/runtime/exact_verification/test_probability_verification.py"
       ],
       "provisional_capability_id": "probability.finite_distribution.event_probability.compute",
       "provisional_capability_ids": [

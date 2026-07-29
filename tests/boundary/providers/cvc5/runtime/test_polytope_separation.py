@@ -4,7 +4,7 @@ import hashlib
 import math
 
 import pytest
-from tests.unit.contracts.rationals import rational_payload as _q
+from tests.support.rationals import rational_payload as _q
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.polytope import PolytopeSeparateRequest

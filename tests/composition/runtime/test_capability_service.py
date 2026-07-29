@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from tests.support.providers import (
+from tests.support.provider_lean import (
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
     pinned_mathlib_runtime_available,
 )
