@@ -12,13 +12,17 @@ RUFF_PATHS := src tests benchmarks
 # Four workers cap memory and repeated per-worker kernel-template setup.
 PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
 
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-unit-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-unit-fast test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 setup: ## Install the locked development environment.
 	uv sync --locked --dev
+
+deploy-check: ## Validate the clone-to-systemd deployment entrypoint.
+	bash -n deploy/install.sh
+	$(UV_RUN) pytest -n 0 tests/unit/test_deploy_installer.py
 
 hooks: setup ## Install pre-commit hooks.
 	$(UV_RUN) pre-commit install --install-hooks
