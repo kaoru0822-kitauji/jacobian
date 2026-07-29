@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import math
 from fractions import Fraction
 from itertools import pairwise
 from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
+from jacobian.canonical import (
+    CanonicalLimits,
+    canonicalize_json,
+    format_canonical_integer,
+)
 from jacobian.contracts.exact import CanonicalInteger, CanonicalRational
 from jacobian.contracts.results import ContractModel
 
@@ -22,6 +28,42 @@ MAX_RATIONAL_GENERATING_FUNCTION_DEGREE = 32
 MAX_RATIONAL_SERIES_TRUNCATION_ORDER = 512
 MAX_COMBINATORICS_INPUT_RATIONAL_DIGITS = 64
 MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS = 32_768
+MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES = 10 * 1024 * 1024
+_LOG10_2 = math.log10(2)
+
+
+def _fraction_wire(value: Fraction) -> dict[str, str]:
+    return {
+        "num": format_canonical_integer(value.numerator),
+        "den": format_canonical_integer(value.denominator),
+    }
+
+
+def _require_bounded_fraction(
+    value: Fraction,
+    *,
+    max_digits: int,
+    label: str,
+) -> None:
+    if (
+        len(format_canonical_integer(abs(value.numerator))) > max_digits
+        or len(format_canonical_integer(value.denominator)) > max_digits
+    ):
+        raise ValueError(f"{label} exceeds the {max_digits}-digit bound")
+
+
+def _lower_decimal_digits(value: int) -> int:
+    if value == 0:
+        return 1
+    return math.floor((abs(value).bit_length() - 1) * _LOG10_2) + 1
+
+
+def _minimum_fraction_wire_bytes(value: Fraction) -> int:
+    return (
+        _lower_decimal_digits(value.numerator)
+        + _lower_decimal_digits(value.denominator)
+        + 20
+    )
 
 
 def _require_bounded_rational(
@@ -30,13 +72,167 @@ def _require_bounded_rational(
     max_digits: int,
     label: str,
 ) -> Fraction:
-    fraction = value.as_fraction()
     if (
-        len(str(abs(fraction.numerator))) > max_digits
-        or len(str(fraction.denominator)) > max_digits
+        len(value.num.lstrip("-")) > max_digits
+        or len(value.den.lstrip("-")) > max_digits
     ):
         raise ValueError(f"{label} exceeds the {max_digits}-digit bound")
+    fraction = value.as_fraction()
+    _require_bounded_fraction(fraction, max_digits=max_digits, label=label)
     return fraction
+
+
+def _validate_result_artifact_size(payload: dict[str, object]) -> None:
+    try:
+        canonicalize_json(
+            payload,
+            limits=CanonicalLimits(
+                max_output_bytes=MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES,
+                max_integer_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
+            ),
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "the exact combinatorics result exceeds the durable artifact limit"
+        ) from exc
+
+
+def _recurrence_replay(
+    coefficients: tuple[Fraction, ...],
+    initial_values: tuple[Fraction, ...],
+    end: int,
+) -> list[Fraction]:
+    replay = list(initial_values[: end + 1])
+    while len(replay) <= end:
+        replay.append(
+            sum(
+                (
+                    coefficient * replay[len(replay) - offset]
+                    for offset, coefficient in enumerate(coefficients, start=1)
+                ),
+                start=Fraction(),
+            )
+        )
+    return replay
+
+
+def _validate_recurrence_result_budget(
+    *,
+    coefficients: tuple[CanonicalRational, ...],
+    initial_values: tuple[CanonicalRational, ...],
+    coefficient_convention: str,
+    scope: str,
+    requested_indices: tuple[int, ...],
+) -> None:
+    replay = _recurrence_replay(
+        tuple(value.as_fraction() for value in coefficients),
+        tuple(value.as_fraction() for value in initial_values),
+        requested_indices[-1],
+    )
+    minimum_size = sum(_minimum_fraction_wire_bytes(value) for value in replay)
+    minimum_size += sum(
+        _minimum_fraction_wire_bytes(replay[index]) for index in requested_indices
+    )
+    if minimum_size + 1_024 > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
+        raise ValueError(
+            "the exact combinatorics result exceeds the durable artifact limit"
+        )
+    for value in replay:
+        if any(
+            _lower_decimal_digits(component) > MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS
+            for component in (value.numerator, value.denominator)
+        ):
+            raise ValueError(
+                "recurrence result exceeds the "
+                f"{MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS}-digit bound"
+            )
+        _require_bounded_fraction(
+            value,
+            max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
+            label="recurrence result",
+        )
+    _validate_result_artifact_size(
+        {
+            "backend": "sympy",
+            "backend_version": "1.14.0",
+            "coefficient_convention": coefficient_convention,
+            "determinism": "DETERMINISTIC",
+            "exactness": "EXACT_RATIONAL",
+            "replay_prefix": [_fraction_wire(value) for value in replay],
+            "replay_scope_end": requested_indices[-1],
+            "scope": scope,
+            "values": [
+                {"index": index, "value": _fraction_wire(replay[index])}
+                for index in requested_indices
+            ],
+            "verification": "UNVERIFIED",
+        }
+    )
+
+
+def _validate_series_result_budget(
+    *,
+    numerator: tuple[CanonicalRational, ...],
+    denominator: tuple[CanonicalRational, ...],
+    coefficient_convention: str,
+    expansion_point: str,
+    truncation_order: int,
+) -> None:
+    numerator_values = tuple(value.as_fraction() for value in numerator)
+    denominator_values = tuple(value.as_fraction() for value in denominator)
+    coefficients: list[Fraction] = []
+    for degree in range(truncation_order):
+        numerator_coefficient = (
+            numerator_values[degree] if degree < len(numerator_values) else Fraction()
+        )
+        known = sum(
+            (
+                denominator_values[offset] * coefficients[degree - offset]
+                for offset in range(
+                    1,
+                    min(degree, len(denominator_values) - 1) + 1,
+                )
+            ),
+            start=Fraction(),
+        )
+        coefficient = (numerator_coefficient - known) / denominator_values[0]
+        if any(
+            _lower_decimal_digits(component) > MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS
+            for component in (coefficient.numerator, coefficient.denominator)
+        ):
+            raise ValueError(
+                "series coefficient exceeds the "
+                f"{MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS}-digit bound"
+            )
+        _require_bounded_fraction(
+            coefficient,
+            max_digits=MAX_COMBINATORICS_RESULT_RATIONAL_DIGITS,
+            label="series coefficient",
+        )
+        coefficients.append(coefficient)
+    minimum_size = sum(_minimum_fraction_wire_bytes(value) for value in coefficients)
+    minimum_size += truncation_order * _minimum_fraction_wire_bytes(Fraction())
+    if minimum_size + 1_024 > MAX_COMBINATORICS_RESULT_ARTIFACT_BYTES:
+        raise ValueError(
+            "the exact combinatorics result exceeds the durable artifact limit"
+        )
+    _validate_result_artifact_size(
+        {
+            "backend": "sympy",
+            "backend_version": "1.14.0",
+            "coefficient_convention": coefficient_convention,
+            "coefficients": [_fraction_wire(value) for value in coefficients],
+            "determinism": "DETERMINISTIC",
+            "exactness": "EXACT_RATIONAL",
+            "expansion_point": expansion_point,
+            "residual_coefficients": [_fraction_wire(Fraction())] * truncation_order,
+            "residual_congruence": (
+                "DENOMINATOR_TIMES_SERIES_MINUS_NUMERATOR_IS_ZERO_MOD_X_TO_ORDER"
+            ),
+            "truncation_order": truncation_order,
+            "verification": "UNVERIFIED",
+        }
+    )
 
 
 def _require_canonical_polynomial(
@@ -189,6 +385,18 @@ class LinearRecurrenceEvaluationRequest(ContractModel):
                 )
             if any(left >= right for left, right in pairwise(self.indices)):
                 raise ValueError("indices must be strictly increasing")
+        requested_indices = (
+            tuple(range(self.term_count))
+            if self.scope == "PREFIX" and self.term_count is not None
+            else self.indices
+        )
+        _validate_recurrence_result_budget(
+            coefficients=self.coefficients,
+            initial_values=self.initial_values,
+            coefficient_convention=self.coefficient_convention,
+            scope=self.scope,
+            requested_indices=requested_indices,
+        )
         return self
 
 
@@ -277,6 +485,13 @@ class RationalGeneratingFunctionCoefficientsRequest(ContractModel):
         )
         if self.denominator[0].as_fraction() == 0:
             raise ValueError("denominator constant coefficient must be nonzero")
+        _validate_series_result_budget(
+            numerator=self.numerator,
+            denominator=self.denominator,
+            coefficient_convention=self.coefficient_convention,
+            expansion_point=self.expansion_point,
+            truncation_order=self.truncation_order,
+        )
         return self
 
 

@@ -118,3 +118,33 @@ def test_checker_runtime_binds_only_independent_source(
         component["provider"]
         for component in descriptor.provider_runtime.configuration["components"]
     } == {"jacobian.combinatorics-exact-checker-source"}
+
+
+def test_checker_replays_a_result_above_python_default_integer_digit_limit(
+    authorized_complete_runtime,
+) -> None:
+    large = "9" * 64
+    computed = authorized_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="combinatorics.recurrence.linear.evaluate",
+            input={
+                "coefficients": [{"num": large, "den": "1"}],
+                "initial_values": [{"num": large, "den": "1"}],
+                "coefficient_convention": _RECURRENCE_CONVENTION,
+                "scope": "INDICES",
+                "term_count": None,
+                "indices": [68],
+            },
+        )
+    )
+    verified = authorized_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="combinatorics.result.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+
+    assert computed.execution.status is ExecutionStatus.COMPLETED
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"

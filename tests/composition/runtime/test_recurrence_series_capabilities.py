@@ -28,6 +28,10 @@ def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
     return {"num": str(numerator), "den": str(denominator)}
 
 
+def _q_string(numerator: str, denominator: str = "1") -> dict[str, str]:
+    return {"num": numerator, "den": denominator}
+
+
 def _recurrence_payload(
     *,
     scope: str = "PREFIX",
@@ -122,6 +126,87 @@ def test_linear_recurrence_exposes_requested_values_and_complete_replay(
     assert [item["index"] for item in sparse.output["result"]["values"]] == [0, 2, 7]
     assert len(sparse.output["result"]["replay_prefix"]) == 8
     assert len(sparse.artifact_uris) == 2
+
+
+def test_large_rational_results_cross_the_python_conversion_limit_safely(
+    fresh_complete_runtime,
+) -> None:
+    large = "9" * 64
+    computed = fresh_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="combinatorics.recurrence.linear.evaluate",
+            input={
+                "coefficients": [_q_string(large)],
+                "initial_values": [_q_string(large)],
+                "coefficient_convention": _RECURRENCE_CONVENTION,
+                "scope": "INDICES",
+                "term_count": None,
+                "indices": [68],
+            },
+        )
+    )
+
+    value = computed.output["result"]["values"][0]["value"]["num"]
+    assert computed.execution.status is ExecutionStatus.COMPLETED
+    assert len(value) > 4_300
+    assert len(value) <= 32_768
+
+
+@pytest.mark.parametrize(
+    ("capability_id", "payload"),
+    (
+        (
+            "combinatorics.recurrence.linear.evaluate",
+            {
+                "coefficients": [_q_string("9" * 64)],
+                "initial_values": [_q_string("9" * 64)],
+                "coefficient_convention": _RECURRENCE_CONVENTION,
+                "scope": "PREFIX",
+                "term_count": 513,
+                "indices": [],
+            },
+        ),
+        (
+            "combinatorics.recurrence.linear.evaluate",
+            {
+                "coefficients": [_q_string("9" * 64)],
+                "initial_values": [_q(1)],
+                "coefficient_convention": _RECURRENCE_CONVENTION,
+                "scope": "PREFIX",
+                "term_count": 512,
+                "indices": [],
+            },
+        ),
+        (
+            "combinatorics.generating_function.coefficients.compute",
+            {
+                "numerator": [_q(1)],
+                "denominator": [_q_string("1", "9" * 64), _q_string("9" * 64)],
+                "coefficient_convention": "ASCENDING_POWERS_OF_X",
+                "expansion_point": "0",
+                "truncation_order": 257,
+            },
+        ),
+    ),
+)
+def test_oversized_derived_results_are_rejected_before_artifact_writes(
+    fresh_complete_runtime,
+    capability_id: str,
+    payload: dict[str, object],
+) -> None:
+    with fresh_complete_runtime.core.store.connection() as connection:
+        before = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
+
+    result = fresh_complete_runtime.core.capabilities.invoke(
+        CapabilityRequest(capability_id=capability_id, input=payload)
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_COMBINATORICS_REQUEST"
+    assert result.artifact_uris == ()
+    with fresh_complete_runtime.core.store.connection() as connection:
+        after = connection.execute("SELECT COUNT(*) FROM artifacts").fetchone()[0]
+    assert after == before
 
 
 def test_rational_generating_function_exposes_exact_residual_congruence(

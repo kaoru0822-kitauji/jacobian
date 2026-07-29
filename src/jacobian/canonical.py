@@ -13,10 +13,44 @@ import rfc8785
 
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _MAX_SAFE_JSON_INTEGER = (1 << 53) - 1
+_DECIMAL_CHUNK_BASE = 1_000_000_000
+_DECIMAL_CHUNK_DIGITS = 9
 
 
 class CanonicalizationError(ValueError):
     """The input cannot be represented by Jacobian's canonical JSON profile."""
+
+
+def parse_canonical_integer(value: str) -> int:
+    """Parse a canonical decimal integer without Python's string-digit limit."""
+
+    if _INTEGER.fullmatch(value) is None:
+        raise CanonicalizationError(
+            "rational components must be canonical decimal integers"
+        )
+    negative = value.startswith("-")
+    digits = value[1:] if negative else value
+    first_chunk_digits = len(digits) % _DECIMAL_CHUNK_DIGITS or _DECIMAL_CHUNK_DIGITS
+    parsed = int(digits[:first_chunk_digits])
+    for offset in range(first_chunk_digits, len(digits), _DECIMAL_CHUNK_DIGITS):
+        chunk = digits[offset : offset + _DECIMAL_CHUNK_DIGITS]
+        parsed = parsed * _DECIMAL_CHUNK_BASE + int(chunk)
+    return -parsed if negative else parsed
+
+
+def format_canonical_integer(value: int) -> str:
+    """Format an integer without Python's string-digit limit."""
+
+    if value == 0:
+        return "0"
+    negative = value < 0
+    remaining = abs(value)
+    chunks: list[str] = []
+    while remaining:
+        remaining, chunk = divmod(remaining, _DECIMAL_CHUNK_BASE)
+        chunks.append(str(chunk).zfill(_DECIMAL_CHUNK_DIGITS))
+    formatted = "".join(reversed(chunks)).lstrip("0")
+    return f"-{formatted}" if negative else formatted
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +58,7 @@ class CanonicalLimits:
     max_input_bytes: int = 10 * 1024 * 1024
     max_output_bytes: int = 10 * 1024 * 1024
     max_depth: int = 64
-    max_integer_digits: int = 4096
+    max_integer_digits: int = 32_768
 
 
 def _reject_float(_value: str) -> NoReturn:
@@ -96,11 +130,14 @@ def _normalize_rational(
         or len(denominator.lstrip("-")) > limits.max_integer_digits
     ):
         raise CanonicalizationError("rational component exceeds the digit limit")
-    den = int(denominator)
+    den = parse_canonical_integer(denominator)
     if den == 0:
         raise CanonicalizationError("rational denominator cannot be zero")
-    fraction = Fraction(int(numerator), den)
-    return {"num": str(fraction.numerator), "den": str(fraction.denominator)}
+    fraction = Fraction(parse_canonical_integer(numerator), den)
+    return {
+        "num": format_canonical_integer(fraction.numerator),
+        "den": format_canonical_integer(fraction.denominator),
+    }
 
 
 def _normalize(value: Any, *, limits: CanonicalLimits, depth: int) -> Any:

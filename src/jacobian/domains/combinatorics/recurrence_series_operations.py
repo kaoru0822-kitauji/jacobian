@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.combinatorics import (
     IndexedRationalValue,
     LinearRecurrenceEvaluationRequest,
@@ -18,11 +19,14 @@ from jacobian.contracts.results import ContractModel
 def _sympy_rational(value: CanonicalRational) -> Any:
     from sympy import Rational
 
-    return Rational(int(value.num), int(value.den))
+    return Rational(value.num, value.den)
 
 
 def _wire(value: Any) -> CanonicalRational:
-    return CanonicalRational(num=str(value.p), den=str(value.q))
+    return CanonicalRational(
+        num=format_canonical_integer(int(value.p)),
+        den=format_canonical_integer(int(value.q)),
+    )
 
 
 def evaluate_linear_recurrence(request: ContractModel) -> ContractModel:

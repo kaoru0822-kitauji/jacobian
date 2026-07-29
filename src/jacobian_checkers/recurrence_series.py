@@ -11,6 +11,7 @@ from collections.abc import Callable
 from fractions import Fraction
 from typing import Any
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian_checkers.bound_artifacts import bound_request as _bound_request
 
 _INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
@@ -51,8 +52,12 @@ def _accept(operation_id: str) -> dict[str, Any]:
 def _integer(value: object, *, maximum: int | None = None) -> int:
     if not isinstance(value, str) or _INTEGER.fullmatch(value) is None:
         raise ValueError("integer is not canonical")
-    parsed = int(value)
-    if str(parsed) != value or (maximum is not None and abs(parsed) > maximum):
+    if maximum is not None and len(value.lstrip("-")) > len(str(maximum)):
+        raise ValueError("integer is outside the checker scope")
+    parsed = parse_canonical_integer(value)
+    if format_canonical_integer(parsed) != value or (
+        maximum is not None and abs(parsed) > maximum
+    ):
         raise ValueError("integer is outside the checker scope")
     return parsed
 
@@ -60,6 +65,13 @@ def _integer(value: object, *, maximum: int | None = None) -> int:
 def _fraction(value: object, *, max_digits: int) -> Fraction:
     if not isinstance(value, dict) or set(value) != {"num", "den"}:
         raise ValueError("rational is malformed")
+    if (
+        not isinstance(value["num"], str)
+        or not isinstance(value["den"], str)
+        or len(value["num"].lstrip("-")) > max_digits
+        or len(value["den"].lstrip("-")) > max_digits
+    ):
+        raise ValueError("rational exceeds the checker digit scope")
     numerator = _integer(value["num"])
     denominator = _integer(value["den"])
     if denominator <= 0:
@@ -67,8 +79,6 @@ def _fraction(value: object, *, max_digits: int) -> Fraction:
     result = Fraction(numerator, denominator)
     if (result.numerator, result.denominator) != (numerator, denominator):
         raise ValueError("rational is not reduced")
-    if len(str(abs(numerator))) > max_digits or len(str(denominator)) > max_digits:
-        raise ValueError("rational exceeds the checker digit scope")
     return result
 
 

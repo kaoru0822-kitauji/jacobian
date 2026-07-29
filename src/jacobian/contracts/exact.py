@@ -7,6 +7,7 @@ from typing import Annotated, Self
 
 from pydantic import StringConstraints, model_validator
 
+from jacobian.canonical import format_canonical_integer, parse_canonical_integer
 from jacobian.contracts.results import ContractModel
 
 CanonicalInteger = Annotated[
@@ -20,6 +21,7 @@ CanonicalInteger = Annotated[
 # Shared by request validators, search producers, and output Field(le=...) caps:
 # all three use the exact deduplicated cartesian grid size, not a loose upper bound.
 RATIONAL_SEARCH_GRID_LIMIT = 10_000
+MAX_CANONICAL_RATIONAL_DIGITS = 32_768
 
 
 def bounded_rational_scalars(
@@ -60,15 +62,26 @@ class CanonicalRational(ContractModel):
 
     @model_validator(mode="after")
     def require_reduced_positive_denominator(self) -> Self:
-        denominator = int(self.den)
+        if (
+            len(self.num.lstrip("-")) > MAX_CANONICAL_RATIONAL_DIGITS
+            or len(self.den.lstrip("-")) > MAX_CANONICAL_RATIONAL_DIGITS
+        ):
+            raise ValueError(
+                "rational components exceed the canonical 32,768-digit limit"
+            )
+        denominator = parse_canonical_integer(self.den)
         if denominator == 0:
             raise ValueError("rational denominator cannot be zero")
-        value = Fraction(int(self.num), denominator)
-        if self.num != str(value.numerator) or self.den != str(value.denominator):
+        value = Fraction(parse_canonical_integer(self.num), denominator)
+        if self.num != format_canonical_integer(
+            value.numerator
+        ) or self.den != format_canonical_integer(value.denominator):
             raise ValueError(
                 "rational must be reduced with a positive denominator and canonical zero"
             )
         return self
 
     def as_fraction(self) -> Fraction:
-        return Fraction(int(self.num), int(self.den))
+        return Fraction(
+            parse_canonical_integer(self.num), parse_canonical_integer(self.den)
+        )
