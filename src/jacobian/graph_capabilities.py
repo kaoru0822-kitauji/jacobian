@@ -550,7 +550,13 @@ class GraphAtlasSearchAdapter:
                 "additionalProperties": False,
             },
             tags=("graph", "construction", "bounded-search"),
-            invocation_examples=(example("empty_graph_search", "Find the order-zero graph in the atlas.", {"order": 0, "constraints": {}, "limit": 1}),),
+            invocation_examples=(
+                example(
+                    "empty_graph_search",
+                    "Find the order-zero graph in the atlas.",
+                    {"order": 0, "constraints": {}, "limit": 1},
+                ),
+            ),
         )
 
     @property
@@ -839,7 +845,13 @@ class GraphDegreeSequenceAdapter:
                 "construction",
                 "counterexample",
             ),
-            invocation_examples=(example("triangle_degree_sequence", "Realize the degree sequence of a triangle.", {"degree_sequence": [2, 2, 2]}),),
+            invocation_examples=(
+                example(
+                    "triangle_degree_sequence",
+                    "Realize the degree sequence of a triangle.",
+                    {"degree_sequence": [2, 2, 2]},
+                ),
+            ),
         )
 
     @property

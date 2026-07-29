@@ -618,7 +618,13 @@ class FiniteMagmaTableEnumerateAdapter:
             input_schema=model_schema(FiniteMagmaTableEnumerationRequest),
             output_schema=model_schema(FiniteMagmaTableEnumerationOutput),
             tags=("universal-algebra", "finite-model", "enumeration"),
-            invocation_examples=(example("order_one", "Enumerate the unique binary table of order one.", {"order": 1}),),
+            invocation_examples=(
+                example(
+                    "order_one",
+                    "Enumerate the unique binary table of order one.",
+                    {"order": 1},
+                ),
+            ),
         )
 
     @property

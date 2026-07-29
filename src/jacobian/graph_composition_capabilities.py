@@ -429,7 +429,13 @@ class GraphEnumerateNonisomorphicAdapter:
                 "nonisomorphic",
                 "bounded-search",
             ),
-            invocation_examples=(example("order_zero", "Enumerate graphs of order zero.", {"order": 0, "limit": 1, "offset": 0}),),
+            invocation_examples=(
+                example(
+                    "order_zero",
+                    "Enumerate graphs of order zero.",
+                    {"order": 0, "limit": 1, "offset": 0},
+                ),
+            ),
         )
 
     @property

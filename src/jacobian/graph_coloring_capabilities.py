@@ -179,7 +179,13 @@ class GraphColoringEncodingAdapter:
             input_schema=model_schema(GraphColoringEncodingRequest),
             output_schema=model_schema(GraphColoringEncodingOutput),
             tags=("graph", "coloring", "sat", "cnf", "encoding"),
-            invocation_examples=(example("single_vertex_two_colors", "Encode a one-vertex graph with two colors.", {"graph": {"vertices": ["v"], "edges": []}, "colors": 2}),),
+            invocation_examples=(
+                example(
+                    "single_vertex_two_colors",
+                    "Encode a one-vertex graph with two colors.",
+                    {"graph": {"vertices": ["v"], "edges": []}, "colors": 2},
+                ),
+            ),
         )
 
     @property
