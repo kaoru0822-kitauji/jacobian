@@ -16,7 +16,7 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
 ) -> None:
     result = CliRunner().invoke(
         app,
-        ["--state-dir", str(tmp_path), "init"],
+        ["--state-dir", str(tmp_path), "init", "--json"],
     )
 
     assert result.exit_code == 0
@@ -42,6 +42,17 @@ def test_cli_init_reports_reference_domains_and_polytope_formats(
         "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
     )
     assert catalog["lean4"]["profiles"]["MATHLIB"]["checker_timeout_seconds"] == 225
+
+
+def test_cli_init_has_a_human_readable_default_summary(tmp_path: Path) -> None:
+    result = CliRunner().invoke(app, ["--state-dir", str(tmp_path), "init"])
+
+    assert result.exit_code == 0
+    assert len(result.stdout) < 1_000
+    assert f"Initialized Jacobian state in {tmp_path.resolve()}" in result.stdout
+    assert "reference domains" in result.stdout
+    assert "capabilities" in result.stdout
+    assert "graph_paths" in result.stdout
 
 
 def test_cli_help_exposes_v02_operations() -> None:
