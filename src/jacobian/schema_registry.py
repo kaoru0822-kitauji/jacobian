@@ -105,7 +105,6 @@ class SchemaRegistry:
 
         self._reconcile_pending()
         canonical_schema = canonicalize_json(schema)
-        _validated_schema(canonical_schema)
         registration = (name, version, canonical_schema)
         transaction_identity = self.store.transaction_identity
         registrations = self._registrations
@@ -117,12 +116,29 @@ class SchemaRegistry:
         cached_uri = registrations.get(registration)
         if cached_uri is not None:
             return cached_uri
+
+        # Descriptor identity is content-addressed.  On a restart, an exact
+        # descriptor already committed to the store was validated before it
+        # was written; avoid paying Draft 2020-12 meta-validation again.  A
+        # new definition still takes the full validation path before any write.
+        _reject_external_references(schema)
+        expected_uri = self.store.descriptor_uri(
+            kind="schema",
+            name=name,
+            version=version,
+            definition=schema,
+        )
+        existing = self.store._artifact_exists(expected_uri)
+        if not existing:
+            _validated_schema(canonical_schema)
         schema_uri = self.store.register_descriptor(
             kind="schema",
             name=name,
             version=version,
             definition=loads_strict_json(canonical_schema),
         )
+        if schema_uri != expected_uri:  # pragma: no cover - identity invariant
+            raise SchemaRegistryError("schema descriptor identity changed unexpectedly")
         registrations[registration] = schema_uri
         if transaction_identity is None:
             self._schema_bytes[schema_uri] = canonical_schema

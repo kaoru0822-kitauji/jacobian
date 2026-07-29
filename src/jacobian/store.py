@@ -82,6 +82,8 @@ class _ConnectionState(threading.local):
 
     def __init__(self) -> None:
         self.transaction: sqlite3.Connection | None = None
+        self.connection: sqlite3.Connection | None = None
+        self.connection_factory_token: object | None = None
         self.blob_lock_depth = 0
         self.pending_sync_directories: set[Path] = set()
 
@@ -184,6 +186,7 @@ class ArtifactStore:
         *,
         limits: StoreLimits | None = None,
         canonical_limits: CanonicalLimits | None = None,
+        synchronous: str = "FULL",
     ) -> None:
         self.root = Path(root).resolve()
         self.limits = limits or StoreLimits()
@@ -191,6 +194,13 @@ class ArtifactStore:
             max_input_bytes=self.limits.max_artifact_bytes,
             max_output_bytes=self.limits.max_artifact_bytes,
         )
+        normalized_synchronous = synchronous.upper()
+        if normalized_synchronous not in {"OFF", "NORMAL", "FULL", "EXTRA"}:
+            raise ValueError("synchronous must be one of OFF, NORMAL, FULL, or EXTRA")
+        # FULL remains the default: callers must opt into a weaker SQLite
+        # synchronization policy explicitly.  This is useful for benchmarks
+        # and disposable test stores without silently changing durability.
+        self.synchronous = normalized_synchronous
         self.blob_root = self.root / "blobs" / "sha256"
         self.staging_root = self.root / "staging"
         self.db_path = self.root / "metadata.sqlite3"
@@ -198,6 +208,8 @@ class ArtifactStore:
         self.transaction_recovery_path = self.root / ".transaction-recovery"
         self._validated_blobs: dict[str, tuple[int, int, int, int, int]] = {}
         self._connection_state = _ConnectionState()
+        self._connection_lock = threading.Lock()
+        self._open_connections: set[sqlite3.Connection] = set()
         self._closed = False
         self._recovery_required = False
         self.blob_root.mkdir(parents=True, exist_ok=True)
@@ -211,15 +223,35 @@ class ArtifactStore:
             raise StoreError(
                 "artifact store requires recovery by a fresh ArtifactStore instance"
             )
-        connection = sqlite3.connect(self.db_path, timeout=30)
+        # Connections remain logically thread-owned by ``_ConnectionState``;
+        # disabling sqlite's thread check only lets lifecycle teardown close a
+        # connection when the store is closed from its coordinating thread.
+        connection = sqlite3.connect(
+            self.db_path,
+            timeout=30,
+            check_same_thread=False,
+        )
         try:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
-            connection.execute("PRAGMA synchronous = FULL")
+            connection.execute(f"PRAGMA synchronous = {self.synchronous}")
+            with self._connection_lock:
+                self._open_connections.add(connection)
         except BaseException:
             connection.close()
+            with self._connection_lock:
+                self._open_connections.discard(connection)
             raise
         return connection
+
+    def _close_connection(self, connection: sqlite3.Connection) -> None:
+        """Close one owned connection and remove it from lifecycle tracking."""
+
+        try:
+            connection.close()
+        finally:
+            with self._connection_lock:
+                self._open_connections.discard(connection)
 
     def close(self) -> None:
         """Checkpoint SQLite and end this store's owned lifetime."""
@@ -229,6 +261,18 @@ class ArtifactStore:
         if self.transaction_active:
             raise StoreError("cannot close an artifact store during a transaction")
         if self._recovery_required:
+            with self._connection_lock:
+                for pooled in tuple(self._open_connections):
+                    try:
+                        pooled.close()
+                    except BaseException:
+                        _LOGGER.exception(
+                            "failed to close pooled artifact connection during recovery"
+                        )
+                    finally:
+                        self._open_connections.discard(pooled)
+            self._connection_state.connection = None
+            self._connection_state.connection_factory_token = None
             self._closed = True
             return
         connection = self._connect()
@@ -239,7 +283,15 @@ class ArtifactStore:
             if checkpoint is None or checkpoint[0] != 0:
                 raise StoreError(f"could not checkpoint artifact store: {checkpoint!r}")
         finally:
-            connection.close()
+            self._close_connection(connection)
+            with self._connection_lock:
+                for pooled in tuple(self._open_connections):
+                    try:
+                        pooled.close()
+                    finally:
+                        self._open_connections.discard(pooled)
+            self._connection_state.connection = None
+            self._connection_state.connection_factory_token = None
         self._closed = True
 
     def __enter__(self) -> ArtifactStore:
@@ -254,17 +306,38 @@ class ArtifactStore:
     def connection(self) -> Iterator[sqlite3.Connection]:
         """Yield this thread's transaction connection or one owned connection."""
 
+        if self._closed:
+            raise StoreClosedError("artifact store is closed")
+        if self._recovery_required:
+            raise StoreError(
+                "artifact store requires recovery by a fresh ArtifactStore instance"
+            )
         transaction = self._connection_state.transaction
         if transaction is not None:
             yield transaction
             return
 
-        connection = self._connect()
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
+        # Keep one connection per owning thread for the store lifetime.  The
+        # old implementation opened and closed a connection for every query,
+        # which made a complete installation perform hundreds of handshakes
+        # and repeated PRAGMA setup.  ``_connect`` remains a narrow factory so
+        # lifecycle and failure tests can still replace it.
+        factory = self._connect
+        factory_token = getattr(factory, "__func__", factory)
+        connection = self._connection_state.connection
+        if (
+            connection is not None
+            and self._connection_state.connection_factory_token is not factory_token
+        ):
+            self._close_connection(connection)
+            connection = None
+            self._connection_state.connection = None
+        if connection is None:
+            connection = factory()
+            self._connection_state.connection = connection
+            self._connection_state.connection_factory_token = factory_token
+        with connection:
+            yield connection
 
     @property
     def transaction_active(self) -> bool:
@@ -324,7 +397,7 @@ class ArtifactStore:
                         except BaseException as exc:
                             cleanup_error = exc
                     try:
-                        connection.close()
+                        self._close_connection(connection)
                     except BaseException as exc:
                         cleanup_error = cleanup_error or exc
                     finally:
@@ -345,11 +418,11 @@ class ArtifactStore:
                     try:
                         self._flush_transaction_directories()
                         connection.commit()
-                        connection.close()
+                        self._close_connection(connection)
                     except BaseException as exc:
                         self._recovery_required = True
                         try:
-                            connection.close()
+                            self._close_connection(connection)
                         except BaseException:
                             _LOGGER.exception(
                                 "failed to close an uncertain artifact transaction"
@@ -368,7 +441,7 @@ class ArtifactStore:
             except BaseException:
                 if self._connection_state.transaction is not None:
                     try:
-                        connection.close()
+                        self._close_connection(connection)
                     except BaseException:
                         _LOGGER.exception(
                             "failed to close artifact transaction during setup cleanup"
@@ -379,7 +452,7 @@ class ArtifactStore:
                     and not self._recovery_required
                 ):
                     try:
-                        connection.close()
+                        self._close_connection(connection)
                     except BaseException:
                         _LOGGER.exception(
                             "failed to close artifact transaction after setup failure"
@@ -449,7 +522,7 @@ class ArtifactStore:
     def _initialize_database(self) -> None:
         with self._exclusive_blob_lock(), self.connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
-            connection.execute("PRAGMA synchronous = FULL")
+            connection.execute(f"PRAGMA synchronous = {self.synchronous}")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS artifacts (
@@ -817,6 +890,40 @@ class ArtifactStore:
         )
         return result.artifact_uri
 
+    def descriptor_uri(
+        self,
+        *,
+        kind: str,
+        name: str,
+        version: str,
+        definition: Any,
+    ) -> str:
+        """Return the deterministic URI for an infrastructure descriptor.
+
+        This is a read-only identity calculation.  Schema registration uses it
+        to distinguish an already validated descriptor from a new definition
+        before doing expensive Draft 2020-12 meta-validation.
+        """
+
+        if kind not in {"schema", "semantics", "canonicalizer", "implementation"}:
+            raise ValueError(f"unsupported descriptor kind: {kind!r}")
+        payload = {
+            "descriptor_version": "1",
+            "kind": kind,
+            "name": name,
+            "version": version,
+            "definition": definition,
+        }
+        canonical_bytes = canonicalize_json(payload, limits=self.canonical_limits)
+        artifact_uri, _object_digest, _manifest_digest = self._artifact_identity(
+            schema_uri=_BOOTSTRAP_SCHEMA_URI,
+            semantics_uri=_BOOTSTRAP_SEMANTICS_URI,
+            canonical_bytes=canonical_bytes,
+            parents=(),
+            summary=f"{kind}: {name}@{version}",
+        )
+        return artifact_uri
+
     def get_descriptor(
         self,
         artifact_uri: str,
@@ -888,20 +995,17 @@ class ArtifactStore:
         if len(canonical_bytes) > self.limits.max_artifact_bytes:
             raise StoreLimitError("artifact exceeds the configured size limit")
 
-        object_digest = _framed_digest(
-            _OBJECT_FORMAT_VERSION,
-            (
-                schema_uri.encode(),
-                semantics_uri.encode(),
-                CANONICALIZER_DIGEST.encode(),
-                canonical_bytes,
-            ),
+        artifact_uri, object_digest, manifest_digest = self._artifact_identity(
+            schema_uri=schema_uri,
+            semantics_uri=semantics_uri,
+            canonical_bytes=canonical_bytes,
+            parents=parents,
+            summary=summary,
         )
-        payload_digest = _sha256(canonical_bytes)
         normalized_parents = tuple(sorted(parents))
         manifest = ArtifactManifest(
             object_digest=object_digest,
-            payload_digest=payload_digest,
+            payload_digest=_sha256(canonical_bytes),
             schema_uri=schema_uri,
             semantics_uri=semantics_uri,
             canonicalizer_digest=CANONICALIZER_DIGEST,
@@ -912,8 +1016,12 @@ class ArtifactStore:
             manifest.model_dump(mode="json"),
             limits=self.canonical_limits,
         )
-        manifest_digest = _sha256(manifest_bytes)
-        artifact_uri = _uri_from_digest(manifest_digest)
+
+        # The identity helper computes the same manifest digest.  Keep this
+        # assertion close to construction so future changes cannot make the
+        # read-only descriptor identity drift from normal puts.
+        if manifest_digest != _sha256(manifest_bytes):  # pragma: no cover - invariant
+            raise AssertionError("artifact identity and manifest digest diverged")
 
         # Re-registering identical content is common while assembling built-in
         # portfolios. Validate the committed artifact before returning so the
@@ -949,7 +1057,7 @@ class ArtifactStore:
                     artifact_uri,
                     manifest_digest,
                     object_digest,
-                    payload_digest,
+                    _sha256(canonical_bytes),
                     schema_uri,
                     semantics_uri,
                     CANONICALIZER_DIGEST,
@@ -972,6 +1080,44 @@ class ArtifactStore:
             manifest_digest=manifest_digest,
             canonicalizer_digest=CANONICALIZER_DIGEST,
         )
+
+    def _artifact_identity(
+        self,
+        *,
+        schema_uri: str,
+        semantics_uri: str,
+        canonical_bytes: bytes,
+        parents: tuple[str, ...],
+        summary: str,
+    ) -> tuple[str, str, str]:
+        """Calculate content-addressed identity without touching storage."""
+
+        object_digest = _framed_digest(
+            _OBJECT_FORMAT_VERSION,
+            (
+                schema_uri.encode(),
+                semantics_uri.encode(),
+                CANONICALIZER_DIGEST.encode(),
+                canonical_bytes,
+            ),
+        )
+        payload_digest = _sha256(canonical_bytes)
+        normalized_parents = tuple(sorted(parents))
+        manifest = ArtifactManifest(
+            object_digest=object_digest,
+            payload_digest=payload_digest,
+            schema_uri=schema_uri,
+            semantics_uri=semantics_uri,
+            canonicalizer_digest=CANONICALIZER_DIGEST,
+            parents=normalized_parents,
+            summary=summary,
+        )
+        manifest_bytes = canonicalize_json(
+            manifest.model_dump(mode="json"),
+            limits=self.canonical_limits,
+        )
+        manifest_digest = _sha256(manifest_bytes)
+        return _uri_from_digest(manifest_digest), object_digest, manifest_digest
 
     def _read_blob(self, digest: str) -> bytes:
         path = self._blob_path(digest)
