@@ -620,6 +620,70 @@ autonomous portfolio-value claim. The result supports retaining the typed AST,
 canonical sparse output, producer/verifier split, and direct URI handoff
 without another contract revision.
 
+### Graph distance-matrix composition pilot
+
+The frozen 2026-07-29 public pilot used case
+`GRAPH-DISTANCE-COMPOSITION-AB-001`, the configured Codex default model,
+`xhigh` reasoning effort, a 600-second per-run limit, three matched
+repetitions, and order seed `20260801`. The case digest was
+`sha256:9a5105e1620cf039af7f7320bd7147c003c979116995073734b6854c2cbd2d1a`.
+The evaluated commit and tree were
+`4300dea5feb67f684a207da5ea49caca859ceb74` and
+`0d612340b761afbe574897ef08f937fef07d4291`; the dependency-lock digest was
+`sha256:54726e82160233cb8512641a329ec4d7fbedd4d9308fa5567976c6c0f28fee83`.
+The runner recorded a dirty working tree, so the tree digest, rather than the
+ambient checkout, defines the evaluated source.
+
+Both conditions used the `COMPUTE_VERIFY_NO_RETRIEVAL` policy, digest
+`sha256:3c8655dcbcecf1965b7727a9333e0f6905b5e1dc7b1e750bd9840223292acddf`.
+Control excluded only `graph.distance_matrix.compute` and
+`graph.distance_matrix.verify`; its installed catalog digest was
+`sha256:8fd971e79febc315cd6904c89598f59c59eef80dbfdb67a4c1489eb33efd8fe2`.
+Treatment installed both operations and had catalog digest
+`sha256:7857aa3b5399960de0cf250990291e39c165d75802421fea9d0008aa294f0c53`.
+The exact-checker provider was `AVAILABLE`, version `composite-1`, digest
+`sha256:574c4727579ae1a234a2779ef2ea706a5c0313f13f82831583b91e9bd3036b74`.
+Capability IDs and a successful sequence were absent from the prompt and case
+metadata.
+
+The answer-visible scorer independently recomputed the maximum-degree set and
+multi-source distances with standard-library breadth-first search. Treatment
+also required exact artifact binding, an ordered matrix compute-to-verify
+trace, and clean-kernel checker replay.
+
+| Condition | Passed | False certifications | Clean replays | Median seconds | Median input tokens | Median calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| targeted distance ablation | 3 / 3 | 0 | 0 / 3 | 179.243 | 631,432 | 19 | 0 |
+| distance producer + verifier | 3 / 3 | 0 | 3 / 3 | 146.877 | 546,609 | 17 | 2 |
+
+Every treatment autonomously discovered and invoked both new capabilities.
+Each returned the correct \(M=\{4\}\), distance profile
+\((1,1,1,1,0,2)\), maximum distance \(2\), and complete argmax
+\(\{5\}\). Agents correctly kept the composed conclusion
+`SELF_CHECKED` or `COMPUTED` and `UNVERIFIED`; `VERIFIED` applied only to the
+exact intermediate distance matrix. Two treatments first passed the
+distance-operation input wrapper to `graph.compute.properties`, received
+`INCOMPATIBLE_GRAPH_ARTIFACT`, then recovered with
+`graph.construct.explicit`. This is inspectable composition friction, not a
+false mathematical conclusion.
+
+The result supports retaining the complete distance matrix as the fundamental
+primitive and does not justify a restricted-set profile capability from this
+single public case. Labelled maximum-degree-set extraction and graph-artifact
+interoperability remain follow-up evidence to watch. Raw traces are under
+`benchmarks/results/ab/20260729T095955Z/`; this ignored host-local directory is
+evaluation evidence, not source of truth.
+
+Several development dispatches are excluded from the table. Two zero-token
+runs were rejected before model work by an unsupported explicit model
+selection and an unsupported response-schema keyword. Two partial batches
+revealed that the initial scorer incorrectly required the whole agent-composed
+claim to be `VERIFIED`; they were stopped and the scorer was corrected to
+preserve the intermediate verification boundary. A subsequent telemetry-only
+fix records distance-capability attempts and successful uses in the generic
+intervention counters; the frozen per-run capability traces already contain
+those exact IDs.
+
 ## Source policy
 
 Use the supplied research collection according to evidence strength:

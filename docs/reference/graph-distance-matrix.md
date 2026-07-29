@@ -59,3 +59,18 @@ The verification record is bound to the exact graph input artifact, matrix
 result artifact, schemas, semantics, checker source digest, witness format, and
 provider runtime. Rejection, timeout, cancellation, unavailable runtime, or
 checker error remains `UNKNOWN` and cannot produce `VERIFIED`.
+
+## Public composition evidence
+
+The frozen public matched evaluation in
+[Capability workflow evaluations](capability-workflow-evaluations.md#graph-distance-matrix-composition-pilot)
+used three control/treatment pairs. All treatments autonomously discovered the
+producer and verifier, preserved independently replayable matrix evidence, and
+correctly derived a restricted-set distance profile without substituting
+diameter, radius, or eccentricity. The composed profile remained
+`SELF_CHECKED` or `COMPUTED` and `UNVERIFIED`; only the exact matrix was
+`VERIFIED`.
+
+This public answer-visible result is regression evidence for composition, not
+a broad portfolio-value claim. It does not justify adding a restricted-set
+distance capability by itself.

@@ -3124,6 +3124,12 @@ def _run_condition(
                     telemetry["capability_attempt_ids"]
                 )
             )
+            or (
+                is_distance_composition
+                and DISTANCE_COMPOSITION_CAPABILITY_IDS.intersection(
+                    telemetry["capability_attempt_ids"]
+                )
+            )
         ),
         "intervention_used": bool(
             (
@@ -3140,6 +3146,12 @@ def _run_condition(
             or (
                 is_polynomial_normalization
                 and POLYNOMIAL_NORMALIZATION_CAPABILITY_IDS.intersection(
+                    telemetry["capability_ids"]
+                )
+            )
+            or (
+                is_distance_composition
+                and DISTANCE_COMPOSITION_CAPABILITY_IDS.intersection(
                     telemetry["capability_ids"]
                 )
             )
