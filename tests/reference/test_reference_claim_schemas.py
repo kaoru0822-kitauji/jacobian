@@ -5,6 +5,8 @@ import pytest
 from jacobian.artifacts import ArtifactValidationError
 from jacobian.kernel import JacobianKernel
 
+pytestmark = pytest.mark.xdist_group("reference-claim-schemas")
+
 
 @pytest.fixture
 def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:

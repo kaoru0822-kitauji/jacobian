@@ -39,9 +39,12 @@ the research strategy.
 
 ```sh
 make setup
-make test-fast
-make validate-full
+make check
 ```
+
+Use focused `make test-*` targets while developing. `make validate-full` is the
+slow broad local subset for exceptional CI-unavailable work; it does not
+reproduce every CI lane.
 
 ## Package Structure
 

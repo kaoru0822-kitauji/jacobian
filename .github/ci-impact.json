@@ -46,7 +46,6 @@
       "name": "verification-boundary",
       "patterns": [
         "src/jacobian/kernel.py",
-        "src/jacobian/contracts/**",
         "src/jacobian/artifacts.py",
         "src/jacobian/checker_artifacts.py",
         "src/jacobian/registry.py",
@@ -59,6 +58,19 @@
       "name": "lean-python-adapter",
       "patterns": ["src/jacobian/lean*.py", "src/jacobian/**/*lean*.py"],
       "suites": ["core", "integration", "lean", "static", "build"]
+    },
+    {
+      "name": "lean-shared-contracts",
+      "patterns": [
+        "src/jacobian/contracts/capabilities.py",
+        "src/jacobian/contracts/checkers.py",
+        "src/jacobian/contracts/common.py",
+        "src/jacobian/contracts/evidence.py",
+        "src/jacobian/contracts/plugins.py",
+        "src/jacobian/contracts/results.py",
+        "src/jacobian/contracts/verification.py"
+      ],
+      "suites": ["lean"]
     },
     {
       "name": "npm-facing-adapter",

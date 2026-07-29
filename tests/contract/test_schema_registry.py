@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 import pytest
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from jacobian.schema_registry import (
     SchemaRegistry,
@@ -16,6 +16,12 @@ from jacobian.store import ArtifactStore
 
 
 class _CachedSchemaModel(BaseModel):
+    value: int
+
+
+class _EquivalentCachedSchemaModel(BaseModel):
+    model_config = ConfigDict(title="_CachedSchemaModel")
+
     value: int
 
 
@@ -78,6 +84,120 @@ def test_schema_validator_cache_is_bound_to_canonical_schema(
     registry.validate(integer_schema, {"value": 1})
     with pytest.raises(SchemaValidationError):
         registry.validate(string_schema, {"value": 1})
+
+
+def test_registered_schema_resolves_from_immutable_local_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    registry = SchemaRegistry(store)
+    schema_uri = registry.register(
+        name="local-cache",
+        version="1",
+        schema={"type": "object"},
+    )
+
+    first = registry.resolve(schema_uri)
+    first["type"] = "array"
+
+    def unexpected_store_read(*_args: object, **_kwargs: object) -> dict[str, object]:
+        pytest.fail("registered schema was read from the store again")
+
+    monkeypatch.setattr(store, "get_descriptor", unexpected_store_read)
+
+    assert registry.resolve(schema_uri) == {"type": "object"}
+
+
+@pytest.mark.parametrize("inside_transaction", [False, True])
+def test_identical_registration_writes_one_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    inside_transaction: bool,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    registry = SchemaRegistry(store)
+    calls = 0
+    register_descriptor = store.register_descriptor
+
+    def counting_register_descriptor(
+        *,
+        kind: str,
+        name: str,
+        version: str,
+        definition: Any,
+    ) -> str:
+        nonlocal calls
+        calls += 1
+        return register_descriptor(
+            kind=kind,
+            name=name,
+            version=version,
+            definition=definition,
+        )
+
+    monkeypatch.setattr(store, "register_descriptor", counting_register_descriptor)
+
+    def register_twice() -> None:
+        for _ in range(2):
+            registry.register(
+                name="deduplicated",
+                version="1",
+                schema={"type": "object"},
+            )
+
+    if inside_transaction:
+        with store.transaction():
+            register_twice()
+    else:
+        register_twice()
+
+    assert calls == 1
+
+
+@pytest.mark.parametrize("model", [None, _CachedSchemaModel])
+def test_rolled_back_schema_is_not_retained_in_local_cache(
+    tmp_path: Path,
+    model: type[BaseModel] | None,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    registry = SchemaRegistry(store)
+    schema_uri = ""
+
+    with pytest.raises(RuntimeError, match="rollback"), store.transaction():
+        schema_uri = (
+            registry.register(
+                name="rolled-back",
+                version="1",
+                schema={"type": "object"},
+            )
+            if model is None
+            else registry.register_model(
+                name="rolled-back",
+                version="1",
+                model=model,
+            )
+        )
+        registry.resolve(schema_uri)
+        raise RuntimeError("rollback")
+
+    with pytest.raises(SchemaRegistryError, match="unregistered schema"):
+        registry.resolve(schema_uri)
+
+    schema_uri = (
+        registry.register(
+            name="rolled-back",
+            version="1",
+            schema={"type": "object"},
+        )
+        if model is None
+        else registry.register_model(
+            name="rolled-back",
+            version="1",
+            model=_EquivalentCachedSchemaModel,
+        )
+    )
+    assert registry.resolve(schema_uri)["type"] == "object"
 
 
 def test_model_backed_schema_applies_cross_field_contracts(

@@ -225,6 +225,13 @@ class ArtifactStore:
 
         return self._connection_state.transaction is not None
 
+    @property
+    def transaction_identity(self) -> int | None:
+        """Process-local identity of this thread's active transaction."""
+
+        transaction = self._connection_state.transaction
+        return None if transaction is None else id(transaction)
+
     @contextmanager
     def transaction(self) -> Iterator[None]:
         """Commit related store operations through one SQLite transaction.

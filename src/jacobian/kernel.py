@@ -264,35 +264,36 @@ class JacobianKernel:
             self.artifacts,
         )
         self.domain_bundles: dict[str, InstalledDomainBundle] = {}
-        self.sat: SatArtifactService = install_sat_artifacts(
-            self.store,
-            self.schemas,
-            self.artifacts,
-        )
-        self.smt: SmtArtifactService = install_smt_artifacts(
-            self.store,
-            self.schemas,
-            self.artifacts,
-        )
-        self.linear: LinearArtifactService = install_linear_artifacts(
-            self.store,
-            self.schemas,
-            self.artifacts,
-        )
-        self.matrix_normal_forms: MatrixNormalFormArtifactService = (
-            install_matrix_normal_form_artifacts(
+        with self.store.transaction():
+            self.sat: SatArtifactService = install_sat_artifacts(
                 self.store,
                 self.schemas,
                 self.artifacts,
             )
-        )
-        self.polynomial_expressions: PolynomialExpressionArtifactService = (
-            install_polynomial_expression_artifacts(
+            self.smt: SmtArtifactService = install_smt_artifacts(
                 self.store,
                 self.schemas,
                 self.artifacts,
             )
-        )
+            self.linear: LinearArtifactService = install_linear_artifacts(
+                self.store,
+                self.schemas,
+                self.artifacts,
+            )
+            self.matrix_normal_forms: MatrixNormalFormArtifactService = (
+                install_matrix_normal_form_artifacts(
+                    self.store,
+                    self.schemas,
+                    self.artifacts,
+                )
+            )
+            self.polynomial_expressions: PolynomialExpressionArtifactService = (
+                install_polynomial_expression_artifacts(
+                    self.store,
+                    self.schemas,
+                    self.artifacts,
+                )
+            )
         self.memory = ResearchMemory(self.store, self.schemas)
         self.workspaces = WorkspaceService(self.store, self.schemas)
         self.plugins = PluginRegistry(self.store)

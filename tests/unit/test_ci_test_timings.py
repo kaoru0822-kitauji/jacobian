@@ -2,9 +2,68 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
+import threading
+from collections.abc import Callable
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import cast
 
 from tests.helpers.ci import run_ci_script
+
+
+def test_archive_download_does_not_forward_token_across_origins() -> None:
+    received_authorization: list[str | None] = []
+
+    class StorageHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            received_authorization.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"timing archive")
+
+        def log_message(self, _format: str, *args: object) -> None:
+            pass
+
+    storage = ThreadingHTTPServer(("127.0.0.1", 0), StorageHandler)
+    storage_thread = threading.Thread(target=storage.serve_forever)
+    storage_thread.start()
+    storage_url = f"http://127.0.0.1:{storage.server_port}/archive"
+
+    class ApiHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            assert self.headers["Authorization"] == "Bearer test-token"
+            self.send_response(302)
+            self.send_header("Location", storage_url)
+            self.end_headers()
+
+        def log_message(self, _format: str, *args: object) -> None:
+            pass
+
+    api = ThreadingHTTPServer(("127.0.0.1", 0), ApiHandler)
+    api_thread = threading.Thread(target=api.serve_forever)
+    api_thread.start()
+    try:
+        namespace = runpy.run_path(
+            Path(__file__).parents[2] / ".github" / "scripts" / "manage-test-timings"
+        )
+        download = cast(Callable[[str, str], bytes], namespace["download"])
+
+        assert (
+            download(
+                f"http://127.0.0.1:{api.server_port}/artifact",
+                "test-token",
+            )
+            == b"timing archive"
+        )
+        assert received_authorization == [None]
+    finally:
+        api.shutdown()
+        storage.shutdown()
+        api.server_close()
+        storage.server_close()
+        api_thread.join()
+        storage_thread.join()
 
 
 def plan_outputs() -> dict[str, str]:
