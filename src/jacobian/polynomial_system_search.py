@@ -56,7 +56,29 @@ class PolynomialSystemRationalSearchAdapter:
             input_schema=PolynomialSystemRationalSearchRequest.model_json_schema(),
             output_schema=PolynomialSystemRationalSearchOutput.model_json_schema(),
             tags=("polynomial", "system", "solution", "bounded-search"),
-            invocation_examples=(example("zero_system", "Find zero for x=0 on the smallest grid.", {"system": {"variables": ["x"], "equations": [{"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [1]}]}]}, "max_abs_numerator": 0, "max_denominator": 1}),),
+            invocation_examples=(
+                example(
+                    "zero_system",
+                    "Find zero for x=0 on the smallest grid.",
+                    {
+                        "system": {
+                            "variables": ["x"],
+                            "equations": [
+                                {
+                                    "terms": [
+                                        {
+                                            "coefficient": {"num": "1", "den": "1"},
+                                            "exponents": [1],
+                                        }
+                                    ]
+                                }
+                            ],
+                        },
+                        "max_abs_numerator": 0,
+                        "max_denominator": 1,
+                    },
+                ),
+            ),
         )
 
     @property

@@ -959,7 +959,17 @@ class PolynomialCollisionSearchAdapter:
             input_schema=model_schema(PolynomialCollisionSearchRequest),
             output_schema=model_schema(PolynomialCollisionSearchOutput),
             tags=("polynomial", "map", "collision", "bounded-search"),
-            invocation_examples=(example("constant_map_collision", "Find a collision for the constant zero map on a tiny grid.", {"map": {"variables": ["x"], "coordinates": [{"terms": []}]}, "max_abs_numerator": 1, "max_denominator": 1}),),
+            invocation_examples=(
+                example(
+                    "constant_map_collision",
+                    "Find a collision for the constant zero map on a tiny grid.",
+                    {
+                        "map": {"variables": ["x"], "coordinates": [{"terms": []}]},
+                        "max_abs_numerator": 1,
+                        "max_denominator": 1,
+                    },
+                ),
+            ),
         )
 
     @property

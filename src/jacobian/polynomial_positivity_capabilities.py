@@ -262,7 +262,29 @@ class PolynomialIntervalPositivityDecideAdapter:
                 "sturm",
                 "exact-decision",
             ),
-            invocation_examples=(example("constant_one_positive", "Decide positivity of 1 on [0,1].", {"polynomial": {"variable": "x", "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [0]}]}}, "interval": {"lo": {"num": "0", "den": "1"}, "hi": {"num": "1", "den": "1"}}}),),
+            invocation_examples=(
+                example(
+                    "constant_one_positive",
+                    "Decide positivity of 1 on [0,1].",
+                    {
+                        "polynomial": {
+                            "variable": "x",
+                            "polynomial": {
+                                "terms": [
+                                    {
+                                        "coefficient": {"num": "1", "den": "1"},
+                                        "exponents": [0],
+                                    }
+                                ]
+                            },
+                        },
+                        "interval": {
+                            "lo": {"num": "0", "den": "1"},
+                            "hi": {"num": "1", "den": "1"},
+                        },
+                    },
+                ),
+            ),
         )
 
     @property

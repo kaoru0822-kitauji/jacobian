@@ -234,7 +234,29 @@ class UniversalAlgebraEvaluateLawsAdapter:
                 "law-evaluation",
                 "counterexample",
             ),
-            invocation_examples=(example("one_element_idempotence", "Evaluate x*x=x on the one-element magma.", {"problem": {"structure": {"order": 1, "table": [[0]]}, "laws": [{"law_id": "idempotence", "variables": ["x"], "left": {"kind": "PRODUCT", "left": {"kind": "VARIABLE", "variable": "x"}, "right": {"kind": "VARIABLE", "variable": "x"}}, "right": {"kind": "VARIABLE", "variable": "x"}}]}}),),
+            invocation_examples=(
+                example(
+                    "one_element_idempotence",
+                    "Evaluate x*x=x on the one-element magma.",
+                    {
+                        "problem": {
+                            "structure": {"order": 1, "table": [[0]]},
+                            "laws": [
+                                {
+                                    "law_id": "idempotence",
+                                    "variables": ["x"],
+                                    "left": {
+                                        "kind": "PRODUCT",
+                                        "left": {"kind": "VARIABLE", "variable": "x"},
+                                        "right": {"kind": "VARIABLE", "variable": "x"},
+                                    },
+                                    "right": {"kind": "VARIABLE", "variable": "x"},
+                                }
+                            ],
+                        }
+                    },
+                ),
+            ),
         )
 
     @property

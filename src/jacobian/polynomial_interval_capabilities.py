@@ -268,7 +268,19 @@ class PolynomialIntervalEncloseAdapter:
                 "bernstein",
                 "exact-computation",
             ),
-            invocation_examples=(example("constant_zero_interval", "Enclose the zero polynomial on [0,1].", {"polynomial": {"variable": "x", "polynomial": {"terms": []}}, "interval": {"lo": {"num": "0", "den": "1"}, "hi": {"num": "1", "den": "1"}}}),),
+            invocation_examples=(
+                example(
+                    "constant_zero_interval",
+                    "Enclose the zero polynomial on [0,1].",
+                    {
+                        "polynomial": {"variable": "x", "polynomial": {"terms": []}},
+                        "interval": {
+                            "lo": {"num": "0", "den": "1"},
+                            "hi": {"num": "1", "den": "1"},
+                        },
+                    },
+                ),
+            ),
         )
 
     @property
