@@ -141,3 +141,63 @@ def test_agent_telemetry_counts_response_bytes_and_repeated_calls(
     assert telemetry["repeated_mcp_calls"][0]["count"] == 2
     assert telemetry["capability_describe_index_calls"] == 2
     assert telemetry["capability_describe_exact_calls"] == 1
+    assert telemetry["mcp_wire_bytes"] == telemetry["mcp_response_bytes"]
+    assert telemetry["mcp_model_visible_bytes"] > 0
+    assert telemetry["mcp_logical_payload_observed_calls"] == 3
+
+
+def test_agent_telemetry_separates_wire_model_and_logical_invocation_bytes(
+    tmp_path: Path,
+) -> None:
+    canonical = {
+        "capability_id": "graph.search.atlas",
+        "execution": {"status": "COMPLETED"},
+        "output": {"status": "FOUND", "graphs": [{"edges": [[0, 1]]}]},
+        "artifact_uris": ["artifact://sha256/" + ("a" * 64)],
+        "assurance": {"level": "COMPUTED"},
+        "completeness": {"status": "COMPLETE"},
+    }
+    projection = {
+        **canonical,
+        "output": {"status": "FOUND"},
+        "mcp_projection": {
+            "logical_payload_bytes": 12_345,
+            "output_complete": False,
+        },
+    }
+    event = {
+        "type": "item.completed",
+        "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.invoke",
+            "arguments": {
+                "capability_id": "graph.search.atlas",
+                "mode": "EXPLORE",
+                "payload": {"order": 2},
+            },
+            "status": "completed",
+            "result": {
+                "isError": False,
+                "_meta": {
+                    "jacobian": {
+                        "logical_payload_bytes": 12_345,
+                        "model_visible_payload_bytes": len(
+                            json.dumps(projection).encode("utf-8")
+                        ),
+                    }
+                },
+                "content": [{"type": "text", "text": json.dumps(projection)}],
+                "structured_content": canonical,
+            },
+        },
+    }
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["mcp_logical_payload_bytes"] == 12_345
+    assert telemetry["mcp_logical_payload_observed_calls"] == 1
+    assert telemetry["mcp_wire_bytes"] > telemetry["mcp_model_visible_bytes"]
+    assert telemetry["mcp_response_bytes"] == telemetry["mcp_wire_bytes"]
+    assert telemetry["capability_invocations"][0]["output"] == canonical["output"]

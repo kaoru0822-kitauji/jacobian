@@ -57,13 +57,21 @@ def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _mcp_response_bytes(item: Mapping[str, Any]) -> int:
+def _mcp_structured_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
     result = item.get("result")
-    if result is None:
-        return 0
+    if not isinstance(result, Mapping):
+        return None
+    for key in ("structured_content", "structuredContent"):
+        payload = result.get(key)
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def _serialized_bytes(value: object) -> int:
     try:
         encoded = json.dumps(
-            result,
+            value,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -71,6 +79,65 @@ def _mcp_response_bytes(item: Mapping[str, Any]) -> int:
     except (TypeError, ValueError):
         return 0
     return len(encoded)
+
+
+def _mcp_wire_bytes(item: Mapping[str, Any]) -> int:
+    result = item.get("result")
+    if result is None:
+        return 0
+    return _serialized_bytes(result)
+
+
+def _mcp_model_visible_bytes(item: Mapping[str, Any]) -> int:
+    result = item.get("result")
+    content = result.get("content") if isinstance(result, Mapping) else None
+    if not isinstance(content, list):
+        return 0
+    byte_count = 0
+    for block in content:
+        if isinstance(block, Mapping) and isinstance(block.get("text"), str):
+            byte_count += len(block["text"].encode("utf-8"))
+        else:
+            byte_count += _serialized_bytes(block)
+    return byte_count
+
+
+def _jacobian_result_meta(item: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    result = item.get("result")
+    if not isinstance(result, Mapping):
+        return None
+    for key in ("_meta", "meta"):
+        metadata = result.get(key)
+        if not isinstance(metadata, Mapping):
+            continue
+        jacobian = metadata.get("jacobian")
+        if isinstance(jacobian, Mapping):
+            return jacobian
+    return None
+
+
+def _mcp_logical_payload_bytes(
+    item: Mapping[str, Any],
+    *,
+    text_payload: Mapping[str, Any] | None,
+    structured_payload: Mapping[str, Any] | None,
+) -> int | None:
+    metadata = _jacobian_result_meta(item)
+    if metadata is not None:
+        value = metadata.get("logical_payload_bytes")
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    if text_payload is not None:
+        projection = text_payload.get("mcp_projection")
+        if isinstance(projection, Mapping):
+            value = projection.get("logical_payload_bytes")
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                return value
+    if structured_payload is not None:
+        return _serialized_bytes(structured_payload)
+    if text_payload is not None:
+        return _serialized_bytes(text_payload)
+    return None
 
 
 def _mcp_call_signature(tool: str, arguments: object) -> tuple[str, str]:
@@ -100,8 +167,13 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
     tool_error_count = 0
     parameter_error_count = 0
     capability_rejection_count = 0
-    mcp_response_bytes = 0
-    mcp_response_bytes_by_tool: Counter[str] = Counter()
+    mcp_wire_bytes = 0
+    mcp_wire_bytes_by_tool: Counter[str] = Counter()
+    mcp_model_visible_bytes = 0
+    mcp_model_visible_bytes_by_tool: Counter[str] = Counter()
+    mcp_logical_payload_bytes = 0
+    mcp_logical_payload_bytes_by_tool: Counter[str] = Counter()
+    mcp_logical_payload_observed_calls = 0
     mcp_call_signatures: Counter[tuple[str, str]] = Counter()
     capability_describe_index_calls = 0
     capability_describe_exact_calls = 0
@@ -129,10 +201,25 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             tool = item["tool"]
             mcp_calls.append(tool)
             arguments = item.get("arguments")
-            response_bytes = _mcp_response_bytes(item)
-            mcp_response_bytes += response_bytes
-            if response_bytes:
-                mcp_response_bytes_by_tool[tool] += response_bytes
+            wire_bytes = _mcp_wire_bytes(item)
+            model_visible_bytes = _mcp_model_visible_bytes(item)
+            text_response = _mcp_text_payload(item)
+            structured_response = _mcp_structured_payload(item)
+            logical_bytes = _mcp_logical_payload_bytes(
+                item,
+                text_payload=text_response,
+                structured_payload=structured_response,
+            )
+            mcp_wire_bytes += wire_bytes
+            mcp_model_visible_bytes += model_visible_bytes
+            if wire_bytes:
+                mcp_wire_bytes_by_tool[tool] += wire_bytes
+            if model_visible_bytes:
+                mcp_model_visible_bytes_by_tool[tool] += model_visible_bytes
+            if logical_bytes is not None:
+                mcp_logical_payload_observed_calls += 1
+                mcp_logical_payload_bytes += logical_bytes
+                mcp_logical_payload_bytes_by_tool[tool] += logical_bytes
             mcp_call_signatures[_mcp_call_signature(tool, arguments)] += 1
             if tool == "capability.describe":
                 if isinstance(arguments, Mapping) and isinstance(
@@ -148,14 +235,19 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             ):
                 capability_attempt_ids.append(arguments["capability_id"])
             result = item.get("result")
-            response = _mcp_text_payload(item)
+            response = structured_response or text_response
             failed = bool(
                 item.get("status") in {"error", "failed"}
                 or item.get("error")
-                or (isinstance(result, Mapping) and result.get("isError") is True)
                 or (
-                    isinstance(response, Mapping)
-                    and isinstance(response.get("error"), Mapping)
+                    isinstance(result, Mapping)
+                    and (
+                        result.get("isError") is True or result.get("is_error") is True
+                    )
+                )
+                or (
+                    isinstance(text_response, Mapping)
+                    and isinstance(text_response.get("error"), Mapping)
                 )
                 or _contains_value(
                     item,
@@ -266,8 +358,20 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         "capability_ids": capability_ids,
         "capability_invocations": capability_invocations,
         "capability_descriptions": capability_descriptions,
-        "mcp_response_bytes": mcp_response_bytes,
-        "mcp_response_bytes_by_tool": dict(sorted(mcp_response_bytes_by_tool.items())),
+        # Compatibility aliases retained for existing evaluation summaries.
+        "mcp_response_bytes": mcp_wire_bytes,
+        "mcp_response_bytes_by_tool": dict(sorted(mcp_wire_bytes_by_tool.items())),
+        "mcp_wire_bytes": mcp_wire_bytes,
+        "mcp_wire_bytes_by_tool": dict(sorted(mcp_wire_bytes_by_tool.items())),
+        "mcp_model_visible_bytes": mcp_model_visible_bytes,
+        "mcp_model_visible_bytes_by_tool": dict(
+            sorted(mcp_model_visible_bytes_by_tool.items())
+        ),
+        "mcp_logical_payload_bytes": mcp_logical_payload_bytes,
+        "mcp_logical_payload_bytes_by_tool": dict(
+            sorted(mcp_logical_payload_bytes_by_tool.items())
+        ),
+        "mcp_logical_payload_observed_calls": mcp_logical_payload_observed_calls,
         "repeated_mcp_call_count": sum(
             count - 1 for count in mcp_call_signatures.values() if count > 1
         ),

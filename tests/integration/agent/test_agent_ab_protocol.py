@@ -90,6 +90,10 @@ def test_autonomous_discovery_case_is_visible_in_the_bounded_dispatch_plan() -> 
             "conditions": ["control", "treatment"],
             "repetitions": 2,
             "model_runs": 4,
+            "capability_policy_profiles": {
+                "control": None,
+                "treatment": "COMPUTE_VERIFY_NO_RETRIEVAL",
+            },
         }
     ]
 
@@ -238,6 +242,13 @@ def test_ab_transcript_parser_separates_mcp_and_shell_calls(tmp_path: Path) -> N
         "capability_invocations": [],
         "mcp_response_bytes": 0,
         "mcp_response_bytes_by_tool": {},
+        "mcp_wire_bytes": 0,
+        "mcp_wire_bytes_by_tool": {},
+        "mcp_model_visible_bytes": 0,
+        "mcp_model_visible_bytes_by_tool": {},
+        "mcp_logical_payload_bytes": 0,
+        "mcp_logical_payload_bytes_by_tool": {},
+        "mcp_logical_payload_observed_calls": 0,
         "repeated_mcp_call_count": 0,
         "repeated_mcp_calls": [],
         "capability_describe_index_calls": 0,
@@ -446,6 +457,9 @@ def test_ab_summary_reports_paired_deltas() -> None:
             "usage": {"input_tokens": 100, "output_tokens": 20},
             "shell_call_count": 2,
             "mcp_call_count": 0,
+            "mcp_wire_bytes": 0,
+            "mcp_model_visible_bytes": 0,
+            "mcp_logical_payload_bytes": 0,
         },
         {
             "case_id": "C",
@@ -456,6 +470,9 @@ def test_ab_summary_reports_paired_deltas() -> None:
             "usage": {"input_tokens": 60, "output_tokens": 10},
             "shell_call_count": 0,
             "mcp_call_count": 1,
+            "mcp_wire_bytes": 1_200,
+            "mcp_model_visible_bytes": 400,
+            "mcp_logical_payload_bytes": 2_000,
         },
     ]
 
@@ -464,4 +481,8 @@ def test_ab_summary_reports_paired_deltas() -> None:
     assert summary["pair_count"] == 1
     assert summary["pairs"][0]["input_token_delta"] == -40
     assert summary["pairs"][0]["elapsed_delta_seconds"] == -4
+    assert summary["pairs"][0]["mcp_wire_byte_delta"] == 1_200
+    assert summary["pairs"][0]["mcp_model_visible_byte_delta"] == 400
+    assert summary["pairs"][0]["mcp_logical_payload_byte_delta"] == 2_000
     assert summary["conditions"]["treatment"]["median_tool_calls"] == 1
+    assert summary["conditions"]["treatment"]["median_mcp_model_visible_bytes"] == 400

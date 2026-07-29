@@ -181,6 +181,22 @@ searching for a checker. Follow the checker, certificate, and verification
 fields in the producer result rather than guessing that a generic verifier
 accepts its artifact.
 
+`capability.invoke` accepts an optional result `view`. The default `STANDARD`
+keeps the complete canonical `CapabilityResult` in MCP structured content.
+Small operation outputs also remain complete in model-visible text. When a
+completed output is large, the text view retains structurally small fields and
+replaces omitted fields with JSON paths, types, byte counts, and SHA-256
+digests; `full_result_episode_uri` points to the durable complete result.
+`SUMMARY` explicitly omits operation output from text. `FULL` places the
+complete result in text as well as structured content.
+
+Each non-`FULL` text response includes `mcp_projection`, and each MCP result
+includes transport metadata, with logical canonical bytes, model-visible text
+bytes, output completeness, full-result digest, and episode URI. Evaluation
+telemetry records logical, model-visible, and serialized wire bytes separately;
+the three measures answer different questions and must not be substituted for
+one another.
+
 Published invocation examples are validated against the descriptor schema when
 the capability is installed. Domain-owned examples may additionally be
 constructed through the complete Pydantic request model. They illustrate valid

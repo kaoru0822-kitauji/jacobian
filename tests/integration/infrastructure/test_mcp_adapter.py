@@ -92,6 +92,12 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             assert (
                 tools["capability.invoke"].input_schema["additionalProperties"] is False
             )
+            assert set(tools["capability.invoke"].input_schema["properties"]) == {
+                "capability_id",
+                "payload",
+                "mode",
+                "view",
+            }
             assert tools["workspace.open"].annotations is not None
             assert tools["workspace.open"].annotations.idempotent_hint is True
             assert tools["workspace.write"].annotations is not None
@@ -514,6 +520,11 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             response = json.loads(result.content[0].text)
             assert response["execution"]["status"] == "COMPLETED"
             assert response["assurance"]["level"] == "COMPUTED"
+            assert response["mcp_projection"]["view"] == "STANDARD"
+            assert response["mcp_projection"]["output_complete"] is True
+            assert isinstance(result.structured_content, dict)
+            assert "mcp_projection" not in result.structured_content
+            assert result.structured_content["output"] == response["output"]
             runtime = contract["capability"]["provider_runtime"]
             assert response["provider"] == contract["capability"]["provider"]
             assert response["provider_digest"] == runtime["digest"]
@@ -550,6 +561,26 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert unknown_result["execution"]["status"] == "ERROR"
             assert unknown_result["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
             assert unknown_result["assurance"]["level"] != "VERIFIED"
+
+            summary_result = await client.call_tool(
+                "capability.invoke",
+                {
+                    "capability_id": "integer.compute.gcd",
+                    "mode": "EXPLORE",
+                    "view": "SUMMARY",
+                    "payload": {"left": "84", "right": "30"},
+                },
+            )
+            summary = json.loads(summary_result.content[0].text)
+            assert summary["output"] == {}
+            assert summary["mcp_projection"]["output_complete"] is False
+            assert summary["mcp_projection"]["omitted_output_fields"][0]["path"] == (
+                "/output"
+            )
+            assert isinstance(summary_result.structured_content, dict)
+            assert summary_result.structured_content["output"]["result"]["value"] == (
+                "6"
+            )
 
     asyncio.run(scenario())
 
