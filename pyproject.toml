@@ -114,7 +114,9 @@ ignore_missing_imports = true
 [tool.deptry]
 extend_exclude = ["benchmarks"]
 known_first_party = ["jacobian", "jacobian_checkers"]
-per_rule_ignores = { "DEP002" = ["cvc5", "mcp-types", "python-flint"] }
+# The maintained deployment smoke configures the HTTP client bundled by the
+# exactly pinned MCP transport; deploy/ is not part of the Python wheel.
+per_rule_ignores = { "DEP002" = ["cvc5", "mcp-types", "python-flint"], "DEP003" = ["httpx2"] }
 
 [tool.coverage.run]
 branch = true

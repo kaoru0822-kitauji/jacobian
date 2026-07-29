@@ -2,9 +2,10 @@
 
 [Documentation home](../index.md)
 
-- Status: v0.2 alpha; capability contracts are pre-stable
-- Normative sources: [v0.2 specification](specifications/v0.2.md) and
-  [conformance gate](conformance-v0.2.md)
+- Status: Current pre-stable MCP surface
+- Frozen baseline: [v0.2 specification](specifications/v0.2.md) and
+  [conformance gate](conformance-v0.2.md); installed later-release membership
+  remains runtime-defined
 
 Jacobian exposes mathematical operations as namespaced capabilities and
 operational working state through three direct workspace tools. The

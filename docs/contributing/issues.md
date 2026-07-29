@@ -36,8 +36,8 @@ The repository implements the verification kernel together with:
 - CLI and MCP adapters;
 - explicit domain bundles for arithmetic, number theory, combinatorics, finite
   sets, sequences, geometry, graph optimization and invariants, matrices,
-  lattices, polynomials, validated analysis, finite probability, and rational
-  optimization; and
+  lattices, polynomials, projective geometry, universal algebra, validated
+  analysis, finite probability, and rational optimization; and
 - typed Lean proof states, premise retrieval, dependency subgraphs, proof-edit
   validation, and independent proof replay.
 

@@ -10,8 +10,10 @@ or evaluation and independently verified evidence.
 
 Read the [documentation home](docs/index.md), the
 [product goals](docs/explanation/goals.md), the
-[v0.2 specification](docs/reference/specifications/v0.2.md), and the
+[v0.2 frozen specification](docs/reference/specifications/v0.2.md), and the
 [v0.2 conformance specification](docs/reference/conformance-v0.2.md).
+Later pre-stable package versions extend that snapshot; use the installed
+catalog and current reference documents for present capability membership.
 
 ## Development environment
 
@@ -144,6 +146,10 @@ Place documentation according to the reader's task:
 - `docs/explanation/` records architecture, rationale, and tradeoffs.
 
 Keep rolling product goals separate from supported release behavior.
+For hosted MCP changes, update and validate
+[`docs/how-to/deploy-remote-mcp.md`](docs/how-to/deploy-remote-mcp.md) together
+with any affected files under `deploy/`. Do not promote ignored `tmp/`
+configuration or deployment notes into source-of-truth instructions.
 For documentation-only changes, run:
 
 ```sh
