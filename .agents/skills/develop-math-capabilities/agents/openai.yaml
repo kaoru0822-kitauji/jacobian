@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop Math Capabilities"
+  short_description: "Run Jacobian capability development end to end"
+  default_prompt: "Use $develop-math-capabilities to turn these mathematical challenges and agent traces into evaluated Jacobian capability improvements."
