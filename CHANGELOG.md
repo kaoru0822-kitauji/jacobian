@@ -1,5 +1,76 @@
 # Changelog
 
+## [0.5.0-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.4.1-alpha.0...jacobian-v0.5.0-alpha.0) (2026-07-29)
+
+
+### Features
+
+* add one-command MCP deployment installer ([c6121c7](https://github.com/morluto/jacobian/commit/c6121c76275594ee36797dc16828d14f83be41e4))
+* add one-command MCP deployment installer ([f960bcd](https://github.com/morluto/jacobian/commit/f960bcd82d8d6e739ff291667d058cc55020aa13))
+* **eval:** harden Frontier evaluation transport ([83006d0](https://github.com/morluto/jacobian/commit/83006d0268a0a4cd35fa06756f9279ebc63be532))
+* **eval:** harden Frontier evaluation transport ([c7b9efe](https://github.com/morluto/jacobian/commit/c7b9efe701726db314e10fda6d51f9871bc44dd6))
+* **graph:** independently verify diameter and radius ([2826ea2](https://github.com/morluto/jacobian/commit/2826ea2e3ec4665eb93eb3b96e060015013860f8))
+* **graph:** verify diameter and radius independently ([46a4bd0](https://github.com/morluto/jacobian/commit/46a4bd02da61da18c9d6a65c398e43c14bc8d71f))
+* **graph:** verify exact distance matrices ([cbdee9b](https://github.com/morluto/jacobian/commit/cbdee9be478ffac27ebe7144e9c2e1f49c76519e))
+* **integer:** independently verify prime factorizations ([4b02dc2](https://github.com/morluto/jacobian/commit/4b02dc2aca5eacd481661bc02ddf9b6b46e2332e))
+* **integer:** verify prime factorizations independently ([4d90c25](https://github.com/morluto/jacobian/commit/4d90c257bbc22638c97e6044446ea6780131ccdf))
+* **number-theory:** decide powerful numbers ([2fb1c0f](https://github.com/morluto/jacobian/commit/2fb1c0ff65223edf9d2e50d6add621cab9c9d6ea))
+* **number-theory:** decide powerful numbers ([9881133](https://github.com/morluto/jacobian/commit/988113312fd2a61933bbf3b8d0cd9036527e4ffd))
+* **number-theory:** verify powerful decisions ([508dbd3](https://github.com/morluto/jacobian/commit/508dbd32c703198aae4665b45e396cb3ffe289ed))
+* **number-theory:** verify powerful decisions ([ee946ad](https://github.com/morluto/jacobian/commit/ee946ad733277a66cda5d21c63290f84995c9fbd))
+* **skills:** orchestrate capability development ([adb3a1b](https://github.com/morluto/jacobian/commit/adb3a1bcd60a728ac178e54d7d26e579b765600b))
+* **skills:** orchestrate capability development ([7fb67c9](https://github.com/morluto/jacobian/commit/7fb67c97086a9d807b11ac1448b111f0d13bd895))
+
+
+### Bug Fixes
+
+* align CI callers with runtime ownership ([d143d69](https://github.com/morluto/jacobian/commit/d143d696e00bff3b5ae95d90ac1c1351deca30da))
+* align MCP deployment and agent handoff ([2213172](https://github.com/morluto/jacobian/commit/221317299b2786a0d8d0a80022aa66de46434347))
+* align MCP deployment and agent handoff ([0fa8798](https://github.com/morluto/jacobian/commit/0fa879829ab40d2d5f4fb0bec7e3f87473867e27))
+* **ci:** close semantic lane review gaps ([7007ece](https://github.com/morluto/jacobian/commit/7007ece42bb4bb0d0cd6475a523906d04d7fa95f))
+* **ci:** enforce semantic validation boundaries ([585fc6e](https://github.com/morluto/jacobian/commit/585fc6e0dba61e224244f62028ce3f7aed550932))
+* **ci:** restore historical integration timing downloads ([fc6f7f5](https://github.com/morluto/jacobian/commit/fc6f7f5df90a717431cf41fcacf2a2ccaddc9215))
+* **cli:** make init output readable by default ([3c3f788](https://github.com/morluto/jacobian/commit/3c3f7886811abab0e2eaf30168e9f38537d62217))
+* **combinatorics:** bound large recurrence and series results ([e167792](https://github.com/morluto/jacobian/commit/e167792bbf4820e433e240edfb2ad37235ee53a4))
+* **deploy:** build release runtime at final path ([#193](https://github.com/morluto/jacobian/issues/193)) ([d63c4ff](https://github.com/morluto/jacobian/commit/d63c4ff052f3a7861a3a0efb71872c43156b81b5))
+* **devex:** align CLI onboarding and validation workflows ([95f2141](https://github.com/morluto/jacobian/commit/95f21417980fb9b940c9841d8b4f56a2cafa64f5))
+* **dev:** preserve transaction and platform safety ([199ab26](https://github.com/morluto/jacobian/commit/199ab26391d8206c786eb981ee5db7312283685e))
+* encode the idempotence example ([36e0fd6](https://github.com/morluto/jacobian/commit/36e0fd654587e156e2445619b226fb7fb19c1802))
+* migrate merged benchmark runtime callers ([70d42ab](https://github.com/morluto/jacobian/commit/70d42ab78b9a8b8c558e065461634f2c2cbd3d4a))
+* **nauty:** harden optional provider boundary ([92e44d4](https://github.com/morluto/jacobian/commit/92e44d40adee3c93cfda5634801e071b57310eee))
+* **posets:** validate ranks and bound recurrence artifacts ([144d100](https://github.com/morluto/jacobian/commit/144d1000671712af66e1718d732d7387b3d1d7e9))
+* **probability:** bound convolution and decouple verification ([85bee90](https://github.com/morluto/jacobian/commit/85bee90b607aba9ac2a3a0cac8a5467510183654))
+* **release:** keep npm trusted publishing OIDC-only ([c763724](https://github.com/morluto/jacobian/commit/c76372452a7108984d73ab7bd408180e27210c6f))
+* **release:** make npm retries idempotent ([43b6a56](https://github.com/morluto/jacobian/commit/43b6a56c3aab50d0e470ddf7b20b305ec1e87918))
+* **release:** remove disabled immutable release gate ([723077d](https://github.com/morluto/jacobian/commit/723077ddb97513094df8fa0474d9412a8c305005))
+* **release:** run publishers from main workflow ([04d11a5](https://github.com/morluto/jacobian/commit/04d11a5c82ad033e4d80d5757446a8759d392261))
+* **release:** tag prerelease npm publications ([2bdaf5a](https://github.com/morluto/jacobian/commit/2bdaf5ad135bb0156ea225f4aa11c67f0bcedbb0))
+* **testing:** resolve package initializer imports ([377cc63](https://github.com/morluto/jacobian/commit/377cc63bddc44fb69ff3f1b7cbaf750cbadbf3bc))
+* type matrix invocation examples ([a1ab021](https://github.com/morluto/jacobian/commit/a1ab021bda6e84a17e2c7b6c25d87c177640de67))
+* use a unit segment invocation example ([3ffe406](https://github.com/morluto/jacobian/commit/3ffe406bfb1df5dcaf92f1c27206c34900481ce9))
+
+
+### Performance Improvements
+
+* **ci:** avoid unnecessary Lean validation work ([d9cd246](https://github.com/morluto/jacobian/commit/d9cd246ad2c07e974c090287846075bb079ace01))
+* **cli:** initialize the kernel only when commands need it ([73b4c5d](https://github.com/morluto/jacobian/commit/73b4c5d69cc53acaab3fa1a047dddaea09a4aa28))
+* **kernel:** reduce repeated schema registration work ([c220830](https://github.com/morluto/jacobian/commit/c2208301de14872c890cc15170ac7a19b32e26b3))
+* **runtime:** make populated portfolio attachment write-free ([faa0ceb](https://github.com/morluto/jacobian/commit/faa0ceb9b9d5efd7b790d99d7c86b37e5097044e))
+* **store:** batch durable blob publication syncs ([44aac8c](https://github.com/morluto/jacobian/commit/44aac8cf35d3a726509a32bfeadc15d1b775893a))
+* **tests:** group reference fixtures in the core lane ([95e138b](https://github.com/morluto/jacobian/commit/95e138b2d46daa59eb88133280feaf51ac5f36fa))
+* **topology:** maintain homology bases incrementally ([a28609f](https://github.com/morluto/jacobian/commit/a28609f261c6dfbf028073b0e50d1e83ccdeacfc))
+
+
+### Documentation
+
+* **audit:** refresh developer experience findings ([124238a](https://github.com/morluto/jacobian/commit/124238a06a26ab41d2374fd0b1b383428a6b666b))
+* **capabilities:** correct discovery handoff evidence ([486d663](https://github.com/morluto/jacobian/commit/486d6637c71e41a048d610c7a3f6fa883a654ce8))
+* **capabilities:** freeze four-domain discovery gates ([#198](https://github.com/morluto/jacobian/issues/198)) ([d2080f2](https://github.com/morluto/jacobian/commit/d2080f2c013df41816af220f4c2d5f68cf160846))
+* **dev:** clarify the local validation workflow ([4144720](https://github.com/morluto/jacobian/commit/41447206d3068b5f80bf87156662d004aafe7774))
+* **devex:** align onboarding with validation lanes ([6d4e12f](https://github.com/morluto/jacobian/commit/6d4e12f239eda1361b4b68e8519616633b4cc8ca))
+* replace legacy kernel architecture references ([3a185c4](https://github.com/morluto/jacobian/commit/3a185c43ba71879ac3385ebb85a5ccfce9b19ded))
+* update probability reproduction paths ([b4bcb1d](https://github.com/morluto/jacobian/commit/b4bcb1d46e6981b405ec153518493d57d511ca95))
+
 ## [0.4.1-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.4.0-alpha.0...jacobian-v0.4.1-alpha.0) (2026-07-28)
 
 
