@@ -220,3 +220,54 @@ def test_ab_non_retrieval_treatment_starts_profiled_mcp(
         "--capability-policy-profile",
         "COMPUTE_VERIFY_NO_RETRIEVAL",
     ]
+
+
+def test_ab_distance_composition_uses_same_mcp_with_targeted_ablation(
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    assert (
+        benchmark.main(
+            [
+                "--case",
+                "GRAPH-DISTANCE-COMPOSITION-AB-001",
+                "--repetitions",
+                "3",
+            ]
+        )
+        == 0
+    )
+    plan = json.loads(capsys.readouterr().out)
+    case_plan = plan["cases"][0]
+    assert plan["model_run_count"] == 6
+    assert case_plan["capability_exclusions"] == {
+        "control": sorted(benchmark.DISTANCE_COMPOSITION_CAPABILITY_IDS),
+        "treatment": [],
+    }
+    assert case_plan["capability_policy_profiles"] == {
+        "control": "COMPUTE_VERIFY_NO_RETRIEVAL",
+        "treatment": "COMPUTE_VERIFY_NO_RETRIEVAL",
+    }
+
+    commands = {}
+    for condition in ("control", "treatment"):
+        commands[condition] = benchmark._codex_command(
+            codex_command="codex",
+            condition=condition,
+            workspace=tmp_path / condition / "workspace",
+            report_path=tmp_path / condition / "report.json",
+            state_dir=tmp_path / condition / "state",
+            model="gpt-5.6",
+            reasoning_effort="high",
+            task_type="graph_distance_composition",
+            excluded_capability_ids=(
+                tuple(benchmark.DISTANCE_COMPOSITION_CAPABILITY_IDS)
+                if condition == "control"
+                else ()
+            ),
+            capability_policy_profile="COMPUTE_VERIFY_NO_RETRIEVAL",
+        )
+    assert "agent_ab_mcp.py" in " ".join(commands["control"])
+    assert "agent_ab_mcp.py" in " ".join(commands["treatment"])
+    assert " ".join(commands["control"]).count("--exclude-capability") == 2
+    assert "--exclude-capability" not in " ".join(commands["treatment"])

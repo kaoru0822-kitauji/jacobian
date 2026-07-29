@@ -104,6 +104,32 @@ GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS = (
         ),
     ),
     ExactReplayCheckerDeclaration(
+        "graph.distance_matrix.compute",
+        GraphInvariantRequest,
+        "check_graph_distance_matrix",
+        "graph.distance-matrix.all-sources-bfs-v1",
+        entrypoint_module=_GRAPH_ENTRYPOINT,
+        replay_method="all-sources breadth-first distance-matrix replay",
+        reason=(
+            "operator-authorized standard-library BFS checker independent of "
+            "the NetworkX producer"
+        ),
+        verification_capability_id="graph.distance_matrix.verify",
+        verification_title="Verify an exact graph distance matrix",
+        verification_description=(
+            "Independently replay every source shortest-path traversal to verify "
+            "one stored all-pairs distance matrix, including unreachable pairs."
+        ),
+        verification_tags=(
+            "verification",
+            "exact",
+            "graph",
+            "distance",
+            "matrix",
+            "breadth-first-search",
+        ),
+    ),
+    ExactReplayCheckerDeclaration(
         "graph.invariant.maximum_matching.compute",
         GraphInvariantRequest,
         "check_graph_maximum_matching",

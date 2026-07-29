@@ -40,3 +40,22 @@ sets or other capabilities.
 The producer is capped at `COMPUTED`. That assurance means the bounded
 operation completed and produced a typed artifact; it is not independent
 verification of the distance claim.
+
+## Independent verification
+
+`graph.distance_matrix.verify` consumes one stored producer result and can
+promote that exact matrix to `VERIFIED`. The operator-authorized checker uses
+only Python standard-library adjacency sets, queues, and integer distances. It
+does not import NetworkX or the producer package.
+
+The checker first rejects malformed metadata, ordering, shape, entry types,
+diagonal values, asymmetry, incorrect edge distances, triangle violations, and
+finite-component closure violations. Those conditions are only fast rejection
+checks. Acceptance still requires an exhaustive breadth-first traversal from
+every source and exact comparison of every finite distance and unreachable
+`null`.
+
+The verification record is bound to the exact graph input artifact, matrix
+result artifact, schemas, semantics, checker source digest, witness format, and
+provider runtime. Rejection, timeout, cancellation, unavailable runtime, or
+checker error remains `UNKNOWN` and cannot produce `VERIFIED`.
