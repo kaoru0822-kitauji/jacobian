@@ -16,8 +16,9 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.provider_measurements import measure_provider
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 from jacobian.smt import SmtArtifactError
 
 pytestmark = pytest.mark.external_backend
@@ -48,8 +49,8 @@ _QF_LRA_UNSAT = (
 _QF_UF_SAT = "(set-logic QF_UF)\n(declare-fun p () Bool)\n(assert p)\n(check-sat)\n"
 
 
-def _invoke(kernel: JacobianKernel, text: str, *, logic: str = "QF_UF"):
-    return kernel.capabilities.invoke(
+def _invoke(runtime: JacobianRuntime, text: str, *, logic: str = "QF_UF"):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="smt.unsat_proof.find",
             input={
@@ -62,37 +63,44 @@ def _invoke(kernel: JacobianKernel, text: str, *, logic: str = "QF_UF"):
 
 
 @pytest.fixture(scope="module")
-def kernel(
+def runtime(
     tmp_path_factory: pytest.TempPathFactory,
-    kernel_store_template: Path,
-) -> JacobianKernel:
-    root = tmp_path_factory.mktemp("cvc5-kernel")
-    shutil.copytree(kernel_store_template, root, dirs_exist_ok=True)
-    return JacobianKernel(root)
+    runtime_store_template: Path,
+) -> JacobianRuntime:
+    root = tmp_path_factory.mktemp("cvc5-runtime")
+    shutil.copytree(runtime_store_template, root, dirs_exist_ok=True)
+    return create_runtime(root)
 
 
-def test_pinned_cvc5_capability_is_discoverable(kernel: JacobianKernel) -> None:
-    assert kernel.cvc5_runtime.availability is CapabilityProviderAvailability.AVAILABLE
-    catalog = kernel.capabilities.catalog().capabilities
+def test_pinned_cvc5_capability_is_discoverable(runtime: JacobianRuntime) -> None:
+    assert (
+        runtime.portfolio.cvc5_runtime.availability
+        is CapabilityProviderAvailability.AVAILABLE
+    )
+    catalog = runtime.core.capabilities.catalog().capabilities
     descriptor = next(
         descriptor
         for descriptor in catalog
         if descriptor.capability_id == "smt.unsat_proof.find"
     )
     assert descriptor.provider == "cvc5"
-    assert descriptor.provider_runtime == kernel.cvc5_runtime
+    assert descriptor.provider_runtime == runtime.portfolio.cvc5_runtime
     assert descriptor.provider_runtime.checker_ids == ()
     assert "smt.unsat_proof.verify" not in {
         installed.capability_id for installed in catalog
     }
-    assert kernel.smt.installation.problem_schema_uri.startswith("artifact://sha256/")
-    assert kernel.smt.installation.proof_schema_uri.startswith("artifact://sha256/")
+    assert runtime.core.smt.installation.problem_schema_uri.startswith(
+        "artifact://sha256/"
+    )
+    assert runtime.core.smt.installation.proof_schema_uri.startswith(
+        "artifact://sha256/"
+    )
 
 
 def test_pinned_cvc5_measurement_runs_its_proof_reproduction(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    measurement = measure_provider(kernel.cvc5_runtime)
+    measurement = measure_provider(runtime.portfolio.cvc5_runtime)
 
     assert measurement.cold_start.status.value == "COMPLETED"
     assert measurement.reproduction_case.status.value == "COMPLETED"
@@ -100,8 +108,8 @@ def test_pinned_cvc5_measurement_runs_its_proof_reproduction(
     assert measurement.installed_bytes > 0
 
 
-def test_qf_uf_proof_is_durable_computed_evidence(kernel: JacobianKernel) -> None:
-    result = _invoke(kernel, _QF_UF_UNSAT)
+def test_qf_uf_proof_is_durable_computed_evidence(runtime: JacobianRuntime) -> None:
+    result = _invoke(runtime, _QF_UF_UNSAT)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
@@ -113,7 +121,7 @@ def test_qf_uf_proof_is_durable_computed_evidence(kernel: JacobianKernel) -> Non
     assert result.assurance.verification_record_uri is None
     assert len(result.artifact_uris) == 2
 
-    resolved = kernel.smt.resolve_proof(result.output["proof_uri"])
+    resolved = runtime.core.smt.resolve_proof(result.output["proof_uri"])
     assert resolved.proof.problem.problem_artifact_uri == result.output["problem_uri"]
     assert resolved.proof.raw_bytes().startswith(b"(\n")
     assert resolved.proof.contains_holes is False
@@ -128,11 +136,11 @@ def test_qf_uf_proof_is_durable_computed_evidence(kernel: JacobianKernel) -> Non
     ),
 )
 def test_linear_arithmetic_holes_stay_explicit_and_unverified(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     logic: str,
     text: str,
 ) -> None:
-    result = _invoke(kernel, text, logic=logic)
+    result = _invoke(runtime, text, logic=logic)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["status"] == "PROOF_PRODUCED"
@@ -144,9 +152,9 @@ def test_linear_arithmetic_holes_stay_explicit_and_unverified(
 
 
 def test_sat_report_produces_no_unsat_artifact_or_conclusion(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    result = _invoke(kernel, _QF_UF_SAT)
+    result = _invoke(runtime, _QF_UF_SAT)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output == {
@@ -166,14 +174,14 @@ def test_sat_report_produces_no_unsat_artifact_or_conclusion(
 
 
 def test_incremental_or_mismatched_queries_are_rejected_before_solver_evidence(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     for invalid in (
         _QF_UF_UNSAT.replace("(check-sat)\n", "(push 1)\n(check-sat)\n"),
         _QF_UF_UNSAT.replace("QF_UF", "QF_LIA"),
         _QF_UF_UNSAT + "(check-sat)\n",
     ):
-        result = _invoke(kernel, invalid)
+        result = _invoke(runtime, invalid)
         assert result.execution.status is ExecutionStatus.ERROR
         assert result.output["error"]["code"] == "INVALID_SMT_UNSAT_PROOF_REQUEST"
         assert result.artifact_uris == ()
@@ -181,7 +189,7 @@ def test_incremental_or_mismatched_queries_are_rejected_before_solver_evidence(
 
 
 def test_theory_outside_declared_logic_fails_in_isolated_parser(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     nonlinear_lia = (
         "(set-logic QF_LIA)\n"
@@ -190,7 +198,7 @@ def test_theory_outside_declared_logic_fails_in_isolated_parser(
         "(check-sat)\n"
     )
 
-    result = _invoke(kernel, nonlinear_lia, logic="QF_LIA")
+    result = _invoke(runtime, nonlinear_lia, logic="QF_LIA")
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output == {}
@@ -200,21 +208,21 @@ def test_theory_outside_declared_logic_fails_in_isolated_parser(
 
 
 def test_problem_and_proof_bindings_reject_cross_domain_artifacts(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    cnf_uri = kernel.sat.put_cnf(
+    cnf_uri = runtime.core.sat.put_cnf(
         variable_names=("x",),
         clauses=((1,),),
     ).artifact_uri
 
     with pytest.raises(SmtArtifactError):
-        kernel.smt.resolve_problem(cnf_uri)
+        runtime.core.smt.resolve_problem(cnf_uri)
     with pytest.raises(SmtArtifactError):
-        kernel.smt.resolve_proof(cnf_uri)
+        runtime.core.smt.resolve_proof(cnf_uri)
 
 
 def test_worker_proof_metadata_mismatch_fails_closed(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_worker(command: list[str], **_kwargs: Any) -> BoundedProcessResult:
@@ -241,7 +249,7 @@ def test_worker_proof_metadata_mismatch_fails_closed(
 
     monkeypatch.setattr("jacobian.cvc5.run_bounded_process", fake_worker)
 
-    result = _invoke(kernel, _QF_UF_UNSAT)
+    result = _invoke(runtime, _QF_UF_UNSAT)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output == {}
@@ -251,7 +259,7 @@ def test_worker_proof_metadata_mismatch_fails_closed(
 
 
 def test_worker_timeout_fails_without_solver_conclusion(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -266,7 +274,7 @@ def test_worker_timeout_fails_without_solver_conclusion(
         ),
     )
 
-    result = _invoke(kernel, _QF_UF_UNSAT)
+    result = _invoke(runtime, _QF_UF_UNSAT)
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output == {}
@@ -277,7 +285,7 @@ def test_worker_timeout_fails_without_solver_conclusion(
 
 def test_missing_optional_cvc5_leaves_artifact_boundary_but_no_capability(
     tmp_path: Path,
-    initialized_kernel_store: None,
+    initialized_runtime_store: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     unavailable = CapabilityProviderRuntime(
@@ -289,16 +297,16 @@ def test_missing_optional_cvc5_leaves_artifact_boundary_but_no_capability(
         diagnostic="cvc5 is intentionally unavailable for this test.",
     )
     monkeypatch.setattr(
-        "jacobian.kernel.cvc5_provider_runtime",
+        "jacobian.portfolio.assembler.cvc5_provider_runtime",
         lambda: unavailable,
     )
 
-    without_cvc5 = JacobianKernel(tmp_path)
+    without_cvc5 = create_runtime(tmp_path)
 
     assert "smt.unsat_proof.find" not in {
         descriptor.capability_id
-        for descriptor in without_cvc5.capabilities.catalog().capabilities
+        for descriptor in without_cvc5.core.capabilities.catalog().capabilities
     }
-    assert without_cvc5.smt.installation.problem_schema_uri.startswith(
+    assert without_cvc5.core.smt.installation.problem_schema_uri.startswith(
         "artifact://sha256/"
     )

@@ -13,8 +13,9 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.smt import SmtResourceBudget
-from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import carcara_provider_runtime
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
     pytest.mark.external_backend,
@@ -24,22 +25,24 @@ _FIXTURES = Path(__file__).parents[2] / "fixtures" / "smt"
 
 
 @pytest.fixture(scope="module")
-def kernel(
+def runtime(
     tmp_path_factory: pytest.TempPathFactory,
-    kernel_store_template_with_references: Path,
-) -> JacobianKernel:
+    runtime_store_template_with_references: Path,
+) -> JacobianRuntime:
     runtime = carcara_provider_runtime()
     if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
         pytest.skip("the exact operator-provenanced Carcara runtime is unavailable")
-    root = tmp_path_factory.mktemp("carcara-kernel")
-    shutil.copytree(kernel_store_template_with_references, root, dirs_exist_ok=True)
-    installed = JacobianKernel(root, install_references=True)
+    root = tmp_path_factory.mktemp("carcara-runtime")
+    shutil.copytree(runtime_store_template_with_references, root, dirs_exist_ok=True)
+    installed = create_runtime(
+        root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     assert installed.carcara_runtime == runtime
     return installed
 
 
-def _produce(kernel: JacobianKernel, logic: str, fixture: str):
-    return kernel.capabilities.invoke(
+def _produce(runtime: JacobianRuntime, logic: str, fixture: str):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="smt.unsat_proof.find",
             input={
@@ -51,8 +54,8 @@ def _produce(kernel: JacobianKernel, logic: str, fixture: str):
     )
 
 
-def _verify(kernel: JacobianKernel, proof_uri: str):
-    return kernel.capabilities.invoke(
+def _verify(runtime: JacobianRuntime, proof_uri: str):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="smt.unsat_proof.verify",
             mode=CapabilityMode.VERIFY,
@@ -62,13 +65,13 @@ def _verify(kernel: JacobianKernel, proof_uri: str):
 
 
 def test_zero_hole_qf_uf_proof_is_independently_verified(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    produced = _produce(kernel, "QF_UF", "qf_uf_equality_unsat.smt2")
+    produced = _produce(runtime, "QF_UF", "qf_uf_equality_unsat.smt2")
 
     assert produced.output["contains_holes"] is False
     assert produced.output["conclusion"] == "UNKNOWN"
-    verified = _verify(kernel, produced.output["proof_uri"])
+    verified = _verify(runtime, produced.output["proof_uri"])
 
     assert verified.execution.status is ExecutionStatus.COMPLETED
     assert verified.output["status"] == "VERIFIED_UNSAT"
@@ -85,15 +88,15 @@ def test_zero_hole_qf_uf_proof_is_independently_verified(
     ),
 )
 def test_holey_arithmetic_proofs_remain_unverified(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     logic: str,
     fixture: str,
 ) -> None:
-    produced = _produce(kernel, logic, fixture)
+    produced = _produce(runtime, logic, fixture)
 
     assert produced.output["contains_holes"] is True
     assert produced.output["alethe_hole_count"] >= 1
-    checked = _verify(kernel, produced.output["proof_uri"])
+    checked = _verify(runtime, produced.output["proof_uri"])
 
     assert checked.execution.status is ExecutionStatus.COMPLETED
     assert checked.output["status"] == "REJECTED"
@@ -103,22 +106,22 @@ def test_holey_arithmetic_proofs_remain_unverified(
 
 
 def test_unknown_rule_is_not_silently_treated_as_verified(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    produced = _produce(kernel, "QF_UF", "qf_uf_equality_unsat.smt2")
-    resolved = kernel.smt.resolve_proof(produced.output["proof_uri"])
+    produced = _produce(runtime, "QF_UF", "qf_uf_equality_unsat.smt2")
+    resolved = runtime.core.smt.resolve_proof(produced.output["proof_uri"])
     unknown_rule = resolved.proof.raw_bytes().replace(
         b":rule resolution",
         b":rule jacobian_unknown_rule",
     )
-    mutated = kernel.smt.put_proof(
+    mutated = runtime.core.smt.put_proof(
         problem_uri=produced.output["problem_uri"],
         proof=unknown_rule,
-        producer=kernel.cvc5_runtime,
+        producer=runtime.portfolio.cvc5_runtime,
         resource_budget=SmtResourceBudget(wall_seconds=5),
     )
 
-    checked = _verify(kernel, mutated.artifact_uri)
+    checked = _verify(runtime, mutated.artifact_uri)
 
     assert checked.execution.status is ExecutionStatus.COMPLETED
     assert checked.output["status"] == "REJECTED"

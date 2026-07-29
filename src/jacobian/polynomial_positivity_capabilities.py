@@ -25,12 +25,9 @@ import hashlib
 import time
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
-import sympy
 from pydantic import ValidationError
-from sympy import QQ, Poly, Symbol, symbols
-from sympy.polys.polyerrors import PolynomialError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
@@ -79,11 +76,38 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.domains._examples import example
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
+from jacobian.providers import LazyLoader
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 from jacobian.verification import VerificationService
+
+if TYPE_CHECKING:
+    from sympy import Poly, Symbol
+
+
+class _SympyBackend(NamedTuple):
+    """Heavy SymPy implementation symbols loaded on first capability invocation."""
+
+    QQ: Any
+    Poly: Any
+    symbols: Any
+    Rational: Any
+    PolynomialError: type
+
+
+def _load_sympy_backend() -> _SympyBackend:
+    """Construct the pinned SymPy implementation bundle on first use."""
+    from sympy import QQ, Poly, Rational, symbols
+    from sympy.polys.polyerrors import PolynomialError
+
+    return _SympyBackend(QQ, Poly, symbols, Rational, PolynomialError)
+
+
+_sympy: LazyLoader[_SympyBackend] = LazyLoader(
+    _load_sympy_backend, component_id="jacobian.sympy.polynomial-positivity"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,6 +325,7 @@ class PolynomialIntervalPositivityDecideAdapter:
         started = time.monotonic()
         polynomial = validated.polynomial
         interval = validated.interval
+        sp = _sympy.get()
         try:
             (
                 sturm_polys,
@@ -310,7 +335,12 @@ class PolynomialIntervalPositivityDecideAdapter:
                 endpoint_root,
                 positive,
             ) = _sturm_positivity(polynomial, interval)
-        except (PolynomialError, TypeError, ValueError, ZeroDivisionError) as exc:
+        except (
+            cast(type[BaseException], sp.PolynomialError),
+            TypeError,
+            ValueError,
+            ZeroDivisionError,
+        ) as exc:
             raise _positivity_error(
                 "POLYNOMIAL_POSITIVITY_DECISION_FAILED",
                 "positivity_computation",
@@ -332,7 +362,7 @@ class PolynomialIntervalPositivityDecideAdapter:
             roots_in_open_interval=roots_in_open,
             endpoint_root=endpoint_root,
             positive=positive,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         decision_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.installation.decision_schema_uri,
@@ -351,7 +381,7 @@ class PolynomialIntervalPositivityDecideAdapter:
             roots_in_open_interval=roots_in_open,
             endpoint_root=endpoint_root,
             positive=positive,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         checker_hint = (
             "invoke polynomial.interval.positivity.verify with the authorized "
@@ -462,9 +492,15 @@ class PolynomialIntervalPositivityVerifyAdapter:
             payload=polynomial.model_dump(mode="json"),
             summary="exact univariate rational polynomial positivity source",
         )
+        sp = _sympy.get()
         try:
             sturm_polys, _, _, _, _, _ = _sturm_positivity(polynomial, interval)
-        except (PolynomialError, TypeError, ValueError, ZeroDivisionError) as exc:
+        except (
+            cast(type[BaseException], sp.PolynomialError),
+            TypeError,
+            ValueError,
+            ZeroDivisionError,
+        ) as exc:
             raise _positivity_error(
                 "POLYNOMIAL_POSITIVITY_VERIFY_FAILED",
                 "positivity_verification",
@@ -480,7 +516,7 @@ class PolynomialIntervalPositivityVerifyAdapter:
             roots_in_open_interval=validated.claimed_roots_in_open_interval,
             endpoint_root=validated.claimed_endpoint_root,
             positive=validated.claimed_positive,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         decision_artifact = self.resources.artifacts.put(
             schema_uri=installation.decision_schema_uri,
@@ -708,15 +744,16 @@ def _sturm_positivity(
 
     a = interval.lo.as_fraction()
     b = interval.hi.as_fraction()
-    generator: Symbol = symbols(polynomial.variable)
+    sp = _sympy.get()
+    generator: Symbol = sp.symbols(polynomial.variable)
     terms = {
-        term.exponents: QQ(int(term.coefficient.num), int(term.coefficient.den))
+        term.exponents: sp.QQ(int(term.coefficient.num), int(term.coefficient.den))
         for term in polynomial.polynomial.terms
     }
-    source = Poly.from_dict(terms, generator, domain=QQ)
+    source = sp.Poly.from_dict(terms, generator, domain=sp.QQ)
     degree = polynomial.degree
     if degree == 0:
-        constant = terms.get((0,), QQ(0))
+        constant = terms.get((0,), sp.QQ(0))
         p_at_a = Fraction(int(constant.p), int(constant.q))
         positive = p_at_a > 0
         sturm_poly = _wire_univariate_poly(source)
@@ -780,7 +817,7 @@ def _wire_univariate_poly(poly: Poly) -> SparseRationalPolynomial:
 
 
 def _rational(value: Any) -> CanonicalRational:
-    rational = sympy.Rational(value)
+    rational = _sympy.get().Rational(value)
     return CanonicalRational(num=str(rational.p), den=str(rational.q))
 
 

@@ -1,4 +1,4 @@
-"""Typer command-line adapter for the v0.2 kernel."""
+"""Typer command-line adapter for the v0.2 runtime."""
 
 from __future__ import annotations
 
@@ -11,43 +11,11 @@ from pydantic import ValidationError
 from typer import _click
 from typer.core import TyperGroup
 
-from jacobian.artifacts import ArtifactValidationError
 from jacobian.canonical import CanonicalizationError, loads_strict_json
-from jacobian.capabilities import CapabilityError
-from jacobian.conjectures import ConjectureError
-from jacobian.contracts.conjectures import (
-    ConjectureOperation,
-    ConjectureWorkflowRequest,
-)
-from jacobian.contracts.discovery import EnumerationBudget, SearchEnumerateRequest
-from jacobian.contracts.evaluation import EvaluationProfile
-from jacobian.contracts.evidence import WitnessRole
-from jacobian.contracts.polytope import PolytopeSeparateRequest
-from jacobian.contracts.search import SearchBudget, SearchRunRequest
-from jacobian.experiments import ExperimentError, ExperimentNotFoundError
-from jacobian.implementation import ImplementationError
-from jacobian.plugins.registry import PluginRegistryError
-from jacobian.provider_measurements import measure_provider
-from jacobian.references import reference_catalog
-from jacobian.registry import (
-    CheckerCompatibilityError,
-    CheckerExecutableChangedError,
-    CheckerNotFoundError,
-    CheckerRegistryError,
-    CheckerRevokedError,
-)
-from jacobian.schema_registry import SchemaRegistryError, SchemaValidationError
-from jacobian.search import SearchError
-from jacobian.store import (
-    ArtifactIntegrityError,
-    ArtifactNotFoundError,
-    StoreError,
-    StoreLimitError,
-)
-from jacobian.verification import CheckerExecutionError
+from jacobian.runtime.config import CheckerAuthorityMode
 
 if TYPE_CHECKING:
-    from jacobian.kernel import JacobianKernel
+    from jacobian.runtime.model import JacobianRuntime
 
 
 class JacobianGroup(TyperGroup):
@@ -65,6 +33,10 @@ class JacobianGroup(TyperGroup):
                 err=True,
             )
             raise typer.Exit(code=exit_code) from None
+        finally:
+            state = ctx.obj
+            if isinstance(state, CliState):
+                state.close()
 
 
 app = typer.Typer(
@@ -76,6 +48,32 @@ app = typer.Typer(
 
 
 def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
+    # Error-class imports are deferred so ``--help`` and subcommand ``--help``
+    # never import the runtime owner or heavy mathematical modules. These are
+    # only needed on the exception path, where the import cost is unavoidable.
+    from jacobian.artifacts import ArtifactValidationError
+    from jacobian.capabilities import CapabilityError
+    from jacobian.conjectures import ConjectureError
+    from jacobian.experiments import ExperimentError, ExperimentNotFoundError
+    from jacobian.implementation import ImplementationError
+    from jacobian.plugins.registry import PluginRegistryError
+    from jacobian.registry import (
+        CheckerCompatibilityError,
+        CheckerExecutableChangedError,
+        CheckerNotFoundError,
+        CheckerRegistryError,
+        CheckerRevokedError,
+    )
+    from jacobian.schema_registry import SchemaRegistryError, SchemaValidationError
+    from jacobian.search import SearchError
+    from jacobian.store import (
+        ArtifactIntegrityError,
+        ArtifactNotFoundError,
+        StoreError,
+        StoreLimitError,
+    )
+    from jacobian.verification import CheckerExecutionError
+
     if isinstance(exc, FileNotFoundError):
         return (
             {
@@ -230,21 +228,31 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
 
 
 class CliState:
-    def __init__(self, state_dir: Path, *, install_references: bool) -> None:
+    def __init__(
+        self,
+        state_dir: Path,
+        *,
+        checker_authority: CheckerAuthorityMode,
+    ) -> None:
         self.state_dir = state_dir
-        self.install_references = install_references
-        self._kernel: JacobianKernel | None = None
+        self.checker_authority = checker_authority
+        self._runtime: JacobianRuntime | None = None
 
     @property
-    def kernel(self) -> JacobianKernel:
-        if self._kernel is None:
-            from jacobian.kernel import JacobianKernel
+    def runtime(self) -> JacobianRuntime:
+        if self._runtime is None:
+            from jacobian.runtime import create_runtime
 
-            self._kernel = JacobianKernel(
+            self._runtime = create_runtime(
                 self.state_dir,
-                install_references=self.install_references,
+                checker_authority=self.checker_authority,
             )
-        return self._kernel
+        return self._runtime
+
+    def close(self) -> None:
+        if self._runtime is not None:
+            self._runtime.close()
+            self._runtime = None
 
 
 @app.callback()
@@ -257,17 +265,17 @@ def configure(
             help="Local artifact and metadata directory.",
         ),
     ] = Path(".jacobian"),
-    install_references: Annotated[
-        bool,
+    checker_authority: Annotated[
+        CheckerAuthorityMode,
         typer.Option(
-            "--install-references/--no-install-references",
-            help="Install bundled graph/path and matrix reference domains.",
+            "--checker-authority",
+            help="Checker authority policy for this runtime.",
         ),
-    ] = True,
+    ] = CheckerAuthorityMode.INSTALL_BUNDLED,
 ) -> None:
     context.obj = CliState(
         state_dir,
-        install_references=install_references,
+        checker_authority=checker_authority,
     )
 
 
@@ -284,22 +292,24 @@ def initialize(
 ) -> None:
     """Initialize storage and summarize the installed reference domains."""
 
+    from jacobian.references import reference_catalog
+
     state = _state(context)
     catalog = reference_catalog(
-        state.kernel.references,
-        graph=state.kernel.graph,
-        polytope=state.kernel.polytope,
-        polytope_checkers=state.kernel.polytope_checkers,
-        polynomial=state.kernel.polynomial,
-        universal_algebra=state.kernel.universal_algebra,
-        lean=state.kernel.lean_checkers,
+        state.runtime.portfolio.references,
+        graph=state.runtime.portfolio.graph,
+        polytope=state.runtime.services.polytope,
+        polytope_checkers=state.runtime.portfolio.polytope_checkers,
+        polynomial=state.runtime.portfolio.polynomial,
+        universal_algebra=state.runtime.portfolio.universal_algebra,
+        lean=state.runtime.portfolio.lean_checkers,
     )
     if json_output:
         _emit(catalog)
         return
 
-    capability_count = len(state.kernel.capabilities.catalog().capabilities)
-    typer.echo(f"Initialized Jacobian state in {state.kernel.store.root}")
+    capability_count = len(state.runtime.core.capabilities.catalog().capabilities)
+    typer.echo(f"Initialized Jacobian state in {state.runtime.core.store.root}")
     typer.echo(
         f"Installed {len(catalog)} reference domains and "
         f"{capability_count} capabilities."
@@ -327,9 +337,14 @@ def provider_measure(
 ) -> None:
     """Measure the exact provider advertised for one installed capability."""
 
+    from jacobian.capabilities import CapabilityError
+    from jacobian.provider_measurements import measure_provider
+
     descriptors = {
         descriptor.capability_id: descriptor
-        for descriptor in _state(context).kernel.capabilities.catalog().capabilities
+        for descriptor in _state(context)
+        .runtime.core.capabilities.catalog()
+        .capabilities
     }
     try:
         runtime = descriptors[capability_id].provider_runtime
@@ -357,7 +372,7 @@ def artifact_put(
     summary: str = "",
 ) -> None:
     payload = _read_json(payload_file)
-    result = _state(context).kernel.artifacts.put(
+    result = _state(context).runtime.core.artifacts.put(
         schema_uri=schema_uri,
         semantics_uri=semantics_uri,
         payload=payload,
@@ -373,7 +388,7 @@ def claim_validate(
     claim_uri: str,
     plugin_id: str,
 ) -> None:
-    result = _state(context).kernel.claims.validate(
+    result = _state(context).runtime.services.claims.validate(
         claim_uri=claim_uri,
         plugin_id=plugin_id,
     )
@@ -390,7 +405,7 @@ def evaluate_batch(
     seed: int = 0,
     wall_seconds: int = 60,
 ) -> None:
-    result = _state(context).kernel.evaluation.evaluate_batch(
+    result = _state(context).runtime.services.evaluation.evaluate_batch(
         claim_uri=claim_uri,
         candidate_uris=tuple(candidate_uri),
         plugin_id=plugin_id,
@@ -410,7 +425,7 @@ def witness_find(
     witness_role: str = "DEFEATS_CANDIDATE",
     wall_seconds: int = 300,
 ) -> None:
-    result = _state(context).kernel.witnesses.find(
+    result = _state(context).runtime.services.witnesses.find(
         claim_uri=claim_uri,
         candidate_uri=candidate_uri,
         plugin_id=plugin_id,
@@ -428,7 +443,7 @@ def witness_verify(
     witness_uri: str,
     checker_id: str,
 ) -> None:
-    result = _state(context).kernel.verification.verify_witness(
+    result = _state(context).runtime.services.verification.verify_witness(
         claim_uri=claim_uri,
         candidate_uri=candidate_uri,
         witness_uri=witness_uri,
@@ -442,7 +457,7 @@ def certificate_verify(
     context: typer.Context,
     certificate_uri: str,
 ) -> None:
-    result = _state(context).kernel.verification.verify_certificate(
+    result = _state(context).runtime.services.verification.verify_certificate(
         certificate_uri=certificate_uri
     )
     _emit(result.model_dump(mode="json"))
@@ -460,7 +475,7 @@ def shrink_run(
     objective: Annotated[list[str] | None, typer.Option("--objective")] = None,
     evaluations: int = 10_000,
 ) -> None:
-    result = _state(context).kernel.shrinking.run(
+    result = _state(context).runtime.services.shrinking.run(
         target_kind=target_kind,
         target_uri=target_uri,
         claim_uri=claim_uri,
@@ -480,7 +495,7 @@ def structure_canonicalize(
     plugin_id: str,
     wall_seconds: int = 30,
 ) -> None:
-    result = _state(context).kernel.structures.canonicalize(
+    result = _state(context).runtime.services.structures.canonicalize(
         structure_uri=structure_uri,
         plugin_id=plugin_id,
         wall_seconds=wall_seconds,
@@ -501,7 +516,10 @@ def search_enumerate(
     wall_seconds: int = 300,
     page_size: int = 128,
 ) -> None:
-    experiments = _state(context).kernel.experiments
+    from jacobian.contracts.discovery import EnumerationBudget, SearchEnumerateRequest
+    from jacobian.contracts.evaluation import EvaluationProfile
+
+    experiments = _state(context).runtime.services.experiments
     handle = experiments.start_enumeration(
         SearchEnumerateRequest(
             claim_uri=claim_uri,
@@ -543,10 +561,14 @@ def search_run(
 ) -> None:
     """Run an idempotent strategy search; its outputs remain unverified."""
 
+    from jacobian.contracts.evaluation import EvaluationProfile
+    from jacobian.contracts.evidence import WitnessRole
+    from jacobian.contracts.search import SearchBudget, SearchRunRequest
+
     initial_state = (
         _read_json_object(initial_state_file) if initial_state_file is not None else {}
     )
-    search = _state(context).kernel.search
+    search = _state(context).runtime.services.search
     handle = search.start(
         SearchRunRequest(
             idempotency_key=idempotency_key,
@@ -580,7 +602,7 @@ def experiment_inspect(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _state(context).kernel.experiment_router.inspect(experiment_uri)
+    result = _state(context).runtime.services.experiment_router.inspect(experiment_uri)
     _emit(result.model_dump(mode="json"))
 
 
@@ -590,7 +612,7 @@ def experiment_wait(
     experiment_uri: str,
     timeout_seconds: float = 30,
 ) -> None:
-    result = _state(context).kernel.experiment_router.wait(
+    result = _state(context).runtime.services.experiment_router.wait(
         experiment_uri,
         timeout_seconds=timeout_seconds,
     )
@@ -602,7 +624,7 @@ def experiment_cancel(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _state(context).kernel.experiment_router.cancel(experiment_uri)
+    result = _state(context).runtime.services.experiment_router.cancel(experiment_uri)
     _emit(result.model_dump(mode="json"))
 
 
@@ -611,7 +633,7 @@ def experiment_pause(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    result = _state(context).kernel.search.pause(experiment_uri)
+    result = _state(context).runtime.services.search.pause(experiment_uri)
     _emit(result.model_dump(mode="json"))
 
 
@@ -620,7 +642,7 @@ def experiment_resume(
     context: typer.Context,
     experiment_uri: str,
 ) -> None:
-    search = _state(context).kernel.search
+    search = _state(context).runtime.services.search
     paused = search.inspect(experiment_uri)
     result = search.resume(experiment_uri)
     if not result.accepted:
@@ -645,7 +667,12 @@ def conjecture_repair(
     max_hypotheses: int = 8,
     wall_seconds: int = 60,
 ) -> None:
-    result = _state(context).kernel.conjectures.run(
+    from jacobian.contracts.conjectures import (
+        ConjectureOperation,
+        ConjectureWorkflowRequest,
+    )
+
+    result = _state(context).runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.REPAIR,
             plugin_id=plugin_id,
@@ -677,7 +704,12 @@ def conjecture_generate(
     max_hypotheses: int = 8,
     wall_seconds: int = 60,
 ) -> None:
-    result = _state(context).kernel.conjectures.run(
+    from jacobian.contracts.conjectures import (
+        ConjectureOperation,
+        ConjectureWorkflowRequest,
+    )
+
+    result = _state(context).runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.GENERATE,
             plugin_id=plugin_id,
@@ -709,7 +741,12 @@ def parameter_generalize(
     max_hypotheses: int = 8,
     wall_seconds: int = 60,
 ) -> None:
-    result = _state(context).kernel.conjectures.run(
+    from jacobian.contracts.conjectures import (
+        ConjectureOperation,
+        ConjectureWorkflowRequest,
+    )
+
+    result = _state(context).runtime.services.conjectures.run(
         ConjectureWorkflowRequest(
             operation=ConjectureOperation.PARAMETER_GENERALIZE,
             plugin_id=plugin_id,
@@ -735,7 +772,7 @@ def parameter_region_promote(
     subject_uri: str,
     verification_record_uri: str,
 ) -> None:
-    result = _state(context).kernel.conjectures.promote_parameter_region(
+    result = _state(context).runtime.services.conjectures.promote_parameter_region(
         subject_uri=subject_uri,
         verification_record_uri=verification_record_uri,
     )
@@ -752,7 +789,7 @@ def transform_apply(
     requested_relation: str,
     wall_seconds: int = 30,
 ) -> None:
-    result = _state(context).kernel.transformations.apply(
+    result = _state(context).runtime.services.transformations.apply(
         source_uri=source_uri,
         plugin_id=plugin_id,
         target_schema_uri=target_schema_uri,
@@ -768,7 +805,7 @@ def transform_verify(
     context: typer.Context,
     transformation_uri: str,
 ) -> None:
-    result = _state(context).kernel.verification.verify_transformation(
+    result = _state(context).runtime.services.verification.verify_transformation(
         transformation_uri=transformation_uri
     )
     _emit(result.model_dump(mode="json"))
@@ -782,7 +819,9 @@ def polytope_separate(
     projection: Annotated[list[int] | None, typer.Option("--projection")] = None,
     wall_seconds: int = 30,
 ) -> None:
-    result = _state(context).kernel.polytope.separate(
+    from jacobian.contracts.polytope import PolytopeSeparateRequest
+
+    result = _state(context).runtime.services.polytope.separate(
         PolytopeSeparateRequest(
             point_uri=point_uri,
             generator_set_uri=generator_set_uri,

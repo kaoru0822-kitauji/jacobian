@@ -7,9 +7,8 @@ import math
 import time
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
-import networkx as nx
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
@@ -63,11 +62,14 @@ from jacobian.contracts.graph_invariants import (
 from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
-from jacobian.graph_atlas import graph_atlas_order
+from jacobian.graph_atlas import graph_atlas_order, networkx_loader
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
+
+if TYPE_CHECKING:
+    import networkx as nx
 
 _ARTIFACT_URI_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
 _PROPERTY_NAMES = (
@@ -91,6 +93,14 @@ _PROPERTY_NAMES = (
     "triangle_count",
     "triangle_frequencies",
 )
+
+
+def _nx() -> Any:
+    """Load NetworkX only when a graph capability is invoked."""
+
+    return networkx_loader.get()
+
+
 _GRAPH_PAYLOAD_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -576,7 +586,7 @@ class GraphAtlasSearchAdapter:
             payload={
                 "scope_schema_version": "1",
                 "source": "networkx.graph_atlas_g",
-                "backend_version": nx.__version__,
+                "backend_version": _nx().__version__,
                 "order": order,
                 "enumerated_count": len(atlas_graphs),
             },
@@ -630,7 +640,7 @@ class GraphAtlasSearchAdapter:
                 "truncated": len(matches) > len(candidates),
                 "scope_uri": scope.artifact_uri,
                 "backend": "networkx.graph_atlas_g",
-                "backend_version": nx.__version__,
+                "backend_version": _nx().__version__,
             },
             scope=CapabilityScope(
                 description=(
@@ -638,7 +648,7 @@ class GraphAtlasSearchAdapter:
                 ),
                 parameters={
                     "source": "networkx.graph_atlas_g",
-                    "backend_version": nx.__version__,
+                    "backend_version": _nx().__version__,
                     "order": order,
                 },
                 artifact_uri=scope.artifact_uri,
@@ -730,7 +740,7 @@ class GraphPropertyAdapter:
                 semantics_uri=self.resources.semantics_uri,
                 payload=GraphInvariantResultArtifact(
                     graph_uri=graph_uri,
-                    backend_version=nx.__version__,
+                    backend_version=_nx().__version__,
                     result=result,
                 ).model_dump(mode="json"),
                 parents=(graph_uri,),
@@ -747,7 +757,7 @@ class GraphPropertyAdapter:
             graph_uri=graph_uri,
             supported_invariants=tuple(sorted(_PROPERTY_NAMES)),
             requested_invariants=names,
-            backend_version=nx.__version__,
+            backend_version=_nx().__version__,
             results=tuple(bindings),
             properties=selected,
         )
@@ -884,7 +894,7 @@ class GraphDegreeSequenceAdapter:
             "ERDOS_GALLAI_OBSTRUCTION",
         ]
         if obstruction is None:
-            graph = nx.havel_hakimi_graph(sequence)
+            graph = _nx().havel_hakimi_graph(sequence)
             graph_payload = _graph_payload(graph)
             graph_artifact = self.resources.artifacts.put(
                 schema_uri=self.resources.graph_schema_uri,
@@ -980,7 +990,7 @@ class GraphDegreeSequenceAdapter:
             claim_uri=claim_artifact.artifact_uri,
             certificate_uri=certificate_artifact.artifact_uri,
             checker_id=self.resources.degree_sequence_checker_id,
-            backend_version=nx.__version__,
+            backend_version=_nx().__version__,
         )
         artifact_uris = [
             claim_artifact.artifact_uri,
@@ -1114,11 +1124,11 @@ class GraphNeighborhoodIndependenceAdapter:
                         ),
                     )
                 )
-            neighborhood_graph: nx.Graph[str] = nx.Graph()
+            neighborhood_graph: nx.Graph[str] = _nx().Graph()
             neighborhood_graph.add_nodes_from(neighborhood)
             neighborhood_graph.add_edges_from(graph.subgraph(neighborhood).edges())
-            independent_set, independence_number = nx.max_weight_clique(
-                nx.complement(neighborhood_graph),
+            independent_set, independence_number = _nx().max_weight_clique(
+                _nx().complement(neighborhood_graph),
                 weight=None,
             )
             records.append(
@@ -1140,7 +1150,7 @@ class GraphNeighborhoodIndependenceAdapter:
             records=tuple(records),
             total=total,
             average=average_wire,
-            backend_version=nx.__version__,
+            backend_version=_nx().__version__,
         )
         invariant_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.neighborhood_schema_uri,
@@ -1198,7 +1208,7 @@ class GraphNeighborhoodIndependenceAdapter:
             records=tuple(records),
             total=total,
             average=average_wire,
-            backend_version=nx.__version__,
+            backend_version=_nx().__version__,
         )
         return CapabilityResult(
             capability_id=self.descriptor.capability_id,
@@ -1301,7 +1311,7 @@ def _degree_sequence_obstruction(
                 lhs=lhs,
                 rhs=rhs,
             )
-    if not nx.is_graphical(sequence, method="eg"):
+    if not _nx().is_graphical(sequence, method="eg"):
         raise RuntimeError(
             "NetworkX rejected a degree sequence without a replayable obstruction"
         )
@@ -1410,7 +1420,7 @@ def _load_graph(resources: GraphCapabilityResources, graph_uri: str) -> nx.Graph
                 hint="Recreate the graph through its owning capability.",
             )
         )
-    graph: nx.Graph[str] = nx.Graph()
+    graph: nx.Graph[str] = _nx().Graph()
     graph.add_nodes_from(vertices)
     graph.add_edges_from(normalized_edges)
     return graph
@@ -1420,8 +1430,8 @@ def _compute_all_properties(graph: nx.Graph[Any]) -> dict[str, Any]:
     order = graph.number_of_nodes()
     degrees = sorted((degree for _, degree in graph.degree), reverse=True)
     if order:
-        independent_set, independence_number = nx.max_weight_clique(
-            nx.complement(graph),
+        independent_set, independence_number = _nx().max_weight_clique(
+            _nx().complement(graph),
             weight=None,
         )
         assert len(independent_set) == independence_number
@@ -1430,14 +1440,14 @@ def _compute_all_properties(graph: nx.Graph[Any]) -> dict[str, Any]:
     return {
         "order": order,
         "size": graph.number_of_edges(),
-        "connected": nx.is_connected(graph) if order else False,
-        "bipartite": nx.is_bipartite(graph),
-        "tree": nx.is_tree(graph) if order else False,
+        "connected": _nx().is_connected(graph) if order else False,
+        "bipartite": _nx().is_bipartite(graph),
+        "tree": _nx().is_tree(graph) if order else False,
         "degree_sequence": degrees,
         "minimum_degree": min(degrees) if degrees else None,
         "maximum_degree": max(degrees) if degrees else None,
         "triangle_count": (
-            sum(cast(dict[Any, int], nx.triangles(graph)).values()) // 3
+            sum(cast(dict[Any, int], _nx().triangles(graph)).values()) // 3
         ),
         "independence_number": independence_number,
     }
@@ -1451,11 +1461,11 @@ def _compute_property(graph: nx.Graph[Any], name: str) -> Any:
     if name == "size":
         return graph.number_of_edges()
     if name == "connected":
-        return nx.is_connected(graph) if graph else False
+        return _nx().is_connected(graph) if graph else False
     if name == "bipartite":
-        return nx.is_bipartite(graph)
+        return _nx().is_bipartite(graph)
     if name == "tree":
-        return nx.is_tree(graph) if graph else False
+        return _nx().is_tree(graph) if graph else False
     if name in {"degree_sequence", "minimum_degree", "maximum_degree"}:
         degrees = sorted((degree for _, degree in graph.degree), reverse=True)
         if name == "degree_sequence":
@@ -1464,25 +1474,25 @@ def _compute_property(graph: nx.Graph[Any], name: str) -> Any:
             return min(degrees) if degrees else None
         return max(degrees) if degrees else None
     if name == "triangle_count":
-        return sum(cast(dict[Any, int], nx.triangles(graph)).values()) // 3
+        return sum(cast(dict[Any, int], _nx().triangles(graph)).values()) // 3
     if name == "independence_number":
         if not graph:
             return 0
-        independent_set, independence_number = nx.max_weight_clique(
-            nx.complement(graph),
+        independent_set, independence_number = _nx().max_weight_clique(
+            _nx().complement(graph),
             weight=None,
         )
         assert len(independent_set) == independence_number
         return independence_number
     if name == "girth":
-        value = nx.girth(graph)
+        value = _nx().girth(graph)
         return None if math.isinf(value) else int(value)
     if name in {"eccentricities", "diameter", "radius", "average_eccentricity"}:
         if not graph:
-            raise nx.NetworkXPointlessConcept(
+            raise _nx().NetworkXPointlessConcept(
                 "distance properties are undefined for the null graph"
             )
-        eccentricities = cast(dict[Any, int], nx.eccentricity(graph))
+        eccentricities = cast(dict[Any, int], _nx().eccentricity(graph))
         ordered = {
             str(vertex): eccentricities[vertex]
             for vertex in sorted(eccentricities, key=str)
@@ -1496,7 +1506,7 @@ def _compute_property(graph: nx.Graph[Any], name: str) -> Any:
         total = sum(eccentricities.values())
         return _rational_payload(Fraction(total, len(eccentricities)))
     if name == "triangle_frequencies":
-        frequencies = cast(dict[Any, int], nx.triangles(graph))
+        frequencies = cast(dict[Any, int], _nx().triangles(graph))
         return {
             str(vertex): frequencies[vertex] for vertex in sorted(frequencies, key=str)
         }
@@ -1520,11 +1530,11 @@ def _havel_hakimi_trace(graph: nx.Graph[Any]) -> list[list[int]]:
     while sequence and sequence[0] > 0:
         degree = sequence.pop(0)
         if degree > len(sequence):
-            raise nx.NetworkXError("degree sequence became non-graphical")
+            raise _nx().NetworkXError("degree sequence became non-graphical")
         for index in range(degree):
             sequence[index] -= 1
             if sequence[index] < 0:
-                raise nx.NetworkXError("degree sequence became non-graphical")
+                raise _nx().NetworkXError("degree sequence became non-graphical")
         sequence.sort(reverse=True)
         trace.append(sequence.copy())
     return trace
@@ -1605,7 +1615,7 @@ def _compute_invariant_result(
         )
     try:
         value = _compute_property(graph, name)
-    except nx.NetworkXError as exc:
+    except cast(type[BaseException], _nx().NetworkXError) as exc:
         return GraphInvariantResult(
             invariant=name,
             status="NOT_APPLICABLE",

@@ -19,8 +19,8 @@ from uvicorn import Config, Server
 from jacobian.adapters.mcp.remote import (
     StaticTokenGrant,
     StaticTokenVerifier,
-    TenantKernelLimitError,
-    TenantKernelRouter,
+    TenantRuntimeLimitError,
+    TenantRuntimeRouter,
     load_static_token_file,
 )
 from jacobian.adapters.mcp.server import create_server
@@ -29,6 +29,7 @@ from jacobian.contracts.workspaces import (
     WorkspaceQueryRequest,
     WorkspaceQueryView,
 )
+from jacobian.runtime import CheckerAuthorityMode
 from jacobian.store import ArtifactNotFoundError
 from jacobian.workspaces import WorkspaceNotFoundError
 
@@ -63,17 +64,17 @@ def test_remote_configuration_errors_name_the_rule_and_recovery(
     ):
         StaticTokenGrant(tenant_id="bad subject", token="a" * 32)
 
-    router = TenantKernelRouter(tmp_path, install_references=False)
+    router = TenantRuntimeRouter(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
     with pytest.raises(
         PermissionError,
         match="Authenticate with a configured bearer token and retry",
     ):
-        router.kernel_for(None)
+        router.runtime_for(None)
     with pytest.raises(
         PermissionError,
         match="Check the server token configuration",
     ):
-        router.kernel_for("bad subject")
+        router.runtime_for("bad subject")
 
     missing = tmp_path / "missing-tokens.json"
     with pytest.raises(
@@ -152,61 +153,61 @@ def test_remote_configuration_errors_name_the_rule_and_recovery(
 
 
 def test_tenant_router_isolates_artifact_stores(tmp_path: Path) -> None:
-    router = TenantKernelRouter(
+    router = TenantRuntimeRouter(
         tmp_path,
-        install_references=False,
-        max_tenant_kernels=2,
+        checker_authority=CheckerAuthorityMode.NONE,
+        max_tenant_runtimes=2,
     )
-    alpha = router.kernel_for("alpha")
-    beta = router.kernel_for("beta")
-    stored = alpha.store.register_descriptor(
+    alpha = router.runtime_for("alpha")
+    beta = router.runtime_for("beta")
+    stored = alpha.core.store.register_descriptor(
         kind="semantics",
         name="alpha-only",
         version="1",
         definition={"value": 1},
     )
 
-    assert alpha.store.root != beta.store.root
-    assert router.kernel_for("alpha") is alpha
-    with pytest.raises(TenantKernelLimitError, match="tenant limit"):
-        router.kernel_for("gamma")
+    assert alpha.core.store.root != beta.core.store.root
+    assert router.runtime_for("alpha") is alpha
+    with pytest.raises(TenantRuntimeLimitError, match="tenant limit"):
+        router.runtime_for("gamma")
     with pytest.raises(ArtifactNotFoundError):
-        beta.store.get(stored)
+        beta.core.store.get(stored)
 
 
 def test_anonymous_tenant_namespace_is_fixed_by_the_operator(tmp_path: Path) -> None:
-    first = TenantKernelRouter(
+    first = TenantRuntimeRouter(
         tmp_path,
-        install_references=False,
+        checker_authority=CheckerAuthorityMode.NONE,
         allow_anonymous=True,
         anonymous_tenant_id="test-endpoint-a",
     )
-    second = TenantKernelRouter(
+    second = TenantRuntimeRouter(
         tmp_path,
-        install_references=False,
+        checker_authority=CheckerAuthorityMode.NONE,
         allow_anonymous=True,
         anonymous_tenant_id="test-endpoint-b",
     )
 
-    first_kernel = first.kernel_for(None)
-    second_kernel = second.kernel_for(None)
+    first_runtime = first.runtime_for(None)
+    second_runtime = second.runtime_for(None)
 
-    assert first_kernel.store.root != second_kernel.store.root
-    assert first.kernel_for(None) is first_kernel
+    assert first_runtime.core.store.root != second_runtime.core.store.root
+    assert first.runtime_for(None) is first_runtime
     with pytest.raises(ValueError, match="anonymous_tenant_id must start"):
-        TenantKernelRouter(
+        TenantRuntimeRouter(
             tmp_path,
-            install_references=False,
+            checker_authority=CheckerAuthorityMode.NONE,
             allow_anonymous=True,
             anonymous_tenant_id="caller controlled",
         )
 
 
 def test_tenant_router_isolates_epistemic_workspaces(tmp_path: Path) -> None:
-    router = TenantKernelRouter(tmp_path, install_references=False)
-    alpha = router.kernel_for("alpha")
-    beta = router.kernel_for("beta")
-    opened = alpha.workspaces.open(
+    router = TenantRuntimeRouter(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
+    alpha = router.runtime_for("alpha")
+    beta = router.runtime_for("beta")
+    opened = alpha.core.workspaces.open(
         WorkspaceOpenRequest(
             idempotency_key="tenant-workspace-open-001",
             name="alpha workspace",
@@ -215,7 +216,7 @@ def test_tenant_router_isolates_epistemic_workspaces(tmp_path: Path) -> None:
     )
 
     with pytest.raises(WorkspaceNotFoundError):
-        beta.workspaces.query(
+        beta.core.workspaces.query(
             WorkspaceQueryRequest(
                 workspace_id=opened.workspace_id,
                 branch_id=opened.branch_id,
@@ -388,7 +389,7 @@ async def _remote_tenant_scenario(port: int) -> None:
                 headers={"Authorization": f"Bearer {token}"},
                 trust_env=False,
                 # The first request constructs the tenant's complete capability
-                # kernel; keep transport tolerance separate from backend budgets.
+                # runtime; keep transport tolerance separate from backend budgets.
                 timeout=60,
             ) as http,
             Client(

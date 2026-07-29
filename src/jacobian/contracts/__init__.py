@@ -1,4 +1,4 @@
-"""Versioned public contracts for the Jacobian kernel."""
+"""Versioned public contracts for the Jacobian runtime."""
 
 from jacobian.contracts.results import (
     Arithmetic,

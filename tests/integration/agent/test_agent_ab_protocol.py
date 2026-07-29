@@ -7,8 +7,8 @@ import pytest
 from benchmarks import agent_ab as benchmark
 from tests.integration.agent._agent_ab_support import (
     _install_fake_carcara,
-    _kernel_from_template,
     _report,
+    _runtime_from_template,
     _smt_producer,
 )
 
@@ -100,13 +100,13 @@ def test_autonomous_discovery_case_is_visible_in_the_bounded_dispatch_plan() -> 
 
 def test_ab_smt_scorer_preserves_rejected_holey_proof(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_fake_carcara(tmp_path, monkeypatch)
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="state",
     )
     text = (
@@ -116,14 +116,14 @@ def test_ab_smt_scorer_preserves_rejected_holey_proof(
         "(assert (not (= a a)))\n"
         "(check-sat)\n"
     )
-    problem = kernel.smt.put_problem(logic="QF_UF", smtlib_text=text)
-    proof = kernel.smt.put_proof(
+    problem = runtime.core.smt.put_problem(logic="QF_UF", smtlib_text=text)
+    proof = runtime.core.smt.put_proof(
         problem_uri=problem.artifact_uri,
         proof=b'(\n(step t0 (cl) :rule hole :args ("unsupported"))\n)\n',
         producer=_smt_producer(),
         resource_budget=SmtResourceBudget(wall_seconds=5),
     )
-    rejected = kernel.capabilities.invoke(
+    rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="smt.unsat_proof.verify",
             mode=CapabilityMode.VERIFY,
@@ -344,7 +344,7 @@ def test_ab_transcript_parser_counts_structured_mcp_errors(tmp_path: Path) -> No
 
 
 def test_ab_scorer_accepts_control_and_durable_treatment(
-    tmp_path: Path, kernel_store_template_with_references: Path
+    tmp_path: Path, runtime_store_template_with_references: Path
 ) -> None:
     load_cases = benchmark.load_cases
     score_report = benchmark.score_report
@@ -359,13 +359,13 @@ def test_ab_scorer_accepts_control_and_durable_treatment(
     )
     assert control["passed"] is True
 
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="treatment",
     )
-    reference = kernel.references["erdos_straus"]
-    claim = kernel.capabilities.invoke(
+    reference = runtime.portfolio.references["erdos_straus"]
+    claim = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="artifact.put",
             input={
@@ -389,7 +389,7 @@ def test_ab_scorer_accepts_control_and_durable_treatment(
         )
     )
     claim_uri = claim.output["artifact_uri"]
-    candidate = kernel.capabilities.invoke(
+    candidate = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="artifact.put",
             input={
@@ -401,7 +401,7 @@ def test_ab_scorer_accepts_control_and_durable_treatment(
         )
     )
     candidate_uri = candidate.output["artifact_uri"]
-    found = kernel.capabilities.invoke(
+    found = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="witness.find",
             input={
@@ -415,7 +415,7 @@ def test_ab_scorer_accepts_control_and_durable_treatment(
     )
     witness_uri = found.output["witness_uri"]
     assert witness_uri is not None
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="witness.verify",
             mode=CapabilityMode.VERIFY,

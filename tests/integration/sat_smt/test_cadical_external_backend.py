@@ -19,22 +19,22 @@ pytestmark = [
 
 
 def test_pinned_cadical_produces_a_model_and_text_drat_proof(
-    kernel,
+    runtime,
 ) -> None:
     runtime = cadical_provider_runtime()
     if runtime.version != CADICAL_VERSION:
         pytest.skip(f"requires pinned CaDiCaL {CADICAL_VERSION}")
     capability_ids = {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
     assert {"sat.model.find", "sat.unsat_proof.find"}.issubset(capability_ids)
 
-    satisfiable = kernel.sat.put_cnf(
+    satisfiable = runtime.core.sat.put_cnf(
         variable_names=("x", "y"),
         clauses=((1,), (-2,)),
     )
-    model = kernel.capabilities.invoke(
+    model = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.model.find",
             mode=CapabilityMode.EXPLORE,
@@ -48,11 +48,11 @@ def test_pinned_cadical_produces_a_model_and_text_drat_proof(
     assert model.output["status"] == "ASSIGNMENT_PRODUCED"
     assert model.output["conclusion"] == "UNKNOWN"
 
-    unsatisfiable = kernel.sat.put_cnf(
+    unsatisfiable = runtime.core.sat.put_cnf(
         variable_names=("x",),
         clauses=((1,), (-1,)),
     )
-    proof = kernel.capabilities.invoke(
+    proof = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.unsat_proof.find",
             mode=CapabilityMode.EXPLORE,

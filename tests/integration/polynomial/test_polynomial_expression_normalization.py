@@ -19,12 +19,13 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.polynomial_expression_capabilities import (
     install_polynomial_expression_checker,
 )
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def _variable(name: str) -> dict[str, Any]:
@@ -42,27 +43,27 @@ def _expression(
     }
 
 
-def _kernel_with_checker(root: Path) -> JacobianKernel:
-    kernel = JacobianKernel(root)
+def _runtime_with_checker(root: Path) -> JacobianRuntime:
+    runtime = create_runtime(root)
     adapter, _installation = install_polynomial_expression_checker(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
-        kernel.polynomial_expressions,
-        kernel.verification,
-        kernel.checkers,
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
+        runtime.core.polynomial_expressions,
+        runtime.services.verification,
+        runtime.core.checkers,
         authorize_checker=True,
     )
     assert adapter is not None
-    kernel.register_capability(adapter)
-    return kernel
+    runtime.core.capabilities.register(adapter)
+    return runtime
 
 
 def test_expansion_term_budget_failure_is_specific_and_non_retryable(
-    kernel,
+    runtime,
 ) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {
             "expression": _expression(
@@ -139,10 +140,10 @@ def _difference_of_squares_plus_half_x() -> dict[str, Any]:
     )
 
 
-def test_sympy_normalizes_typed_multivariate_expression(kernel) -> None:
+def test_sympy_normalizes_typed_multivariate_expression(runtime) -> None:
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {
             "expression": _difference_of_squares_plus_half_x(),
@@ -167,7 +168,7 @@ def test_sympy_normalizes_typed_multivariate_expression(kernel) -> None:
         "polynomial.relation.expression-normalization-of"
     )
 
-    resolved = kernel.polynomial_expressions.resolve_normalization(
+    resolved = runtime.core.polynomial_expressions.resolve_normalization(
         result.output["normalization_uri"]
     )
     assert (
@@ -177,9 +178,9 @@ def test_sympy_normalizes_typed_multivariate_expression(kernel) -> None:
     assert result.output["expression_uri"] in resolved.artifact.manifest.parents
 
 
-def test_sympy_normalization_preserves_exact_zero(kernel) -> None:
+def test_sympy_normalization_preserves_exact_zero(runtime) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {
             "expression": _expression(
@@ -201,7 +202,7 @@ def test_sympy_normalization_preserves_exact_zero(kernel) -> None:
 
 
 def test_sympy_normalization_runtime_has_exact_profile(tmp_path: Path) -> None:
-    runtime = JacobianKernel(tmp_path).sympy_polynomial_normalization_runtime
+    runtime = create_runtime(tmp_path).portfolio.sympy_polynomial_normalization_runtime
 
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.version == "1.14.0"
@@ -275,7 +276,7 @@ def test_normalization_rejects_inputs_outside_typed_ast_contract(
     expression: dict[str, Any],
 ) -> None:
     result = _invoke(
-        JacobianKernel(tmp_path),
+        create_runtime(tmp_path),
         "polynomial.expression.normalize",
         {"expression": expression},
         mode=CapabilityMode.EXPLORE,
@@ -290,15 +291,15 @@ def test_normalization_rejects_inputs_outside_typed_ast_contract(
 
 
 def test_independent_checker_verifies_full_ast_relation(tmp_path: Path) -> None:
-    kernel = _kernel_with_checker(tmp_path)
+    runtime = _runtime_with_checker(tmp_path)
     computed = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {"expression": _difference_of_squares_plus_half_x()},
         mode=CapabilityMode.EXPLORE,
     )
     verified = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression_normalization.verify",
         {"normalization_uri": computed.output["normalization_uri"]},
         mode=CapabilityMode.VERIFY,
@@ -325,19 +326,19 @@ def test_independent_checker_verifies_full_ast_relation(tmp_path: Path) -> None:
 def test_independent_checker_rejects_wrong_bound_coefficients(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_checker(tmp_path)
-    expression_uri = kernel.polynomial_expressions.put_expression(
+    runtime = _runtime_with_checker(tmp_path)
+    expression_uri = runtime.core.polynomial_expressions.put_expression(
         _expression(_variable("x"), variables=["x"])
     ).artifact_uri
-    candidate = kernel.polynomial_expressions.put_normalization(
+    candidate = runtime.core.polynomial_expressions.put_normalization(
         expression_uri=expression_uri,
         normalized={"terms": []},
-        producer=kernel.sympy_polynomial_normalization_runtime,
+        producer=runtime.portfolio.sympy_polynomial_normalization_runtime,
         resource_budget={"wall_seconds": 5},
     )
 
     rejected = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression_normalization.verify",
         {"normalization_uri": candidate.artifact_uri},
         mode=CapabilityMode.VERIFY,
@@ -351,7 +352,7 @@ def test_independent_checker_rejects_wrong_bound_coefficients(
 
 
 def test_sympy_normalization_timeout_is_operational(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -367,7 +368,7 @@ def test_sympy_normalization_timeout_is_operational(
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {"expression": _expression(_variable("x"), variables=["x"])},
         mode=CapabilityMode.EXPLORE,
@@ -381,7 +382,7 @@ def test_sympy_normalization_timeout_is_operational(
 
 
 def test_sympy_worker_gets_only_fixed_environment_and_budget(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("JACOBIAN_SYMPY_SECRET", "must-not-propagate")
@@ -421,7 +422,7 @@ def test_sympy_worker_gets_only_fixed_environment_and_budget(
         fake_worker,
     )
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {
             "expression": _expression(_variable("x"), variables=["x"]),
@@ -443,10 +444,10 @@ def test_sympy_worker_gets_only_fixed_environment_and_budget(
 
 
 def test_normalization_output_is_discarded_if_runtime_identity_changes(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    original = kernel.sympy_polynomial_normalization_runtime
+    original = runtime.portfolio.sympy_polynomial_normalization_runtime
     changed = original.model_copy(update={"digest": "sha256:" + "f" * 64})
     observations = iter((original, changed))
     monkeypatch.setattr(
@@ -484,7 +485,7 @@ def test_normalization_output_is_discarded_if_runtime_identity_changes(
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {"expression": _expression(_variable("x"), variables=["x"])},
         mode=CapabilityMode.EXPLORE,
@@ -497,7 +498,7 @@ def test_normalization_output_is_discarded_if_runtime_identity_changes(
 
 
 def test_invalid_worker_protocol_retains_no_normalization_evidence(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -513,7 +514,7 @@ def test_invalid_worker_protocol_retains_no_normalization_evidence(
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {"expression": _expression(_variable("x"), variables=["x"])},
         mode=CapabilityMode.EXPLORE,
@@ -529,9 +530,9 @@ def test_normalization_checker_timeout_is_operational(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = _kernel_with_checker(tmp_path)
+    runtime = _runtime_with_checker(tmp_path)
     computed = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression.normalize",
         {"expression": _expression(_variable("x"), variables=["x"])},
         mode=CapabilityMode.EXPLORE,
@@ -549,7 +550,7 @@ def test_normalization_checker_timeout_is_operational(
     )
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.expression_normalization.verify",
         {"normalization_uri": computed.output["normalization_uri"]},
         mode=CapabilityMode.VERIFY,

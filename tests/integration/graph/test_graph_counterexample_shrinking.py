@@ -10,25 +10,26 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.plugin_execution import PluginExecutionResult
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 
 def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scope(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
+    runtime, graph_uri = _runtime_with_redundant_odd_cycle(
         tmp_path,
-        template=kernel_store_template_with_references,
+        template=runtime_store_template_with_references,
     )
 
-    result = _shrink(kernel, graph_uri)
+    result = _shrink(runtime, graph_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert kernel.store.get(result.output["final_graph_uri"]).payload == {
+    assert runtime.core.store.get(result.output["final_graph_uri"]).payload == {
         "graph_schema_version": "1",
         "vertices": ["a", "b", "c"],
         "edges": [["a", "b"], ["a", "c"], ["b", "c"]],
@@ -53,20 +54,20 @@ def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scop
     assert scope["complete_for_requested_reducers"] is True
     assert scope["one_step_locally_minimal"] is True
     assert scope["global_minimality_claimed"] is False
-    trace = kernel.store.get(result.output["trace_uri"])
+    trace = runtime.core.store.get(result.output["trace_uri"])
     assert trace.payload["attempts"] == result.output["attempts"]
     assert trace.payload["local_minimality_scope"] == scope
 
 
 def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
-        tmp_path, template=kernel_store_template_with_references
+    runtime, graph_uri = _runtime_with_redundant_odd_cycle(
+        tmp_path, template=runtime_store_template_with_references
     )
 
-    result = _shrink(kernel, graph_uri, evaluation_budget=2)
+    result = _shrink(runtime, graph_uri, evaluation_budget=2)
 
     scope = result.output["local_minimality_scope"]
     assert scope["complete_for_requested_reducers"] is False
@@ -77,14 +78,14 @@ def test_graph_counterexample_shrink_budget_reports_only_tested_scope(
 
 def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimality(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
-        tmp_path, template=kernel_store_template_with_references
+    runtime, graph_uri = _runtime_with_redundant_odd_cycle(
+        tmp_path, template=runtime_store_template_with_references
     )
-    kernel.shrinking.executor = _TimeoutExecutor()  # type: ignore[assignment]
+    runtime.services.shrinking.executor = _TimeoutExecutor()  # type: ignore[assignment]
 
-    result = _shrink(kernel, graph_uri)
+    result = _shrink(runtime, graph_uri)
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.output["final_graph_uri"] == graph_uri
@@ -95,15 +96,15 @@ def test_graph_counterexample_shrink_timeout_returns_incumbent_without_minimalit
 
 def test_graph_counterexample_shrink_requires_compatible_registered_checker(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
-        tmp_path, template=kernel_store_template_with_references
+    runtime, graph_uri = _runtime_with_redundant_odd_cycle(
+        tmp_path, template=runtime_store_template_with_references
     )
-    incompatible = kernel.graph.degree_sequence_checker_id
+    incompatible = runtime.portfolio.graph.degree_sequence_checker_id
     assert incompatible is not None
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.counterexample.shrink",
             input={
@@ -122,15 +123,17 @@ def test_graph_counterexample_shrink_requires_compatible_registered_checker(
 
 def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
-        tmp_path, template=kernel_store_template_with_references
+    runtime, graph_uri = _runtime_with_redundant_odd_cycle(
+        tmp_path, template=runtime_store_template_with_references
     )
-    graph = kernel.store.get(graph_uri)
-    kernel.store._blob_path(graph.manifest.payload_digest).write_bytes(b"tampered")
+    graph = runtime.core.store.get(graph_uri)
+    runtime.core.store._blob_path(graph.manifest.payload_digest).write_bytes(
+        b"tampered"
+    )
 
-    result = _shrink(kernel, graph_uri)
+    result = _shrink(runtime, graph_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.output["error"]["code"] == "GRAPH_SHRINK_INPUT_INVALID"
@@ -139,14 +142,14 @@ def test_graph_counterexample_shrink_fails_closed_on_tampered_graph(
 
 def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
-    kernel, graph_uri = _kernel_with_redundant_odd_cycle(
-        tmp_path, template=kernel_store_template_with_references
+    runtime, graph_uri = _runtime_with_redundant_odd_cycle(
+        tmp_path, template=runtime_store_template_with_references
     )
-    kernel.shrinking.executor = _UnrelatedEditExecutor()  # type: ignore[assignment]
+    runtime.services.shrinking.executor = _UnrelatedEditExecutor()  # type: ignore[assignment]
 
-    result = _shrink(kernel, graph_uri)
+    result = _shrink(runtime, graph_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.output["final_graph_uri"] == graph_uri
@@ -156,15 +159,15 @@ def test_graph_counterexample_shrink_rejects_unrelated_reducer_edits(
 
 
 def test_graph_counterexample_shrink_order_is_deterministic(
-    tmp_path: Path, kernel_store_template_with_references: Path
+    tmp_path: Path, runtime_store_template_with_references: Path
 ) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
-    first, first_graph = _kernel_with_redundant_odd_cycle(
-        first_root, template=kernel_store_template_with_references
+    first, first_graph = _runtime_with_redundant_odd_cycle(
+        first_root, template=runtime_store_template_with_references
     )
-    second, second_graph = _kernel_with_redundant_odd_cycle(
-        second_root, template=kernel_store_template_with_references
+    second, second_graph = _runtime_with_redundant_odd_cycle(
+        second_root, template=runtime_store_template_with_references
     )
 
     first_result = _shrink(first, first_graph)
@@ -227,17 +230,19 @@ class _UnrelatedEditExecutor:
         )
 
 
-def _kernel_with_redundant_odd_cycle(
+def _runtime_with_redundant_odd_cycle(
     root: Path,
     *,
     template: Path,
-) -> tuple[JacobianKernel, str]:
+) -> tuple[JacobianRuntime, str]:
     root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(template, root, dirs_exist_ok=True)
-    kernel = JacobianKernel(root, install_references=True)
-    graph = kernel.artifacts.put(
-        schema_uri=kernel.graph.graph_schema_uri,
-        semantics_uri=kernel.graph.semantics_uri,
+    runtime = create_runtime(
+        root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    graph = runtime.core.artifacts.put(
+        schema_uri=runtime.portfolio.graph.graph_schema_uri,
+        semantics_uri=runtime.portfolio.graph.semantics_uri,
         payload={
             "graph_schema_version": "1",
             "vertices": ["a", "b", "c", "d"],
@@ -245,18 +250,18 @@ def _kernel_with_redundant_odd_cycle(
         },
         summary="non-bipartite graph with one redundant leaf",
     )
-    return kernel, graph.artifact_uri
+    return runtime, graph.artifact_uri
 
 
 def _shrink(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     graph_uri: str,
     *,
     evaluation_budget: int = 20,
 ) -> Any:
-    checker_id = kernel.graph_shrinking.property_checker_id
+    checker_id = runtime.portfolio.graph_shrinking.property_checker_id
     assert checker_id is not None
-    return kernel.capabilities.invoke(
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.counterexample.shrink",
             input={

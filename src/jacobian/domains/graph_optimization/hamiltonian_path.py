@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
-
-import networkx as nx
+from typing import TYPE_CHECKING, cast
 
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.graph_optimization import (
@@ -19,6 +17,9 @@ from jacobian.operations import (
     ComputedOutcome,
     ComputedSuccess,
 )
+
+if TYPE_CHECKING:
+    import networkx as nx
 
 
 def decide_hamiltonian_path(request: ContractModel) -> ContractModel:
@@ -80,6 +81,8 @@ def decide_hamiltonian_path(request: ContractModel) -> ContractModel:
 def _execute(
     request: GraphHamiltonianPathRequest,
 ) -> ComputedOutcome[GraphHamiltonianPathResult]:
+    import networkx as nx
+
     try:
         return ComputedSuccess(
             cast(GraphHamiltonianPathResult, decide_hamiltonian_path(request))

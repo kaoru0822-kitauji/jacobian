@@ -51,6 +51,7 @@ PYTHON_FLINT_LLL_CONFIGURATION = {
     "relation": "L=T*A",
 }
 SYMPY_VERSION = "1.14.0"
+SYMPY_POLYNOMIAL_WORKER_PROTOCOL = "jacobian.sympy-polynomial-normalization/v1"
 Z3_SOLVER_VERSION = "5.0.0.0"
 
 
@@ -122,20 +123,29 @@ def _inspect_python_distribution_identity(
     import_name: str,
     required_attributes: tuple[str, ...],
 ) -> tuple[str, str, tuple[str, ...]]:
+    """Read immutable distribution metadata without importing its implementation.
+
+    ``import_name`` and ``required_attributes`` remain bound into the returned
+    runtime contract. The provider loader validates them on first use; identity
+    measurement itself must stay import-free so runtime assembly does not load
+    every optional mathematical backend.
+    """
+
+    del required_attributes
     try:
-        module = importlib.import_module(import_name)
-        for attribute in required_attributes:
-            getattr(module, attribute)
+        if importlib.util.find_spec(import_name) is None:
+            raise ProviderRuntimeError(
+                f"the {distribution_name} import target is unavailable"
+            )
         distribution = importlib.metadata.distribution(distribution_name)
         digest = _distribution_record_digest(distribution)
     except (
-        AttributeError,
         ImportError,
         importlib.metadata.PackageNotFoundError,
         ProviderRuntimeError,
     ) as exc:
         raise ProviderRuntimeError(
-            f"the {distribution_name} provider is not installed and healthy"
+            f"the {distribution_name} distribution identity is unavailable"
         ) from exc
     return distribution.version, digest, _license_files(distribution)
 
@@ -977,7 +987,7 @@ def python_flint_exact_checker_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} exact-checker profile."
             ),
         )
-    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+    if refresh and runtime.availability is CapabilityProviderAvailability.AVAILABLE:
         try:
             flint = importlib.import_module("flint")
         except (ImportError, OSError):
@@ -1282,7 +1292,7 @@ def python_flint_hnf_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} HNF compatibility profile."
             ),
         )
-    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+    if refresh and runtime.availability is CapabilityProviderAvailability.AVAILABLE:
         try:
             flint = importlib.import_module("flint")
         except (ImportError, OSError):
@@ -1341,7 +1351,7 @@ def python_flint_lll_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} LLL profile."
             ),
         )
-    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+    if refresh and runtime.availability is CapabilityProviderAvailability.AVAILABLE:
         try:
             flint = importlib.import_module("flint")
         except (ImportError, OSError):

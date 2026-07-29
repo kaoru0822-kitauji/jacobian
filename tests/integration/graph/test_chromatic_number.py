@@ -12,14 +12,14 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def _invoke(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     graph: dict[str, object],
 ) -> CapabilityResult:
-    return kernel.capabilities.invoke(
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.chromatic_number.compute",
             input={"graph": graph, "resource_budget": {"wall_seconds": 5}},
@@ -28,10 +28,10 @@ def _invoke(
 
 
 def test_chromatic_number_returns_first_satisfying_k_with_witness(
-    kernel,
+    runtime,
 ) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         {
             "vertices": ["a", "b", "c"],
             "edges": [["a", "b"], ["b", "c"], ["c", "a"]],
@@ -51,11 +51,11 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
     ]
     assert len(result.artifact_uris) == 3
     input_uri, output_uri, obligation_uri = result.artifact_uris
-    assert kernel.store.get(output_uri).manifest.parents == (input_uri,)
-    assert kernel.store.get(output_uri).payload == result.output
-    assert frozenset(kernel.store.get(obligation_uri).manifest.parents) == frozenset(
-        (input_uri, output_uri)
-    )
+    assert runtime.core.store.get(output_uri).manifest.parents == (input_uri,)
+    assert runtime.core.store.get(output_uri).payload == result.output
+    assert frozenset(
+        runtime.core.store.get(obligation_uri).manifest.parents
+    ) == frozenset((input_uri, output_uri))
     assert result.obligations[0].obligation_uri == obligation_uri
     assert result.relationships[0].obligation_uris == (obligation_uri,)
 
@@ -72,13 +72,13 @@ def test_chromatic_number_returns_first_satisfying_k_with_witness(
 
 
 def test_chromatic_number_timeout_is_unknown_and_preserves_bounds(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(z3.Solver, "check", lambda _solver: z3.unknown)
 
     result = _invoke(
-        kernel,
+        runtime,
         {
             "vertices": ["a", "b", "c", "d", "e"],
             "edges": [
@@ -100,17 +100,19 @@ def test_chromatic_number_timeout_is_unknown_and_preserves_bounds(
     assert result.output["lower_bound"] <= result.output["upper_bound"]
     assert result.output["tested"][-1]["status"] == "UNKNOWN"
     assert len(result.artifact_uris) == 3
-    assert kernel.store.get(result.artifact_uris[1]).payload["status"] == "UNKNOWN"
-    obligation = kernel.store.get(result.artifact_uris[2])
+    assert (
+        runtime.core.store.get(result.artifact_uris[1]).payload["status"] == "UNKNOWN"
+    )
+    obligation = runtime.core.store.get(result.artifact_uris[2])
     assert obligation.payload["claimed_value"] is None
     assert obligation.payload["status"] == "UNKNOWN"
 
 
 def test_chromatic_number_rejects_repeated_undirected_edges(
-    kernel,
+    runtime,
 ) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         {
             "vertices": ["a", "b"],
             "edges": [["a", "b"], ["b", "a"]],
@@ -124,7 +126,7 @@ def test_chromatic_number_rejects_repeated_undirected_edges(
 
 
 def test_chromatic_number_rejects_result_for_a_different_vertex_universe(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from jacobian.domains.graph_optimization import chromatic_number
@@ -143,7 +145,7 @@ def test_chromatic_number_rejects_result_for_a_different_vertex_universe(
 
     monkeypatch.setattr(chromatic_number, "solve_chromatic_number", invalid_result)
     result = _invoke(
-        kernel,
+        runtime,
         {
             "vertices": ["a", "b", "c"],
             "edges": [["a", "b"], ["b", "c"]],

@@ -1,0 +1,77 @@
+"""Construction of foundational runtime-owned services."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from jacobian.artifacts import ArtifactService
+from jacobian.capabilities import CapabilityService
+from jacobian.linear import install_linear_artifacts
+from jacobian.matrix_normal_forms import install_matrix_normal_form_artifacts
+from jacobian.memory import ResearchMemory
+from jacobian.operation_installation import OperationInstaller
+from jacobian.plugins.registry import PluginRegistry
+from jacobian.polynomial_expressions import install_polynomial_expression_artifacts
+from jacobian.registry import CheckerRegistry
+from jacobian.runtime.config import CheckerAuthorityMode, RuntimeOptions
+from jacobian.runtime.services import CoreServices
+from jacobian.sat import install_sat_artifacts
+from jacobian.schema_registry import SchemaRegistry
+from jacobian.smt import install_smt_artifacts
+from jacobian.store import ArtifactStore
+from jacobian.workspaces import WorkspaceService
+
+
+def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreServices:
+    """Open storage and construct the capability-independent service graph."""
+
+    store = ArtifactStore(root)
+    try:
+        schemas = SchemaRegistry(store)
+        artifacts = ArtifactService(store, schemas)
+        operations = OperationInstaller(store, schemas, artifacts)
+        with store.transaction():
+            sat = install_sat_artifacts(store, schemas, artifacts)
+            smt = install_smt_artifacts(store, schemas, artifacts)
+            linear = install_linear_artifacts(store, schemas, artifacts)
+            matrix_normal_forms = install_matrix_normal_form_artifacts(
+                store,
+                schemas,
+                artifacts,
+            )
+            polynomial_expressions = install_polynomial_expression_artifacts(
+                store,
+                schemas,
+                artifacts,
+            )
+        memory = ResearchMemory(store, schemas)
+        workspaces = WorkspaceService(store, schemas)
+        plugins = PluginRegistry(store)
+        checkers = CheckerRegistry(store)
+        checkers.bind_existing_when_omitted = (
+            options.checker_authority is CheckerAuthorityMode.HYDRATE_EXISTING
+        )
+        capabilities = CapabilityService(
+            store,
+            memory,
+            policy=options.capability_policy,
+        )
+        return CoreServices(
+            store=store,
+            schemas=schemas,
+            artifacts=artifacts,
+            operations=operations,
+            sat=sat,
+            smt=smt,
+            linear=linear,
+            matrix_normal_forms=matrix_normal_forms,
+            polynomial_expressions=polynomial_expressions,
+            memory=memory,
+            workspaces=workspaces,
+            plugins=plugins,
+            checkers=checkers,
+            capabilities=capabilities,
+        )
+    except BaseException:
+        store.close()
+        raise

@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import sympy
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
@@ -36,9 +35,12 @@ from jacobian.contracts.matrices import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
+
+if TYPE_CHECKING:
+    from sympy import Matrix, Rational
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,14 +152,14 @@ class MatrixDeterminantAdapter:
         validated = _validate(MatrixDeterminantRequest, request.input)
         started = time.monotonic()
         matrix_uri = _materialize_matrix(self.resources, validated.matrix)
-        determinant = sympy.Rational(
-            _sympy_matrix(validated.matrix).det(method="bareiss")
-        )
+        from sympy import Rational
+
+        determinant = Rational(_sympy_matrix(validated.matrix).det(method="bareiss"))
         determinant_value = _wire(determinant)
         artifact = MatrixDeterminantArtifact(
             matrix_uri=matrix_uri,
             determinant=determinant_value,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         result_uri = self.resources.artifacts.put(
             schema_uri=self.resources.installation.determinant_schema_uri,
@@ -170,7 +172,7 @@ class MatrixDeterminantAdapter:
             matrix_uri=matrix_uri,
             determinant_uri=result_uri,
             determinant=determinant_value,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -252,7 +254,7 @@ class MatrixRankAdapter:
             matrix_uri=matrix_uri,
             rank=len(pivot_columns),
             pivot_columns=pivot_columns,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         result_uri = self.resources.artifacts.put(
             schema_uri=self.resources.installation.rank_schema_uri,
@@ -266,7 +268,7 @@ class MatrixRankAdapter:
             rank_uri=result_uri,
             rank=len(pivot_columns),
             pivot_columns=pivot_columns,
-            backend_version=sympy.__version__,
+            backend_version=SYMPY_VERSION,
         )
         return _computed_result(
             descriptor=self.descriptor,
@@ -310,16 +312,18 @@ def _materialize_matrix(
     ).artifact_uri
 
 
-def _sympy_matrix(matrix: ExactRationalMatrix) -> sympy.Matrix:
-    return sympy.Matrix(
+def _sympy_matrix(matrix: ExactRationalMatrix) -> Matrix:
+    from sympy import Matrix, Rational
+
+    return Matrix(
         [
-            [sympy.Rational(int(entry.num), int(entry.den)) for entry in row]
+            [Rational(int(entry.num), int(entry.den)) for entry in row]
             for row in matrix.entries
         ]
     )
 
 
-def _wire(value: sympy.Rational) -> CanonicalRational:
+def _wire(value: Rational) -> CanonicalRational:
     return CanonicalRational(num=str(value.p), den=str(value.q))
 
 

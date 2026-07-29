@@ -14,18 +14,19 @@ from typing import Any
 from mcp.server.auth.provider import AccessToken
 
 from jacobian.capabilities import CapabilityPolicy
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 _TENANT_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-DEFAULT_MAX_TENANT_KERNELS = 32
+DEFAULT_MAX_TENANT_RUNTIMES = 32
 
 
 class AuthenticationError(PermissionError):
     """A remote request lacks a usable authenticated tenant subject."""
 
 
-class TenantKernelLimitError(RuntimeError):
-    """The server cannot admit another in-memory tenant kernel."""
+class TenantRuntimeLimitError(RuntimeError):
+    """The server cannot admit another in-memory tenant runtime."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,38 +75,38 @@ class StaticTokenVerifier:
         return None
 
 
-class TenantKernelRouter:
-    """Create one isolated kernel root per authenticated subject."""
+class TenantRuntimeRouter:
+    """Own one isolated runtime per authenticated subject."""
 
     def __init__(
         self,
         root: str | Path,
         *,
-        install_references: bool = True,
+        checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.INSTALL_BUNDLED,
         allow_anonymous: bool = False,
         anonymous_tenant_id: str = "anonymous",
         capability_adapter_entrypoints: tuple[str, ...] = (),
         capability_policy: CapabilityPolicy | None = None,
-        max_tenant_kernels: int = DEFAULT_MAX_TENANT_KERNELS,
+        max_tenant_runtimes: int = DEFAULT_MAX_TENANT_RUNTIMES,
     ) -> None:
-        if max_tenant_kernels < 1:
-            raise ValueError("max_tenant_kernels must be positive")
+        if max_tenant_runtimes < 1:
+            raise ValueError("max_tenant_runtimes must be positive")
         if not _TENANT_PATTERN.fullmatch(anonymous_tenant_id):
             raise ValueError(
                 "anonymous_tenant_id must start with a letter or digit, contain only "
                 "letters, digits, '.', '_', or '-', and be at most 128 characters"
             )
         self.root = Path(root)
-        self.install_references = install_references
+        self.checker_authority = checker_authority
         self.allow_anonymous = allow_anonymous
         self.anonymous_tenant_id = anonymous_tenant_id
         self.capability_adapter_entrypoints = capability_adapter_entrypoints
         self.capability_policy = capability_policy
-        self.max_tenant_kernels = max_tenant_kernels
-        self._kernels: dict[str, JacobianKernel] = {}
+        self.max_tenant_runtimes = max_tenant_runtimes
+        self._runtimes: dict[str, JacobianRuntime] = {}
         self._lock = threading.Lock()
 
-    def kernel_for(self, subject: str | None) -> JacobianKernel:
+    def runtime_for(self, subject: str | None) -> JacobianRuntime:
         tenant = subject
         if tenant is None:
             if not self.allow_anonymous:
@@ -121,22 +122,39 @@ class TenantKernelRouter:
             )
         tenant_key = hashlib.sha256(tenant.encode("utf-8")).hexdigest()
         with self._lock:
-            kernel = self._kernels.get(tenant_key)
-            if kernel is None:
-                if len(self._kernels) >= self.max_tenant_kernels:
-                    raise TenantKernelLimitError(
+            runtime = self._runtimes.get(tenant_key)
+            if runtime is None:
+                if len(self._runtimes) >= self.max_tenant_runtimes:
+                    raise TenantRuntimeLimitError(
                         "This server has reached its in-memory tenant limit."
                     )
-                kernel = JacobianKernel(
+                runtime = create_runtime(
                     self.root / "tenants" / tenant_key,
-                    install_references=self.install_references,
+                    checker_authority=self.checker_authority,
                     capability_adapter_entrypoints=(
                         self.capability_adapter_entrypoints
                     ),
                     capability_policy=self.capability_policy,
                 )
-                self._kernels[tenant_key] = kernel
-            return kernel
+                self._runtimes[tenant_key] = runtime
+            return runtime
+
+    def close(self) -> None:
+        """Close every tenant runtime owned by this router."""
+
+        with self._lock:
+            runtimes = tuple(self._runtimes.values())
+            self._runtimes.clear()
+        failures: list[Exception] = []
+        for runtime in runtimes:
+            try:
+                runtime.close()
+            except Exception as exc:
+                failures.append(exc)
+        if failures:
+            raise ExceptionGroup(
+                "one or more tenant runtimes failed to close", failures
+            )
 
 
 def load_static_token_file(path: str | Path) -> tuple[StaticTokenGrant, ...]:

@@ -7,12 +7,12 @@ import pytest
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 _ROOT = Path(__file__).parents[2]
 _PILOT = _ROOT / "benchmarks" / "example_cases" / "pilot.json"
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 _REQUIRED_CAPABILITIES = {
     "finite.coverage.verify",
@@ -60,12 +60,12 @@ def test_pilot_manifest_is_small_source_backed_and_review_gated() -> None:
 
 
 def test_installed_public_pilot_examples_use_descriptor_mechanism(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     pilot = _pilot()
     installed = {
         descriptor.capability_id: descriptor
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
 
     checked = set()
@@ -89,7 +89,7 @@ def test_installed_public_pilot_examples_use_descriptor_mechanism(
 
 
 def test_search_pilot_boundaries_use_typed_public_results(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     artifact_uri = "artifact://sha256/" + "a" * 64
     payload = {
@@ -99,14 +99,14 @@ def test_search_pilot_boundaries_use_typed_public_results(
         "budget": {"candidates_max": 1, "wall_seconds": 1},
     }
 
-    unsupported = kernel.capabilities.invoke(
+    unsupported = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="search.enumerate",
             mode=CapabilityMode.VERIFY,
             input=payload,
         )
     )
-    invalid_budget = kernel.capabilities.invoke(
+    invalid_budget = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="search.enumerate",
             input={

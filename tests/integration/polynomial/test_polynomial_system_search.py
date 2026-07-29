@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 
 from jacobian.contracts.capabilities import CapabilityAssuranceLevel, CapabilityRequest
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
 
 
 def _request(constant: int) -> CapabilityRequest:
@@ -33,9 +33,9 @@ def _request(constant: int) -> CapabilityRequest:
 
 
 def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) -> None:
-    result = JacobianKernel(tmp_path, install_references=True).capabilities.invoke(
-        _request(1)
-    )
+    result = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    ).capabilities.invoke(_request(1))
     assert result.output["found"] is True
     assert result.output["assignment"] == [{"num": "-1", "den": "1"}]
     assert result.output["examined_assignment_count"] == 1
@@ -45,7 +45,7 @@ def test_rational_solution_search_returns_first_exact_candidate(tmp_path: Path) 
 def test_rational_solution_search_reports_completed_bounded_absence(
     tmp_path: Path,
 ) -> None:
-    result = JacobianKernel(tmp_path).capabilities.invoke(_request(2))
+    result = create_runtime(tmp_path).capabilities.invoke(_request(2))
     assert result.output["found"] is False
     assert result.output["examined_assignment_count"] == 3
     assert result.output["grid_assignment_count"] == 3

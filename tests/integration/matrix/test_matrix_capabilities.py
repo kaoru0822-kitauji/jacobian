@@ -17,12 +17,13 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.matrix_determinant_capabilities import (
     install_matrix_determinant_checker,
 )
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def _rational(value: int | Fraction) -> dict[str, str]:
@@ -53,20 +54,20 @@ def _reference_determinant(rows: list[list[Fraction]]) -> Fraction:
     return total
 
 
-def _kernel_with_determinant_checker(root: Path) -> JacobianKernel:
-    kernel = JacobianKernel(root)
+def _runtime_with_determinant_checker(root: Path) -> JacobianRuntime:
+    runtime = create_runtime(root)
     adapter, _installation = install_matrix_determinant_checker(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
-        kernel.matrix,
-        kernel.verification,
-        kernel.checkers,
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
+        runtime.portfolio.matrix,
+        runtime.services.verification,
+        runtime.core.checkers,
         authorize_checker=True,
     )
     assert adapter is not None
-    kernel.register_capability(adapter)
-    return kernel
+    runtime.core.capabilities.register(adapter)
+    return runtime
 
 
 @pytest.mark.parametrize(
@@ -83,12 +84,12 @@ def _kernel_with_determinant_checker(root: Path) -> JacobianKernel:
     ],
 )
 def test_matrix_determinant_compute_is_exact_and_unverified(
-    kernel,
+    runtime,
     rows: list[list[int | Fraction]],
     expected: Fraction,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
             input={"matrix": _matrix(rows)},
@@ -101,7 +102,7 @@ def test_matrix_determinant_compute_is_exact_and_unverified(
     assert result.output["backend_version"] == sympy.__version__
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 2
-    determinant_artifact = kernel.store.get(result.output["determinant_uri"])
+    determinant_artifact = runtime.core.store.get(result.output["determinant_uri"])
     assert determinant_artifact.payload["backend"] == "sympy"
     assert determinant_artifact.payload["backend_version"] == sympy.__version__
 
@@ -109,8 +110,8 @@ def test_matrix_determinant_compute_is_exact_and_unverified(
 def test_matrix_determinant_verify_independently_recomputes_exact_value(
     tmp_path: Path,
 ) -> None:
-    kernel = _kernel_with_determinant_checker(tmp_path)
-    computed = kernel.capabilities.invoke(
+    runtime = _runtime_with_determinant_checker(tmp_path)
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
             input={
@@ -125,7 +126,7 @@ def test_matrix_determinant_verify_independently_recomputes_exact_value(
         )
     )
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.verify",
             mode=CapabilityMode.VERIFY,
@@ -141,26 +142,26 @@ def test_matrix_determinant_verify_independently_recomputes_exact_value(
 
 
 def test_matrix_determinant_verify_rejects_wrong_bound_value(tmp_path: Path) -> None:
-    kernel = _kernel_with_determinant_checker(tmp_path)
-    computed = kernel.capabilities.invoke(
+    runtime = _runtime_with_determinant_checker(tmp_path)
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
             input={"matrix": _matrix([[1, 2], [3, 4]])},
         )
     )
     source_uri = computed.output["matrix_uri"]
-    wrong = kernel.artifacts.put(
-        schema_uri=kernel.matrix.determinant_schema_uri,
-        semantics_uri=kernel.matrix.semantics_uri,
+    wrong = runtime.core.artifacts.put(
+        schema_uri=runtime.portfolio.matrix.determinant_schema_uri,
+        semantics_uri=runtime.portfolio.matrix.semantics_uri,
         payload={
-            **kernel.store.get(computed.output["determinant_uri"]).payload,
+            **runtime.core.store.get(computed.output["determinant_uri"]).payload,
             "determinant": _rational(2),
         },
         parents=(source_uri,),
         summary="deliberately incorrect determinant candidate",
     )
 
-    rejected = kernel.capabilities.invoke(
+    rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.verify",
             mode=CapabilityMode.VERIFY,
@@ -179,22 +180,22 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    kernel = _kernel_with_determinant_checker(tmp_path)
-    computed = kernel.capabilities.invoke(
+    runtime = _runtime_with_determinant_checker(tmp_path)
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
             input={"matrix": _matrix([[1]])},
         )
     )
     monkeypatch.setattr(
-        kernel.verification,
+        runtime.services.verification,
         "_run_checker",
         lambda **_kwargs: (_ for _ in ()).throw(
             subprocess.TimeoutExpired("determinant-checker", 1)
         ),
     )
 
-    timed_out = kernel.capabilities.invoke(
+    timed_out = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.verify",
             mode=CapabilityMode.VERIFY,
@@ -210,10 +211,10 @@ def test_matrix_determinant_verify_timeout_is_not_a_conclusion(
 
 
 def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.rank.compute",
             input={
@@ -234,14 +235,14 @@ def test_matrix_rank_compute_returns_rectangular_pivot_evidence(
     assert result.output["backend_version"] == sympy.__version__
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 2
-    rank_artifact = kernel.store.get(result.output["rank_uri"])
+    rank_artifact = runtime.core.store.get(result.output["rank_uri"])
     assert rank_artifact.payload["backend"] == "sympy"
     assert rank_artifact.payload["backend_version"] == sympy.__version__
 
 
-def test_matrix_determinant_rejects_rectangular_input(kernel) -> None:
+def test_matrix_determinant_rejects_rectangular_input(runtime) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
             input={"matrix": _matrix([[1, 2, 3], [4, 5, 6]])},
@@ -254,7 +255,7 @@ def test_matrix_determinant_rejects_rectangular_input(kernel) -> None:
 
 @pytest.mark.differential
 def test_matrix_determinant_matches_independent_bounded_oracle(
-    kernel,
+    runtime,
 ) -> None:
     random = Random(20260726)
 
@@ -267,7 +268,7 @@ def test_matrix_determinant_matches_independent_bounded_oracle(
                 ]
                 for _ in range(size)
             ]
-            result = kernel.capabilities.invoke(
+            result = runtime.core.capabilities.invoke(
                 CapabilityRequest(
                     capability_id="matrix.determinant.compute",
                     input={"matrix": _matrix(rows)},
@@ -279,10 +280,10 @@ def test_matrix_determinant_matches_independent_bounded_oracle(
             )
 
 
-def test_matrix_capabilities_report_sympy_provider_identity(kernel) -> None:
+def test_matrix_capabilities_report_sympy_provider_identity(runtime) -> None:
     descriptors = {
         descriptor.capability_id: descriptor
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
 
     for capability_id in ("matrix.determinant.compute", "matrix.rank.compute"):

@@ -2,7 +2,7 @@ import pytest
 
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.mark.parametrize(
@@ -14,11 +14,11 @@ from jacobian.kernel import JacobianKernel
     ),
 )
 def test_finite_differences_return_natural_empty_result(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     capability_id: str,
     values: list[str],
 ) -> None:
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=capability_id,
             input={"values": values},

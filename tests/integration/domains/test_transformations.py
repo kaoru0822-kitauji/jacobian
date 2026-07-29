@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import pytest
 
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 @pytest.mark.subprocess
 def test_matrix_representation_change_is_independently_verified(
-    kernel,
+    runtime,
 ) -> None:
-    reference = kernel.references["matrices"]
-    source = kernel.artifacts.put(
+    reference = runtime.portfolio.references["matrices"]
+    source = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -25,7 +25,7 @@ def test_matrix_representation_change_is_independently_verified(
         },
     )
 
-    applied = kernel.transformations.apply(
+    applied = runtime.services.transformations.apply(
         source_uri=source.artifact_uri,
         plugin_id=reference.plugin_id,
         target_schema_uri=reference.representation_schema_uris["row_major"],
@@ -36,7 +36,7 @@ def test_matrix_representation_change_is_independently_verified(
 
     assert applied.transformation_uri is not None
     assert applied.result.assurance.verification.value == "UNVERIFIED"
-    verified = kernel.verification.verify_transformation(
+    verified = runtime.services.verification.verify_transformation(
         transformation_uri=applied.transformation_uri,
     )
     assert verified.conclusion.value == "TRUE"
@@ -47,14 +47,14 @@ def test_matrix_representation_change_is_independently_verified(
     )
 
 
-def test_transformation_target_rebinding_fails_closed(kernel) -> None:
-    reference = kernel.references["matrices"]
-    source = kernel.artifacts.put(
+def test_transformation_target_rebinding_fails_closed(runtime) -> None:
+    reference = runtime.portfolio.references["matrices"]
+    source = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={"rows": 1, "cols": 1, "entries": [["1"]]},
     )
-    applied = kernel.transformations.apply(
+    applied = runtime.services.transformations.apply(
         source_uri=source.artifact_uri,
         plugin_id=reference.plugin_id,
         target_schema_uri=reference.representation_schema_uris["row_major"],
@@ -63,15 +63,15 @@ def test_transformation_target_rebinding_fails_closed(kernel) -> None:
         wall_seconds=30,
     )
     assert applied.transformation_uri is not None
-    transformation = kernel.store.get(applied.transformation_uri)
-    replacement = kernel.artifacts.put(
+    transformation = runtime.core.store.get(applied.transformation_uri)
+    replacement = runtime.core.artifacts.put(
         schema_uri=reference.representation_schema_uris["row_major"],
         semantics_uri=reference.representation_semantics_uris["row_major"],
         payload={"rows": 1, "cols": 1, "values": ["2"]},
     )
     rebound_payload = dict(transformation.payload)
     rebound_payload["target_uri"] = replacement.artifact_uri
-    rebound = kernel.store.put(
+    rebound = runtime.core.store.put(
         schema_uri=transformation.manifest.schema_uri,
         semantics_uri=transformation.manifest.semantics_uri,
         payload=rebound_payload,
@@ -83,7 +83,7 @@ def test_transformation_target_rebinding_fails_closed(kernel) -> None:
         summary="adversarial target rebinding",
     )
 
-    result = kernel.verification.verify_transformation(
+    result = runtime.services.verification.verify_transformation(
         transformation_uri=rebound.artifact_uri
     )
 
@@ -93,14 +93,14 @@ def test_transformation_target_rebinding_fails_closed(kernel) -> None:
     assert result.verification_record_uri is None
 
 
-def test_transformation_relation_rebinding_fails_closed(kernel) -> None:
-    reference = kernel.references["matrices"]
-    source = kernel.artifacts.put(
+def test_transformation_relation_rebinding_fails_closed(runtime) -> None:
+    reference = runtime.portfolio.references["matrices"]
+    source = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={"rows": 1, "cols": 2, "entries": [["1", "2"]]},
     )
-    applied = kernel.transformations.apply(
+    applied = runtime.services.transformations.apply(
         source_uri=source.artifact_uri,
         plugin_id=reference.plugin_id,
         target_schema_uri=reference.representation_schema_uris["row_major"],
@@ -109,10 +109,10 @@ def test_transformation_relation_rebinding_fails_closed(kernel) -> None:
         wall_seconds=30,
     )
     assert applied.transformation_uri is not None
-    transformation = kernel.store.get(applied.transformation_uri)
+    transformation = runtime.core.store.get(applied.transformation_uri)
     rebound_payload = dict(transformation.payload)
     rebound_payload["relation"] = "HEURISTIC"
-    rebound = kernel.store.put(
+    rebound = runtime.core.store.put(
         schema_uri=transformation.manifest.schema_uri,
         semantics_uri=transformation.manifest.semantics_uri,
         payload=rebound_payload,
@@ -120,7 +120,7 @@ def test_transformation_relation_rebinding_fails_closed(kernel) -> None:
         summary="adversarial relation rebinding",
     )
 
-    result = kernel.verification.verify_transformation(
+    result = runtime.services.verification.verify_transformation(
         transformation_uri=rebound.artifact_uri
     )
 
@@ -131,15 +131,15 @@ def test_transformation_relation_rebinding_fails_closed(kernel) -> None:
 
 
 def test_transformation_obligation_tampering_fails_closed(
-    kernel,
+    runtime,
 ) -> None:
-    reference = kernel.references["matrices"]
-    source = kernel.artifacts.put(
+    reference = runtime.portfolio.references["matrices"]
+    source = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={"rows": 1, "cols": 2, "entries": [["1", "2"]]},
     )
-    applied = kernel.transformations.apply(
+    applied = runtime.services.transformations.apply(
         source_uri=source.artifact_uri,
         plugin_id=reference.plugin_id,
         target_schema_uri=reference.representation_schema_uris["row_major"],
@@ -148,10 +148,10 @@ def test_transformation_obligation_tampering_fails_closed(
         wall_seconds=30,
     )
     assert applied.transformation_uri is not None
-    transformation = kernel.store.get(applied.transformation_uri)
+    transformation = runtime.core.store.get(applied.transformation_uri)
     tampered_payload = dict(transformation.payload)
     tampered_payload["obligation"] = {"rows": 999, "cols": 999}
-    tampered = kernel.store.put(
+    tampered = runtime.core.store.put(
         schema_uri=transformation.manifest.schema_uri,
         semantics_uri=transformation.manifest.semantics_uri,
         payload=tampered_payload,
@@ -159,7 +159,7 @@ def test_transformation_obligation_tampering_fails_closed(
         summary="adversarial obligation tampering",
     )
 
-    result = kernel.verification.verify_transformation(
+    result = runtime.services.verification.verify_transformation(
         transformation_uri=tampered.artifact_uri
     )
 

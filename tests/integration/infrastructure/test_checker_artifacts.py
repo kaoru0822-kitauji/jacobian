@@ -9,24 +9,24 @@ from jacobian.contracts.evidence import (
     WitnessEnvelope,
     WitnessRole,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 from jacobian.store import StoredArtifact
 
 
-def _witness_schema_uri(kernel: JacobianKernel) -> str:
-    return kernel.schemas.register_model(
+def _witness_schema_uri(runtime: JacobianRuntime) -> str:
+    return runtime.core.schemas.register_model(
         name="jacobian.witness-envelope",
         version="1",
         model=WitnessEnvelope,
     )
 
 
-def _semantics_artifact(kernel: JacobianKernel) -> StoredArtifact:
-    return kernel.store.get(kernel.matrix.semantics_uri)
+def _semantics_artifact(runtime: JacobianRuntime) -> StoredArtifact:
+    return runtime.core.store.get(runtime.portfolio.matrix.semantics_uri)
 
 
 def _claim_and_candidate(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> tuple[StoredArtifact, StoredArtifact]:
     matrix = {
         "matrix_schema_version": "1",
@@ -36,26 +36,26 @@ def _claim_and_candidate(
             [{"num": "3", "den": "1"}, {"num": "4", "den": "1"}],
         ],
     }
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.determinant.compute",
             input={"matrix": matrix},
         )
     )
-    claim = kernel.store.get(computed.output["matrix_uri"])
-    candidate = kernel.store.get(computed.output["determinant_uri"])
+    claim = runtime.core.store.get(computed.output["matrix_uri"])
+    candidate = runtime.core.store.get(computed.output["determinant_uri"])
     return claim, candidate
 
 
 def test_put_witness_envelope_binds_digests_and_parents(
-    kernel,
+    runtime,
 ) -> None:
-    claim, candidate = _claim_and_candidate(kernel)
-    semantics = _semantics_artifact(kernel)
-    witness_schema_uri = _witness_schema_uri(kernel)
+    claim, candidate = _claim_and_candidate(runtime)
+    semantics = _semantics_artifact(runtime)
+    witness_schema_uri = _witness_schema_uri(runtime)
 
     result = put_witness_envelope(
-        kernel.artifacts,
+        runtime.core.artifacts,
         witness_schema_uri=witness_schema_uri,
         witness_format="matrix.rational_determinant",
         claim_artifact=claim,
@@ -68,7 +68,7 @@ def test_put_witness_envelope_binds_digests_and_parents(
         summary="exact rational determinant verification witness",
     )
 
-    stored = kernel.store.get(result.artifact_uri)
+    stored = runtime.core.store.get(result.artifact_uri)
     assert stored.manifest.schema_uri == witness_schema_uri
     assert stored.manifest.semantics_uri == semantics.artifact_uri
     assert stored.manifest.parents == (claim.artifact_uri, candidate.artifact_uri)
@@ -88,14 +88,14 @@ def test_put_witness_envelope_binds_digests_and_parents(
 
 
 def test_put_witness_envelope_parents_order_is_claim_then_candidate(
-    kernel,
+    runtime,
 ) -> None:
-    claim, candidate = _claim_and_candidate(kernel)
-    semantics = _semantics_artifact(kernel)
-    witness_schema_uri = _witness_schema_uri(kernel)
+    claim, candidate = _claim_and_candidate(runtime)
+    semantics = _semantics_artifact(runtime)
+    witness_schema_uri = _witness_schema_uri(runtime)
 
     result = put_witness_envelope(
-        kernel.artifacts,
+        runtime.core.artifacts,
         witness_schema_uri=witness_schema_uri,
         witness_format="sat.assignment",
         claim_artifact=claim,
@@ -108,5 +108,5 @@ def test_put_witness_envelope_parents_order_is_claim_then_candidate(
         summary="SAT assignment verification witness",
     )
 
-    stored = kernel.store.get(result.artifact_uri)
+    stored = runtime.core.store.get(result.artifact_uri)
     assert stored.manifest.parents == (claim.artifact_uri, candidate.artifact_uri)

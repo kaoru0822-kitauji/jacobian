@@ -65,5 +65,5 @@ class FixtureAdapter:
         )
 
 
-def create_adapter(_kernel: Any) -> FixtureAdapter:
+def create_adapter(_runtime: Any) -> FixtureAdapter:
     return FixtureAdapter()

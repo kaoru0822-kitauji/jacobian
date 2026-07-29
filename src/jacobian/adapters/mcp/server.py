@@ -1,8 +1,7 @@
-"""Thin MCP 2.0.0b2 adapter over the tested Python kernel."""
+"""Thin MCP 2.0.0b2 adapter over the tested Python runtime."""
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import hashlib
 import json
@@ -19,7 +18,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
 from mcp_types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import AnyHttpUrl, Field, StrictInt
+from pydantic import Field, StrictInt
 
 from jacobian import __version__
 from jacobian.adapters.mcp.guidance import (
@@ -64,7 +63,7 @@ from jacobian.contracts.workspaces import (
 
 _LOGGER = logging.getLogger(__name__)
 CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
-CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "COMPACT", "FULL"]
+CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "FULL"]
 CapabilityInvocationView = Literal["SUMMARY", "STANDARD", "FULL"]
 CAPABILITY_STANDARD_OUTPUT_BYTE_LIMIT = 8_192
 CAPABILITY_STANDARD_FIELD_BYTE_LIMIT = 2_048
@@ -268,13 +267,13 @@ _RELATED_CAPABILITIES: dict[str, tuple[tuple[str, str], ...]] = {
     "polynomial.jacobian_syzygy.minimum_degree.compute": (
         (
             "polynomial.jacobian_syzygy.minimum_degree.verify",
-            "independently rebuild the graded maps, ranks, minors, and first kernel",
+            "independently rebuild the graded maps, ranks, minors, and first runtime",
         ),
     ),
     "polynomial.jacobian_syzygy.minimum_degree.verify": (
         (
             "polynomial.jacobian_syzygy.minimum_degree.compute",
-            "produce the provenance-bound graded rank ledger and kernel witness",
+            "produce the provenance-bound graded rank ledger and runtime witness",
         ),
     ),
     "geometry.projective_line_arrangement.flats.materialize": (
@@ -295,17 +294,18 @@ if TYPE_CHECKING:
     from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
-    from jacobian.adapters.mcp.remote import TenantKernelRouter
-    from jacobian.kernel import JacobianKernel
+    from jacobian.adapters.mcp.remote import TenantRuntimeRouter
+    from jacobian.runtime import CheckerAuthorityMode
+    from jacobian.runtime.model import JacobianRuntime
 
 
 def _invoke_capability_with_cancellation(
-    kernel: Any,
+    runtime: Any,
     request: CapabilityRequest,
     cancellation_event: threading.Event,
 ) -> CapabilityResult:
     with bounded_process_cancellation(cancellation_event):
-        result: CapabilityResult = kernel.capabilities.invoke(request)
+        result: CapabilityResult = runtime.core.capabilities.invoke(request)
         return result
 
 
@@ -577,7 +577,7 @@ def _log_capability_attempt(
 
 
 async def _invoke_capability_attempt(
-    kernel: Any,
+    runtime: Any,
     *,
     capability_id: str,
     payload: dict[str, Any],
@@ -597,7 +597,7 @@ async def _invoke_capability_attempt(
     worker = asyncio.create_task(
         asyncio.to_thread(
             _invoke_capability_with_cancellation,
-            kernel,
+            runtime,
             CapabilityRequest(
                 capability_id=capability_id,
                 mode=mode,
@@ -660,7 +660,7 @@ def _catalog_digest(
 
 
 def _capability_discovery_response(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     *,
     query: str | None,
     domain: str | None,
@@ -668,9 +668,9 @@ def _capability_discovery_response(
     limit: int | None,
     cursor: str | None,
 ) -> dict[str, Any]:
-    catalog = kernel.capabilities.catalog()
+    catalog = runtime.core.capabilities.catalog()
     try:
-        discovered = kernel.capabilities.discover(
+        discovered = runtime.core.capabilities.discover(
             CapabilityDiscoveryRequest(
                 query=query,
                 domain=domain,
@@ -814,14 +814,42 @@ def _publish_workspace_normalization_aliases(server: Any) -> None:
 
 @dataclass(frozen=True, slots=True)
 class AppState:
-    kernel: JacobianKernel | None
-    tenant_router: TenantKernelRouter | None = None
+    runtime: JacobianRuntime | None
+    tenant_router: TenantRuntimeRouter | None = None
+
+
+def _selected_checker_authority(
+    authority: CheckerAuthorityMode | None,
+) -> CheckerAuthorityMode:
+    if authority is not None:
+        return authority
+    from jacobian.runtime import CheckerAuthorityMode
+
+    return CheckerAuthorityMode.INSTALL_BUNDLED
+
+
+@asynccontextmanager
+async def _runtime_lifespan(
+    _server: Any,
+    *,
+    runtime: JacobianRuntime | None,
+    tenant_router: TenantRuntimeRouter | None,
+) -> AsyncIterator[AppState]:
+    if runtime is not None:
+        _start_lean_warmup(runtime)
+    try:
+        yield AppState(runtime=runtime, tenant_router=tenant_router)
+    finally:
+        if runtime is not None:
+            runtime.close()
+        if tenant_router is not None:
+            tenant_router.close()
 
 
 def create_server(
     state_dir: str | Path | None = None,
     *,
-    install_references: bool = True,
+    checker_authority: CheckerAuthorityMode | None = None,
     tenant_isolation: bool = False,
     allow_anonymous: bool = False,
     anonymous_tenant_id: str = "anonymous",
@@ -830,9 +858,9 @@ def create_server(
     capability_adapter_entrypoints: tuple[str, ...] = (),
     capability_exclusions: frozenset[str] = frozenset(),
     capability_policy: CapabilityPolicy | None = None,
-    max_tenant_kernels: int | None = None,
+    max_tenant_runtimes: int | None = None,
 ) -> MCPServer[AppState]:
-    """Create a local or tenant-routed adapter over the Jacobian kernel."""
+    """Create a local or tenant-routed adapter over a Jacobian runtime."""
 
     if tenant_isolation and capability_exclusions:
         raise ValueError("capability exclusions are supported only by local evaluation")
@@ -843,16 +871,17 @@ def create_server(
     from mcp.server.mcpserver import Context
 
     from jacobian.adapters.mcp.remote import (
-        DEFAULT_MAX_TENANT_KERNELS,
-        TenantKernelRouter,
+        DEFAULT_MAX_TENANT_RUNTIMES,
+        TenantRuntimeRouter,
     )
-    from jacobian.kernel import JacobianKernel
     from jacobian.references import reference_catalog
+    from jacobian.runtime import create_runtime
+    from jacobian.runtime.model import JacobianRuntime
 
     globals().update(
         {
             "Context": Context,
-            "JacobianKernel": JacobianKernel,
+            "JacobianRuntime": JacobianRuntime,
         }
     )
 
@@ -900,30 +929,31 @@ def create_server(
             )
             return result
 
+    selected_authority = _selected_checker_authority(checker_authority)
     configured_root = _configured_root(state_dir)
-    kernel = (
+    runtime = (
         None
         if tenant_isolation
-        else JacobianKernel(
+        else create_runtime(
             configured_root,
-            install_references=install_references,
+            checker_authority=selected_authority,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
             capability_exclusions=capability_exclusions,
             capability_policy=capability_policy,
         )
     )
     tenant_router = (
-        TenantKernelRouter(
+        TenantRuntimeRouter(
             configured_root,
-            install_references=install_references,
+            checker_authority=selected_authority,
             allow_anonymous=allow_anonymous,
             anonymous_tenant_id=anonymous_tenant_id,
             capability_adapter_entrypoints=capability_adapter_entrypoints,
             capability_policy=capability_policy,
-            max_tenant_kernels=(
-                DEFAULT_MAX_TENANT_KERNELS
-                if max_tenant_kernels is None
-                else max_tenant_kernels
+            max_tenant_runtimes=(
+                DEFAULT_MAX_TENANT_RUNTIMES
+                if max_tenant_runtimes is None
+                else max_tenant_runtimes
             ),
         )
         if tenant_isolation
@@ -931,10 +961,13 @@ def create_server(
     )
 
     @asynccontextmanager
-    async def lifespan(_server: MCPServer[AppState]) -> AsyncIterator[AppState]:
-        if kernel is not None:
-            _start_lean_warmup(kernel)
-        yield AppState(kernel=kernel, tenant_router=tenant_router)
+    async def lifespan(server: MCPServer[AppState]) -> AsyncIterator[AppState]:
+        async with _runtime_lifespan(
+            server,
+            runtime=runtime,
+            tenant_router=tenant_router,
+        ) as state:
+            yield state
 
     server: MCPServer[AppState] = JacobianMCPServer(
         name="jacobian",
@@ -1018,8 +1051,7 @@ def create_server(
                     "Exact-lookup projection. SUMMARY is the small agent-facing "
                     "default for judging fit. CONTRACT adds the validation-equivalent "
                     "input schema, runtime identity, related operations, and validated "
-                    "invocation examples; request it before invoking. COMPACT is the "
-                    "legacy alias for the previous contract projection. FULL returns "
+                    "invocation examples; request it before invoking. FULL returns "
                     "the complete installed descriptor for audit or client generation. "
                     "Omit for discovery."
                 )
@@ -1027,7 +1059,7 @@ def create_server(
         ] = "SUMMARY",
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
-        active_kernel = _kernel(ctx)
+        active_runtime = _runtime(ctx)
         search_arguments = (query, domain, mode, limit, cursor)
         if capability_id is not None and any(
             argument is not None for argument in search_arguments
@@ -1039,14 +1071,14 @@ def create_server(
             )
         if capability_id is None:
             return _capability_discovery_response(
-                active_kernel,
+                active_runtime,
                 query=query,
                 domain=domain,
                 mode=mode,
                 limit=limit,
                 cursor=cursor,
             )
-        capability_catalog = active_kernel.capabilities.catalog()
+        capability_catalog = active_runtime.core.capabilities.catalog()
         descriptors = {
             item.capability_id: item for item in capability_catalog.capabilities
         }
@@ -1116,15 +1148,15 @@ def create_server(
         if (
             view != "SUMMARY"
             and capability_id == "lean.check"
-            and active_kernel.lean_checkers
+            and active_runtime.portfolio.lean_checkers
         ):
             response["cache"] = {
                 "key": "exact content-addressed certificate and active checker digest",
                 "max_entries": 128,
                 "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
                 "mathlib_warmup": (
-                    active_kernel.lean.mathlib_warmup_health()
-                    if active_kernel.lean is not None
+                    active_runtime.portfolio.lean.mathlib_warmup_health()
+                    if active_runtime.portfolio.lean is not None
                     else {"status": "UNAVAILABLE", "detail": None}
                 ),
             }
@@ -1144,9 +1176,9 @@ def create_server(
         view: CapabilityInvocationView = "STANDARD",
         ctx: Context[AppState, Any] | None = None,
     ) -> Annotated[CallToolResult, CapabilityResult]:
-        active_kernel = _kernel(ctx)
+        active_runtime = _runtime(ctx)
         result = await _invoke_capability_attempt(
-            active_kernel,
+            active_runtime,
             capability_id=capability_id,
             payload=payload,
             mode=mode,
@@ -1174,9 +1206,9 @@ def create_server(
         ] = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> WorkspaceOpenResult:
-        active_kernel = _kernel(ctx)
+        active_runtime = _runtime(ctx)
         return await asyncio.to_thread(
-            active_kernel.workspaces.open,
+            active_runtime.core.workspaces.open,
             WorkspaceOpenRequest(
                 idempotency_key=idempotency_key,
                 name=name,
@@ -1315,9 +1347,9 @@ def create_server(
         ] = None,
         ctx: Context[AppState, Any] | None = None,
     ) -> WorkspaceWriteResult:
-        active_kernel = _kernel(ctx)
+        active_runtime = _runtime(ctx)
         return await asyncio.to_thread(
-            active_kernel.workspaces.write,
+            active_runtime.core.workspaces.write,
             WorkspaceWriteRequest(
                 idempotency_key=idempotency_key,
                 workspace_id=workspace_id,
@@ -1360,9 +1392,9 @@ def create_server(
         limit: Annotated[StrictInt, Field(ge=1, le=50)] = 10,
         ctx: Context[AppState, Any] | None = None,
     ) -> WorkspaceQueryResult:
-        active_kernel = _kernel(ctx)
+        active_runtime = _runtime(ctx)
         return await asyncio.to_thread(
-            active_kernel.workspaces.query,
+            active_runtime.core.workspaces.query,
             WorkspaceQueryRequest(
                 workspace_id=workspace_id,
                 branch_id=branch_id,
@@ -1403,9 +1435,9 @@ def create_server(
     async def artifact_resource(
         digest: str,
     ) -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         artifact = await asyncio.to_thread(
-            active_kernel.store.get,
+            active_runtime.core.store.get,
             f"artifact://sha256/{digest}",
         )
         return json.dumps(
@@ -1427,9 +1459,9 @@ def create_server(
         mime_type="application/json",
     )
     async def capability_catalog_resource() -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         return json.dumps(
-            active_kernel.capabilities.catalog().model_dump(mode="json"),
+            active_runtime.core.capabilities.catalog().model_dump(mode="json"),
             ensure_ascii=False,
             sort_keys=True,
         )
@@ -1441,16 +1473,16 @@ def create_server(
         mime_type="application/json",
     )
     async def reference_catalog_resource() -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         return json.dumps(
             reference_catalog(
-                active_kernel.references,
-                graph=active_kernel.graph,
-                polytope=active_kernel.polytope,
-                polytope_checkers=active_kernel.polytope_checkers,
-                polynomial=active_kernel.polynomial,
-                universal_algebra=active_kernel.universal_algebra,
-                lean=active_kernel.lean_checkers,
+                active_runtime.portfolio.references,
+                graph=active_runtime.portfolio.graph,
+                polytope=active_runtime.services.polytope,
+                polytope_checkers=active_runtime.portfolio.polytope_checkers,
+                polynomial=active_runtime.portfolio.polynomial,
+                universal_algebra=active_runtime.portfolio.universal_algebra,
+                lean=active_runtime.portfolio.lean_checkers,
             ),
             ensure_ascii=False,
             sort_keys=True,
@@ -1465,9 +1497,9 @@ def create_server(
     async def experiment_resource(
         experiment_id: str,
     ) -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         snapshot = await asyncio.to_thread(
-            active_kernel.experiment_router.inspect,
+            active_runtime.services.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         return json.dumps(
@@ -1485,9 +1517,9 @@ def create_server(
     async def experiment_accounting_resource(
         experiment_id: str,
     ) -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         snapshot = await asyncio.to_thread(
-            active_kernel.experiment_router.inspect,
+            active_runtime.services.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         coverage = getattr(snapshot, "coverage", None)
@@ -1517,14 +1549,14 @@ def create_server(
     async def experiment_scope_resource(
         experiment_id: str,
     ) -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         snapshot = await asyncio.to_thread(
-            active_kernel.experiment_router.inspect,
+            active_runtime.services.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         return await asyncio.to_thread(
             _experiment_scope_content,
-            active_kernel,
+            active_runtime,
             snapshot,
         )
 
@@ -1537,9 +1569,9 @@ def create_server(
     async def experiment_archive_resource(
         experiment_id: str,
     ) -> str:
-        active_kernel = _resource_kernel(kernel, tenant_router)
+        active_runtime = _resource_runtime(runtime, tenant_router)
         snapshot = await asyncio.to_thread(
-            active_kernel.experiment_router.inspect,
+            active_runtime.services.experiment_router.inspect,
             f"experiment://{experiment_id}",
         )
         if snapshot.archive_uri is None:
@@ -1552,7 +1584,7 @@ def create_server(
                 sort_keys=True,
             )
         archive = await asyncio.to_thread(
-            active_kernel.store.get,
+            active_runtime.core.store.get,
             snapshot.archive_uri,
         )
         return json.dumps(
@@ -1605,7 +1637,7 @@ def create_server(
     return server
 
 
-def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
+def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
     if ctx is None:
         raise AgentRecoveryError(
             "Jacobian is unavailable for this request. Retry once; if it fails "
@@ -1622,26 +1654,29 @@ def _kernel(ctx: Context[AppState, Any] | None) -> JacobianKernel:
 
         access_token = get_access_token()
         subject = access_token.subject if access_token is not None else None
-        kernel = state.tenant_router.kernel_for(subject)
-        _start_lean_warmup(kernel)
-        return kernel
-    if state.kernel is None:
+        runtime = state.tenant_router.runtime_for(subject)
+        _start_lean_warmup(runtime)
+        return runtime
+    if state.runtime is None:
         raise AgentRecoveryError(
             "Jacobian is unavailable for this request. Retry once; if it fails "
             "again, inspect the local Jacobian log."
         )
-    return state.kernel
+    return state.runtime
 
 
-def _start_lean_warmup(kernel: JacobianKernel) -> None:
-    if kernel.lean is not None and os.environ.get("JACOBIAN_LEAN_WARMUP") == "1":
-        kernel.lean.start_mathlib_warmup()
+def _start_lean_warmup(runtime: JacobianRuntime) -> None:
+    if (
+        runtime.portfolio.lean is not None
+        and os.environ.get("JACOBIAN_LEAN_WARMUP") == "1"
+    ):
+        runtime.portfolio.lean.start_mathlib_warmup()
 
 
-def _resource_kernel(
-    kernel: JacobianKernel | None,
-    tenant_router: TenantKernelRouter | None,
-) -> JacobianKernel:
+def _resource_runtime(
+    runtime: JacobianRuntime | None,
+    tenant_router: TenantRuntimeRouter | None,
+) -> JacobianRuntime:
     """Route resources through the same auth context as tools.
 
     MCP 2.0.0b2 does not inject ``Context`` into static resources, but its HTTP
@@ -1653,13 +1688,13 @@ def _resource_kernel(
 
         access_token = get_access_token()
         subject = access_token.subject if access_token is not None else None
-        return tenant_router.kernel_for(subject)
-    if kernel is None:
+        return tenant_router.runtime_for(subject)
+    if runtime is None:
         raise AgentRecoveryError(
             "Jacobian is unavailable for this resource request. Retry once; if it "
             "fails again, inspect the local Jacobian log."
         )
-    return kernel
+    return runtime
 
 
 def _configured_root(state_dir: str | Path | None) -> Path:
@@ -1671,7 +1706,7 @@ def _configured_root(state_dir: str | Path | None) -> Path:
 def _public_tool_error(tool_name: str, exc: Exception) -> str:
     from jacobian.adapters.mcp.remote import (
         AuthenticationError,
-        TenantKernelLimitError,
+        TenantRuntimeLimitError,
     )
     from jacobian.experiments import ExperimentNotFoundError
     from jacobian.registry import CheckerNotFoundError
@@ -1698,7 +1733,7 @@ def _public_tool_error(tool_name: str, exc: Exception) -> str:
         code = "AUTHENTICATION_REQUIRED"
         message = str(tool_error)
         hint = "Authenticate with a configured bearer token, then retry."
-    elif isinstance(tool_error, TenantKernelLimitError):
+    elif isinstance(tool_error, TenantRuntimeLimitError):
         code = "TENANT_KERNEL_LIMIT"
         message = str(tool_error)
         hint = (
@@ -1760,7 +1795,7 @@ def _public_tool_error(tool_name: str, exc: Exception) -> str:
     )
 
 
-def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
+def _experiment_scope_content(runtime: JacobianRuntime, snapshot: Any) -> str:
     scope_uri = getattr(snapshot, "scope_uri", None)
     if scope_uri is None:
         return json.dumps(
@@ -1770,7 +1805,7 @@ def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
             },
             sort_keys=True,
         )
-    scope = kernel.store.get(scope_uri)
+    scope = runtime.core.store.get(scope_uri)
     return json.dumps(
         {
             "experiment_uri": snapshot.experiment_uri,
@@ -1781,200 +1816,3 @@ def _experiment_scope_content(kernel: JacobianKernel, snapshot: Any) -> str:
         ensure_ascii=False,
         sort_keys=True,
     )
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="jacobian-mcp",
-        description="Run the Jacobian MCP server locally or over remote HTTP.",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-    parser.add_argument(
-        "--transport",
-        choices=("stdio", "streamable-http", "sse"),
-        default="stdio",
-    )
-    parser.add_argument(
-        "--state-dir",
-        type=Path,
-        help="state root; defaults to JACOBIAN_STATE_DIR or .jacobian",
-    )
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--path", default="/mcp")
-    parser.add_argument(
-        "--stateless-http",
-        action="store_true",
-        help="use stateless Streamable HTTP sessions",
-    )
-    parser.add_argument(
-        "--auth-tokens-file",
-        type=Path,
-        help="JSON secret mapping opaque bearer tokens to tenant IDs",
-    )
-    parser.add_argument(
-        "--public-base-url",
-        help="public issuer/resource base URL advertised to remote clients",
-    )
-    parser.add_argument(
-        "--allow-anonymous",
-        action="store_true",
-        help="development only: permit unauthenticated remote requests",
-    )
-    parser.add_argument(
-        "--anonymous-tenant-id",
-        default="anonymous",
-        help=(
-            "fixed operator-chosen tenant namespace for anonymous mode; use a "
-            "different value for each isolated test endpoint"
-        ),
-    )
-    parser.add_argument(
-        "--capability-adapter",
-        action="append",
-        default=[],
-        help="operator-approved package.module:factory entrypoint; repeatable",
-    )
-    parser.add_argument(
-        "--capability-policy-profile",
-        choices=("DEFAULT", "COMPUTE_VERIFY_NO_RETRIEVAL"),
-        default="DEFAULT",
-        help=(
-            "operator capability policy profile; the no-retrieval profile is "
-            "intended for compute/verify evaluation isolation"
-        ),
-    )
-    for option, destination, help_text in (
-        (
-            "--allow-capability",
-            "allowed_capability_ids",
-            "allow only this capability ID; repeatable",
-        ),
-        (
-            "--deny-capability",
-            "denied_capability_ids",
-            "deny this capability ID; repeatable",
-        ),
-        ("--allow-domain", "allowed_domains", "allow only this domain; repeatable"),
-        ("--deny-domain", "denied_domains", "deny this domain; repeatable"),
-        ("--allow-tag", "allowed_tags", "allow only capabilities with this tag"),
-        ("--deny-tag", "denied_tags", "deny capabilities with this tag"),
-    ):
-        parser.add_argument(
-            option,
-            dest=destination,
-            action="append",
-            default=[],
-            help=help_text,
-        )
-    parser.add_argument(
-        "--allow-mode",
-        action="append",
-        default=[],
-        choices=tuple(mode.value for mode in CapabilityMode),
-        help="allow only this capability mode; repeatable",
-    )
-    parser.add_argument(
-        "--deny-mode",
-        action="append",
-        default=[],
-        choices=tuple(mode.value for mode in CapabilityMode),
-        help="deny this capability mode; repeatable",
-    )
-    parser.add_argument(
-        "--max-tenant-kernels",
-        type=int,
-        default=32,
-        help="maximum in-memory tenant kernels for remote transports",
-    )
-    args = parser.parse_args()
-    if args.max_tenant_kernels < 1:
-        parser.error("--max-tenant-kernels must be positive")
-    if args.anonymous_tenant_id != "anonymous" and not args.allow_anonymous:
-        parser.error("--anonymous-tenant-id requires --allow-anonymous")
-    args.path = args.path if args.path.startswith("/") else f"/{args.path}"
-    capability_policy = CapabilityPolicy(
-        profile=args.capability_policy_profile,
-        allowed_capability_ids=frozenset(args.allowed_capability_ids),
-        denied_capability_ids=frozenset(args.denied_capability_ids),
-        allowed_domains=frozenset(args.allowed_domains),
-        denied_domains=frozenset(args.denied_domains),
-        allowed_tags=frozenset(args.allowed_tags),
-        denied_tags=frozenset(args.denied_tags),
-        allowed_modes=frozenset(CapabilityMode(value) for value in args.allow_mode),
-        denied_modes=frozenset(CapabilityMode(value) for value in args.deny_mode),
-    )
-    if args.transport == "stdio":
-        if (
-            args.auth_tokens_file is not None
-            or args.allow_anonymous
-            or args.anonymous_tenant_id != "anonymous"
-        ):
-            parser.error("remote authentication options cannot be used with stdio")
-        create_server(
-            state_dir=args.state_dir,
-            capability_adapter_entrypoints=tuple(args.capability_adapter),
-            capability_policy=capability_policy,
-        ).run("stdio")
-        return
-
-    if args.auth_tokens_file is None and not args.allow_anonymous:
-        parser.error(
-            "remote transports require --auth-tokens-file or explicit --allow-anonymous"
-        )
-    token_verifier = None
-    auth = None
-    if args.auth_tokens_file is not None:
-        from mcp.server.auth.settings import AuthSettings
-
-        from jacobian.adapters.mcp.remote import (
-            StaticTokenVerifier,
-            load_static_token_file,
-        )
-
-        public_base_url = str(
-            args.public_base_url or f"http://{args.host}:{args.port}"
-        ).rstrip("/")
-        token_verifier = StaticTokenVerifier(
-            load_static_token_file(args.auth_tokens_file)
-        )
-        auth = AuthSettings(
-            issuer_url=AnyHttpUrl(public_base_url),
-            resource_server_url=AnyHttpUrl(f"{public_base_url}{args.path}"),
-            required_scopes=["jacobian:use"],
-        )
-    server = create_server(
-        state_dir=args.state_dir,
-        tenant_isolation=True,
-        allow_anonymous=args.allow_anonymous,
-        anonymous_tenant_id=args.anonymous_tenant_id,
-        token_verifier=token_verifier,
-        auth=auth,
-        capability_adapter_entrypoints=tuple(args.capability_adapter),
-        capability_policy=capability_policy,
-        max_tenant_kernels=args.max_tenant_kernels,
-    )
-    if args.transport == "streamable-http":
-        server.run(
-            "streamable-http",
-            host=args.host,
-            port=args.port,
-            streamable_http_path=args.path,
-            stateless_http=args.stateless_http,
-        )
-    else:
-        server.run(
-            "sse",
-            host=args.host,
-            port=args.port,
-            sse_path=args.path,
-            message_path="/messages/",
-        )
-
-
-if __name__ == "__main__":
-    main()

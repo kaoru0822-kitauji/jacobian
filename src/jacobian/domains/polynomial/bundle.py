@@ -1,7 +1,5 @@
 """Installation bundle for exact rational polynomial operations."""
 
-import sympy
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.polynomial.elementary import (
     INTEGER_POLYNOMIAL_CAPABILITIES,
@@ -15,7 +13,7 @@ from jacobian.domains.polynomial.jacobian_syzygy import (
     GRADED_JACOBIAN_SYZYGY_CAPABILITY,
 )
 from jacobian.operations import DomainBundle, DomainDiagnostics, DomainSemantics
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
 POLYNOMIAL_BUNDLE = DomainBundle(
     domain_id="polynomial",
@@ -50,7 +48,7 @@ POLYNOMIAL_BUNDLE = DomainBundle(
         "jacobian.sympy",
         features=("exact-rational-polynomial-operations",),
     ),
-    backend_version=sympy.__version__,
+    backend_version=SYMPY_VERSION,
     capabilities=(
         *POLYNOMIAL_INVARIANT_CAPABILITIES,
         POLYNOMIAL_GROEBNER_CAPABILITY,

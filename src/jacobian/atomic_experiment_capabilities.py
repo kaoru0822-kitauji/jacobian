@@ -26,11 +26,11 @@ from jacobian.schema_registry import model_schema
 
 if TYPE_CHECKING:
     from jacobian.atomic_capabilities import AtomicServiceAdapter
-    from jacobian.kernel import JacobianKernel
+    from jacobian.runtime.services import ApplicationServices
 
 
 def build_experiment_adapters(
-    kernel: JacobianKernel,
+    application: ApplicationServices,
     *,
     adapter: AdapterFactory,
     schema: SchemaBuilder,
@@ -62,7 +62,7 @@ def build_experiment_adapters(
                 required=("structure_uri", "plugin_id", "wall_seconds"),
             ),
             output_schema=model_schema(StructureCanonicalizationResult),
-            invoke=lambda p: kernel.structures.canonicalize(**p),
+            invoke=lambda p: application.structures.canonicalize(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis="plugin canonicalization is not independently verified",
             tags=("structure", "canonicalization"),
@@ -88,7 +88,7 @@ def build_experiment_adapters(
                 required=("claim_uri", "plugin_id", "bounds", "budget"),
             ),
             output_schema=model_schema(ExperimentHandle),
-            invoke=lambda p: kernel.experiments.start_enumeration(p),
+            invoke=lambda p: application.experiments.start_enumeration(p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis=(
                 "enumeration lifecycle state cannot certify a mathematical conclusion"
@@ -110,7 +110,7 @@ def build_experiment_adapters(
             output_schema=TypeAdapter(
                 ExperimentSnapshot | SearchExperimentSnapshot
             ).json_schema(),
-            invoke=lambda p: kernel.experiment_router.inspect(p["experiment_uri"]),
+            invoke=lambda p: application.experiment_router.inspect(p["experiment_uri"]),
             read_only=True,
             tags=("experiment",),
         ),
@@ -135,7 +135,7 @@ def build_experiment_adapters(
             output_schema=TypeAdapter(
                 ExperimentSnapshot | SearchExperimentSnapshot
             ).json_schema(),
-            invoke=lambda p: kernel.experiment_router.wait(
+            invoke=lambda p: application.experiment_router.wait(
                 p["experiment_uri"],
                 timeout_seconds=p.get("timeout_seconds", 30),
             ),
@@ -156,7 +156,7 @@ def build_experiment_adapters(
             output_schema=TypeAdapter(
                 ExperimentCancelResult | ExperimentControlResult
             ).json_schema(),
-            invoke=lambda p: kernel.experiment_router.cancel(p["experiment_uri"]),
+            invoke=lambda p: application.experiment_router.cancel(p["experiment_uri"]),
             tags=("experiment", "control"),
         ),
     )

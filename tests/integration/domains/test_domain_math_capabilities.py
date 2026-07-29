@@ -5,7 +5,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 
-def test_representative_exact_domain_results(kernel) -> None:
+def test_representative_exact_domain_results(runtime) -> None:
     cases = (
         (
             "integer.compute.extended_gcd",
@@ -53,15 +53,15 @@ def test_representative_exact_domain_results(kernel) -> None:
     )
 
     for capability_id, payload, expected in cases:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
         assert result.output["result"] == expected
 
 
-def test_domain_error_fails_before_artifact_writes(kernel) -> None:
-    result = kernel.capabilities.invoke(
+def test_domain_error_fails_before_artifact_writes(runtime) -> None:
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="modular.compute.inverse",
             input={"value": "6", "modulus": 9},
@@ -75,7 +75,7 @@ def test_domain_error_fails_before_artifact_writes(kernel) -> None:
     assert result.episode_uri is None
 
 
-def test_number_theory_boundary_results(kernel) -> None:
+def test_number_theory_boundary_results(runtime) -> None:
     empty_cases = (
         ("integer.compute.proper_divisors", {"value": "1"}, {"divisors": []}),
         ("integer.compute.proper_divisors", {"value": "-1"}, {"divisors": []}),
@@ -83,7 +83,7 @@ def test_number_theory_boundary_results(kernel) -> None:
         ("integer.compute.prime_factorization", {"value": "-1"}, {"factors": []}),
     )
     for capability_id, payload, expected in empty_cases:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.COMPLETED
@@ -94,14 +94,14 @@ def test_number_theory_boundary_results(kernel) -> None:
         ("integer.compute.prime_factorization", {"value": "0"}),
         ("integer.compute.previous_prime", {"n": 2}),
     ):
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(capability_id=capability_id, input=payload)
         )
         assert result.execution.status is ExecutionStatus.ERROR
         assert result.artifact_uris == ()
 
 
-def test_geometric_sequence_handles_zero_terms_exactly(kernel) -> None:
+def test_geometric_sequence_handles_zero_terms_exactly(runtime) -> None:
     cases = (
         (["0", "0", "1"], False),
         (["1", "0", "0"], True),
@@ -112,7 +112,7 @@ def test_geometric_sequence_handles_zero_terms_exactly(kernel) -> None:
     )
 
     for values, expected in cases:
-        result = kernel.capabilities.invoke(
+        result = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="sequence.decide.geometric",
                 input={"values": values},

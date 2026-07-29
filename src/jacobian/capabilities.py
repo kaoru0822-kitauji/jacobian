@@ -42,7 +42,7 @@ from jacobian.schema_validation import check_draft202012_schema
 from jacobian.store import ArtifactStore, StoreError
 
 if TYPE_CHECKING:
-    from jacobian.kernel import JacobianKernel
+    from jacobian.runtime.model import JacobianRuntime
 
 _ENTRYPOINT_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
 _DISCOVERY_TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
@@ -760,9 +760,9 @@ class CapabilityService:
 
 def load_capability_adapter(
     entrypoint: str,
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> CapabilityAdapter:
-    """Load one operator-approved ``factory(kernel)`` adapter entrypoint."""
+    """Load one operator-approved ``factory(runtime)`` adapter entrypoint."""
 
     if not _ENTRYPOINT_PATTERN.fullmatch(entrypoint):
         raise CapabilityError("capability adapter entrypoint has an invalid format")
@@ -770,7 +770,7 @@ def load_capability_adapter(
     try:
         module = importlib.import_module(module_name)
         factory = getattr(module, attribute_name)
-        adapter = factory(kernel)
+        adapter = factory(runtime)
         descriptor = adapter.descriptor
         invoke = adapter.invoke
     except (AttributeError, ImportError, TypeError) as exc:

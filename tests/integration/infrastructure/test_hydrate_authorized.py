@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 
-def _verify_ids(kernel: JacobianKernel) -> set[str]:
+def _verify_ids(runtime: JacobianRuntime) -> set[str]:
     return {
         entry.capability_id
-        for entry in kernel.capabilities.catalog().capabilities
+        for entry in runtime.core.capabilities.catalog().capabilities
         if ".verify" in entry.capability_id
     }
 
@@ -29,42 +30,43 @@ def _audit_count(root: Path) -> int:
     return int(row[0])
 
 
-def test_hydrate_authorized_matches_install_references_without_audit(
+def test_hydrate_authorized_matches_bundled_authority_without_audit(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
     seed = tmp_path_factory.mktemp("hydrate-seed")
-    authorized = JacobianKernel(seed, install_references=True)
+    authorized = create_runtime(
+        seed, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     expected = _verify_ids(authorized)
     baseline_audit = _audit_count(seed)
-    del authorized
+    authorized.close()
 
     attached = tmp_path_factory.mktemp("hydrate-attach")
     shutil.copytree(seed, attached, dirs_exist_ok=True)
-    hydrated = JacobianKernel(attached, hydrate_authorized=True)
+    hydrated = create_runtime(
+        attached, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
 
     assert _verify_ids(hydrated) == expected
     assert _audit_count(attached) == baseline_audit
 
 
 def test_hydrate_authorized_on_empty_store_is_fail_closed(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
 
     assert _audit_count(tmp_path) == 0
     # Atomic / resource verify surfaces may still appear; domain checkers must not.
-    assert "polynomial.result.verify" not in _verify_ids(kernel)
-    assert "sat.model.verify" not in _verify_ids(kernel)
-    assert "matrix.determinant.verify" not in _verify_ids(kernel)
+    assert "polynomial.result.verify" not in _verify_ids(runtime)
+    assert "sat.model.verify" not in _verify_ids(runtime)
+    assert "matrix.determinant.verify" not in _verify_ids(runtime)
 
 
-def test_install_references_and_hydrate_are_mutually_exclusive(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        JacobianKernel(tmp_path, install_references=True, hydrate_authorized=True)
-
-
-def test_kernel_with_references_fixture_hydrates(
-    kernel_with_references: JacobianKernel,
+def test_runtime_with_references_fixture_hydrates(
+    runtime_with_references: JacobianRuntime,
 ) -> None:
-    ids = _verify_ids(kernel_with_references)
+    ids = _verify_ids(runtime_with_references)
     assert "sat.model.verify" in ids
     assert "polynomial.result.verify" in ids
     assert "matrix.result.verify" in ids

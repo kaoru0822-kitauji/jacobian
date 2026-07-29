@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from jacobian.cli import _public_error, app
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.store import StoreLimitError
 
 
@@ -86,7 +86,8 @@ def test_cli_measures_exact_provider_without_implicit_cold_install(
         [
             "--state-dir",
             str(tmp_path),
-            "--no-install-references",
+            "--checker-authority",
+            "NONE",
             "provider-measure",
             "graph.compute.properties",
         ],
@@ -217,13 +218,15 @@ def test_cli_storage_limit_has_a_capacity_recovery_action() -> None:
     assert "fixture" not in str(error)
 
 
-@pytest.mark.usefixtures("initialized_kernel_store_with_references")
+@pytest.mark.usefixtures("initialized_runtime_store_with_references")
 def test_cli_enumeration_completes_before_the_local_process_exits(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=True)
-    reference = kernel.references["matrices"]
-    claim = kernel.artifacts.put(
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    reference = runtime.portfolio.references["matrices"]
+    claim = runtime.core.artifacts.put(
         schema_uri=reference.claim_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={

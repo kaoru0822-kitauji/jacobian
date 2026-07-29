@@ -4,15 +4,15 @@ from jacobian.contracts.workspaces import (
     WorkspaceOpenRequest,
     WorkspaceOpenResult,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def _open(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     *,
     key: str = "workspace-open-001",
 ) -> WorkspaceOpenResult:
-    return kernel.workspaces.open(
+    return runtime.core.workspaces.open(
         WorkspaceOpenRequest(
             idempotency_key=key,
             name="bounded conjecture",

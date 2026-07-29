@@ -58,7 +58,7 @@ from jacobian.eval_graph_oracle import (
     normalize_graph,
 )
 from jacobian.eval_telemetry import parse_agent_transcript
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.sat import install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore, StoreError
@@ -551,12 +551,16 @@ def _score_linear_report(
     assert isinstance(solution_uri, str)
     assert isinstance(record_uri, str)
 
-    kernel = JacobianKernel(state_dir, install_references=True)
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     try:
-        resolved = kernel.linear.resolve_solution(solution_uri)
-        record_artifact = kernel.store.get(record_uri)
+        resolved = runtime.core.linear.resolve_solution(solution_uri)
+        record_artifact = runtime.core.store.get(record_uri)
         record = VerificationRecord.model_validate(record_artifact.payload)
-        semantics = kernel.store.get(kernel.linear.installation.semantics_uri)
+        semantics = runtime.core.store.get(
+            runtime.core.linear.installation.semantics_uri
+        )
     except (StoreError, ValueError) as exc:
         raise BenchmarkError("linear treatment artifacts are unavailable") from exc
     if (
@@ -608,7 +612,7 @@ def _score_linear_report(
             "linear treatment lacks an exact ordered find-to-verify trace"
         )
 
-    replay = kernel.capabilities.invoke(
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="linear.rational_solution.verify",
             mode=CapabilityMode.VERIFY,
@@ -819,15 +823,17 @@ def _score_hnf_report(
     assert isinstance(normal_form_uri, str)
     assert isinstance(record_uri, str)
 
-    kernel = JacobianKernel(state_dir, install_references=True)
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     try:
-        resolved = kernel.matrix_normal_forms.resolve_hermite_normal_form(
+        resolved = runtime.core.matrix_normal_forms.resolve_hermite_normal_form(
             normal_form_uri
         )
-        record_artifact = kernel.store.get(record_uri)
+        record_artifact = runtime.core.store.get(record_uri)
         record = VerificationRecord.model_validate(record_artifact.payload)
-        semantics = kernel.store.get(
-            kernel.matrix_normal_forms.installation.semantics_uri
+        semantics = runtime.core.store.get(
+            runtime.core.matrix_normal_forms.installation.semantics_uri
         )
     except (StoreError, ValueError) as exc:
         raise BenchmarkError("HNF treatment artifacts are unavailable") from exc
@@ -879,7 +885,7 @@ def _score_hnf_report(
     if not verified_trace:
         raise BenchmarkError("HNF treatment lacks an ordered compute-to-verify trace")
 
-    replay = kernel.capabilities.invoke(
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="matrix.normal_form.hermite.verify",
             mode=CapabilityMode.VERIFY,
@@ -1041,15 +1047,17 @@ def _score_polynomial_normalization_report(
     assert isinstance(normalization_uri, str)
     assert isinstance(record_uri, str)
 
-    kernel = JacobianKernel(state_dir, install_references=True)
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     try:
-        resolved = kernel.polynomial_expressions.resolve_normalization(
+        resolved = runtime.core.polynomial_expressions.resolve_normalization(
             normalization_uri
         )
-        record_artifact = kernel.store.get(record_uri)
+        record_artifact = runtime.core.store.get(record_uri)
         record = VerificationRecord.model_validate(record_artifact.payload)
-        semantics = kernel.store.get(
-            kernel.polynomial_expressions.installation.semantics_uri
+        semantics = runtime.core.store.get(
+            runtime.core.polynomial_expressions.installation.semantics_uri
         )
     except (StoreError, ValueError) as exc:
         raise BenchmarkError(
@@ -1111,7 +1119,7 @@ def _score_polynomial_normalization_report(
             "trace"
         )
 
-    replay = kernel.capabilities.invoke(
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.expression_normalization.verify",
             mode=CapabilityMode.VERIFY,
@@ -1321,8 +1329,10 @@ def _score_sat_report(
     if not verified_trace:
         raise BenchmarkError("SAT treatment lacks an exact find-to-verify trace")
 
-    kernel = JacobianKernel(state_dir, install_references=True)
-    replay = kernel.capabilities.invoke(
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=verify_id,
             mode=CapabilityMode.VERIFY,
@@ -1500,8 +1510,10 @@ def _score_smt_report(
         ):
             raise BenchmarkError("SMT verification record is not exactly bound")
 
-    kernel = JacobianKernel(state_dir, install_references=True)
-    replay = kernel.capabilities.invoke(
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="smt.unsat_proof.verify",
             mode=CapabilityMode.VERIFY,
@@ -1523,7 +1535,7 @@ def _score_smt_report(
             "hidden UNSAT expectation",
             "durable exact SMT-LIB and Alethe binding",
             "ordered find-to-verify trace",
-            "clean-kernel checker replay",
+            "clean-runtime checker replay",
         ],
     }
 
@@ -1854,7 +1866,7 @@ def _score_lean_record(
     payload = certificate.get("payload") if isinstance(certificate, dict) else None
     if (
         not isinstance(certificate, dict)
-        or certificate.get("certificate_type") != "lean4.kernel"
+        or certificate.get("certificate_type") != "lean4.runtime"
         or not isinstance(payload, dict)
         or payload.get("environment") != environment
         or payload.get("statement") != statement
@@ -2048,8 +2060,10 @@ def _replay_lean_certificate(
     record: VerificationRecord,
     state_dir: Path,
 ) -> None:
-    kernel = JacobianKernel(state_dir, install_references=True)
-    replay = kernel.capabilities.invoke(
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="certificate.verify",
             mode=CapabilityMode.VERIFY,

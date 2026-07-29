@@ -2,8 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import replace
-
-from sympy.polys.polyerrors import PolynomialError
+from typing import cast
 
 from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
@@ -12,6 +11,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.domains.polynomial.operations import PolynomialOutputBudgetError
 from jacobian.operations import (
+    ComputedNotApplicable,
     ComputedOperation,
     ComputedOperationFactory,
     ComputedOutcome,
@@ -24,9 +24,17 @@ _polynomial_operation_factory = ComputedOperationFactory(
         code="POLYNOMIAL_OPERATION_NOT_APPLICABLE",
         stage="polynomial_computation",
         hint="Check the declared ring, variable, and operation budgets.",
-        exceptions=(PolynomialError, TypeError, ValueError),
+        exceptions=(TypeError, ValueError),
     )
 )
+
+
+def _polynomial_error() -> type[Exception]:
+    """Load SymPy's polynomial error class only while handling an invocation."""
+
+    from sympy.polys.polyerrors import PolynomialError
+
+    return cast(type[Exception], PolynomialError)
 
 
 def polynomial_operation[
@@ -74,5 +82,11 @@ def polynomial_operation[
                     ),
                 ),
             )
+        except Exception as error:
+            if isinstance(error, _polynomial_error()):
+                return ComputedNotApplicable(
+                    _polynomial_operation_factory.failure.diagnostic(error)
+                )
+            raise
 
     return replace(declared, implementation=execute)

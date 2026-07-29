@@ -10,9 +10,9 @@ from tests.helpers.capabilities import invoke_capability as _invoke
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.evidence import WitnessRole
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store_with_references")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
 
 _MATHLIB_OLEAN = (
     Path(__file__).resolve().parents[3]
@@ -42,8 +42,10 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
     tmp_path: Path,
 ) -> None:
     case = benchmark.load_cases(["GRAPH-ATLAS-PATH-001"])[0]
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
-    searched = kernel.capabilities.invoke(
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
+    searched = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.search.atlas",
             input={
@@ -54,7 +56,7 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
         )
     )
     graph_uri = searched.output["candidates"][0]["graph_uri"]
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.compute.properties",
             input={
@@ -251,10 +253,12 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["PATH-CLOSURE-001"]) if case["case_id"])
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
-    reference = kernel.references["graph_paths"]
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
+    reference = runtime.portfolio.references["graph_paths"]
     claim = _invoke(
-        kernel,
+        runtime,
         "artifact.put",
         {
             "schema_uri": reference.claim_schema_uri,
@@ -277,7 +281,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     )
     claim_uri = claim.output["artifact_uri"]
     candidate = _invoke(
-        kernel,
+        runtime,
         "artifact.put",
         {
             "schema_uri": reference.candidate_schema_uri,
@@ -304,13 +308,13 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     )
     candidate_uri = candidate.output["artifact_uri"]
     validation = _invoke(
-        kernel,
+        runtime,
         "claim.validate",
         {"claim_uri": claim_uri, "plugin_id": reference.plugin_id},
     )
     assert validation.output["valid"] is True
     _invoke(
-        kernel,
+        runtime,
         "evaluate.batch",
         {
             "claim_uri": claim_uri,
@@ -322,7 +326,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
         },
     )
     found = _invoke(
-        kernel,
+        runtime,
         "witness.find",
         {
             "claim_uri": claim_uri,
@@ -335,7 +339,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     witness_uri = found.output["witness_uri"]
     assert witness_uri is not None
     verified = _invoke(
-        kernel,
+        runtime,
         "witness.verify",
         {
             "claim_uri": claim_uri,
@@ -387,10 +391,12 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["GRAPH-BIP-TRUE-001"]) if case["case_id"])
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
-    reference = kernel.references["graph_paths"]
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
+    reference = runtime.portfolio.references["graph_paths"]
     claim = _invoke(
-        kernel,
+        runtime,
         "artifact.put",
         {
             "schema_uri": reference.claim_schema_uri,
@@ -410,7 +416,7 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     )
     claim_uri = claim.output["artifact_uri"]
     candidate = _invoke(
-        kernel,
+        runtime,
         "artifact.put",
         {
             "schema_uri": reference.candidate_schema_uri,
@@ -424,13 +430,13 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     )
     candidate_uri = candidate.output["artifact_uri"]
     validation = _invoke(
-        kernel,
+        runtime,
         "claim.validate",
         {"claim_uri": claim_uri, "plugin_id": reference.plugin_id},
     )
     assert validation.output["valid"] is True
     _invoke(
-        kernel,
+        runtime,
         "evaluate.batch",
         {
             "claim_uri": claim_uri,
@@ -442,7 +448,7 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
         },
     )
     found = _invoke(
-        kernel,
+        runtime,
         "witness.find",
         {
             "claim_uri": claim_uri,
@@ -455,7 +461,7 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     witness_uri = found.output["witness_uri"]
     assert witness_uri is not None
     verified = _invoke(
-        kernel,
+        runtime,
         "witness.verify",
         {
             "claim_uri": claim_uri,
@@ -498,16 +504,18 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
 )
 def test_known_answer_scorer_accepts_bound_lean_certificate(
     tmp_path: Path,
-    initialized_kernel_store_with_references: None,
+    initialized_runtime_store_with_references: None,
 ) -> None:
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(
         case for case in load_cases(["LEAN-NAT-INDUCTION-001"]) if case["case_id"]
     )
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
-    assert kernel.lean is not None
-    verified = kernel.lean.verify(
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
+    assert runtime.portfolio.lean is not None
+    verified = runtime.portfolio.lean.verify(
         statement="∀ n : Nat, n + 0 = n",
         proof=(
             "intro n\n"
@@ -527,7 +535,7 @@ def test_known_answer_scorer_accepts_bound_lean_certificate(
         "candidate_uri": verified.candidate_uri,
         "evidence_uri": verified.certificate_uri,
         "verification_record_uri": verified.result.verification_record_uri,
-        "witness_summary": "Lean kernel certificate",
+        "witness_summary": "Lean runtime certificate",
         "limitations": ["pinned core Lean only"],
         "feedback": _feedback(),
     }
@@ -549,10 +557,12 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     load_cases = benchmark.load_cases
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["ERDOS-STRAUS-001"]) if case["case_id"])
-    kernel = JacobianKernel(tmp_path, hydrate_authorized=True)
-    reference = kernel.references["erdos_straus"]
+    runtime = create_runtime(
+        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+    )
+    reference = runtime.portfolio.references["erdos_straus"]
     claim = _invoke(
-        kernel,
+        runtime,
         "artifact.put",
         {
             "schema_uri": reference.claim_schema_uri,
@@ -576,7 +586,7 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     )
     claim_uri = claim.output["artifact_uri"]
     candidate = _invoke(
-        kernel,
+        runtime,
         "artifact.put",
         {
             "schema_uri": reference.candidate_schema_uri,
@@ -588,13 +598,13 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     )
     candidate_uri = candidate.output["artifact_uri"]
     validation = _invoke(
-        kernel,
+        runtime,
         "claim.validate",
         {"claim_uri": claim_uri, "plugin_id": reference.plugin_id},
     )
     assert validation.output["valid"] is True
     evaluation = _invoke(
-        kernel,
+        runtime,
         "evaluate.batch",
         {
             "claim_uri": claim_uri,
@@ -606,7 +616,7 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
         },
     )
     found = _invoke(
-        kernel,
+        runtime,
         "witness.find",
         {
             "claim_uri": claim_uri,
@@ -619,7 +629,7 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     witness_uri = found.output["witness_uri"]
     assert witness_uri is not None
     verified = _invoke(
-        kernel,
+        runtime,
         "witness.verify",
         {
             "claim_uri": claim_uri,

@@ -17,7 +17,7 @@ from pathlib import Path
 import pyperf
 
 from jacobian.contracts.polytope import PolytopeSeparateRequest
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 
 def _q(numerator: int, denominator: int = 1) -> dict[str, str]:
@@ -29,9 +29,11 @@ def main() -> None:
     runner.metadata["suite"] = "jacobian-v0.2"
 
     with tempfile.TemporaryDirectory(prefix="jacobian-v02-benchmark-") as directory:
-        kernel = JacobianKernel(Path(directory), install_references=True)
-        graph = kernel.references["graph_paths"]
-        candidate = kernel.artifacts.put(
+        runtime = create_runtime(
+            Path(directory), checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+        )
+        graph = runtime.portfolio.references["graph_paths"]
+        candidate = runtime.core.artifacts.put(
             schema_uri=graph.candidate_schema_uri,
             semantics_uri=graph.semantics_uri,
             payload={
@@ -48,24 +50,24 @@ def main() -> None:
         runner.bench_func(
             "canonicalize-five-vertex-digraph",
             partial(
-                kernel.structures.canonicalize,
+                runtime.services.structures.canonicalize,
                 structure_uri=candidate.artifact_uri,
                 plugin_id=graph.plugin_id,
                 wall_seconds=30,
             ),
         )
 
-        point = kernel.artifacts.put(
-            schema_uri=kernel.polytope.point_schema_uri,
-            semantics_uri=kernel.polytope.semantics_uri,
+        point = runtime.core.artifacts.put(
+            schema_uri=runtime.services.polytope.point_schema_uri,
+            semantics_uri=runtime.services.polytope.semantics_uri,
             payload={
                 "point_schema_version": "1",
                 "coordinates": [_q(1, 2), _q(1, 2), _q(1, 2)],
             },
         )
-        generators = kernel.artifacts.put(
-            schema_uri=kernel.polytope.generator_set_schema_uri,
-            semantics_uri=kernel.polytope.semantics_uri,
+        generators = runtime.core.artifacts.put(
+            schema_uri=runtime.services.polytope.generator_set_schema_uri,
+            semantics_uri=runtime.services.polytope.semantics_uri,
             payload={
                 "generator_set_schema_version": "1",
                 "dimension": 3,
@@ -79,7 +81,7 @@ def main() -> None:
         )
         runner.bench_func(
             "separate-triangle-stable-set-point",
-            kernel.polytope.separate,
+            runtime.services.polytope.separate,
             PolytopeSeparateRequest(
                 point_uri=point.artifact_uri,
                 generator_set_uri=generators.artifact_uri,

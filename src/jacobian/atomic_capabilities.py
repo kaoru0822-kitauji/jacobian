@@ -1,4 +1,4 @@
-"""Atomic capability adapters over the kernel's existing mathematical services.
+"""Atomic capability adapters over explicitly installed application services.
 
 The adapters intentionally expose individual materialization, evaluation,
 search, and replay operations.  They do not compose those operations into a
@@ -44,7 +44,8 @@ from jacobian.schema_registry import model_schema
 from jacobian.store import ArtifactStore, StoreError
 
 if TYPE_CHECKING:
-    from jacobian.kernel import JacobianKernel
+    from jacobian.installation.context import InstallationContext
+    from jacobian.runtime.services import ApplicationServices
 
 
 _ARTIFACT_URI_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
@@ -85,7 +86,7 @@ class AtomicServiceAdapter:
         unverified_basis: str = "deterministic local service result",
         read_only: bool = False,
         tags: tuple[str, ...] = (),
-        provider: str = "jacobian.kernel",
+        provider: str = "jacobian.runtime",
     ) -> None:
         self._descriptor = CapabilityDescriptor(
             capability_id=capability_id,
@@ -167,12 +168,13 @@ class AtomicServiceAdapter:
 
 
 def install_atomic_capabilities(
-    kernel: JacobianKernel,
+    context: InstallationContext,
+    application: ApplicationServices,
 ) -> tuple[AtomicServiceAdapter, ...]:
     """Build the bundled atomic adapters without adding MCP-specific behavior."""
 
     def _adapter(**kwargs: Any) -> AtomicServiceAdapter:
-        return AtomicServiceAdapter(store=kernel.store, **kwargs)
+        return AtomicServiceAdapter(store=context.store, **kwargs)
 
     adapters = (
         _adapter(
@@ -195,7 +197,7 @@ def install_atomic_capabilities(
                 required=("schema_uri", "semantics_uri", "payload"),
             ),
             output_schema=model_schema(ArtifactPutResult),
-            invoke=lambda p: kernel.artifacts.put(
+            invoke=lambda p: context.artifacts.put(
                 schema_uri=p["schema_uri"],
                 semantics_uri=p["semantics_uri"],
                 payload=p["payload"],
@@ -214,7 +216,7 @@ def install_atomic_capabilities(
                 required=("claim_uri", "plugin_id"),
             ),
             output_schema=model_schema(ClaimValidationResult),
-            invoke=lambda p: kernel.claims.validate(**p),
+            invoke=lambda p: application.claims.validate(**p),
             read_only=True,
             tags=("claim", "validation"),
         ),
@@ -251,7 +253,7 @@ def install_atomic_capabilities(
                 ),
             ),
             output_schema=model_schema(EvaluationBatchResult),
-            invoke=lambda p: kernel.evaluation.evaluate_batch(
+            invoke=lambda p: application.evaluation.evaluate_batch(
                 **{
                     **p,
                     "candidate_uris": tuple(p["candidate_uris"]),
@@ -295,7 +297,7 @@ def install_atomic_capabilities(
                 ),
             ),
             output_schema=model_schema(WitnessFindResult),
-            invoke=lambda p: kernel.witnesses.find(
+            invoke=lambda p: application.witnesses.find(
                 **{**p, "witness_role": WitnessRole(p["witness_role"])}
             ),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
@@ -317,7 +319,7 @@ def install_atomic_capabilities(
                 required=("claim_uri", "candidate_uri", "witness_uri", "checker_id"),
             ),
             output_schema=model_schema(ResultEnvelope),
-            invoke=lambda p: kernel.verification.verify_witness(**p),
+            invoke=lambda p: application.verification.verify_witness(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis="the checker did not accept the supplied witness",
             tags=("witness", "verification"),
@@ -332,7 +334,7 @@ def install_atomic_capabilities(
                 required=("certificate_uri",),
             ),
             output_schema=model_schema(ResultEnvelope),
-            invoke=lambda p: kernel.verification.verify_certificate(**p),
+            invoke=lambda p: application.verification.verify_certificate(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis="the checker did not accept the supplied certificate",
             tags=("certificate", "verification"),
@@ -378,7 +380,7 @@ def install_atomic_capabilities(
                 ),
             ),
             output_schema=model_schema(ShrinkResult),
-            invoke=lambda p: kernel.shrinking.run(
+            invoke=lambda p: application.shrinking.run(
                 **{
                     **p,
                     "reducers": tuple(p["reducers"]),
@@ -390,7 +392,7 @@ def install_atomic_capabilities(
             tags=("shrink",),
         ),
         *build_experiment_adapters(
-            kernel,
+            application,
             adapter=_adapter,
             schema=_schema,
             artifact_uri=_ARTIFACT_URI,
@@ -398,7 +400,7 @@ def install_atomic_capabilities(
             enumeration_budget_schema=_enumeration_budget_schema,
         ),
         *build_domain_adapters(
-            kernel,
+            application,
             adapter=_adapter,
             schema=_schema,
             artifact_uri=_ARTIFACT_URI,

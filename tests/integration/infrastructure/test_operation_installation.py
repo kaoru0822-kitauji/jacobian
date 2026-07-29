@@ -10,7 +10,6 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ContractModel, ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.operation_installation import OperationInstaller
 from jacobian.operations import (
     BoundedSearchInterrupted,
@@ -25,6 +24,7 @@ from jacobian.operations import (
     OperationExecutionFailure,
 )
 from jacobian.provider_runtime import known_provider_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 
 class _SyntheticRequest(ContractModel):
@@ -91,24 +91,24 @@ def _synthetic_bundle() -> DomainBundle:
     )
 
 
-def _install(kernel: JacobianKernel, bundle: DomainBundle) -> None:
+def _install(runtime: JacobianRuntime, bundle: DomainBundle) -> None:
     installation = OperationInstaller(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
     ).install(bundle)
     for adapter in installation.adapters:
-        kernel.register_capability(adapter)
+        runtime.core.capabilities.register(adapter)
 
 
 def test_synthetic_bundle_installs_and_materializes_typed_result(
-    kernel,
+    runtime,
 ) -> None:
-    _install(kernel, _synthetic_bundle())
+    _install(runtime, _synthetic_bundle())
 
     descriptor = next(
         descriptor
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "synthetic.compute.double"
     )
     assert descriptor.provider == "jacobian.synthetic"
@@ -116,7 +116,7 @@ def test_synthetic_bundle_installs_and_materializes_typed_result(
     result_schema = descriptor.output_schema["properties"]["result"]
     assert result_schema == {"$ref": "#/$defs/_SyntheticResult"}
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="synthetic.compute.double",
             input={"value": 6},
@@ -127,8 +127,8 @@ def test_synthetic_bundle_installs_and_materializes_typed_result(
     assert result.output["result"] == {"doubled": 12}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 2
-    input_artifact = kernel.store.get(result.artifact_uris[0])
-    output_artifact = kernel.store.get(result.artifact_uris[1])
+    input_artifact = runtime.core.store.get(result.artifact_uris[0])
+    output_artifact = runtime.core.store.get(result.artifact_uris[1])
     assert input_artifact.payload == {"value": 6}
     assert output_artifact.payload == {"doubled": 12}
     assert output_artifact.manifest.parents == (result.artifact_uris[0],)
@@ -136,10 +136,10 @@ def test_synthetic_bundle_installs_and_materializes_typed_result(
     assert result.relationships[0].target_artifact_uris == (result.artifact_uris[1],)
 
 
-def test_synthetic_bundle_fails_closed_before_artifact_writes(kernel) -> None:
-    _install(kernel, _synthetic_bundle())
+def test_synthetic_bundle_fails_closed_before_artifact_writes(runtime) -> None:
+    _install(runtime, _synthetic_bundle())
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="synthetic.compute.double",
             input={"value": 13},
@@ -161,7 +161,7 @@ def test_synthetic_bundle_fails_closed_before_artifact_writes(kernel) -> None:
     ),
 )
 def test_computed_adapter_preserves_operational_failure_status(
-    kernel,
+    runtime,
     status: ExecutionStatus,
 ) -> None:
     bundle = _synthetic_bundle()
@@ -174,9 +174,9 @@ def test_computed_adapter_preserves_operational_failure_status(
         bundle.capabilities[0],
         implementation=lambda _request: OperationExecutionFailure(status, diagnostic),
     )
-    _install(kernel, replace(bundle, capabilities=(failed,)))
+    _install(runtime, replace(bundle, capabilities=(failed,)))
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="synthetic.compute.double",
             input={"value": 2},
@@ -202,7 +202,7 @@ def test_computed_failure_rejects_conclusive_status() -> None:
 
 
 def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
-    kernel,
+    runtime,
 ) -> None:
     bundle = _synthetic_bundle()
     diagnostic = CapabilityDiagnostic(
@@ -227,9 +227,9 @@ def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
         obligation=lambda _request, result: result,
         incomplete_basis="the synthetic search did not complete",
     )
-    _install(kernel, replace(bundle, capabilities=(operation,)))
+    _install(runtime, replace(bundle, capabilities=(operation,)))
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="synthetic.search.timeout",
             input={"value": 2},
@@ -243,7 +243,7 @@ def test_bounded_adapter_preserves_timeout_without_partial_artifacts(
 
 
 def test_bounded_adapter_materializes_interrupted_partial_result(
-    kernel,
+    runtime,
 ) -> None:
     bundle = _synthetic_bundle()
     diagnostic = CapabilityDiagnostic(
@@ -269,9 +269,9 @@ def test_bounded_adapter_materializes_interrupted_partial_result(
         obligation=lambda _request, result: result,
         incomplete_basis="the synthetic search did not complete",
     )
-    _install(kernel, replace(bundle, capabilities=(operation,)))
+    _install(runtime, replace(bundle, capabilities=(operation,)))
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="synthetic.search.partial_timeout",
             input={"value": 2},
@@ -287,7 +287,7 @@ def test_bounded_adapter_materializes_interrupted_partial_result(
 
 
 def test_computed_adapter_rejects_invalid_implementation_result(
-    kernel,
+    runtime,
 ) -> None:
     bundle = _synthetic_bundle()
     original = bundle.capabilities[0]
@@ -303,7 +303,7 @@ def test_computed_adapter_rejects_invalid_implementation_result(
         relation_id="synthetic.relation.invalid",
     )
     _install(
-        kernel,
+        runtime,
         DomainBundle(
             domain_id=bundle.domain_id,
             schema_namespace=bundle.schema_namespace,
@@ -317,7 +317,7 @@ def test_computed_adapter_rejects_invalid_implementation_result(
             assurance_basis=bundle.assurance_basis,
         ),
     )
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="synthetic.compute.invalid",
             input={"value": 2},
@@ -330,11 +330,11 @@ def test_computed_adapter_rejects_invalid_implementation_result(
     assert result.episode_uri is None
 
 
-def test_installer_rejects_empty_and_duplicate_domain_bundles(kernel) -> None:
+def test_installer_rejects_empty_and_duplicate_domain_bundles(runtime) -> None:
     installer = OperationInstaller(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
     )
     bundle = _synthetic_bundle()
 
@@ -345,7 +345,7 @@ def test_installer_rejects_empty_and_duplicate_domain_bundles(kernel) -> None:
 
 
 def test_bounded_outcome_cannot_contradict_completion_semantics(
-    kernel,
+    runtime,
 ) -> None:
     bundle = _synthetic_bundle()
     contradictory = BoundedSearchOperation(
@@ -364,9 +364,9 @@ def test_bounded_outcome_cannot_contradict_completion_semantics(
         obligation=lambda _request, result: result,
         incomplete_basis="the synthetic search did not complete",
     )
-    _install(kernel, replace(bundle, capabilities=(contradictory,)))
+    _install(runtime, replace(bundle, capabilities=(contradictory,)))
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=contradictory.capability_id,
             input={"value": 2},

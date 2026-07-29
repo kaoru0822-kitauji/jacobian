@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import pytest
 
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
-def test_isomorphic_graphs_share_one_canonical_object(kernel) -> None:
-    reference = kernel.references["graph_paths"]
-    first = kernel.artifacts.put(
+def test_isomorphic_graphs_share_one_canonical_object(runtime) -> None:
+    reference = runtime.portfolio.references["graph_paths"]
+    first = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -20,7 +20,7 @@ def test_isomorphic_graphs_share_one_canonical_object(kernel) -> None:
             "arcs": [["a", "b"], ["b", "c"]],
         },
     )
-    relabeled = kernel.artifacts.put(
+    relabeled = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -29,12 +29,12 @@ def test_isomorphic_graphs_share_one_canonical_object(kernel) -> None:
         },
     )
 
-    first_result = kernel.structures.canonicalize(
+    first_result = runtime.services.structures.canonicalize(
         structure_uri=first.artifact_uri,
         plugin_id=reference.plugin_id,
         wall_seconds=30,
     )
-    second_result = kernel.structures.canonicalize(
+    second_result = runtime.services.structures.canonicalize(
         structure_uri=relabeled.artifact_uri,
         plugin_id=reference.plugin_id,
         wall_seconds=30,
@@ -46,10 +46,10 @@ def test_isomorphic_graphs_share_one_canonical_object(kernel) -> None:
 
 
 def test_nonisomorphic_graphs_have_distinct_canonical_keys(
-    kernel,
+    runtime,
 ) -> None:
-    reference = kernel.references["graph_paths"]
-    path = kernel.artifacts.put(
+    reference = runtime.portfolio.references["graph_paths"]
+    path = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -57,7 +57,7 @@ def test_nonisomorphic_graphs_have_distinct_canonical_keys(
             "arcs": [["a", "b"], ["b", "c"]],
         },
     )
-    cycle = kernel.artifacts.put(
+    cycle = runtime.core.artifacts.put(
         schema_uri=reference.candidate_schema_uri,
         semantics_uri=reference.semantics_uri,
         payload={
@@ -66,12 +66,12 @@ def test_nonisomorphic_graphs_have_distinct_canonical_keys(
         },
     )
 
-    path_result = kernel.structures.canonicalize(
+    path_result = runtime.services.structures.canonicalize(
         structure_uri=path.artifact_uri,
         plugin_id=reference.plugin_id,
         wall_seconds=30,
     )
-    cycle_result = kernel.structures.canonicalize(
+    cycle_result = runtime.services.structures.canonicalize(
         structure_uri=cycle.artifact_uri,
         plugin_id=reference.plugin_id,
         wall_seconds=30,

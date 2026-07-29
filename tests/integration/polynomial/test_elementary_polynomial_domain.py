@@ -1,6 +1,6 @@
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def _polynomial(
@@ -24,26 +24,26 @@ def _polynomial(
 
 
 def _invoke(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     capability_id: str,
     payload: dict[str, object],
 ) -> dict[str, object]:
-    outcome = kernel.capabilities.invoke(
+    outcome = runtime.core.capabilities.invoke(
         CapabilityRequest(capability_id=capability_id, input=payload)
     )
     assert outcome.execution.status is ExecutionStatus.COMPLETED
     assert len(outcome.artifact_uris) == 2
-    result_artifact = kernel.store.get(outcome.artifact_uris[1])
+    result_artifact = runtime.core.store.get(outcome.artifact_uris[1])
     assert result_artifact.manifest.parents == (outcome.artifact_uris[0],)
     return outcome.output["result"]
 
 
 def test_integer_polynomial_operations_preserve_ring_semantics(
-    kernel,
+    runtime,
 ) -> None:
 
     assert _invoke(
-        kernel,
+        runtime,
         "polynomial.integer.compute.gcd",
         {
             "left": {"coefficients": ["6", "6", "0"]},
@@ -61,7 +61,7 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
     }
     assert (
         _invoke(
-            kernel,
+            runtime,
             "polynomial.integer.compute.content",
             {"polynomial": {"coefficients": ["-6", "-6", "0"]}},
         )["content"]
@@ -72,7 +72,7 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
     # flipping its content, so its two reported values did not reconstruct a
     # negative-leading source. The domain result retains an exact reconstruction.
     primitive = _invoke(
-        kernel,
+        runtime,
         "polynomial.integer.compute.primitive_part",
         {"polynomial": {"coefficients": ["-6", "-6", "0"]}},
     )
@@ -81,12 +81,12 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
     assert primitive["reconstruction"]["coefficients"] == ["-6", "-6", "0"]
 
     assert _invoke(
-        kernel,
+        runtime,
         "polynomial.integer.compute.evaluate",
         {"polynomial": {"coefficients": ["2", "-3", "1"]}, "point": "4"},
     ) == {"point": "4", "value": "21"}
     assert _invoke(
-        kernel,
+        runtime,
         "polynomial.integer.compute.compose",
         {
             "outer": {"coefficients": ["1", "0", "1"]},
@@ -96,11 +96,11 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
 
 
 def test_rational_polynomial_operations_return_typed_intermediates(
-    kernel,
+    runtime,
 ) -> None:
 
     division = _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.quotient_remainder",
         {
             "left": _polynomial([(2, 1, 1), (0, -1, 1)]),
@@ -112,7 +112,7 @@ def test_rational_polynomial_operations_return_typed_intermediates(
     assert division["reconstruction"] == _polynomial([(2, 1, 1), (0, -1, 1)])
 
     assert _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.evaluate",
         {
             "polynomial": _polynomial([(2, 1, 2), (0, 1, 3)]),
@@ -120,12 +120,12 @@ def test_rational_polynomial_operations_return_typed_intermediates(
         },
     )["value"] == {"num": "5", "den": "9"}
     assert _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.derivative",
         {"polynomial": _polynomial([(3, 1, 2), (1, -2, 1)])},
     )["derivative"] == _polynomial([(2, 3, 2), (0, -2, 1)])
     integral = _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.integral",
         {"polynomial": _polynomial([(2, 3, 1), (0, 2, 1)])},
     )
@@ -134,13 +134,13 @@ def test_rational_polynomial_operations_return_typed_intermediates(
 
 
 def test_partial_fraction_output_is_structured_and_reconstructs(
-    kernel,
+    runtime,
 ) -> None:
     numerator = _polynomial([(2, 1, 1), (1, 2, 1), (0, 3, 1)])
     denominator = _polynomial([(3, 1, 1), (2, 4, 1), (1, 5, 1), (0, 2, 1)])
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.partial_fraction_decomposition",
         {"numerator": numerator, "denominator": denominator},
     )
@@ -168,13 +168,13 @@ def test_partial_fraction_output_is_structured_and_reconstructs(
 
 
 def test_partial_fraction_uses_the_declared_univariate_generator(
-    kernel,
+    runtime,
 ) -> None:
     numerator = _polynomial([(1, 1, 1), (0, 3, 1)], "t")
     denominator = _polynomial([(2, 1, 1), (0, -1, 1)], "t")
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.partial_fraction_decomposition",
         {"numerator": numerator, "denominator": denominator},
     )
@@ -196,13 +196,13 @@ def test_partial_fraction_uses_the_declared_univariate_generator(
 
 
 def test_partial_fraction_normalizes_non_monic_denominators_exactly(
-    kernel,
+    runtime,
 ) -> None:
     numerator = _polynomial([(2, 2, 1), (1, -3, 1), (0, 1, 1)], "t")
     denominator = _polynomial([(2, 6, 1), (1, -3, 1), (0, -3, 1)], "t")
 
     result = _invoke(
-        kernel,
+        runtime,
         "polynomial.rational.compute.partial_fraction_decomposition",
         {"numerator": numerator, "denominator": denominator},
     )
@@ -232,9 +232,9 @@ def test_partial_fraction_normalizes_non_monic_denominators_exactly(
 
 
 def test_elementary_polynomial_requests_fail_closed_before_artifact_writes(
-    kernel,
+    runtime,
 ) -> None:
-    outcome = kernel.capabilities.invoke(
+    outcome = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.integer.compute.compose",
             input={

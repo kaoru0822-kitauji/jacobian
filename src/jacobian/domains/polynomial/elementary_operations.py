@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+from functools import cache
 from typing import Any, cast
-
-from sympy import Add, Poly, Rational, Symbol, apart, cancel, fraction, together
 
 from jacobian.contracts.polynomial_operations import (
     IntegerPolynomial,
@@ -33,18 +32,27 @@ from jacobian.contracts.polynomial_operations import (
 from jacobian.contracts.results import ContractModel
 from jacobian.domains.polynomial.operations import _poly, _rational, _wire
 
-_X = Symbol("x")
+
+@cache
+def _x() -> Any:
+    """Load the canonical integer-polynomial indeterminate on first invocation."""
+
+    from sympy import Symbol
+
+    return Symbol("x")
 
 
-def _integer_poly(polynomial: IntegerPolynomial) -> Poly:
+def _integer_poly(polynomial: IntegerPolynomial) -> Any:
+    from sympy import Poly
+
     return Poly.from_list(
         [int(coefficient) for coefficient in polynomial.coefficients],
-        _X,
+        _x(),
         domain="ZZ",
     )
 
 
-def _integer_wire(polynomial: Poly) -> IntegerPolynomial:
+def _integer_wire(polynomial: Any) -> IntegerPolynomial:
     return IntegerPolynomial(
         coefficients=tuple(
             str(int(coefficient)) for coefficient in polynomial.all_coeffs()
@@ -123,6 +131,8 @@ def rational_polynomial_division(request: ContractModel) -> ContractModel:
 
 def rational_polynomial_evaluate(request: ContractModel) -> ContractModel:
     request = cast(RationalPolynomialEvaluationRequest, request)
+    from sympy import Rational
+
     point = request.point.as_fraction()
     value = _poly(request.polynomial).eval(Rational(point.numerator, point.denominator))
     return RationalPolynomialEvaluationResult(
@@ -154,9 +164,11 @@ def rational_polynomial_integral(request: ContractModel) -> ContractModel:
 def _partial_fraction_term(
     numerator: Any,
     denominator: Any,
-    generator: Symbol,
+    generator: Any,
     variables: tuple[str, ...],
 ) -> RationalPartialFractionTerm:
+    from sympy import Poly
+
     denominator_poly = Poly(denominator, generator, domain="QQ")
     denominator_coefficient, factors = denominator_poly.factor_list()
     if len(factors) != 1:
@@ -191,6 +203,8 @@ def rational_partial_fraction_decomposition(
     request: ContractModel,
 ) -> ContractModel:
     request = cast(RationalFunctionRequest, request)
+    from sympy import Add, Poly, apart, cancel, fraction, together
+
     variables = request.numerator.variables
     generator = _poly(request.numerator).gens[0]
     source = cancel(

@@ -10,15 +10,15 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
     pytest.mark.subprocess,
 ]
 
 
-def _verify(kernel: JacobianKernel, cnf_uri: str, proof: bytes, **extra: object):
-    return kernel.capabilities.invoke(
+def _verify(runtime: JacobianRuntime, cnf_uri: str, proof: bytes, **extra: object):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.lrat.verify",
             mode=CapabilityMode.VERIFY,
@@ -32,19 +32,19 @@ def _verify(kernel: JacobianKernel, cnf_uri: str, proof: bytes, **extra: object)
 
 
 def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    cnf = kernel_with_references.sat.put_cnf(
+    cnf = runtime_with_references.core.sat.put_cnf(
         variable_names=("x",), clauses=((-1,), (1,))
     )
 
-    result = _verify(kernel_with_references, cnf.artifact_uri, b"3 0 1 2 0\n")
+    result = _verify(runtime_with_references, cnf.artifact_uri, b"3 0 1 2 0\n")
 
     assert result.output["status"] == "VERIFIED_UNSAT"
     assert result.output["conclusion"] == "TRUE"
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
     assert result.output["verification_record_uri"] is not None
-    proof = kernel_with_references.store.get(result.output["proof_uri"])
+    proof = runtime_with_references.core.store.get(result.output["proof_uri"])
     assert proof.manifest.parents == (cnf.artifact_uri,)
     assert (
         proof.payload["cnf"]["variable_map_digest"]
@@ -66,43 +66,43 @@ def test_rup_lrat_derives_empty_clause_and_binds_artifacts(
     ),
 )
 def test_invalid_or_incomplete_lrat_never_proves_sat_or_unsat(
-    kernel_with_references, proof
+    runtime_with_references, proof
 ) -> None:
-    cnf = kernel_with_references.sat.put_cnf(
+    cnf = runtime_with_references.core.sat.put_cnf(
         variable_names=("x",), clauses=((-1,), (1,))
     )
 
-    result = _verify(kernel_with_references, cnf.artifact_uri, proof)
+    result = _verify(runtime_with_references, cnf.artifact_uri, proof)
 
     assert result.output["status"] == "REJECTED"
     assert result.output["conclusion"] == "UNKNOWN"
     assert result.output["verification_record_uri"] is None
 
 
-def test_negative_rat_hint_is_explicitly_unsupported(kernel_with_references) -> None:
-    cnf = kernel_with_references.sat.put_cnf(
+def test_negative_rat_hint_is_explicitly_unsupported(runtime_with_references) -> None:
+    cnf = runtime_with_references.core.sat.put_cnf(
         variable_names=("x",), clauses=((-1,), (1,))
     )
 
-    result = _verify(kernel_with_references, cnf.artifact_uri, b"3 0 -1 2 0\n")
+    result = _verify(runtime_with_references, cnf.artifact_uri, b"3 0 -1 2 0\n")
 
     assert result.output["status"] == "UNSUPPORTED"
     assert result.output["conclusion"] == "UNKNOWN"
 
 
-def test_timeout_and_cancellation_are_fail_closed(kernel_with_references) -> None:
-    cnf = kernel_with_references.sat.put_cnf(
+def test_timeout_and_cancellation_are_fail_closed(runtime_with_references) -> None:
+    cnf = runtime_with_references.core.sat.put_cnf(
         variable_names=("x",), clauses=((-1,), (1,))
     )
 
     timed_out = _verify(
-        kernel_with_references,
+        runtime_with_references,
         cnf.artifact_uri,
         b"3 0 1 2 0\n",
         limits={"timeout_ms": 0},
     )
     cancelled = _verify(
-        kernel_with_references, cnf.artifact_uri, b"3 0 1 2 0\n", cancelled=True
+        runtime_with_references, cnf.artifact_uri, b"3 0 1 2 0\n", cancelled=True
     )
 
     assert timed_out.output["status"] == "TIMEOUT"
@@ -114,7 +114,9 @@ def test_timeout_and_cancellation_are_fail_closed(kernel_with_references) -> Non
 
 
 def test_capability_is_absent_without_operator_authorized_references(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    ids = {item.capability_id for item in kernel.capabilities.catalog().capabilities}
+    ids = {
+        item.capability_id for item in runtime.core.capabilities.catalog().capabilities
+    }
     assert "sat.lrat.verify" not in ids

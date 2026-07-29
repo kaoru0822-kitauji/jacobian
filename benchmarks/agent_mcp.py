@@ -829,7 +829,7 @@ def _run_case(
         **metadata,
         "case_id": case_id,
         "case_version": case["version"],
-        "condition": "kernel",
+        "condition": "runtime",
         "started_at": started_at,
         "completed_at": _timestamp(),
         "elapsed_seconds": round(elapsed, 3),
@@ -915,7 +915,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     summary = {
         **metadata,
         "run_id": run_id,
-        "condition": "kernel",
+        "condition": "runtime",
         "cases": [
             {
                 "case_id": result["case_id"],

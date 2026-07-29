@@ -75,7 +75,7 @@ def _reject_external_references(value: Any) -> None:
 def _validated_schema(canonical_schema: bytes) -> Draft202012Validator:
     """Validate and compile one exact schema definition per process.
 
-    Kernel construction registers the same contract schemas repeatedly across
+    Runtime construction registers the same contract schemas repeatedly across
     isolated stores, especially in tests. The canonical bytes are the cache
     key, so a changed schema cannot reuse an older validation result or
     validator. The returned validator is read-only during validation.
@@ -141,7 +141,7 @@ class SchemaRegistry:
 
         JSON Schema carries the durable structural contract. The operator-owned
         model adds invariants JSON Schema cannot express, such as canonical
-        ordering and digests derived from multiple fields. Kernel construction
+        ordering and digests derived from multiple fields. Runtime construction
         repeats this registration after every restart before accepting writes.
         """
 

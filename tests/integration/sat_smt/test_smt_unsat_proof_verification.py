@@ -21,12 +21,13 @@ from jacobian.contracts.evidence import CertificateEnvelope
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.contracts.verification import VerificationRecord
-from jacobian.kernel import JacobianKernel
 from jacobian.provider_runtime import carcara_provider_runtime
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 from jacobian.verification import CheckerExecutionError, _environment_digest
 
 pytestmark = [
-    pytest.mark.usefixtures("initialized_kernel_store_with_references"),
+    pytest.mark.usefixtures("initialized_runtime_store_with_references"),
 ]
 
 _FIXTURES = Path(__file__).parents[2] / "fixtures" / "smt"
@@ -89,22 +90,22 @@ def _producer() -> CapabilityProviderRuntime:
     )
 
 
-def _kernel_with_runtime(
+def _runtime_with_runtime(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     executable: Path,
     *,
-    install_references: bool = True,
-) -> JacobianKernel:
+    checker_authority: CheckerAuthorityMode = CheckerAuthorityMode.INSTALL_BUNDLED,
+) -> JacobianRuntime:
     runtime = carcara_provider_runtime(executable)
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     monkeypatch.setattr(
-        "jacobian.kernel.carcara_provider_runtime",
+        "jacobian.portfolio.assembler.carcara_provider_runtime",
         lambda *_args, **_kwargs: runtime,
     )
-    return JacobianKernel(
+    return create_runtime(
         tmp_path / "store",
-        install_references=install_references,
+        checker_authority=checker_authority,
     )
 
 
@@ -143,9 +144,9 @@ def test_carcara_runtime_requires_exact_operator_provenance(
     assert runtime.diagnostic is not None
 
 
-def _proof(kernel: JacobianKernel) -> tuple[str, str]:
-    problem = kernel.smt.put_problem(logic="QF_UF", smtlib_text=_PROBLEM)
-    proof = kernel.smt.put_proof(
+def _proof(runtime: JacobianRuntime) -> tuple[str, str]:
+    problem = runtime.core.smt.put_problem(logic="QF_UF", smtlib_text=_PROBLEM)
+    proof = runtime.core.smt.put_proof(
         problem_uri=problem.artifact_uri,
         proof=_PROOF,
         producer=_producer(),
@@ -154,8 +155,8 @@ def _proof(kernel: JacobianKernel) -> tuple[str, str]:
     return problem.artifact_uri, proof.artifact_uri
 
 
-def _verify(kernel: JacobianKernel, proof_uri: str):
-    return kernel.capabilities.invoke(
+def _verify(runtime: JacobianRuntime, proof_uri: str):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="smt.unsat_proof.verify",
             mode=CapabilityMode.VERIFY,
@@ -173,8 +174,8 @@ def test_unsat_proof_is_verified_by_authorized_strict_carcara(
         tmp_path,
         "print('valid')\nraise SystemExit(0)",
     )
-    kernel = _kernel_with_runtime(tmp_path, monkeypatch, executable)
-    problem_uri, proof_uri = _proof(kernel)
+    runtime = _runtime_with_runtime(tmp_path, monkeypatch, executable)
+    problem_uri, proof_uri = _proof(runtime)
     monkeypatch.setattr(
         jacobian_checkers.smt,
         "check_unsat_proof",
@@ -188,7 +189,7 @@ def test_unsat_proof_is_verified_by_authorized_strict_carcara(
         },
     )
 
-    result = _verify(kernel, proof_uri)
+    result = _verify(runtime, proof_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
@@ -198,7 +199,7 @@ def test_unsat_proof_is_verified_by_authorized_strict_carcara(
     assert result.output["proof_uri"] == proof_uri
     certificate_uri = result.output["certificate_uri"]
     certificate = CertificateEnvelope.model_validate(
-        kernel.store.get(certificate_uri).payload
+        runtime.core.store.get(certificate_uri).payload
     )
     assert certificate.certificate_type == "smt.unsat-proof"
     assert certificate.payload == {
@@ -207,12 +208,12 @@ def test_unsat_proof_is_verified_by_authorized_strict_carcara(
     }
     record_uri = result.output["verification_record_uri"]
     assert record_uri is not None
-    record_artifact = kernel.store.get(record_uri)
+    record_artifact = runtime.core.store.get(record_uri)
     record = VerificationRecord.model_validate(record_artifact.payload)
-    assert record.checker_id == kernel.smt_unsat_proof_checker.checker_id
+    assert record.checker_id == runtime.portfolio.smt_unsat_proof_checker.checker_id
     assert record.evidence_uri == certificate_uri
-    checker = kernel.checkers.require_active(record.checker_id)
-    assert checker.provider_runtime == kernel.carcara_runtime
+    checker = runtime.core.checkers.require_active(record.checker_id)
+    assert checker.provider_runtime == runtime.portfolio.carcara_runtime
     assert record.environment_digest == _environment_digest(
         checker.executable_digest,
         checker.provider_runtime,
@@ -232,10 +233,10 @@ def test_holey_checker_report_never_establishes_sat_or_unsat(
         tmp_path,
         "print('holey')\nraise SystemExit(0)",
     )
-    kernel = _kernel_with_runtime(tmp_path, monkeypatch, executable)
-    _problem_uri, proof_uri = _proof(kernel)
+    runtime = _runtime_with_runtime(tmp_path, monkeypatch, executable)
+    _problem_uri, proof_uri = _proof(runtime)
 
-    result = _verify(kernel, proof_uri)
+    result = _verify(runtime, proof_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
@@ -252,28 +253,28 @@ def test_proof_verify_requires_runtime_and_operator_authorization(
         tmp_path,
         "print('valid')\nraise SystemExit(0)",
     )
-    without_references = _kernel_with_runtime(
+    without_references = _runtime_with_runtime(
         tmp_path / "without-references",
         monkeypatch,
         executable,
-        install_references=False,
+        checker_authority=CheckerAuthorityMode.NONE,
     )
     unavailable = carcara_provider_runtime(tmp_path / "missing")
     monkeypatch.setattr(
-        "jacobian.kernel.carcara_provider_runtime",
+        "jacobian.portfolio.assembler.carcara_provider_runtime",
         lambda *_args, **_kwargs: unavailable,
     )
-    without_runtime = JacobianKernel(
+    without_runtime = create_runtime(
         tmp_path / "without-runtime",
-        install_references=True,
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
     )
 
-    assert without_references.smt_unsat_proof_checker.checker_id is None
-    assert without_runtime.smt_unsat_proof_checker.checker_id is None
-    for kernel in (without_references, without_runtime):
+    assert without_references.portfolio.smt_unsat_proof_checker.checker_id is None
+    assert without_runtime.portfolio.smt_unsat_proof_checker.checker_id is None
+    for runtime in (without_references, without_runtime):
         assert "smt.unsat_proof.verify" not in {
             descriptor.capability_id
-            for descriptor in kernel.capabilities.catalog().capabilities
+            for descriptor in runtime.core.capabilities.catalog().capabilities
         }
 
 
@@ -303,14 +304,14 @@ def test_checker_operational_failure_never_creates_a_conclusion(
         tmp_path,
         "print('valid')\nraise SystemExit(0)",
     )
-    kernel = _kernel_with_runtime(tmp_path, monkeypatch, executable)
-    _problem_uri, proof_uri = _proof(kernel)
+    runtime = _runtime_with_runtime(tmp_path, monkeypatch, executable)
+    _problem_uri, proof_uri = _proof(runtime)
 
     def fail(**_kwargs: Any):
         raise exception
 
-    monkeypatch.setattr(kernel.verification, "_run_checker", fail)
-    result = _verify(kernel, proof_uri)
+    monkeypatch.setattr(runtime.services.verification, "_run_checker", fail)
+    result = _verify(runtime, proof_uri)
 
     assert result.execution.status is expected_status
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
@@ -327,12 +328,12 @@ def test_runtime_replacement_after_authorization_fails_closed(
         tmp_path,
         "print('valid')\nraise SystemExit(0)",
     )
-    kernel = _kernel_with_runtime(tmp_path, monkeypatch, executable)
-    _problem_uri, proof_uri = _proof(kernel)
+    runtime = _runtime_with_runtime(tmp_path, monkeypatch, executable)
+    _problem_uri, proof_uri = _proof(runtime)
     executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     executable.chmod(0o755)
 
-    result = _verify(kernel, proof_uri)
+    result = _verify(runtime, proof_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED

@@ -53,6 +53,10 @@ class StoreLimitError(StoreError):
     """A bounded store limit would be exceeded."""
 
 
+class StoreClosedError(StoreError):
+    """An operation targeted a store whose runtime ownership has ended."""
+
+
 @dataclass(frozen=True, slots=True)
 class StoreLimits:
     """Local artifact and aggregate blob-size limits."""
@@ -193,15 +197,44 @@ class ArtifactStore:
         self.transaction_recovery_path = self.root / ".transaction-recovery"
         self._validated_blobs: dict[str, tuple[int, int, int, int, int]] = {}
         self._connection_state = _ConnectionState()
+        self._closed = False
         self.blob_root.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
         self._initialize_database()
 
     def _connect(self) -> sqlite3.Connection:
+        if self._closed:
+            raise StoreClosedError("artifact store is closed")
         connection = sqlite3.connect(self.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
+
+    def close(self) -> None:
+        """Checkpoint SQLite and end this store's owned lifetime."""
+
+        if self._closed:
+            return
+        if self.transaction_active:
+            raise StoreError("cannot close an artifact store during a transaction")
+        connection = self._connect()
+        try:
+            checkpoint = connection.execute(
+                "PRAGMA wal_checkpoint(TRUNCATE)"
+            ).fetchone()
+            if checkpoint is None or checkpoint[0] != 0:
+                raise StoreError(f"could not checkpoint artifact store: {checkpoint!r}")
+        finally:
+            connection.close()
+        self._closed = True
+
+    def __enter__(self) -> ArtifactStore:
+        if self._closed:
+            raise StoreClosedError("artifact store is closed")
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
 
     @contextmanager
     def connection(self) -> Iterator[sqlite3.Connection]:
@@ -241,6 +274,8 @@ class ArtifactStore:
         set before control returns to the caller.
         """
 
+        if self._closed:
+            raise StoreClosedError("artifact store is closed")
         if self._connection_state.transaction is not None:
             raise StoreError("nested artifact store transactions are unsupported")
 

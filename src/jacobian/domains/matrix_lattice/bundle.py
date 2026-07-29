@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import sympy
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.matrix_lattice.capabilities import MATRIX_CAPABILITIES
 from jacobian.operations import DomainBundle, DomainDiagnostics, DomainSemantics
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
 MATRIX_BUNDLE = DomainBundle(
     domain_id="matrix",
@@ -39,7 +37,7 @@ MATRIX_BUNDLE = DomainBundle(
             "smith-normal-form",
         ),
     ),
-    backend_version=sympy.__version__,
+    backend_version=SYMPY_VERSION,
     capabilities=MATRIX_CAPABILITIES,
     diagnostics=DomainDiagnostics(
         invalid_request=CapabilityDiagnostic(

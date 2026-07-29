@@ -10,7 +10,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.exact_domain_checkers import install_exact_domain_verification
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def _poly(*coefficients_ascending: int) -> dict[str, object]:
@@ -44,25 +44,25 @@ def _poly_xy(*terms: tuple[tuple[int, int], int]) -> dict[str, object]:
 
 
 def _install_verification(
-    kernel: JacobianKernel, *, authorize: bool
+    runtime: JacobianRuntime, *, authorize: bool
 ) -> tuple[object, ...]:
     adapters, _ = install_exact_domain_verification(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
-        kernel.verification,
-        kernel.checkers,
-        polynomial=kernel.domain_bundles["polynomial"],
-        matrix=kernel.domain_bundles["matrix"],
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
+        runtime.services.verification,
+        runtime.core.checkers,
+        polynomial=runtime.portfolio.domain_bundles["polynomial"],
+        matrix=runtime.portfolio.domain_bundles["matrix"],
         authorize=authorize,
     )
     for adapter in adapters:
-        kernel.register_capability(adapter)
+        runtime.core.capabilities.register(adapter)
     return adapters
 
 
-def _computed_gcd(kernel: JacobianKernel):
-    return kernel.capabilities.invoke(
+def _computed_gcd(runtime: JacobianRuntime):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.compute.gcd",
             input={
@@ -73,16 +73,16 @@ def _computed_gcd(kernel: JacobianKernel):
     )
 
 
-def test_public_seam_verifies_exact_producer_result(kernel) -> None:
-    adapters = _install_verification(kernel, authorize=True)
+def test_public_seam_verifies_exact_producer_result(runtime) -> None:
+    adapters = _install_verification(runtime, authorize=True)
     runtime = adapters[0].descriptor.provider_runtime
     assert runtime is not None
     assert {
         component["provider"] for component in runtime.configuration["components"]
     } == {"jacobian.exact-domain-checker-source", "python-flint"}
-    computed = _computed_gcd(kernel)
+    computed = _computed_gcd(runtime)
 
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.result.verify",
             mode=CapabilityMode.VERIFY,
@@ -99,12 +99,12 @@ def test_public_seam_verifies_exact_producer_result(kernel) -> None:
     assert len(verified.artifact_uris) == 4
 
 
-def test_public_seam_rejects_validly_shaped_false_result(kernel) -> None:
-    _install_verification(kernel, authorize=True)
-    computed = _computed_gcd(kernel)
+def test_public_seam_rejects_validly_shaped_false_result(runtime) -> None:
+    _install_verification(runtime, authorize=True)
+    computed = _computed_gcd(runtime)
     input_uri = computed.output["input_uri"]
-    installed = kernel.domain_bundles["polynomial"]
-    false_result = kernel.artifacts.put(
+    installed = runtime.portfolio.domain_bundles["polynomial"]
+    false_result = runtime.core.artifacts.put(
         schema_uri=installed.result_schema_uris["polynomial.compute.gcd"],
         semantics_uri=installed.semantics_uri,
         parents=(input_uri,),
@@ -119,7 +119,7 @@ def test_public_seam_rejects_validly_shaped_false_result(kernel) -> None:
         summary="adversarial false GCD candidate",
     )
 
-    rejected = kernel.capabilities.invoke(
+    rejected = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.result.verify",
             mode=CapabilityMode.VERIFY,
@@ -135,10 +135,10 @@ def test_public_seam_rejects_validly_shaped_false_result(kernel) -> None:
 
 
 def test_public_seam_reports_valid_multivariate_result_as_unsupported(
-    kernel,
+    runtime,
 ) -> None:
-    _install_verification(kernel, authorize=True)
-    computed = kernel.capabilities.invoke(
+    _install_verification(runtime, authorize=True)
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.compute.resultant",
             input={
@@ -149,7 +149,7 @@ def test_public_seam_reports_valid_multivariate_result_as_unsupported(
         )
     )
 
-    checked = kernel.capabilities.invoke(
+    checked = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.result.verify",
             mode=CapabilityMode.VERIFY,
@@ -166,9 +166,9 @@ def test_public_seam_reports_valid_multivariate_result_as_unsupported(
 
 
 def test_induced_tree_result_is_domain_bound_and_independently_replayed(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.compute",
             input={
@@ -192,7 +192,7 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     assert computed.output["optimum_value"] == 3
     result_uri = computed.artifact_uris[1]
 
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.verify",
             mode=CapabilityMode.VERIFY,
@@ -211,7 +211,7 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
     )
     assert "FLINT" not in verified.execution.detail
 
-    result_artifact = kernel_with_references.store.get(result_uri)
+    result_artifact = runtime_with_references.core.store.get(result_uri)
     false_payload = dict(result_artifact.payload)
     false_payload.update(
         {
@@ -222,14 +222,14 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
             "witness_vertices": ["a", "b", "c", "d"],
         }
     )
-    false_result = kernel_with_references.artifacts.put(
+    false_result = runtime_with_references.core.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
         payload=false_payload,
         summary="adversarial false maximum induced-tree result",
     )
-    rejected = kernel_with_references.capabilities.invoke(
+    rejected = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.induced_tree.maximum.verify",
             mode=CapabilityMode.VERIFY,
@@ -243,9 +243,9 @@ def test_induced_tree_result_is_domain_bound_and_independently_replayed(
 
 
 def test_maximum_matching_result_uses_independent_tutte_berge_replay(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.compute",
             input={
@@ -262,7 +262,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     )
     result_uri = computed.artifact_uris[1]
 
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
             mode=CapabilityMode.VERIFY,
@@ -283,7 +283,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     )
     runtime = next(
         descriptor.provider_runtime
-        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == "graph.invariant.maximum_matching.verify"
     )
     assert runtime is not None
@@ -292,8 +292,8 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         component["provider"] for component in runtime.configuration["components"]
     } == {"jacobian.graph-exact-checker-source"}
 
-    result_artifact = kernel_with_references.store.get(result_uri)
-    false_result = kernel_with_references.artifacts.put(
+    result_artifact = runtime_with_references.core.store.get(result_uri)
+    false_result = runtime_with_references.core.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
@@ -307,7 +307,7 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
         },
         summary="adversarial feasible but nonmaximum matching result",
     )
-    rejected = kernel_with_references.capabilities.invoke(
+    rejected = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
             mode=CapabilityMode.VERIFY,
@@ -339,13 +339,13 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     ),
 )
 def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
-    kernel_with_references,
+    runtime_with_references,
     producer_id: str,
     verifier_id: str,
     result_field: str,
     expected: int,
 ) -> None:
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=producer_id,
             input={
@@ -357,7 +357,7 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
         )
     )
 
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=verifier_id,
             mode=CapabilityMode.VERIFY,
@@ -374,21 +374,23 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     runtime = next(
         descriptor.provider_runtime
-        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == verifier_id
     )
     assert runtime is not None
     assert runtime.provider == "jacobian.graph-exact-checkers"
 
-    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
-    false_result = kernel_with_references.artifacts.put(
+    result_artifact = runtime_with_references.core.store.get(
+        computed.output["result_uri"]
+    )
+    false_result = runtime_with_references.core.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
         payload={**result_artifact.payload, result_field: 0},
         summary=f"adversarial false {result_field} result",
     )
-    rejected = kernel_with_references.capabilities.invoke(
+    rejected = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=verifier_id,
             mode=CapabilityMode.VERIFY,
@@ -404,19 +406,19 @@ def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
 
 @pytest.mark.parametrize("value", ("360", "-360", "1", "-1", "101"))
 def test_prime_factorization_result_uses_independent_python_flint_replay(
-    kernel_with_references,
+    runtime_with_references,
     value: str,
 ) -> None:
     producer_id = "integer.compute.prime_factorization"
     verifier_id = "integer.prime_factorization.verify"
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=producer_id,
             input={"value": value},
         )
     )
 
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=verifier_id,
             mode=CapabilityMode.VERIFY,
@@ -432,7 +434,7 @@ def test_prime_factorization_result_uses_independent_python_flint_replay(
     assert verified.output["verification_record_uri"] in verified.artifact_uris
     runtime = next(
         descriptor.provider_runtime
-        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        for descriptor in runtime_with_references.core.capabilities.catalog().capabilities
         if descriptor.capability_id == verifier_id
     )
     assert runtime is not None
@@ -443,16 +445,18 @@ def test_prime_factorization_result_uses_independent_python_flint_replay(
 
 
 def test_prime_factorization_verifier_rejects_incomplete_factor_list(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="integer.compute.prime_factorization",
             input={"value": "360"},
         )
     )
-    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
-    false_result = kernel_with_references.artifacts.put(
+    result_artifact = runtime_with_references.core.store.get(
+        computed.output["result_uri"]
+    )
+    false_result = runtime_with_references.core.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
@@ -460,7 +464,7 @@ def test_prime_factorization_verifier_rejects_incomplete_factor_list(
         summary="adversarial incomplete prime factorization result",
     )
 
-    rejected = kernel_with_references.capabilities.invoke(
+    rejected = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="integer.prime_factorization.verify",
             mode=CapabilityMode.VERIFY,
@@ -476,19 +480,19 @@ def test_prime_factorization_verifier_rejects_incomplete_factor_list(
 
 @pytest.mark.parametrize("value", ("1", "72", "12", "30"))
 def test_powerful_number_result_uses_independent_python_flint_replay(
-    kernel_with_references,
+    runtime_with_references,
     value: str,
 ) -> None:
     producer_id = "integer.decide.powerful"
     verifier_id = "integer.powerful.verify"
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=producer_id,
             input={"value": value},
         )
     )
 
-    verified = kernel_with_references.capabilities.invoke(
+    verified = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=verifier_id,
             mode=CapabilityMode.VERIFY,
@@ -505,16 +509,18 @@ def test_powerful_number_result_uses_independent_python_flint_replay(
 
 
 def test_powerful_number_verifier_rejects_schema_valid_wrong_factor_product(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
-    computed = kernel_with_references.capabilities.invoke(
+    computed = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="integer.decide.powerful",
             input={"value": "72"},
         )
     )
-    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
-    false_result = kernel_with_references.artifacts.put(
+    result_artifact = runtime_with_references.core.store.get(
+        computed.output["result_uri"]
+    )
+    false_result = runtime_with_references.core.artifacts.put(
         schema_uri=result_artifact.manifest.schema_uri,
         semantics_uri=result_artifact.manifest.semantics_uri,
         parents=result_artifact.manifest.parents,
@@ -530,7 +536,7 @@ def test_powerful_number_verifier_rejects_schema_valid_wrong_factor_product(
         summary="adversarial wrong powerful-number factor product",
     )
 
-    rejected = kernel_with_references.capabilities.invoke(
+    rejected = runtime_with_references.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="integer.powerful.verify",
             mode=CapabilityMode.VERIFY,
@@ -545,15 +551,15 @@ def test_powerful_number_verifier_rejects_schema_valid_wrong_factor_product(
 
 
 def test_operator_can_leave_exact_result_verification_unavailable(
-    kernel,
+    runtime,
 ) -> None:
 
-    adapters = _install_verification(kernel, authorize=False)
+    adapters = _install_verification(runtime, authorize=False)
 
     assert adapters == ()
     assert {"polynomial.result.verify", "matrix.result.verify"}.isdisjoint(
         {
             descriptor.capability_id
-            for descriptor in kernel.capabilities.catalog().capabilities
+            for descriptor in runtime.core.capabilities.catalog().capabilities
         }
     )

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import platform
 
-import sympy
-
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.domains.combinatorics.counting import COUNTING_CAPABILITIES
 from jacobian.domains.combinatorics.partitions import PARTITION_CAPABILITIES
@@ -15,7 +13,7 @@ from jacobian.operations import (
     DomainDiagnostics,
     DomainSemantics,
 )
-from jacobian.provider_runtime import known_provider_runtime
+from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
 COMBINATORICS_BUNDLE = DomainBundle(
     domain_id="combinatorics",
@@ -33,7 +31,7 @@ COMBINATORICS_BUNDLE = DomainBundle(
         "jacobian.sympy",
         features=("exact-combinatorics",),
     ),
-    backend_version=f"python-{platform.python_version()};sympy-{sympy.__version__}",
+    backend_version=f"python-{platform.python_version()};sympy-{SYMPY_VERSION}",
     capabilities=(
         *COUNTING_CAPABILITIES,
         *PARTITION_CAPABILITIES,

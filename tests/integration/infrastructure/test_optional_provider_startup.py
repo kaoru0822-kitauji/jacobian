@@ -5,35 +5,35 @@ import sys
 from pathlib import Path
 
 
-def test_kernel_starts_and_exposes_unrelated_capabilities_without_flint(
+def test_runtime_starts_and_exposes_unrelated_capabilities_without_flint(
     tmp_path: Path,
 ) -> None:
     script = """
-import importlib
+import importlib.abc
 import sys
 from pathlib import Path
 
-real_import_module = importlib.import_module
+class BlockFlint(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "flint" or fullname.startswith("flint."):
+            raise ImportError("python-flint intentionally unavailable")
+        return None
 
-def import_without_flint(name, package=None):
-    if name == "flint":
-        raise ImportError("python-flint intentionally unavailable")
-    return real_import_module(name, package)
+sys.meta_path.insert(0, BlockFlint())
 
-importlib.import_module = import_without_flint
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-from jacobian.kernel import JacobianKernel
-
-kernel = JacobianKernel(Path(sys.argv[1]))
+runtime = create_runtime(Path(sys.argv[1]))
 ids = {
     descriptor.capability_id
-    for descriptor in kernel.capabilities.catalog().capabilities
+    for descriptor in runtime.core.capabilities.catalog().capabilities
 }
 assert "integer.compute.gcd" in ids
 assert "probability.finite_distribution.raw_moment.compute" not in ids
 """
     completed = subprocess.run(
-        [sys.executable, "-c", script, str(tmp_path / "kernel")],
+        [sys.executable, "-c", script, str(tmp_path / "runtime")],
         check=False,
         capture_output=True,
         text=True,
@@ -43,7 +43,7 @@ assert "probability.finite_distribution.raw_moment.compute" not in ids
     assert completed.returncode == 0, completed.stderr
 
 
-def test_kernel_starts_and_exposes_unrelated_capabilities_without_z3(
+def test_runtime_starts_and_exposes_unrelated_capabilities_without_z3(
     tmp_path: Path,
 ) -> None:
     script = """
@@ -59,19 +59,20 @@ class BlockZ3(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, BlockZ3())
 
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import CheckerAuthorityMode, create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-kernel = JacobianKernel(Path(sys.argv[1]))
+runtime = create_runtime(Path(sys.argv[1]))
 ids = {
     descriptor.capability_id
-    for descriptor in kernel.capabilities.catalog().capabilities
+    for descriptor in runtime.core.capabilities.catalog().capabilities
 }
 assert "integer.compute.gcd" in ids
 assert "graph.invariant.girth.compute" in ids
 assert "graph.domination.minimum.compute" not in ids
 """
     completed = subprocess.run(
-        [sys.executable, "-c", script, str(tmp_path / "kernel")],
+        [sys.executable, "-c", script, str(tmp_path / "runtime")],
         check=False,
         capture_output=True,
         text=True,

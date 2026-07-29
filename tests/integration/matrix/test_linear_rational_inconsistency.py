@@ -15,12 +15,13 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
 from jacobian.linear_capabilities import (
     install_linear_rational_inconsistency_checker,
 )
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def _system(coefficients: list[list[int]], rhs: list[int]) -> dict[str, Any]:
@@ -33,31 +34,31 @@ def _system(coefficients: list[list[int]], rhs: list[int]) -> dict[str, Any]:
     }
 
 
-def _kernel_with_checker(root: Path) -> JacobianKernel:
-    kernel = JacobianKernel(root)
+def _runtime_with_checker(root: Path) -> JacobianRuntime:
+    runtime = create_runtime(root)
     adapter, _installation = install_linear_rational_inconsistency_checker(
-        kernel.store,
-        kernel.schemas,
-        kernel.artifacts,
-        kernel.linear,
-        kernel.verification,
-        kernel.checkers,
+        runtime.core.store,
+        runtime.core.schemas,
+        runtime.core.artifacts,
+        runtime.core.linear,
+        runtime.services.verification,
+        runtime.core.checkers,
         authorize_checker=True,
     )
     assert adapter is not None
-    kernel.register_capability(adapter)
-    return kernel
+    runtime.core.capabilities.register(adapter)
+    return runtime
 
 
 def test_python_flint_finds_normalized_unverified_inconsistency_witness(
-    kernel,
+    runtime,
 ) -> None:
     assert (
-        kernel.python_flint_runtime.availability
+        runtime.portfolio.python_flint_runtime.availability
         is CapabilityProviderAvailability.AVAILABLE
     )
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_inconsistency.find",
         {
             "system": _system([[1, 1], [2, 2]], [1, 3]),
@@ -77,16 +78,18 @@ def test_python_flint_finds_normalized_unverified_inconsistency_witness(
         result.relationships[0].relation_id
         == "linear.relation.inconsistency-certificate-of"
     )
-    resolved = kernel.linear.resolve_inconsistency(result.output["certificate_uri"])
+    resolved = runtime.core.linear.resolve_inconsistency(
+        result.output["certificate_uri"]
+    )
     assert (
         resolved.certificate.system.system_artifact_uri == result.output["system_uri"]
     )
     assert result.output["system_uri"] in resolved.artifact.manifest.parents
 
 
-def test_no_certificate_is_not_a_consistency_conclusion(kernel) -> None:
+def test_no_certificate_is_not_a_consistency_conclusion(runtime) -> None:
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_inconsistency.find",
         {"system": _system([[1, 0], [0, 1]], [2, 3])},
         mode=CapabilityMode.EXPLORE,
@@ -100,15 +103,15 @@ def test_no_certificate_is_not_a_consistency_conclusion(kernel) -> None:
 
 
 def test_independent_checker_verifies_inconsistency(tmp_path: Path) -> None:
-    kernel = _kernel_with_checker(tmp_path)
+    runtime = _runtime_with_checker(tmp_path)
     found = _invoke(
-        kernel,
+        runtime,
         "linear.rational_inconsistency.find",
         {"system": _system([[1, 1], [2, 2]], [1, 3])},
         mode=CapabilityMode.EXPLORE,
     )
     verified = _invoke(
-        kernel,
+        runtime,
         "linear.rational_inconsistency.verify",
         {"certificate_uri": found.output["certificate_uri"]},
         mode=CapabilityMode.VERIFY,
@@ -122,7 +125,7 @@ def test_independent_checker_verifies_inconsistency(tmp_path: Path) -> None:
 
 
 def test_inconsistency_timeout_retains_no_certificate(
-    kernel,
+    runtime,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -137,7 +140,7 @@ def test_inconsistency_timeout_retains_no_certificate(
         ),
     )
     result = _invoke(
-        kernel,
+        runtime,
         "linear.rational_inconsistency.find",
         {"system": _system([[1]], [1])},
         mode=CapabilityMode.EXPLORE,

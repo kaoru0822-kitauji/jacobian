@@ -20,11 +20,11 @@ from jacobian.schema_registry import model_schema
 
 if TYPE_CHECKING:
     from jacobian.atomic_capabilities import AtomicServiceAdapter
-    from jacobian.kernel import JacobianKernel
+    from jacobian.runtime.services import ApplicationServices
 
 
 def build_domain_adapters(
-    kernel: JacobianKernel,
+    application: ApplicationServices,
     *,
     adapter: AdapterFactory,
     schema: SchemaBuilder,
@@ -71,7 +71,7 @@ def build_domain_adapters(
                 ),
             ),
             output_schema=model_schema(TransformationApplyResult),
-            invoke=lambda p: kernel.transformations.apply(
+            invoke=lambda p: application.transformations.apply(
                 **{
                     **p,
                     "requested_relation": TransformationRelation(
@@ -98,7 +98,7 @@ def build_domain_adapters(
                 required=("transformation_uri",),
             ),
             output_schema=model_schema(ResultEnvelope),
-            invoke=lambda p: kernel.verification.verify_transformation(**p),
+            invoke=lambda p: application.verification.verify_transformation(**p),
             unverified_assurance_level=CapabilityAssuranceLevel.HEURISTIC,
             unverified_basis=("the checker did not accept the transformation relation"),
             tags=("transform", "verification"),
@@ -130,7 +130,9 @@ def build_domain_adapters(
                 required=("point_uri", "generator_set_uri"),
             ),
             output_schema=model_schema(PolytopeSeparateResult),
-            invoke=lambda p: kernel.polytope.separate(PolytopeSeparateRequest(**p)),
+            invoke=lambda p: application.polytope.separate(
+                PolytopeSeparateRequest(**p)
+            ),
             tags=("polytope", "exact"),
             provider="jacobian.z3",
         ),
@@ -150,7 +152,7 @@ def build_domain_adapters(
                 required=("subject_uri", "verification_record_uri"),
             ),
             output_schema=model_schema(ParameterRegion),
-            invoke=lambda p: kernel.conjectures.promote_parameter_region(**p),
+            invoke=lambda p: application.conjectures.promote_parameter_region(**p),
             read_only=True,
             tags=("parameter", "verification"),
         ),

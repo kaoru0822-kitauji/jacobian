@@ -20,31 +20,31 @@ from jacobian.contracts.workspaces import (
     WorkspaceScratchDraft,
     WorkspaceWriteRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime import create_runtime
 from jacobian.workspaces import (
     WorkspaceConflictError,
     WorkspaceIdempotencyError,
     WorkspaceReferenceError,
 )
 
-pytestmark = pytest.mark.usefixtures("initialized_kernel_store")
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def test_workspace_open_is_idempotent_and_restart_replays_revision(
     tmp_path: Path,
 ) -> None:
-    kernel = JacobianKernel(tmp_path)
+    runtime = create_runtime(tmp_path)
     request = WorkspaceOpenRequest(
         idempotency_key="workspace-open-replay-001",
         name="replay fixture",
         problem="Prove or refute the fixture claim.",
     )
 
-    first = kernel.workspaces.open(request)
-    second = kernel.workspaces.open(request)
+    first = runtime.core.workspaces.open(request)
+    second = runtime.core.workspaces.open(request)
 
     assert second == first
-    revision_artifact = kernel.store.get(first.revision_artifact_uri)
+    revision_artifact = runtime.core.store.get(first.revision_artifact_uri)
     revision = WorkspaceRevision.model_validate(revision_artifact.payload)
     assert revision.revision_id == first.revision_id
     assert revision.parent_revision is None
@@ -53,8 +53,8 @@ def test_workspace_open_is_idempotent_and_restart_replays_revision(
     assert revision.focus is not None
     assert revision.focus.active_item_id == first.problem_card_id
 
-    restarted = JacobianKernel(tmp_path)
-    resume = restarted.workspaces.query(
+    restarted = create_runtime(tmp_path)
+    resume = restarted.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=first.workspace_id,
             branch_id=first.branch_id,
@@ -69,8 +69,8 @@ def test_workspace_open_is_idempotent_and_restart_replays_revision(
     assert "retrieval does not promote" in resume.warning
 
 
-def test_workspace_write_cannot_add_a_second_problem(kernel) -> None:
-    opened = _open(kernel, key="workspace-open-single-problem-001")
+def test_workspace_write_cannot_add_a_second_problem(runtime) -> None:
+    opened = _open(runtime, key="workspace-open-single-problem-001")
     problem_draft = WorkspaceFindingDraft(
         client_ref="P2",
         kind=WorkspaceFindingKind.PROBLEM,
@@ -106,22 +106,22 @@ def test_workspace_write_cannot_add_a_second_problem(kernel) -> None:
         ValidationError,
         match=r"only workspace\.open may create the canonical PROBLEM",
     ):
-        kernel.workspaces.write(bypassed_contract)
+        runtime.core.workspaces.write(bypassed_contract)
 
     with (
         pytest.raises(
             WorkspaceReferenceError,
             match=r"only workspace\.open may create the canonical PROBLEM",
         ),
-        kernel.workspaces._connect() as connection,
+        runtime.core.workspaces._connect() as connection,
     ):
-        kernel.workspaces._prepare_write(
+        runtime.core.workspaces._prepare_write(
             connection,
             bypassed_contract,
             "sha256:" + ("0" * 64),
         )
 
-    resumed = kernel.workspaces.query(
+    resumed = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -134,9 +134,9 @@ def test_workspace_write_cannot_add_a_second_problem(kernel) -> None:
 
 
 def test_workspace_write_builds_resume_frontier_and_attempt_views(
-    kernel,
+    runtime,
 ) -> None:
-    opened = _open(kernel)
+    opened = _open(runtime)
     request = WorkspaceWriteRequest(
         idempotency_key="workspace-write-batch-001",
         workspace_id=opened.workspace_id,
@@ -184,8 +184,8 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
         focus=WorkspaceFocusDraft(active_ref="G1", pinned_refs=("G1", "L1")),
     )
 
-    written = kernel.workspaces.write(request)
-    reused = kernel.workspaces.write(request)
+    written = runtime.core.workspaces.write(request)
+    reused = runtime.core.workspaces.write(request)
 
     assert reused == written
     assert written.scratch_written == 1
@@ -203,14 +203,14 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
     assert "cannot establish an exact mathematical conclusion" in (
         written.assurance_notice
     )
-    revision_artifact = kernel.store.get(written.revision_artifact_uri)
+    revision_artifact = runtime.core.store.get(written.revision_artifact_uri)
     assert opened.revision_artifact_uri in revision_artifact.manifest.parents
     revision = WorkspaceRevision.model_validate(revision_artifact.payload)
     assert revision.parent_revision == opened.revision_id
     assert {item.verification for item in revision.findings} == {"UNVERIFIED"}
     assert {item.verification for item in revision.attempts} == {"UNVERIFIED"}
 
-    resume = kernel.workspaces.query(
+    resume = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -231,7 +231,7 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
     assert resume.resume.open_goals[0].assumption_ids == (written.id_map["A1"],)
     assert resume.resume.recent_attempts[0].verification == "UNVERIFIED"
 
-    frontier = kernel.workspaces.query(
+    frontier = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -243,7 +243,7 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
     assert frontier.frontier[0].last_attempt is not None
     assert frontier.frontier[0].last_attempt.outcome is WorkspaceAttemptOutcome.BLOCKED
 
-    attempts = kernel.workspaces.query(
+    attempts = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -255,10 +255,10 @@ def test_workspace_write_builds_resume_frontier_and_attempt_views(
 
 
 def test_workspace_rejects_stale_base_without_partial_index_writes(
-    kernel,
+    runtime,
 ) -> None:
-    opened = _open(kernel)
-    accepted = kernel.workspaces.write(
+    opened = _open(runtime)
+    accepted = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-accepted-001",
             workspace_id=opened.workspace_id,
@@ -276,7 +276,7 @@ def test_workspace_rejects_stale_base_without_partial_index_writes(
     )
 
     with pytest.raises(WorkspaceConflictError, match="base_revision is stale"):
-        kernel.workspaces.write(
+        runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key="workspace-write-stale-001",
                 workspace_id=opened.workspace_id,
@@ -293,7 +293,7 @@ def test_workspace_rejects_stale_base_without_partial_index_writes(
             )
         )
 
-    with sqlite3.connect(kernel.store.db_path) as connection:
+    with sqlite3.connect(runtime.core.store.db_path) as connection:
         finding_count = connection.execute(
             "SELECT COUNT(*) FROM workspace_findings WHERE workspace_id = ?",
             (opened.workspace_id,),
@@ -304,7 +304,7 @@ def test_workspace_rejects_stale_base_without_partial_index_writes(
         ).fetchone()[0]
     assert finding_count == 2
     assert revision_count == 2
-    current = kernel.workspaces.query(
+    current = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -318,7 +318,7 @@ def test_workspace_rejects_stale_base_without_partial_index_writes(
         WorkspaceConflictError,
         match="query revision_id is stale",
     ):
-        kernel.workspaces.query(
+        runtime.core.workspaces.query(
             WorkspaceQueryRequest(
                 workspace_id=opened.workspace_id,
                 branch_id=opened.branch_id,
@@ -329,12 +329,12 @@ def test_workspace_rejects_stale_base_without_partial_index_writes(
 
 
 def test_workspace_rejects_idempotency_rebinding_and_invalid_references(
-    kernel,
+    runtime,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-binding-001")
+    opened = _open(runtime, key="workspace-open-binding-001")
 
     with pytest.raises(WorkspaceIdempotencyError, match="different workspace request"):
-        kernel.workspaces.open(
+        runtime.core.workspaces.open(
             WorkspaceOpenRequest(
                 idempotency_key="workspace-open-binding-001",
                 name="different",
@@ -343,7 +343,7 @@ def test_workspace_rejects_idempotency_rebinding_and_invalid_references(
         )
 
     with pytest.raises(WorkspaceReferenceError, match="does not exist"):
-        kernel.workspaces.write(
+        runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key="workspace-write-missing-ref-001",
                 workspace_id=opened.workspace_id,
@@ -362,7 +362,7 @@ def test_workspace_rejects_idempotency_rebinding_and_invalid_references(
         )
 
     with pytest.raises(WorkspaceReferenceError, match="contain a cycle"):
-        kernel.workspaces.write(
+        runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key="workspace-write-cycle-001",
                 workspace_id=opened.workspace_id,
@@ -388,10 +388,10 @@ def test_workspace_rejects_idempotency_rebinding_and_invalid_references(
         )
 
 
-def test_workspace_focus_clear_is_explicit_and_resumable(kernel) -> None:
-    opened = _open(kernel, key="workspace-open-focus-clear-001")
+def test_workspace_focus_clear_is_explicit_and_resumable(runtime) -> None:
+    opened = _open(runtime, key="workspace-open-focus-clear-001")
 
-    cleared = kernel.workspaces.write(
+    cleared = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-focus-clear-001",
             workspace_id=opened.workspace_id,
@@ -402,7 +402,7 @@ def test_workspace_focus_clear_is_explicit_and_resumable(kernel) -> None:
     )
 
     assert cleared.focus_updated is True
-    resume = kernel.workspaces.query(
+    resume = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,

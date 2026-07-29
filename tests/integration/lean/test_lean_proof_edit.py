@@ -10,7 +10,7 @@ from jacobian.contracts.capabilities import (
     CapabilityMode,
     CapabilityRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 pytestmark = [
     pytest.mark.external_backend,
@@ -20,15 +20,15 @@ pytestmark = [
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def test_exact_proof_edit_is_bound_to_authorized_lean_check(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.proof_edit.validate",
             mode=CapabilityMode.VERIFY,
@@ -52,7 +52,7 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(
     assert result.output["verification_record_uri"] in result.artifact_uris
     assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
     assert result.output["proof_edit_uri"] in result.artifact_uris
-    edit = kernel.store.get(result.output["proof_edit_uri"])
+    edit = runtime.core.store.get(result.output["proof_edit_uri"])
     assert edit.payload["edited_proof"] == "by\n  trivial"
     assert set(edit.manifest.parents) == {
         result.output["claim_uri"],
@@ -64,10 +64,10 @@ def test_exact_proof_edit_is_bound_to_authorized_lean_check(
 
 
 def test_proof_edit_rejects_holes_before_checker_invocation(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.proof_edit.validate",
             mode=CapabilityMode.VERIFY,
@@ -85,10 +85,10 @@ def test_proof_edit_rejects_holes_before_checker_invocation(
 
 
 def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.proof_edit.validate",
             mode=CapabilityMode.VERIFY,
@@ -109,10 +109,10 @@ def test_rejected_edit_keeps_checker_evidence_without_becoming_accepted(
 
 
 def test_valid_edit_is_not_accepted_when_original_baseline_is_invalid(
-    kernel,
+    runtime,
 ) -> None:
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="lean.proof_edit.validate",
             mode=CapabilityMode.VERIFY,

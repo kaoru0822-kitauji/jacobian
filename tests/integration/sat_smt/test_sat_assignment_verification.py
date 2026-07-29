@@ -19,7 +19,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import SatResourceBudget
 from jacobian.contracts.verification import VerificationRecord
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 from jacobian.verification import CheckerExecutionError
 
 
@@ -37,15 +37,15 @@ def _producer() -> CapabilityProviderRuntime:
 
 
 def _assignment(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
     *,
     values: tuple[bool, bool],
 ) -> tuple[str, str]:
-    cnf = kernel.sat.put_cnf(
+    cnf = runtime.core.sat.put_cnf(
         variable_names=("a", "b"),
         clauses=((-1, 2), (1, 2)),
     )
-    assignment = kernel.sat.put_assignment(
+    assignment = runtime.core.sat.put_assignment(
         cnf_uri=cnf.artifact_uri,
         values=values,
         producer=_producer(),
@@ -54,8 +54,8 @@ def _assignment(
     return cnf.artifact_uri, assignment.artifact_uri
 
 
-def _verify(kernel: JacobianKernel, assignment_uri: str):
-    return kernel.capabilities.invoke(
+def _verify(runtime: JacobianRuntime, assignment_uri: str):
+    return runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="sat.model.verify",
             mode=CapabilityMode.VERIFY,
@@ -66,10 +66,10 @@ def _verify(kernel: JacobianKernel, assignment_uri: str):
 
 @pytest.mark.subprocess
 def test_sat_assignment_is_verified_by_an_authorized_clean_process(
-    kernel_with_references,
+    runtime_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
+    cnf_uri, assignment_uri = _assignment(runtime_with_references, values=(False, True))
 
     monkeypatch.setattr(
         jacobian_checkers.sat,
@@ -83,7 +83,7 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
             "detail": "parent-process monkeypatch",
         },
     )
-    result = _verify(kernel_with_references, assignment_uri)
+    result = _verify(runtime_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
@@ -93,9 +93,12 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
     assert result.output["assignment_uri"] == assignment_uri
     record_uri = result.assurance.verification_record_uri
     assert record_uri is not None
-    record_artifact = kernel_with_references.store.get(record_uri)
+    record_artifact = runtime_with_references.core.store.get(record_uri)
     record = VerificationRecord.model_validate(record_artifact.payload)
-    assert record.checker_id == kernel_with_references.sat_assignment_checker.checker_id
+    assert (
+        record.checker_id
+        == runtime_with_references.core.sat_assignment_checker.checker_id
+    )
     assert record.evidence_uri == result.output["witness_uri"]
     assert set(record_artifact.manifest.parents) == {
         cnf_uri,
@@ -106,13 +109,13 @@ def test_sat_assignment_is_verified_by_an_authorized_clean_process(
 
 @pytest.mark.subprocess
 def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
-    kernel_with_references,
+    runtime_with_references,
 ) -> None:
     _cnf_uri, assignment_uri = _assignment(
-        kernel_with_references, values=(False, False)
+        runtime_with_references, values=(False, False)
     )
 
-    result = _verify(kernel_with_references, assignment_uri)
+    result = _verify(runtime_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
@@ -123,28 +126,28 @@ def test_unsatisfying_assignment_is_rejected_without_an_opposite_conclusion(
 
 
 def test_sat_assignment_verify_requires_operator_authorized_checker(
-    kernel,
+    runtime,
 ) -> None:
 
-    assert kernel.sat_assignment_checker.checker_id is None
+    assert runtime.portfolio.sat_assignment_checker.checker_id is None
     assert "sat.model.verify" not in {
         descriptor.capability_id
-        for descriptor in kernel.capabilities.catalog().capabilities
+        for descriptor in runtime.core.capabilities.catalog().capabilities
     }
 
 
 def test_misbound_assignment_artifact_fails_before_checker_dispatch(
-    kernel_with_references,
+    runtime_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
-    second = kernel_with_references.sat.put_cnf(
+    cnf_uri, assignment_uri = _assignment(runtime_with_references, values=(False, True))
+    second = runtime_with_references.core.sat.put_cnf(
         variable_names=("a", "b"), clauses=((1,),)
     )
-    stored = kernel_with_references.store.get(assignment_uri)
+    stored = runtime_with_references.core.store.get(assignment_uri)
     payload = deepcopy(stored.payload)
     payload["cnf"]["cnf_artifact_uri"] = second.artifact_uri
-    forged = kernel_with_references.store.put(
+    forged = runtime_with_references.core.store.put(
         schema_uri=stored.manifest.schema_uri,
         semantics_uri=stored.manifest.semantics_uri,
         payload=payload,
@@ -159,9 +162,11 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
         raise AssertionError("checker must not receive malformed source bindings")
 
     monkeypatch.setattr(
-        kernel_with_references.verification, "_run_checker", unexpected_checker
+        runtime_with_references.services.verification,
+        "_run_checker",
+        unexpected_checker,
     )
-    result = _verify(kernel_with_references, forged.artifact_uri)
+    result = _verify(runtime_with_references, forged.artifact_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
@@ -169,16 +174,20 @@ def test_misbound_assignment_artifact_fails_before_checker_dispatch(
 
 
 def test_checker_timeout_cannot_create_a_sat_conclusion(
-    kernel_with_references,
+    runtime_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
+    _cnf_uri, assignment_uri = _assignment(
+        runtime_with_references, values=(False, True)
+    )
 
     def timeout(**_kwargs: Any):
         raise subprocess.TimeoutExpired(cmd=("sat-assignment-checker",), timeout=1)
 
-    monkeypatch.setattr(kernel_with_references.verification, "_run_checker", timeout)
-    result = _verify(kernel_with_references, assignment_uri)
+    monkeypatch.setattr(
+        runtime_with_references.services.verification, "_run_checker", timeout
+    )
+    result = _verify(runtime_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.TIMEOUT
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED
@@ -188,16 +197,20 @@ def test_checker_timeout_cannot_create_a_sat_conclusion(
 
 
 def test_checker_error_cannot_create_a_sat_conclusion(
-    kernel_with_references,
+    runtime_with_references,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _cnf_uri, assignment_uri = _assignment(kernel_with_references, values=(False, True))
+    _cnf_uri, assignment_uri = _assignment(
+        runtime_with_references, values=(False, True)
+    )
 
     def fail(**_kwargs: Any):
         raise CheckerExecutionError("deliberate checker failure")
 
-    monkeypatch.setattr(kernel_with_references.verification, "_run_checker", fail)
-    result = _verify(kernel_with_references, assignment_uri)
+    monkeypatch.setattr(
+        runtime_with_references.services.verification, "_run_checker", fail
+    )
+    result = _verify(runtime_with_references, assignment_uri)
 
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.assurance.level is not CapabilityAssuranceLevel.VERIFIED

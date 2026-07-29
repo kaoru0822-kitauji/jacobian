@@ -6,11 +6,11 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 
 def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     polynomial = {
         "terms": [
@@ -20,7 +20,7 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
         ]
     }
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.factor.compute",
             input={"variable": "x", "polynomial": polynomial},
@@ -34,20 +34,23 @@ def test_factor_compute_preserves_multiplicity_and_reconstructs_exactly(
     assert result.output["product_reconstruction"] == "EXACT"
     assert result.output["irreducibility_verification"] == "UNVERIFIED"
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    source = kernel.store.get(result.output["source_polynomial_uri"])
-    factorization = kernel.store.get(result.output["factorization_uri"])
-    assert source.manifest.semantics_uri == kernel.polynomial.polynomial_semantics_uri
+    source = runtime.core.store.get(result.output["source_polynomial_uri"])
+    factorization = runtime.core.store.get(result.output["factorization_uri"])
+    assert (
+        source.manifest.semantics_uri
+        == runtime.portfolio.polynomial.polynomial_semantics_uri
+    )
     assert (
         factorization.manifest.semantics_uri
-        == kernel.polynomial.factorization_semantics_uri
+        == runtime.portfolio.polynomial.factorization_semantics_uri
     )
     assert source.manifest.semantics_uri != factorization.manifest.semantics_uri
 
 
 def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.factor.compute",
             input={"variable": "x", "polynomial": {"terms": []}},
@@ -62,7 +65,7 @@ def test_factor_compute_handles_zero_as_a_coefficient_not_a_unit(
 
 
 def test_factor_compute_preserves_rational_coefficient_and_irreducible_factor(
-    kernel: JacobianKernel,
+    runtime: JacobianRuntime,
 ) -> None:
     polynomial = {
         "terms": [
@@ -77,7 +80,7 @@ def test_factor_compute_preserves_rational_coefficient_and_irreducible_factor(
         ]
     }
 
-    result = kernel.capabilities.invoke(
+    result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.factor.compute",
             input={"variable": "x", "polynomial": polynomial},

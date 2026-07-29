@@ -19,9 +19,9 @@ from jacobian.workspaces import (
 )
 
 
-def test_workspace_invalid_marks_leave_no_partial_state(kernel) -> None:
-    opened = _open(kernel, key="workspace-open-invalid-mark-001")
-    seeded = kernel.workspaces.write(
+def test_workspace_invalid_marks_leave_no_partial_state(runtime) -> None:
+    opened = _open(runtime, key="workspace-open-invalid-mark-001")
+    seeded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-invalid-mark-seed-001",
             workspace_id=opened.workspace_id,
@@ -91,9 +91,9 @@ def test_workspace_invalid_marks_leave_no_partial_state(kernel) -> None:
     )
     for invalid in invalid_requests:
         with pytest.raises(WorkspaceReferenceError):
-            kernel.workspaces.write(invalid)
+            runtime.core.workspaces.write(invalid)
 
-    accepted = kernel.workspaces.write(
+    accepted = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-valid-supersede-001",
             workspace_id=opened.workspace_id,
@@ -111,7 +111,7 @@ def test_workspace_invalid_marks_leave_no_partial_state(kernel) -> None:
         )
     )
     with pytest.raises(WorkspaceReferenceError, match=r"supersession.*cycle"):
-        kernel.workspaces.write(
+        runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key="workspace-write-invalid-cycle-001",
                 workspace_id=opened.workspace_id,
@@ -129,7 +129,7 @@ def test_workspace_invalid_marks_leave_no_partial_state(kernel) -> None:
             )
         )
 
-    with sqlite3.connect(kernel.store.db_path) as connection:
+    with sqlite3.connect(runtime.core.store.db_path) as connection:
         revision_count = connection.execute(
             "SELECT COUNT(*) FROM workspace_revisions WHERE workspace_id = ?",
             (opened.workspace_id,),
@@ -143,10 +143,10 @@ def test_workspace_invalid_marks_leave_no_partial_state(kernel) -> None:
 
 
 def test_workspace_invalidating_mark_requires_explicit_reactivation(
-    kernel,
+    runtime,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-explicit-reactivation-001")
-    seeded = kernel.workspaces.write(
+    opened = _open(runtime, key="workspace-open-explicit-reactivation-001")
+    seeded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-explicit-reactivation-seed-001",
             workspace_id=opened.workspace_id,
@@ -169,7 +169,7 @@ def test_workspace_invalidating_mark_requires_explicit_reactivation(
             ),
         )
     )
-    retracted = kernel.workspaces.write(
+    retracted = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-explicit-reactivation-retract-001",
             workspace_id=opened.workspace_id,
@@ -190,7 +190,7 @@ def test_workspace_invalidating_mark_requires_explicit_reactivation(
         WorkspaceReferenceError,
         match="must be marked ACTIVE before",
     ):
-        kernel.workspaces.write(
+        runtime.core.workspaces.write(
             WorkspaceWriteRequest(
                 idempotency_key="workspace-write-explicit-reactivation-bypass-001",
                 workspace_id=opened.workspace_id,
@@ -207,7 +207,7 @@ def test_workspace_invalidating_mark_requires_explicit_reactivation(
             )
         )
 
-    unchanged = kernel.workspaces.query(
+    unchanged = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,
@@ -222,10 +222,10 @@ def test_workspace_invalidating_mark_requires_explicit_reactivation(
 
 
 def test_workspace_archiving_is_organizational_not_invalidation(
-    kernel,
+    runtime,
 ) -> None:
-    opened = _open(kernel, key="workspace-open-archive-001")
-    seeded = kernel.workspaces.write(
+    opened = _open(runtime, key="workspace-open-archive-001")
+    seeded = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-archive-seed-001",
             workspace_id=opened.workspace_id,
@@ -248,7 +248,7 @@ def test_workspace_archiving_is_organizational_not_invalidation(
             ),
         )
     )
-    archived = kernel.workspaces.write(
+    archived = runtime.core.workspaces.write(
         WorkspaceWriteRequest(
             idempotency_key="workspace-write-archive-mark-001",
             workspace_id=opened.workspace_id,
@@ -265,7 +265,7 @@ def test_workspace_archiving_is_organizational_not_invalidation(
         )
     )
 
-    context = kernel.workspaces.query(
+    context = runtime.core.workspaces.query(
         WorkspaceQueryRequest(
             workspace_id=opened.workspace_id,
             branch_id=opened.branch_id,

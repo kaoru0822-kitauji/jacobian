@@ -101,9 +101,9 @@ class ClaimDecompositionAdapter:
                 "Decompose only the requested top-level connective while preserving "
                 "the exact ordered subtrees and a deterministic reconstruction record."
             ),
-            provider="jacobian.kernel",
+            provider="jacobian.runtime",
             provider_runtime=known_provider_runtime(
-                "jacobian.kernel", features=("claim", "structured-decomposition")
+                "jacobian.runtime", features=("claim", "structured-decomposition")
             ),
             modes=(CapabilityMode.EXPLORE,),
             input_schema=model_schema(ClaimDecompositionRequest),

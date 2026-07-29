@@ -13,7 +13,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.kernel import JacobianKernel
+from jacobian.runtime.model import JacobianRuntime
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REPRODUCTIONS = (
@@ -31,8 +31,8 @@ pytestmark = [
 
 
 @pytest.fixture
-def kernel(kernel_with_references: JacobianKernel) -> JacobianKernel:
-    return kernel_with_references
+def runtime(runtime_with_references: JacobianRuntime) -> JacobianRuntime:
+    return runtime_with_references
 
 
 def _load_cases() -> list[dict[str, Any]]:
@@ -50,11 +50,11 @@ def _load_cases() -> list[dict[str, Any]]:
 
 
 def test_sat_public_reproductions_reach_checker_bound_results(
-    kernel,
+    runtime,
 ) -> None:
 
     for case in _load_cases():
-        cnf = kernel.sat.put_cnf(
+        cnf = runtime.core.sat.put_cnf(
             variable_names=tuple(case["variable_names"]),
             clauses=tuple(tuple(clause) for clause in case["clauses"]),
         )
@@ -67,7 +67,7 @@ def test_sat_public_reproductions_reach_checker_bound_results(
             verify_id = "sat.unsat_proof.verify"
             evidence_field = "proof_uri"
 
-        found = kernel.capabilities.invoke(
+        found = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=find_id,
                 mode=CapabilityMode.EXPLORE,
@@ -84,7 +84,7 @@ def test_sat_public_reproductions_reach_checker_bound_results(
         if case["expected_status"] == "SATISFIABLE":
             assert found.output["assignment"] is not None
 
-        verified = kernel.capabilities.invoke(
+        verified = runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=verify_id,
                 mode=CapabilityMode.VERIFY,
