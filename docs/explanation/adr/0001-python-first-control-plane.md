@@ -55,7 +55,7 @@ compute kernel.
 These systems remain typed backends:
 
 ```text
-Python kernel
+Python runtime
     ├── Z3 / cvc5 / PySAT / OR-Tools
     ├── HiGHS / SCIP / SoPlex
     ├── nauty / Graphillion
@@ -133,7 +133,7 @@ Candidate backends to evaluate when a capability needs them:
 Jacobian does not plan to provide a security sandbox. Plugins and checkers are
 operator-installed local code. A remote or multi-tenant deployment that accepts
 untrusted executable uploads would need its own isolation layer outside the
-research kernel.
+research runtime.
 
 Optional backends are installed in dependency groups. They do not become
 dependencies of the trusted checker API merely because a search plugin uses

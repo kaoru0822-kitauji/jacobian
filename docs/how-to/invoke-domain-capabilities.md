@@ -50,6 +50,7 @@ from pathlib import Path
 from mcp import Client
 
 from jacobian.adapters.mcp.server import create_server
+from jacobian.runtime import CheckerAuthorityMode
 
 
 STATE_DIR = Path(".jacobian-domain-how-to")
@@ -83,7 +84,7 @@ async def tool(client: Client, name: str, arguments: dict) -> dict:
 
 
 async def main() -> None:
-    server = create_server(STATE_DIR, install_references=True)
+    server = create_server(STATE_DIR, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED)
     async with Client(server, raise_exceptions=True) as client:
         described = await tool(
             client,

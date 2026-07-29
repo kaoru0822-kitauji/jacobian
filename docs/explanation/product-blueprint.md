@@ -80,7 +80,7 @@ consolidation, or retirement before adding another stable ID.
 
 The boundaries are intentionally narrow:
 
-- The kernel owns artifact identity, execution status, assurance, checker
+- The runtime owns artifact identity, execution status, assurance, checker
   authorization, budgets, and provenance.
 - Capability adapters connect external SAT, SMT, CAS, optimization, retrieval,
   and proof systems to the primitive contract.
@@ -172,9 +172,9 @@ contract conformance, not autonomous portfolio value.
 
 Deploy an operator-approved adapter package with a repeatable
 `--capability-adapter package.module:factory` option. The factory receives the
-tenant's `JacobianKernel` and returns a `CapabilityAdapter`. Loading Python code
-is an operator action, never a model tool; it establishes availability, not
-mathematical trust.
+tenant's explicit `ApplicationServices` graph and returns a
+`CapabilityAdapter`. Loading Python code is an operator action, never a model
+tool; it establishes availability, not mathematical trust.
 
 The always-available bundled catalog contains:
 
@@ -283,7 +283,7 @@ concrete requirements.
 ## Product evidence
 
 The immediate product work is to stabilize the primitive contract, make stage
-composition visible, and exercise external adapters without kernel or MCP
+composition visible, and exercise external adapters without runtime or MCP
 edits. Authenticated hosting, local research memory, and compact tool
 projection support that work; they are not substitutes for useful mathematical
 operations.

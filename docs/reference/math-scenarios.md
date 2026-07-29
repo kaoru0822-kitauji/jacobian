@@ -641,7 +641,7 @@ truth semantics:
 
 Search score, novelty, or model confidence never replaces the promotion gate.
 The scenario harness may use exact enumeration, refinement, tree search,
-evolutionary search, or another strategy without changing kernel records or
+evolutionary search, or another strategy without changing runtime records or
 trust semantics.
 
 ## Claim-transformation and repair scenarios

@@ -359,7 +359,7 @@ resource budget. Preserve the raw proof as a durable artifact but keep bounded
 inline summaries small.
 
 The artifact-contract checkpoint was implemented on 2026-07-26. The base
-kernel now registers model-backed schemas for canonical CNF, total assignment,
+runtime now registers model-backed schemas for canonical CNF, total assignment,
 and raw DRAT proof artifacts without installing a solver, checker, or SAT
 capability. Canonicalization deterministically renumbers the sorted variable
 map, removes duplicate literals and clauses, omits tautologies, orders the
@@ -374,7 +374,7 @@ The assignment-checker checkpoint was implemented on 2026-07-26.
 checker. Its standard-library-only clean-process implementation independently
 validates the canonical CNF and all source, projection, assignment, evidence,
 and lineage bindings before evaluating every clause. Acceptance uses the
-kernel's existing `VerificationRecord` path. Rejection, malformed input, and
+runtime's existing `VerificationRecord` path. Rejection, malformed input, and
 operational failure remain `UNKNOWN` and cannot establish UNSAT.
 
 The CaDiCaL producer checkpoint was implemented on 2026-07-26.

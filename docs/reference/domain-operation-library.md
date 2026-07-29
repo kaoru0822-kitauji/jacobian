@@ -30,7 +30,7 @@ A `DomainBundle` declares:
 
 Bundles are imported through the fixed built-in portfolio. They do not use a
 global registry, recursive package scan, compatibility wrapper, or import-time
-registration. Kernel registration still applies configured exclusions and
+registration. Runtime registration still applies configured exclusions and
 provider health checks uniformly.
 
 The current built-in domains cover arithmetic, number theory, combinatorics,
@@ -111,7 +111,7 @@ remeasures the checker runtime, and replays the mathematical relation in a
 bounded worker.
 
 Built-in producer bundles are installed independently of checker
-authorization. In the reference kernel, exact replay capabilities are present
+authorization. In the reference runtime, exact replay capabilities are present
 only when bundled references are enabled; disabling them leaves the computed
 producers available but removes those verification capabilities from the
 catalog. Operator-installed packages follow the same separation between

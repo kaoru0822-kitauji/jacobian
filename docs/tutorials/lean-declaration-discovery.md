@@ -4,7 +4,7 @@
 
 This tutorial searches pinned Mathlib metadata, inspects the selected theorem,
 then submits a small proof to the independent `lean.check` boundary. Retrieval
-remains `COMPUTED`; only successful kernel replay returns `VERIFIED`.
+remains `COMPUTED`; only successful runtime replay returns `VERIFIED`.
 
 ## Prerequisites
 
@@ -23,6 +23,7 @@ from pathlib import Path
 from mcp import Client
 
 from jacobian.adapters.mcp.server import create_server
+from jacobian.runtime import CheckerAuthorityMode
 
 
 STATE_DIR = Path(".jacobian-lean-tutorial")
@@ -34,7 +35,7 @@ async def tool(client: Client, name: str, arguments: dict) -> dict:
 
 
 async def main() -> None:
-    server = create_server(STATE_DIR, install_references=True)
+    server = create_server(STATE_DIR, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED)
 
     async with Client(server, raise_exceptions=True) as client:
         searched = await tool(

@@ -104,7 +104,7 @@ uv run jacobian-mcp \
   --port 8000 \
   --path /mcp \
   --state-dir /var/lib/jacobian \
-  --max-tenant-kernels 32 \
+  --max-tenant-runtimes 32 \
   --auth-tokens-file /run/secrets/jacobian-tokens.json \
   --public-base-url https://math-tools.example.org
 ```
@@ -112,9 +112,9 @@ uv run jacobian-mcp \
 Put a TLS-terminating reverse proxy in front of `127.0.0.1:8000`. The public
 URL must route `/mcp` without stripping the path. Each authenticated subject is
 mapped to a separate hashed directory below
-`/var/lib/jacobian/tenants/`. The server retains at most 32 tenant kernels by
+`/var/lib/jacobian/tenants/`. The server retains at most 32 tenant runtimes by
 default. Existing tenants remain available at the limit; new tenants receive a
-bounded admission error. Set `--max-tenant-kernels` to match the instance's
+bounded admission error. Set `--max-tenant-runtimes` to match the instance's
 memory budget.
 
 For a disposable local transport test only:
@@ -122,7 +122,7 @@ For a disposable local transport test only:
 ```sh
 uv run jacobian-mcp \
   --transport streamable-http \
-  --max-tenant-kernels 32 \
+  --max-tenant-runtimes 32 \
   --allow-anonymous \
   --anonymous-tenant-id local-smoke-2026-07
 ```
@@ -312,7 +312,7 @@ use `git reset --hard` as a deployment or rollback mechanism.
 ## Warm the Mathlib profile when serving `lean.check`
 
 Set `JACOBIAN_LEAN_WARMUP=1` on a host that serves `lean.check`. Jacobian then
-checks a small pinned Mathlib theorem in the background when each tenant kernel
+checks a small pinned Mathlib theorem in the background when each tenant runtime
 is first used. This warms Lean and filesystem caches without delaying MCP
 startup.
 

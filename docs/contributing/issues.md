@@ -8,7 +8,7 @@ updates; it does not duplicate full issue bodies.
 
 ## Foundational issues
 
-The original verification-kernel decisions and implementation work were posted
+The original verification-runtime decisions and implementation work were posted
 as:
 
 | Area | GitHub issue |
@@ -27,7 +27,7 @@ normative behavior is defined by the
 
 ## Current implementation
 
-The repository implements the verification kernel together with:
+The repository implements the verification runtime together with:
 
 - bounded enumeration experiments and cancellation;
 - implementation-bound canonicalization;

@@ -29,7 +29,7 @@ uv sync --extra flint
 The verifiers do not import Python-FLINT, SymPy, or the producers. They use
 standard-library `fractions.Fraction` arithmetic in the existing clean-process
 checker boundary. Bundled checker authorization remains an explicit
-`install_references=True` operator decision.
+`checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED` operator decision.
 
 ## Exact system input
 

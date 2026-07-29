@@ -14,7 +14,7 @@ The agent-facing MCP surface consists of `capability.describe` and
 `capability.invoke`. Operation names in this document, such as
 `witness.verify`, are capability IDs rather than additional top-level MCP
 tools. Clients may inspect the small default summary to judge fit, then request
-`view = CONTRACT` (or the legacy `COMPACT` alias) for the installed
+`view = CONTRACT` for the installed
 capability's validation-equivalent input schema, or `view = FULL` for the
 complete descriptor and output schema. They then pass that ID and a
 schema-valid payload to `capability.invoke`.

@@ -11,7 +11,7 @@
 
 The [product model](product-blueprint.md) defines Jacobian's composable
 mathematical primitives and their intended users. This document describes the
-kernel, ownership boundaries, and trust zones that support that model.
+runtime, ownership boundaries, and trust zones that support that model.
 
 Models, search algorithms, and domain solvers are allowed to be heuristic,
 stochastic, incomplete, and frequently replaced. Verification is performed by
@@ -20,7 +20,7 @@ semantics.
 
 The agent-facing product has two assurance lanes. They are invocation modes,
 not a prescribed workflow: agents compose `EXPLORE` and `VERIFY` calls in
-whatever order a research strategy requires, and the kernel does not prescribe
+whatever order a research strategy requires, and the runtime does not prescribe
 that order. A checker-backed verification capability may be distinct from the
 capability that produced its evidence.
 
@@ -61,7 +61,7 @@ that schema validation can establish it automatically.
 
 ## Ownership boundaries
 
-The kernel owns artifact identity, execution status, assurance, checker
+The runtime owns artifact identity, execution status, assurance, checker
 authorization, budgets, and provenance. It governs trust and execution policy,
 not mathematical strategy. Capability adapters translate between the primitive
 contract and external mathematical systems and expose a broad portfolio of
@@ -76,7 +76,7 @@ that jointly produce one coherent mathematical outcome. They must not hide a
 multi-step research strategy behind an opaque operation: material stage
 artifacts, relationships, proof obligations, scope, assurance, and independent
 verification boundaries stay visible to the agent. Worked cases and expected
-outcomes belong in scenario and benchmark documents, not in generic kernel
+outcomes belong in scenario and benchmark documents, not in generic runtime
 types.
 
 ## Trust zones
@@ -187,7 +187,7 @@ generic-core type. The current catalog returns full descriptors. As the
 portfolio grows, discovery should add compact summaries, search, and ranking
 rather than placing every schema in the agent's initial context. Domain
 descriptions project exact schemas, binding rules, and executable examples
-without moving mathematical semantics into the generic kernel.
+without moving mathematical semantics into the generic runtime.
 
 Registration also enforces the
 [provider runtime contract](../reference/provider-runtime.md). The catalog
@@ -206,7 +206,7 @@ Only completed invocations are eligible for research memory recording.
 
 A registered capability should expose one observable mathematical operation.
 Broad tasks are workflows over multiple capability invocations owned by the
-agent, not by the kernel. A capability may coordinate several backend calls
+agent, not by the runtime. A capability may coordinate several backend calls
 when they implement that one operation, but material intermediate artifacts
 and verification obligations remain visible.
 
@@ -227,9 +227,10 @@ input and result artifacts with lineage, and caps producer assurance at
 `COMPUTED`. Domain functions therefore depend on mathematical libraries and
 contracts, not stores, protocol envelopes, or checker authorization.
 
-The kernel installs a fixed tuple of built-in bundles. Registration still
-passes through `JacobianKernel.register_capability`, so portfolio exclusions
-apply uniformly. There is no global operation registry, recursive package
+The runtime installs a typed, fixed `PortfolioPlan` of built-in bundles through
+`PortfolioAssembler`. Its `InstallationContext` owns the exclusion-aware
+registration callback, so the runtime remains a lifecycle owner rather than a
+registration facade. There is no global operation registry, recursive package
 scan, compatibility adapter, or registration side effect.
 
 The built-in portfolio spans arithmetic, number theory, combinatorics, finite
@@ -370,7 +371,7 @@ mandatory problem interface. Capability IDs are descriptive and domain-owned,
 for example `graph.enumerate.nonisomorphic` or
 `polynomial.compute.groebner_basis`. Their input and output contracts may use
 domain-specific schemas for candidates, invariants, transformations, witnesses,
-or certificates. The kernel does not impose a universal operation enum or
+or certificates. The runtime does not impose a universal operation enum or
 shared mathematical object ontology.
 
 A domain adapter may delegate its operation to a proof assistant, CAS, solver,
@@ -384,7 +385,7 @@ registry is operator-managed and binds checker digests to supported claim,
 semantics, and certificate versions.
 
 Plugins define mathematical meaning; adapters present their operations through
-`capability.describe` and `capability.invoke`; the kernel enforces the common
+`capability.describe` and `capability.invoke`; the runtime enforces the common
 artifact and assurance contract.
 
 ### Sealed plugin identity
@@ -525,7 +526,7 @@ authorized certificate record whose exact claim and subject artifact URIs are
 parents of that record. The service replays the certificate and accepts the
 promotion only if replay reproduces the same verification-record URI.
 Mathematical interpretation of the region remains in the authorized checker;
-the generic kernel only enforces bindings and evidence state.
+the generic runtime only enforces bindings and evidence state.
 
 ## MCP boundary
 

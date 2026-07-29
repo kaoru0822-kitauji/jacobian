@@ -33,7 +33,7 @@ Help agents find relevant capabilities without loading every schema into their
 initial context. Improve descriptors, examples, catalog search, ranking, and
 artifact relationships from observed agent behavior. Keep research strategy
 with the agent rather than encoding one preferred proof workflow in the
-kernel.
+runtime.
 
 ### Increase independent verification coverage
 
@@ -76,4 +76,4 @@ release specifications record supported contracts.
 The direction is working when better agents can discover and compose the same
 portfolio more effectively, exact conclusions remain independently
 checkable, and adding a mathematical backend does not require redesigning the
-kernel or MCP surface.
+runtime or MCP surface.

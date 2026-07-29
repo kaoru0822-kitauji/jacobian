@@ -23,7 +23,7 @@ Promote a region only when an authorized certificate verification record:
 - has conclusion `TRUE`;
 - replays to the identical verification-record URI.
 
-The generic kernel assigns the verified label from the subject kind only after
+The runtime assigns the verified label from the subject kind only after
 those checks. The authorized domain checker defines what the conditions mean
 and whether the certificate proves them.
 
@@ -53,9 +53,9 @@ untrusted component.
 Rejected because the target claim, sufficient/necessary relation, samples, and
 artifact lineage would remain substitutable.
 
-### Add parameter mathematics to the generic kernel
+### Add parameter mathematics to the generic runtime
 
-Rejected because sufficiency and necessity are domain semantics. The kernel
+Rejected because sufficiency and necessity are domain semantics. The runtime
 should enforce evidence and identity boundaries, not reimplement every
 certificate checker.
 

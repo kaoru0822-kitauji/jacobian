@@ -55,7 +55,7 @@ invocation can demonstrate fail-closed rejection.
 
 The conformance runner requires:
 
-- an isolated `JacobianKernel`;
+- an isolated `JacobianRuntime`;
 - the installed synthetic plugin artifact URI;
 - the expected capability IDs and their successful invocation payloads;
 - fault-injection payloads for declared failure, malformed output, and timeout;

@@ -166,8 +166,7 @@ related operations, and descriptor-owned validated invocation examples:
 }
 ```
 
-`view: "COMPACT"` is retained as a compatibility alias for the previous
-contract projection. Use `view: "FULL"` when complete output schema, provider
+Use `view: "FULL"` when complete output schema, provider
 configuration, licensing, or other audit metadata is required:
 
 ```json
@@ -288,7 +287,7 @@ assurance boundaries.
 Capability adapters connect maintained proof assistants, CAS systems, solvers,
 mathematical databases, and domain libraries to the common contract. Domain
 plugins own mathematical schemas, transformations, invariant meanings, and
-required checker roles. The kernel owns artifact identity, budgets, execution
+required checker roles. The runtime owns artifact identity, budgets, execution
 status, provenance, assurance, and checker authorization.
 
 SAT, SMT, LP, MIP, SyGuS, interval arithmetic, and proof assistants should use
@@ -345,7 +344,7 @@ experiment://<id>/scope
 experiment://<id>/archive
 ```
 
-Only resource templates implemented by the installed kernel are advertised.
+Only resource templates implemented by the installed runtime are advertised.
 Schemas, semantics, plugin manifests, witnesses, certificates, and
 verification records are ordinary artifacts. Resource access does not alter
 their assurance.
