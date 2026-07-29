@@ -21,7 +21,13 @@ SEQUENCE_STATISTIC_CAPABILITIES = (
         sequence_mean,
         "sequence",
         "statistic",
-        invocation_examples=(example("mean_1_2_3", "Compute the mean of 1, 2, and 3.", {"values": ["1", "2", "3"]}),),
+        invocation_examples=(
+            example(
+                "mean_1_2_3",
+                "Compute the mean of 1, 2, and 3.",
+                {"values": ["1", "2", "3"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.median",
@@ -32,6 +38,12 @@ SEQUENCE_STATISTIC_CAPABILITIES = (
         sequence_median,
         "sequence",
         "statistic",
-        invocation_examples=(example("median_1_3_2", "Compute the median of 1, 3, and 2.", {"values": ["1", "3", "2"]}),),
+        invocation_examples=(
+            example(
+                "median_1_3_2",
+                "Compute the median of 1, 3, and 2.",
+                {"values": ["1", "3", "2"]},
+            ),
+        ),
     ),
 )

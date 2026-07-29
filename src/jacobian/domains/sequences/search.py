@@ -22,7 +22,13 @@ SEQUENCE_SEARCH_CAPABILITIES = (
         frequencies,
         "sequence",
         "counting",
-        invocation_examples=(example("frequencies_1_2_1", "Count frequencies in 1, 2, and 1.", {"values": ["1", "2", "1"]}),),
+        invocation_examples=(
+            example(
+                "frequencies_1_2_1",
+                "Count frequencies in 1, 2, and 1.",
+                {"values": ["1", "2", "1"]},
+            ),
+        ),
     ),
     sequence_operation(
         "sequence.compute.zero_indices",
@@ -33,6 +39,12 @@ SEQUENCE_SEARCH_CAPABILITIES = (
         zero_indices,
         "sequence",
         "search",
-        invocation_examples=(example("zero_indices_2_0_3", "Locate zero terms in 2, 0, and 3.", {"values": ["2", "0", "3"]}),),
+        invocation_examples=(
+            example(
+                "zero_indices_2_0_3",
+                "Locate zero terms in 2, 0, and 3.",
+                {"values": ["2", "0", "3"]},
+            ),
+        ),
     ),
 )
