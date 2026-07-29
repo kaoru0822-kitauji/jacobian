@@ -30,7 +30,48 @@ POLYNOMIAL_INVARIANT_CAPABILITIES = (
         "polynomial",
         "gcd",
         "bezout",
-        invocation_examples=(example("gcd_x2_minus_one_x_minus_one", "Compute the GCD of x²-1 and x-1.", {"left": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}, "right": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [1]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}}),),
+        invocation_examples=(
+            example(
+                "gcd_x2_minus_one_x_minus_one",
+                "Compute the GCD of x²-1 and x-1.",
+                {
+                    "left": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [2],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                    "right": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [1],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                },
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.compute.resultant",
@@ -42,7 +83,49 @@ POLYNOMIAL_INVARIANT_CAPABILITIES = (
         "polynomial",
         "resultant",
         "elimination",
-        invocation_examples=(example("resultant_x2_minus_one_x_minus_two", "Compute the resultant of x²-1 and x-2.", {"left": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}, "right": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [1]}, {"coefficient": {"num": "-2", "den": "1"}, "exponents": [0]}]}}, "elimination_variable": "x"}),),
+        invocation_examples=(
+            example(
+                "resultant_x2_minus_one_x_minus_two",
+                "Compute the resultant of x²-1 and x-2.",
+                {
+                    "left": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [2],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                    "right": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [1],
+                                },
+                                {
+                                    "coefficient": {"num": "-2", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                    "elimination_variable": "x",
+                },
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.compute.discriminant",
@@ -53,7 +136,32 @@ POLYNOMIAL_INVARIANT_CAPABILITIES = (
         polynomial_discriminant,
         "polynomial",
         "discriminant",
-        invocation_examples=(example("discriminant_x2_minus_one", "Compute the discriminant of x²-1.", {"polynomial": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}, "variable": "x"}),),
+        invocation_examples=(
+            example(
+                "discriminant_x2_minus_one",
+                "Compute the discriminant of x²-1.",
+                {
+                    "polynomial": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [2],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                    "variable": "x",
+                },
+            ),
+        ),
     ),
     polynomial_operation(
         "polynomial.compute.square_free_decomposition",
@@ -65,7 +173,31 @@ POLYNOMIAL_INVARIANT_CAPABILITIES = (
         "polynomial",
         "square-free",
         "multiplicity",
-        invocation_examples=(example("square_free_x2_minus_one", "Compute the square-free decomposition of x²-1.", {"polynomial": {"polynomial_schema_version": "1", "domain": "QQ", "variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}}),),
+        invocation_examples=(
+            example(
+                "square_free_x2_minus_one",
+                "Compute the square-free decomposition of x²-1.",
+                {
+                    "polynomial": {
+                        "polynomial_schema_version": "1",
+                        "domain": "QQ",
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [2],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    }
+                },
+            ),
+        ),
     ),
 )
 
