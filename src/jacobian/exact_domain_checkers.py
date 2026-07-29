@@ -45,15 +45,19 @@ from jacobian.domains.number_theory.checkers import (
     NUMBER_THEORY_EXACT_REPLAY_CHECKERS,
 )
 from jacobian.domains.polynomial.checkers import POLYNOMIAL_EXACT_REPLAY_CHECKERS
+from jacobian.domains.probability.checkers import PROBABILITY_EXACT_REPLAY_CHECKERS
 from jacobian.domains.projective_geometry.checkers import (
     PROJECTIVE_GEOMETRY_EXACT_REPLAY_CHECKERS,
 )
+from jacobian.domains.topology.checkers import TOPOLOGY_EXACT_REPLAY_CHECKERS
 from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.provider_runtime import (
     exact_domain_checker_provider_runtime,
     graded_syzygy_checker_provider_runtime,
     graph_exact_checker_provider_runtime,
+    probability_exact_checker_provider_runtime,
     projective_arrangement_checker_provider_runtime,
+    topology_exact_checker_provider_runtime,
 )
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
@@ -84,10 +88,17 @@ def _provider_runtime_key(declaration: ExactReplayCheckerDeclaration) -> str:
         return "python-flint"
     if declaration.entrypoint_module == "jacobian_checkers.graph_exact_operations":
         return "finite-graph"
+    if (
+        declaration.entrypoint_module
+        == "jacobian_checkers.exact_probability_operations"
+    ):
+        return "finite-probability"
     if declaration.entrypoint_module == "jacobian_checkers.jacobian_syzygy":
         return "graded-syzygy"
     if declaration.entrypoint_module == "jacobian_checkers.projective_arrangements":
         return "projective-arrangement"
+    if declaration.entrypoint_module == "jacobian_checkers.simplicial_topology":
+        return "topology"
     raise ValueError(
         "exact replay checker declaration uses an unsupported provider runtime"
     )
@@ -101,7 +112,9 @@ def install_exact_domain_checkers(
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
     number_theory: InstalledDomainBundle | None = None,
+    probability: InstalledDomainBundle | None = None,
     projective_geometry: InstalledDomainBundle | None = None,
+    topology: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> ExactDomainCheckerInstallation:
     """Install independent exact replay against dynamically registered schemas."""
@@ -110,8 +123,10 @@ def install_exact_domain_checkers(
     provider_runtimes = {
         "python-flint": exact_domain_checker_provider_runtime(),
         "finite-graph": graph_exact_checker_provider_runtime(),
+        "finite-probability": probability_exact_checker_provider_runtime(),
         "graded-syzygy": graded_syzygy_checker_provider_runtime(),
         "projective-arrangement": (projective_arrangement_checker_provider_runtime()),
+        "topology": topology_exact_checker_provider_runtime(),
     }
     checker_ids: dict[str, str | None] = {}
     declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
@@ -128,9 +143,19 @@ def install_exact_domain_checkers(
             if number_theory is not None
         ),
         *(
+            (probability, item)
+            for item in PROBABILITY_EXACT_REPLAY_CHECKERS
+            if probability is not None
+        ),
+        *(
             (projective_geometry, item)
             for item in PROJECTIVE_GEOMETRY_EXACT_REPLAY_CHECKERS
             if projective_geometry is not None
+        ),
+        *(
+            (topology, item)
+            for item in TOPOLOGY_EXACT_REPLAY_CHECKERS
+            if topology is not None
         ),
     ):
         declarations_by_id[declaration.capability_id] = declaration
@@ -171,6 +196,9 @@ def install_exact_domain_checkers(
             "finite-graph": graph_exact_checker_provider_runtime(
                 checker_ids=authorized_ids["finite-graph"]
             ),
+            "finite-probability": probability_exact_checker_provider_runtime(
+                checker_ids=authorized_ids["finite-probability"]
+            ),
             "graded-syzygy": graded_syzygy_checker_provider_runtime(
                 checker_ids=authorized_ids["graded-syzygy"]
             ),
@@ -178,6 +206,9 @@ def install_exact_domain_checkers(
                 projective_arrangement_checker_provider_runtime(
                     checker_ids=authorized_ids["projective-arrangement"]
                 )
+            ),
+            "topology": topology_exact_checker_provider_runtime(
+                checker_ids=authorized_ids["topology"]
             ),
         },
     )
@@ -195,7 +226,9 @@ def install_exact_domain_verification(
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
     number_theory: InstalledDomainBundle | None = None,
+    probability: InstalledDomainBundle | None = None,
     projective_geometry: InstalledDomainBundle | None = None,
+    topology: InstalledDomainBundle | None = None,
     authorize: bool,
 ) -> tuple[tuple[CapabilityAdapter, ...], ExactDomainCheckerInstallation]:
     """Authorize exact replay and expose domain-owned verification capabilities."""
@@ -207,7 +240,9 @@ def install_exact_domain_verification(
         graph=graph,
         graph_invariants=graph_invariants,
         number_theory=number_theory,
+        probability=probability,
         projective_geometry=projective_geometry,
+        topology=topology,
         authorize=authorize,
     )
     witness_schema_uri = schemas.register_model(
@@ -277,6 +312,32 @@ def install_exact_domain_verification(
         if projective_geometry is not None
         else ()
     )
+    probability_declarations = (
+        tuple(
+            _installed_declaration(
+                probability,
+                declaration,
+                installation,
+            )
+            for declaration in PROBABILITY_EXACT_REPLAY_CHECKERS
+            if installation.checker_ids.get(declaration.capability_id) is not None
+        )
+        if probability is not None
+        else ()
+    )
+    topology_declarations = (
+        tuple(
+            _installed_declaration(
+                topology,
+                declaration,
+                installation,
+            )
+            for declaration in TOPOLOGY_EXACT_REPLAY_CHECKERS
+            if installation.checker_ids.get(declaration.capability_id) is not None
+        )
+        if topology is not None
+        else ()
+    )
     dedicated_declarations = (
         *(
             declaration
@@ -342,6 +403,49 @@ def install_exact_domain_verification(
                 declarations=matrix_declarations,
                 witness_schema_uri=witness_schema_uri,
                 provider_runtime=installation.provider_runtimes["python-flint"],
+            )
+        )
+    if probability_declarations:
+        adapters.append(
+            ExactDomainResultVerificationAdapter(
+                capability_id="probability.result.verify",
+                title="Verify an exact finite-probability result",
+                description=(
+                    "Independently replay one supported stored finite-probability "
+                    "result against its exact input lineage."
+                ),
+                tags=("verification", "exact", "probability", "finite"),
+                store=store,
+                schemas=schemas,
+                artifacts=artifacts,
+                verification=verification,
+                declarations=probability_declarations,
+                witness_schema_uri=witness_schema_uri,
+                provider_runtime=installation.provider_runtimes["finite-probability"],
+            )
+        )
+    if topology_declarations:
+        adapters.append(
+            ExactDomainResultVerificationAdapter(
+                capability_id="topology.result.verify",
+                title="Verify an exact simplicial-topology result",
+                description=(
+                    "Independently reconstruct one finite complex and replay its "
+                    "oriented boundaries or prime-field homology quotient evidence."
+                ),
+                tags=(
+                    "verification",
+                    "exact",
+                    "topology",
+                    "simplicial-homology",
+                ),
+                store=store,
+                schemas=schemas,
+                artifacts=artifacts,
+                verification=verification,
+                declarations=topology_declarations,
+                witness_schema_uri=witness_schema_uri,
+                provider_runtime=installation.provider_runtimes["topology"],
             )
         )
     adapters.extend(dedicated_adapters)
@@ -468,7 +572,8 @@ class ExactDomainResultVerificationAdapter:
                     path="result_uri",
                     hint=(
                         "Pass a result_uri returned by one supported exact "
-                        "polynomial, matrix, or graph producer."
+                        "polynomial, matrix, graph, probability, projective-"
+                        "geometry, or topology producer."
                     ),
                 )
             ) from exc

@@ -20,12 +20,13 @@ def test_pinned_cadical_produces_a_model_and_text_drat_proof(
     attached_complete_runtime,
 ) -> None:
     _ = attached_complete_runtime
-    runtime = cadical_provider_runtime()
-    if runtime.version != CADICAL_VERSION:
+    provider_runtime = cadical_provider_runtime()
+    if provider_runtime.version != CADICAL_VERSION:
         pytest.skip(f"requires pinned CaDiCaL {CADICAL_VERSION}")
+    runtime = provider_runtime
     capability_ids = {
         descriptor.capability_id
-        for descriptor in runtime.core.capabilities.catalog().capabilities
+        for descriptor in provider_runtime.core.capabilities.catalog().capabilities
     }
     assert {"sat.model.find", "sat.unsat_proof.find"}.issubset(capability_ids)
 
