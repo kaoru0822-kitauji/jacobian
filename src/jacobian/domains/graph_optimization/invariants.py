@@ -479,6 +479,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _triangle_count,
         "triangle",
         "exact",
+        invocation_examples=(
+            example(
+                "triangle_graph",
+                "Count triangles in a three-cycle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.radius.compute",
@@ -489,6 +501,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         "radius",
         "exact",
         version="2",
+        invocation_examples=(
+            example(
+                "path_three_radius",
+                "Compute the radius of a three-vertex path.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     ComputedOperation(
         capability_id="graph.k_core.compute",
@@ -500,6 +524,19 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         relation_id="graph.relation.k-core-of",
         tags=("graph", "invariant", "k-core", "exact"),
         invalid_request=_INVALID_REQUEST,
+        invocation_examples=(
+            example(
+                "triangle_two_core",
+                "Compute the 2-core of a triangle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    },
+                    "k": 2,
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.girth.compute",
@@ -509,6 +546,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _girth,
         "girth",
         "exact",
+        invocation_examples=(
+            example(
+                "triangle_girth",
+                "Compute the girth of a triangle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.diameter.compute",
@@ -519,6 +568,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         "diameter",
         "exact",
         version="2",
+        invocation_examples=(
+            example(
+                "path_three_diameter",
+                "Compute the diameter of a three-vertex path.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.edge_connectivity.compute",
@@ -528,6 +589,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _edge_connectivity,
         "edge-connectivity",
         "exact",
+        invocation_examples=(
+            example(
+                "triangle_edge_connectivity",
+                "Compute edge connectivity of a triangle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.vertex_connectivity.compute",
@@ -537,6 +610,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _vertex_connectivity,
         "vertex-connectivity",
         "exact",
+        invocation_examples=(
+            example(
+                "triangle_vertex_connectivity",
+                "Compute vertex connectivity of a triangle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.is_eulerian.compute",
@@ -546,6 +631,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _eulerian,
         "eulerian",
         "exact",
+        invocation_examples=(
+            example(
+                "triangle_eulerian",
+                "Decide whether a triangle has an Eulerian circuit.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.spanning_tree_count.compute",
@@ -555,6 +652,18 @@ EXACT_GRAPH_INVARIANT_CAPABILITIES = (
         _spanning_tree_count,
         "spanning-tree",
         "exact",
+        invocation_examples=(
+            example(
+                "triangle_spanning_trees",
+                "Count spanning trees of a triangle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["b", "c"], ["a", "c"]],
+                    }
+                },
+            ),
+        ),
     ),
     _computed(
         "graph.invariant.maximum_matching.compute",
