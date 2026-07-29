@@ -133,6 +133,7 @@ def test_clean_worker_exit_drains_pipes_inherited_by_descendants() -> None:
     os.name != "posix",
     reason="detached process groups are exercised on POSIX",
 )
+@pytest.mark.slow
 def test_detached_descendant_with_inherited_pipe_fails_closed() -> None:
     completed = run_bounded_process(
         [

@@ -60,10 +60,9 @@ def test_pilot_manifest_is_small_source_backed_and_review_gated() -> None:
 
 
 def test_installed_public_pilot_examples_use_descriptor_mechanism(
-    tmp_path: Path,
+    kernel: JacobianKernel,
 ) -> None:
     pilot = _pilot()
-    kernel = JacobianKernel(tmp_path, install_references=False)
     installed = {
         descriptor.capability_id: descriptor
         for descriptor in kernel.capabilities.catalog().capabilities
@@ -89,8 +88,9 @@ def test_installed_public_pilot_examples_use_descriptor_mechanism(
     }
 
 
-def test_search_pilot_boundaries_use_typed_public_results(tmp_path: Path) -> None:
-    kernel = JacobianKernel(tmp_path, install_references=False)
+def test_search_pilot_boundaries_use_typed_public_results(
+    kernel: JacobianKernel,
+) -> None:
     artifact_uri = "artifact://sha256/" + "a" * 64
     payload = {
         "claim_uri": artifact_uri,

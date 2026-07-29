@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   stress:
-    name: Stress property tests
+    name: Repeated contract and checker tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
