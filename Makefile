@@ -11,6 +11,9 @@ INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
 # Four workers cap memory and repeated per-worker kernel-template setup.
 PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
+# Clean-process tests also construct kernel stores; two workers avoid I/O and
+# memory contention while retaining useful parallel feedback.
+PYTEST_SUBPROCESS_XDIST_ARGS := -n auto --maxprocesses=2 --dist=worksteal
 
 .PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-fast test-unit-fast test-subprocess test-core test-integration test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck
 
@@ -53,7 +56,7 @@ test-unit-fast: ## Sequential unit-only edit loop (excludes slow tests).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" tests/unit $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-subprocess: ## Run clean-process replay tests selected by the subprocess marker.
-	$(UV_RUN) pytest -n 0 -m "subprocess and not lean_runtime" $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+	$(UV_RUN) pytest $(PYTEST_SUBPROCESS_XDIST_ARGS) -m "subprocess and not lean_runtime" $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-core: ## Parallel core suites (same paths as test-fast, uses xdist by default).
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
