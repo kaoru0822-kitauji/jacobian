@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from tests.helpers.rationals import rational_payload as _q
 
 from jacobian.contracts.capabilities import (
@@ -309,6 +310,87 @@ def test_maximum_matching_result_uses_independent_tutte_berge_replay(
     rejected = kernel_with_references.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.invariant.maximum_matching.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": false_result.artifact_uri},
+        )
+    )
+
+    assert rejected.execution.status is ExecutionStatus.COMPLETED
+    assert rejected.output["status"] == "REJECTED"
+    assert rejected.output["conclusion"] == "UNKNOWN"
+    assert rejected.output["verification_record_uri"] is None
+
+
+@pytest.mark.parametrize(
+    ("producer_id", "verifier_id", "result_field", "expected"),
+    (
+        (
+            "graph.invariant.diameter.compute",
+            "graph.invariant.diameter.verify",
+            "diameter",
+            3,
+        ),
+        (
+            "graph.invariant.radius.compute",
+            "graph.invariant.radius.verify",
+            "radius",
+            2,
+        ),
+    ),
+)
+def test_graph_metric_result_uses_independent_all_sources_bfs_replay(
+    kernel_with_references,
+    producer_id: str,
+    verifier_id: str,
+    result_field: str,
+    expected: int,
+) -> None:
+    computed = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=producer_id,
+            input={
+                "graph": {
+                    "vertices": ["a", "b", "c", "d"],
+                    "edges": [["a", "b"], ["b", "c"], ["c", "d"]],
+                }
+            },
+        )
+    )
+
+    verified = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=verifier_id,
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": computed.output["result_uri"]},
+        )
+    )
+
+    assert computed.output["result"][result_field] == expected
+    assert verified.execution.status is ExecutionStatus.COMPLETED
+    assert verified.output["status"] == "VERIFIED"
+    assert verified.output["operation_id"] == producer_id
+    assert verified.output["verification_record_uri"] is not None
+    assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
+    assert verified.output["verification_record_uri"] in verified.artifact_uris
+    runtime = next(
+        descriptor.provider_runtime
+        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        if descriptor.capability_id == verifier_id
+    )
+    assert runtime is not None
+    assert runtime.provider == "jacobian.graph-exact-checkers"
+
+    result_artifact = kernel_with_references.store.get(computed.output["result_uri"])
+    false_result = kernel_with_references.artifacts.put(
+        schema_uri=result_artifact.manifest.schema_uri,
+        semantics_uri=result_artifact.manifest.semantics_uri,
+        parents=result_artifact.manifest.parents,
+        payload={**result_artifact.payload, result_field: 0},
+        summary=f"adversarial false {result_field} result",
+    )
+    rejected = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=verifier_id,
             mode=CapabilityMode.VERIFY,
             input={"result_uri": false_result.artifact_uri},
         )
