@@ -26,6 +26,7 @@ from jacobian_checkers.exact_domain_operations import (
 )
 from jacobian_checkers.graph_exact_operations import (
     check_graph_diameter,
+    check_graph_distance_matrix,
     check_graph_induced_tree_maximum,
     check_graph_maximum_matching,
     check_graph_radius,
@@ -357,6 +358,29 @@ _CASES: tuple[
                 "connected": True,
                 "exactness": "EXACT",
                 "detail": None,
+            },
+        ),
+    ),
+    (
+        check_graph_distance_matrix,
+        _request(
+            "graph.distance_matrix.compute",
+            "graph.distance-matrix.all-sources-bfs-v1",
+            {
+                "graph": {
+                    "graph_schema_version": "1",
+                    "vertices": ["c", "a", "b"],
+                    "edges": [["a", "b"], ["b", "c"]],
+                }
+            },
+            {
+                "semantics_version": ("unweighted-shortest-path-distance-matrix.v1"),
+                "vertex_ordering": "LEXICOGRAPHIC_ASCENDING",
+                "pair_coverage": "ALL_ORDERED_VERTEX_PAIRS",
+                "unreachable_representation": "JSON_NULL",
+                "vertices": ["a", "b", "c"],
+                "distances": [[0, 1, 2], [1, 0, 1], [2, 1, 0]],
+                "connected": True,
             },
         ),
     ),
@@ -899,6 +923,129 @@ def test_graph_metric_checker_accepts_singleton_zero(
     )
 
     assert checker(checker_request)["accepted"] is True
+
+
+def _distance_matrix_checker_request(
+    *,
+    vertices: list[str],
+    edges: list[list[str]],
+    result_vertices: list[str],
+    distances: list[list[int | None]],
+    connected: bool,
+) -> dict[str, Any]:
+    return _request(
+        "graph.distance_matrix.compute",
+        "graph.distance-matrix.all-sources-bfs-v1",
+        {
+            "graph": {
+                "graph_schema_version": "1",
+                "vertices": vertices,
+                "edges": edges,
+            }
+        },
+        {
+            "semantics_version": "unweighted-shortest-path-distance-matrix.v1",
+            "vertex_ordering": "LEXICOGRAPHIC_ASCENDING",
+            "pair_coverage": "ALL_ORDERED_VERTEX_PAIRS",
+            "unreachable_representation": "JSON_NULL",
+            "vertices": result_vertices,
+            "distances": distances,
+            "connected": connected,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    "checker_request",
+    (
+        _distance_matrix_checker_request(
+            vertices=[],
+            edges=[],
+            result_vertices=[],
+            distances=[],
+            connected=False,
+        ),
+        _distance_matrix_checker_request(
+            vertices=["only"],
+            edges=[],
+            result_vertices=["only"],
+            distances=[[0]],
+            connected=True,
+        ),
+        _distance_matrix_checker_request(
+            vertices=["c", "a", "b"],
+            edges=[["a", "b"]],
+            result_vertices=["a", "b", "c"],
+            distances=[[0, 1, None], [1, 0, None], [None, None, 0]],
+            connected=False,
+        ),
+    ),
+    ids=("empty", "singleton", "disconnected"),
+)
+def test_distance_matrix_checker_accepts_exact_boundary_claims(
+    checker_request: dict[str, Any],
+) -> None:
+    decision = check_graph_distance_matrix(checker_request)
+
+    assert decision["accepted"] is True
+    assert decision["conclusion"] == "TRUE"
+    assert decision["method"] == "EXHAUSTIVE_FINITE"
+    assert decision["coverage"] == "EXHAUSTIVE"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda result: result.update(vertices=["b", "a", "c"]),
+        lambda result: result.update(
+            distances=[[0, 1], [1, 0]],
+        ),
+        lambda result: result["distances"][0].__setitem__(0, 1),
+        lambda result: result["distances"][0].__setitem__(1, 0),
+        lambda result: result["distances"][0].__setitem__(2, 1),
+        lambda result: result["distances"][2].__setitem__(0, 1),
+        lambda result: result.update(
+            distances=[[0, 1, 1], [1, 0, 1], [1, 1, 0]],
+        ),
+        lambda result: result.update(connected=False),
+        lambda result: result.update(
+            semantics_version="unweighted-shortest-path-distance-matrix.v2"
+        ),
+        lambda result: result.update(extra="forged"),
+        lambda result: result["distances"][0].__setitem__(1, True),
+    ),
+    ids=(
+        "wrong-order",
+        "wrong-shape",
+        "diagonal",
+        "off-diagonal-zero",
+        "asymmetric-left",
+        "asymmetric-right",
+        "wrong-shortest-paths",
+        "wrong-connectedness",
+        "wrong-semantics",
+        "extra-field",
+        "boolean-distance",
+    ),
+)
+def test_distance_matrix_checker_rejects_false_certification_paths(
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    checker_request = _distance_matrix_checker_request(
+        vertices=["c", "a", "b"],
+        edges=[["a", "b"], ["b", "c"]],
+        result_vertices=["a", "b", "c"],
+        distances=[[0, 1, 2], [1, 0, 1], [2, 1, 0]],
+        connected=True,
+    )
+    result = checker_request["candidate"]["payload"]
+    mutate(result)
+    checker_request["candidate"]["payload_digest"] = _digest(result)
+
+    decision = check_graph_distance_matrix(checker_request)
+
+    assert decision["accepted"] is False
+    assert decision["conclusion"] == "UNKNOWN"
 
 
 @pytest.mark.parametrize(

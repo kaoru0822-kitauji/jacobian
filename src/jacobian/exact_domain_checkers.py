@@ -374,13 +374,18 @@ def _available_graph_declaration_bundles(
 ) -> tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...]:
     available: list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]] = []
     for declaration in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS:
-        bundle = (
-            graph_invariants
-            if declaration.capability_id.startswith("graph.invariant.")
-            else graph
+        installed = tuple(
+            bundle
+            for bundle in (graph, graph_invariants)
+            if bundle is not None
+            and declaration.capability_id in bundle.result_schema_uris
         )
-        if bundle is not None:
-            available.append((bundle, declaration))
+        if len(installed) > 1:
+            raise ValueError(
+                "graph exact replay declaration is owned by multiple bundles"
+            )
+        if installed:
+            available.append((installed[0], declaration))
     return tuple(available)
 
 

@@ -26,6 +26,7 @@ import shutil
 import statistics
 import subprocess
 import time
+from collections import deque
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from itertools import product
@@ -77,6 +78,9 @@ HNF_REPORT_SCHEMA = CASES_ROOT / "hnf-report.schema.json"
 POLYNOMIAL_NORMALIZATION_REPORT_SCHEMA = (
     CASES_ROOT / "polynomial-normalization-report.schema.json"
 )
+DISTANCE_COMPOSITION_REPORT_SCHEMA = (
+    CASES_ROOT / "distance-composition-report.schema.json"
+)
 LEAN_DECLARATION_REPORT_SCHEMA = CASES_ROOT / "lean-report.schema.json"
 LEAN_PROOF_REPORT_SCHEMA = CASES_ROOT / "lean-proof-report.schema.json"
 DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "ab"
@@ -119,6 +123,12 @@ POLYNOMIAL_NORMALIZATION_CAPABILITY_IDS = frozenset(
     {
         "polynomial.expression.normalize",
         "polynomial.expression_normalization.verify",
+    }
+)
+DISTANCE_COMPOSITION_CAPABILITY_IDS = frozenset(
+    {
+        "graph.distance_matrix.compute",
+        "graph.distance_matrix.verify",
     }
 )
 LEAN_PROOF_CONDITIONS = ("baseline", "tactic", "retrieval", "combined")
@@ -313,6 +323,16 @@ available operations according to your own mathematical strategy. A discovery
 rank is not a recommendation. Report only conclusions and assurance supported
 by returned scope, completeness, evidence, and verification records. Public
 invocation examples demonstrate contracts; they are not evaluation answers.
+"""
+
+DISTANCE_COMPOSITION_INSTRUCTIONS = """\
+Use only the jacobian_local mathematical toolbox for mathematical computation.
+Do not use shell commands or create programs. Capability IDs and a successful
+tool sequence are intentionally not supplied. Search the installed portfolio,
+inspect exact contracts, and compose any available atomic outcomes according to
+your own strategy. Preserve durable evidence when the installed portfolio can
+independently verify it. Do not substitute whole-graph diameter, radius, or
+vertex eccentricity for distance to the designated set.
 """
 
 
@@ -1528,6 +1548,249 @@ def _score_smt_report(
     }
 
 
+def _distance_composition_oracle(case: Mapping[str, Any]) -> dict[str, Any]:
+    graph = case.get("graph")
+    if not isinstance(graph, Mapping) or set(graph) != {"vertices", "edges"}:
+        raise BenchmarkError("distance-composition case graph is malformed")
+    raw_vertices = graph["vertices"]
+    raw_edges = graph["edges"]
+    if (
+        not isinstance(raw_vertices, list)
+        or not raw_vertices
+        or not all(isinstance(vertex, str) for vertex in raw_vertices)
+        or len(raw_vertices) != len(set(raw_vertices))
+        or not isinstance(raw_edges, list)
+    ):
+        raise BenchmarkError("distance-composition case graph is outside scope")
+    vertices = tuple(sorted(raw_vertices))
+    vertex_set = set(vertices)
+    adjacency = {vertex: set[str]() for vertex in vertices}
+    normalized_edges: set[tuple[str, str]] = set()
+    for edge in raw_edges:
+        if (
+            not isinstance(edge, list)
+            or len(edge) != 2
+            or not all(isinstance(endpoint, str) for endpoint in edge)
+            or edge[0] == edge[1]
+            or edge[0] not in vertex_set
+            or edge[1] not in vertex_set
+        ):
+            raise BenchmarkError("distance-composition case edge is malformed")
+        normalized = tuple(sorted((edge[0], edge[1])))
+        if normalized in normalized_edges:
+            raise BenchmarkError("distance-composition case has duplicate edges")
+        normalized_edges.add(normalized)
+        adjacency[normalized[0]].add(normalized[1])
+        adjacency[normalized[1]].add(normalized[0])
+
+    maximum_degree = max(len(adjacency[vertex]) for vertex in vertices)
+    designated = tuple(
+        vertex for vertex in vertices if len(adjacency[vertex]) == maximum_degree
+    )
+    distance_to_set = dict.fromkeys(designated, 0)
+    frontier = deque(designated)
+    while frontier:
+        current = frontier.popleft()
+        for neighbor in adjacency[current]:
+            if neighbor not in distance_to_set:
+                distance_to_set[neighbor] = distance_to_set[current] + 1
+                frontier.append(neighbor)
+    if len(distance_to_set) != len(vertices):
+        raise BenchmarkError("distance-composition public case must be connected")
+
+    matrix: list[list[int]] = []
+    for source in vertices:
+        distances = {source: 0}
+        source_frontier = deque([source])
+        while source_frontier:
+            current = source_frontier.popleft()
+            for neighbor in adjacency[current]:
+                if neighbor not in distances:
+                    distances[neighbor] = distances[current] + 1
+                    source_frontier.append(neighbor)
+        matrix.append([distances[target] for target in vertices])
+
+    maximum_distance = max(distance_to_set.values())
+    return {
+        "vertices": list(vertices),
+        "edges": [list(edge) for edge in sorted(normalized_edges)],
+        "maximum_degree_vertices": list(designated),
+        "distance_to_set": [
+            {"vertex": vertex, "distance": distance_to_set[vertex]}
+            for vertex in vertices
+        ],
+        "maximum_distance_to_set": maximum_distance,
+        "maximizing_vertices": [
+            vertex for vertex in vertices if distance_to_set[vertex] == maximum_distance
+        ],
+        "matrix": matrix,
+    }
+
+
+def _score_distance_composition_report(
+    case: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    condition: str,
+    state_dir: Path,
+    mcp_calls: Sequence[str],
+    shell_calls: Sequence[str],
+    capability_attempt_ids: Sequence[str],
+    capability_invocations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    oracle = _distance_composition_oracle(case)
+    if report.get("case_id") != case.get("case_id"):
+        raise BenchmarkError("distance-composition report has the wrong case")
+    for field in (
+        "maximum_degree_vertices",
+        "distance_to_set",
+        "maximum_distance_to_set",
+        "maximizing_vertices",
+    ):
+        if report.get(field) != oracle[field]:
+            raise BenchmarkError(
+                f"distance-composition report {field} differs from the oracle"
+            )
+    _validate_feedback(report.get("feedback"))
+    if shell_calls:
+        raise BenchmarkError("distance-composition condition used a shell command")
+    if (
+        any(
+            capability_id in DISTANCE_COMPOSITION_CAPABILITY_IDS
+            for capability_id in capability_attempt_ids
+        )
+        and condition == "control"
+    ):
+        raise BenchmarkError("distance-composition control escaped its ablation")
+
+    matrix_uri = report.get("distance_matrix_uri")
+    record_uri = report.get("verification_record_uri")
+    if condition == "control":
+        if (
+            report.get("assurance") not in {"SELF_CHECKED", "COMPUTED"}
+            or report.get("final_verification") != "UNVERIFIED"
+            or matrix_uri is not None
+            or record_uri is not None
+        ):
+            raise BenchmarkError(
+                "distance-composition control must remain unverified without "
+                "distance-matrix evidence"
+            )
+        return {
+            "passed": True,
+            "false_certification": False,
+            "replay_success": False,
+            "checks": [
+                "independent standard-library distance-to-set oracle",
+                "targeted distance-capability ablation",
+            ],
+        }
+    if condition != "treatment":
+        raise BenchmarkError(f"unknown condition: {condition}")
+    if (
+        "capability.invoke" not in mcp_calls
+        or report.get("assurance") not in {"SELF_CHECKED", "COMPUTED"}
+        or report.get("final_verification") != "UNVERIFIED"
+        or not isinstance(matrix_uri, str)
+        or not isinstance(record_uri, str)
+    ):
+        raise BenchmarkError(
+            "distance-composition treatment did not preserve verified matrix "
+            "evidence while keeping the composed conclusion unverified"
+        )
+
+    kernel = JacobianKernel(state_dir, install_references=True)
+    try:
+        matrix_artifact = kernel.store.get(matrix_uri)
+        input_uri = matrix_artifact.manifest.parents[0]
+        input_artifact = kernel.store.get(input_uri)
+        record_artifact = kernel.store.get(record_uri)
+        record = VerificationRecord.model_validate(record_artifact.payload)
+    except (IndexError, StoreError, ValueError) as exc:
+        raise BenchmarkError(
+            "distance-composition treatment artifacts are unavailable"
+        ) from exc
+    expected_graph = {
+        "graph_schema_version": "1",
+        "vertices": case["graph"]["vertices"],
+        "edges": case["graph"]["edges"],
+    }
+    matrix_payload = matrix_artifact.payload
+    if (
+        input_artifact.payload != {"graph": expected_graph}
+        or matrix_payload.get("vertices") != oracle["vertices"]
+        or matrix_payload.get("distances") != oracle["matrix"]
+        or matrix_payload.get("connected") is not True
+        or record.bindings.claim_digest != input_artifact.manifest.object_digest
+        or record.bindings.candidate_digest != matrix_artifact.manifest.object_digest
+        or not {
+            input_uri,
+            matrix_uri,
+            record.evidence_uri,
+        }.issubset(record_artifact.manifest.parents)
+    ):
+        raise BenchmarkError(
+            "distance-composition verification record is not exactly bound"
+        )
+
+    computed_index: int | None = None
+    verified_trace = False
+    for index, invocation in enumerate(capability_invocations):
+        invocation_output = invocation.get("output")
+        if (
+            invocation.get("capability_id") == "graph.distance_matrix.compute"
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("result_uri") == matrix_uri
+            and matrix_uri in (invocation.get("artifact_uris") or [])
+        ):
+            computed_index = index
+        if (
+            computed_index is not None
+            and index > computed_index
+            and invocation.get("capability_id") == "graph.distance_matrix.verify"
+            and invocation.get("input") == {"result_uri": matrix_uri}
+            and isinstance(invocation_output, Mapping)
+            and invocation_output.get("verification_record_uri") == record_uri
+            and isinstance(invocation.get("assurance"), Mapping)
+            and invocation["assurance"].get("level") == "VERIFIED"
+            and record_uri in (invocation.get("artifact_uris") or [])
+        ):
+            verified_trace = True
+            break
+    if not verified_trace:
+        raise BenchmarkError(
+            "distance-composition treatment lacks an ordered compute-to-verify trace"
+        )
+
+    replay = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.distance_matrix.verify",
+            mode=CapabilityMode.VERIFY,
+            input={"result_uri": matrix_uri},
+        )
+    )
+    if (
+        replay.assurance.level.value != "VERIFIED"
+        or replay.assurance.verification_record_uri != record_uri
+        or replay.output.get("status") != "VERIFIED"
+        or replay.output.get("result_uri") != matrix_uri
+    ):
+        raise BenchmarkError(
+            "distance-composition evidence does not replay independently"
+        )
+    return {
+        "passed": True,
+        "false_certification": False,
+        "replay_success": True,
+        "checks": [
+            "independent standard-library distance-to-set oracle",
+            "durable graph and matrix binding",
+            "ordered compute-to-verify trace",
+            "independent checker replay",
+        ],
+    }
+
+
 def score_report(
     case: Mapping[str, Any],
     report: Mapping[str, Any],
@@ -1539,6 +1802,17 @@ def score_report(
     capability_attempt_ids: Sequence[str] = (),
     capability_invocations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    if case.get("task_type") == "graph_distance_composition":
+        return _score_distance_composition_report(
+            case,
+            report,
+            condition=condition,
+            state_dir=state_dir,
+            mcp_calls=mcp_calls,
+            shell_calls=shell_calls,
+            capability_attempt_ids=capability_attempt_ids,
+            capability_invocations=capability_invocations,
+        )
     if case.get("task_type") == "polynomial_expression_normalization":
         return _score_polynomial_normalization_report(
             case,
@@ -2411,11 +2685,12 @@ def _codex_command(
         "model_reasoning_effort=" + json.dumps(reasoning_effort),
     ]
     lean_task = task_type in {"lean_declaration", "lean_proof"}
-    if condition == "treatment" or lean_task:
+    portfolio_ab = task_type == "graph_distance_composition"
+    if condition == "treatment" or lean_task or portfolio_ab:
         uv_command = shutil.which("uv")
         if uv_command is None:
             raise BenchmarkError("uv is required for the treatment MCP server")
-        if lean_task:
+        if lean_task or portfolio_ab:
             server_args = [
                 "run",
                 "--project",
@@ -2475,12 +2750,16 @@ def _condition_policy_profile(
 ) -> str | None:
     if case.get("task_type") in {"lean_declaration", "lean_proof"}:
         return DEFAULT_CAPABILITY_POLICY_PROFILE
+    if case.get("task_type") == "graph_distance_composition":
+        return NO_RETRIEVAL_CAPABILITY_POLICY_PROFILE
     if condition == "treatment":
         return NO_RETRIEVAL_CAPABILITY_POLICY_PROFILE
     return None
 
 
 def _condition_instructions(task_type: object, condition: str) -> str:
+    if task_type == "graph_distance_composition":
+        return DISTANCE_COMPOSITION_INSTRUCTIONS
     if task_type == "polynomial_expression_normalization":
         return (
             POLYNOMIAL_NORMALIZATION_CONTROL_INSTRUCTIONS
@@ -2559,6 +2838,7 @@ def _run_condition(
     is_polynomial_normalization = (
         case.get("task_type") == "polynomial_expression_normalization"
     )
+    is_distance_composition = case.get("task_type") == "graph_distance_composition"
     is_lean_declaration = case.get("task_type") == "lean_declaration"
     is_lean_proof = case.get("task_type") == "lean_proof"
     sat_context = ""
@@ -2593,7 +2873,9 @@ def _run_condition(
             + "\n"
         )
     condition_instructions = (
-        AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS
+        _condition_instructions(case.get("task_type"), condition)
+        if is_distance_composition
+        else AUTONOMOUS_DISCOVERY_TREATMENT_INSTRUCTIONS
         if condition == "treatment" and case.get("autonomous_discovery") is True
         else _condition_instructions(
             case.get("task_type"),
@@ -2637,12 +2919,18 @@ def _run_condition(
             if is_hnf
             else POLYNOMIAL_NORMALIZATION_REPORT_SCHEMA
             if is_polynomial_normalization
+            else DISTANCE_COMPOSITION_REPORT_SCHEMA
+            if is_distance_composition
             else PARTITION_REPORT_SCHEMA
             if is_partition
             else REPORT_SCHEMA
         ),
         excluded_capability_ids=(
-            LEAN_PROOF_CAPABILITY_EXCLUSIONS[condition] if is_lean_proof else ()
+            LEAN_PROOF_CAPABILITY_EXCLUSIONS[condition]
+            if is_lean_proof
+            else tuple(sorted(DISTANCE_COMPOSITION_CAPABILITY_IDS))
+            if is_distance_composition and condition == "control"
+            else ()
         ),
         capability_policy_profile=_condition_policy_profile(case, condition),
     )
@@ -2836,6 +3124,12 @@ def _run_condition(
                     telemetry["capability_attempt_ids"]
                 )
             )
+            or (
+                is_distance_composition
+                and DISTANCE_COMPOSITION_CAPABILITY_IDS.intersection(
+                    telemetry["capability_attempt_ids"]
+                )
+            )
         ),
         "intervention_used": bool(
             (
@@ -2852,6 +3146,12 @@ def _run_condition(
             or (
                 is_polynomial_normalization
                 and POLYNOMIAL_NORMALIZATION_CAPABILITY_IDS.intersection(
+                    telemetry["capability_ids"]
+                )
+            )
+            or (
+                is_distance_composition
+                and DISTANCE_COMPOSITION_CAPABILITY_IDS.intersection(
                     telemetry["capability_ids"]
                 )
             )
@@ -3124,6 +3424,20 @@ def build_dispatch_plan(
                     condition: _condition_policy_profile(case, condition)
                     for condition in conditions
                 },
+                **(
+                    {
+                        "capability_exclusions": {
+                            condition: (
+                                sorted(DISTANCE_COMPOSITION_CAPABILITY_IDS)
+                                if condition == "control"
+                                else []
+                            )
+                            for condition in conditions
+                        }
+                    }
+                    if case.get("task_type") == "graph_distance_composition"
+                    else {}
+                ),
             }
         )
     return {
@@ -3220,6 +3534,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "order_seed": args.order_seed,
         "provider_generation_seed": None,
         "lean_proof_capability_exclusions": LEAN_PROOF_CAPABILITY_EXCLUSIONS,
+        "distance_composition_capability_exclusions": {
+            "control": sorted(DISTANCE_COMPOSITION_CAPABILITY_IDS),
+            "treatment": [],
+        },
         "evaluation_capability_policy_profiles": {
             str(case["case_id"]): {
                 condition: _condition_policy_profile(case, condition)
@@ -3231,7 +3549,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             for case in cases
         },
-        "public_reproduction_cases_scored": False,
+        "public_reproduction_cases_scored": any(
+            case.get("evaluation_class") == "PUBLIC_REGRESSION" for case in cases
+        ),
         "dispatch": {
             **plan,
             "mode": "execute",
