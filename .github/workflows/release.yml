@@ -9,7 +9,7 @@ on:
         type: string
 
 concurrency:
-  group: release-${{ inputs.tag }}
+  group: release-publishing
   cancel-in-progress: false
 
 permissions:
@@ -109,4 +109,12 @@ jobs:
         with:
           name: release-distributions
           path: artifacts/
-      - run: npm publish artifacts/npm/*.tgz --access public --tag alpha
+      - name: Publish npm distribution
+        run: |
+          version="$(node -p "require('./npm/package.json').version")"
+          if npm view "jacobian@$version" version >/dev/null 2>&1; then
+            echo "jacobian@$version is already published"
+          else
+            npm publish artifacts/npm/*.tgz --access public --tag alpha
+          fi
+          npm dist-tag add "jacobian@$version" alpha
