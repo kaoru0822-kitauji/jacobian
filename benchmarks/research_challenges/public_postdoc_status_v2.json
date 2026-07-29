@@ -126,8 +126,8 @@
         "graph.induced_tree.maximum.verify"
       ],
       "repository_evidence": [
-        "tests/integration/domains/test_frontier_capabilities.py::test_hamiltonian_path_decision_has_independent_replay",
-        "tests/integration/domains/test_frontier_capabilities.py::test_hamiltonian_checker_rejects_a_forged_negative_decision"
+        "tests/composition/runtime/test_frontier_capabilities.py::test_hamiltonian_path_decision_has_independent_replay",
+        "tests/composition/runtime/test_frontier_capabilities.py::test_hamiltonian_checker_rejects_a_forged_negative_decision"
       ],
       "current_boundary": "The historical suite correctly recorded the older portfolio, but the current catalog now includes bounded Hamiltonian-path decision and independent replay through order 18, covering the 14-vertex obstruction without rewriting v1.",
       "evaluation_status": "REGRESSION_COVERED",
@@ -160,7 +160,7 @@
         "graph.compute.neighborhood_independence"
       ],
       "repository_evidence": [
-        "tests/integration/domains/test_frontier_capabilities.py::test_hamiltonian_path_decision_has_independent_replay"
+        "tests/composition/runtime/test_frontier_capabilities.py::test_hamiltonian_path_decision_has_independent_replay"
       ],
       "current_boundary": "A proposed 18-vertex graph can now receive a bounded Hamiltonian decision, but construction strategy and the invariant-guided search remain agent-owned.",
       "evaluation_status": "RUNNABLE_PUBLIC_REPRODUCTION",

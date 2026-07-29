@@ -152,14 +152,11 @@ Non-obvious caveats:
   not break the kernel, catalog, or the core test suites. Only install Lean/elan
   or those executables when specifically exercising `lean_runtime` tests or SAT
   proof-artifact capabilities.
-- `make test-fast` is the quick full-core loop; `make test-unit-fast` is the
-  unit-only pre-push test lane, and `make check` combines it with lint and
-  typecheck. Never run bare `uv run pytest` across the whole
-  suite — it mixes `lean_runtime` tests into the xdist pool and pytest rejects it;
-  use a focused `make test-* TESTS=<file-or-node>` target instead. Outside CI,
-  `make test` and `make test-integration` reject an omitted `TESTS`; the explicit
-  `test-integration-all` and `validate-full` escape hatches are only for CI
-  outages or environment-specific reproduction.
+- `make test-unit` is the quick unit lane and `make check` combines it with lint
+  and typecheck. Use `make test-all-ci` only for an explicit exhaustive local
+  reproduction. Never run bare `uv run pytest` across the whole suite — it mixes
+  provider and Lean boundary tests into one pool; use a focused `make test-*`
+  target instead.
 - Only the coordinating agent may start an exhaustive test lane. Never delegate
   one to a parallel agent sharing the host. Before an exceptional broad run,
   inspect active processes for pytest jobs from this checkout and stop or wait

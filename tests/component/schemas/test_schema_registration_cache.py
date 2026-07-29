@@ -9,7 +9,7 @@ from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
 from jacobian.store import ArtifactStore
 
 
-def test_existing_descriptor_skips_meta_validation(
+def test_existing_descriptor_reuses_cached_meta_validation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -29,7 +29,34 @@ def test_existing_descriptor_skips_meta_validation(
     monkeypatch.setattr(schema_registry, "_validated_schema", count_validation)
     second = SchemaRegistry(store)
     assert second.register(name="component.cache", version="1", schema=schema) == uri
-    assert calls == 0
+    assert calls == 1
+    store.close()
+
+
+def test_existing_descriptor_written_without_schema_validation_is_rejected(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    schema = {"type": 17}
+    uri = store.register_descriptor(
+        kind="schema",
+        name="component.unvalidated",
+        version="1",
+        definition=schema,
+    )
+
+    with pytest.raises(SchemaRegistryError, match="invalid Draft"):
+        SchemaRegistry(store).register(
+            name="component.unvalidated",
+            version="1",
+            schema=schema,
+        )
+    assert uri == store.descriptor_uri(
+        kind="schema",
+        name="component.unvalidated",
+        version="1",
+        definition=schema,
+    )
     store.close()
 
 

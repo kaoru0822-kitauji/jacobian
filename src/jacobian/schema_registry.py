@@ -117,10 +117,11 @@ class SchemaRegistry:
         if cached_uri is not None:
             return cached_uri
 
-        # Descriptor identity is content-addressed.  On a restart, an exact
-        # descriptor already committed to the store was validated before it
-        # was written; avoid paying Draft 2020-12 meta-validation again.  A
-        # new definition still takes the full validation path before any write.
+        # Descriptor identity is content-addressed, but an existing descriptor
+        # may have been written through ArtifactStore.register_descriptor()
+        # without ever passing Draft 2020-12 validation.  Keep the validation
+        # boundary here; _validated_schema is content-cached, so repeated
+        # registrations still reuse the compiled validator.
         _reject_external_references(schema)
         expected_uri = self.store.descriptor_uri(
             kind="schema",
@@ -128,9 +129,7 @@ class SchemaRegistry:
             version=version,
             definition=schema,
         )
-        existing = self.store._artifact_exists(expected_uri)
-        if not existing:
-            _validated_schema(canonical_schema)
+        _validated_schema(canonical_schema)
         schema_uri = self.store.register_descriptor(
             kind="schema",
             name=name,

@@ -29,7 +29,7 @@ verified status.
 ## Local execution boundary
 
 Model-in-the-loop evaluation is a separate, optional local activity. It is not
-called by `make test-fast`, `make test`, `make validate-full`, CI, release
+called by `make test-unit`, `make test-all-ci`, CI, release
 jobs, or pre-commit hooks. Those paths may test case loading, scoring, replay,
 telemetry, and dispatch guards with deterministic fixtures, but they never
 launch an evaluated model.

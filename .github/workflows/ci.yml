@@ -381,13 +381,23 @@ jobs:
           python-version: "3.12"
       - name: Run process boundary lane in a separate job
         run: make test-process
+        env:
+          PYTEST_ARGS: >-
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
+      - if: needs.plan.outputs.run-coverage == 'true'
+        run: mv .coverage .coverage.process
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
+        with:
+          name: coverage-data-process
+          path: .coverage.process
+          include-hidden-files: true
 
   semantic-lane-test:
     name: Tests (${{ matrix.lane }}, Python 3.12)
     needs: plan
-    if: >-
-      needs.plan.outputs.run-python == 'true' &&
-      needs.plan.outputs[format('run-{0}', matrix.lane)] == 'true'
+    if: needs.plan.outputs.run-python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -395,16 +405,40 @@ jobs:
       matrix:
         lane: [component, composition, storage, mcp, provider, e2e]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select planned lane
+        id: select
+        env:
+          RUN_LANE: ${{ needs.plan.outputs[format('run-{0}', matrix.lane)] }}
+        run: |
+          case "$RUN_LANE" in
+            true) echo "selected=true" >> "$GITHUB_OUTPUT" ;;
+            false) echo "selected=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "invalid plan value for ${{ matrix.lane }}: $RUN_LANE" >&2; exit 1 ;;
+          esac
+      - if: steps.select.outputs.selected == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-python-tests
+      - if: steps.select.outputs.selected == 'true'
+        uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
       - name: Run semantic lane
+        if: steps.select.outputs.selected == 'true'
         env:
           LANE: ${{ matrix.lane }}
+          PYTEST_ARGS: >-
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
         run: make "test-${LANE}"
+      - if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+        run: mv .coverage .coverage.${{ matrix.lane }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+        with:
+          name: coverage-data-${{ matrix.lane }}
+          path: .coverage.${{ matrix.lane }}
+          include-hidden-files: true
 
   publish-test-durations:
     name: Publish domain test durations
@@ -472,7 +506,8 @@ jobs:
   python-test:
     name: Python Tests
     if: ${{ !cancelled() }}
-    needs: [plan, unit-test, domain-test, compatibility-test]
+    needs:
+      [plan, unit-test, domain-test, process-test, semantic-lane-test, compatibility-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -482,9 +517,12 @@ jobs:
           RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
           RUN_UNIT: ${{ needs.plan.outputs.run-unit }}
           RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
+          RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
           RUN_COMPATIBILITY: ${{ needs.plan.outputs.run-compatibility }}
           UNIT_RESULT: ${{ needs.unit-test.result }}
           DOMAIN_RESULT: ${{ needs.domain-test.result }}
+          PROCESS_RESULT: ${{ needs.process-test.result }}
+          SEMANTIC_RESULT: ${{ needs.semantic-lane-test.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility-test.result }}
         run: |
           case "$PLAN_RESULT" in
@@ -510,6 +548,16 @@ jobs:
           case "$RUN_DOMAIN" in
             true) test "$DOMAIN_RESULT" = "success" ;;
             false) test "$DOMAIN_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
+          case "$RUN_PROCESS" in
+            true) test "$PROCESS_RESULT" = "success" ;;
+            false) test "$PROCESS_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
+          case "$RUN_PYTHON" in
+            true) test "$SEMANTIC_RESULT" = "success" ;;
+            false) test "$SEMANTIC_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
           case "$RUN_COMPATIBILITY" in
@@ -575,7 +623,8 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [plan, unit-test, domain-test]
+    needs:
+      [plan, unit-test, domain-test, process-test, semantic-lane-test]
     permissions:
       contents: read
       pull-requests: write
@@ -586,8 +635,11 @@ jobs:
           RUN_COVERAGE: ${{ needs.plan.outputs.run-coverage }}
           RUN_UNIT: ${{ needs.plan.outputs.run-unit }}
           RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
+          RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
           UNIT_RESULT: ${{ needs.unit-test.result }}
           DOMAIN_RESULT: ${{ needs.domain-test.result }}
+          PROCESS_RESULT: ${{ needs.process-test.result }}
+          SEMANTIC_RESULT: ${{ needs.semantic-lane-test.result }}
         run: |
           case "$PLAN_RESULT" in
             success) ;;
@@ -614,6 +666,11 @@ jobs:
             false) test "$DOMAIN_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
+          if [ "$RUN_COVERAGE" = "true" ]; then
+            test "$RUN_PROCESS" = "true"
+            test "$PROCESS_RESULT" = "success"
+            test "$SEMANTIC_RESULT" = "success"
+          fi
           if [ "$RUN_COVERAGE" = "true" ]; then
             test "$UNIT_RESULT" = "success"
             test "$DOMAIN_RESULT" = "success"
@@ -878,6 +935,8 @@ jobs:
       - domain-test
       - compatibility-test
       - python-test
+      - process-test
+      - semantic-lane-test
       - lean-test-run
       - lean-test
       - coverage
