@@ -158,8 +158,9 @@ agent-authored state; workspace entries remain `UNVERIFIED`.
 | [Tool surface](docs/reference/tools.md) | MCP resources, tools, and invocation contracts |
 | [Domain operation library](docs/reference/domain-operation-library.md) | Built-in producer, bounded-search, artifact, and exact-replay contracts |
 | [Provider runtime](docs/reference/provider-runtime.md) | Backend availability, compatibility, and identity |
-| [v0.2 specification](docs/reference/specifications/v0.2.md) | Supported release behavior and conformance |
+| [v0.2 specification](docs/reference/specifications/v0.2.md) | Last frozen release snapshot and conformance baseline |
 | [Testing strategy](docs/reference/testing-strategy.md) | Validation layers, commands, and CI responsibilities |
+| [Capability development handoffs](docs/reference/capability-development-handoffs.md) | Evidence-preserving agent handoffs between discovery, implementation, checking, and evaluation |
 
 Specialized contracts cover
 [SAT artifacts](docs/reference/sat-artifacts.md),

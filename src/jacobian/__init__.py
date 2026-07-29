@@ -1,6 +1,12 @@
 """Jacobian verification kernel."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from jacobian.contracts.results import ResultEnvelope
 
 __all__ = ["ResultEnvelope"]
-__version__ = "0.2.0a0"
+
+try:
+    __version__ = version("jacobian")
+except PackageNotFoundError:  # pragma: no cover - only an unpackaged source tree
+    __version__ = "0+unknown"

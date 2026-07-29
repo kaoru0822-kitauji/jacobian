@@ -95,6 +95,36 @@ checker authorization out of plugins and search code.
 - Keep `deep_review.md` local; it is ignored and is not design source material.
 - Keep worked cases in reference scenarios and benchmarks.
 
+## Agent Workflow Entry Points
+
+Repository-local skills under `.agents/skills/` are the maintained entry points
+for recurring capability work:
+
+- use `develop-math-capabilities` for the complete challenge-to-evaluation
+  improvement loop;
+- use `discover-math-capabilities` to mine recurring mathematical moves and
+  produce evidence-gated candidates;
+- use `implement-math-capability` for a bounded producer contract;
+- use `implement-math-capability-checker` for an operator-authorized,
+  independent verification path; and
+- use `evaluate-math-capabilities` for frozen public reproductions or held-out
+  comparative evaluations.
+
+Read the selected skill completely and use
+[capability development handoffs](docs/reference/capability-development-handoffs.md)
+between stages. Record the git tree, installed catalog and policy digests,
+provider/runtime state, model and prompt settings, raw trace location,
+validation actually run, unresolved obligations, and next action. Do not use
+ignored transcripts or local review notes as the only handoff.
+
+For remote MCP operation, use
+[Deploy the remote MCP server](docs/how-to/deploy-remote-mcp.md) and the
+checked-in files under `deploy/`. They define the reproducible systemd, Caddy,
+Tailscale Funnel, smoke, restart, and rollback baseline. Files under `tmp/` are
+ignored host-local evidence and are never deployment source of truth. Compare
+the MCP-advertised package version with the selected checkout during every
+redeploy; an unchanged catalog does not prove that the backend restarted.
+
 ## Cursor Cloud specific instructions
 
 This is a Python 3.12 project managed with `uv`; the base image ships Python 3.12
