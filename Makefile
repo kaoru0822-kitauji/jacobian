@@ -140,7 +140,7 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck todo-check build ## Run CI-owned static checks plus a local package build.
 
-validate-full: lint-full typecheck test test-lean build ## Run broad local validation (slow; omits security/duplicate/npm CI lanes).
+validate-full: lint-full typecheck test test-lean build ## Run the broad local subset; CI also owns Python 3.13, coverage, security, duplicate, and npm.
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)
