@@ -34,7 +34,7 @@ def test_graph_capability_scorer_checks_multi_call_artifacts(
 ) -> None:
     case = benchmark.load_cases(["GRAPH-ATLAS-PATH-001"])[0]
     runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
     searched = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -245,7 +245,7 @@ def test_known_answer_scorer_replays_durable_witness_bindings(
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["PATH-CLOSURE-001"]) if case["case_id"])
     runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
     reference = runtime.portfolio.references["graph_paths"]
     claim = _invoke(
@@ -383,7 +383,7 @@ def test_known_answer_scorer_accepts_verified_positive_witness(
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["GRAPH-BIP-TRUE-001"]) if case["case_id"])
     runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
     reference = runtime.portfolio.references["graph_paths"]
     claim = _invoke(
@@ -503,7 +503,7 @@ def test_known_answer_scorer_accepts_bound_lean_certificate(
         case for case in load_cases(["LEAN-NAT-INDUCTION-001"]) if case["case_id"]
     )
     runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
     assert runtime.portfolio.lean is not None
     verified = runtime.portfolio.lean.verify(
@@ -549,7 +549,7 @@ def test_known_answer_scorer_accepts_bounded_erdos_straus_table(
     score_run = benchmark.score_run
     case = next(case for case in load_cases(["ERDOS-STRAUS-001"]) if case["case_id"])
     runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.HYDRATE_EXISTING
+        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
     reference = runtime.portfolio.references["erdos_straus"]
     claim = _invoke(
