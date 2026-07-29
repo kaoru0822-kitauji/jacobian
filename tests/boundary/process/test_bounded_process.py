@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import sys
@@ -14,6 +15,21 @@ from jacobian.bounded_process import (
     bounded_process_cancellation,
     run_bounded_process,
 )
+
+
+@pytest.mark.parametrize("timeout_seconds", [math.inf, math.nan])
+def test_nonfinite_timeout_is_rejected_before_process_launch(
+    timeout_seconds: float,
+) -> None:
+    with pytest.raises(ValueError, match="timeout must be positive"):
+        run_bounded_process(
+            [sys.executable, "-c", "raise SystemExit(0)"],
+            input_bytes=b"",
+            timeout_seconds=timeout_seconds,
+            environment=dict(os.environ),
+            stdout_limit=4096,
+            stderr_limit=4096,
+        )
 
 
 @pytest.mark.skipif(

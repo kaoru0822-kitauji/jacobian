@@ -7,6 +7,7 @@ also terminate descendants rather than only the immediate worker.
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import signal
@@ -186,7 +187,7 @@ def run_bounded_process(
 
     if stdout_limit < 0 or stderr_limit < 0:
         raise ValueError("subprocess output limits must be nonnegative")
-    if timeout_seconds <= 0:
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise ValueError("subprocess timeout must be positive")
 
     start_new_session = os.name == "posix"

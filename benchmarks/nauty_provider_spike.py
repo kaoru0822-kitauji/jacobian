@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import tarfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -60,6 +61,59 @@ def _sha256_file(path: Path) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
+def _invalid_pin(detail: str) -> NautySpikeError:
+    return NautySpikeError("ERROR", "INVALID_SPIKE_PIN", detail)
+
+
+def _pin_string(value: object, *, label: str) -> str:
+    if not isinstance(value, str) or not value or not value.isascii():
+        raise _invalid_pin(f"The pinned {label} must be a non-empty ASCII string.")
+    return value
+
+
+def _pin_digest(value: object, *, label: str) -> str:
+    digest = _pin_string(value, label=label)
+    if (
+        len(digest) != 71
+        or not digest.startswith("sha256:")
+        or any(character not in "0123456789abcdef" for character in digest[7:])
+    ):
+        raise _invalid_pin(f"The pinned {label} must be a SHA-256 digest.")
+    return digest
+
+
+def _pin_command(value: object, *, tool: str, label: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(
+            not isinstance(argument, str) or not argument or not argument.isascii()
+            for argument in value
+        )
+        or value[0] != tool
+    ):
+        raise _invalid_pin(
+            f"The pinned {label} command must start with {tool!r} and contain "
+            "non-empty ASCII arguments."
+        )
+    return value
+
+
+def _pin_graph6_list(value: object, *, label: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(
+            not isinstance(record, str) or not record or not record.isascii()
+            for record in value
+        )
+    ):
+        raise _invalid_pin(
+            f"The pinned {label} must be a non-empty list of ASCII graph6 records."
+        )
+    return value
+
+
 def _load_pin(path: Path = PIN_PATH) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -81,11 +135,61 @@ def _load_pin(path: Path = PIN_PATH) -> dict[str, Any]:
         "version",
     }
     if not isinstance(payload, dict) or set(payload) != required:
-        raise NautySpikeError(
-            "ERROR",
-            "INVALID_SPIKE_PIN",
-            "The checked-in nauty spike pin is malformed.",
-        )
+        raise _invalid_pin("The checked-in nauty spike pin is malformed.")
+    for key in (
+        "contract",
+        "download_url",
+        "license_id",
+        "manual_url",
+        "provider",
+        "version",
+    ):
+        _pin_string(payload[key], label=key)
+    _pin_digest(payload["archive_sha256"], label="archive_sha256")
+
+    canonicalization = payload["canonicalization"]
+    if not isinstance(canonicalization, dict) or set(canonicalization) != {
+        "command",
+        "expected_output_graph6",
+        "expected_output_sha256",
+        "input_graph6",
+    }:
+        raise _invalid_pin("The pinned canonicalization profile is malformed.")
+    _pin_command(canonicalization["command"], tool="labelg", label="canonicalization")
+    _pin_graph6_list(
+        canonicalization["expected_output_graph6"],
+        label="canonicalization output",
+    )
+    _pin_graph6_list(
+        canonicalization["input_graph6"],
+        label="canonicalization input",
+    )
+    _pin_digest(
+        canonicalization["expected_output_sha256"],
+        label="canonicalization output",
+    )
+
+    reproduction = payload["reproduction"]
+    if not isinstance(reproduction, dict) or set(reproduction) != {
+        "command",
+        "expected_graph6",
+        "expected_output_sha256",
+        "scope",
+        "vertex_count",
+    }:
+        raise _invalid_pin("The pinned reproduction profile is malformed.")
+    _pin_command(reproduction["command"], tool="geng", label="reproduction")
+    _pin_graph6_list(reproduction["expected_graph6"], label="reproduction output")
+    _pin_digest(
+        reproduction["expected_output_sha256"],
+        label="reproduction output",
+    )
+    _pin_string(reproduction["scope"], label="reproduction scope")
+    if (
+        type(reproduction["vertex_count"]) is not int
+        or reproduction["vertex_count"] <= 0
+    ):
+        raise _invalid_pin("The pinned reproduction vertex_count must be positive.")
     return payload
 
 
@@ -249,12 +353,47 @@ def _probe_help(
         )
 
 
+def _measure_executable_digests(
+    geng: Path,
+    labelg: Path,
+) -> dict[str, str]:
+    try:
+        return {"geng": _sha256_file(geng), "labelg": _sha256_file(labelg)}
+    except OSError as exc:
+        raise NautySpikeError(
+            "ERROR",
+            "EXECUTABLE_CHANGED",
+            "A selected nauty executable disappeared during the probe.",
+        ) from exc
+
+
+def _verify_executable_digests(
+    executables: Mapping[str, Path],
+    recorded: Mapping[str, str],
+) -> None:
+    try:
+        current = {name: _sha256_file(path) for name, path in executables.items()}
+    except OSError as exc:
+        raise NautySpikeError(
+            "REJECTED",
+            "EXECUTABLE_CHANGED",
+            "A selected nauty executable changed during the probe.",
+        ) from exc
+    if current != dict(recorded):
+        raise NautySpikeError(
+            "REJECTED",
+            "EXECUTABLE_CHANGED",
+            "A selected nauty executable changed during the probe.",
+        )
+
+
 def _success_report(
     *,
     pin: Mapping[str, Any],
     source: Mapping[str, Any],
     geng: Path,
     labelg: Path,
+    executable_digests: Mapping[str, str],
     generated: bytes,
     canonicalized: bytes,
 ) -> dict[str, Any]:
@@ -272,11 +411,11 @@ def _success_report(
             "executables": {
                 "geng": {
                     "path": str(geng),
-                    "sha256": _sha256_file(geng),
+                    "sha256": executable_digests["geng"],
                 },
                 "labelg": {
                     "path": str(labelg),
-                    "sha256": _sha256_file(labelg),
+                    "sha256": executable_digests["labelg"],
                 },
             },
         },
@@ -329,7 +468,7 @@ def run_spike(
     """Run the frozen probe and return a JSON-safe success or non-conclusion."""
 
     try:
-        if timeout_seconds <= 0:
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise NautySpikeError(
                 "ERROR",
                 "INVALID_TIMEOUT",
@@ -339,6 +478,7 @@ def run_spike(
         source = _inspect_source_archive(source_archive, pin)
         resolved_geng = _resolve_file(geng, role="geng executable")
         resolved_labelg = _resolve_file(labelg, role="labelg executable")
+        executable_digests = _measure_executable_digests(resolved_geng, resolved_labelg)
         _probe_help(
             runner,
             resolved_geng,
@@ -354,7 +494,7 @@ def run_spike(
 
         generated = _run_checked(
             runner,
-            [str(resolved_geng), "-q", "4"],
+            [str(resolved_geng), *pin["reproduction"]["command"][1:]],
             input_bytes=b"",
             timeout_seconds=timeout_seconds,
             stdout_limit=4096,
@@ -376,7 +516,7 @@ def run_spike(
         ).encode("ascii")
         canonicalized = _run_checked(
             runner,
-            [str(resolved_labelg), "-q"],
+            [str(resolved_labelg), *pin["canonicalization"]["command"][1:]],
             input_bytes=canonical_input,
             timeout_seconds=timeout_seconds,
             stdout_limit=4096,
@@ -393,11 +533,15 @@ def run_spike(
                 "CANONICALIZATION_MISMATCH",
                 "labelg did not reproduce the frozen isomorphic-pair output.",
             )
+        _verify_executable_digests(
+            {"geng": resolved_geng, "labelg": resolved_labelg}, executable_digests
+        )
         return _success_report(
             pin=pin,
             source=source,
             geng=resolved_geng,
             labelg=resolved_labelg,
+            executable_digests=executable_digests,
             generated=generated,
             canonicalized=canonicalized,
         )

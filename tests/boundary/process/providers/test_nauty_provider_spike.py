@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import runpy
 import tarfile
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 from typing import Any, cast
+
+import pytest
 
 from jacobian.bounded_process import BoundedProcessResult
 
@@ -94,9 +98,9 @@ def _files(tmp_path: Path) -> tuple[Path, Path]:
     return geng, labelg
 
 
-def _pin_file(tmp_path: Path) -> Path:
+def _pin_file(tmp_path: Path, pin: dict[str, Any] | None = None) -> Path:
     path = tmp_path / "pin.json"
-    path.write_text(json.dumps(PIN), encoding="utf-8")
+    path.write_text(json.dumps(PIN if pin is None else pin), encoding="utf-8")
     return path
 
 
@@ -190,6 +194,90 @@ def test_invalid_timeout_fails_before_provider_inspection(tmp_path: Path) -> Non
     assert report["status"] == "ERROR"
     assert report["conclusion"] == "NO_CONCLUSION"
     assert report["diagnostic"]["code"] == "INVALID_TIMEOUT"
+
+
+@pytest.mark.parametrize("timeout_seconds", [math.inf, math.nan])
+def test_nonfinite_timeout_fails_before_provider_inspection(
+    tmp_path: Path,
+    timeout_seconds: float,
+) -> None:
+    report = RUN_SPIKE(
+        geng=tmp_path / "absent-geng",
+        labelg=tmp_path / "absent-labelg",
+        source_archive=tmp_path / "absent-nauty.tar.gz",
+        timeout_seconds=timeout_seconds,
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["conclusion"] == "NO_CONCLUSION"
+    assert report["diagnostic"]["code"] == "INVALID_TIMEOUT"
+
+
+def test_malformed_nested_pin_fails_as_json_safe_non_conclusion(tmp_path: Path) -> None:
+    pin = deepcopy(PIN)
+    pin["reproduction"] = {"command": ["geng", "-q", "4"]}
+
+    report = RUN_SPIKE(
+        geng=tmp_path / "absent-geng",
+        labelg=tmp_path / "absent-labelg",
+        source_archive=tmp_path / "absent-nauty.tar.gz",
+        pin_path=_pin_file(tmp_path, pin),
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["conclusion"] == "NO_CONCLUSION"
+    assert report["diagnostic"]["code"] == "INVALID_SPIKE_PIN"
+
+
+def test_spike_executes_the_command_profile_recorded_by_the_pin(tmp_path: Path) -> None:
+    archive = _source_archive(tmp_path)
+    geng, labelg = _files(tmp_path)
+    pin = deepcopy(PIN)
+    pin["reproduction"]["command"] = ["geng", "--frozen-profile", "4"]
+    commands: list[list[str]] = []
+    outcomes = iter(_successful_outcomes())
+
+    def runner(command: Sequence[str], **_kwargs: object) -> BoundedProcessResult:
+        commands.append(list(command))
+        return next(outcomes)
+
+    report = RUN_SPIKE(
+        geng=geng,
+        labelg=labelg,
+        source_archive=archive,
+        runner=runner,
+        pin_path=_pin_file(tmp_path, pin),
+    )
+
+    assert report["status"] == "COMPLETED"
+    assert commands[2] == [str(geng.resolve()), "--frozen-profile", "4"]
+
+
+def test_changed_executable_digest_rejects_the_success_report(tmp_path: Path) -> None:
+    archive = _source_archive(tmp_path)
+    geng, labelg = _files(tmp_path)
+    outcomes = iter(_successful_outcomes())
+    call_count = 0
+
+    def runner(_command: Sequence[str], **_kwargs: object) -> BoundedProcessResult:
+        nonlocal call_count
+        result = next(outcomes)
+        call_count += 1
+        if call_count == 4:
+            labelg.write_bytes(b"replaced after execution")
+        return result
+
+    report = RUN_SPIKE(
+        geng=geng,
+        labelg=labelg,
+        source_archive=archive,
+        runner=runner,
+        pin_path=_pin_file(tmp_path),
+    )
+
+    assert report["status"] == "REJECTED"
+    assert report["conclusion"] == "NO_CONCLUSION"
+    assert report["diagnostic"]["code"] == "EXECUTABLE_CHANGED"
 
 
 def test_malformed_generation_output_is_not_a_partial_result(tmp_path: Path) -> None:
