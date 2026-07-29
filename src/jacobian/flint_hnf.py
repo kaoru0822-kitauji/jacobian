@@ -183,7 +183,13 @@ class PythonFlintHermiteNormalFormAdapter:
                 "exact",
                 "python-flint",
             ),
-            invocation_examples=(example("unit_matrix", "Compute the row HNF of the one-by-one unit matrix.", {"matrix": {"entries": [["1"]]}}),),
+            invocation_examples=(
+                example(
+                    "unit_matrix",
+                    "Compute the row HNF of the one-by-one unit matrix.",
+                    {"matrix": {"entries": [["1"]]}},
+                ),
+            ),
         )
 
     @property
