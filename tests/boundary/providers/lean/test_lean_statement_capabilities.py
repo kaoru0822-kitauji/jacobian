@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 from tests.support.provider_lean import (
-    PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
-    pinned_mathlib_runtime_available,
+    PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
+    pinned_lean_core_runtime_available,
 )
 
 import jacobian.lean_statement_capabilities as lean_statements
@@ -29,7 +29,7 @@ from jacobian.lean_statement_capabilities import (
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
-LEAN_AVAILABLE = pinned_mathlib_runtime_available()
+LEAN_AVAILABLE = pinned_lean_core_runtime_available()
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ def _build_adapters(
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
     propose, _ = _build_adapters(tmp_path)
@@ -86,7 +86,7 @@ def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_propose_reports_elaboration_failure(tmp_path: Path) -> None:
     propose, _ = _build_adapters(tmp_path)
@@ -141,7 +141,7 @@ def test_propose_rejects_mathlib_environment(tmp_path: Path) -> None:
             )
         )
 
-    assert exc_info.value.diagnostic.code == "LEAN_ENVIRONMENT_UNSUPPORTED"
+    assert exc_info.value.diagnostic.code == "INVALID_LEAN_STATEMENT_PROPOSAL"
 
 
 def test_propose_returns_diagnostic_when_lean_unavailable(
@@ -255,7 +255,7 @@ def test_direct_elaboration_parser_accepts_plain_lean_check_output() -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_direct_elaboration_core_runtime_matrix() -> None:
     successful_cases = (
@@ -299,7 +299,7 @@ def test_direct_elaboration_parser_preserves_coded_lean_error() -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_compare_identical_statements(tmp_path: Path) -> None:
     _, compare = _build_adapters(tmp_path)
@@ -328,7 +328,7 @@ def test_compare_identical_statements(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_compare_different_statements(tmp_path: Path) -> None:
     _, compare = _build_adapters(tmp_path)

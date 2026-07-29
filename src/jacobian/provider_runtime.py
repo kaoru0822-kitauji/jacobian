@@ -1584,3 +1584,40 @@ def lean_provider_runtime(
         checker_ids=checker_ids,
         configuration={"profiles": dict(profiles)},
     )
+
+
+def lean_frontend_provider_runtime() -> CapabilityProviderRuntime:
+    """Inspect the pinned Lean executable used by CORE elaboration capabilities."""
+
+    from jacobian_checkers import lean4
+
+    try:
+        executable, _ = lean4.inspect_runtime(require_mathlib=False)
+        digest = _sha256_file(executable)
+    except (OSError, RuntimeError) as exc:
+        return _unavailable_runtime(
+            provider="jacobian.lean4",
+            install_tier=CapabilityInstallTier.T3,
+            license_id="Apache-2.0",
+            diagnostic=str(exc)
+            or f"The pinned Lean {lean4.LEAN_VERSION} executable is unavailable.",
+        )
+    return CapabilityProviderRuntime(
+        provider="jacobian.lean4",
+        availability=CapabilityProviderAvailability.AVAILABLE,
+        version=lean4.LEAN_VERSION,
+        digest=digest,
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        platform=_platform_tag(),
+        install_tier=CapabilityInstallTier.T3,
+        license_id="Apache-2.0",
+        features=("CORE", "elaboration", "lean-statement"),
+        configuration={
+            "profiles": {
+                "CORE": {
+                    "import_name": "Init.Prelude",
+                    "lean_commit": lean4.LEAN_COMMIT,
+                }
+            }
+        },
+    )

@@ -80,13 +80,14 @@ def test_installed_public_pilot_examples_use_descriptor_mechanism(
         }
         checked.add(case["capability_id"])
 
-    assert checked == {
+    public_example_capabilities = {
         "knowledge.search",
         "lean.statement.propose",
         "polynomial.expression.normalize",
         "polynomial.identity.verify",
         "polynomial.map.inverse.candidate_synthesize",
     }
+    assert checked == public_example_capabilities & installed.keys()
 
 
 def test_search_pilot_boundaries_use_typed_public_results(

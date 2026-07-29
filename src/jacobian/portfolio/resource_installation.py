@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from jacobian.contracts.capabilities import CapabilityProviderAvailability
 from jacobian.graph_composition_capabilities import (
     install_graph_composition_capabilities,
 )
@@ -15,6 +16,7 @@ from jacobian.polynomial_interval_capabilities import (
 from jacobian.polynomial_positivity_capabilities import (
     install_polynomial_positivity_capabilities,
 )
+from jacobian.portfolio.provider_resolution import ProviderAvailabilityResolver
 from jacobian.portfolio.result import PortfolioInstallation
 
 
@@ -23,6 +25,9 @@ class ResourceCapabilityInstaller:
     """Install resources after their core capability dependencies exist."""
 
     context: InstallationContext
+    provider_resolver: ProviderAvailabilityResolver = field(
+        default_factory=ProviderAvailabilityResolver
+    )
 
     def install(self, result: PortfolioInstallation) -> None:
         ctx = self.context
@@ -68,10 +73,13 @@ class ResourceCapabilityInstaller:
             if positivity_adapter is not None:
                 ctx.register_capability(positivity_adapter)
 
+        lean_runtime = self.provider_resolver.resolve_lean_frontend()
         lean_adapters, result.lean_statement = install_lean_statement_capabilities(
             ctx.store,
             ctx.schemas,
             ctx.artifacts,
+            provider_runtime=lean_runtime,
         )
-        for lean_adapter in lean_adapters:
-            ctx.register_capability(lean_adapter)
+        if lean_runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+            for lean_adapter in lean_adapters:
+                ctx.register_capability(lean_adapter)

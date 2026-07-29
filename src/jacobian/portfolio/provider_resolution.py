@@ -11,6 +11,7 @@ from jacobian.provider_runtime import (
     carcara_provider_runtime,
     cvc5_provider_runtime,
     drat_trim_provider_runtime,
+    lean_frontend_provider_runtime,
     lean_provider_runtime,
     python_flint_hnf_provider_runtime,
     python_flint_provider_runtime,
@@ -57,3 +58,8 @@ class ProviderAvailabilityResolver:
         """Resolve Lean after authorized checker profiles have been installed."""
 
         return lean_provider_runtime(profiles=profiles, checker_ids=checker_ids)
+
+    def resolve_lean_frontend(self) -> CapabilityProviderRuntime:
+        """Resolve the pinned CORE Lean frontend before statement registration."""
+
+        return lean_frontend_provider_runtime()

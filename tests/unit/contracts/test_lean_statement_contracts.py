@@ -47,6 +47,20 @@ def test_proposal_request_accepts_valid_input() -> None:
     assert req.source_locator == "https://example.com/claim"
 
 
+def test_proposal_request_does_not_advertise_mathlib() -> None:
+    with pytest.raises(ValidationError):
+        LeanStatementProposalRequest(
+            environment="MATHLIB",
+            informal_claim="one plus one equals two",
+            proposed_statement="1 + 1 = 2",
+        )
+
+    environment_schema = LeanStatementProposalRequest.model_json_schema()["properties"][
+        "environment"
+    ]
+    assert environment_schema["const"] == "CORE"
+
+
 def test_direct_elaboration_does_not_require_informal_claim() -> None:
     request = LeanStatementProposalRequest(
         operation="ELABORATE_PROPOSITION",
@@ -148,6 +162,15 @@ def test_comparison_request_accepts_axiom_sets() -> None:
         axiom_set_b=("Classical.choice",),
     )
     assert req.axiom_set_a == ("Classical.choice",)
+
+
+def test_comparison_request_does_not_advertise_mathlib() -> None:
+    with pytest.raises(ValidationError):
+        LeanStatementComparisonRequest(
+            environment="MATHLIB",
+            statement_a="True",
+            statement_b="True",
+        )
 
 
 # ---------------------------------------------------------------------------

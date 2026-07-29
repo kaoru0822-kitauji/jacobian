@@ -54,10 +54,16 @@ distribution RECORD. The Lean probe validates the pinned Lean version and
 commit, resolves and hashes the actual executable, and validates the pinned
 Mathlib checkout before `lean.check` is registered.
 
-If the separately managed Lean runtime is absent or unhealthy, the runtime still
-starts, `lean.check` is absent from `capability://catalog`, and no invocation is
-attempted. Explicit operator-installed adapters fail registration instead of
-silently falling back to another provider.
+CORE-only statement elaboration uses a separate frontend profile over the same
+pinned executable. `lean.statement.propose` and `lean.statement.compare` are
+registered only when that executable passes its version and commit probe; this
+profile does not require a Mathlib checkout.
+
+If the separately managed Lean runtime is absent or unhealthy, the runtime
+still starts. Capabilities requiring the failed profile are absent from
+`capability://catalog`, and no invocation is attempted. Explicit
+operator-installed adapters fail registration instead of silently falling
+back to another provider.
 
 The optional cvc5 Alethe producer follows the same rule. The exact 1.3.4 wheel
 must expose the required SMT-LIB parser and proof APIs and have a hashed RECORD

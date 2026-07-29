@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -248,3 +249,51 @@ def test_python_distribution_unchanged_check_does_not_import_implementation(
 
     monkeypatch.setattr(provider_runtime.importlib, "import_module", fail_import)
     require_provider_runtime_unchanged(runtime)
+
+
+def test_lean_frontend_runtime_binds_the_pinned_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian_checkers import lean4
+
+    executable = tmp_path / "lean"
+    executable.write_bytes(b"pinned-lean")
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (
+            executable,
+            None
+            if not require_mathlib
+            else pytest.fail("CORE must not require Mathlib"),
+        ),
+    )
+
+    runtime = provider_runtime.lean_frontend_provider_runtime()
+
+    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    assert runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE
+    assert runtime.features == ("CORE", "elaboration", "lean-statement")
+    assert runtime.configuration["profiles"]["CORE"]["import_name"] == "Init.Prelude"
+
+
+def test_lean_frontend_runtime_preserves_actionable_probe_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian_checkers import lean4
+
+    def fail(*, require_mathlib: bool) -> tuple[Path, Path | None]:
+        assert require_mathlib is False
+        raise RuntimeError(
+            "TOOLCHAIN_RESOLUTION: the pinned Lean executable is unavailable"
+        )
+
+    monkeypatch.setattr(lean4, "inspect_runtime", fail)
+
+    runtime = provider_runtime.lean_frontend_provider_runtime()
+
+    assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
+    assert runtime.diagnostic is not None
+    assert "TOOLCHAIN_RESOLUTION" in runtime.diagnostic
+    assert "executable is unavailable" in runtime.diagnostic

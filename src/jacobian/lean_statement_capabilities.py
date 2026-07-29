@@ -61,7 +61,7 @@ from jacobian.contracts.lean_statement import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
-from jacobian.provider_runtime import jacobian_provider_runtime
+from jacobian.provider_runtime import lean_frontend_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
@@ -420,10 +420,7 @@ def install_lean_statement_capabilities(
     """Register schemas and return the three atomic Lean statement adapters."""
 
     if provider_runtime is None:
-        provider_runtime = jacobian_provider_runtime(
-            "jacobian.lean4",
-            features=("lean-statement", "elaboration", "comparison"),
-        )
+        provider_runtime = lean_frontend_provider_runtime()
     semantics_uri = store.register_descriptor(
         kind="semantics",
         name="jacobian.lean4-statement",
@@ -535,19 +532,6 @@ class LeanStatementProposalAdapter:
                     ),
                 )
             ) from exc
-        if validated.environment is not LeanEnvironment.CORE:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="LEAN_ENVIRONMENT_UNSUPPORTED",
-                    stage="environment_resolution",
-                    message=(
-                        f"Environment {validated.environment.value} is not "
-                        "supported by lean.statement.propose; use CORE or "
-                        "lean.check for MATHLIB statements."
-                    ),
-                    hint="Set environment to CORE for statement type-checking.",
-                )
-            )
         try:
             elaboration = (
                 _elaborate_statement(validated.proposed_statement)
@@ -708,18 +692,6 @@ class LeanStatementCompareAdapter:
                     ),
                 )
             ) from exc
-        if validated.environment is not LeanEnvironment.CORE:
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="LEAN_ENVIRONMENT_UNSUPPORTED",
-                    stage="environment_resolution",
-                    message=(
-                        f"Environment {validated.environment.value} is not "
-                        "supported by lean.statement.compare."
-                    ),
-                    hint="Set environment to CORE for statement comparison.",
-                )
-            )
         statements_identical = _normalize_whitespace(
             validated.statement_a
         ) == _normalize_whitespace(validated.statement_b)
