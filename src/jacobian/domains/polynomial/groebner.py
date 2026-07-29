@@ -172,7 +172,29 @@ POLYNOMIAL_GROEBNER_CAPABILITY = BoundedSearchOperation(
         "supports an ideal conclusion"
     ),
     tags=("polynomial", "groebner", "ideal", "bounded", "exact"),
-    invocation_examples=(example("unit_ideal", "Compute a Groebner basis for the unit ideal in one variable.", {"generators": [{"variables": ["x"], "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [0]}]}}], "monomial_order": "lex", "resource_budget": {"wall_seconds": 1}}),),
+    invocation_examples=(
+        example(
+            "unit_ideal",
+            "Compute a Groebner basis for the unit ideal in one variable.",
+            {
+                "generators": [
+                    {
+                        "variables": ["x"],
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [0],
+                                }
+                            ]
+                        },
+                    }
+                ],
+                "monomial_order": "lex",
+                "resource_budget": {"wall_seconds": 1},
+            },
+        ),
+    ),
 )
 
 __all__ = ["POLYNOMIAL_GROEBNER_CAPABILITY"]

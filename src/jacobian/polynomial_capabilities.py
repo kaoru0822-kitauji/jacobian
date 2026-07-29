@@ -1353,7 +1353,27 @@ class PolynomialFactorAdapter:
             input_schema=model_schema(PolynomialFactorRequest),
             output_schema=model_schema(PolynomialFactorOutput),
             tags=("polynomial", "factorization", "exact-computation"),
-            invocation_examples=(example("factor_x_squared_minus_one", "Factor x^2-1 over QQ.", {"variable": "x", "polynomial": {"terms": [{"coefficient": {"num": "1", "den": "1"}, "exponents": [2]}, {"coefficient": {"num": "-1", "den": "1"}, "exponents": [0]}]}}),),
+            invocation_examples=(
+                example(
+                    "factor_x_squared_minus_one",
+                    "Factor x^2-1 over QQ.",
+                    {
+                        "variable": "x",
+                        "polynomial": {
+                            "terms": [
+                                {
+                                    "coefficient": {"num": "1", "den": "1"},
+                                    "exponents": [2],
+                                },
+                                {
+                                    "coefficient": {"num": "-1", "den": "1"},
+                                    "exponents": [0],
+                                },
+                            ]
+                        },
+                    },
+                ),
+            ),
         )
 
     @property
