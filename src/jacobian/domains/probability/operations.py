@@ -72,8 +72,14 @@ FINITE_MOMENT_CAPABILITIES = (
                 "Compute the second raw moment of a fair distribution on 0 and 1.",
                 {
                     "atoms": [
-                        {"value": {"num": "0", "den": "1"}, "probability": {"num": "1", "den": "2"}},
-                        {"value": {"num": "1", "den": "1"}, "probability": {"num": "1", "den": "2"}},
+                        {
+                            "value": {"num": "0", "den": "1"},
+                            "probability": {"num": "1", "den": "2"},
+                        },
+                        {
+                            "value": {"num": "1", "den": "1"},
+                            "probability": {"num": "1", "den": "2"},
+                        },
                     ],
                     "order": 2,
                 },
