@@ -142,11 +142,11 @@ def imports(path: Path) -> set[str] | None:
                 except ValueError:
                     continue
                 module_parts = list(relative.with_suffix("").parts)
-                package_parts = (
-                    module_parts
-                    if module_parts[-1] == "__init__"
-                    else module_parts[:-1]
-                )
+                # Relative imports are resolved from the containing package.
+                # For __init__.py that package is still its parent directory;
+                # retaining "__init__" would invent modules such as
+                # jacobian.pkg.__init__.leaf.
+                package_parts = module_parts[:-1]
                 drop = node.level - 1
                 if drop > len(package_parts):
                     return None

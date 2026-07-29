@@ -325,6 +325,34 @@ def test_plan_keeps_a_changed_test_as_an_exact_node_selector(
     assert fallback is None
 
 
+def test_plan_resolves_relative_imports_from_package_initializers(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    planner = _planner_tree(tmp_path, monkeypatch)
+    package = tmp_path / "src/jacobian/pkg"
+    leaf = package / "leaf.py"
+    initializer = package / "__init__.py"
+    direct = tmp_path / "tests/unit/test_leaf.py"
+    package_user = tmp_path / "tests/unit/test_package.py"
+    package.mkdir(parents=True)
+    direct.parent.mkdir(parents=True)
+    leaf.write_text("VALUE = 1\n", encoding="utf-8")
+    initializer.write_text("from .leaf import VALUE\n", encoding="utf-8")
+    direct.write_text("from jacobian.pkg.leaf import VALUE\n", encoding="utf-8")
+    package_user.write_text("from jacobian.pkg import VALUE\n", encoding="utf-8")
+
+    selected, fallback = planner.exact_tests(
+        [planner.Change("M", "src/jacobian/pkg/leaf.py")]
+    )
+
+    assert selected == []
+    assert fallback == (
+        "src/jacobian/pkg/leaf.py: imported by src/jacobian/pkg/__init__.py; "
+        "transitive impact is ambiguous"
+    )
+
+
 def test_plan_fails_closed_for_unknown_path_and_invalid_manifest(
     tmp_path: Path,
     monkeypatch,
