@@ -45,13 +45,15 @@ def emit_large_diagnostic(_request: dict[str, Any]) -> dict[str, Any]:
 def spawn_delayed_child(request: dict[str, Any]) -> dict[str, Any]:
     marker = request["marker"]
     started_marker = request["started_marker"]
+    pid_marker = request["pid_marker"]
     delay_seconds = request.get("delay_seconds", 1)
     script = (
         "import pathlib,time;"
         f"time.sleep({delay_seconds!r});"
         f"pathlib.Path({marker!r}).write_text('survived', encoding='utf-8')"
     )
-    subprocess.Popen([sys.executable, "-c", script])
+    child = subprocess.Popen([sys.executable, "-c", script])
+    pathlib.Path(pid_marker).write_text(str(child.pid), encoding="utf-8")
     pathlib.Path(started_marker).write_text("started", encoding="utf-8")
     time.sleep(60)
     return {"unreachable": True}
@@ -61,29 +63,33 @@ def spawn_child_then_return(request: dict[str, Any]) -> dict[str, Any]:
     """Exit the worker while a descendant still owns its output pipes."""
 
     marker = request["marker"]
+    pid_marker = request["pid_marker"]
     delay_seconds = request.get("delay_seconds", 1)
     script = (
         "import pathlib,time;"
         f"time.sleep({delay_seconds!r});"
         f"pathlib.Path({marker!r}).write_text('survived', encoding='utf-8')"
     )
-    subprocess.Popen([sys.executable, "-c", script])
+    child = subprocess.Popen([sys.executable, "-c", script])
+    pathlib.Path(pid_marker).write_text(str(child.pid), encoding="utf-8")
     return {"worker": "returned"}
 
 
 def spawn_detached_child_then_return(request: dict[str, Any]) -> dict[str, Any]:
     marker = request["marker"]
+    pid_marker = request["pid_marker"]
     script = (
         "import pathlib,time;"
         "time.sleep(1);"
         f"pathlib.Path({marker!r}).write_text('survived', encoding='utf-8')"
     )
-    subprocess.Popen(
+    child = subprocess.Popen(
         [sys.executable, "-c", script],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    pathlib.Path(pid_marker).write_text(str(child.pid), encoding="utf-8")
     return {"worker": "returned"}
 
 

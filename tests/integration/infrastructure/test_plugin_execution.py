@@ -10,6 +10,18 @@ import pytest
 from jacobian.plugin_execution import PluginExecutor
 
 
+def _wait_until_process_exits(pid: int, *, timeout_seconds: float = 2) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        if time.monotonic() >= deadline:
+            pytest.fail(f"descendant process {pid} remained alive")
+        time.sleep(0.01)
+
+
 def test_plugin_executor_returns_only_canonical_result() -> None:
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:echo",
@@ -117,53 +129,57 @@ def test_plugin_diagnostic_limit_fails_closed() -> None:
 def test_plugin_timeout_kills_descendant_processes(tmp_path: Path) -> None:
     marker = tmp_path / "descendant-survived"
     started_marker = tmp_path / "descendant-started"
+    pid_marker = tmp_path / "descendant-pid"
 
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:spawn_delayed_child",
         request={
             "marker": str(marker),
             "started_marker": str(started_marker),
+            "pid_marker": str(pid_marker),
             "delay_seconds": 3,
         },
         timeout_seconds=2,
     )
-    time.sleep(1.2)
 
     assert started_marker.read_text(encoding="utf-8") == "started"
     assert result.status.value == "TIMEOUT"
+    _wait_until_process_exits(int(pid_marker.read_text(encoding="utf-8")))
     assert not marker.exists()
 
 
 def test_plugin_success_kills_descendant_holding_output_pipes(tmp_path: Path) -> None:
     marker = tmp_path / "pipe-holder-survived"
+    pid_marker = tmp_path / "pipe-holder-pid"
     start = time.monotonic()
 
     result = PluginExecutor().run(
         entrypoint="tests.fixtures.plugin_functions:spawn_child_then_return",
-        request={"marker": str(marker)},
+        request={"marker": str(marker), "pid_marker": str(pid_marker)},
         timeout_seconds=2,
     )
     elapsed = time.monotonic() - start
-    time.sleep(1.2)
 
     # Bound kill latency under load; not a performance SLO.
     assert elapsed < 30
     assert result.status.value == "COMPLETED"
     assert result.output == {"worker": "returned"}
+    _wait_until_process_exits(int(pid_marker.read_text(encoding="utf-8")))
     assert not marker.exists()
 
 
 def test_plugin_success_still_kills_detached_descendants(tmp_path: Path) -> None:
     marker = tmp_path / "detached-descendant-survived"
+    pid_marker = tmp_path / "detached-descendant-pid"
 
     result = PluginExecutor().run(
         entrypoint=("tests.fixtures.plugin_functions:spawn_detached_child_then_return"),
-        request={"marker": str(marker)},
+        request={"marker": str(marker), "pid_marker": str(pid_marker)},
         timeout_seconds=5,
     )
-    time.sleep(1.2)
 
     assert result.status.value == "COMPLETED"
+    _wait_until_process_exits(int(pid_marker.read_text(encoding="utf-8")))
     assert not marker.exists()
 
 
