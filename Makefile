@@ -5,6 +5,7 @@ PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
 ORDERING_DEFAULT_SEED := --randomly-seed=17
+PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
 CORE_TEST_PATHS := tests/unit tests/contract tests/checkers tests/reference
 INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
@@ -42,32 +43,32 @@ typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
 
 test: ## Run tests; narrow with TESTS=... and PYTEST_ARGS=....
-	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" $(TESTS) $(PYTEST_ARGS)
+	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" $(TESTS) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-fast: ## Sequential core edit loop (unit/contract/checkers/reference, no xdist).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" \
-		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
+		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-unit-fast: ## Sequential unit-only edit loop (excludes slow tests).
-	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" tests/unit $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" tests/unit $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-core: ## Parallel core suites (same paths as test-fast, uses xdist by default).
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
-		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_ARGS)
+		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-integration: ## Run the directory-owned integration suites.
 	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
-		$(if $(TESTS),$(TESTS),$(INTEGRATION_TEST_PATHS)) $(PYTEST_ARGS)
+		$(if $(TESTS),$(TESTS),$(INTEGRATION_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-contracts: ## Run contract tests.
-	$(UV_RUN) pytest -n 0 tests/contract $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 tests/contract $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-checkers: ## Run independent checker tests.
-	$(UV_RUN) pytest -n 0 tests/checkers $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 tests/checkers $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-mcp: ## Run focused local and remote MCP integration tests.
 	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_mcp_adapter.py \
-		tests/integration/infrastructure/test_remote_mcp.py $(PYTEST_ARGS)
+		tests/integration/infrastructure/test_remote_mcp.py $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-storage: ## Run artifact, registry, and workspace integration tests.
 	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_artifact_store.py \
@@ -77,21 +78,21 @@ test-storage: ## Run artifact, registry, and workspace integration tests.
 		tests/integration/infrastructure/test_workspace_lifecycle.py \
 		tests/integration/infrastructure/test_workspace_scaling.py \
 		tests/integration/infrastructure/test_workspace_invalidation.py \
-		$(PYTEST_ARGS)
+		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_ARGS=....
-	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_ARGS)
+	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-failed: ## Re-run failures from the previous pytest invocation.
-	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) --lf -m "not lean_runtime" $(PYTEST_ARGS)
+	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) --lf -m "not lean_runtime" $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-stress: ## Repeat contract, checker, and property tests (pytest-repeat --count=3).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime" --count=3 \
-		$(if $(TESTS),$(TESTS),tests/contract tests/checkers) $(PYTEST_ARGS)
+		$(if $(TESTS),$(TESTS),tests/contract tests/checkers) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-ordering: ## Reproduce scheduled ordering (default seed 17; override with PYTEST_ARGS).
 	$(UV_RUN) pytest -n 0 -m "not lean_runtime" \
-		$(if $(findstring --randomly-seed,$(PYTEST_ARGS)),,$(ORDERING_DEFAULT_SEED)) $(PYTEST_ARGS)
+		$(if $(findstring --randomly-seed,$(PYTEST_ARGS)),,$(ORDERING_DEFAULT_SEED)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 duplicate-code: ## Run the CI duplicate-code detector locally.
 	npx --yes jscpd@5.0.12 --config .jscpd.json .

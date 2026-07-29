@@ -52,19 +52,6 @@ jobs:
       - id: shards
         name: Load integration shard configuration
         run: .github/scripts/manage-test-timings emit-plan-outputs >> "$GITHUB_OUTPUT"
-      - name: Prepare integration timing hint
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          .github/scripts/manage-test-timings prepare
-          --output .ci/test-durations.json
-      - name: Share integration timing hint
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: integration-test-durations-input
-          path: .ci/test-durations.json
-          include-hidden-files: true
-          retention-days: 1
       - id: classify
         name: Classify changed paths
         env:
@@ -104,6 +91,33 @@ jobs:
             echo "$plan_output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  prepare-test-timings:
+    name: Prepare integration timing hint
+    needs: plan
+    if: needs.plan.outputs.run-integration == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare integration timing hint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .github/scripts/manage-test-timings prepare
+          --output .ci/test-durations.json
+      - name: Share integration timing hint
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: integration-test-durations-input
+          path: .ci/test-durations.json
+          include-hidden-files: true
+          retention-days: 1
 
   lint:
     name: Lint & Format
@@ -277,7 +291,6 @@ jobs:
           PYTEST_ARGS: >-
             --junitxml=pytest.xml
             ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
-            --durations=10
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -300,7 +313,7 @@ jobs:
     name: >-
       Tests (integration ${{ matrix.shard }} of ${{ needs.plan.outputs.integration-shard-count }},
       Python 3.12)
-    needs: plan
+    needs: [plan, prepare-test-timings]
     if: needs.plan.outputs.run-integration == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -332,7 +345,6 @@ jobs:
             --clean-durations
             --junitxml=pytest.xml
             ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
-            --durations=10
       - name: Upload integration shard timings
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -411,7 +423,7 @@ jobs:
           python-version: "3.13"
       - run: make test
         env:
-          PYTEST_ARGS: --junitxml=pytest.xml --durations=10
+          PYTEST_ARGS: --junitxml=pytest.xml
       - if: ${{ !cancelled() }}
         run: uv cache prune --ci
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -492,8 +504,6 @@ jobs:
           set -e
           echo "| Selected Lean tests | $((SECONDS - started)) |" >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
-        env:
-          PYTEST_ARGS: --durations=10
 
   lean-test:
     name: Lean Tests
@@ -823,7 +833,7 @@ jobs:
 
   ci-metrics:
     name: CI Metrics
-    if: ${{ !cancelled() }}
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - plan
       - lint

@@ -73,6 +73,11 @@ make docs-linkcheck
 make clean
 ```
 
+The Makefile pytest targets emit the ten slowest tests by default so local
+commands provide actionable duration telemetry. Override this with
+`PYTEST_DIAGNOSTIC_ARGS=--durations=0`, or increase the count when profiling a
+slow lane.
+
 `make test-fast` collects only unit, contract, checker, and reference
 directories and excludes `slow` cases under a single process. Prefer the
 function-scoped `kernel` / `kernel_with_references` fixtures when attaching to

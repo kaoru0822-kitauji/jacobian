@@ -71,28 +71,39 @@
       "suites": ["core", "integration", "static", "build"]
     },
     {
-      "name": "ci-and-packaging",
-      "patterns": [
-        ".github/actions/**",
-        ".github/scripts/**",
-        ".github/workflows/**",
-        ".github/ci-impact.json",
-        ".github/ci-config.json",
-        "pyproject.toml",
-        "uv.lock",
-        "Makefile"
-      ],
+      "name": "ci-automation",
+      "patterns": [".github/actions/**", ".github/workflows/**"],
+      "suites": ["core", "integration", "static", "build"]
+    },
+    {
+      "name": "ci-scripts",
+      "patterns": [".github/scripts/**"],
+      "suites": ["core", "integration", "static", "build"]
+    },
+    {
+      "name": "ci-plan-config",
+      "patterns": [".github/ci-impact.json", ".github/ci-config.json"],
+      "suites": ["core", "integration", "static", "build"]
+    },
+    {
+      "name": "makefile",
+      "patterns": ["Makefile"],
+      "suites": ["core", "integration", "lean", "npm", "static", "build"]
+    },
+    {
+      "name": "python-packaging",
+      "patterns": ["pyproject.toml", "uv.lock"],
       "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
     },
     {
-      "name": "repository-policy",
-      "patterns": [
-        "AGENTS.md",
-        "CONTRIBUTING.md",
-        ".pre-commit-config.yaml",
-        ".jscpd.json"
-      ],
-      "suites": ["core", "integration", "lean", "npm", "static", "build", "security", "duplicate"]
+      "name": "pre-commit",
+      "patterns": [".pre-commit-config.yaml"],
+      "suites": ["static"]
+    },
+    {
+      "name": "duplicate-code-policy",
+      "patterns": [".jscpd.json"],
+      "suites": ["duplicate"]
     },
     {
       "name": "test-support",

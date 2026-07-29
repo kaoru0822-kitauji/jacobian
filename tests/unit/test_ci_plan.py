@@ -47,6 +47,9 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ("README.md", "docs/how-to/contribute.md", ".github/CODEOWNERS"),
             _expected_plan("docs", "run-docs"),
         ),
+        (("AGENTS.md",), _expected_plan("docs", "run-docs")),
+        ((".pre-commit-config.yaml",), _expected_plan("selective", "run-static")),
+        ((".jscpd.json",), _expected_plan("selective", "run-duplicate")),
         (
             ("npm/package.json", "npm/npm-packaging.test.mjs"),
             _expected_plan("npm", "run-npm"),
@@ -195,11 +198,42 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             (".github/workflows/ci.yml",),
-            _expected_plan("full", *FUNCTIONAL_KEYS),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            (".github/scripts/classify-ci-paths",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-static",
+                "run-build",
+            ),
+        ),
+        (
+            ("Makefile",),
+            _expected_plan(
+                "selective",
+                "run-python",
+                "run-core",
+                "run-integration",
+                "run-lean",
+                "run-npm",
+                "run-static",
+                "run-build",
+            ),
         ),
         (
             ("CONTRIBUTING.md",),
-            _expected_plan("full", *FUNCTIONAL_KEYS, "run-docs"),
+            _expected_plan("docs", "run-docs"),
         ),
         (
             ("tests/helpers/capabilities.py",),
