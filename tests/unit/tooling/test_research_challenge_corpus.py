@@ -188,7 +188,7 @@ def test_postdoc_status_v2_updates_hamiltonian_boundary_without_rewriting_v1() -
     assert current["historical_fit"] == "DIRECT"
     assert current["current_status"] == "COVERED"
     assert "graph.hamiltonian_path.decide" in current["current_capabilities"]
-    assert current["evaluation_status"] == "REGRESSION_COVERED"
+    assert current["evaluation_status"] == "RUNNABLE_PUBLIC_REPRODUCTION"
 
 
 def test_postdoc_status_v2_freezes_four_domain_coverage_and_handoffs() -> None:
@@ -217,6 +217,7 @@ def test_postdoc_status_v2_freezes_four_domain_coverage_and_handoffs() -> None:
         "status",
         "contract_ref",
         "runtime_snapshot_ref",
+        "reproducibility",
         "assurance",
         "open_gaps",
         "missing_evidence",
@@ -227,6 +228,13 @@ def test_postdoc_status_v2_freezes_four_domain_coverage_and_handoffs() -> None:
         assert candidate["stage"] == "discovery"
         assert candidate["status"] == "accepted"
         assert candidate["runtime_snapshot_ref"] == "#/portfolio_snapshot"
+        assert set(candidate["reproducibility"]) == {
+            "provider_runtime_state",
+            "model_settings",
+            "prompt_settings",
+            "raw_trace_location",
+            "validation_run",
+        }
         assert handoff_fields <= candidate.keys()
 
 

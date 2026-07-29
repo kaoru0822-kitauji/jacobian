@@ -423,6 +423,24 @@
           "type": "string",
           "minLength": 1
         },
+        "reproducibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider_runtime_state",
+            "model_settings",
+            "prompt_settings",
+            "raw_trace_location",
+            "validation_run"
+          ],
+          "properties": {
+            "provider_runtime_state": {"type": "string", "minLength": 1},
+            "model_settings": {"type": "string", "minLength": 1},
+            "prompt_settings": {"type": "string", "minLength": 1},
+            "raw_trace_location": {"type": "string", "minLength": 1},
+            "validation_run": {"type": "string", "minLength": 1}
+          }
+        },
         "assurance": {
           "type": "string",
           "minLength": 1
