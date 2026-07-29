@@ -1711,12 +1711,14 @@ def _score_distance_composition_report(
             "evidence while keeping the composed conclusion unverified"
         )
 
-    kernel = JacobianKernel(state_dir, install_references=True)
+    runtime = create_runtime(
+        state_dir, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
+    )
     try:
-        matrix_artifact = kernel.store.get(matrix_uri)
+        matrix_artifact = runtime.core.store.get(matrix_uri)
         input_uri = matrix_artifact.manifest.parents[0]
-        input_artifact = kernel.store.get(input_uri)
-        record_artifact = kernel.store.get(record_uri)
+        input_artifact = runtime.core.store.get(input_uri)
+        record_artifact = runtime.core.store.get(record_uri)
         record = VerificationRecord.model_validate(record_artifact.payload)
     except (IndexError, StoreError, ValueError) as exc:
         raise BenchmarkError(
@@ -1774,7 +1776,7 @@ def _score_distance_composition_report(
             "distance-composition treatment lacks an ordered compute-to-verify trace"
         )
 
-    replay = kernel.capabilities.invoke(
+    replay = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.verify",
             mode=CapabilityMode.VERIFY,

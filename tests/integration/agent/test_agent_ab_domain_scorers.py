@@ -750,21 +750,21 @@ def test_ab_sat_scorer_rejects_unbound_verified_claim(
 
 def test_ab_distance_composition_scorer_requires_bound_matrix_replay(
     tmp_path: Path,
-    kernel_store_template_with_references: Path,
+    runtime_store_template_with_references: Path,
 ) -> None:
     case = benchmark.load_cases(["GRAPH-DISTANCE-COMPOSITION-AB-001"])[0]
-    state_dir, kernel = _kernel_from_template(
+    state_dir, runtime = _runtime_from_template(
         tmp_path,
-        kernel_store_template_with_references,
+        runtime_store_template_with_references,
         name="distance-state",
     )
-    computed = kernel.capabilities.invoke(
+    computed = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.compute",
             input={"graph": case["graph"]},
         )
     )
-    verified = kernel.capabilities.invoke(
+    verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="graph.distance_matrix.verify",
             mode=CapabilityMode.VERIFY,
