@@ -4,6 +4,7 @@ from jacobian.contracts.finite_sets import (
     FiniteSetBooleanResult,
     FiniteSetPairRequest,
 )
+from jacobian.domains._examples import example
 from jacobian.domains.finite_sets._support import finite_set_operation
 from jacobian.domains.finite_sets.operations import (
     decide_disjoint,
@@ -21,6 +22,16 @@ SET_PREDICATE_CAPABILITIES = (
         decide_subset,
         "finite-set",
         "predicate",
+        invocation_examples=(
+            example(
+                "subset_1_2_of_1_2_3",
+                "Check a finite-set subset relation.",
+                {
+                    "left": {"elements": ["1", "2"]},
+                    "right": {"elements": ["1", "2", "3"]},
+                },
+            ),
+        ),
     ),
     finite_set_operation(
         "finite_set.decide.proper_subset",
@@ -31,6 +42,16 @@ SET_PREDICATE_CAPABILITIES = (
         decide_proper_subset,
         "finite-set",
         "predicate",
+        invocation_examples=(
+            example(
+                "proper_subset_1_2_of_1_2_3",
+                "Check a proper finite-set subset relation.",
+                {
+                    "left": {"elements": ["1", "2"]},
+                    "right": {"elements": ["1", "2", "3"]},
+                },
+            ),
+        ),
     ),
     finite_set_operation(
         "finite_set.decide.disjoint",
@@ -41,5 +62,12 @@ SET_PREDICATE_CAPABILITIES = (
         decide_disjoint,
         "finite-set",
         "predicate",
+        invocation_examples=(
+            example(
+                "disjoint_1_2_and_3_4",
+                "Check whether two finite sets are disjoint.",
+                {"left": {"elements": ["1", "2"]}, "right": {"elements": ["3", "4"]}},
+            ),
+        ),
     ),
 )

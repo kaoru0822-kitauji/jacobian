@@ -28,6 +28,9 @@ RECURRENCE_CAPABILITIES = (
         fibonacci,
         "combinatorics",
         "sequence",
+        invocation_examples=(
+            example("fibonacci_10", "Compute the tenth Fibonacci number.", {"n": 10}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.fibonacci_pair",
@@ -39,6 +42,13 @@ RECURRENCE_CAPABILITIES = (
         "combinatorics",
         "fibonacci",
         "recurrence-boundary",
+        invocation_examples=(
+            example(
+                "fibonacci_pair_8",
+                "Return consecutive Fibonacci values at n=8.",
+                {"n": 8},
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.lucas",
@@ -49,6 +59,9 @@ RECURRENCE_CAPABILITIES = (
         lucas,
         "combinatorics",
         "sequence",
+        invocation_examples=(
+            example("lucas_7", "Compute the seventh Lucas number.", {"n": 7}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.bernoulli",

@@ -29,6 +29,13 @@ PARTITION_CAPABILITIES = (
         stirling_first,
         "combinatorics",
         "partition",
+        invocation_examples=(
+            example(
+                "stirling_first_5_2",
+                "Compute the unsigned Stirling number for n=5, k=2.",
+                {"n": 5, "k": 2},
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.stirling_second",
@@ -39,6 +46,13 @@ PARTITION_CAPABILITIES = (
         stirling_second,
         "combinatorics",
         "partition",
+        invocation_examples=(
+            example(
+                "stirling_second_5_2",
+                "Compute the Stirling number for n=5, k=2.",
+                {"n": 5, "k": 2},
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.bell",
@@ -49,6 +63,9 @@ PARTITION_CAPABILITIES = (
         bell,
         "combinatorics",
         "partition",
+        invocation_examples=(
+            example("bell_5", "Compute the fifth Bell number.", {"n": 5}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.partition_number",
@@ -59,6 +76,11 @@ PARTITION_CAPABILITIES = (
         partition_number,
         "combinatorics",
         "partition",
+        invocation_examples=(
+            example(
+                "partition_number_6", "Count the additive partitions of 6.", {"n": 6}
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.enumerate.integer_partitions",

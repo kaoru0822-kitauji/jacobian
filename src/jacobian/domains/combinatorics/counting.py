@@ -33,6 +33,7 @@ COUNTING_CAPABILITIES = (
         factorial,
         "combinatorics",
         "counting",
+        invocation_examples=(example("factorial_5", "Compute 5 factorial.", {"n": 5}),),
     ),
     combinatorics_operation(
         "combinatorics.compute.double_factorial",
@@ -43,6 +44,9 @@ COUNTING_CAPABILITIES = (
         double_factorial,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example("double_factorial_7", "Compute 7 double factorial.", {"n": 7}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.derangements",
@@ -53,6 +57,9 @@ COUNTING_CAPABILITIES = (
         derangements,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example("derangements_4", "Count derangements of 4 objects.", {"n": 4}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.binomial",
@@ -76,6 +83,13 @@ COUNTING_CAPABILITIES = (
         multinomial,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example(
+                "multinomial_2_1_2",
+                "Compute a multinomial coefficient for parts 2, 1, and 2.",
+                {"values": ["2", "1", "2"]},
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.permutations",
@@ -86,6 +100,13 @@ COUNTING_CAPABILITIES = (
         permutations,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example(
+                "permutations_5_2",
+                "Count ordered selections of 2 from 5.",
+                {"n": 5, "k": 2},
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.catalan",
@@ -96,6 +117,9 @@ COUNTING_CAPABILITIES = (
         catalan,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example("catalan_4", "Compute the fourth Catalan number.", {"n": 4}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.motzkin",
@@ -106,6 +130,9 @@ COUNTING_CAPABILITIES = (
         motzkin,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example("motzkin_5", "Compute the fifth Motzkin number.", {"n": 5}),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.central_binomial",
@@ -116,6 +143,13 @@ COUNTING_CAPABILITIES = (
         central_binomial,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example(
+                "central_binomial_4",
+                "Compute the central binomial coefficient for n=4.",
+                {"n": 4},
+            ),
+        ),
     ),
     combinatorics_operation(
         "combinatorics.compute.compositions",
@@ -126,5 +160,12 @@ COUNTING_CAPABILITIES = (
         compositions,
         "combinatorics",
         "counting",
+        invocation_examples=(
+            example(
+                "compositions_5_2",
+                "Count positive compositions of 5 into 2 parts.",
+                {"n": 5, "k": 2},
+            ),
+        ),
     ),
 )
