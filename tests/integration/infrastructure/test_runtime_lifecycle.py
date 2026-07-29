@@ -1,4 +1,4 @@
-"""Behavioral audit of :class:`JacobianRuntime` lifecycle ownership.
+"""Integration coverage of :class:`JacobianRuntime` lifecycle ownership.
 
 These tests pin the runtime ownership contract: explicit ``close``,
 idempotence, context-manager semantics, partial-bootstrap failure cleanup,
@@ -19,6 +19,8 @@ import pytest
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import RuntimeClosedError
 from jacobian.store import StoreClosedError
+
+pytestmark = pytest.mark.usefixtures("initialized_runtime_store")
 
 
 def test_close_is_idempotent(tmp_path: Path) -> None:

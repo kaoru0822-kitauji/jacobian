@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from tests.helpers.provider_runtime import (
+    PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    pinned_mathlib_runtime_available,
+)
+from tests.helpers.runtime import CapabilityTestServices
 
 from jacobian.capabilities import CapabilityError
 from jacobian.contracts.capabilities import (
@@ -28,9 +32,8 @@ from jacobian.contracts.results import (
     Execution,
     ExecutionStatus,
 )
-from jacobian.runtime import CheckerAuthorityMode, create_runtime
-
-pytestmark = pytest.mark.usefixtures("initialized_runtime_store_with_references")
+from jacobian.runtime import create_runtime
+from jacobian.runtime.model import JacobianRuntime
 
 TEST_RUNTIME = CapabilityProviderRuntime(
     provider="tests",
@@ -291,12 +294,12 @@ class MisboundVerifiedAdapter:
 
 
 def test_external_adapter_invocation_is_recorded_and_retrievable(
-    tmp_path: Path,
+    capability_core_services: CapabilityTestServices,
 ) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(ComputedAdapter())
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(ComputedAdapter())
 
-    result = runtime.core.capabilities.invoke(
+    result = core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.double",
             input={"value": 21},
@@ -306,24 +309,24 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert result.output == {"value": 42}
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.episode_uri is not None
-    episode = runtime.core.store.get(result.episode_uri)
+    episode = core.store.get(result.episode_uri)
     assert episode.payload["result"]["response_version"] == "2"
     assert episode.payload["result"]["completeness"]["status"] == "NOT_APPLICABLE"
-    hits = runtime.core.memory.search(query="double computed").hits
+    hits = core.memory.search(query="double computed").hits
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
 
 
 def test_installed_capability_discovery_is_compact_deterministic_and_transparent(
-    tmp_path: Path,
+    capability_core_services: CapabilityTestServices,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    core = capability_core_services.core
     schema = {
         "type": "object",
         "properties": {"value": {"type": "integer"}},
         "required": ["value"],
         "additionalProperties": False,
     }
-    runtime.core.capabilities.register(
+    capability_core_services.installation.register_capability(
         DiscoveryAdapter(
             CapabilityDescriptor(
                 capability_id="fixture_algebra.search.countermodel",
@@ -347,7 +350,7 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
             )
         )
     )
-    runtime.core.capabilities.register(
+    capability_core_services.installation.register_capability(
         DiscoveryAdapter(
             CapabilityDescriptor(
                 capability_id="fixture_graph.verify.coloring",
@@ -370,8 +373,8 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
         mode=CapabilityMode.EXPLORE,
         limit=10,
     )
-    first = runtime.core.capabilities.discover(request)
-    second = runtime.core.capabilities.discover(request)
+    first = core.capabilities.discover(request)
+    second = core.capabilities.discover(request)
 
     assert first == second
     assert [match.capability_id for match in first.matches] == [
@@ -388,9 +391,9 @@ def test_installed_capability_discovery_is_compact_deterministic_and_transparent
 
 
 def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
-    tmp_path: Path,
+    complete_runtime_with_references: JacobianRuntime,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = complete_runtime_with_references
 
     strong = runtime.core.capabilities.discover(
         CapabilityDiscoveryRequest(
@@ -426,9 +429,8 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
 
 
 def test_capability_registration_rejects_an_invalid_invocation_example(
-    tmp_path: Path,
+    capability_core_services: CapabilityTestServices,
 ) -> None:
-    runtime = create_runtime(tmp_path)
     adapter = DiscoveryAdapter(
         CapabilityDescriptor(
             capability_id="example.invalid-example",
@@ -457,13 +459,13 @@ def test_capability_registration_rejects_an_invalid_invocation_example(
     )
 
     with pytest.raises(CapabilityError, match="invocation example"):
-        runtime.core.capabilities.register(adapter)
+        capability_core_services.installation.register_capability(adapter)
 
 
 def test_knowledge_search_filters_episode_domain_tags_and_failures(
-    tmp_path: Path,
+    complete_runtime_with_references: JacobianRuntime,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = complete_runtime_with_references
     graph_episode = ResearchEpisode(
         capability_id="graph.compute.properties",
         capability_version="1",
@@ -529,9 +531,9 @@ def test_knowledge_search_filters_episode_domain_tags_and_failures(
 
 
 def test_knowledge_search_reports_snapshot_bounded_partial_results(
-    tmp_path: Path,
+    complete_runtime_with_references: JacobianRuntime,
 ) -> None:
-    runtime = create_runtime(tmp_path)
+    runtime = complete_runtime_with_references
     for value in (1, 2):
         runtime.core.memory.record(
             ResearchEpisode(
@@ -563,10 +565,13 @@ def test_knowledge_search_reports_snapshot_bounded_partial_results(
     assert result.output["completeness"] == "PARTIAL"
 
 
-def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None:
-    runtime = create_runtime(tmp_path)
+def test_unknown_capability_returns_an_actionable_result(
+    capability_core_services: CapabilityTestServices,
+) -> None:
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(ComputedAdapter())
 
-    result = runtime.core.capabilities.invoke(
+    result = core.capabilities.invoke(
         CapabilityRequest(
             capability_id="missing.capability",
             input={},
@@ -584,11 +589,13 @@ def test_unknown_capability_returns_an_actionable_result(tmp_path: Path) -> None
     assert result.output["available_capability_ids"]
 
 
-def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(ComputedAdapter())
+def test_unsupported_capability_mode_lists_available_modes(
+    capability_core_services: CapabilityTestServices,
+) -> None:
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(ComputedAdapter())
 
-    result = runtime.core.capabilities.invoke(
+    result = core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.double",
             mode=CapabilityMode.VERIFY,
@@ -602,11 +609,13 @@ def test_unsupported_capability_mode_lists_available_modes(tmp_path: Path) -> No
     assert result.output["available_modes"] == ["EXPLORE"]
 
 
-def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(ComputedAdapter())
+def test_invalid_capability_input_does_not_echo_payload(
+    capability_core_services: CapabilityTestServices,
+) -> None:
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(ComputedAdapter())
 
-    result = runtime.core.capabilities.invoke(
+    result = core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.double",
             input={"value": "fixture-secret-value"},
@@ -630,12 +639,12 @@ def test_invalid_capability_input_does_not_echo_payload(tmp_path: Path) -> None:
 
 
 def test_adapter_failure_does_not_expose_internal_exception_text(
-    tmp_path: Path,
+    capability_core_services: CapabilityTestServices,
 ) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(CrashingAdapter())
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(CrashingAdapter())
 
-    result = runtime.core.capabilities.invoke(
+    result = core.capabilities.invoke(
         CapabilityRequest(
             capability_id="example.crash",
             input={},
@@ -655,15 +664,17 @@ def test_adapter_failure_does_not_expose_internal_exception_text(
     assert "RuntimeError" not in result.execution.detail
 
 
-def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(ForgedProviderAdapter())
+def test_adapter_cannot_forge_provider_provenance(
+    capability_core_services: CapabilityTestServices,
+) -> None:
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(ForgedProviderAdapter())
 
     with pytest.raises(
         CapabilityError,
         match="provider runtime differs from its descriptor",
     ):
-        runtime.core.capabilities.invoke(
+        core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.forged-provider",
                 input={},
@@ -671,7 +682,11 @@ def test_adapter_cannot_forge_provider_provenance(tmp_path: Path) -> None:
         )
 
 
-def test_external_adapter_loads_from_an_operator_entrypoint(tmp_path: Path) -> None:
+def test_external_adapter_loads_from_an_operator_entrypoint(
+    tmp_path: Path,
+    initialized_runtime_store: None,
+) -> None:
+    _ = initialized_runtime_store
     runtime = create_runtime(
         tmp_path,
         capability_adapter_entrypoints=(
@@ -679,24 +694,26 @@ def test_external_adapter_loads_from_an_operator_entrypoint(tmp_path: Path) -> N
         ),
     )
 
-    result = runtime.core.capabilities.invoke(
-        CapabilityRequest(
-            capability_id="fixture.increment",
-            input={"value": 4},
+    try:
+        result = runtime.core.capabilities.invoke(
+            CapabilityRequest(
+                capability_id="fixture.increment",
+                input={"value": 4},
+            )
         )
-    )
-
-    assert result.output == {"value": 5}
+        assert result.output == {"value": 5}
+    finally:
+        runtime.close()
 
 
 def test_adapter_cannot_promote_without_a_local_verification_record(
-    tmp_path: Path,
+    capability_core_services: CapabilityTestServices,
 ) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(ForgedVerifiedAdapter())
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(ForgedVerifiedAdapter())
 
     with pytest.raises(CapabilityError, match="verification record"):
-        runtime.core.capabilities.invoke(
+        core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.forged",
                 mode=CapabilityMode.VERIFY,
@@ -706,13 +723,15 @@ def test_adapter_cannot_promote_without_a_local_verification_record(
 
 
 def test_first_class_relationship_endpoints_must_be_exposed(
-    tmp_path: Path,
+    capability_core_services: CapabilityTestServices,
 ) -> None:
-    runtime = create_runtime(tmp_path)
-    runtime.core.capabilities.register(OmittedRelationshipArtifactAdapter())
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(
+        OmittedRelationshipArtifactAdapter()
+    )
 
     with pytest.raises(CapabilityError, match="missing from artifact_uris"):
-        runtime.core.capabilities.invoke(
+        core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="example.relationship",
                 input={},
@@ -721,11 +740,9 @@ def test_first_class_relationship_endpoints_must_be_exposed(
 
 
 def test_verified_relationship_must_match_checker_selected_endpoints(
-    tmp_path: Path,
+    complete_runtime_with_references: JacobianRuntime,
 ) -> None:
-    runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    )
+    runtime = complete_runtime_with_references
     verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="case.partition.finite",
@@ -763,11 +780,9 @@ def test_verified_relationship_must_match_checker_selected_endpoints(
 
 
 def test_verified_relationship_must_match_checker_selected_obligation(
-    tmp_path: Path,
+    complete_runtime_with_references: JacobianRuntime,
 ) -> None:
-    runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    )
+    runtime = complete_runtime_with_references
     verified = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="case.partition.finite",
@@ -804,13 +819,13 @@ def test_verified_relationship_must_match_checker_selected_obligation(
 
 @pytest.mark.lean_runtime
 @pytest.mark.skipif(
-    shutil.which("lean") is None,
-    reason="Lean is not installed",
+    not pinned_mathlib_runtime_available(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
 )
-def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
-    runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    )
+def test_lean_capability_returns_bound_verified_result(
+    complete_runtime_with_references: JacobianRuntime,
+) -> None:
+    runtime = complete_runtime_with_references
 
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
@@ -831,15 +846,13 @@ def test_lean_capability_returns_bound_verified_result(tmp_path: Path) -> None:
 
 @pytest.mark.lean_runtime
 @pytest.mark.skipif(
-    shutil.which("lean") is None,
-    reason="Lean is not installed",
+    not pinned_mathlib_runtime_available(),
+    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_lean_capability_projects_repairable_checker_diagnostics(
-    tmp_path: Path,
+    complete_runtime_with_references: JacobianRuntime,
 ) -> None:
-    runtime = create_runtime(
-        tmp_path, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
-    )
+    runtime = complete_runtime_with_references
 
     result = runtime.core.capabilities.invoke(
         CapabilityRequest(
