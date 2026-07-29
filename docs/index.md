@@ -82,6 +82,7 @@ expectations.
 - [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
 - [Typed polynomial expression normalization](reference/polynomial-expression-normalization.md)
 - [Polynomial-map inverse verification](reference/polynomial-map-inverse-verification.md)
+- [External conjecture ingestion](reference/external-conjecture-ingestion.md)
 - [Lean statement proposal and elaboration](reference/lean-statement-elaboration.md)
 - [Replayable Lean proof-state transitions](reference/lean-replayable-proof-states.md)
 - [v0.2 specification](reference/specifications/v0.2.md)
