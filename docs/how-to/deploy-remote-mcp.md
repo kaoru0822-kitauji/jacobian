@@ -6,15 +6,74 @@ Use STDIO for a single local Codex process. Use Streamable HTTP when ChatGPT or
 another remote MCP client must reach Jacobian.
 
 This guide and the checked-in files under `deploy/` are the reproducible
-deployment source of truth. `tmp/` is intentionally ignored and may contain
-host-specific copies, smoke output, or a last-deployed note; do not install
-configuration from there or treat it as current.
+deployment source of truth. Keep host-specific copies, smoke output, and
+last-deployed notes outside source control; do not install configuration from
+operator scratch space or treat it as current.
 
 The server exposes `capability.describe`, `capability.invoke`, and the three
 direct `workspace.*` tools. Clients may read installed descriptors from
 `capability://catalog` and inspect exact contracts before invoking mathematical
 operations, which remain behind namespaced capability IDs. Workspace state is
 subject-bound operational data and never becomes mathematical assurance.
+
+## Install from a clone
+
+On a systemd host, the maintained installer turns the committed checkout into
+an immutable release, renders the selected ingress, validates systemd and
+Caddy, starts the services, and runs the read-only MCP smoke:
+
+```sh
+git clone https://github.com/morluto/jacobian.git
+cd jacobian
+sudo ./deploy/install.sh --mode domain --domain math.example.org
+```
+
+Choose one deployment mode:
+
+| Mode | Command | Connector |
+| --- | --- | --- |
+| Localhost | `sudo ./deploy/install.sh` | `http://127.0.0.1:8765/mcp` |
+| Public domain | `sudo ./deploy/install.sh --mode domain --domain math.example.org` | `https://math.example.org/mcp` |
+| Tailscale Funnel | `sudo ./deploy/install.sh --mode tailscale` | `https://<tailnet-dns-name>/mcp` |
+
+The host must already provide:
+
+- `uv`, Python 3, Git, and systemd for every mode;
+- Caddy for `domain` and `tailscale`; and
+- a connected Tailscale installation whose tailnet permits Funnel for
+  `tailscale`.
+
+The installer does not pipe remote installation scripts into a shell. Install
+those host dependencies through a reviewed package or the upstream documented
+procedure. For `domain`, point the domain's DNS at the host and allow inbound
+TCP 80 and 443 before deployment so Caddy can obtain and renew its certificate.
+
+Authentication is the default. The first authenticated run creates
+`/etc/jacobian-mcp/tokens.json`, prints its generated token once, and uses that
+token for the smoke. A subsequent run reuses the secret. Supply a reviewed
+multi-tenant file with `--auth-tokens-file PATH` instead. Anonymous operation
+requires `--allow-anonymous`; a public anonymous endpoint additionally requires
+`--confirm-public-anonymous`, because every reachable caller shares its
+operator-chosen tenant and state.
+
+Inspect a complete plan without root or host mutation:
+
+```sh
+./deploy/install.sh \
+  --mode domain \
+  --domain math.example.org \
+  --dry-run
+```
+
+The installer archives committed `HEAD` to
+`/opt/jacobian/releases/<git-sha>`, syncs its locked non-development
+environment, and atomically selects it through `/opt/jacobian/current`.
+Tracked or staged changes fail closed; commit them or deploy a clean checkout.
+Untracked files are not archived. Re-running the same revision is idempotent.
+After reviewing and pulling a new revision, run the same command to upgrade.
+Use `--skip-smoke` only when the endpoint cannot yet be reached from the host,
+then run [`deploy/smoke_remote.py`](../../deploy/smoke_remote.py) before
+advertising it.
 
 ## Create the auth secret
 
@@ -94,6 +153,7 @@ The corresponding maintained files are:
 
 | File | Purpose |
 | --- | --- |
+| [`deploy/install.sh`](../../deploy/install.sh) | Idempotent clone-to-systemd installer for localhost, public-domain, and Funnel modes |
 | [`deploy/systemd/jacobian-mcp.service`](../../deploy/systemd/jacobian-mcp.service) | Authenticated backend baseline with persistent state and a versioned checkout path |
 | [`deploy/systemd/jacobian-mcp-anonymous.conf`](../../deploy/systemd/jacobian-mcp-anonymous.conf) | Explicit test-only anonymous override with a separate state root |
 | [`deploy/systemd/jacobian-caddy.service`](../../deploy/systemd/jacobian-caddy.service) | Local Caddy process and writable data directories |
@@ -101,14 +161,17 @@ The corresponding maintained files are:
 | [`deploy/caddy/Caddyfile`](../../deploy/caddy/Caddyfile) | Path routing and credential-safe logging |
 | [`deploy/smoke_remote.py`](../../deploy/smoke_remote.py) | Read-only handshake, version, tool, catalog, policy, and discovery gate |
 
-The units are reviewable templates, not a one-command installer. Before copying
-them, replace `math-tools.example.org`, verify the service accounts, Caddy
-binary, and `/opt/jacobian/current` checkout, and decide between the static-token
-baseline and the anonymous test override. Keep each release in an immutable
-checkout and atomically move `/opt/jacobian/current` to the selected release;
-do not point a long-running service at a dirty developer worktree.
+The installer is the default clone-to-host path. The units remain reviewable
+templates for operators who need to integrate with existing provisioning.
+Before copying them manually, replace `math-tools.example.org`, verify the
+service accounts, Caddy binary, and `/opt/jacobian/current` checkout, and decide
+between the static-token baseline and the anonymous test override. Keep each
+release in an immutable checkout and atomically move
+`/opt/jacobian/current` to the selected release; do not point a long-running
+service at a dirty developer worktree.
 
-Install reviewed copies and validate them before enabling traffic:
+For manual provisioning, install reviewed copies and validate them before
+enabling traffic:
 
 ```sh
 sudo install -d -m 0700 /etc/jacobian-mcp

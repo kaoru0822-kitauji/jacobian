@@ -195,6 +195,20 @@ authentication and subject-bound tenant state. See
 [Deploy the remote MCP server](docs/how-to/deploy-remote-mcp.md). Static tokens
 are intended for controlled deployments, not as a hosted identity system.
 
+From a clean clone on a systemd host, the maintained installer can deploy a
+localhost endpoint, a Caddy-managed public domain, or Tailscale Funnel:
+
+```sh
+sudo ./deploy/install.sh
+sudo ./deploy/install.sh --mode domain --domain math.example.org
+sudo ./deploy/install.sh --mode tailscale
+```
+
+Run `./deploy/install.sh --help` or add `--dry-run` to inspect the plan first.
+The public modes require a reviewed Caddy installation; Funnel additionally
+requires a connected Tailscale installation. Authentication is enabled by
+default, and a newly generated bearer token is printed once.
+
 ## Optional backends
 
 Some capabilities use backends that are not installed by default:
