@@ -26,6 +26,20 @@ from 237.91 seconds wall time to 56.55 seconds while selecting 591 tests; three
 exhaustive cases were explicitly marked `slow` and excluded from that lane.
 These are single-host observations, not timing gates.
 
+## 2026-07-29 core scheduler follow-up
+
+The core lane was benchmarked in three alternating, same-seed pairs with four
+workers. Targeted `loadgroup` scheduling, with only the reference claim schema
+module grouped around its expensive shared fixture, had a 45.5-second median
+wall time. The existing `worksteal` scheduler had a 46.9-second median. Host
+noise was material, so this is a small scheduling improvement rather than a
+performance guarantee.
+
+`make test-core` therefore uses `loadgroup`, while integration and general
+parallel targets retain `worksteal`. A global `loadscope` policy was rejected:
+it groups every module whether or not it shares expensive setup and produced
+worse balancing in a controlled run.
+
 ## Measured lanes
 
 | Lane | Selected tests | Observed wall time | Purpose |

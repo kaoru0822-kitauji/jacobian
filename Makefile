@@ -11,6 +11,9 @@ INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
 # Four workers cap memory and repeated per-worker kernel-template setup.
 PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
+# Keep modules that share an expensive fixture template on one core worker.
+# Ungrouped tests still distribute individually under loadgroup.
+PYTEST_CORE_XDIST_ARGS := -n auto --maxprocesses=4 --dist=loadgroup
 # Clean-process tests also construct kernel stores; two workers avoid I/O and
 # memory contention while retaining useful parallel feedback.
 PYTEST_SUBPROCESS_XDIST_ARGS := -n auto --maxprocesses=2 --dist=worksteal
@@ -63,7 +66,7 @@ test-subprocess: ## Run clean-process replay tests selected by the subprocess ma
 	$(UV_RUN) pytest $(PYTEST_SUBPROCESS_XDIST_ARGS) -m "subprocess and not lean_runtime" $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-core: ## Parallel core suites (same paths as test-fast, uses xdist by default).
-	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
+	$(UV_RUN) pytest $(PYTEST_CORE_XDIST_ARGS) -m "not lean_runtime" \
 		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-integration: ## Run the directory-owned integration suites.
