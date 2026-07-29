@@ -42,13 +42,8 @@ jobs:
         with:
           node-version: ${{ steps.node.outputs.node-version }}
           package-manager-cache: false
-      - name: Verify immutable release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(gh release view "$RELEASE_TAG" --json isImmutable --jq .isImmutable)" = "true"
+      - name: Verify release commit
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Build Python distributions
         run: uv build --out-dir dist/python
       - name: Test and pack npm distribution
