@@ -23,6 +23,35 @@ PY = {"x": ZERO, "y": TWO}
 PXY = {"x": TWO, "y": TWO}
 
 
+def test_segment_midpoint_example_is_directly_invocable(kernel) -> None:
+    descriptor = next(
+        descriptor
+        for descriptor in kernel.capabilities.catalog().capabilities
+        if descriptor.capability_id == "geometry.segment.compute.midpoint"
+    )
+    example = descriptor.invocation_examples[0]
+
+    result = kernel.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=descriptor.capability_id,
+            mode=example.mode,
+            input=example.input,
+        )
+    )
+
+    assert example.input == {
+        "first": {"x": ZERO, "y": ZERO},
+        "second": {"x": ONE, "y": ZERO},
+    }
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    assert result.output["result"] == {
+        "point": {
+            "x": {"num": "1", "den": "2"},
+            "y": ZERO,
+        }
+    }
+
+
 def test_geometry_capabilities_are_distinct_and_every_contract_completes(
     kernel,
 ) -> None:
