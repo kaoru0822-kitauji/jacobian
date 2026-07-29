@@ -259,21 +259,42 @@ def configure(
 
 
 @app.command("init")
-def initialize(context: typer.Context) -> None:
-    """Initialize storage and print installed reference identifiers."""
+def initialize(
+    context: typer.Context,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Print the complete machine-readable reference catalog.",
+        ),
+    ] = False,
+) -> None:
+    """Initialize storage and summarize the installed reference domains."""
 
     state = _state(context)
-    _emit(
-        reference_catalog(
-            state.kernel.references,
-            graph=state.kernel.graph,
-            polytope=state.kernel.polytope,
-            polytope_checkers=state.kernel.polytope_checkers,
-            polynomial=state.kernel.polynomial,
-            universal_algebra=state.kernel.universal_algebra,
-            lean=state.kernel.lean_checkers,
-        )
+    catalog = reference_catalog(
+        state.kernel.references,
+        graph=state.kernel.graph,
+        polytope=state.kernel.polytope,
+        polytope_checkers=state.kernel.polytope_checkers,
+        polynomial=state.kernel.polynomial,
+        universal_algebra=state.kernel.universal_algebra,
+        lean=state.kernel.lean_checkers,
     )
+    if json_output:
+        _emit(catalog)
+        return
+
+    capability_count = len(state.kernel.capabilities.catalog().capabilities)
+    typer.echo(f"Initialized Jacobian state in {state.kernel.store.root}")
+    typer.echo(
+        f"Installed {len(catalog)} reference domains and "
+        f"{capability_count} capabilities."
+    )
+    if catalog:
+        typer.echo("Reference domains:")
+        for domain_id in sorted(catalog):
+            typer.echo(f"  - {domain_id}")
 
 
 @app.command("provider-measure")

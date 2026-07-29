@@ -116,8 +116,9 @@ Non-obvious caveats:
   not break the kernel, catalog, or the core test suites. Only install Lean/elan
   or those executables when specifically exercising `lean_runtime` tests or SAT
   proof-artifact capabilities.
-- `make test-fast` is the quick core loop; `make check` (lint + typecheck +
-  test-fast) is the pre-push gate. Never run bare `uv run pytest` across the whole
+- `make test-fast` is the quick full-core loop; `make test-unit-fast` is the
+  unit-only pre-push test lane, and `make check` combines it with lint and
+  typecheck. Never run bare `uv run pytest` across the whole
   suite — it mixes `lean_runtime` tests into the xdist pool and pytest rejects it;
   use the `make test-*` targets instead. Parallel xdist is enabled by Make
   targets (`test`, `test-core`, `test-integration`), not by global pytest addopts.

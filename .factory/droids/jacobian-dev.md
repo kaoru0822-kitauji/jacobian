@@ -40,7 +40,7 @@ the research strategy.
 ```sh
 make setup
 make test-fast
-make validate
+make validate-full
 ```
 
 ## Package Structure

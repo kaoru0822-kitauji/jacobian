@@ -64,6 +64,9 @@ uv sync --dev
 uv run jacobian --state-dir .jacobian init
 ```
 
+The default `init` output is a short onboarding summary. Add `init --json`
+when a script needs the complete reference catalog.
+
 Use `uv run jacobian --help` to inspect the CLI or `uv run jacobian-mcp` to
 start the MCP adapter.
 

@@ -160,7 +160,7 @@ jobs:
     name: Documentation
     needs: plan
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Require a valid documentation plan

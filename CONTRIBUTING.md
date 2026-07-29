@@ -24,10 +24,13 @@ make test-fast
 ```
 
 `make test-fast` is the short sequential non-integration feedback loop; it
-excludes tests explicitly marked `slow`. `make test-core` runs the same core
-directories with default xdist parallelism and includes `slow` cases; CI's core
-lane uses that target. Run `make check` before pushing; it performs fast Ruff,
-strict typing, and `test-fast`. Push after that check and let CI own
+excludes tests explicitly marked `slow`. `make test-unit-fast` is the smaller
+unit-only lane used by the pre-push `make check`; contract, checker, and
+reference tests remain available through their focused targets and CI. `make
+test-core` runs the same core directories with default xdist parallelism and
+includes `slow` cases; CI's core lane uses that target. Run `make check` before
+pushing; it performs fast Ruff, strict typing, and `test-unit-fast`. Push after
+that check and let CI own
 path-planned validation: static analysis, package builds, planned Python lanes,
 and Lean/npm/security/duplicate-code when the impact manifest selects them.
 Coverage and Python 3.13 compatibility run only on exhaustive plans (merge
@@ -52,10 +55,12 @@ make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k inducti
 ```
 
 Run `make hooks` once to install commit-time formatting, syntax, secret,
-large-file, dead-code, and actionlint hooks plus the `make check` pre-push
-gate. Commit hooks are a narrower hygiene pass than `make check` (which adds
-mypy and `test-fast`); pre-push is the routine correctness gate. Hooks remain
-bypassable for exceptional cases with Git's standard `--no-verify` option.
+large-file, dead-code, and actionlint hooks plus the fast `make check`
+pre-push gate. `make check` runs Ruff, mypy, and the unit-only fast lane;
+contract, checker, and reference suites remain in CI. Use
+`make pre-push-full` when a local push also needs the sequential core tests.
+Hooks remain bypassable for exceptional cases with Git's standard
+`--no-verify` option.
 `make fix` applies Ruff's safe lint fixes followed by formatting. `make
 precommit` applies those fixes and then runs the routine handoff checks.
 
