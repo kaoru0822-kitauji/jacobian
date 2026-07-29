@@ -18,6 +18,7 @@ from jacobian.contracts.validated_analysis import (
     RationalLinearProgramRequest,
     RationalLinearProgramResult,
 )
+from jacobian.domains._examples import example
 from jacobian.operations import (
     BoundedSearchIncomplete,
     BoundedSearchInterrupted,
@@ -158,6 +159,21 @@ RATIONAL_LINEAR_CAPABILITIES = (
             "rational",
             "certificate",
             "bounded",
+        ),
+        invocation_examples=(
+            example(
+                "one_variable_unit_lp",
+                "Optimize x subject to x=1 and x>=0.",
+                {
+                    "program": {
+                        "variables": ["x"],
+                        "objective": [{"num": "1", "den": "1"}],
+                        "coefficients": [[{"num": "1", "den": "1"}]],
+                        "rhs": [{"num": "1", "den": "1"}],
+                    },
+                    "wall_seconds": 5,
+                },
+            ),
         ),
     ),
 )
