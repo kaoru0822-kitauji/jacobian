@@ -54,6 +54,11 @@ make test-storage PYTEST_ARGS="-k workspace"
 make test-lean TESTS=tests/integration/lean/test_lean.py PYTEST_ARGS="-k induction"
 ```
 
+All Makefile pytest targets print their ten slowest tests by default. Set
+`PYTEST_DIAGNOSTIC_ARGS=--durations=0` to suppress that report, or use a larger
+value such as `PYTEST_DIAGNOSTIC_ARGS=--durations=25` while investigating a
+regression.
+
 Run `make hooks` once to install commit-time formatting, syntax, secret,
 large-file, dead-code, and actionlint hooks plus the fast `make check`
 pre-push gate. `make check` runs Ruff, mypy, and the unit-only fast lane;
