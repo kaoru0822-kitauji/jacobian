@@ -73,6 +73,44 @@ def test_countermodel_descriptor_publishes_a_model_valid_invocation_example(
     assert validated.target_law.law_id == "associative"
 
 
+def test_evaluate_laws_descriptor_example_encodes_idempotence(
+    kernel_with_references,
+) -> None:
+    descriptor = next(
+        descriptor
+        for descriptor in kernel_with_references.capabilities.catalog().capabilities
+        if descriptor.capability_id == "universal_algebra.evaluate_laws"
+    )
+    example = descriptor.invocation_examples[0]
+    law = example.input["problem"]["laws"][0]
+
+    assert law["law_id"] == "idempotence"
+    assert law["left"] == {
+        "kind": "PRODUCT",
+        "left": {"kind": "VARIABLE", "variable": "x"},
+        "right": {"kind": "VARIABLE", "variable": "x"},
+    }
+    assert law["right"] == {"kind": "VARIABLE", "variable": "x"}
+
+    result = kernel_with_references.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=descriptor.capability_id,
+            mode=example.mode,
+            input=example.input,
+        )
+    )
+
+    assert result.output["records"] == [
+        {
+            "law_id": "idempotence",
+            "holds": True,
+            "coverage": "EXHAUSTIVE",
+            "checked_valuations": 1,
+            "counterexample": None,
+        }
+    ]
+
+
 def test_evaluate_laws_returns_exact_truth_and_counterexample(
     kernel_with_references,
 ) -> None:
