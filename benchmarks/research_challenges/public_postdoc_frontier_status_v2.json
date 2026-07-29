@@ -122,8 +122,8 @@
         "polynomial.jacobian_syzygy.minimum_degree.verify"
       ],
       "repository_evidence": [
-        "tests/integration/domains/test_frontier_capabilities.py::test_projective_arrangement_materializes_the_nine_line_flat_lattice",
-        "tests/integration/domains/test_frontier_capabilities.py::test_nine_line_challenge_mdr_values_are_end_to_end_verified"
+        "tests/composition/runtime/test_frontier_capabilities.py::test_projective_arrangement_materializes_the_nine_line_flat_lattice",
+        "tests/composition/runtime/test_frontier_capabilities.py::test_nine_line_challenge_mdr_values_are_end_to_end_verified"
       ],
       "current_boundary": "The exact arrangement flats and first graded Jacobian syzygy are now domain-owned and independently replayable within their declared degree and input bounds.",
       "evaluation_status": "REGRESSION_COVERED",
@@ -206,7 +206,7 @@
       "next_action": "Hand the accepted contract to implement-math-capability, then implement its independent checker before comparative evaluation.",
       "reproduction_assets": [
         "benchmarks/research_challenges/public_postdoc_frontier_v1.json#jcb-postdoc-018",
-        "tests/integration/domains/test_frontier_capabilities.py"
+        "tests/composition/runtime/test_frontier_capabilities.py"
       ],
       "provisional_capability_id": "graph.restricted_set.distance_profile.compute",
       "atomic_outcome": "For one exact labelled graph and one nonempty designated vertex set, return vertex-to-set distances, internal set-distance maximum, and set eccentricity with explicit disconnectedness semantics.",

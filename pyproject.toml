@@ -65,15 +65,15 @@ packages = ["src/jacobian", "src/jacobian_checkers"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
-timeout = 60
+# Lane runners provide the deadline.  Thread mode avoids relying on a SIGALRM
+# that native solver extensions may not observe; killable work is isolated in
+# the process boundary lane.
+timeout_method = "thread"
 markers = [
+    "requires_provider(name): test requires a production provider readiness probe",
+    "performance: benchmark or timing evidence excluded from correctness lanes",
     "property: property-based invariant tests",
-    "subprocess: clean-process replay tests",
-    "conformance: normative release conformance cases",
-    "differential: independent implementation comparisons",
-    "external_backend: tests requiring an optional external engine",
-    "lean_runtime: tests requiring the pinned Lean toolchain or Mathlib runtime",
-    "slow: tests excluded from the fastest development loop",
+    "destructive_process: test requires child-process isolation and group termination",
 ]
 
 [tool.ruff]

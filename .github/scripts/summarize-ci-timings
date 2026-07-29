@@ -26,11 +26,11 @@ def _jobs(payload: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _integration_shard_seconds(rows: list[tuple[str, float]]) -> list[float]:
+def _domain_shard_seconds(rows: list[tuple[str, float]]) -> list[float]:
     return [
         seconds
         for name, seconds in rows
-        if "integration" in name.casefold() and " of " in name.casefold()
+        if "domain" in name.casefold() and " of " in name.casefold()
     ]
 
 
@@ -63,14 +63,14 @@ def render(payload: Any) -> str:
         f"| Completed jobs | {len(rows)} |",
         "",
     ]
-    shard_seconds = _integration_shard_seconds(rows)
+    shard_seconds = _domain_shard_seconds(rows)
     if len(shard_seconds) >= 2:
         slowest = max(shard_seconds)
         fastest = min(shard_seconds)
         skew_ratio = slowest / fastest if fastest > 0 else float("inf")
         lines.extend(
             (
-                f"| Integration shard skew (max/min) | {skew_ratio:.2f}x |",
+                f"| Domain shard skew (max/min) | {skew_ratio:.2f}x |",
                 "",
             )
         )
@@ -78,7 +78,7 @@ def render(payload: Any) -> str:
             lines.extend(
                 (
                     "Integration shards differ by at least 1.5x. The next successful "
-                    "main-branch integration run will publish fresh timings; until "
+                    "main-branch domain run will publish fresh timings; until "
                     "then, shards fall back to equal weighting.",
                     "",
                 )

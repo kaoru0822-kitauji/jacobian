@@ -317,7 +317,7 @@ Jacobian uses Python 3.12, `uv`, and a small `Makefile`:
 
 ```sh
 make setup
-make test-fast
+make test-unit
 make check
 ```
 

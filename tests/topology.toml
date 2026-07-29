@@ -1,0 +1,124 @@
+version = 1
+
+# Directory ownership is recursive.  Every tracked tests/test_*.py file must
+# be selected by exactly one lane; the runner validates this before pytest.
+
+[[lanes]]
+name = "unit"
+tier = "unit"
+paths = ["tests/unit"]
+workers = 0
+distribution = "none"
+timeout_seconds = 10
+required_environment = []
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "component"
+tier = "component"
+paths = ["tests/component"]
+workers = 4
+distribution = "worksteal"
+timeout_seconds = 30
+required_environment = []
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "domain"
+tier = "domain"
+paths = ["tests/domain"]
+workers = 4
+distribution = "worksteal"
+timeout_seconds = 120
+required_environment = []
+required_provider = ""
+timing_sharding = true
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "composition"
+tier = "composition"
+paths = ["tests/composition"]
+workers = 2
+distribution = "worksteal"
+timeout_seconds = 120
+required_environment = []
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "storage"
+tier = "boundary"
+paths = ["tests/boundary/storage"]
+workers = 0
+distribution = "none"
+timeout_seconds = 120
+required_environment = ["sqlite"]
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "process"
+tier = "boundary"
+paths = ["tests/boundary/process"]
+workers = 2
+distribution = "worksteal"
+timeout_seconds = 120
+required_environment = ["process-group"]
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "mcp"
+tier = "boundary"
+paths = ["tests/boundary/mcp"]
+workers = 2
+distribution = "worksteal"
+timeout_seconds = 120
+required_environment = ["mcp"]
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "provider"
+tier = "boundary"
+paths = ["tests/boundary/providers/cvc5", "tests/boundary/providers/external_sat", "tests/boundary/providers/flint", "tests/boundary/providers/graph", "tests/boundary/providers/sympy"]
+workers = 1
+distribution = "load"
+timeout_seconds = 180
+required_environment = ["provider-readiness"]
+required_provider = "optional"
+timing_sharding = false
+ci = { pull_request = false, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "lean"
+tier = "boundary"
+paths = ["tests/boundary/providers/lean"]
+workers = 0
+distribution = "none"
+timeout_seconds = 300
+required_environment = ["lean-4.31.0", "mathlib"]
+required_provider = "lean"
+timing_sharding = false
+ci = { pull_request = false, merge_queue = true, main = true, scheduled = true }
+
+[[lanes]]
+name = "e2e"
+tier = "e2e"
+paths = ["tests/e2e"]
+workers = 0
+distribution = "none"
+timeout_seconds = 180
+required_environment = []
+required_provider = ""
+timing_sharding = false
+ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }

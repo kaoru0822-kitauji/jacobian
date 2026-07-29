@@ -6,30 +6,17 @@ TESTS ?=
 COMMAND ?= make check
 RECEIPT ?= /tmp/jacobian-validation-receipt.json
 EVAL_ARGS ?=
+STRESS_COUNT ?= 3
 ORDERING_DEFAULT_SEED := --randomly-seed=17
 PYTEST_DIAGNOSTIC_ARGS ?= --durations=10
-CORE_TEST_PATHS := tests/unit tests/contract tests/checkers tests/reference
-INTEGRATION_TEST_PATHS := tests/integration tests/end_to_end
 RUFF_PATHS := src tests benchmarks
-# Four workers cap memory and repeated per-worker kernel-template setup.
-PYTEST_XDIST_ARGS := -n auto --maxprocesses=4 --dist=worksteal
-# Keep modules that share an expensive fixture template on one core worker.
-# Ungrouped tests still distribute individually under loadgroup.
-PYTEST_CORE_XDIST_ARGS := -n auto --maxprocesses=4 --dist=loadgroup
-# Clean-process tests also construct kernel stores; two workers avoid I/O and
-# memory contention while retaining useful parallel feedback.
-PYTEST_SUBPROCESS_XDIST_ARGS := -n auto --maxprocesses=2 --dist=worksteal
+TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test test-plan validation-receipt test-fast test-unit-fast test-subprocess test-core test-integration test-integration-all test-contracts test-checkers test-mcp test-storage test-lean test-failed test-stress test-ordering duplicate-code npm-test todo-check coverage build check pre-push-full precommit check-static validate-full agent-eval bench-core clean docs-linkcheck deploy-check
-
-define require_test_scope
-	@if [ -z "$(strip $(TESTS))" ] && [ -z "$(CI)" ] && [ "$(EXHAUSTIVE)" != "1" ]; then \
-		echo "Refusing an exhaustive local test run." >&2; \
-		echo "Use TESTS=<file-or-node> while iterating; CI owns the exhaustive lane." >&2; \
-		echo "For an intentional local exception, use $(1)." >&2; \
-		exit 2; \
-	fi
-endef
+# A timeout is a lane-level containment policy.  It intentionally does not live
+# in pyproject.toml: direct pytest invocations must not silently inherit a
+# signal-based deadline that cannot interrupt a native solver.  Process and
+# provider lanes run risky work in killable children and set their own deadline.
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-plan validation-receipt test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -39,7 +26,7 @@ setup: ## Install the locked development environment.
 
 deploy-check: ## Validate the clone-to-systemd deployment entrypoint.
 	bash -n deploy/install.sh
-	$(UV_RUN) pytest -n 0 tests/unit/test_deploy_installer.py
+	$(UV_RUN) pytest -n 0 tests/boundary/process/tooling/test_deploy_installer.py
 
 hooks: setup ## Install pre-commit hooks.
 	$(UV_RUN) pre-commit install --install-hooks
@@ -63,10 +50,6 @@ security-audit: ## Audit dependencies for known vulnerabilities.
 typecheck: ## Run strict static type checking.
 	$(UV_RUN) mypy
 
-test: ## Run selected tests; exhaustive execution requires CI or EXHAUSTIVE=1.
-	$(call require_test_scope,make validate-full)
-	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" $(TESTS) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
-
 test-plan: ## Print local validation selected for BASE..HEAD and working changes.
 	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-plan BASE=origin/main)" >&2; exit 2; }
 	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"
@@ -74,60 +57,66 @@ test-plan: ## Print local validation selected for BASE..HEAD and working changes
 validation-receipt: ## Run COMMAND and bind its result to the exact working tree.
 	@$(UV_RUN) python .github/scripts/validation-receipt --output "$(RECEIPT)" -- $(COMMAND)
 
-test-fast: ## Sequential core edit loop (unit/contract/checkers/reference, no xdist).
-	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" \
-		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+define run_topology_lane
+	PYTEST_ADDOPTS="$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)" \
+		$(TOPOLOGY_RUNNER) $(1) $(if $(TESTS),$(TESTS))
+endef
 
-test-unit-fast: ## Sequential unit-only edit loop (excludes slow tests).
-	$(UV_RUN) pytest -n 0 -m "not lean_runtime and not slow" tests/unit $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-unit: ## Run pure contracts and models (10s lane, sequential).
+	$(call run_topology_lane,unit)
 
-test-subprocess: ## Run clean-process replay tests selected by the subprocess marker.
-	$(UV_RUN) pytest $(PYTEST_SUBPROCESS_XDIST_ARGS) -m "subprocess and not lean_runtime" $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-component: ## Run one-service component tests (30s lane, four workers).
+	$(call run_topology_lane,component)
 
-test-core: ## Parallel core suites (same paths as test-fast, uses xdist by default).
-	$(UV_RUN) pytest $(PYTEST_CORE_XDIST_ARGS) -m "not lean_runtime" \
-		$(if $(TESTS),$(TESTS),$(CORE_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-domain: ## Run explicitly bundled mathematical domains (120s lane).
+	$(call run_topology_lane,domain)
 
-test-integration: ## Run selected integration tests; TESTS is required locally.
-	$(call require_test_scope,make test-integration-all)
-	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) -m "not lean_runtime" \
-		$(if $(TESTS),$(TESTS),$(INTEGRATION_TEST_PATHS)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-composition: ## Run complete-runtime composition tests (120s, two workers).
+	$(call run_topology_lane,composition)
 
-test-integration-all: EXHAUSTIVE=1
-test-integration-all: test-integration ## Intentionally run all integration/end-to-end tests locally.
+test-storage: ## Run SQLite durability and recovery boundaries (serial).
+	$(call run_topology_lane,storage)
 
-test-contracts: ## Run contract tests.
-	$(UV_RUN) pytest -n 0 tests/contract $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-process: ## Run killable child-process boundaries (two workers).
+	$(call run_topology_lane,process)
 
-test-checkers: ## Run independent checker tests.
-	$(UV_RUN) pytest -n 0 tests/checkers $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-mcp: ## Run MCP transport boundaries (two workers).
+	$(call run_topology_lane,mcp)
 
-test-mcp: ## Run focused local and remote MCP integration tests.
-	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_mcp_adapter.py \
-		tests/integration/infrastructure/test_remote_mcp.py $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-provider: ## Run prepared optional-provider boundaries (one worker).
+	$(call run_topology_lane,provider)
 
-test-storage: ## Run artifact, registry, and workspace integration tests.
-	$(UV_RUN) pytest -n 0 tests/integration/infrastructure/test_artifact_store.py \
-		tests/integration/infrastructure/test_checker_registry.py \
-		tests/integration/infrastructure/test_plugin_registry_snapshots.py \
-		tests/integration/infrastructure/test_workspace_revisions.py \
-		tests/integration/infrastructure/test_workspace_lifecycle.py \
-		tests/integration/infrastructure/test_workspace_scaling.py \
-		tests/integration/infrastructure/test_workspace_invalidation.py \
-		$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-lean: ## Run the pinned Lean/Mathlib boundary serially.
+	$(call run_topology_lane,lean)
 
-test-lean: ## Run pinned Lean tests serially; narrow with TESTS=... and PYTEST_ARGS=....
-	$(UV_RUN) pytest -n 0 -m lean_runtime $(TESTS) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-e2e: ## Run complete user-visible CLI/workflow scenarios serially.
+	$(call run_topology_lane,e2e)
 
-test-failed: ## Re-run failures from the previous pytest invocation.
-	$(UV_RUN) pytest $(PYTEST_XDIST_ARGS) --lf -m "not lean_runtime" $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-compatibility: ## Run the small supported-version import/API compatibility smoke suite.
+	$(UV_RUN) pytest -n 0 --timeout=30 --timeout-method=thread tests/unit/tooling/test_ci_compatibility.py $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
-test-stress: ## Repeat contract, checker, and property tests (pytest-repeat --count=3).
-	$(UV_RUN) pytest -n 0 -m "not lean_runtime" --count=3 \
-		$(if $(TESTS),$(TESTS),tests/contract tests/checkers) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
+test-affected: ## Execute planner-selected exact nodes or their fail-closed lanes.
+	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-affected BASE=origin/main)" >&2; exit 2; }
+	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)" --execute
+
+test-all-ci: ## Explicitly run every semantic lane locally (exceptional).
+	$(MAKE) test-unit
+	$(MAKE) test-component
+	$(MAKE) test-domain
+	$(MAKE) test-composition
+	$(MAKE) test-storage
+	$(MAKE) test-process
+	$(MAKE) test-mcp
+	$(MAKE) test-provider
+	$(MAKE) test-lean
+	$(MAKE) test-e2e
+
+test-stress: ## Repeat explicitly marked property tests on the scheduled lane.
+	$(UV_RUN) pytest -n 0 --timeout=120 --timeout-method=thread -m property --count=$(STRESS_COUNT) \
+		$(if $(TESTS),$(TESTS),tests) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 test-ordering: ## Reproduce scheduled ordering (default seed 17; override with PYTEST_ARGS).
-	$(UV_RUN) pytest -n 0 -m "not lean_runtime" \
+	$(UV_RUN) pytest -n 0 --timeout=120 --timeout-method=thread \
 		$(if $(findstring --randomly-seed,$(PYTEST_ARGS)),,$(ORDERING_DEFAULT_SEED)) $(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)
 
 duplicate-code: ## Run the CI duplicate-code detector locally.
@@ -153,18 +142,13 @@ coverage: ## Combine coverage data files and enforce the repository threshold.
 build: ## Build Python source and wheel distributions.
 	uv build
 
-check: lint typecheck test-unit-fast ## Run the fast routine local handoff checks.
-
-pre-push-full: lint typecheck test-fast ## Run the routine checks plus all fast core tests.
+check: lint typecheck test-unit ## Run the fast routine local handoff checks.
 
 precommit: ## Fix and run every routine local handoff check.
 	$(MAKE) fix
 	$(MAKE) check
 
 check-static: lint-full typecheck todo-check build ## Run CI-owned static checks plus a local package build.
-
-validate-full: EXHAUSTIVE=1
-validate-full: lint-full typecheck test test-lean build ## Intentionally run the broad local subset when CI is unavailable.
 
 agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
 	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)

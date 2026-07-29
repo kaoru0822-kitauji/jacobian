@@ -18,16 +18,36 @@ CLASSIFIER = ROOT / ".github" / "scripts" / "classify-ci-paths"
 OWNERSHIP = ROOT / ".github" / "local-test-ownership.json"
 
 COMMANDS = {
-    "core": "make test-core",
-    "integration": "make test-integration-all",
-    "lean": "make test-lean",
-    "npm": "make npm-test",
-    "static": "make check-static",
-    "build": "make build",
-    "security": "make security-audit",
-    "duplicate": "make duplicate-code",
-    "docs": "make docs-linkcheck",
+    "unit": ("make test-unit",),
+    "component": ("make test-component",),
+    "domain": ("make test-domain",),
+    "composition": ("make test-composition",),
+    "storage": ("make test-storage",),
+    "process": ("make test-process",),
+    "mcp": ("make test-mcp",),
+    "provider": ("make test-provider",),
+    "e2e": ("make test-e2e",),
+    "lean": ("make test-lean",),
+    "npm": ("make npm-test",),
+    "static": ("make check-static",),
+    "build": ("make build",),
+    "security": ("make security-audit",),
+    "duplicate": ("make duplicate-code",),
+    "docs": ("make docs-linkcheck",),
 }
+
+TOPOLOGY_LANES = (
+    "unit",
+    "component",
+    "domain",
+    "composition",
+    "storage",
+    "process",
+    "mcp",
+    "provider",
+    "lean",
+    "e2e",
+)
 
 HIGH_IMPACT_PATHS = {
     "src/jacobian/__init__.py",
@@ -267,18 +287,83 @@ def exact_tests(entries: list[Change]) -> tuple[list[str], str | None]:
 
 
 def focused_commands(tests: list[str]) -> list[str]:
-    lean = [
-        test
-        for test in tests
-        if "lean_runtime" in (ROOT / test.split("::", 1)[0]).read_text(encoding="utf-8")
+    grouped: dict[str, list[str]] = {lane: [] for lane in TOPOLOGY_LANES}
+    for test in tests:
+        path = test.split("::", 1)[0]
+        lane = _lane_for_path(path)
+        if lane is None:
+            # An exact node without a topology owner is unsafe to run narrowly.
+            return []
+        grouped[lane].append(test)
+    return [
+        f"make test-{lane} TESTS={shlex.quote(' '.join(selectors))}"
+        for lane in TOPOLOGY_LANES
+        if (selectors := grouped[lane])
     ]
-    ordinary = [test for test in tests if test not in lean]
-    commands = []
-    if ordinary:
-        commands.append(f"make test TESTS={shlex.quote(' '.join(ordinary))}")
-    if lean:
-        commands.append(f"make test-lean TESTS={shlex.quote(' '.join(lean))}")
-    return commands
+
+
+def _lane_for_path(path: str) -> str | None:
+    """Resolve one test path against the checked-in topology manifest."""
+
+    manifest = ROOT / "tests" / "topology.toml"
+    if not manifest.is_file():
+        return None
+    try:
+        import tomllib
+
+        raw = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    lanes = raw.get("lanes", [])
+    if not isinstance(lanes, list):
+        return None
+    normalized = path.replace("\\", "/")
+    matches: list[str] = []
+
+    def matches_pattern(pattern: str) -> bool:
+        """Apply topology directory and glob ownership semantics."""
+
+        pattern = pattern.replace("\\", "/")
+        if fnmatch.fnmatchcase(normalized, pattern):
+            return True
+        if pattern.endswith("/**"):
+            prefix = pattern[:-3].rstrip("/")
+            return normalized == prefix or normalized.startswith(prefix + "/")
+        if not any(char in pattern for char in "*?["):
+            return normalized == pattern or normalized.startswith(
+                pattern.rstrip("/") + "/"
+            )
+        return False
+    for lane in lanes:
+        if not isinstance(lane, dict) or not isinstance(lane.get("name"), str):
+            continue
+        paths = lane.get("paths", [])
+        if not isinstance(paths, list):
+            continue
+        for pattern in paths:
+            if not isinstance(pattern, str):
+                continue
+            if matches_pattern(pattern):
+                matches.append(lane["name"])
+                break
+    return matches[0] if len(matches) == 1 else None
+
+
+def _command_arguments(command: str) -> list[str]:
+    """Convert a displayed make command into an executable argv."""
+
+    return shlex.split(command)
+
+
+def execute_commands(commands: list[str]) -> int:
+    """Execute planner output in fresh make invocations and retain failures."""
+
+    status = 0
+    for command in commands:
+        completed = subprocess.run(_command_arguments(command), cwd=ROOT, check=False)
+        if completed.returncode and status == 0:
+            status = completed.returncode
+    return status
 
 
 def classify(paths: list[str]) -> dict[str, str]:
@@ -297,6 +382,11 @@ def classify(paths: list[str]) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", required=True, help="Base commit or ref.")
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute the exact selectors or fail-closed lane commands.",
+    )
     args = parser.parse_args()
 
     try:
@@ -326,13 +416,26 @@ def main() -> None:
     else:
         print("  none")
     print("commands:")
-    focused_lanes = {"core", "integration", "lean"} if tests else set()
+    focused_lanes = set(TOPOLOGY_LANES) if tests else set()
     for command in focused_commands(tests):
         print(f"  {command}")
     for lane in lanes:
         if lane in focused_lanes:
             continue
-        print(f"  {COMMANDS[lane]}")
+        for command in COMMANDS[lane]:
+            print(f"  {command}")
+
+    if args.execute:
+        if tests:
+            commands = focused_commands(tests)
+            if not commands:
+                print("cannot execute: selected tests have no unique topology lane", file=sys.stderr)
+                raise SystemExit(2)
+        elif fallback:
+            commands = [command for lane in lanes for command in COMMANDS[lane]]
+        else:
+            commands = []
+        raise SystemExit(execute_commands(commands))
 
 
 if __name__ == "__main__":

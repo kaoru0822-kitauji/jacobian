@@ -27,8 +27,15 @@ jobs:
     outputs:
       classification: ${{ steps.classify.outputs.classification }}
       run-python: ${{ steps.classify.outputs.run-python }}
-      run-core: ${{ steps.classify.outputs.run-core }}
-      run-integration: ${{ steps.classify.outputs.run-integration }}
+      run-unit: ${{ steps.classify.outputs.run-unit }}
+      run-component: ${{ steps.classify.outputs.run-component }}
+      run-domain: ${{ steps.classify.outputs.run-domain }}
+      run-composition: ${{ steps.classify.outputs.run-composition }}
+      run-storage: ${{ steps.classify.outputs.run-storage }}
+      run-process: ${{ steps.classify.outputs.run-process }}
+      run-mcp: ${{ steps.classify.outputs.run-mcp }}
+      run-provider: ${{ steps.classify.outputs.run-provider }}
+      run-e2e: ${{ steps.classify.outputs.run-e2e }}
       run-coverage: ${{ steps.classify.outputs.run-coverage }}
       run-compatibility: ${{ steps.classify.outputs.run-compatibility }}
       run-lean: ${{ steps.classify.outputs.run-lean }}
@@ -38,8 +45,8 @@ jobs:
       run-security: ${{ steps.classify.outputs.run-security }}
       run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
       run-docs: ${{ steps.classify.outputs.run-docs }}
-      integration-shard-count: ${{ steps.shards.outputs.integration-shard-count }}
-      integration-shards: ${{ steps.shards.outputs.integration-shards }}
+      domain-shard-count: ${{ steps.shards.outputs.domain-shard-count }}
+      domain-shards: ${{ steps.shards.outputs.domain-shards }}
       node-version-jscpd: ${{ steps.shards.outputs.node-version-jscpd }}
       node-version-npm: ${{ steps.shards.outputs.node-version-npm }}
       pytest-randomly-shard-seed: ${{ steps.shards.outputs.pytest-randomly-shard-seed }}
@@ -50,7 +57,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - id: shards
-        name: Load integration shard configuration
+        name: Load domain shard configuration
         run: .github/scripts/manage-test-timings emit-plan-outputs >> "$GITHUB_OUTPUT"
       - id: classify
         name: Classify changed paths
@@ -91,18 +98,18 @@ jobs:
             echo "$plan_output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Prepare integration timing hint
-        if: steps.classify.outputs.run-integration == 'true'
+      - name: Prepare domain timing hint
+        if: steps.classify.outputs.run-domain == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           .github/scripts/manage-test-timings prepare
           --output .ci/test-durations.json
-      - name: Share integration timing hint
-        if: steps.classify.outputs.run-integration == 'true'
+      - name: Share domain timing hint
+        if: steps.classify.outputs.run-domain == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: integration-test-durations-input
+          name: domain-test-durations-input
           path: .ci/test-durations.json
           include-hidden-files: true
           retention-days: 1
@@ -261,10 +268,10 @@ jobs:
           uvx --from "$wheel" jacobian --help
           uvx --from "$wheel" jacobian-mcp --help
 
-  core-test:
-    name: Tests (core, Python 3.12)
+  unit-test:
+    name: Tests (unit, Python 3.12)
     needs: plan
-    if: needs.plan.outputs.run-core == 'true'
+    if: needs.plan.outputs.run-unit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -274,7 +281,7 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: make test-core
+      - run: make test-unit
         env:
           PYTEST_ARGS: >-
             --junitxml=pytest.xml
@@ -284,47 +291,47 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
-          name: junit-core-3.12
+          name: junit-unit-3.12
           path: pytest.xml
           if-no-files-found: ignore
           retention-days: 7
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: mv .coverage .coverage.core
+        run: mv .coverage .coverage.unit
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
         with:
-          name: coverage-data-core
-          path: .coverage.core
+          name: coverage-data-unit
+          path: .coverage.unit
           include-hidden-files: true
 
-  integration-test:
+  domain-test:
     name: >-
-      Tests (integration ${{ matrix.shard }} of ${{ needs.plan.outputs.integration-shard-count }},
+      Tests (domain ${{ matrix.shard }} of ${{ needs.plan.outputs.domain-shard-count }},
       Python 3.12)
     needs: plan
-    if: needs.plan.outputs.run-integration == 'true'
+    if: needs.plan.outputs.run-domain == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.plan.outputs.integration-shards) }}
+        shard: ${{ fromJSON(needs.plan.outputs.domain-shards) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Download integration timing hint
+      - name: Download domain timing hint
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: integration-test-durations-input
+          name: domain-test-durations-input
           path: .ci
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: make test-integration
+      - run: make test-domain
         env:
           PYTEST_ARGS: >-
-            --splits ${{ needs.plan.outputs.integration-shard-count }}
+            --splits ${{ needs.plan.outputs.domain-shard-count }}
             --group ${{ matrix.shard }}
             --splitting-algorithm least_duration
             --durations-path .ci/test-durations.json
@@ -333,10 +340,10 @@ jobs:
             --clean-durations
             --junitxml=pytest.xml
             ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
-      - name: Upload integration shard timings
+      - name: Upload domain shard timings
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: integration-duration-shard-${{ matrix.shard }}
+          name: domain-duration-shard-${{ matrix.shard }}
           path: .ci/test-durations.json
           include-hidden-files: true
           retention-days: 1
@@ -346,23 +353,97 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: >-
-            junit-integration-${{ matrix.shard }}-3.12
+            junit-domain-${{ matrix.shard }}-3.12
           path: pytest.xml
           if-no-files-found: ignore
           retention-days: 7
       - if: needs.plan.outputs.run-coverage == 'true'
-        run: mv .coverage .coverage.integration-${{ matrix.shard }}
+        run: mv .coverage .coverage.domain-${{ matrix.shard }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
         with:
-          name: coverage-data-integration-${{ matrix.shard }}
-          path: .coverage.integration-${{ matrix.shard }}
+          name: coverage-data-domain-${{ matrix.shard }}
+          path: .coverage.domain-${{ matrix.shard }}
+          include-hidden-files: true
+
+  process-test:
+    name: Tests (process boundary, Python 3.12)
+    needs: plan
+    if: needs.plan.outputs.run-process == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - name: Run process boundary lane in a separate job
+        run: make test-process
+        env:
+          PYTEST_ARGS: >-
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
+      - if: needs.plan.outputs.run-coverage == 'true'
+        run: mv .coverage .coverage.process
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
+        with:
+          name: coverage-data-process
+          path: .coverage.process
+          include-hidden-files: true
+
+  semantic-lane-test:
+    name: Tests (${{ matrix.lane }}, Python 3.12)
+    needs: plan
+    if: needs.plan.outputs.run-python == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [component, composition, storage, mcp, provider, e2e]
+    steps:
+      - name: Select planned lane
+        id: select
+        env:
+          RUN_LANE: ${{ needs.plan.outputs[format('run-{0}', matrix.lane)] }}
+        run: |
+          case "$RUN_LANE" in
+            true) echo "selected=true" >> "$GITHUB_OUTPUT" ;;
+            false) echo "selected=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "invalid plan value for ${{ matrix.lane }}: $RUN_LANE" >&2; exit 1 ;;
+          esac
+      - if: steps.select.outputs.selected == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: steps.select.outputs.selected == 'true'
+        uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - name: Run semantic lane
+        if: steps.select.outputs.selected == 'true'
+        env:
+          LANE: ${{ matrix.lane }}
+          PYTEST_ARGS: >-
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
+        run: make "test-${LANE}"
+      - if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+        run: mv .coverage .coverage.${{ matrix.lane }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+        with:
+          name: coverage-data-${{ matrix.lane }}
+          path: .coverage.${{ matrix.lane }}
           include-hidden-files: true
 
   publish-test-durations:
-    name: Publish integration test durations
+    name: Publish domain test durations
     if: github.ref == 'refs/heads/main'
-    needs: [plan, integration-test]
+    needs: [plan, domain-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -372,32 +453,32 @@ jobs:
       - name: Download shard timings
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: integration-duration-shard-*
+          pattern: domain-duration-shard-*
           path: .ci/shards
       - name: Merge shard timings
         env:
-          SHARD_COUNT: ${{ needs.plan.outputs.integration-shard-count }}
+          SHARD_COUNT: ${{ needs.plan.outputs.domain-shard-count }}
         run: |
           inputs=()
           for shard in $(seq 1 "$SHARD_COUNT"); do
-            inputs+=(--input ".ci/shards/integration-duration-shard-${shard}/test-durations.json")
+            inputs+=(--input ".ci/shards/domain-duration-shard-${shard}/test-durations.json")
           done
           .github/scripts/manage-test-timings merge \
             "${inputs[@]}" \
-            --output .ci/integration-test-durations.json \
+            --output .ci/domain-test-durations.json \
             --source-sha "${{ github.sha }}" \
             --python-version "3.12" \
             --pytest-split-version "${{ needs.plan.outputs.pytest-split-version }}"
       - name: Publish timing hint
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: integration-test-durations
-          path: .ci/integration-test-durations.json
+          name: domain-test-durations
+          path: .ci/domain-test-durations.json
           include-hidden-files: true
           retention-days: 90
 
   compatibility-test:
-    name: Exhaustive compatibility (Python 3.13)
+    name: Compatibility smoke (Python 3.13)
     needs: plan
     if: needs.plan.outputs.run-compatibility == 'true'
     runs-on: ubuntu-latest
@@ -409,7 +490,7 @@ jobs:
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.13"
-      - run: make test
+      - run: make test-compatibility
         env:
           PYTEST_ARGS: --junitxml=pytest.xml
       - if: ${{ !cancelled() }}
@@ -425,7 +506,8 @@ jobs:
   python-test:
     name: Python Tests
     if: ${{ !cancelled() }}
-    needs: [plan, core-test, integration-test, compatibility-test]
+    needs:
+      [plan, unit-test, domain-test, process-test, semantic-lane-test, compatibility-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -433,11 +515,14 @@ jobs:
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
-          RUN_CORE: ${{ needs.plan.outputs.run-core }}
-          RUN_INTEGRATION: ${{ needs.plan.outputs.run-integration }}
+          RUN_UNIT: ${{ needs.plan.outputs.run-unit }}
+          RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
+          RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
           RUN_COMPATIBILITY: ${{ needs.plan.outputs.run-compatibility }}
-          CORE_RESULT: ${{ needs.core-test.result }}
-          INTEGRATION_RESULT: ${{ needs.integration-test.result }}
+          UNIT_RESULT: ${{ needs.unit-test.result }}
+          DOMAIN_RESULT: ${{ needs.domain-test.result }}
+          PROCESS_RESULT: ${{ needs.process-test.result }}
+          SEMANTIC_RESULT: ${{ needs.semantic-lane-test.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility-test.result }}
         run: |
           case "$PLAN_RESULT" in
@@ -455,14 +540,24 @@ jobs:
             true|false) ;;
             *) exit 1 ;;
           esac
-          case "$RUN_CORE" in
-            true) test "$CORE_RESULT" = "success" ;;
-            false) test "$CORE_RESULT" = "skipped" ;;
+          case "$RUN_UNIT" in
+            true) test "$UNIT_RESULT" = "success" ;;
+            false) test "$UNIT_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
-          case "$RUN_INTEGRATION" in
-            true) test "$INTEGRATION_RESULT" = "success" ;;
-            false) test "$INTEGRATION_RESULT" = "skipped" ;;
+          case "$RUN_DOMAIN" in
+            true) test "$DOMAIN_RESULT" = "success" ;;
+            false) test "$DOMAIN_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
+          case "$RUN_PROCESS" in
+            true) test "$PROCESS_RESULT" = "success" ;;
+            false) test "$PROCESS_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
+          case "$RUN_PYTHON" in
+            true) test "$SEMANTIC_RESULT" = "success" ;;
+            false) test "$SEMANTIC_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
           case "$RUN_COMPATIBILITY" in
@@ -528,7 +623,8 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [plan, core-test, integration-test]
+    needs:
+      [plan, unit-test, domain-test, process-test, semantic-lane-test]
     permissions:
       contents: read
       pull-requests: write
@@ -537,10 +633,13 @@ jobs:
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           RUN_COVERAGE: ${{ needs.plan.outputs.run-coverage }}
-          RUN_CORE: ${{ needs.plan.outputs.run-core }}
-          RUN_INTEGRATION: ${{ needs.plan.outputs.run-integration }}
-          CORE_RESULT: ${{ needs.core-test.result }}
-          INTEGRATION_RESULT: ${{ needs.integration-test.result }}
+          RUN_UNIT: ${{ needs.plan.outputs.run-unit }}
+          RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
+          RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
+          UNIT_RESULT: ${{ needs.unit-test.result }}
+          DOMAIN_RESULT: ${{ needs.domain-test.result }}
+          PROCESS_RESULT: ${{ needs.process-test.result }}
+          SEMANTIC_RESULT: ${{ needs.semantic-lane-test.result }}
         run: |
           case "$PLAN_RESULT" in
             success) ;;
@@ -557,19 +656,24 @@ jobs:
             true|false) ;;
             *) exit 1 ;;
           esac
-          case "$RUN_CORE" in
-            true) test "$CORE_RESULT" = "success" ;;
-            false) test "$CORE_RESULT" = "skipped" ;;
+          case "$RUN_UNIT" in
+            true) test "$UNIT_RESULT" = "success" ;;
+            false) test "$UNIT_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
-          case "$RUN_INTEGRATION" in
-            true) test "$INTEGRATION_RESULT" = "success" ;;
-            false) test "$INTEGRATION_RESULT" = "skipped" ;;
+          case "$RUN_DOMAIN" in
+            true) test "$DOMAIN_RESULT" = "success" ;;
+            false) test "$DOMAIN_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
           if [ "$RUN_COVERAGE" = "true" ]; then
-            test "$CORE_RESULT" = "success"
-            test "$INTEGRATION_RESULT" = "success"
+            test "$RUN_PROCESS" = "true"
+            test "$PROCESS_RESULT" = "success"
+            test "$SEMANTIC_RESULT" = "success"
+          fi
+          if [ "$RUN_COVERAGE" = "true" ]; then
+            test "$UNIT_RESULT" = "success"
+            test "$DOMAIN_RESULT" = "success"
           fi
       - if: needs.plan.outputs.run-coverage == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -827,10 +931,12 @@ jobs:
       - lint
       - security-audit
       - validate-built-package
-      - core-test
-      - integration-test
+      - unit-test
+      - domain-test
       - compatibility-test
       - python-test
+      - process-test
+      - semantic-lane-test
       - lean-test-run
       - lean-test
       - coverage

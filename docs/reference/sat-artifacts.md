@@ -328,7 +328,7 @@ regression behavior and are never hidden evaluation. Run the actual
 CaDiCaL-to-checker path with:
 
 ```sh
-uv run pytest -n 0 tests/integration/sat_smt/test_sat_public_reproductions.py
+uv run pytest -n 0 tests/boundary/providers/external_sat/test_sat_public_reproductions.py
 ```
 
 The `BOOL-MUS-001` replay exposed CaDiCaL cleanup deletions after its empty

@@ -6,7 +6,7 @@ on:
       pytest-selector:
         description: One Lean pytest file or node ID to run
         required: true
-        default: tests/integration/lean/test_lean.py
+        default: tests/boundary/providers/lean/startup/test_lean.py
         type: string
       keyword:
         description: Optional pytest -k expression
@@ -38,7 +38,7 @@ jobs:
           TEST_SELECTOR: ${{ inputs.pytest-selector }}
           TEST_KEYWORD: ${{ inputs.keyword }}
         run: |
-          args=(-n 0 -m lean_runtime "$TEST_SELECTOR" --durations=10)
+          args=(-n 0 "$TEST_SELECTOR" --durations=10)
           if [ -n "$TEST_KEYWORD" ]; then
             args+=(-k "$TEST_KEYWORD")
           fi
