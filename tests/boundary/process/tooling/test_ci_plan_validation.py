@@ -108,7 +108,7 @@ def test_ci_plan_validator_rejects_malformed_or_incoherent_plans(plan: str) -> N
     "plan",
     [
         {**_plan_for("README.md"), "classification": "full"},
-        {**_plan_for("tests/unit/test_runtime.py"), "classification": "selective"},
+        {**_plan_for("tests/unit/test_runtime.py"), "classification": "docs"},
         {
             **_plan_for("tests/composition/runtime/test_runtime_lifecycle.py"),
             "classification": "docs",

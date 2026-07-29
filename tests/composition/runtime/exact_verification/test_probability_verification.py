@@ -76,7 +76,9 @@ def test_probability_results_are_independently_replayed(
     assert verified.assurance.level is CapabilityAssuranceLevel.VERIFIED
 
 
-def test_probability_checker_rejects_forged_event_mass(authorized_complete_runtime) -> None:
+def test_probability_checker_rejects_forged_event_mass(
+    authorized_complete_runtime,
+) -> None:
     computed = authorized_complete_runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id=("probability.finite_distribution.event_probability.compute"),

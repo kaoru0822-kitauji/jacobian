@@ -1,16 +1,13 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-
-from tests.support.services import DomainTestServices, open_domain_services
-
-import subprocess
-import sys
-
 from pydantic import ValidationError
+from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -24,7 +21,9 @@ from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(tmp_path / "state", RATIONAL_OPTIMIZATION_BUNDLE) as services:
+    with open_domain_services(
+        tmp_path / "state", RATIONAL_OPTIMIZATION_BUNDLE
+    ) as services:
         yield services
 
 
@@ -71,6 +70,7 @@ def test_rational_lp_produces_inspectable_primal_dual_certificate(
         "OBJECTIVE_EQUALITY",
     ]
 
+
 def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(
     domain_services: DomainTestServices,
 ) -> None:
@@ -105,6 +105,7 @@ def test_rational_lp_dual_variables_are_unrestricted_and_dimension_bound(
         obligation.payload["program"]["coefficients"]
     )
 
+
 def test_rational_lp_obligation_rejects_wrong_candidate_dimensions() -> None:
     program = {
         "variables": ["x", "y"],
@@ -131,6 +132,7 @@ def test_rational_lp_obligation_rejects_wrong_candidate_dimensions() -> None:
                 "dual_candidate": [_rational(1), _rational(0)],
             }
         )
+
 
 @pytest.mark.parametrize(
     "payload",
@@ -163,6 +165,7 @@ def test_rational_lp_worker_rejects_malformed_protocol(payload: str) -> None:
     assert completed.returncode == 2
     assert completed.stdout == ""
     assert completed.stderr == "invalid rational optimization worker request\n"
+
 
 def test_invalid_rational_lp_never_reaches_backend_worker(
     domain_services: DomainTestServices,

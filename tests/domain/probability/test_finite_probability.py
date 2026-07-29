@@ -4,13 +4,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
-    CapabilityObligationStatus,
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
@@ -19,7 +17,9 @@ from jacobian.domains.probability import FINITE_PROBABILITY_BUNDLE
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(tmp_path / "state", FINITE_PROBABILITY_BUNDLE) as services:
+    with open_domain_services(
+        tmp_path / "state", FINITE_PROBABILITY_BUNDLE
+    ) as services:
         yield services
 
 
@@ -70,6 +70,7 @@ def test_finite_raw_moment_preserves_exact_contributions(
     persisted = runtime.core.store.get(result.artifact_uris[1])
     assert persisted.payload == result.output["result"]
 
+
 def test_invalid_finite_distribution_fails_before_artifact_writes(
     domain_services: DomainTestServices,
 ) -> None:
@@ -91,6 +92,8 @@ def test_invalid_finite_distribution_fails_before_artifact_writes(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "INVALID_FINITE_PROBABILITY_REQUEST"
     assert result.artifact_uris == ()
+
+
 def test_finite_event_probability_preserves_selected_atom_contributions(
     domain_services: DomainTestServices,
 ) -> None:
@@ -123,6 +126,7 @@ def test_finite_event_probability_preserves_selected_atom_contributions(
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert len(result.artifact_uris) == 2
 
+
 def test_finite_conditioning_returns_one_normalized_distribution(
     domain_services: DomainTestServices,
 ) -> None:
@@ -151,6 +155,7 @@ def test_finite_conditioning_returns_one_normalized_distribution(
         for contribution in result.output["result"]["contributions"]
     ] == [_rational(1, 4), _rational(3, 4)]
 
+
 def test_zero_mass_conditioning_is_a_non_conclusion_without_artifacts(
     domain_services: DomainTestServices,
 ) -> None:
@@ -173,6 +178,7 @@ def test_zero_mass_conditioning_is_a_non_conclusion_without_artifacts(
     assert result.completeness.status is CapabilityCompletenessStatus.NOT_APPLICABLE
     assert result.artifact_uris == ()
     assert result.episode_uri is None
+
 
 def test_finite_pushforward_collapses_equal_target_atoms(
     domain_services: DomainTestServices,
@@ -202,6 +208,7 @@ def test_finite_pushforward_collapses_equal_target_atoms(
     )
     assert len(result.output["result"]["contributions"]) == 3
 
+
 def test_finite_convolution_aggregates_all_independent_pairs(
     domain_services: DomainTestServices,
 ) -> None:
@@ -220,6 +227,7 @@ def test_finite_convolution_aggregates_all_independent_pairs(
         (2, 1, 4),
     )
     assert len(result.output["result"]["contributions"]) == 4
+
 
 def test_finite_convolution_rejects_distinct_support_above_result_bound(
     domain_services: DomainTestServices,
@@ -243,6 +251,7 @@ def test_finite_convolution_rejects_distinct_support_above_result_bound(
     assert result.execution.status is ExecutionStatus.ERROR
     assert result.diagnostics[0].code == "INVALID_FINITE_PROBABILITY_REQUEST"
     assert result.artifact_uris == ()
+
 
 def test_incomplete_pushforward_mapping_fails_before_artifact_writes(
     domain_services: DomainTestServices,

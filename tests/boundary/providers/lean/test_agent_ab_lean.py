@@ -9,7 +9,7 @@ from tests.composition.agent_ab_support import _runtime_from_template
 from tests.support._agent_ab_support import (
     _lean_proof_case,
 )
-from tests.support.providers import (
+from tests.support.provider_lean import (
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
     pinned_mathlib_runtime_available,
 )

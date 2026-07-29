@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Iterator
 from pathlib import Path
-import subprocess
 
 import pytest
-
 from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import (
@@ -60,6 +59,7 @@ def test_arb_point_enclosure_materializes_exact_dyadics_and_obligation(
         "AUTHORIZED_INDEPENDENT_BALL_ARITHMETIC"
     )
     assert set(obligation.manifest.parents) == set(result.artifact_uris[:2])
+
 
 def test_arb_nonfinite_and_timeout_are_non_conclusions(
     domain_services: DomainTestServices,

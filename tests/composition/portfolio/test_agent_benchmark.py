@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from benchmarks import agent_mcp as benchmark
 from tests.component.capabilities.capabilities import invoke_capability as _invoke
-from tests.support.providers import (
+from tests.support.provider_lean import (
     PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
     pinned_mathlib_runtime_available,
 )

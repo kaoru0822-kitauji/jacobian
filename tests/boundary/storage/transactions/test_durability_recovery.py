@@ -15,12 +15,14 @@ from jacobian.store import (
     transaction_active_for,
 )
 
+
 def test_metadata_connections_use_full_synchronous_durability(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     with store.connection() as connection:
         synchronous = connection.execute("PRAGMA synchronous").fetchone()
     assert synchronous is not None
     assert synchronous[0] == 2
+
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_transaction_batches_blob_directory_syncs(
@@ -56,6 +58,7 @@ def test_transaction_batches_blob_directory_syncs(
 
     assert synced == [store._blob_path(first_digest).parent, store.blob_root]
 
+
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_transaction_body_failure_flushes_before_reconciliation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -88,6 +91,7 @@ def test_transaction_body_failure_flushes_before_reconciliation(
     assert not store.transaction_recovery_path.exists()
     with pytest.raises(ArtifactNotFoundError):
         store.get_descriptor(descriptor_uri, expected_kind="schema")
+
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_persistent_directory_sync_failure_poisoned_until_reopen(
@@ -126,6 +130,7 @@ def test_persistent_directory_sync_failure_poisoned_until_reopen(
     recovered = ArtifactStore(tmp_path)
     assert not recovered.transaction_recovery_path.exists()
 
+
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_recovery_sync_failure_leaves_marker_for_later_reopen(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -155,6 +160,7 @@ def test_recovery_sync_failure_leaves_marker_for_later_reopen(
     assert store.transaction_recovery_path.exists()
     monkeypatch.setattr(ArtifactStore, "_sync_directory", real_sync_directory)
     assert not ArtifactStore(tmp_path).transaction_recovery_path.exists()
+
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_preopened_store_recovers_existing_marker_before_new_transaction(
@@ -209,6 +215,7 @@ def test_preopened_store_recovers_existing_marker_before_new_transaction(
         preopened_store.get_descriptor(descriptor_uri, expected_kind="schema")["name"]
         == "example.preopened-recovered"
     )
+
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_preopened_store_recovers_before_direct_repeated_descriptor_write(
@@ -266,6 +273,7 @@ def test_preopened_store_recovers_before_direct_repeated_descriptor_write(
     assert repeated_uri == failed_uri
     assert recovery_sync_seen
 
+
 @pytest.mark.parametrize("failure", ["rollback", "close"])
 def test_cleanup_failure_clears_ownership_and_defers_recovery(
     tmp_path: Path,
@@ -307,6 +315,7 @@ def test_cleanup_failure_clears_ownership_and_defers_recovery(
     with pytest.raises(StoreError, match="requires recovery"):
         store.find_by_object_digest("sha256:" + "0" * 64)
     assert not ArtifactStore(tmp_path).transaction_recovery_path.exists()
+
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no directory fsync")
 def test_markerless_direct_sync_failure_is_synced_before_quota_clearance(

@@ -13,6 +13,7 @@ import pytest
 from jacobian.canonical import CanonicalizationError
 from jacobian.store import ArtifactStore, StoreError, StoreLimitError, StoreLimits
 
+
 def test_over_limit_artifact_leaves_no_partial_metadata(tmp_path: Path) -> None:
     store = ArtifactStore(
         tmp_path,
@@ -50,6 +51,7 @@ def test_over_limit_artifact_leaves_no_partial_metadata(tmp_path: Path) -> None:
         for path in (tmp_path / "blobs" / "sha256").glob("*/*")
     }
     assert blobs_after == blobs_before
+
 
 def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     tmp_path: Path,
@@ -112,6 +114,7 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     assert sum(isinstance(outcome, str) for outcome in outcomes) == 1
     assert sum(isinstance(outcome, StoreLimitError) for outcome in outcomes) == 1
 
+
 def test_blob_writes_do_not_rescan_the_blob_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -124,6 +127,7 @@ def test_blob_writes_do_not_rescan_the_blob_tree(
     monkeypatch.setattr(Path, "iterdir", unexpected_scan)
     store._write_blob(b"constant-time quota accounting")
 
+
 def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     committed = store._blob_bytes_committed()
@@ -135,6 +139,7 @@ def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
     reopened = ArtifactStore(tmp_path)
 
     assert reopened._blob_bytes_committed() == committed
+
 
 def test_store_open_migrates_legacy_quota_metadata(tmp_path: Path) -> None:
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -166,6 +171,7 @@ def test_store_open_migrates_legacy_quota_metadata(tmp_path: Path) -> None:
     assert "reconciliation_required" in columns
     assert row == (0, 0)
     assert store._blob_bytes_committed() == 0
+
 
 def test_concurrent_store_open_migrates_legacy_quota_metadata_once(
     tmp_path: Path,
@@ -206,6 +212,7 @@ ArtifactStore(sys.argv[1])
         ]
     assert columns.count("reconciliation_required") == 1
 
+
 def test_failed_blob_publication_releases_quota_reservation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -222,6 +229,7 @@ def test_failed_blob_publication_releases_quota_reservation(
         store._write_blob(b"unpublished")
 
     assert store._blob_bytes_committed() == committed
+
 
 def test_cross_process_blob_writes_cannot_oversubscribe_quota(
     tmp_path: Path,

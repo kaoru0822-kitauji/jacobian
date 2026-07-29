@@ -7,6 +7,7 @@ import pytest
 
 from jacobian.store import ArtifactNotFoundError, ArtifactStore
 
+
 def test_transaction_commits_multiple_descriptors_together(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
 
@@ -32,6 +33,7 @@ def test_transaction_commits_multiple_descriptors_together(tmp_path: Path) -> No
         == "example.second"
     )
     assert not store.transaction_recovery_path.exists()
+
 
 def test_transactions_serialize_across_store_instances(tmp_path: Path) -> None:
     first = ArtifactStore(tmp_path)
@@ -65,6 +67,7 @@ def test_transactions_serialize_across_store_instances(tmp_path: Path) -> None:
     writer.join(timeout=5)
     assert not writer.is_alive()
     assert writer_entered.is_set()
+
 
 def test_transaction_rolls_back_metadata_and_recovers_blob_accounting(
     tmp_path: Path,

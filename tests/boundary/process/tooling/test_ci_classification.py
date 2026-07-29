@@ -33,6 +33,7 @@ NON_PROVIDER_FUNCTIONAL_KEYS = tuple(
     key for key in FUNCTIONAL_KEYS if key != "run-provider"
 )
 
+
 def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
     selected = set(enabled)
     if "run-unit" in selected:
@@ -45,6 +46,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         "classification": classification,
         **{key: str(key in selected).lower() for key in BOOLEAN_KEYS},
     }
+
 
 @pytest.mark.parametrize(
     ("paths", "expected"),
@@ -141,18 +143,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-provider",
                 "run-static",
                 "run-build",
-            ),
-        ),
-        (
-            ("tests/support/providers.py",),
-            _expected_plan(
-                "selective",
-                "run-python",
-                "run-unit",
-                "run-domain",
-                "run-provider",
-                "run-lean",
-                "run-static",
             ),
         ),
         (
@@ -379,6 +369,7 @@ def test_ci_plan_fails_closed_outside_isolated_paths(
     assert (
         dict(line.split("=", 1) for line in completed.stdout.splitlines()) == expected
     )
+
 
 def test_full_override_expands_an_isolated_plan() -> None:
     completed = run_ci_script(

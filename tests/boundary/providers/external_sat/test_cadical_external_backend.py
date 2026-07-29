@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from tests.support.providers import cadical_runtime_available
+from tests.support.provider_external_sat import cadical_runtime_available
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus

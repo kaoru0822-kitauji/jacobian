@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.canonical import CanonicalizationError
 from jacobian.store import ArtifactIntegrityError, ArtifactStore, StoreError
+
 
 def test_artifact_identity_uses_canonical_payload_schema_and_semantics(
     tmp_path: Path,
@@ -75,6 +75,7 @@ def test_artifact_identity_uses_canonical_payload_schema_and_semantics(
     )
     assert store.get(first.artifact_uri).payload == {"weight": {"den": "2", "num": "1"}}
 
+
 def test_repeated_put_validates_without_blob_or_metadata_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -138,6 +139,7 @@ def test_repeated_put_validates_without_blob_or_metadata_writes(
 
     assert repeated == expected
 
+
 def test_repeated_put_rejects_corrupted_committed_blob(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     schema = store.register_descriptor(
@@ -171,6 +173,7 @@ def test_repeated_put_rejects_corrupted_committed_blob(tmp_path: Path) -> None:
             payload={"value": "original"},
         )
 
+
 def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     schema = store.register_descriptor(
@@ -200,6 +203,7 @@ def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
 
     with pytest.raises(ArtifactIntegrityError):
         store.get(artifact.artifact_uri)
+
 
 @pytest.mark.parametrize("column", ["manifest_digest", "summary"])
 def test_modified_artifact_metadata_is_rejected_on_read(
@@ -252,6 +256,7 @@ def test_modified_artifact_metadata_is_rejected_on_read(
     with pytest.raises(ArtifactIntegrityError, match="manifest differs"):
         store.get(artifact.artifact_uri)
 
+
 @pytest.mark.parametrize("missing_reference", ["parent", "schema", "semantics"])
 def test_missing_reference_metadata_is_rejected_on_read(
     tmp_path: Path,
@@ -296,6 +301,7 @@ def test_missing_reference_metadata_is_rejected_on_read(
     with pytest.raises(ArtifactIntegrityError, match="is not committed"):
         store.get(child.artifact_uri)
 
+
 def test_duplicate_put_rechecks_a_changed_blob(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     original = b"original"
@@ -304,6 +310,7 @@ def test_duplicate_put_rechecks_a_changed_blob(tmp_path: Path) -> None:
 
     with pytest.raises(ArtifactIntegrityError, match="does not match"):
         store._write_blob(original)
+
 
 def test_store_keeps_filesystem_paths_local(
     tmp_path: Path,

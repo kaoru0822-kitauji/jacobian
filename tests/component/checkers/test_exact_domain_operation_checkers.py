@@ -7,9 +7,9 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
+from tests.support.rationals import rational_payload as _q
 from tests.unit.contracts.artifacts import artifact_uri as _uri
 from tests.unit.contracts.artifacts import canonical_digest as _digest
-from tests.support.rationals import rational_payload as _q
 
 import jacobian_checkers.exact_domain_operations as checker_module
 from jacobian_checkers.exact_domain_operations import (

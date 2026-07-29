@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from hashlib import sha256
@@ -9,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.store import ArtifactStore
+
 
 def test_store_open_recovers_process_death_before_blob_publication(
     tmp_path: Path,
@@ -42,6 +42,7 @@ store._write_blob(b"reserved-but-unpublished")
     assert reopened._blob_bytes_committed() == 0
     assert not tuple((tmp_path / "blobs" / "sha256").glob("*/*"))
 
+
 def test_store_open_recovers_process_death_after_blob_publication(
     tmp_path: Path,
 ) -> None:
@@ -69,6 +70,7 @@ store._write_blob(sys.argv[2].encode("ascii"))
 
     assert reopened._blob_bytes_committed() == len(data)
     assert reopened._read_blob(digest) == data
+
 
 def test_store_open_recovers_process_death_during_store_transaction(
     tmp_path: Path,
@@ -110,6 +112,7 @@ with store.transaction():
 
     assert reopened._blob_bytes_committed() == stored_blob_bytes
     assert not reopened.transaction_recovery_path.exists()
+
 
 def test_clean_store_open_does_not_scan_the_blob_tree(
     tmp_path: Path,
