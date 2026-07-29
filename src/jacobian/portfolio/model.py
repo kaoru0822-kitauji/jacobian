@@ -13,7 +13,8 @@ class PortfolioPlan:
 
     The plan is a literal, ordered tuple of domain-owned ``DomainBundle``
     installation units. It performs no discovery, registration, or ranking:
-    callers install it through :class:`jacobian.portfolio.assembler.PortfolioAssembler`,
+    callers install it through
+    :class:`jacobian.portfolio.domain_installation.DomainBundleInstaller`,
     which records every per-bundle outcome as a typed diagnostic.
     """
 

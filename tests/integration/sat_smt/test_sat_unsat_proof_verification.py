@@ -87,7 +87,7 @@ def _runtime_with_runtime(
     runtime = drat_trim_provider_runtime(executable)
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     monkeypatch.setattr(
-        "jacobian.portfolio.assembler.drat_trim_provider_runtime",
+        "jacobian.portfolio.provider_resolution.drat_trim_provider_runtime",
         lambda *_args, **_kwargs: runtime,
     )
     return create_runtime(
@@ -255,7 +255,7 @@ def test_proof_verify_requires_runtime_and_operator_authorization(
     )
     unavailable = drat_trim_provider_runtime(tmp_path / "missing")
     monkeypatch.setattr(
-        "jacobian.portfolio.assembler.drat_trim_provider_runtime",
+        "jacobian.portfolio.provider_resolution.drat_trim_provider_runtime",
         lambda *_args, **_kwargs: unavailable,
     )
     without_runtime = create_runtime(

@@ -306,7 +306,7 @@ def test_missing_optional_cvc5_leaves_artifact_boundary_but_no_capability(
         diagnostic="cvc5 is intentionally unavailable for this test.",
     )
     monkeypatch.setattr(
-        "jacobian.portfolio.assembler.cvc5_provider_runtime",
+        "jacobian.portfolio.provider_resolution.cvc5_provider_runtime",
         lambda: unavailable,
     )
 
