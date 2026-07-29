@@ -31,7 +31,11 @@ def main() -> None:
     runner.metadata["suite"] = "jacobian-runtime-startup"
     with tempfile.TemporaryDirectory(prefix="jacobian-runtime-startup-") as directory:
         root = Path(directory)
-        create_runtime(root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED)
+        initial = create_runtime(
+            root,
+            checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+        )
+        initial.close()
         runner.bench_func(
             "runtime-populated-same-process",
             partial(

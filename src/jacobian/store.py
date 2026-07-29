@@ -794,6 +794,20 @@ class ArtifactStore:
         )
         manifest_digest = _sha256(manifest_bytes)
         artifact_uri = _uri_from_digest(manifest_digest)
+
+        # Re-registering identical content is common while assembling built-in
+        # portfolios. Validate the committed artifact before returning so the
+        # idempotent path avoids both blob publication and metadata writes
+        # without allowing missing or corrupted content to be silently healed.
+        if self._artifact_exists(artifact_uri):
+            self.get(artifact_uri)
+            return ArtifactPutResult(
+                artifact_uri=artifact_uri,
+                object_digest=object_digest,
+                manifest_digest=manifest_digest,
+                canonicalizer_digest=CANONICALIZER_DIGEST,
+            )
+
         self._write_blob(canonical_bytes)
         self._write_blob(manifest_bytes)
 

@@ -12,7 +12,7 @@ This package provides two independent, composable primitives:
 
 The package deliberately avoids registries, package discovery, import-time
 registration, and compatibility shims. Each loader is an independent, owned
-object; metadata helpers are pure functions.
+object; successful metadata identities are deduplicated process-locally.
 """
 
 from __future__ import annotations

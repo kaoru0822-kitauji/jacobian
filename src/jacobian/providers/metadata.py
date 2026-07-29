@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, distribution, version
+from threading import RLock
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,13 +20,29 @@ class DistributionSummary:
     version: str
 
 
-def distribution_version(distribution_name: str) -> str | None:
-    """Return installed distribution metadata without importing its package."""
+_cache_lock = RLock()
+_version_cache: dict[str, str] = {}
+_summary_cache: dict[str, DistributionSummary] = {}
 
-    try:
-        return version(distribution_name)
-    except PackageNotFoundError:
-        return None
+
+def distribution_version(distribution_name: str) -> str | None:
+    """Return installed distribution metadata without importing its package.
+
+    Successful identity lookups are cached for the process. Missing
+    distributions are deliberately not cached: a long-lived process may gain
+    an optional provider after its environment or import path changes.
+    """
+
+    with _cache_lock:
+        cached = _version_cache.get(distribution_name)
+        if cached is not None:
+            return cached
+        try:
+            installed_version = version(distribution_name)
+        except PackageNotFoundError:
+            return None
+        _version_cache[distribution_name] = installed_version
+        return installed_version
 
 
 def distribution_summary(distribution_name: str) -> DistributionSummary | None:
@@ -36,12 +53,18 @@ def distribution_summary(distribution_name: str) -> DistributionSummary | None:
     the recorded ``Name`` header is missing or empty.
     """
 
-    try:
-        dist = distribution(distribution_name)
-    except PackageNotFoundError:
-        return None
-    recorded_name = dist.metadata["Name"]
-    return DistributionSummary(
-        name=recorded_name or distribution_name,
-        version=dist.version,
-    )
+    with _cache_lock:
+        cached = _summary_cache.get(distribution_name)
+        if cached is not None:
+            return cached
+        try:
+            dist = distribution(distribution_name)
+        except PackageNotFoundError:
+            return None
+        recorded_name = dist.metadata["Name"]
+        summary = DistributionSummary(
+            name=recorded_name or distribution_name,
+            version=dist.version,
+        )
+        _summary_cache[distribution_name] = summary
+        return summary
