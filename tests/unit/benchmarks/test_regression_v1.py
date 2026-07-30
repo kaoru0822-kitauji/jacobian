@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+import json
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).parents[3]
+DATASET = ROOT / "benchmarks" / "regression-v1"
+TASKS = DATASET / "tasks"
+EXPECTED_TASKS = {
+    "graph-counterexample",
+    "graph-artifact-composition",
+    "finite-partition",
+    "sat-witness",
+    "rational-linear-solution",
+    "hermite-normal-form",
+    "polynomial-normalization",
+    "polynomial-map-collision",
+}
+
+
+def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
+    manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
+    assert manifest["dataset"]["name"] == "jacobian/regression-v1"
+    assert {
+        task["name"].rsplit("/", 1)[-1].removeprefix("regression-v1-")
+        for task in manifest["tasks"]
+    } == EXPECTED_TASKS
+
+    task_dirs = {path.name for path in TASKS.iterdir() if path.is_dir()}
+    assert task_dirs == EXPECTED_TASKS
+
+    for task_name in sorted(EXPECTED_TASKS):
+        task = TASKS / task_name
+        spec = tomllib.loads((task / "task.toml").read_text())
+        assert spec["schema_version"] == "1.4"
+        assert spec["task"]["name"] == f"jacobian/regression-v1-{task_name}"
+        assert spec["environment"]["network_mode"] == "no-network"
+        assert spec["verifier"]["environment"]["network_mode"] == "no-network"
+
+        input_bytes = (task / "input.json").read_bytes()
+        assert input_bytes == (task / "environment" / "input.json").read_bytes()
+        assert input_bytes == (task / "tests" / "input.json").read_bytes()
+        json.loads(input_bytes)
+        metadata = json.loads((task / "metadata.json").read_text())
+        assert metadata["case_version"] == "regression-v1"
+        assert metadata["fixture_digest"].startswith("sha256:")
+        assert metadata["upstream"] is None
+
+        instruction = (task / "instruction.md").read_text()
+        assert "capability_id" not in instruction
+        assert "agent-specific" not in instruction.lower()
+
+        for dockerfile in (
+            task / "environment" / "Dockerfile",
+            task / "tests" / "Dockerfile",
+        ):
+            assert "@sha256:" in dockerfile.read_text()
