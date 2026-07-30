@@ -17,7 +17,28 @@ const { join } = require("node:path");
  */
 
 const PACKAGE_NAME = "jacobian";
-const PACKAGE_SPEC = process.env.JACOBIAN_PACKAGE || PACKAGE_NAME;
+const npmPackageVersion = require("../package.json").version;
+
+/**
+ * Convert the npm release spelling to the Python spelling used by
+ * importlib.metadata and pip.
+ *
+ * @param {string} version
+ * @returns {string}
+ */
+function pythonVersionFromNpmVersion(version) {
+  const match = version.match(
+    /^(\d+\.\d+\.\d+)(?:-(alpha|beta|rc)\.(\d+))?$/,
+  );
+  if (!match) throw new Error(`unsupported Jacobian npm version: ${version}`);
+  const prerelease = { alpha: "a", beta: "b", rc: "rc" }[match[2]];
+  return prerelease ? `${match[1]}${prerelease}${match[3]}` : match[1];
+}
+
+const PYTHON_PACKAGE_VERSION = pythonVersionFromNpmVersion(npmPackageVersion);
+const USING_DEFAULT_PACKAGE = !process.env.JACOBIAN_PACKAGE;
+const PACKAGE_SPEC =
+  process.env.JACOBIAN_PACKAGE || `${PACKAGE_NAME}==${PYTHON_PACKAGE_VERSION}`;
 const VENV_NAME = "jacobian-venv";
 const STATE_DIR_ENV = "JACOBIAN_STATE_DIR";
 
@@ -86,6 +107,19 @@ function detectRuntime() {
 }
 
 /**
+ * Return whether the cached environment needs the configured package.
+ *
+ * @param {string | null} installedVersion
+ * @returns {boolean}
+ */
+function packageNeedsRefresh(installedVersion) {
+  return (
+    installedVersion === null ||
+    (USING_DEFAULT_PACKAGE && installedVersion !== PYTHON_PACKAGE_VERSION)
+  );
+}
+
+/**
  * Ensure the shared virtual environment exists and the Jacobian package is
  * installed.  Returns the path to the venv Python executable.
  *
@@ -121,9 +155,10 @@ function ensureEnvironment(runtime) {
 
   // Check if the package is already installed.
   const check = run(python, ["-c", `import jacobian; print(jacobian.__version__)`], { silent: true });
-  if (check.error || check.status !== 0) {
+  const installedVersion = check.status === 0 ? check.stdout.trim() : null;
+  if (packageNeedsRefresh(installedVersion)) {
     if (runtime.kind === "uv") {
-      const result = run(runtime.path, ["pip", "install", "--python", python, PACKAGE_SPEC]);
+      const result = run(runtime.path, ["pip", "install", "--upgrade", "--python", python, PACKAGE_SPEC]);
       if (result.error || result.status !== 0) {
         process.exitCode = 1;
         throw new Error(
@@ -132,7 +167,7 @@ function ensureEnvironment(runtime) {
         );
       }
     } else {
-      const result = run(python, ["-m", "pip", "install", PACKAGE_SPEC]);
+      const result = run(python, ["-m", "pip", "install", "--upgrade", PACKAGE_SPEC]);
       if (result.error || result.status !== 0) {
         process.exitCode = 1;
         throw new Error(
@@ -223,8 +258,11 @@ function launch(module, extraArgs, options = {}) {
 
 module.exports = {
   PACKAGE_NAME,
+  PYTHON_PACKAGE_VERSION,
   PACKAGE_SPEC,
   VENV_NAME,
+  packageNeedsRefresh,
+  pythonVersionFromNpmVersion,
   venvRoot,
   venvPython,
   detectRuntime,

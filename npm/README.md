@@ -44,7 +44,8 @@ Supported clients: `claude`, `cursor`, `opencode`, `codex`, `gemini`.
 ## Environment
 
 - `JACOBIAN_STATE_DIR` — state directory (default: `./.jacobian`)
-- `JACOBIAN_PACKAGE` — Python package spec (default: `jacobian`)
+- `JACOBIAN_PACKAGE` — Python package spec override (default: the Python package
+  version matching the installed npm launcher)
 
 ## Verification model
 

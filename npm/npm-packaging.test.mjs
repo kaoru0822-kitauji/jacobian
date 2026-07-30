@@ -52,6 +52,12 @@ import {
   SERVER_NAME,
 } from "./bin/setup.cjs";
 import {
+  PACKAGE_SPEC,
+  PYTHON_PACKAGE_VERSION,
+  packageNeedsRefresh,
+  pythonVersionFromNpmVersion,
+} from "./bin/launcher.cjs";
+import {
   EXPECTED_TOOLS,
   handshakeFailure,
   timeoutMessage,
@@ -128,6 +134,15 @@ test("normalizes release-please Python prerelease versions for npm", () => {
     npmVersionFromPythonVersion("0.3.0-alpha.0"),
     "0.3.0-alpha.0",
   );
+});
+
+test("launcher pins and refreshes stale default Python packages", () => {
+  assert.equal(pythonVersionFromNpmVersion("0.5.0-alpha.0"), "0.5.0a0");
+  assert.equal(PYTHON_PACKAGE_VERSION, "0.5.0a0");
+  assert.equal(PACKAGE_SPEC, "jacobian==0.5.0a0");
+  assert.equal(packageNeedsRefresh("0.4.0"), true);
+  assert.equal(packageNeedsRefresh(null), true);
+  assert.equal(packageNeedsRefresh(PYTHON_PACKAGE_VERSION), false);
 });
 
 test("npm and Python packages publish the same release version", async () => {
