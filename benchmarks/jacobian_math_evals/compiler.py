@@ -219,9 +219,7 @@ def _public_tasks() -> Iterator[TaskSpec]:
                 expected={
                     "answer_visible": True,
                     "oracle": case["oracle"],
-                    "allowed_conclusions": [
-                        case["oracle"]["expected_conclusion"]
-                    ],
+                    "allowed_conclusions": [case["oracle"]["expected_conclusion"]],
                     "maximum_assurance": "UNVERIFIED",
                 },
                 admissible_for_publish=True,
@@ -637,9 +635,7 @@ def compile_tasks(
         None
         if split in {Split.PUBLIC, Split.FULL}
         or (
-            task_ids
-            and task_ids
-            <= frozenset(spec.task_id for spec in _public_tasks())
+            task_ids and task_ids <= frozenset(spec.task_id for spec in _public_tasks())
         )
         else cache_dir
     )
@@ -711,9 +707,7 @@ def compile_tasks(
         if split == Split.FULL:
             with full_records_path.open("a", encoding="utf-8") as stream:
                 stream.write(
-                    json.dumps(
-                        task_record, sort_keys=True, separators=(",", ":")
-                    )
+                    json.dumps(task_record, sort_keys=True, separators=(",", ":"))
                     + "\n"
                 )
         else:

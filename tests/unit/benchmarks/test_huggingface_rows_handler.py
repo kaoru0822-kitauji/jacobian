@@ -157,7 +157,7 @@ def test_hf_full_offline_stream_replays_every_manifest_row(
             "rows": [
                 {"row_idx": 0, "row": {"problem": "1+1", "answer": "2"}},
                 {"row_idx": 1, "row": {"problem": "2+2", "answer": "4"}},
-            ]
+            ],
         },
     )
     specs = list(

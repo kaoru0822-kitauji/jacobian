@@ -275,8 +275,7 @@ class HuggingFaceExactAnswerHandler:
                 and page_value.get("config") == config
                 and page_value.get("split") == split
                 and page_value.get("source_revision") == source.immutable_revision
-                and page_value.get("source_snapshot_sha256")
-                == source.snapshot_sha256
+                and page_value.get("source_snapshot_sha256") == source.snapshot_sha256
                 and page_value.get("offset") == offset
             )
             if not page_identity_matches:

@@ -85,9 +85,7 @@ def test_probe_registers_declaration_supported_github_sources() -> None:
     ]
     assert len(github_handlers) == 60
     assert len({handler.source_id for handler in github_handlers}) == 60
-    assert "src-ed12e2650dc9" not in {
-        handler.source_id for handler in github_handlers
-    }
+    assert "src-ed12e2650dc9" not in {handler.source_id for handler in github_handlers}
 
 
 def test_formal_handler_offline_missing_snapshot_fails_closed(
@@ -107,9 +105,7 @@ def test_formal_handler_offline_missing_snapshot_fails_closed(
 
 def test_formal_handler_rejects_cache_from_another_revision(tmp_path: Path) -> None:
     source = _source()
-    destination = (
-        tmp_path / source.source_id / "formal-declarations.json"
-    )
+    destination = tmp_path / source.source_id / "formal-declarations.json"
     destination.parent.mkdir(parents=True)
     payload = (
         json.dumps(
@@ -123,9 +119,7 @@ def test_formal_handler_rejects_cache_from_another_revision(tmp_path: Path) -> N
         + "\n"
     ).encode()
     destination.write_bytes(payload)
-    destination.with_suffix(".sha256").write_text(
-        hashlib.sha256(payload).hexdigest()
-    )
+    destination.with_suffix(".sha256").write_text(hashlib.sha256(payload).hexdigest())
     with pytest.raises(ValueError, match="does not match source lock"):
         GitHubFormalDeclarationHandler(source.source_id).acquire(
             source,

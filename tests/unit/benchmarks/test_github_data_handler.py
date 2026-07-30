@@ -88,9 +88,7 @@ def test_repository_handler_rejects_cache_from_another_snapshot(
         + "\n"
     ).encode()
     destination.write_bytes(payload)
-    destination.with_suffix(".sha256").write_text(
-        hashlib.sha256(payload).hexdigest()
-    )
+    destination.with_suffix(".sha256").write_text(hashlib.sha256(payload).hexdigest())
     with pytest.raises(ValueError, match="does not match source lock"):
         GitHubStructuredDataHandler(source.source_id).acquire(
             source,

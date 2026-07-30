@@ -326,9 +326,7 @@ def test_full_generation_streams_task_source_mappings(
         cache_dir=tmp_path / "cache",
         offline=True,
     )
-    manifest = json.loads(
-        (tmp_path / "out" / "generation-manifest.json").read_text()
-    )
+    manifest = json.loads((tmp_path / "out" / "generation-manifest.json").read_text())
     records_path = tmp_path / "out" / manifest["task_records"]["path"]
     [record] = [json.loads(line) for line in records_path.read_text().splitlines()]
     assert record["task_id"] == spec.task_id
