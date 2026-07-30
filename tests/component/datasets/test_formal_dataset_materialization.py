@@ -127,9 +127,7 @@ def test_materialization_preserves_environment_and_preprocessing(
     )
 
     assert result.output["normalized_source"] == (
-        "import Mathlib  \n"
-        "theorem mathd_algebra_1 : (1 : Nat) = 1 := by  \n"
-        "  rfl  \n"
+        "import Mathlib  \ntheorem mathd_algebra_1 : (1 : Nat) = 1 := by  \n  rfl  \n"
     )
     assert result.output["environment"] == _environment()
     assert [item["operation"] for item in result.output["preprocessing"]] == [
