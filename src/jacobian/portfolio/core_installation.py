@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from jacobian.atomic_capabilities import install_atomic_capabilities
 from jacobian.builtin_capabilities import KnowledgeSearchAdapter
+from jacobian.conjecture_ingestion import ConjectureIngestionInstallation
 from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.finite_coverage import install_finite_coverage
 from jacobian.finite_partition import install_finite_partition
@@ -111,6 +112,14 @@ class CoreApplicationInstaller:
         result.domain_bundles = dict(bundle_result.installed)
         result.portfolio_diagnostics = bundle_result.diagnostics
         result.portfolio_outcomes = bundle_result.outcomes
+        conjecture_ingestion = result.domain_bundles.get("conjecture_ingestion")
+        if conjecture_ingestion is not None:
+            result.conjecture_ingestion = ConjectureIngestionInstallation(
+                semantics_uri=conjecture_ingestion.semantics_uri,
+                artifact_schema_uri=conjecture_ingestion.result_schema_uris[
+                    "dataset.conjecture.ingest"
+                ],
+            )
         self.install_domain_verification(result)
 
         graph_isomorphism_adapter, result.graph_isomorphism = install_graph_isomorphism(

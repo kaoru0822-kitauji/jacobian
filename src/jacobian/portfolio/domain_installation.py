@@ -56,6 +56,15 @@ class DomainBundleInstaller:
                 installation = self.context.operations.install(bundle)
             else:
                 installation = bundle.managed_installer(self.context)
+                installed_ids = tuple(
+                    adapter.descriptor.capability_id
+                    for adapter in installation.adapters
+                )
+                if installed_ids != capability_ids:
+                    raise ValueError(
+                        f"managed bundle {bundle.domain_id} installed capability IDs "
+                        f"{installed_ids!r}, expected {capability_ids!r}"
+                    )
             installed[bundle.domain_id] = installation
             for adapter in installation.adapters:
                 self.context.register_capability(adapter)

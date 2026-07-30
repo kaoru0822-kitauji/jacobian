@@ -365,6 +365,19 @@ def test_conjecture_ingestion_installs_through_domain_bundle_outcome(
     assert "dataset.conjecture.ingest" in assembly.registered
 
 
+def test_managed_bundle_rejects_installed_capability_id_mismatch(
+    assembly: _RecordingContext,
+) -> None:
+    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    assert bundle is not None
+    mismatched = replace(bundle, managed_capability_ids=("dataset.wrong.ingest",))
+
+    with pytest.raises(ValueError, match="installed capability IDs"):
+        DomainBundleInstaller(assembly.context).install(
+            PortfolioPlan(domain_bundles=(mismatched,))
+        )
+
+
 def test_duplicate_capability_id_within_a_bundle_propagates(
     assembly: _RecordingContext,
 ) -> None:

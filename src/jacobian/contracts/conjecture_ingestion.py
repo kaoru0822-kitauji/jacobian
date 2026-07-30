@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from enum import StrEnum
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 
@@ -35,6 +36,12 @@ class ExternalConjectureMetadata(ContractModel):
     domain: str | None = Field(default=None, max_length=256)
     source_name: str | None = Field(default=None, max_length=512)
     source_item_url: str | None = Field(default=None, max_length=2_000)
+
+    @model_validator(mode="after")
+    def require_nonblank_title(self) -> Self:
+        if not self.title.strip():
+            raise ValueError("title must not be blank")
+        return self
 
 
 class ExternalConjectureIngestRequest(ContractModel):
@@ -78,6 +85,8 @@ class ExternalConjectureIngestRequest(ContractModel):
             and not self.license_evidence_url.strip()
         ):
             raise ValueError("license evidence URL must not be blank")
+        if self.license_evidence_url is not None:
+            _require_http_url(self.license_evidence_url, "license evidence URL")
         if (
             self.license_evidence_text is not None
             and not self.license_evidence_text.strip()
@@ -167,3 +176,9 @@ class ExternalConjectureIngestOutput(ExternalConjectureIngestArtifact):
 
 def _text_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _require_http_url(value: str, label: str) -> None:
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"{label} must be an HTTP(S) URL")
