@@ -133,7 +133,7 @@ duplicate-code: ## Run the CI duplicate-code detector locally.
 
 npm-test: ## Run the npm package tests and dry-run pack.
 	npm test --prefix npm
-	npm pack --dry-run --prefix npm
+	npm pack --dry-run ./npm
 
 todo-check: ## Fail on TODO comments that do not reference an issue.
 	@violations="$$(rg -n 'TODO' --type py src/ tests/ | rg -v 'TODO\(#\d+\)' || true)"; \
