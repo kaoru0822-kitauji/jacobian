@@ -67,6 +67,11 @@ Public answer-visible Frontier challenges use the separate
 unchanged, withholds evaluator source URLs, enforces no-retrieval, remains
 unscored, and requires the same explicit execution and process budget.
 
+The source-backed Harbor task compiler is documented in the
+[Jacobian math evaluation suite](../../benchmarks/jacobian_math_evals/README.md).
+Generating or validating tasks does not authorize model execution; the suite
+README records its current rollout gate.
+
 ## Experimental conditions
 
 Each scenario compares at least:

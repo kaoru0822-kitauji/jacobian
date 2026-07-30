@@ -59,7 +59,22 @@ held-out scored partitions.
 Each generated task contains `task.toml`, `instruction.md`, offline
 `environment/Dockerfile`, Oracle-only `solution/`, clean-room Reward Kit
 criteria under `tests/`. `generation-manifest.json` records task/source mapping
-and redistribution eligibility.
+and redistribution eligibility. The
+[catalog contract](catalog/README.md) defines committed provenance, cache
+boundaries, and coverage labels.
+
+## Current validation status
+
+Repository tests exercise catalog parsing, handlers, deterministic generation,
+submission verification, matched configuration, telemetry, and acceptance
+gates. No committed result currently demonstrates a complete coverage-suite
+Oracle run or a control/treatment model rollout. Do not treat task generation,
+unit-test success, or source references as rollout evidence.
+
+After verifier, verifier dependency, generated Dockerfile, or task-contract
+changes, rerun the affected Oracle suite. Record the exact tree, catalog and
+policy digests, dependency lock, image digest, task manifest, and validation
+results before making benchmark claims.
 
 ## Run
 
