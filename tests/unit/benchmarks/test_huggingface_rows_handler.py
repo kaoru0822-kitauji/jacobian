@@ -5,6 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import benchmarks.jacobian_math_evals.handlers.huggingface_rows as hf_rows
 import pytest
 from benchmarks.jacobian_math_evals.catalog import load_sources
 from benchmarks.jacobian_math_evals.handlers.huggingface_rows import (
@@ -142,6 +143,23 @@ def test_hf_handler_rejects_cache_not_bound_to_source_lock(tmp_path: Path) -> No
             source,
             cache_dir=tmp_path,
             offline=True,
+        )
+
+
+def test_hf_handler_rejects_fresh_snapshot_not_bound_to_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = replace(_source(), snapshot_sha256="sha256:" + "0" * 64)
+    viewer = json.loads(FIXTURE.read_text())
+
+    def fake_get(url: str) -> dict[str, object]:
+        return {"sha": source.immutable_revision} if "/api/datasets/" in url else viewer
+
+    monkeypatch.setattr(hf_rows, "_json_get", fake_get)
+    with pytest.raises(ValueError, match="fetched snapshot does not match source lock"):
+        HuggingFaceExactAnswerHandler(source.source_id).acquire(
+            source, cache_dir=tmp_path, offline=False
         )
 
 

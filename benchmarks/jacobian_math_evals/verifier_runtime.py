@@ -62,11 +62,11 @@ def submission_contract_valid(submission: dict[str, Any]) -> bool:
         and bool(submission["task_id"])
         and isinstance(source_ids, list)
         and bool(source_ids)
-        and len(source_ids) == len(set(source_ids))
         and all(
             isinstance(source_id, str) and SOURCE_ID_PATTERN.fullmatch(source_id)
             for source_id in source_ids
         )
+        and len(source_ids) == len(set(source_ids))
         and submission.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
         and isinstance(submission.get("evidence"), list)

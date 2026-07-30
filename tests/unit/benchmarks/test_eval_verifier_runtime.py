@@ -159,6 +159,11 @@ def test_wrong_task_or_source_binding_forces_zero(tmp_path: Path) -> None:
     assert score_submission(tmp_path, _expected()).reward == 0
 
 
+def test_unhashable_source_id_scores_zero_instead_of_crashing(tmp_path: Path) -> None:
+    _write_submission(tmp_path, source_ids=[[]])
+    assert score_submission(tmp_path, _expected()).reward == 0
+
+
 def test_alternative_valid_answer_passes(tmp_path: Path) -> None:
     _write_submission(tmp_path, answer="6·7")
     scores = score_submission(

@@ -203,6 +203,7 @@ def resolve_source(source: SourceRecord, timestamp: str) -> dict[str, Any]:
         }
     except (
         KeyError,
+        subprocess.TimeoutExpired,
         TimeoutError,
         ValueError,
         urllib.error.HTTPError,

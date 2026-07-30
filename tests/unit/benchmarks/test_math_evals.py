@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 
+import benchmarks.jacobian_math_evals.acquisition as acquisition
 import benchmarks.jacobian_math_evals.compiler as compiler
 import pytest
 from benchmarks.jacobian_math_evals.acquisition import _github_subresource_path
@@ -259,8 +261,9 @@ def test_public_diagnostic_oracle_uses_known_conclusion(tmp_path: Path) -> None:
     )
     expected = json.loads((task / "tests" / "expected.json").read_text())
     submission = json.loads((task / "solution" / "submission.json").read_text())
-    assert expected["allowed_conclusions"] == ["DISPROVED"]
-    assert submission["conclusion"] == "DISPROVED"
+    assert expected["allowed_conclusions"] == ["REFUTED"]
+    assert expected["required_scope_terms"][0] == "jcb-postdoc-001"
+    assert submission["conclusion"] == "REFUTED"
 
 
 def test_targeted_public_generation_does_not_acquire_unrelated_sources(
@@ -274,6 +277,18 @@ def test_targeted_public_generation_does_not_acquire_unrelated_sources(
         offline=True,
     )
     assert len(written) == 1
+
+
+def test_public_selection_includes_handler_backed_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handler_public = replace(
+        task_specs()[0],
+        task_id="handler-public",
+        split=Split.PUBLIC,
+    )
+    monkeypatch.setattr(compiler, "task_specs", lambda **_kwargs: (handler_public,))
+    assert compiler.select_tasks(split=Split.PUBLIC) == (handler_public,)
 
 
 def test_required_cli_flags_parse(tmp_path: Path) -> None:
@@ -356,6 +371,45 @@ def test_full_generation_streams_task_source_mappings(
     assert record["task_id"] == spec.task_id
     assert record["source_ids"] == list(spec.source_ids)
     assert manifest["task_records"]["count"] == 1
+
+
+def test_dataset_digest_binds_generated_task_tree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = compiler._write_task
+    marker = {"value": "one"}
+
+    def write_with_marker(root: Path, spec) -> None:
+        original(root, spec)
+        (root / "tests" / "semantic-marker.txt").write_text(marker["value"])
+
+    monkeypatch.setattr(compiler, "_write_task", write_with_marker)
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    compile_tasks(output_dir=first, split=Split.SMOKE, limit=1)
+    marker["value"] = "two"
+    compile_tasks(output_dir=second, split=Split.SMOKE, limit=1)
+    first_manifest = json.loads((first / "generation-manifest.json").read_text())
+    second_manifest = json.loads((second / "generation-manifest.json").read_text())
+    assert first_manifest["dataset_digest"] != second_manifest["dataset_digest"]
+    assert first_manifest["tasks"][0]["task_digest"].startswith("sha256:")
+
+
+def test_github_timeout_is_isolated_to_one_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = next(item for item in load_sources() if item.host == "github.com")
+    monkeypatch.setattr(
+        acquisition,
+        "_resolve_github",
+        lambda *_args: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired(["gh", "api"], 45)
+        ),
+    )
+    result = acquisition.resolve_source(source, "2026-07-30T00:00:00+00:00")
+    assert result["access_state"] == "unresolved"
+    assert result["error"].startswith("TimeoutExpired:")
 
 
 def test_strict_coverage_refuses_placeholder_tasks(tmp_path: Path) -> None:

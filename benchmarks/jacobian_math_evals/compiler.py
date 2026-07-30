@@ -31,6 +31,13 @@ RESEARCH_SUITES = (
     PACKAGE_ROOT.parent / "research_challenges" / "public_postdoc_v1.json",
     PACKAGE_ROOT.parent / "research_challenges" / "public_postdoc_frontier_v1.json",
 )
+RESEARCH_CONCLUSIONS = {
+    "PROVED": "SUPPORTED",
+    "DISPROVED": "REFUTED",
+    "COUNTEREXAMPLE_EXISTS": "REFUTED",
+    "EXACT_IDENTITY": "SUPPORTED",
+    "NO_GLOBAL_CONCLUSION_EXPECTED": "INCONCLUSIVE",
+}
 
 
 def _clear_previous_generation(output_dir: Path) -> None:
@@ -98,6 +105,15 @@ VERIFIER_IMAGE = (
 
 def _digest(value: str, length: int = 12) -> str:
     return hashlib.sha256(value.encode()).hexdigest()[:length]
+
+
+def _directory_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        digest.update(path.relative_to(root).as_posix().encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+    return "sha256:" + digest.hexdigest()
 
 
 def _normalized_url(value: str) -> str:
@@ -236,6 +252,9 @@ def _public_tasks() -> Iterator[TaskSpec]:
                 )
             )
             task_id = case["challenge_id"]
+            expected_conclusion = RESEARCH_CONCLUSIONS[
+                case["oracle"]["expected_conclusion"]
+            ]
             yield TaskSpec(
                 task_id=task_id,
                 family="research-artifact",
@@ -263,7 +282,8 @@ def _public_tasks() -> Iterator[TaskSpec]:
                 expected={
                     "answer_visible": True,
                     "oracle": case["oracle"],
-                    "allowed_conclusions": [case["oracle"]["expected_conclusion"]],
+                    "allowed_conclusions": [expected_conclusion],
+                    "required_scope_terms": [task_id, *source_ids],
                     "maximum_assurance": "UNVERIFIED",
                 },
                 admissible_for_publish=True,
@@ -388,7 +408,20 @@ def select_tasks(
     offline: bool = False,
 ) -> tuple[TaskSpec, ...]:
     if split == Split.PUBLIC:
-        selected = list(_public_tasks())
+        curated = list(_public_tasks())
+        curated_ids = frozenset(spec.task_id for spec in curated)
+        if task_ids and task_ids <= curated_ids:
+            selected = curated
+        else:
+            selected = [
+                spec
+                for spec in task_specs(
+                    cache_dir=cache_dir,
+                    offline=offline,
+                    selected_source_ids=source_ids,
+                )
+                if spec.split == Split.PUBLIC
+            ]
         if task_ids:
             selected = [spec for spec in selected if spec.task_id in task_ids]
         if source_ids:
@@ -677,7 +710,7 @@ def compile_tasks(
         raise ValueError("limit must be non-negative")
     report_cache_dir = (
         None
-        if split in {Split.PUBLIC, Split.FULL}
+        if split == Split.PUBLIC or (split == Split.FULL and not strict_coverage)
         or (
             task_ids and task_ids <= frozenset(spec.task_id for spec in _public_tasks())
         )
@@ -746,6 +779,7 @@ def compile_tasks(
             "admissible_for_publish": spec.admissible_for_publish,
             "readiness": spec.readiness.value,
             "oracle_kind": spec.oracle_kind.value,
+            "task_digest": _directory_digest(destination),
         }
         dataset_hasher.update(
             json.dumps(task_record, sort_keys=True, separators=(",", ":")).encode()

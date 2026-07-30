@@ -187,6 +187,11 @@ class HuggingFaceExactAnswerHandler:
             or snapshot.get("split") != split
         ):
             raise ValueError("Dataset Viewer response identity mismatch")
+        actual_snapshot = "sha256:" + hashlib.sha256(
+            _canonical_bytes(snapshot)
+        ).hexdigest()
+        if actual_snapshot != source.snapshot_sha256:
+            raise ValueError("fetched snapshot does not match source lock")
         _write_cache(destination, snapshot)
         return destination
 
