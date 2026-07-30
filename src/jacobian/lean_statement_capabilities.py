@@ -292,6 +292,10 @@ def _execute_lean_source(
         )
     except subprocess.TimeoutExpired as exc:
         raise _LeanUnavailableError(f"lean timed out after {timeout_seconds}s") from exc
+    except OSError as exc:
+        raise _LeanUnavailableError(
+            f"The pinned Lean executable could not run: {exc}"
+        ) from exc
     finally:
         Path(temp_path).unlink(missing_ok=True)
     return (result.stdout or "") + (result.stderr or "")
@@ -490,7 +494,7 @@ def install_lean_statement_capabilities(
         comparison_schema_uri=comparison_schema_uri,
         provider_runtime=provider_runtime,
         lean_executable=(
-            str(provider_runtime.configuration["executable_path"])
+            str(provider_runtime.configuration["executable"])
             if provider_runtime.availability is CapabilityProviderAvailability.AVAILABLE
             else None
         ),

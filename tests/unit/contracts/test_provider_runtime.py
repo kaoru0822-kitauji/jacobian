@@ -275,7 +275,7 @@ def test_lean_frontend_runtime_binds_the_pinned_executable(
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE
     assert runtime.features == ("CORE", "elaboration", "lean-statement")
-    assert runtime.configuration["executable_path"] == str(executable)
+    assert runtime.configuration["executable"] == str(executable)
     assert runtime.configuration["profiles"]["CORE"]["import_name"] == "Init.Prelude"
 
 

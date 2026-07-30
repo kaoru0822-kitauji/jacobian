@@ -1613,7 +1613,7 @@ def lean_frontend_provider_runtime() -> CapabilityProviderRuntime:
         license_id="Apache-2.0",
         features=("CORE", "elaboration", "lean-statement"),
         configuration={
-            "executable_path": str(executable),
+            "executable": str(executable),
             "profiles": {
                 "CORE": {
                     "import_name": "Init.Prelude",

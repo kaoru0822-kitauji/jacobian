@@ -422,6 +422,25 @@ def test_execution_uses_the_exact_pinned_executable(
     assert all(call[0] == str(executable) for call in calls)
 
 
+def test_stale_pinned_executable_becomes_backend_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stale_executable = tmp_path / "removed-lean"
+
+    def run(_args, **_kwargs):
+        raise FileNotFoundError(stale_executable)
+
+    monkeypatch.setattr(lean_statements.subprocess, "run", run)
+
+    with pytest.raises(lean_statements._LeanUnavailableError, match="could not run"):
+        lean_statements._execute_lean_source(
+            "#check True",
+            executable=str(stale_executable),
+            timeout_seconds=1,
+        )
+
+
 def test_compare_normalizes_whitespace(tmp_path: Path) -> None:
     _, compare = _build_adapters(tmp_path)
 
