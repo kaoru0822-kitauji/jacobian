@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from jacobian.adapters.mcp.server import _capability_call_tool_result
+from jacobian.adapters.mcp.projections import _capability_call_tool_result
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,

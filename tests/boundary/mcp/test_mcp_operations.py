@@ -12,12 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.adapters.mcp.server import (
-    WORKSPACE_TOOL_NAMES,
-    _public_tool_error,
-    _request_trace_digest,
-    create_server,
-)
+from jacobian.adapters.mcp.context import _public_tool_error
+from jacobian.adapters.mcp.projections import WORKSPACE_TOOL_NAMES
+from jacobian.adapters.mcp.server import create_server
+from jacobian.adapters.mcp.tooling import _request_trace_digest
 
 MCP_TOOL_NAMES = {
     "capability.describe",
@@ -47,6 +45,7 @@ def test_mcp_logs_bounded_tool_metrics_without_arguments(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO, logger="jacobian.adapters.mcp.server")
+    caplog.set_level(logging.INFO, logger="jacobian.adapters.mcp.tooling")
 
     async def scenario() -> None:
         from mcp import Client
