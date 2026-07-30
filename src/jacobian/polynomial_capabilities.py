@@ -2864,6 +2864,10 @@ def _solve_inverse_system(
     *,
     timeout_ms: int,
 ) -> tuple[str, dict[Any, Any] | None]:
+    # Spawn is used (not fork) because the Jacobian runtime is multi-threaded.
+    # fork() in a multi-threaded process can deadlock and is deprecated in
+    # Python 3.14+.  The spawn cost (~30ms plus SymPy re-import) is accepted
+    # as the price of process isolation for this unbounded solver.
     context = multiprocessing.get_context("spawn")
     result_queue = context.Queue(maxsize=1)
     process = context.Process(
