@@ -1740,7 +1740,7 @@ class PolynomialMapInverseCollisionVerifyAdapter:
         witness = WitnessEnvelope(
             witness_format="polynomial.map_collision_refutes_inverse",
             format_version="1",
-            role=WitnessRole.REFUTES_CLAIM,
+            role=WitnessRole.SUPPORTS_CLAIM,
             bindings=EvidenceBindings(
                 claim_digest=claim.object_digest,
                 semantics_digest=semantics.manifest.object_digest,

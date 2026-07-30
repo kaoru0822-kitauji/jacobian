@@ -254,7 +254,7 @@ def check_collision_refutes_inverse(request: dict[str, Any]) -> dict[str, Any]:
             or witness.get("witness_format")
             != "polynomial.map_collision_refutes_inverse"
             or witness.get("format_version") != "1"
-            or witness.get("role") != "REFUTES_CLAIM"
+            or witness.get("role") != "SUPPORTS_CLAIM"
         ):
             return _reject("unexpected inverse-obstruction witness format or role")
         if witness.get("bindings") != request.get("expected_bindings"):

@@ -152,7 +152,7 @@ def _inverse_obstruction_request() -> dict[str, Any]:
                 "evidence_schema_version": "1",
                 "witness_format": "polynomial.map_collision_refutes_inverse",
                 "format_version": "1",
-                "role": "REFUTES_CLAIM",
+                "role": "SUPPORTS_CLAIM",
                 "bindings": bindings,
                 "payload": {
                     "first_point": [{"num": "-1", "den": "1"}],
