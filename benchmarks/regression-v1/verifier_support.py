@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
@@ -57,15 +57,23 @@ def strict_submission_contract(
     task_id: str,
     conclusion: str,
     completeness: str = "COMPLETE",
+    allowed_assurances: frozenset[str] = ASSURANCE_LEVELS,
+    verification_record: Literal[
+        "required_when_verified", "optional", "forbidden"
+    ] = "required_when_verified",
 ) -> bool:
     """Validate the shared submission envelope without interpreting mathematics."""
 
     if not isinstance(submission, dict):
         return False
     verified = submission.get("claimed_assurance") == "VERIFIED"
-    expected = SUBMISSION_FIELDS | ({"verification_record_uri"} if verified else set())
+    expected_fields = {frozenset(SUBMISSION_FIELDS)}
+    if verification_record == "required_when_verified" and verified:
+        expected_fields = {frozenset(SUBMISSION_FIELDS | {"verification_record_uri"})}
+    elif verification_record == "optional":
+        expected_fields.add(frozenset(SUBMISSION_FIELDS | {"verification_record_uri"}))
     return bool(
-        set(submission) == expected
+        frozenset(submission) in expected_fields
         and submission.get("task_id") == task_id
         and submission.get("conclusion") == conclusion
         and submission.get("completeness") == completeness
@@ -73,7 +81,7 @@ def strict_submission_contract(
         and isinstance(submission.get("scope"), str)
         and isinstance(submission.get("limitations"), list)
         and isinstance(submission.get("evidence"), list)
-        and submission.get("claimed_assurance") in ASSURANCE_LEVELS
+        and submission.get("claimed_assurance") in allowed_assurances
     )
 
 

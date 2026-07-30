@@ -14,32 +14,32 @@ authors = [
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
-digest = "sha256:bbd890e359d2c6a12536caea5194dd14035c8c531df32beef4f8c4d207fea27b"
+digest = "sha256:7313de0d2ae21e6e8523c885ccd016761f6762b66338b75a2c2e54e33a8c2032"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-artifact-composition"
-digest = "sha256:15550464d9fa0346052e384da184b4975fdd3aa3193e1828f1809e4cd6ce3d00"
+digest = "sha256:9900627b7b97055186e2b3b6f3a3c1ea2a2af30bbc96973f2c57b92f2af93253"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-counterexample"
-digest = "sha256:66abb6718b57b9e963f03d124a63c2205025d0d8e8d1b9af410fcd49bae3e70d"
+digest = "sha256:81902e9411f31e0358cd823e3cf496d609251f56f5757d239a44d5220ab7cfaf"
 
 [[tasks]]
 name = "jacobian/regression-v1-hermite-normal-form"
-digest = "sha256:470dab5cee866ec23377a6dc1f9b72ae9fcb0ab7d174b7f83fead18c6328d52c"
+digest = "sha256:933c2b6edea559a97a8c9e517b129cefd6435f7d38621409888144208a96dc49"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
-digest = "sha256:929065cad9aa83a3fd2c5239bc4180db82313645e93d6fef94d1fb94459f21d9"
+digest = "sha256:d8219d7a5d0d0a647ef5085513c05a99c90f1818739ae48b03662dc0ea895a73"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-normalization"
-digest = "sha256:9d49df037397ffbde9853d21aaa5609c13bb64700d458dfaab801e138186aaca"
+digest = "sha256:742639fbe28848e9334cb3542377022142607686934cdf4be3104e90d89dd282"
 
 [[tasks]]
 name = "jacobian/regression-v1-rational-linear-solution"
-digest = "sha256:fb3bbb45a669871647140f0209f5205555f063d8d304f5c9e38c7c1d3e35f11c"
+digest = "sha256:10371bd05d7ebf985d694b0084ed78d55e33ae65e44896b4ebcf97fef9c53092"
 
 [[tasks]]
 name = "jacobian/regression-v1-sat-witness"
-digest = "sha256:e62af5de4cc5dcfcea7bd75b8528300816580eb402398b326c39bbbdab45e867"
+digest = "sha256:fefdcce4c5a7e93e5207af644a3e1ca54273aa5313960e0501a5ee79b40261a8"
