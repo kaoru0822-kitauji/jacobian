@@ -154,9 +154,10 @@ Separate two evaluation classes:
   intervention dimension, use the same visible task/model/budget/environment,
   randomize condition order, and run enough repetitions for the stated claim.
 
-Use Harbor directly through the committed
-`benchmarks/regression-v1/job-jacobian.json` observation config and inspect
-Harbor ATIF together with Jacobian telemetry. Record the git tree, task
+Use the repository-local `harbor-benchmarks` skill for the committed Harbor
+task bundles, Oracle validation, and Jacobian observation job. Run the guarded
+`make agent-eval` entry point rather than creating a custom task runner. Inspect
+Harbor ATIF together with Jacobian telemetry and record the git tree, task
 digests, provider/runtime, model/settings, prompt, oracle/verifier identities,
 seeds, raw traces, and structured reports.
 

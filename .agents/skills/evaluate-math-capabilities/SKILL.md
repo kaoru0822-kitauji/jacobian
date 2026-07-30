@@ -69,9 +69,15 @@ Read `AGENTS.md` and inspect:
 - the Harbor task and verifier validation checks
 - the relevant capability descriptors, checkers, and contracts.
 
-Extend the committed Harbor task contracts when practical. Keep any future
-control/treatment configuration outside task bundles; do not create a custom
-task runner for one experiment.
+Use the repository-local `harbor-benchmarks` skill for Harbor packaging,
+verifier validation, task-digest updates, Oracle runs, and Jacobian observation
+jobs. Extend the committed Harbor task contracts when practical. Keep any
+future control/treatment configuration outside task bundles; do not create a
+custom task runner for one experiment.
+
+Treat the Harbor boundary as a handoff: this skill owns the evaluation
+question, intervention, oracle independence, scoring interpretation, and
+evidence report; `harbor-benchmarks` owns the runnable task/job implementation.
 
 ## State the comparison
 
