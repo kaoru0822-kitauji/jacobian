@@ -72,7 +72,9 @@ def test_put_witness_envelope_binds_digests_and_parents(
     stored = runtime.core.store.get(result.artifact_uri)
     assert stored.manifest.schema_uri == witness_schema_uri
     assert stored.manifest.semantics_uri == semantics.artifact_uri
-    assert stored.manifest.parents == tuple(sorted((claim.artifact_uri, candidate.artifact_uri)))
+    assert stored.manifest.parents == tuple(
+        sorted((claim.artifact_uri, candidate.artifact_uri))
+    )
     witness = WitnessEnvelope.model_validate(stored.payload)
     assert witness.witness_format == "matrix.rational_determinant"
     assert witness.format_version == "1"
@@ -111,4 +113,6 @@ def test_put_witness_envelope_parents_order_is_claim_then_candidate(
     )
 
     stored = runtime.core.store.get(result.artifact_uri)
-    assert stored.manifest.parents == tuple(sorted((claim.artifact_uri, candidate.artifact_uri)))
+    assert stored.manifest.parents == tuple(
+        sorted((claim.artifact_uri, candidate.artifact_uri))
+    )
