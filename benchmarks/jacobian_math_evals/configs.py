@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +101,7 @@ def experiment_manifest(*, seed: int = 1729) -> dict[str, Any]:
         "randomization": "sha256-family schedule; paired within task-agent-model-seed",
         "policy": "COMPUTE_VERIFY_NO_RETRIEVAL",
         "required_trial_record": [
+            "condition",
             "jacobian_commit",
             "jacobian_image_digest",
             "catalog_digest",
@@ -119,7 +122,11 @@ def write_matched_configs(
     *,
     dataset_path: str,
     seed: int = 1729,
+    treatment_env: dict[str, str] | None = None,
 ) -> tuple[Path, Path, Path]:
+    validate_treatment_environment(
+        dict(os.environ) if treatment_env is None else treatment_env
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     control, treatment = matched_configs(dataset_path=dataset_path, seed=seed)
     paths = (
@@ -151,7 +158,7 @@ def oracle_config(*, dataset_path: str, jobs_dir: str) -> dict[str, Any]:
 
 def validate_treatment_environment(env: dict[str, str]) -> None:
     image = env.get("JACOBIAN_IMAGE", "")
-    if "@sha256:" not in image or len(image.rsplit("@sha256:", 1)[1]) != 64:
+    if re.fullmatch(r".+@sha256:[0-9a-fA-F]{64}", image) is None:
         raise ValueError("JACOBIAN_IMAGE must be digest-pinned")
     token = env.get("JACOBIAN_MCP_TOKEN")
     if not token:

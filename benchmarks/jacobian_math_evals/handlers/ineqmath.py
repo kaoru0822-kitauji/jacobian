@@ -68,7 +68,18 @@ class IneqMathHandler:
         if source.immutable_revision is None:
             raise ValueError("IneqMath source lacks immutable revision")
         destination = cache_dir / source.source_id / "dev.json"
+        metadata_path = destination.with_suffix(".metadata.json")
+        expected_metadata = {
+            "source_id": source.source_id,
+            "source_revision": source.immutable_revision,
+            "snapshot_sha256": source.snapshot_sha256,
+            "payload_sha256": f"sha256:{DEV_SNAPSHOT_SHA256}",
+        }
         if destination.exists():
+            if not metadata_path.exists() or json.loads(
+                metadata_path.read_text(encoding="utf-8")
+            ) != expected_metadata:
+                raise ValueError("cached IneqMath snapshot provenance mismatch")
             digest = _sha256(destination.read_bytes())
             if digest != DEV_SNAPSHOT_SHA256:
                 raise ValueError("cached IneqMath snapshot digest mismatch")
@@ -90,6 +101,10 @@ class IneqMathHandler:
         temporary = destination.with_suffix(".tmp")
         temporary.write_bytes(payload)
         temporary.replace(destination)
+        metadata_path.write_text(
+            json.dumps(expected_metadata, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         return destination
 
     def iter_specs(

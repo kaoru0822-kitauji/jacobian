@@ -93,6 +93,23 @@ def test_hf_handler_rejects_rows_without_deterministic_answer(
         )
 
 
+def test_hf_handler_does_not_treat_solver_metadata_as_an_answer(
+    tmp_path: Path,
+) -> None:
+    source = _source()
+    snapshot = tmp_path / "rows.json"
+    snapshot.write_text(
+        '{"rows":[{"row_idx":0,"row":{"problem":"Prove P.",'
+        '"solver_status":"sat","title":"metadata"}}]}'
+    )
+    with pytest.raises(UnsupportedDatasetSchemaError):
+        list(
+            HuggingFaceExactAnswerHandler(source.source_id).iter_specs(
+                source, snapshot, full=False
+            )
+        )
+
+
 def test_hf_handler_offline_missing_snapshot_fails_closed(
     tmp_path: Path,
 ) -> None:

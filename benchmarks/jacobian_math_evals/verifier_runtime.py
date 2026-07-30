@@ -108,7 +108,11 @@ def evidence_valid(workspace: Path, submission: dict[str, Any] | None) -> bool:
             or not target.is_file()
         ):
             return False
-        digest = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        with target.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                hasher.update(chunk)
+        digest = "sha256:" + hasher.hexdigest()
         if digest != digest_value:
             return False
     return True
@@ -240,6 +244,11 @@ def _validate_answer(
         if not isinstance(candidates, list) or not isinstance(goal, str):
             return False
         if len(parsed) != len(set(parsed)) or not set(parsed) <= set(candidates):
+            return False
+        candidate_positions = {item: index for index, item in enumerate(candidates)}
+        if [candidate_positions[item] for item in parsed] != sorted(
+            candidate_positions[item] for item in parsed
+        ):
             return False
         proof = [*parsed, goal]
         closure = _mp_closure(proof, parsed)

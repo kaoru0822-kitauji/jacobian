@@ -114,8 +114,10 @@ JobConfigs plus a deterministic paired-order manifest. Treatment adds only the
 toolbox instruction, per-trial compose service, and Jacobian MCP entries.
 The compose file requires a digest-pinned `JACOBIAN_IMAGE`, an opaque
 `JACOBIAN_MCP_TOKEN`, and `JACOBIAN_AUTH_TOKENS_JSON`; Caddy injects the bearer
-header without exposing it to the task prompt. Jacobian starts stateless HTTP
-with `COMPUTE_VERIFY_NO_RETRIEVAL` and a per-compose-project state volume.
+header without exposing it to the task prompt. Configuration generation
+validates those values before writing the treatment JobConfig. Jacobian starts
+stateless HTTP with `COMPUTE_VERIFY_NO_RETRIEVAL` and a per-compose-project
+state volume.
 
 Observable process events and trial provenance use the schemas under
 `schemas/`. Hidden reasoning is neither requested nor analyzed.

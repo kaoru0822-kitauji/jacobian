@@ -10,8 +10,10 @@ from benchmarks.jacobian_math_evals.acceptance import (
 )
 
 
-def _write_result(root: Path, *, reward: float = 1.0) -> None:
-    trial = root / "trial"
+def _write_result(
+    root: Path, *, reward: float = 1.0, trial_name: str = "trial"
+) -> None:
+    trial = root / trial_name
     trial.mkdir(parents=True, exist_ok=True)
     (trial / "result.json").write_text(
         json.dumps(
@@ -56,3 +58,13 @@ def test_oracle_acceptance_requires_every_dimension_at_one(
     _write_result(tmp_path, reward=0.9)
     with pytest.raises(ValueError, match="full reward"):
         validate_oracle_job(tmp_path, expected_task_names=expected)
+
+
+def test_oracle_acceptance_rejects_duplicate_task_results(tmp_path: Path) -> None:
+    _write_result(tmp_path, trial_name="trial-1")
+    _write_result(tmp_path, trial_name="trial-2")
+    with pytest.raises(ValueError, match="duplicate Oracle result"):
+        validate_oracle_job(
+            tmp_path,
+            expected_task_names=frozenset({"jacobian-evals/exact-answer-a-b"}),
+        )

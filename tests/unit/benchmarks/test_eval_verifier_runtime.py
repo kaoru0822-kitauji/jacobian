@@ -116,6 +116,22 @@ def test_evidence_symlink_cannot_escape_workspace(tmp_path: Path) -> None:
     assert scores.evidence_validity == 0
 
 
+def test_evidence_hashing_does_not_read_entire_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_submission(tmp_path)
+    original = Path.read_bytes
+
+    def guarded_read_bytes(path: Path) -> bytes:
+        if path.name == "answer.txt":
+            raise AssertionError("evidence must be hashed incrementally")
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+    assert score_submission(tmp_path, _expected()).evidence_validity == 1
+
+
 def test_mismatched_statement_forces_zero(tmp_path: Path) -> None:
     wanted = "sha256:" + "1" * 64
     _write_submission(tmp_path, claim_digest="sha256:" + "2" * 64)
@@ -208,6 +224,20 @@ def test_proof_replay_checks_each_line(
         ),
     )
     assert scores.correctness == correct
+
+
+def test_premise_retrieval_requires_source_order(tmp_path: Path) -> None:
+    expected = _expected(
+        validator="minimal-premises",
+        validator_instance={
+            "candidates": ["p", "p -> q", "r"],
+            "goal": "q",
+        },
+    )
+    _write_submission(tmp_path, answer='["p","p -> q"]')
+    assert score_submission(tmp_path, expected).correctness == 1
+    _write_submission(tmp_path, answer='["p -> q","p"]')
+    assert score_submission(tmp_path, expected).correctness == 0
 
 
 def test_polynomial_checker_recomputes_answer(tmp_path: Path) -> None:

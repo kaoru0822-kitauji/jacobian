@@ -31,6 +31,50 @@ RESEARCH_SUITES = (
     PACKAGE_ROOT.parent / "research_challenges" / "public_postdoc_v1.json",
     PACKAGE_ROOT.parent / "research_challenges" / "public_postdoc_frontier_v1.json",
 )
+
+
+def _clear_previous_generation(output_dir: Path) -> None:
+    manifest_path = output_dir / "generation-manifest.json"
+    existing = tuple(output_dir.iterdir())
+    if not existing:
+        return
+    if not manifest_path.is_file():
+        raise ValueError(
+            "--overwrite requires an empty output directory or a prior "
+            "generation-manifest.json"
+        )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    task_names: set[str] = set()
+    tasks = manifest.get("tasks")
+    if isinstance(tasks, list):
+        task_names.update(
+            record["name"]
+            for record in tasks
+            if isinstance(record, dict) and isinstance(record.get("name"), str)
+        )
+    task_records = manifest.get("task_records")
+    if isinstance(task_records, dict) and isinstance(task_records.get("path"), str):
+        records_name = task_records["path"]
+        if Path(records_name).name != records_name:
+            raise ValueError(f"unsafe task records path in manifest: {records_name}")
+        records_path = output_dir / records_name
+        if records_path.is_file():
+            for line in records_path.read_text(encoding="utf-8").splitlines():
+                record = json.loads(line)
+                if isinstance(record, dict) and isinstance(record.get("name"), str):
+                    task_names.add(record["name"])
+            records_path.unlink()
+    for task_name in task_names:
+        prefix = "jacobian-evals/"
+        if not task_name.startswith(prefix):
+            raise ValueError(f"unsafe generated task name in manifest: {task_name}")
+        directory_name = task_name.removeprefix(prefix)
+        if Path(directory_name).name != directory_name or directory_name in {"", "."}:
+            raise ValueError(f"unsafe generated task name in manifest: {task_name}")
+        destination = output_dir / directory_name
+        if destination.is_dir():
+            shutil.rmtree(destination)
+    manifest_path.unlink()
 FAMILIES = (
     "exact-answer",
     "counterexample",
@@ -671,6 +715,8 @@ def compile_tasks(
         )
         selected = bounded[:limit] if limit is not None else bounded
     output_dir.mkdir(parents=True, exist_ok=True)
+    if overwrite:
+        _clear_previous_generation(output_dir)
     written: list[Path] = []
     manifest_tasks: list[dict[str, object]] = []
     full_records_path = output_dir / "generation-task-records.jsonl"

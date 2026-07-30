@@ -37,7 +37,10 @@ def validate_oracle_job(
         value: Any = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(value, dict) or not isinstance(value.get("task_name"), str):
             continue
-        results[value["task_name"]] = value
+        task_name = value["task_name"]
+        if task_name in results:
+            raise ValueError(f"duplicate Oracle result for {task_name}")
+        results[task_name] = value
     missing = expected_task_names - results.keys()
     unexpected = results.keys() - expected_task_names
     if missing or unexpected:

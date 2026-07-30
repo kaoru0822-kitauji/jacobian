@@ -200,12 +200,36 @@ def test_names_are_registry_safe_stable_and_unique() -> None:
     assert all(name == name.lower() and " " not in name for name in names)
 
 
+def test_handler_coverage_identity_is_not_expanded_to_related_sources() -> None:
+    assert registry.handled_source_ids() == frozenset(
+        handler.source_id for handler in registry.HANDLERS
+    )
+
+
 def test_generation_is_byte_deterministic(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"
     compile_tasks(output_dir=first, split=Split.SMOKE)
     compile_tasks(output_dir=second, split=Split.SMOKE)
     assert _tree_digest(first) == _tree_digest(second)
+
+
+def test_overwrite_removes_tasks_not_selected_by_new_generation(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "out"
+    first = compile_tasks(output_dir=output, split=Split.SMOKE, limit=2)
+    stale_names = {path.name for path in first}
+    [replacement] = compile_tasks(
+        output_dir=output,
+        split=Split.PUBLIC,
+        limit=1,
+        overwrite=True,
+    )
+    assert {path.name for path in output.iterdir() if path.is_dir()} == {
+        replacement.name
+    }
+    assert replacement.name not in stale_names
 
 
 def test_generated_task_uses_harbor_14_and_clean_room_rewardkit(

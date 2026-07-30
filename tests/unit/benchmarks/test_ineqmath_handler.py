@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,25 @@ def test_ineqmath_offline_acquisition_fails_when_snapshot_missing(
 ) -> None:
     with pytest.raises(FileNotFoundError, match="offline IneqMath snapshot missing"):
         IneqMathHandler().acquire(_source(), cache_dir=tmp_path, offline=True)
+
+
+def test_ineqmath_cache_must_match_current_source_lock(tmp_path: Path) -> None:
+    source = _source()
+    snapshot = tmp_path / source.source_id / "dev.json"
+    snapshot.parent.mkdir(parents=True)
+    snapshot.write_bytes(FIXTURE.read_bytes())
+    snapshot.with_suffix(".metadata.json").write_text(
+        json.dumps(
+            {
+                "source_id": source.source_id,
+                "source_revision": "stale",
+                "snapshot_sha256": source.snapshot_sha256,
+                "payload_sha256": "sha256:625296f60c6847dbad77c60b518588c0d5e1722cd8822ee5e35d9d0dcaabfe9b",
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="provenance mismatch"):
+        IneqMathHandler().acquire(source, cache_dir=tmp_path, offline=True)
 
 
 def test_ineqmath_rejects_malformed_or_wrong_split(tmp_path: Path) -> None:

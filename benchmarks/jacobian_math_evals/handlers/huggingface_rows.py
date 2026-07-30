@@ -42,11 +42,7 @@ ANSWER_FIELDS = (
     "gold_answer",
     "ori_solution",
     "latest_label",
-    "solver_status",
     "target_merged",
-    "subdomain_tag",
-    "role",
-    "title",
 )
 
 
