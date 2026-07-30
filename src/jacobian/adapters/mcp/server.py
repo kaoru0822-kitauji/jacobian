@@ -836,7 +836,9 @@ class JacobianMCPServer(MCPServer[AppState]):
         arguments: dict[str, Any],
         context: Any | None = None,
     ) -> Any:
-        tool = next((tool for tool in await self.list_tools() if tool.name == name), None)
+        tool = next(
+            (tool for tool in await self.list_tools() if tool.name == name), None
+        )
         if tool is not None:
             schema = {**tool.input_schema, "additionalProperties": False}
             errors = list(Draft202012Validator(schema).iter_errors(arguments))
