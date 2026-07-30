@@ -173,7 +173,7 @@ def main():
 
     math_contract = (
         isinstance(s, dict)
-        and set(s) == required
+        and set(s) == expected_keys
         and s.get("task_id") == e["task_id"]
         and s.get("conclusion") == e["conclusion"]
         and s.get("completeness") == "COMPLETE"
