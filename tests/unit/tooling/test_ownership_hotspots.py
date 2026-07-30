@@ -64,5 +64,5 @@ def test_harbor_verifier_support_copies_are_identical() -> None:
             "*/tests/verifier_support.py"
         )
     )
-    assert len(targets) == 12
+    assert len(targets) == 14
     assert all(target.read_bytes() == source for target in targets)
