@@ -18,6 +18,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInputKind,
     CapabilityMode,
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
@@ -149,6 +150,11 @@ class SmtUnsatProofVerificationAdapter:
                 "alethe",
                 "carcara",
             ),
+            accepted_input_kinds=(
+                CapabilityInputKind.STRUCTURED_REQUEST,
+                CapabilityInputKind.TYPED_ARTIFACT,
+            ),
+            accepted_artifact_types=(self.smt.installation.proof_schema_uri,),
         )
 
     @property
