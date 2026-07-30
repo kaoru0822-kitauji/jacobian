@@ -59,6 +59,16 @@ def verification_record_is_bound(submission):
     )
 
 
+def _matches_recorded_candidate(groups, universe):
+    return groups == [
+        {
+            "name": f"residue-{remainder}",
+            "members": [value for value in universe if int(value) % 3 == remainder],
+        }
+        for remainder in range(3)
+    ]
+
+
 def main():
     try:
         s = json.loads((W / "submission.json").read_text())
@@ -121,7 +131,12 @@ def main():
         f"residue-{r}": frozenset(n for n in x["universe"] if int(n) % 3 == r)
         for r in range(3)
     }
-    record_bound = verification_record_is_bound(s) if isinstance(s, dict) else False
+    record_bound = (
+        verification_record_is_bound(s)
+        and _matches_recorded_candidate(groups, x["universe"])
+        if isinstance(s, dict)
+        else False
+    )
     correct = bool(
         contract
         and (s["claimed_assurance"] != "VERIFIED" or record_bound)

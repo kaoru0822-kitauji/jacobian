@@ -69,10 +69,22 @@ def evidence(s):
     return True
 
 
-def graph_ok(result):
-    vertices = {str(x) for x in result.get("vertices", [])}
+def _graph_arrays(result):
+    raw_vertices = result.get("vertices")
     edges = result.get("edges")
-    if vertices != {str(i) for i in range(6)} or not isinstance(edges, list):
+    if (
+        set(result) == {"vertices", "edges"}
+        and isinstance(raw_vertices, list)
+        and isinstance(edges, list)
+    ):
+        return raw_vertices, edges
+    return [], []
+
+
+def graph_ok(result):
+    raw_vertices, edges = _graph_arrays(result)
+    vertices = {str(x) for x in raw_vertices}
+    if vertices != {str(i) for i in range(6)}:
         return False
     adj = {v: set() for v in vertices}
     for edge in edges:

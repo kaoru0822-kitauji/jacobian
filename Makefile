@@ -172,7 +172,7 @@ agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
 		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
 		exit 2; \
 	fi; \
-	$(MAKE) harbor-check; \
+	$(MAKE) harbor-check && \
 	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-jacobian.json $(EVAL_ARGS)
 
 bench-core: ## Run the core performance benchmark script.

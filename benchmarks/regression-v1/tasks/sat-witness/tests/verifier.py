@@ -15,7 +15,7 @@ def _digest(path):
 
 
 def _descriptor_target(descriptor, expected_path):
-    if not isinstance(descriptor, dict):
+    if not isinstance(descriptor, dict) or set(descriptor) != {"path", "sha256"}:
         return None
     if not isinstance(descriptor.get("path"), str) or not isinstance(
         descriptor.get("sha256"), str
@@ -142,21 +142,24 @@ def main():
         s = None
     x = json.loads((W / "input.json").read_text())
     e = json.loads((E / "expected.json").read_text())
+    required = {
+        "task_id",
+        "conclusion",
+        "result",
+        "claimed_assurance",
+        "scope",
+        "completeness",
+        "evidence",
+        "limitations",
+    }
+    expected_keys = required | (
+        {"verification_record_uri"}
+        if isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
+        else set()
+    )
     contract = (
         isinstance(s, dict)
-        and all(
-            k in s
-            for k in (
-                "task_id",
-                "conclusion",
-                "result",
-                "claimed_assurance",
-                "scope",
-                "completeness",
-                "evidence",
-                "limitations",
-            )
-        )
+        and set(s) == expected_keys
         and s.get("task_id") == e["task_id"]
         and s.get("conclusion") == e["conclusion"]
         and s.get("completeness") == "COMPLETE"
@@ -170,7 +173,9 @@ def main():
     result = s.get("result", {}) if isinstance(s, dict) else {}
     a = result.get("assignment", {}) if isinstance(result, dict) else {}
     valid = (
-        isinstance(a, dict)
+        isinstance(result, dict)
+        and set(result) == {"status", "assignment"}
+        and isinstance(a, dict)
         and set(a) == set(x["variables"])
         and all(isinstance(v, bool) for v in a.values())
     )

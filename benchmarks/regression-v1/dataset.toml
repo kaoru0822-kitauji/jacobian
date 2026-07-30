@@ -11,7 +11,7 @@ email = "maintainers@jacobian.invalid"
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
-digest = "sha256:1c494c07bca5538aa64dc763af5fb3e0cd3fd4f09914083c8f5cc03d36de65bb"
+digest = "sha256:759fa45849a3bf8dbcae30620fa755607dec6482078646ab9e9bf6df988fce3a"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-artifact-composition"
@@ -19,7 +19,7 @@ digest = "sha256:53cef5714a70f154e12743c7c793bbb40eefd62f5c5cab0c29e81ad0f0af14e
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-counterexample"
-digest = "sha256:de79860038ec11573677b53c4a7a8332e57194c8ff5b40a8de74e6ade8ce7a21"
+digest = "sha256:1ad4ed9238cff3ee23bb7c47155a9340eb46a6ddac7be890ae80215f687de123"
 
 [[tasks]]
 name = "jacobian/regression-v1-hermite-normal-form"
@@ -39,4 +39,4 @@ digest = "sha256:1c541b2592d00fd4658891671302e3f9a7940b977fb0c3950a0209dea47bdab
 
 [[tasks]]
 name = "jacobian/regression-v1-sat-witness"
-digest = "sha256:82463ce80871739b3aa4525997bdfe39de28c250b5c5189dc2b892d4034c9d5c"
+digest = "sha256:97e1cbc4ebec1e26a0ccbdcc94ab77d196dc0e30dc8bb840f769b68618f70064"
