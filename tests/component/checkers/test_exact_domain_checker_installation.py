@@ -30,6 +30,7 @@ from jacobian.contracts.results import ContractModel
 from jacobian.exact_domain_checkers import install_exact_domain_checkers
 from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.registry import CheckerRegistry
+from jacobian.store import ArtifactStore
 
 
 def _installed(
@@ -78,7 +79,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
         "integer.decide.powerful",
     )
     projective_ids = ("geometry.projective_line_arrangement.flats.materialize",)
-    registry = CheckerRegistry(tmp_path / "checkers.sqlite3")
+    registry = CheckerRegistry(ArtifactStore(tmp_path / "store"))
 
     installation = install_exact_domain_checkers(
         registry,
@@ -162,7 +163,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
 
 
 def test_installer_preserves_operator_control(tmp_path: Path) -> None:
-    registry = CheckerRegistry(tmp_path / "checkers.sqlite3")
+    registry = CheckerRegistry(ArtifactStore(tmp_path / "store"))
 
     installation = install_exact_domain_checkers(
         registry,
@@ -274,10 +275,9 @@ def test_installer_skips_checkers_for_an_unavailable_graph_bundle(
             },
         ),
     ):
-        registry_path = tmp_path / name / "checkers.sqlite3"
-        registry_path.parent.mkdir()
+        registry_root = tmp_path / name
         installation = install_exact_domain_checkers(
-            CheckerRegistry(registry_path),
+            CheckerRegistry(ArtifactStore(registry_root)),
             polynomial=polynomial,
             matrix=matrix,
             authorize=True,
