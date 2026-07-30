@@ -192,6 +192,8 @@ def test_unhealthy_lean_frontend_is_absent_from_catalog(
 
     runtime = create_runtime(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
 
+    assert runtime.portfolio.lean_statement is None
+    assert runtime.portfolio.lean_statement_runtime == unavailable
     capability_ids = {
         item.capability_id for item in runtime.core.capabilities.catalog().capabilities
     }
