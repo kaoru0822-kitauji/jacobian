@@ -213,9 +213,10 @@ and verification obligations remain visible.
 ### Domain operation library
 
 Built-in mathematical producers live in explicit domain packages. A package
-exports one `DomainBundle`; subject modules export named collections such as
-`POINT_CAPABILITIES` or `DIVISIBILITY_CAPABILITIES`, and `bundle.py` combines
-them without import-time registration or recursive discovery.
+exports a `DomainBundle` factory; subject modules export named collections such
+as `POINT_CAPABILITIES` or `DIVISIBILITY_CAPABILITIES`, and `bundle.py` combines
+them without import-time instances, registration, or recursive discovery. The
+single built-in composition module holds the ordered tuple of factories.
 
 `ComputedOperation` declares a deterministic typed producer.
 `BoundedSearchOperation` additionally distinguishes a complete witness from an
@@ -227,11 +228,15 @@ input and result artifacts with lineage, and caps producer assurance at
 `COMPUTED`. Domain functions therefore depend on mathematical libraries and
 contracts, not stores, protocol envelopes, or checker authorization.
 
-The runtime installs a typed, fixed `PortfolioPlan` of built-in bundles through
-`PortfolioAssembler`. Its `InstallationContext` owns the exclusion-aware
-registration callback, so the runtime remains a lifecycle owner rather than a
-registration facade. There is no global operation registry, recursive package
-scan, compatibility adapter, or registration side effect.
+The runtime builds and installs a typed, fixed `PortfolioPlan` through
+`PortfolioAssembler`. Bundles declare earlier domain dependencies explicitly;
+a managed installer receives only those installed dependencies. Exact replay
+declarations stay on their producer bundles, while the operator-owned
+verification phase alone authorizes and installs them. Its
+`InstallationContext` owns the exclusion-aware registration callback, so the
+runtime remains a lifecycle owner rather than a registration facade. There is
+no global operation registry, recursive package scan, compatibility adapter,
+or registration side effect.
 
 The built-in portfolio spans arithmetic, number theory, combinatorics, finite
 sets, sequences, geometry, graph optimization and invariants, matrices,
@@ -543,6 +548,14 @@ surface is deliberately small:
 - Long-running searches return an experiment handle.
 - Scope and archive artifacts are immutable; the experiment snapshot is a
   durable lifecycle record.
+
+The Python SDK advertises these stable tools and static resources through the
+`io.jacobian/core` v1 extension. They remain ordinary MCP tools and resources:
+clients do not need to advertise a matching client extension to invoke them.
+Prompts and parameterized resource templates are registered through the SDK's
+public server APIs because extensions intentionally do not contribute those
+protocol objects. Adding a mathematical domain never adds another extension or
+top-level MCP tool.
 
 The engine does not expose a generic public `solver.solve`. Solver families have
 different inputs, guarantees, and certificates, and remain typed internal
