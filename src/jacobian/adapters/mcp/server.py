@@ -21,6 +21,7 @@ from mcp_types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import Field, StrictInt
 
 from jacobian import __version__
+from jacobian.references import reference_catalog
 from jacobian.adapters.mcp.guidance import (
     CAPABILITY_DESCRIBE_DESCRIPTION,
     CAPABILITY_INVOKE_DESCRIPTION,
@@ -874,7 +875,6 @@ def create_server(
         DEFAULT_MAX_TENANT_RUNTIMES,
         TenantRuntimeRouter,
     )
-    from jacobian.references import reference_catalog
     from jacobian.runtime import create_runtime
     from jacobian.runtime.model import JacobianRuntime
 
@@ -980,6 +980,253 @@ def create_server(
         auth=auth,
     )
 
+    _register_tools(server, runtime, tenant_router)
+    _register_resources_and_prompts(server, runtime, tenant_router)
+    return server
+
+def _register_resources_and_prompts(
+    server: Any,
+    runtime: JacobianRuntime | None,
+    tenant_router: Any,
+) -> None:
+    """Register all MCP resource and prompt handlers on the server."""
+    _forbid_extra_tool_arguments(
+        server,
+        "capability.describe",
+        "capability.invoke",
+        *WORKSPACE_TOOL_NAMES,
+    )
+    _publish_workspace_normalization_aliases(server)
+
+    @server.resource(
+        "jacobian://instructions",
+        name="jacobian-instructions",
+        title="Jacobian operating guide",
+        description=(
+            "Complete guidance for discovering, invoking, and independently checking "
+            "Jacobian mathematical capabilities."
+        ),
+        mime_type="text/markdown",
+    )
+    async def jacobian_instructions_resource() -> str:
+        return OPERATING_GUIDE
+
+    @server.resource(
+        "artifact://sha256/{digest}",
+        name="artifact",
+        description="Read an immutable artifact manifest and payload.",
+        mime_type="application/json",
+    )
+    async def artifact_resource(
+        digest: str,
+    ) -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        artifact = await asyncio.to_thread(
+            active_runtime.core.store.get,
+            f"artifact://sha256/{digest}",
+        )
+        return json.dumps(
+            {
+                "artifact_uri": artifact.artifact_uri,
+                "manifest": artifact.manifest.model_dump(mode="json"),
+                "payload": artifact.payload,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "capability://catalog",
+        name="capability-catalog",
+        description=(
+            "Installed model-facing operations, supported lanes, and compact schemas."
+        ),
+        mime_type="application/json",
+    )
+    async def capability_catalog_resource() -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        return json.dumps(
+            active_runtime.core.capabilities.catalog().model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "reference://catalog",
+        name="reference-catalog",
+        description="Read installed domain schema, semantics, plugin, and checker IDs.",
+        mime_type="application/json",
+    )
+    async def reference_catalog_resource() -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        return json.dumps(
+            reference_catalog(
+                active_runtime.portfolio.references,
+                graph=active_runtime.portfolio.graph,
+                polytope=active_runtime.services.polytope,
+                polytope_checkers=active_runtime.portfolio.polytope_checkers,
+                polynomial=active_runtime.portfolio.polynomial,
+                universal_algebra=active_runtime.portfolio.universal_algebra,
+                lean=active_runtime.portfolio.lean_checkers,
+            ),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}",
+        name="experiment",
+        description="Read the latest durable experiment snapshot.",
+        mime_type="application/json",
+    )
+    async def experiment_resource(
+        experiment_id: str,
+    ) -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        snapshot = await asyncio.to_thread(
+            active_runtime.services.experiment_router.inspect,
+            f"experiment://{experiment_id}",
+        )
+        return json.dumps(
+            snapshot.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}/accounting",
+        name="experiment-accounting",
+        description="Read durable enumeration accounting and assurance labels.",
+        mime_type="application/json",
+    )
+    async def experiment_accounting_resource(
+        experiment_id: str,
+    ) -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        snapshot = await asyncio.to_thread(
+            active_runtime.services.experiment_router.inspect,
+            f"experiment://{experiment_id}",
+        )
+        coverage = getattr(snapshot, "coverage", None)
+        return json.dumps(
+            {
+                "experiment_uri": snapshot.experiment_uri,
+                "state": snapshot.state.value,
+                "stop_reason": (
+                    snapshot.stop_reason.value
+                    if snapshot.stop_reason is not None
+                    else None
+                ),
+                "coverage": coverage.value if coverage is not None else None,
+                "verification": snapshot.verification.value,
+                "accounting": snapshot.accounting.model_dump(mode="json"),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}/scope",
+        name="experiment-scope",
+        description="Read the current enumeration scope artifact, when available.",
+        mime_type="application/json",
+    )
+    async def experiment_scope_resource(
+        experiment_id: str,
+    ) -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        snapshot = await asyncio.to_thread(
+            active_runtime.services.experiment_router.inspect,
+            f"experiment://{experiment_id}",
+        )
+        return await asyncio.to_thread(
+            _experiment_scope_content,
+            active_runtime,
+            snapshot,
+        )
+
+    @server.resource(
+        "experiment://{experiment_id}/archive",
+        name="experiment-archive",
+        description="Read the immutable archive manifest and page handles.",
+        mime_type="application/json",
+    )
+    async def experiment_archive_resource(
+        experiment_id: str,
+    ) -> str:
+        active_runtime = _resource_runtime(runtime, tenant_router)
+        snapshot = await asyncio.to_thread(
+            active_runtime.services.experiment_router.inspect,
+            f"experiment://{experiment_id}",
+        )
+        if snapshot.archive_uri is None:
+            return json.dumps(
+                {
+                    "experiment_uri": snapshot.experiment_uri,
+                    "archive_uri": None,
+                    "page_uris": list(snapshot.archive_page_uris),
+                },
+                sort_keys=True,
+            )
+        archive = await asyncio.to_thread(
+            active_runtime.core.store.get,
+            snapshot.archive_uri,
+        )
+        return json.dumps(
+            {
+                "experiment_uri": snapshot.experiment_uri,
+                "archive_uri": archive.artifact_uri,
+                "manifest": archive.manifest.model_dump(mode="json"),
+                "payload": archive.payload,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    @server.prompt(
+        name="jacobian-discover",
+        title="Discover Jacobian capabilities",
+        description=(
+            "Guide capability discovery without choosing the agent's mathematical "
+            "research strategy."
+        ),
+    )
+    def jacobian_discover_prompt(
+        task: Annotated[
+            str,
+            Field(description="The mathematical task or desired outcome."),
+        ],
+    ) -> str:
+        return discovery_prompt(task)
+
+    @server.prompt(
+        name="jacobian-check-evidence",
+        title="Check mathematical evidence with Jacobian",
+        description=(
+            "Guide selection and use of an installed independent checker without "
+            "promoting unverified evidence."
+        ),
+    )
+    def jacobian_check_evidence_prompt(
+        claim: Annotated[
+            str,
+            Field(description="The exact mathematical claim to check."),
+        ],
+        artifact_uri: Annotated[
+            str | None,
+            Field(description="Optional artifact:// URI carrying candidate evidence."),
+        ] = None,
+    ) -> str:
+        return evidence_check_prompt(claim, artifact_uri)
+
+
+
+def _register_tools(
+    server: Any,
+    runtime: JacobianRuntime | None,
+    tenant_router: Any,
+) -> None:
+    """Register all MCP tool handlers on the server."""
     @server.tool(
         name="capability.describe",
         title="Discover mathematical capabilities",
@@ -1405,236 +1652,7 @@ def create_server(
             ),
         )
 
-    _forbid_extra_tool_arguments(
-        server,
-        "capability.describe",
-        "capability.invoke",
-        *WORKSPACE_TOOL_NAMES,
-    )
-    _publish_workspace_normalization_aliases(server)
 
-    @server.resource(
-        "jacobian://instructions",
-        name="jacobian-instructions",
-        title="Jacobian operating guide",
-        description=(
-            "Complete guidance for discovering, invoking, and independently checking "
-            "Jacobian mathematical capabilities."
-        ),
-        mime_type="text/markdown",
-    )
-    async def jacobian_instructions_resource() -> str:
-        return OPERATING_GUIDE
-
-    @server.resource(
-        "artifact://sha256/{digest}",
-        name="artifact",
-        description="Read an immutable artifact manifest and payload.",
-        mime_type="application/json",
-    )
-    async def artifact_resource(
-        digest: str,
-    ) -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        artifact = await asyncio.to_thread(
-            active_runtime.core.store.get,
-            f"artifact://sha256/{digest}",
-        )
-        return json.dumps(
-            {
-                "artifact_uri": artifact.artifact_uri,
-                "manifest": artifact.manifest.model_dump(mode="json"),
-                "payload": artifact.payload,
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(
-        "capability://catalog",
-        name="capability-catalog",
-        description=(
-            "Installed model-facing operations, supported lanes, and compact schemas."
-        ),
-        mime_type="application/json",
-    )
-    async def capability_catalog_resource() -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        return json.dumps(
-            active_runtime.core.capabilities.catalog().model_dump(mode="json"),
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(
-        "reference://catalog",
-        name="reference-catalog",
-        description="Read installed domain schema, semantics, plugin, and checker IDs.",
-        mime_type="application/json",
-    )
-    async def reference_catalog_resource() -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        return json.dumps(
-            reference_catalog(
-                active_runtime.portfolio.references,
-                graph=active_runtime.portfolio.graph,
-                polytope=active_runtime.services.polytope,
-                polytope_checkers=active_runtime.portfolio.polytope_checkers,
-                polynomial=active_runtime.portfolio.polynomial,
-                universal_algebra=active_runtime.portfolio.universal_algebra,
-                lean=active_runtime.portfolio.lean_checkers,
-            ),
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(
-        "experiment://{experiment_id}",
-        name="experiment",
-        description="Read the latest durable experiment snapshot.",
-        mime_type="application/json",
-    )
-    async def experiment_resource(
-        experiment_id: str,
-    ) -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        snapshot = await asyncio.to_thread(
-            active_runtime.services.experiment_router.inspect,
-            f"experiment://{experiment_id}",
-        )
-        return json.dumps(
-            snapshot.model_dump(mode="json"),
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(
-        "experiment://{experiment_id}/accounting",
-        name="experiment-accounting",
-        description="Read durable enumeration accounting and assurance labels.",
-        mime_type="application/json",
-    )
-    async def experiment_accounting_resource(
-        experiment_id: str,
-    ) -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        snapshot = await asyncio.to_thread(
-            active_runtime.services.experiment_router.inspect,
-            f"experiment://{experiment_id}",
-        )
-        coverage = getattr(snapshot, "coverage", None)
-        return json.dumps(
-            {
-                "experiment_uri": snapshot.experiment_uri,
-                "state": snapshot.state.value,
-                "stop_reason": (
-                    snapshot.stop_reason.value
-                    if snapshot.stop_reason is not None
-                    else None
-                ),
-                "coverage": coverage.value if coverage is not None else None,
-                "verification": snapshot.verification.value,
-                "accounting": snapshot.accounting.model_dump(mode="json"),
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(
-        "experiment://{experiment_id}/scope",
-        name="experiment-scope",
-        description="Read the current enumeration scope artifact, when available.",
-        mime_type="application/json",
-    )
-    async def experiment_scope_resource(
-        experiment_id: str,
-    ) -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        snapshot = await asyncio.to_thread(
-            active_runtime.services.experiment_router.inspect,
-            f"experiment://{experiment_id}",
-        )
-        return await asyncio.to_thread(
-            _experiment_scope_content,
-            active_runtime,
-            snapshot,
-        )
-
-    @server.resource(
-        "experiment://{experiment_id}/archive",
-        name="experiment-archive",
-        description="Read the immutable archive manifest and page handles.",
-        mime_type="application/json",
-    )
-    async def experiment_archive_resource(
-        experiment_id: str,
-    ) -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        snapshot = await asyncio.to_thread(
-            active_runtime.services.experiment_router.inspect,
-            f"experiment://{experiment_id}",
-        )
-        if snapshot.archive_uri is None:
-            return json.dumps(
-                {
-                    "experiment_uri": snapshot.experiment_uri,
-                    "archive_uri": None,
-                    "page_uris": list(snapshot.archive_page_uris),
-                },
-                sort_keys=True,
-            )
-        archive = await asyncio.to_thread(
-            active_runtime.core.store.get,
-            snapshot.archive_uri,
-        )
-        return json.dumps(
-            {
-                "experiment_uri": snapshot.experiment_uri,
-                "archive_uri": archive.artifact_uri,
-                "manifest": archive.manifest.model_dump(mode="json"),
-                "payload": archive.payload,
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.prompt(
-        name="jacobian-discover",
-        title="Discover Jacobian capabilities",
-        description=(
-            "Guide capability discovery without choosing the agent's mathematical "
-            "research strategy."
-        ),
-    )
-    def jacobian_discover_prompt(
-        task: Annotated[
-            str,
-            Field(description="The mathematical task or desired outcome."),
-        ],
-    ) -> str:
-        return discovery_prompt(task)
-
-    @server.prompt(
-        name="jacobian-check-evidence",
-        title="Check mathematical evidence with Jacobian",
-        description=(
-            "Guide selection and use of an installed independent checker without "
-            "promoting unverified evidence."
-        ),
-    )
-    def jacobian_check_evidence_prompt(
-        claim: Annotated[
-            str,
-            Field(description="The exact mathematical claim to check."),
-        ],
-        artifact_uri: Annotated[
-            str | None,
-            Field(description="Optional artifact:// URI carrying candidate evidence."),
-        ] = None,
-    ) -> str:
-        return evidence_check_prompt(claim, artifact_uri)
-
-    return server
 
 
 def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
