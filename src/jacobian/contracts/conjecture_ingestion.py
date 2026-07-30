@@ -56,6 +56,14 @@ class ExternalConjectureIngestRequest(ContractModel):
 
     @model_validator(mode="after")
     def require_complete_nonblank_evidence(self) -> Self:
+        for field_name in (
+            "corpus_id",
+            "corpus_revision",
+            "source_url",
+            "item_id",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be blank")
         evidence = (
             self.license_evidence_url,
             self.license_evidence_text,

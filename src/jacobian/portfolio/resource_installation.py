@@ -34,6 +34,7 @@ class ResourceCapabilityInstaller:
                 ctx.store,
                 ctx.schemas,
                 ctx.artifacts,
+                ctx.capabilities.memory,
             )
         )
         ctx.register_capability(conjecture_adapter)

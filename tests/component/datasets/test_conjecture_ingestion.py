@@ -231,12 +231,18 @@ def test_descriptor_disables_episode_recording(tmp_path: Path) -> None:
     assert adapter.descriptor.records_episode is False
 
 
-def test_restricted_request_is_not_copied_to_research_memory(tmp_path: Path) -> None:
+def test_restricted_request_records_only_policy_safe_memory(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
-    adapter, _ = install_conjecture_ingestion_capability(store, schemas, artifacts)
-    service = CapabilityService(store, ResearchMemory(store, schemas))
+    memory = ResearchMemory(store, schemas)
+    adapter, _ = install_conjecture_ingestion_capability(
+        store,
+        schemas,
+        artifacts,
+        memory,
+    )
+    service = CapabilityService(store, memory)
     service.register(adapter)
 
     result = service.invoke(
@@ -246,7 +252,13 @@ def test_restricted_request_is_not_copied_to_research_memory(tmp_path: Path) -> 
         )
     )
 
-    assert result.episode_uri is None
+    assert result.episode_uri is not None
+    episode = store.get(result.episode_uri)
+    assert "statement" not in episode.payload["request"]
+    assert "license_evidence_text" not in episode.payload["request"]
+    assert episode.payload["request"]["metadata"]["title"] == "Fixture conjecture"
+    search = memory.search(query="Fixture conjecture", limit=10)
+    assert any(hit.episode_uri == result.episode_uri for hit in search.hits)
 
 
 def test_generic_artifact_write_rejects_policy_bypass(tmp_path: Path) -> None:

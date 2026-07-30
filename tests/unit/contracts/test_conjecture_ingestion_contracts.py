@@ -82,6 +82,25 @@ def test_request_rejects_statement_that_normalizes_to_empty(statement: str) -> N
         )
 
 
+@pytest.mark.parametrize(
+    "field",
+    ("corpus_id", "corpus_revision", "source_url", "item_id"),
+)
+def test_request_rejects_blank_provenance_identity(field: str) -> None:
+    payload = {
+        "corpus_id": "fixture",
+        "corpus_revision": "revision-1",
+        "source_url": "https://example.invalid/corpus",
+        "item_id": "item-1",
+        "metadata": {"title": "Fixture conjecture"},
+        "source_license": "MISSING",
+    }
+    payload[field] = "       "
+
+    with pytest.raises(ValidationError, match=f"{field} must not be blank"):
+        ExternalConjectureIngestRequest.model_validate(payload)
+
+
 def test_artifact_cannot_claim_verification() -> None:
     with pytest.raises(ValidationError):
         ExternalConjectureIngestArtifact(

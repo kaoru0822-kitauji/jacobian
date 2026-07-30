@@ -30,8 +30,10 @@ from jacobian.contracts.conjecture_ingestion import (
     ExternalConjectureIngestOutput,
     ExternalConjectureIngestRequest,
 )
+from jacobian.contracts.memory import ResearchEpisode
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
+from jacobian.memory import ResearchMemory
 from jacobian.provider_runtime import jacobian_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -110,11 +112,13 @@ class ExternalConjectureIngestAdapter:
         *,
         semantics_uri: str,
         artifact_schema_uri: str,
+        memory: ResearchMemory | None = None,
     ) -> None:
         self.store = store
         self.artifacts = artifacts
         self.semantics_uri = semantics_uri
         self.artifact_schema_uri = artifact_schema_uri
+        self.memory = memory
         self._descriptor = CapabilityDescriptor(
             capability_id="dataset.conjecture.ingest",
             version="1",
@@ -289,7 +293,7 @@ class ExternalConjectureIngestAdapter:
             **artifact_payload.model_dump(mode="python"),
             artifact_uri=artifact.artifact_uri,
         )
-        return CapabilityResult(
+        result = CapabilityResult(
             capability_id=self.descriptor.capability_id,
             capability_version=self.descriptor.version,
             mode=request.mode,
@@ -320,12 +324,43 @@ class ExternalConjectureIngestAdapter:
             ),
             artifact_uris=(artifact.artifact_uri,),
         )
+        if self.memory is None:
+            return result
+        episode_uri = self.memory.record(
+            ResearchEpisode(
+                capability_id=self.descriptor.capability_id,
+                capability_version=self.descriptor.version,
+                mode=request.mode,
+                request={
+                    "corpus_id": validated.corpus_id,
+                    "corpus_revision": validated.corpus_revision,
+                    "source_url": validated.source_url,
+                    "item_id": validated.item_id,
+                    "metadata": validated.metadata.model_dump(mode="json"),
+                    "source_license": validated.source_license.value,
+                    "policy_id": validated.policy_id,
+                    "indexed_statement": indexed_statement,
+                    "license_decision": decision.value,
+                    "ingestion_status": status,
+                },
+                result=result.model_dump(mode="json", exclude={"episode_uri"}),
+                assurance_level=CapabilityAssuranceLevel.HEURISTIC,
+                artifact_uris=(artifact.artifact_uri,),
+                summary=(
+                    f"{validated.metadata.title}: {decision.value} "
+                    f"({validated.corpus_id}/{validated.item_id})"
+                )[:1024],
+                tags=self.descriptor.tags,
+            )
+        )
+        return result.model_copy(update={"episode_uri": episode_uri})
 
 
 def install_conjecture_ingestion_capability(
     store: ArtifactStore,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
+    memory: ResearchMemory | None = None,
 ) -> tuple[ExternalConjectureIngestAdapter, ConjectureIngestionInstallation]:
     semantics_uri = store.register_descriptor(
         kind="semantics",
@@ -353,6 +388,7 @@ def install_conjecture_ingestion_capability(
             artifacts,
             semantics_uri=semantics_uri,
             artifact_schema_uri=artifact_schema_uri,
+            memory=memory,
         ),
         ConjectureIngestionInstallation(
             semantics_uri=semantics_uri,

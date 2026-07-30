@@ -41,8 +41,10 @@ license classifications produce `METADATA_ONLY`. In that state:
 A metadata record for which no statement was supplied uses
 `METADATA_INDEXED_NO_TEXT`; it is not mislabeled as policy-withheld content.
 Because an input request can contain restricted text and raw license evidence,
-this capability disables automatic research-episode recording. Only its
-policy-filtered artifact and output are persisted.
+this capability disables automatic request recording. It instead writes a
+redacted research episode containing safe metadata, the policy decision, and
+only text approved for indexing. Restricted statement and evidence text never
+enter research-memory search data.
 
 The policy artifact schema is producer-only: generic `artifact.put` calls
 cannot issue an `ALLOW_TEXT` decision because they do not possess the
