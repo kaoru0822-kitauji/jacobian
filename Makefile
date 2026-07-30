@@ -194,7 +194,7 @@ agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
 	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
 bench-core: ## Run the core performance benchmark script.
-	$(UV_RUN) python benchmarks/benchmark_core.py
+	$(UV_RUN) python benchmarks/performance/benchmark_core.py
 
 clean: ## Remove local caches, build outputs, and coverage artifacts.
 	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build htmlcov

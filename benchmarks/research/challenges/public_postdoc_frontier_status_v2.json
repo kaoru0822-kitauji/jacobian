@@ -8,7 +8,7 @@
   "scored": false,
   "captured_at": "2026-07-29",
   "source_suite": {
-    "path": "benchmarks/research_challenges/public_postdoc_frontier_v1.json",
+    "path": "benchmarks/research/challenges/public_postdoc_frontier_v1.json",
     "sha256": "sha256:3711b5c598024cb7fa129c4ea45bd020ece1c1a3ae1fd109bfec010ad60f09ba",
     "snapshot_semantics": "IMMUTABLE_HISTORICAL_INPUT"
   },
@@ -33,7 +33,7 @@
     "captured_at": "2026-07-29"
   },
   "evaluation_protocol": {
-    "runner": "benchmarks/research_challenge.py",
+    "runner": "benchmarks/research/runner.py",
     "prompt_handling": "PASS_PUBLISHED_PROMPT_UNCHANGED",
     "source_urls_withheld": true,
     "capability_policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
@@ -205,7 +205,7 @@
       ],
       "next_action": "Hand the accepted contract to implement-math-capability, then implement its independent checker before comparative evaluation.",
       "reproduction_assets": [
-        "benchmarks/research_challenges/public_postdoc_frontier_v1.json#jcb-postdoc-018",
+        "benchmarks/research/challenges/public_postdoc_frontier_v1.json#jcb-postdoc-018",
         "tests/composition/runtime/test_frontier_capabilities.py"
       ],
       "provisional_capability_id": "graph.restricted_set.distance_profile.compute",
@@ -243,7 +243,7 @@
       ],
       "next_action": "Implement the atomic predicate and its checker before designing any batch or range-certificate capability.",
       "reproduction_assets": [
-        "benchmarks/research_challenges/public_postdoc_frontier_v1.json#jcb-postdoc-016",
+        "benchmarks/research/challenges/public_postdoc_frontier_v1.json#jcb-postdoc-016",
         "https://github.com/ibrahimmian36/Optio"
       ],
       "provisional_capability_id": "number_theory.powerful.decide",
@@ -281,7 +281,7 @@
       ],
       "next_action": "Return to discovery with the pinned Optio artifact and reproduce a small chunk before accepting a contract.",
       "reproduction_assets": [
-        "benchmarks/research_challenges/public_postdoc_frontier_v1.json#jcb-postdoc-016",
+        "benchmarks/research/challenges/public_postdoc_frontier_v1.json#jcb-postdoc-016",
         "https://github.com/google-deepmind/formal-conjectures/issues/4600",
         "https://github.com/ibrahimmian36/Optio"
       ],
@@ -321,7 +321,7 @@
       ],
       "next_action": "Hand the accepted verification outcome directly to implement-math-capability-checker, then freeze the held-out generator before model runs.",
       "reproduction_assets": [
-        "benchmarks/research_challenges/public_postdoc_frontier_v1.json#jcb-postdoc-017",
+        "benchmarks/research/challenges/public_postdoc_frontier_v1.json#jcb-postdoc-017",
         "https://arxiv.org/abs/2606.19663"
       ],
       "provisional_capability_id": "optimization.coverage_pairwise.quadratic_dual.verify",

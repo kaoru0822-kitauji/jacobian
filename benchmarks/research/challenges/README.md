@@ -86,10 +86,10 @@ server under `COMPUTE_VERIFY_NO_RETRIEVAL`. It is plan-only unless model work an
 an explicit process budget are both authorized:
 
 ```console
-uv run python benchmarks/research_challenge.py \
+uv run python benchmarks/research/runner.py \
   --challenge jcb-postdoc-014
 
-uv run python benchmarks/research_challenge.py \
+uv run python benchmarks/research/runner.py \
   --sample-size 3 \
   --seed 17 \
   --repetitions 2 \

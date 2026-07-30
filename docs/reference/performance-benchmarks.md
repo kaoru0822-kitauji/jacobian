@@ -197,14 +197,14 @@ The initial executable harness covers canonical rational encoding,
 deduplicated artifact insertion, and verified artifact reads:
 
 ```sh
-uv run python benchmarks/benchmark_core.py
+uv run python benchmarks/performance/benchmark_core.py
 ```
 
 The capability harness adds bounded graph canonicalization and finite rational
 membership/separation:
 
 ```sh
-uv run python benchmarks/benchmark_v02.py
+uv run python benchmarks/performance/benchmark_v02.py
 ```
 
 Use pyperf's ordinary CLI flags to select a faster development run or write raw
@@ -215,9 +215,9 @@ Architecture work that changes runtime construction uses the startup phase
 harness and compares the base and head revisions on the same host:
 
 ```sh
-uv run python benchmarks/benchmark_startup_phases.py -o /tmp/startup-base.json
-uv run python benchmarks/benchmark_startup_phases.py -o /tmp/startup-head.json
-uv run python benchmarks/compare_startup.py \
+uv run python benchmarks/performance/benchmark_startup_phases.py -o /tmp/startup-base.json
+uv run python benchmarks/performance/benchmark_startup_phases.py -o /tmp/startup-head.json
+uv run python benchmarks/performance/compare_startup.py \
   --baseline /tmp/startup-base.json \
   --current /tmp/startup-head.json
 ```

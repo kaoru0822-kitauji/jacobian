@@ -21,7 +21,7 @@ and the official
 [pycddlib 3.0.2 source distribution](https://pypi.org/project/pycddlib/3.0.2/).
 The source archives, tag commits, license files, GMP rational interface, and
 pycddlib `cdd.gmp` binding sources are digest-bound in
-`benchmarks/cddlib_hv_pin.json`.
+`benchmarks/provider_spikes/cddlib_hv_pin.json`.
 
 pycddlib 3.x intentionally separates the floating `cdd` module from the exact
 `cdd.gmp` module. This spike imports only `cdd.gmp`, supplies
@@ -57,7 +57,7 @@ Run the bounded adapter from the locked Jacobian environment while selecting
 the isolated provider interpreter:
 
 ```bash
-uv run python benchmarks/cddlib_hv_spike.py \
+uv run python benchmarks/provider_spikes/cddlib_hv_spike.py \
   --python-executable /tmp/pycddlib-venv/bin/python \
   --cddlib-source-archive /tmp/cddlib-0.94n.tar.gz \
   --pycddlib-source-archive /tmp/pycddlib-3.0.2.tar.gz \

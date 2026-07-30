@@ -43,6 +43,6 @@ config before Harbor starts. Do not embed secrets in the job JSON because
 Harbor's Docker compose mode does not resolve `${VAR}` templates in job-level
 env blocks.
 
-The 18 public research challenges under `benchmarks/research_challenges/` are
+The 18 public research challenges under `benchmarks/research/challenges/` are
 candidate material only. They are not silently promoted into this scored
 dataset.

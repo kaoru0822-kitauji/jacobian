@@ -82,7 +82,7 @@ checker for the resulting weighted orbit sum.
 - Base revision: `851414bad7fffab9afa7631ab95b7691ba8aabf3`.
 - Runtime: CPython 3.12 and Jacobian standard library; no dependency change.
 - Public reproduction:
-  [`graph_symmetry_orbits_public.json`](../../benchmarks/reproduction_cases/graph_symmetry_orbits_public.json).
+  [`graph_symmetry_orbits_public.json`](../../benchmarks/reproductions/graph_symmetry_orbits_public.json).
 
 ### Checker and evaluation
 

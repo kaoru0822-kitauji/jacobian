@@ -40,7 +40,7 @@ and the
 
 ## Pinned provider identity
 
-[`benchmarks/regina_outcomes_pin.json`](../../benchmarks/regina_outcomes_pin.json)
+[`benchmarks/provider_spikes/regina_outcomes_pin.json`](../../benchmarks/provider_spikes/regina_outcomes_pin.json)
 binds:
 
 - the 7.4.1 upstream source archive and the upstream signed-checksum location;
@@ -71,7 +71,7 @@ uv pip install \
 Run the controller from the locked Jacobian environment:
 
 ```sh
-uv run python benchmarks/regina_outcomes_spike.py \
+uv run python benchmarks/provider_spikes/regina_outcomes_spike.py \
   --python-executable /tmp/jcb-regina-venv/bin/python \
   --wheel /path/to/regina-7.4.1-cp312-cp312-manylinux_2_28_x86_64.whl \
   --source-archive /path/to/regina-7.4.1.tar.gz \

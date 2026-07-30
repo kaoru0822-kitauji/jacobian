@@ -106,7 +106,7 @@ produce no verification record and no promoted conclusion.
   finite atomic distribution, or generic polynomial normalization, which has
   no probability semantics.
 - Public reproduction:
-  [`gaussian_polynomial_moment_public.json`](../../benchmarks/reproduction_cases/gaussian_polynomial_moment_public.json).
+  [`gaussian_polynomial_moment_public.json`](../../benchmarks/reproductions/gaussian_polynomial_moment_public.json).
 - Evaluation hypothesis: a domain-owned fixed-order outcome plus independent
   replay should reduce hand-written Wick arithmetic errors without increasing
   false all-order claims or false `VERIFIED` results.

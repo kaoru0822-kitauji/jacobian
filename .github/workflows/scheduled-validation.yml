@@ -69,7 +69,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: >-
-          uv run --locked python benchmarks/benchmark_core.py
+          uv run --locked python benchmarks/performance/benchmark_core.py
           --fast
           --output benchmark.json
       - name: Find previous successful benchmark
@@ -112,7 +112,7 @@ jobs:
               | tee benchmark-comparison.md
             exit 1
           fi
-          if ! uv run --locked python benchmarks/compare_core.py \
+          if ! uv run --locked python benchmarks/performance/compare_core.py \
             --baseline "$baseline_path" \
             --current benchmark.json \
             --threshold-percent 25 \

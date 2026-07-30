@@ -17,8 +17,13 @@ The committed
 contains eight bounded, offline mathematical workflow tasks. Its task digests,
 clean-room verifiers, and Oracle job are the canonical validation surface.
 
+The full on-disk ownership map lives in
+[`benchmarks/README.md`](../../benchmarks/README.md): Harbor datasets,
+research challenges, public reproductions, performance microbenchmarks, and
+provider spikes are separate classes.
+
 The 18 public research challenges remain candidate material under
-`benchmarks/research_challenges/`; they are not source-oriented dataset splits
+`benchmarks/research/challenges/`; they are not source-oriented dataset splits
 and are not silently promoted into regression-v1.
 
 ## Benchmark hierarchy

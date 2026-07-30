@@ -54,7 +54,7 @@ performance claim.
 
 ## Research challenges and future A/B
 
-The 18 public research challenges under `benchmarks/research_challenges/` remain
+The 18 public research challenges under `benchmarks/research/challenges/` remain
 candidate material. They are answer-visible and are not held-out performance
 evidence.
 

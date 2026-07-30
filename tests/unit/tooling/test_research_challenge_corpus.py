@@ -9,7 +9,7 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 
 REPO_ROOT = Path(__file__).parents[3]
-CORPUS_DIR = REPO_ROOT / "benchmarks" / "research_challenges"
+CORPUS_DIR = REPO_ROOT / "benchmarks" / "research" / "challenges"
 SCHEMA_PATH = CORPUS_DIR / "public_postdoc.schema.json"
 SUITE_PATH = CORPUS_DIR / "public_postdoc_v1.json"
 FRONTIER_SUITE_PATH = CORPUS_DIR / "public_postdoc_frontier_v1.json"
@@ -162,7 +162,7 @@ def test_postdoc_status_v2_conforms_and_binds_immutable_v1() -> None:
     )
     suite_digest = "sha256:" + hashlib.sha256(SUITE_PATH.read_bytes()).hexdigest()
     assert manifest["source_suite"] == {
-        "path": "benchmarks/research_challenges/public_postdoc_v1.json",
+        "path": "benchmarks/research/challenges/public_postdoc_v1.json",
         "sha256": suite_digest,
         "snapshot_semantics": "IMMUTABLE_HISTORICAL_INPUT",
     }

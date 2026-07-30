@@ -18,7 +18,7 @@ _OVERLAP_CASES = json.loads(
     (
         Path(__file__).resolve().parents[3]
         / "benchmarks"
-        / "reproduction_cases"
+        / "reproductions"
         / "recurrence_series_overlap_regression.json"
     ).read_text()
 )["discovery_cases"]

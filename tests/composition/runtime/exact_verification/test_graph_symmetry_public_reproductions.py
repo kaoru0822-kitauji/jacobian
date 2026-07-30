@@ -13,10 +13,7 @@ from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 REPRODUCTIONS = (
-    PROJECT_ROOT
-    / "benchmarks"
-    / "reproduction_cases"
-    / "graph_symmetry_orbits_public.json"
+    PROJECT_ROOT / "benchmarks" / "reproductions" / "graph_symmetry_orbits_public.json"
 )
 
 

@@ -2,7 +2,7 @@
 
 Run with::
 
-    uv run python benchmarks/benchmark_startup_phases.py
+    uv run python benchmarks/performance/benchmark_startup_phases.py
 
 The complete-runtime benchmark intentionally remains separate: this module
 keeps storage bootstrap and schema meta-validation visible without hiding them

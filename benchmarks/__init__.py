@@ -1,1 +1,1 @@
-"""Executable benchmark modules."""
+"""Benchmark harness packages (performance, research, spikes)."""

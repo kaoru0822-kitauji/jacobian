@@ -348,7 +348,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("benchmarks/benchmark_core.py",),
+            ("benchmarks/performance/benchmark_core.py",),
             _expected_plan(
                 "selective",
                 "run-python",

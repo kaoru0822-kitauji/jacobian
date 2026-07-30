@@ -56,7 +56,7 @@ performance claim.
 ## Candidate material and future experiments
 
 The 18 public research challenges under
-`benchmarks/research_challenges/` remain candidate material. They are useful
+`benchmarks/research/challenges/` remain candidate material. They are useful
 for discovery and workflow reproduction, but are not hidden answers or
 held-out performance evidence. Lean and external proof backends remain outside
 this Harbor dataset until their pinned task-container runtimes are reliable.

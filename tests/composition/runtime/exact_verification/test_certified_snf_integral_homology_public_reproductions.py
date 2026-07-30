@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[4]
 REPRODUCTIONS = (
     PROJECT_ROOT
     / "benchmarks"
-    / "reproduction_cases"
+    / "reproductions"
     / "certified_snf_integral_homology_public.json"
 )
 

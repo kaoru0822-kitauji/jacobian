@@ -23,7 +23,7 @@ production capabilities remain deferred.
 
 The version, source digest, license text, command profiles, and exact expected
 outputs are frozen in
-[`benchmarks/nauty_provider_pin.json`](../../benchmarks/nauty_provider_pin.json).
+[`benchmarks/provider_spikes/nauty_provider_pin.json`](../../benchmarks/provider_spikes/nauty_provider_pin.json).
 The source and command semantics were checked against the
 [official nauty/Traces page](https://users.cecs.anu.edu.au/~bdm/nauty/) and the
 [2.9.3 user's guide](https://users.cecs.anu.edu.au/~bdm/nauty/nug29.pdf).
@@ -33,7 +33,7 @@ The source and command semantics were checked against the
 Build the official source archive outside the repository, then run:
 
 ```sh
-uv run python benchmarks/nauty_provider_spike.py \
+uv run python benchmarks/provider_spikes/nauty_provider_spike.py \
   --source-archive /path/to/nauty2_9_3.tar.gz \
   --geng /path/to/nauty2_9_3/geng \
   --labelg /path/to/nauty2_9_3/labelg \

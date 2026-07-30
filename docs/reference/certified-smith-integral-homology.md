@@ -168,7 +168,7 @@ for an opposite mathematical claim.
 ## Public reproductions and evaluation status
 
 The answer-visible, unscored reproduction file
-[`certified_snf_integral_homology_public.json`](../../benchmarks/reproduction_cases/certified_snf_integral_homology_public.json)
+[`certified_snf_integral_homology_public.json`](../../benchmarks/reproductions/certified_snf_integral_homology_public.json)
 contains rectangular and rank-deficient matrix cases, a circle,
 \(\mathbb{RP}^2\), and reduced-point homology. It also records a frozen
 held-out comparison design. That held-out evaluation remains

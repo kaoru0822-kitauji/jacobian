@@ -2,7 +2,7 @@
 
 Run with:
 
-    uv run python benchmarks/benchmark_core.py
+    uv run python benchmarks/performance/benchmark_core.py
 
 The benchmark records timing only. Contract and conformance tests remain the
 correctness gate.

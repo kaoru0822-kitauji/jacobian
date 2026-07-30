@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from benchmarks import research_challenge as runner
+from benchmarks.research import runner
 
 
 def test_research_challenge_is_plan_only_and_no_retrieval(

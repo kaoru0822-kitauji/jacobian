@@ -8,7 +8,7 @@
   "scored": false,
   "captured_at": "2026-07-29",
   "source_suite": {
-    "path": "benchmarks/research_challenges/public_postdoc_v1.json",
+    "path": "benchmarks/research/challenges/public_postdoc_v1.json",
     "sha256": "sha256:cb025baf444d4a21482f4582afac066bb515aded105fd380cbd10ec4b78483ec",
     "snapshot_semantics": "IMMUTABLE_HISTORICAL_INPUT"
   },
@@ -33,7 +33,7 @@
     "captured_at": "2026-07-29"
   },
   "evaluation_protocol": {
-    "runner": "benchmarks/research_challenge.py",
+    "runner": "benchmarks/research/runner.py",
     "prompt_handling": "PASS_PUBLISHED_PROMPT_UNCHANGED",
     "source_urls_withheld": true,
     "capability_policy_profile": "COMPUTE_VERIFY_NO_RETRIEVAL",
@@ -383,8 +383,8 @@
       "missing_evidence": [],
       "next_action": "Evaluate the independently composable finite-distribution outcomes against the recorded public reproductions.",
       "reproduction_assets": [
-        "benchmarks/research_challenges/public_postdoc_v1.json#jcb-postdoc-005",
-        "benchmarks/research_challenges/public_postdoc_v1.json#jcb-postdoc-011",
+        "benchmarks/research/challenges/public_postdoc_v1.json#jcb-postdoc-005",
+        "benchmarks/research/challenges/public_postdoc_v1.json#jcb-postdoc-011",
         "tests/domain/probability/test_finite_probability.py",
         "tests/composition/runtime/exact_verification/test_probability_verification.py"
       ],

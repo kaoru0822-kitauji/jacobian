@@ -57,7 +57,7 @@ lift that action to edge states or establish a reliability identity.
 - Base revision: `765cf5cb48dcf0f2b40e8dc3bffc3988ae8aa7e1`.
 - Runtime: CPython 3.12 and pinned `python-flint==0.9.0`; no dependency change.
 - Public reproduction:
-  [`graph_reliability_public.json`](../../benchmarks/reproduction_cases/graph_reliability_public.json).
+  [`graph_reliability_public.json`](../../benchmarks/reproductions/graph_reliability_public.json).
 
 ### Checker and evaluation
 

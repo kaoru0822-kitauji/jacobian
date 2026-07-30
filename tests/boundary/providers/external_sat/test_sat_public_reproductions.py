@@ -16,7 +16,7 @@ from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 REPRODUCTIONS = (
-    PROJECT_ROOT / "benchmarks" / "reproduction_cases" / "sat_public_reproductions.json"
+    PROJECT_ROOT / "benchmarks" / "reproductions" / "sat_public_reproductions.json"
 )
 
 pytestmark = [

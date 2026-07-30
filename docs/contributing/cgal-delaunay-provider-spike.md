@@ -30,7 +30,7 @@ The [official 6.2 release](https://www.cgal.org/2026/06/11/cgal62/),
 [package license inventory](https://doc.cgal.org/6.2/Manual/packages.html)
 define the upstream boundary. The frozen source, adapter, commands, and outputs
 are in
-[`benchmarks/cgal_delaunay_pin.json`](../../benchmarks/cgal_delaunay_pin.json).
+[`benchmarks/provider_spikes/cgal_delaunay_pin.json`](../../benchmarks/provider_spikes/cgal_delaunay_pin.json).
 
 ## Reproduce
 
@@ -39,10 +39,10 @@ Compile the checked-in fixed transport against the official library archive:
 ```sh
 g++ -std=c++17 -O2 \
   -I/path/to/CGAL-6.2/include \
-  benchmarks/cgal_delaunay_spike.cpp \
+  benchmarks/provider_spikes/cgal_delaunay_spike.cpp \
   -lgmp -lmpfr -o /tmp/cgal-delaunay-spike
 
-uv run python benchmarks/cgal_delaunay_spike.py \
+uv run python benchmarks/provider_spikes/cgal_delaunay_spike.py \
   --source-archive /path/to/CGAL-6.2-library.tar.xz \
   --executable /tmp/cgal-delaunay-spike \
   --output /tmp/cgal-delaunay-provider-spike.json

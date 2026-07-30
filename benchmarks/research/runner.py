@@ -25,14 +25,14 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from jacobian.canonical import canonicalize_json
 from jacobian.capabilities import CapabilityPolicy, CapabilityPolicyProfile
-from jacobian.eval_telemetry import parse_agent_transcript
+from jacobian.eval.telemetry import parse_agent_transcript
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CHALLENGE_ROOT = Path(__file__).with_name("research_challenges")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CHALLENGE_ROOT = Path(__file__).resolve().parent / "challenges"
 DEFAULT_SUITE = CHALLENGE_ROOT / "public_postdoc_frontier_v1.json"
 CHALLENGE_SCHEMA = CHALLENGE_ROOT / "public_postdoc.schema.json"
-DEFAULT_RESULTS_ROOT = Path(__file__).with_name("results") / "research-challenges"
+DEFAULT_RESULTS_ROOT = PROJECT_ROOT / "benchmarks" / "results" / "research-challenges"
 CAPABILITY_POLICY_PROFILE: CapabilityPolicyProfile = "COMPUTE_VERIFY_NO_RETRIEVAL"
 
 

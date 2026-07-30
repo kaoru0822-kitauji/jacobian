@@ -64,21 +64,21 @@ those are the actual gap. Require recurring move evidence or a justified
 fundamental-primitive exception before adding a capability.
 
 Add public diagnostic cases to the versioned corpus under
-`benchmarks/research_challenges/`. Preserve immutable input suites and create a
+`benchmarks/research/challenges/`. Preserve immutable input suites and create a
 new status overlay when live portfolio coverage changes. Keep `scored=false`
 when the answer is public.
 
 Plan a no-retrieval public run before spending model budget:
 
 ```console
-uv run python benchmarks/research_challenge.py \
+uv run python benchmarks/research/runner.py \
   --challenge CHALLENGE_ID
 ```
 
 Execute only with explicit model-work authorization and a hard process budget:
 
 ```console
-uv run python benchmarks/research_challenge.py \
+uv run python benchmarks/research/runner.py \
   --challenge CHALLENGE_ID \
   --model MODEL \
   --reasoning-effort xhigh \

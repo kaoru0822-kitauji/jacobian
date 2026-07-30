@@ -10,7 +10,9 @@ from tests.support.provider_spike_isolation import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-SPIKE = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "cgal_delaunay_spike.py"))
+SPIKE = runpy.run_path(
+    str(PROJECT_ROOT / "benchmarks" / "provider_spikes" / "cgal_delaunay_spike.py")
+)
 RunSpike = Callable[..., dict[str, Any]]
 RUN_SPIKE = cast(RunSpike, SPIKE["run_spike"])
 

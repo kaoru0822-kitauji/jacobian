@@ -2,7 +2,7 @@
 
 Run with:
 
-    uv run python benchmarks/benchmark_runtime_startup.py
+    uv run python benchmarks/performance/benchmark_runtime_startup.py
 
 Each pyperf worker constructs one complete reference-enabled runtime outside the
 timed region, then measures a second construction over that populated store.
