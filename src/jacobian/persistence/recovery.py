@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from datetime import UTC, datetime
 from typing import Any
 
 from jacobian.contracts.artifacts import ArtifactPutResult
@@ -104,7 +105,5 @@ def put_internal_artifact(
     )
 
 
-def _now():
-    from datetime import UTC, datetime
-
+def _now() -> datetime:
     return datetime.now(UTC)

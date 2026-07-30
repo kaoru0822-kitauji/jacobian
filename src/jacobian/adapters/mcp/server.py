@@ -21,7 +21,6 @@ from mcp_types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import Field, StrictInt
 
 from jacobian import __version__
-from jacobian.references import reference_catalog
 from jacobian.adapters.mcp.guidance import (
     CAPABILITY_DESCRIBE_DESCRIPTION,
     CAPABILITY_INVOKE_DESCRIPTION,
@@ -61,6 +60,7 @@ from jacobian.contracts.workspaces import (
     WorkspaceWriteRequest,
     WorkspaceWriteResult,
 )
+from jacobian.references import reference_catalog
 
 _LOGGER = logging.getLogger(__name__)
 CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
