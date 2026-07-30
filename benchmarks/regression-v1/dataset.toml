@@ -11,32 +11,32 @@ email = "maintainers@jacobian.invalid"
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
-digest = "sha256:4d1a376a6fb93fdfc8d209229631e3d36edc2fe1739179ab62a54df08290a2c9"
+digest = "sha256:d76766c7a079f804baecc5ecc5270de70586ada978a8a273618be22feec9dcfe"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-artifact-composition"
-digest = "sha256:97edcd8b93908ba1e0999b07a031d62e11927798671d545926dd28feeaab52f0"
+digest = "sha256:0aba8965d36740e74e172571ba1976f7dd305996c40af935edb3844b9acb3b72"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-counterexample"
-digest = "sha256:6adfb55c135eb129a70f75176ccc79c820ad08672f6ffa526cb202c6898b790d"
+digest = "sha256:8312c39284450d37eeabf46dd40de139c6cdf946c8ff2cb187f82f3a1244dd47"
 
 [[tasks]]
 name = "jacobian/regression-v1-hermite-normal-form"
-digest = "sha256:ba50ac49b3d707bbbbea3ed5f2a8765c5893c621e27b4ddb77b1c124cccba220"
+digest = "sha256:016b85f9bd0616494287155483b86ba58bc1e06a61a3445a588db181d97e0e9b"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
-digest = "sha256:3361bd9adef99bd11a8d4324331b972846540b1fd73f4ceafa2e41b6dc971ba3"
+digest = "sha256:b47f7d1bd713029a996b54701992a7dd1578bb832d8bef1108433d22a4e49281"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-normalization"
-digest = "sha256:fb7a91502e1de40b9471c3d83871a44b7b3b94fe4cf8a6ceabfdbe04a5c9f9b8"
+digest = "sha256:bcb7b6adeaeb535ae087dec3e7a7ddaf006713e9825e0efee331928f69b13ad3"
 
 [[tasks]]
 name = "jacobian/regression-v1-rational-linear-solution"
-digest = "sha256:ef82fd5f89a4253648c36a32a99dae9840f6c2ebce9370bfbc6d7f1da88c37dc"
+digest = "sha256:7ce0a8cec334540f4556a6849e65ce96ab13ed34abe9af986f8790ef8bce3d37"
 
 [[tasks]]
 name = "jacobian/regression-v1-sat-witness"
-digest = "sha256:60955ced4365cf68481ce4a15b4b73bcc4a44f873c186dfe330c405e883907c0"
+digest = "sha256:2376b5e230e6eb83541d49c18d3892a137a4dd1af7cdca78f2e7ae575af12c5d"

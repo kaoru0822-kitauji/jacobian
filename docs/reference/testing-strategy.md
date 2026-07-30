@@ -161,7 +161,8 @@ Model-in-the-loop evaluations are not tests. Routine targets and CI may exercise
 their loaders, scorers, replay paths, telemetry parsing, and dispatch guards
 with deterministic fixtures, but never start an evaluated model. A human must
 use the separate `make agent-eval` entry point, select cases explicitly, review
-the plan, and opt into execution with a bounded model-run count. See
+the plan, and opt into execution with `EVAL_EXECUTE=1` and a bounded model-run
+count. See
 [Agent evaluations](agent-evaluations.md#validation-boundary).
 
 ## Criticality classes

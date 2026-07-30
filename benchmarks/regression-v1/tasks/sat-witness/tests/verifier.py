@@ -4,6 +4,49 @@ from pathlib import Path
 
 W = Path("/app")
 E = Path("/tests")
+AUTHORIZED_CHECKER_ID = (
+    "checker://sha256/4f4ab2af490f33c77f9035ef1bef083f145553fb1ab3c578cb5b1dcf2f2f2cc0"
+)
+AUTHORIZED_CHECKER_DIGEST = (
+    "sha256:b9c178342e86f2d533db8336162c063b64034aa99f6e84856058a0d1df4a831f"
+)
+AUTHORIZED_VERIFICATION_RECORD = {
+    "record_schema_version": "1",
+    "checker_id": AUTHORIZED_CHECKER_ID,
+    "checker_digest": AUTHORIZED_CHECKER_DIGEST,
+    "evidence_kind": "WITNESS",
+    "evidence_uri": (
+        "artifact://sha256/"
+        "d98a2a68ff7ef2c48d50eca71a1618a99d8f35005f2ff82c64701a02efe71342"
+    ),
+    "bindings": {
+        "claim_digest": (
+            "sha256:6204650d53228c9801de367990c10bb3541a82ab33cef3f81165d337712b0b7a"
+        ),
+        "semantics_digest": (
+            "sha256:663ed4ee4e97d0474bca04a9ffe71a56fc6569cb92d864ec208256a438e779622"
+        ),
+        "candidate_digest": (
+            "sha256:0067fcba7f58ea779b0d88af49944b41d9127b8ca177d766b2f99962741d55ff"
+        ),
+        "scope_digest": None,
+        "encoding_digest": None,
+    },
+    "conclusion": "TRUE",
+    "arithmetic": "EXACT_INTEGER",
+    "method": "DIRECT_WITNESS",
+    "coverage": "NOT_APPLICABLE",
+    "request_digest": (
+        "sha256:557d49f80ad560c762200f3ad8f2288eb5940ff83130ce6aa640b3601388f94e"
+    ),
+    "environment_digest": (
+        "sha256:a308d74b82cc9e43e018cb17c79180e1da140e3034feb4be03be9a6d9778d7a2"
+    ),
+    "relation_id": None,
+    "relationship_source_artifact_uris": [],
+    "relationship_target_artifact_uris": [],
+    "obligation_uri": None,
+}
 
 
 def _digest(path):
@@ -68,7 +111,38 @@ def _record_is_bound(submission, input_data, assignment, sat):
         "status",
         "assignment",
         "scope",
+        "verification_record",
+    }:
+        return False
+    verification_record = record["verification_record"]
+    if not isinstance(verification_record, dict):
+        return False
+    if set(verification_record) != {
+        "record_schema_version",
         "checker_id",
+        "checker_digest",
+        "evidence_kind",
+        "evidence_uri",
+        "bindings",
+        "conclusion",
+        "arithmetic",
+        "method",
+        "coverage",
+        "request_digest",
+        "environment_digest",
+        "relation_id",
+        "relationship_source_artifact_uris",
+        "relationship_target_artifact_uris",
+        "obligation_uri",
+    }:
+        return False
+    bindings = verification_record["bindings"]
+    if not isinstance(bindings, dict) or set(bindings) != {
+        "claim_digest",
+        "semantics_digest",
+        "candidate_digest",
+        "scope_digest",
+        "encoding_digest",
     }:
         return False
     return (
@@ -78,8 +152,7 @@ def _record_is_bound(submission, input_data, assignment, sat):
         and record["status"] == "VERIFIED_SATISFYING"
         and record["assignment"] == assignment
         and record["scope"] == "sat-witness complete finite input"
-        and isinstance(record["checker_id"], str)
-        and bool(record["checker_id"])
+        and verification_record == AUTHORIZED_VERIFICATION_RECORD
     )
 
 

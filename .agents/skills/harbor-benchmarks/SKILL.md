@@ -57,6 +57,7 @@ Use the pinned Harbor runner from the repository:
 uvx --from harbor==0.20.0 harbor --version
 make test-plan BASE=origin/main
 make check
+make harbor-check
 ```
 
 After any input, instruction, metadata, verifier, dependency, image, or task
@@ -85,7 +86,7 @@ export JACOBIAN_IMAGE='registry.example/jacobian@sha256:<64-lowercase-hex-digits
 export JACOBIAN_MCP_TOKEN='replace-with-at-least-32-character-token'
 export JACOBIAN_AUTH_TOKENS_JSON='{"tokens":[{"tenant_id":"observation","token":"replace-with-at-least-32-character-token","scopes":["jacobian:use"]}]}'
 export JACOBIAN_MODEL='your-model'
-make agent-eval
+make agent-eval EVAL_EXECUTE=1
 ```
 
 Inspect Harbor ATIF together with Jacobian telemetry for capability discovery

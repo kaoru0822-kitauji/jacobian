@@ -156,7 +156,8 @@ Separate two evaluation classes:
 
 Use the repository-local `harbor-benchmarks` skill for the committed Harbor
 task bundles, Oracle validation, and Jacobian observation job. Run the guarded
-`make agent-eval` entry point rather than creating a custom task runner. Inspect
+`make agent-eval EVAL_EXECUTE=1` entry point rather than creating a custom task
+runner. Inspect
 Harbor ATIF together with Jacobian telemetry and record the git tree, task
 digests, provider/runtime, model/settings, prompt, oracle/verifier identities,
 seeds, raw traces, and structured reports.

@@ -81,3 +81,7 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
             task / "tests" / "Dockerfile",
         ):
             assert "@sha256:" in dockerfile.read_text()
+        assert (
+            "submission_schema.json"
+            in (task / "environment" / "Dockerfile").read_text()
+        )
