@@ -125,7 +125,7 @@ def test_persistent_repl_kills_a_process_that_exceeds_rss_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "jacobian.lean_exploration._process_rss_kb",
+        "jacobian.lean_frontend.exploration._process_rss_kb",
         lambda _pid: 2,
     )
     repl = PersistentLeanRepl(

@@ -63,7 +63,7 @@ def test_typed_goal_extraction_failure_is_a_structured_non_conclusion(
         raise RuntimeError("helper protocol failed")
 
     monkeypatch.setattr(
-        "jacobian.lean_exploration._extract_typed_goals",
+        "jacobian.lean_frontend.exploration._extract_typed_goals",
         fail_extraction,
     )
 

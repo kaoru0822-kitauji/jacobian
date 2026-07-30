@@ -130,7 +130,7 @@ def _stub_lean_runtime(
 
     monkeypatch.setattr(adapter.resources.repl, "execute_clean", _execute_clean)
     monkeypatch.setattr(
-        "jacobian.lean_exploration._extract_typed_goals",
+        "jacobian.lean_frontend.exploration._extract_typed_goals",
         _fake_extract,
     )
 
