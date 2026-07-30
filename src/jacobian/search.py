@@ -126,6 +126,7 @@ class SearchService:
         self._clock = clock
         self._threads: dict[str, threading.Thread] = {}
         self._thread_lock = threading.Lock()
+        self._starts_in_flight = 0
         self._closing = False
         self._closed = False
         self.semantics_uri = store.register_descriptor(
@@ -175,7 +176,7 @@ class SearchService:
                 active = tuple(
                     thread for thread in self._threads.values() if thread.is_alive()
                 )
-                if not active:
+                if not active and self._starts_in_flight == 0:
                     self._closed = True
                     self._closing = False
                     return
@@ -184,6 +185,9 @@ class SearchService:
                 raise SearchError(
                     "search workers did not quiesce before runtime shutdown"
                 )
+            if not active:
+                time.sleep(min(remaining, 0.01))
+                continue
             for thread in active:
                 thread.join(timeout=min(remaining, 0.05))
 
@@ -370,7 +374,22 @@ class SearchService:
     ) -> ExperimentHandle:
         """Commit one idempotent search request and launch it locally."""
 
-        self._require_open()
+        with self._thread_lock:
+            if self._closing or self._closed:
+                raise SearchError("search service is closing")
+            self._starts_in_flight += 1
+        try:
+            return self._start_reserved(request)
+        finally:
+            with self._thread_lock:
+                self._starts_in_flight -= 1
+
+    def _start_reserved(
+        self,
+        request: SearchRunRequest | dict[str, Any],
+    ) -> ExperimentHandle:
+        """Start after reserving the service lifecycle through worker launch."""
+
         selected = SearchRunRequest.model_validate(request)
         request_digest = _digest(selected.model_dump(mode="json"))
         with self.store.connection() as connection:
@@ -503,7 +522,7 @@ class SearchService:
             created = True
 
         if created:
-            self._launch(experiment_uri)
+            self._launch(experiment_uri, lifecycle_reserved=True)
         return ExperimentHandle(
             experiment_uri=experiment_uri,
             state=ExperimentState.PENDING,
@@ -728,9 +747,14 @@ class SearchService:
             workers=requested.workers,
         )
 
-    def _launch(self, experiment_uri: str) -> None:
+    def _launch(
+        self,
+        experiment_uri: str,
+        *,
+        lifecycle_reserved: bool = False,
+    ) -> None:
         with self._thread_lock:
-            if self._closing or self._closed:
+            if self._closed or (self._closing and not lifecycle_reserved):
                 raise SearchError("search service is closing")
             current = self._threads.get(experiment_uri)
             if current is not None and current.is_alive():
