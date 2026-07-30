@@ -1,0 +1,1 @@
+Set A=(0,0), B=(2u,0), and C=(2v,2w), where u and w are nonzero. The two equal-distance equations give O=(u,(v^2+w^2-uv)/w). The centroid is G=(2(u+v)/3,2w/3). The altitude equations give H=(2v,2v(u-v)/w). Direct substitution yields 2O-3G+H=(0,0), so O, G, and H are collinear.
