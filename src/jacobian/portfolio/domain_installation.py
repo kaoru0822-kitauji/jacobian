@@ -31,9 +31,7 @@ class DomainBundleInstaller:
         diagnostics: list[PortfolioDiagnostic] = []
         outcomes: list[BundleInstallation] = []
         for bundle in plan.domain_bundles:
-            capability_ids = tuple(
-                operation.capability_id for operation in bundle.capabilities
-            )
+            capability_ids = bundle.capability_ids
             runtime = bundle.provider_runtime
             if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
                 diagnostic = PortfolioDiagnostic(
@@ -54,7 +52,10 @@ class DomainBundleInstaller:
                 )
                 continue
 
-            installation = self.context.operations.install(bundle)
+            if bundle.managed_installer is None:
+                installation = self.context.operations.install(bundle)
+            else:
+                installation = bundle.managed_installer(self.context)
             installed[bundle.domain_id] = installation
             for adapter in installation.adapters:
                 self.context.register_capability(adapter)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from jacobian.conjecture_ingestion import install_conjecture_ingestion_capability
 from jacobian.graph_composition_capabilities import (
     install_graph_composition_capabilities,
 )
@@ -29,16 +28,6 @@ class ResourceCapabilityInstaller:
         ctx = self.context
         if result.graph is None:
             raise RuntimeError("graph capabilities must precede resource installation")
-        conjecture_adapter, result.conjecture_ingestion = (
-            install_conjecture_ingestion_capability(
-                ctx.store,
-                ctx.schemas,
-                ctx.artifacts,
-                ctx.capabilities.memory,
-            )
-        )
-        ctx.register_capability(conjecture_adapter)
-
         graph_adapters, result.graph_composition = (
             install_graph_composition_capabilities(
                 ctx.store,

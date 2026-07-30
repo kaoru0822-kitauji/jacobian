@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+if TYPE_CHECKING:
+    from jacobian.installation.context import InstallationContext
+    from jacobian.operation_installation import InstalledDomainBundle
 
 from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
@@ -230,6 +234,15 @@ class DomainDiagnostics:
 type DomainOperation = ComputedOperation[Any, Any] | BoundedSearchOperation[Any, Any]
 
 
+class ManagedDomainInstaller(Protocol):
+    """Install a domain adapter whose resource policy is not generic."""
+
+    def __call__(
+        self,
+        context: InstallationContext,
+    ) -> InstalledDomainBundle: ...
+
+
 @dataclass(frozen=True, slots=True)
 class DomainBundle:
     """Explicit installation unit owned by one mathematical domain."""
@@ -244,3 +257,13 @@ class DomainBundle:
     scope_description: str
     completeness_basis: str
     assurance_basis: str
+    managed_capability_ids: tuple[str, ...] = ()
+    managed_installer: ManagedDomainInstaller | None = None
+
+    @property
+    def capability_ids(self) -> tuple[str, ...]:
+        """Return the capability IDs declared by exactly one installation mode."""
+
+        if self.managed_installer is not None:
+            return self.managed_capability_ids
+        return tuple(operation.capability_id for operation in self.capabilities)

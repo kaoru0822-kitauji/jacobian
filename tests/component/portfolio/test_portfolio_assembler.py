@@ -39,6 +39,7 @@ from jacobian.portfolio import (
     PROVIDER_UNAVAILABLE,
     PortfolioPlan,
 )
+from jacobian.portfolio.builtin import BUILTIN_PORTFOLIO
 from jacobian.portfolio.domain_installation import DomainBundleInstaller
 from jacobian.portfolio.result import (
     BundleInstallationStatus,
@@ -344,6 +345,24 @@ def test_install_failure_propagates_without_silent_partial_portfolio(
     # caller is expected to roll back its enclosing transaction; the assembler
     # itself never returns a silently-degraded result.
     assert "broken" not in assembly.registered
+
+
+def test_conjecture_ingestion_installs_through_domain_bundle_outcome(
+    assembly: _RecordingContext,
+) -> None:
+    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+
+    assert bundle is not None
+    assert bundle.capability_ids == ("dataset.conjecture.ingest",)
+    assert bundle.managed_installer is not None
+
+    result = DomainBundleInstaller(assembly.context).install(
+        PortfolioPlan(domain_bundles=(bundle,))
+    )
+
+    assert result.outcomes[0].status is BundleInstallationStatus.INSTALLED
+    assert result.outcomes[0].capability_ids == ("dataset.conjecture.ingest",)
+    assert "dataset.conjecture.ingest" in assembly.registered
 
 
 def test_duplicate_capability_id_within_a_bundle_propagates(

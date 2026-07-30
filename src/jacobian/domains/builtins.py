@@ -3,6 +3,7 @@
 from jacobian.domains.analysis import REAL_ANALYSIS_BUNDLE
 from jacobian.domains.arithmetic import ARITHMETIC_BUNDLE
 from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
+from jacobian.domains.conjecture_ingestion import CONJECTURE_INGESTION_BUNDLE
 from jacobian.domains.finite_sets import FINITE_SET_BUNDLE
 from jacobian.domains.geometry import GEOMETRY_BUNDLE
 from jacobian.domains.graph_optimization import (
@@ -21,6 +22,7 @@ from jacobian.domains.topology import TOPOLOGY_BUNDLE
 
 BUILTIN_DOMAIN_BUNDLES = (
     ARITHMETIC_BUNDLE,
+    CONJECTURE_INGESTION_BUNDLE,
     NUMBER_THEORY_BUNDLE,
     COMBINATORICS_BUNDLE,
     FINITE_SET_BUNDLE,

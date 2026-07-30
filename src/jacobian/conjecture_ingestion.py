@@ -323,6 +323,12 @@ class ExternalConjectureIngestAdapter:
                 ),
             ),
             artifact_uris=(artifact.artifact_uri,),
+            provider=self.descriptor.provider,
+            provider_digest=(
+                self.descriptor.provider_runtime.digest
+                if self.descriptor.provider_runtime is not None
+                else None
+            ),
         )
         if self.memory is None:
             return result
@@ -349,7 +355,7 @@ class ExternalConjectureIngestAdapter:
                 summary=(
                     f"{validated.metadata.title}: {decision.value} "
                     f"({validated.corpus_id}/{validated.item_id})"
-                )[:1024],
+                )[:512],
                 tags=self.descriptor.tags,
             )
         )

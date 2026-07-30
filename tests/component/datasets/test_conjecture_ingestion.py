@@ -257,6 +257,12 @@ def test_restricted_request_records_only_policy_safe_memory(tmp_path: Path) -> N
     assert "statement" not in episode.payload["request"]
     assert "license_evidence_text" not in episode.payload["request"]
     assert episode.payload["request"]["metadata"]["title"] == "Fixture conjecture"
+    assert episode.payload["result"]["provider"] == adapter.descriptor.provider
+    assert (
+        episode.payload["result"]["provider_digest"]
+        == adapter.descriptor.provider_runtime.digest
+    )
+    assert len(episode.manifest.summary) <= 512
     search = memory.search(query="Fixture conjecture", limit=10)
     assert any(hit.episode_uri == result.episode_uri for hit in search.hits)
 
