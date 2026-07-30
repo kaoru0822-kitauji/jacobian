@@ -425,6 +425,10 @@ def _capability_descriptor_view(
             "provider_runtime": runtime_summary,
             "modes": [mode.value for mode in descriptor.modes],
             "tags": list(descriptor.tags),
+            "accepted_input_kinds": [
+                kind.value for kind in descriptor.accepted_input_kinds
+            ],
+            "accepted_artifact_types": list(descriptor.accepted_artifact_types),
             "input_schema_summary": _input_schema_summary(descriptor.input_schema),
             "output_schema_summary": _output_schema_summary(descriptor.output_schema),
             "has_invocation_examples": bool(descriptor.invocation_examples),
@@ -452,6 +456,10 @@ def _capability_descriptor_view(
         "provider": descriptor.provider,
         "provider_runtime": runtime_summary,
         "modes": [mode.value for mode in descriptor.modes],
+        "accepted_input_kinds": [
+            kind.value for kind in descriptor.accepted_input_kinds
+        ],
+        "accepted_artifact_types": list(descriptor.accepted_artifact_types),
         "input_schema": _compact_json_schema(descriptor.input_schema),
         "output_schema_summary": _output_schema_summary(descriptor.output_schema),
     }

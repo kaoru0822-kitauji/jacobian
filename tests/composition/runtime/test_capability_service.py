@@ -529,6 +529,14 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
         "fixture_sat.proof.verify"
     ]
 
+    formal_trace = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="verify an LRAT proof trace",
+            mode=CapabilityMode.VERIFY,
+        )
+    )
+    assert formal_trace.resolved_input_kind is None
+
 
 def test_discovery_routes_only_declared_input_and_artifact_contracts(
     capability_core_services: DomainTestServices,

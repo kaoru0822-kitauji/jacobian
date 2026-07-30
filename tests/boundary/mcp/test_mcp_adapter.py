@@ -622,11 +622,19 @@ def test_mcp_exact_description_layers_summary_contract_and_full_views(
             assert "input_schema" not in summary["capability"]
             assert summary["capability"]["input_schema_summary"]["type"] == "object"
             assert summary["capability"]["has_invocation_examples"] is True
+            assert summary["capability"]["accepted_input_kinds"] == [
+                "STRUCTURED_REQUEST"
+            ]
+            assert summary["capability"]["accepted_artifact_types"] == []
             assert "invocations" not in summary
             assert "CONTRACT" in summary["next_views"]
             assert "all-orders" in summary["scope_rule"]["bounded_repetition"]
             assert contract["view"] == "CONTRACT"
             assert contract["capability"]["input_schema"]["type"] == "object"
+            assert contract["capability"]["accepted_input_kinds"] == [
+                "STRUCTURED_REQUEST"
+            ]
+            assert contract["capability"]["accepted_artifact_types"] == []
             assert contract["invocations"]
             assert full["view"] == "FULL"
             assert "output_schema" in full["capability"]

@@ -864,7 +864,6 @@ def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None
         "natural language proof",
         "informal proof",
         "proof prose",
-        "proof trace",
         "written proof",
     )
     discourse = frozenset(

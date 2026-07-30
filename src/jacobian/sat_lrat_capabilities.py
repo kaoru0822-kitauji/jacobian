@@ -140,11 +140,7 @@ class SatLratVerificationAdapter:
             input_schema=model_schema(SatLratVerificationRequest),
             output_schema=model_schema(SatLratVerificationOutput),
             tags=("sat", "cnf", "lrat", "unsat", "certificate", "verification"),
-            accepted_input_kinds=(
-                CapabilityInputKind.STRUCTURED_REQUEST,
-                CapabilityInputKind.TYPED_ARTIFACT,
-            ),
-            accepted_artifact_types=("sat.lrat_proof.artifact",),
+            accepted_input_kinds=(CapabilityInputKind.STRUCTURED_REQUEST,),
         )
 
     @property
