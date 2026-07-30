@@ -169,7 +169,7 @@ def test_checker_timeout_and_cancellation_are_non_conclusions(
         tmp_path
     )
     monkeypatch.setattr(
-        "jacobian.verification.run_bounded_process",
+        "jacobian.verification.service.run_bounded_process",
         lambda *_args, **_kwargs: stopped,
     )
 

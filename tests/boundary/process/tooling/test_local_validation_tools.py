@@ -149,7 +149,7 @@ else:
 forbidden = (
     "jacobian.adapters.mcp.server",
     "jacobian.domains",
-    "jacobian.lean",
+    "jacobian.lean_frontend.service",
     "sympy",
     "cvc5",
     "flint",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from jacobian.eval_graph_oracle import (
+from jacobian.eval.graph_oracle import (
     GraphOracleError,
     check_constraints,
     check_reported_properties,

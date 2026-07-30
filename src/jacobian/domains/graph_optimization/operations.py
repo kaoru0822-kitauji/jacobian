@@ -10,7 +10,7 @@ from jacobian.contracts.graph_coloring import (
     ChromaticSearchStep,
     GraphChromaticNumberOutput,
 )
-from jacobian.graph_coloring_semantics import canonical_graph, coloring_cnf
+from jacobian.graphs.coloring_semantics import canonical_graph, coloring_cnf
 
 
 def build_simple_graph(graph: ChromaticGraph) -> Any:

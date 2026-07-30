@@ -545,7 +545,7 @@ def test_normalization_checker_timeout_is_operational(
         mode=CapabilityMode.EXPLORE,
     )
     monkeypatch.setattr(
-        "jacobian.verification.run_bounded_process",
+        "jacobian.verification.service.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",

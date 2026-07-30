@@ -21,7 +21,7 @@ from jacobian.contracts.sat import (
     SatResourceBudget,
 )
 from jacobian.runtime import create_runtime
-from jacobian.sat import SatArtifactError
+from jacobian.sat_smt.sat import SatArtifactError
 
 pytestmark = pytest.mark.usefixtures("attached_complete_runtime")
 

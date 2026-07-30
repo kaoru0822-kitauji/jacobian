@@ -20,8 +20,8 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.flint_linear import install_python_flint_inconsistency_capability
-from jacobian.linear_capabilities import (
+from jacobian.matrices.flint_linear import install_python_flint_inconsistency_capability
+from jacobian.matrices.linear_capabilities import (
     install_linear_rational_inconsistency_checker,
 )
 from jacobian.providers.flint_runtime import python_flint_provider_runtime
@@ -172,7 +172,7 @@ def test_inconsistency_timeout_retains_no_certificate(
 ) -> None:
     runtime = linear_services
     monkeypatch.setattr(
-        "jacobian.flint_linear.run_bounded_process",
+        "jacobian.matrices.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",

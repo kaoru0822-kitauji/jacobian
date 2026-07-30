@@ -24,7 +24,8 @@ from jacobian.contracts.verification import VerificationRecord
 from jacobian.providers.external_solver_runtime import drat_trim_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime
-from jacobian.verification import CheckerExecutionError, _environment_digest
+from jacobian.verification import CheckerExecutionError
+from jacobian.verification._helpers import _environment_digest
 
 pytestmark = [
     pytest.mark.usefixtures("authorized_complete_runtime"),

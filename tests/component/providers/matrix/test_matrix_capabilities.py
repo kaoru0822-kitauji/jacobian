@@ -21,8 +21,11 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.matrix_capabilities import MatrixInstallation, install_matrix_capabilities
-from jacobian.matrix_determinant_capabilities import (
+from jacobian.matrices.capabilities import (
+    MatrixInstallation,
+    install_matrix_capabilities,
+)
+from jacobian.matrices.determinant import (
     install_matrix_determinant_checker,
 )
 from jacobian.runtime import CheckerAuthorityMode

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from jacobian.eval_telemetry import parse_agent_transcript
+from jacobian.eval.telemetry import parse_agent_transcript
 
 
 def _tool_event(

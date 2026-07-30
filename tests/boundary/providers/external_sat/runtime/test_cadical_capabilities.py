@@ -7,7 +7,6 @@ import pytest
 from tests.support.provider_external_sat import drat_trim_runtime_available
 
 from jacobian.bounded_process import bounded_process_cancellation
-from jacobian.cadical import install_cadical_capabilities
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -19,6 +18,7 @@ from jacobian.contracts.sat import SatAssignmentArtifact, SatProofArtifact
 from jacobian.providers.external_solver_runtime import cadical_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime
+from jacobian.sat_smt.cadical import install_cadical_capabilities
 
 pytestmark = [
     pytest.mark.usefixtures("authorized_complete_runtime"),
@@ -406,7 +406,7 @@ def test_excessive_stdout_fails_closed_without_an_assignment(
         tmp_path,
         "print('x' * 4096)\nraise SystemExit(10)",
     )
-    monkeypatch.setattr("jacobian.cadical.CADICAL_STDOUT_LIMIT", 1024)
+    monkeypatch.setattr("jacobian.sat_smt.cadical.CADICAL_STDOUT_LIMIT", 1024)
     runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
     cnf = runtime.core.sat.put_cnf(variable_names=("x",), clauses=((1,),))
 
@@ -427,7 +427,7 @@ def test_oversized_proof_fails_closed_before_reading_or_materialization(
         "print('s UNSATISFIABLE')\n"
         "raise SystemExit(20)",
     )
-    monkeypatch.setattr("jacobian.cadical.CADICAL_PROOF_LIMIT", 8)
+    monkeypatch.setattr("jacobian.sat_smt.cadical.CADICAL_PROOF_LIMIT", 8)
     runtime = _runtime_with_fake(tmp_path, monkeypatch, executable)
     cnf = runtime.core.sat.put_cnf(
         variable_names=("x",),

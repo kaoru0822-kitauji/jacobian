@@ -3,7 +3,7 @@ from __future__ import annotations
 import networkx as nx
 import pytest
 
-import jacobian.graph_atlas as graph_atlas
+import jacobian.graphs.atlas as graph_atlas
 from jacobian.domains.graph_optimization.invariants import _maximum_matching
 
 

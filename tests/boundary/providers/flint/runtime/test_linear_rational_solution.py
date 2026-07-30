@@ -26,8 +26,10 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.flint_linear import install_python_flint_linear_capability
-from jacobian.linear_capabilities import install_linear_rational_solution_checker
+from jacobian.matrices.flint_linear import install_python_flint_linear_capability
+from jacobian.matrices.linear_capabilities import (
+    install_linear_rational_solution_checker,
+)
 from jacobian.provider_runtime import PYTHON_FLINT_VERSION
 from jacobian.providers.flint_runtime import python_flint_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
@@ -301,7 +303,7 @@ def test_python_flint_timeout_is_operational_not_mathematical(
 ) -> None:
     runtime = linear_services
     monkeypatch.setattr(
-        "jacobian.flint_linear.run_bounded_process",
+        "jacobian.matrices.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",
@@ -357,7 +359,9 @@ def test_python_flint_worker_gets_only_fixed_environment_and_exact_budget(
             timed_out=False,
         )
 
-    monkeypatch.setattr("jacobian.flint_linear.run_bounded_process", fake_worker)
+    monkeypatch.setattr(
+        "jacobian.matrices.flint_linear.run_bounded_process", fake_worker
+    )
     result = _invoke(
         runtime,
         "linear.rational_solution.find",
@@ -391,11 +395,11 @@ def test_python_flint_discards_output_if_runtime_identity_changes(
     )
     observations = iter((original_runtime, changed_runtime))
     monkeypatch.setattr(
-        "jacobian.flint_linear.python_flint_provider_runtime",
+        "jacobian.matrices.flint_linear.python_flint_provider_runtime",
         lambda **_kwargs: next(observations),
     )
     monkeypatch.setattr(
-        "jacobian.flint_linear.run_bounded_process",
+        "jacobian.matrices.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=0,
             stdout=(
@@ -436,7 +440,7 @@ def test_invalid_worker_protocol_fails_without_solution_evidence(
 ) -> None:
     runtime = linear_services
     monkeypatch.setattr(
-        "jacobian.flint_linear.run_bounded_process",
+        "jacobian.matrices.flint_linear.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=0,
             stdout=b'{"status":"SOLUTION_PRODUCED","values":[]}\n',
@@ -471,7 +475,7 @@ def test_linear_checker_timeout_is_operational_not_mathematical(
         mode=CapabilityMode.EXPLORE,
     )
     monkeypatch.setattr(
-        "jacobian.verification.run_bounded_process",
+        "jacobian.verification.service.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",

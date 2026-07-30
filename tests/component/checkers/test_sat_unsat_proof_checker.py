@@ -19,7 +19,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.sat import SatResourceBudget
-from jacobian.sat import install_sat_artifacts
+from jacobian.sat_smt.sat import install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore, StoredArtifact
 from jacobian_checkers.sat import check_unsat_proof

@@ -10,7 +10,7 @@ from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_exploration import LeanProofStateRequest, LeanTypedGoal
-from jacobian.lean_exploration import (
+from jacobian.lean_frontend.exploration import (
     LeanProofStateAdapter,
     _Resources,
     install_lean_exploration_capabilities,

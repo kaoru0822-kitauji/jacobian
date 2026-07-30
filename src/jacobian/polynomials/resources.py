@@ -1,0 +1,49 @@
+"""Installation records for polynomial-map capabilities."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from jacobian.artifacts import ArtifactService
+from jacobian.store import ArtifactStore
+from jacobian.verification import VerificationService
+
+
+@dataclass(frozen=True, slots=True)
+class PolynomialInstallation:
+    semantics_uri: str
+    polynomial_semantics_uri: str
+    factorization_semantics_uri: str
+    identity_semantics_uri: str
+    inverse_semantics_uri: str
+    map_schema_uri: str
+    evaluation_schema_uri: str
+    jacobian_schema_uri: str
+    claim_schema_uri: str
+    jacobian_claim_schema_uri: str
+    right_polynomial_schema_uri: str
+    left_polynomial_schema_uri: str
+    identity_claim_schema_uri: str
+    keller_claim_schema_uri: str
+    inverse_collision_claim_schema_uri: str
+    inverse_claim_schema_uri: str
+    inverse_residual_schema_uri: str
+    inverse_synthesis_schema_uri: str
+    witness_schema_uri: str
+    certificate_schema_uri: str
+    polynomial_schema_uri: str
+    factorization_schema_uri: str
+    collision_checker_id: str | None
+    jacobian_checker_id: str | None
+    keller_checker_id: str | None
+    identity_checker_id: str | None
+    inverse_checker_id: str | None
+    inverse_collision_checker_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PolynomialResources:
+    store: ArtifactStore
+    artifacts: ArtifactService
+    verification: VerificationService
+    installation: PolynomialInstallation

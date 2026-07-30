@@ -13,7 +13,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.domains.polynomial import build_polynomial_bundle
-from jacobian.polynomial_capabilities import install_polynomial_capabilities
+from jacobian.polynomials import install_polynomial_capabilities
 
 
 @pytest.fixture

@@ -46,9 +46,9 @@ _PROVIDER_MODULE_PREFIXES = (
     # contracts.  Keep those importable from unit tests; the concrete
     # provider adapters live in the explicitly named modules below.
     "jacobian.flint_",
-    "jacobian.cvc5",
+    "jacobian.sat_smt.cvc5",
     "jacobian.lean_",
-    "jacobian.lean",
+    "jacobian.lean_frontend.service",
     "jacobian.z3_",
     "jacobian.sympy_",
 )

@@ -15,7 +15,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_exploration import (
+from jacobian.lean_frontend.exploration import (
     LeanProofStateAdapter,
     _Resources,
     _single_proof_state,

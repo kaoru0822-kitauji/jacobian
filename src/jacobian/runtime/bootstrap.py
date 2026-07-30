@@ -6,8 +6,8 @@ from pathlib import Path
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityService
-from jacobian.linear import install_linear_artifacts
-from jacobian.matrix_normal_forms import install_matrix_normal_form_artifacts
+from jacobian.matrices.linear import install_linear_artifacts
+from jacobian.matrices.normal_forms import install_matrix_normal_form_artifacts
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.plugins.registry import PluginRegistry
@@ -15,9 +15,9 @@ from jacobian.polynomial_expressions import install_polynomial_expression_artifa
 from jacobian.registry import CheckerRegistry
 from jacobian.runtime.config import CheckerAuthorityMode, RuntimeOptions
 from jacobian.runtime.services import CoreServices
-from jacobian.sat import install_sat_artifacts
+from jacobian.sat_smt.sat import install_sat_artifacts
+from jacobian.sat_smt.smt import install_smt_artifacts
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.smt import install_smt_artifacts
 from jacobian.store import ArtifactStore
 from jacobian.workspaces import WorkspaceService
 

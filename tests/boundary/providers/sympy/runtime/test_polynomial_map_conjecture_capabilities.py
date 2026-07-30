@@ -47,7 +47,7 @@ def test_public_jacobian_counterexample_fixture_replays_both_claim_bindings(
     fixture_path = (
         Path(__file__).resolve().parents[5]
         / "benchmarks"
-        / "reproduction_cases"
+        / "reproductions"
         / "jacobian_counterexample_public.json"
     )
     fixture = json.loads(fixture_path.read_text())

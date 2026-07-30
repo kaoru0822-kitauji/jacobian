@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_exploration import (
+from jacobian.lean_frontend.exploration import (
     LeanExplorationReplRuntime,
     LeanReplPolicy,
     PersistentLeanRepl,

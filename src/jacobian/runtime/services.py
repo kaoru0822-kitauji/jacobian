@@ -15,8 +15,8 @@ from jacobian.conjectures import ConjectureService
 from jacobian.evaluation import EvaluationService
 from jacobian.experiment_router import ExperimentRouter
 from jacobian.experiments import ExperimentService
-from jacobian.linear import LinearArtifactService
-from jacobian.matrix_normal_forms import MatrixNormalFormArtifactService
+from jacobian.matrices.linear import LinearArtifactService
+from jacobian.matrices.normal_forms import MatrixNormalFormArtifactService
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.plugin_execution import PluginExecutor
@@ -25,11 +25,11 @@ from jacobian.polynomial_expressions import PolynomialExpressionArtifactService
 from jacobian.polytope import PolytopeService
 from jacobian.references import ReferenceInstaller
 from jacobian.registry import CheckerRegistry
-from jacobian.sat import SatArtifactService
+from jacobian.sat_smt.sat import SatArtifactService
+from jacobian.sat_smt.smt import SmtArtifactService
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
-from jacobian.smt import SmtArtifactService
 from jacobian.store import ArtifactStore
 from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService

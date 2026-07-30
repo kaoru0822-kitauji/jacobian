@@ -261,7 +261,7 @@ def test_workspace_supersession_and_reactivation_are_explicit(
         )
     )
     monkeypatch.setattr(
-        "jacobian.workspaces._now",
+        "jacobian.workspaces._helpers._now",
         lambda: datetime(2030, 1, 1, tzinfo=UTC),
     )
     superseded = runtime.core.workspaces.write(
@@ -305,7 +305,7 @@ def test_workspace_supersession_and_reactivation_are_explicit(
     assert context.context.target.stale_due_to_ids == (seeded.id_map["A1"],)
 
     monkeypatch.setattr(
-        "jacobian.workspaces._now",
+        "jacobian.workspaces._helpers._now",
         lambda: datetime(2020, 1, 1, tzinfo=UTC),
     )
     reactivated = runtime.core.workspaces.write(
@@ -415,7 +415,7 @@ def test_workspace_recent_views_follow_acceptance_order(
     runtime = attached_complete_runtime
     opened = _open(runtime, key="workspace-open-acceptance-order-001")
     monkeypatch.setattr(
-        "jacobian.workspaces._now",
+        "jacobian.workspaces._helpers._now",
         lambda: datetime(2030, 1, 1, tzinfo=UTC),
     )
     first = runtime.core.workspaces.write(
@@ -445,7 +445,7 @@ def test_workspace_recent_views_follow_acceptance_order(
         )
     )
     monkeypatch.setattr(
-        "jacobian.workspaces._now",
+        "jacobian.workspaces._helpers._now",
         lambda: datetime(2020, 1, 1, tzinfo=UTC),
     )
     second = runtime.core.workspaces.write(

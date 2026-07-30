@@ -14,23 +14,21 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from jacobian.cadical import install_cadical_capabilities
 from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
 )
-from jacobian.cvc5 import install_cvc5_capability
-from jacobian.flint_hnf import install_python_flint_hnf_capability
-from jacobian.flint_linear import (
+from jacobian.installation.context import InstallationContext
+from jacobian.matrices.flint_hnf import install_python_flint_hnf_capability
+from jacobian.matrices.flint_linear import (
     install_python_flint_inconsistency_capability,
     install_python_flint_linear_capability,
 )
-from jacobian.installation.context import InstallationContext
-from jacobian.linear_capabilities import (
+from jacobian.matrices.linear_capabilities import (
     install_linear_rational_inconsistency_checker,
     install_linear_rational_solution_checker,
 )
-from jacobian.matrix_normal_form_capabilities import (
+from jacobian.matrices.normal_form import (
     install_matrix_normal_form_checker,
 )
 from jacobian.polynomial_expression_capabilities import (
@@ -39,13 +37,15 @@ from jacobian.polynomial_expression_capabilities import (
 from jacobian.portfolio.provider_resolution import ProviderRuntimePlan
 from jacobian.portfolio.result import PortfolioInstallation
 from jacobian.runtime.services import CoreServices
-from jacobian.sat_capabilities import (
+from jacobian.sat_smt.cadical import install_cadical_capabilities
+from jacobian.sat_smt.cvc5 import install_cvc5_capability
+from jacobian.sat_smt.sat_capabilities import (
     SatCnfMaterializationAdapter,
     install_sat_assignment_checker,
     install_sat_unsat_proof_checker,
 )
-from jacobian.sat_lrat_capabilities import install_sat_lrat_verifier
-from jacobian.smt_capabilities import install_smt_unsat_proof_checker
+from jacobian.sat_smt.sat_lrat import install_sat_lrat_verifier
+from jacobian.sat_smt.smt_capabilities import install_smt_unsat_proof_checker
 from jacobian.sympy_polynomial_normalization import (
     install_sympy_polynomial_normalization_capability,
 )

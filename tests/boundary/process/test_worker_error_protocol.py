@@ -8,7 +8,7 @@ import pytest
 from jacobian.canonical import loads_strict_json
 from jacobian.implementation import package_source_digest
 from jacobian.plugin_execution import _plugin_failure_detail
-from jacobian.verification import _checker_failure_detail
+from jacobian.verification._helpers import _checker_failure_detail
 
 
 @pytest.mark.parametrize(

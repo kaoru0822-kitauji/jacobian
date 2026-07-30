@@ -22,10 +22,10 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.lean import LeanDependencyGraphArtifact
 from jacobian.installation.context import InstallationContext
-from jacobian.lean import LeanService
-from jacobian.lean_declarations import installed_lean_declaration_service
-from jacobian.lean_exploration import install_lean_exploration_capabilities
-from jacobian.lean_proof_edit import install_lean_proof_edit_capability
+from jacobian.lean_frontend.declarations import installed_lean_declaration_service
+from jacobian.lean_frontend.exploration import install_lean_exploration_capabilities
+from jacobian.lean_frontend.proof_edit import install_lean_proof_edit_capability
+from jacobian.lean_frontend.service import LeanService
 from jacobian.portfolio.provider_resolution import ProviderAvailabilityResolver
 from jacobian.portfolio.result import PortfolioInstallation
 from jacobian.references import REFERENCE_INSTALLATION_DOMAINS

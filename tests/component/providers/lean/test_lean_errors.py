@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean import LeanService
+from jacobian.lean_frontend.service import LeanService
 from jacobian.references import LeanCheckerInstallation, reference_catalog
 
 

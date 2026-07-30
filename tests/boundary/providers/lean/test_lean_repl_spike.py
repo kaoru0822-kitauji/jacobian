@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-SPIKE = runpy.run_path(str(PROJECT_ROOT / "benchmarks" / "lean_repl_spike.py"))
+SPIKE = runpy.run_path(
+    str(PROJECT_ROOT / "benchmarks" / "provider_spikes" / "lean_repl_spike.py")
+)
 
 
 def test_repl_error_extraction_covers_protocol_and_lean_messages() -> None:

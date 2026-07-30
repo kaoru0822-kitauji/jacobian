@@ -27,7 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.lean import LeanDependencyGraphArtifact, LeanEnvironment
-from jacobian.lean_declarations import (
+from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackend,
     LeanDeclarationBackendError,
     LeanDeclarationService,

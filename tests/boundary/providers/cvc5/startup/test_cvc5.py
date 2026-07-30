@@ -21,7 +21,7 @@ from jacobian.provider_measurements import measure_provider
 from jacobian.providers.external_solver_runtime import cvc5_provider_runtime
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import JacobianRuntime
-from jacobian.smt import SmtArtifactError
+from jacobian.sat_smt.smt import SmtArtifactError
 
 # Provider lane owns readiness and isolation for this module.
 
@@ -258,7 +258,7 @@ def test_worker_proof_metadata_mismatch_fails_closed(
             timed_out=False,
         )
 
-    monkeypatch.setattr("jacobian.cvc5.run_bounded_process", fake_worker)
+    monkeypatch.setattr("jacobian.sat_smt.cvc5.run_bounded_process", fake_worker)
 
     result = _invoke(cvc5_runtime, _QF_UF_UNSAT)
 
@@ -274,7 +274,7 @@ def test_worker_timeout_fails_without_solver_conclusion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "jacobian.cvc5.run_bounded_process",
+        "jacobian.sat_smt.cvc5.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",

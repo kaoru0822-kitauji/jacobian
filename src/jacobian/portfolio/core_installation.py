@@ -11,20 +11,20 @@ from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.finite_coverage import install_finite_coverage
 from jacobian.finite_partition import install_finite_partition
 from jacobian.geometry_verification import install_geometry_checker
-from jacobian.graph_capabilities import install_graph_capabilities
-from jacobian.graph_coloring_capabilities import install_graph_coloring_capabilities
-from jacobian.graph_isomorphism import install_graph_isomorphism
-from jacobian.graph_shrinking import install_graph_shrinking
+from jacobian.graphs.capabilities import install_graph_capabilities
+from jacobian.graphs.coloring import install_graph_coloring_capabilities
+from jacobian.graphs.isomorphism import install_graph_isomorphism
+from jacobian.graphs.shrinking import install_graph_shrinking
 from jacobian.installation.context import InstallationContext
-from jacobian.matrix_capabilities import install_matrix_capabilities
-from jacobian.matrix_determinant_capabilities import install_matrix_determinant_checker
-from jacobian.matrix_rank_capabilities import install_matrix_rank_checker
+from jacobian.matrices.capabilities import install_matrix_capabilities
+from jacobian.matrices.determinant import install_matrix_determinant_checker
+from jacobian.matrices.rank import install_matrix_rank_checker
 from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.polynomial_capabilities import install_polynomial_capabilities
 from jacobian.polynomial_system_capabilities import (
     install_polynomial_system_capabilities,
 )
 from jacobian.polynomial_system_search import PolynomialSystemRationalSearchAdapter
+from jacobian.polynomials import install_polynomial_capabilities
 from jacobian.portfolio.builtin import build_builtin_portfolio
 from jacobian.portfolio.domain_installation import DomainBundleInstaller
 from jacobian.portfolio.model import PortfolioPlan

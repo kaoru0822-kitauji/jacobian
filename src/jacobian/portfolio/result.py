@@ -26,30 +26,29 @@ from jacobian.exact_domain_checkers import ExactDomainCheckerInstallation
 from jacobian.finite_coverage import FiniteCoverageInstallation
 from jacobian.finite_partition import FinitePartitionInstallation
 from jacobian.geometry_verification import GeometryCheckerInstallation
-from jacobian.graph_capabilities import GraphInstallation
-from jacobian.graph_coloring_capabilities import GraphColoringInstallation
-from jacobian.graph_composition_capabilities import GraphCompositionInstallation
-from jacobian.graph_isomorphism import GraphIsomorphismInstallation
-from jacobian.graph_shrinking import GraphShrinkingInstallation
-from jacobian.lean import LeanService
-from jacobian.lean_declarations import LeanDeclarationService
-from jacobian.lean_exploration import LeanExplorationInstallation
-from jacobian.lean_proof_edit import LeanProofEditInstallation
-from jacobian.lean_statement_capabilities import LeanStatementInstallation
-from jacobian.linear_capabilities import (
+from jacobian.graphs.capabilities import GraphInstallation
+from jacobian.graphs.coloring import GraphColoringInstallation
+from jacobian.graphs.composition import GraphCompositionInstallation
+from jacobian.graphs.isomorphism import GraphIsomorphismInstallation
+from jacobian.graphs.shrinking import GraphShrinkingInstallation
+from jacobian.lean_frontend.declarations import LeanDeclarationService
+from jacobian.lean_frontend.exploration import LeanExplorationInstallation
+from jacobian.lean_frontend.proof_edit import LeanProofEditInstallation
+from jacobian.lean_frontend.service import LeanService
+from jacobian.lean_frontend.statement import LeanStatementInstallation
+from jacobian.matrices.capabilities import MatrixInstallation
+from jacobian.matrices.determinant import (
+    MatrixDeterminantCheckerInstallation,
+)
+from jacobian.matrices.linear_capabilities import (
     LinearRationalInconsistencyCheckerInstallation,
     LinearRationalSolutionCheckerInstallation,
 )
-from jacobian.matrix_capabilities import MatrixInstallation
-from jacobian.matrix_determinant_capabilities import (
-    MatrixDeterminantCheckerInstallation,
-)
-from jacobian.matrix_normal_form_capabilities import (
+from jacobian.matrices.normal_form import (
     MatrixNormalFormCheckerInstallation,
 )
-from jacobian.matrix_rank_capabilities import MatrixRankCheckerInstallation
+from jacobian.matrices.rank import MatrixRankCheckerInstallation
 from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.polynomial_capabilities import PolynomialInstallation
 from jacobian.polynomial_expression_capabilities import (
     PolynomialExpressionCheckerInstallation,
 )
@@ -58,17 +57,18 @@ from jacobian.polynomial_positivity_capabilities import (
     PolynomialPositivityInstallation,
 )
 from jacobian.polynomial_system_capabilities import PolynomialSystemInstallation
+from jacobian.polynomials import PolynomialInstallation
 from jacobian.references import (
     LeanCheckerInstallation,
     PolytopeCheckerInstallation,
     ReferenceInstallation,
 )
-from jacobian.sat_capabilities import (
+from jacobian.sat_smt.sat_capabilities import (
     SatAssignmentCheckerInstallation,
     SatUnsatProofCheckerInstallation,
 )
-from jacobian.sat_lrat_capabilities import SatLratInstallation
-from jacobian.smt_capabilities import SmtUnsatProofCheckerInstallation
+from jacobian.sat_smt.sat_lrat import SatLratInstallation
+from jacobian.sat_smt.smt_capabilities import SmtUnsatProofCheckerInstallation
 from jacobian.universal_algebra_capabilities import UniversalAlgebraInstallation
 
 # Diagnostic codes follows the same convention as CapabilityDiagnostic codes.

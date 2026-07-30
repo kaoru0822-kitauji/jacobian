@@ -11,7 +11,7 @@ from tests.support.provider_lean import (
     pinned_lean_core_runtime_available,
 )
 
-import jacobian.lean_statement_capabilities as lean_statements
+import jacobian.lean_frontend.statement as lean_statements
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
@@ -21,7 +21,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.lean_statement import LeanElaborationOption
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.lean_statement_capabilities import (
+from jacobian.lean_frontend.statement import (
     LeanStatementCompareAdapter,
     LeanStatementProposalAdapter,
     install_lean_statement_capabilities,

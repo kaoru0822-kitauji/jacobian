@@ -23,8 +23,8 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderRuntime,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.flint_hnf import install_python_flint_hnf_capability
-from jacobian.matrix_normal_form_capabilities import (
+from jacobian.matrices.flint_hnf import install_python_flint_hnf_capability
+from jacobian.matrices.normal_form import (
     install_matrix_normal_form_checker,
 )
 from jacobian.providers.flint_runtime import python_flint_hnf_provider_runtime
@@ -282,7 +282,7 @@ def test_python_flint_hnf_timeout_is_operational(
 ) -> None:
     runtime = hnf_services
     monkeypatch.setattr(
-        "jacobian.flint_hnf.run_bounded_process",
+        "jacobian.matrices.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",
@@ -339,7 +339,7 @@ def test_hnf_worker_gets_only_fixed_environment_and_budget(
             timed_out=False,
         )
 
-    monkeypatch.setattr("jacobian.flint_hnf.run_bounded_process", fake_worker)
+    monkeypatch.setattr("jacobian.matrices.flint_hnf.run_bounded_process", fake_worker)
     result = _invoke(
         runtime,
         "matrix.normal_form.hermite",
@@ -371,11 +371,11 @@ def test_hnf_output_is_discarded_if_runtime_identity_changes(
     changed = original.model_copy(update={"digest": "sha256:" + "f" * 64})
     observations = iter((original, changed))
     monkeypatch.setattr(
-        "jacobian.flint_hnf.python_flint_hnf_provider_runtime",
+        "jacobian.matrices.flint_hnf.python_flint_hnf_provider_runtime",
         lambda **_kwargs: next(observations),
     )
     monkeypatch.setattr(
-        "jacobian.flint_hnf.run_bounded_process",
+        "jacobian.matrices.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=0,
             stdout=canonicalize_json(
@@ -415,7 +415,7 @@ def test_invalid_worker_protocol_retains_no_hnf_evidence(
 ) -> None:
     runtime = hnf_services
     monkeypatch.setattr(
-        "jacobian.flint_hnf.run_bounded_process",
+        "jacobian.matrices.flint_hnf.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=0,
             stdout=b'{"status":"NORMAL_FORM_PRODUCED"}\n',
@@ -451,7 +451,7 @@ def test_hnf_checker_timeout_is_operational(
         mode=CapabilityMode.EXPLORE,
     )
     monkeypatch.setattr(
-        "jacobian.verification.run_bounded_process",
+        "jacobian.verification.service.run_bounded_process",
         lambda *_args, **_kwargs: BoundedProcessResult(
             returncode=None,
             stdout=b"",

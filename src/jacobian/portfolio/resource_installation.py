@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from jacobian.contracts.capabilities import CapabilityProviderAvailability
-from jacobian.graph_composition_capabilities import (
+from jacobian.graphs.composition import (
     install_graph_composition_capabilities,
 )
 from jacobian.installation.context import InstallationContext
-from jacobian.lean_statement_capabilities import install_lean_statement_capabilities
+from jacobian.lean_frontend.statement import install_lean_statement_capabilities
 from jacobian.polynomial_interval_capabilities import (
     install_polynomial_interval_capabilities,
 )

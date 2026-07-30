@@ -32,7 +32,7 @@ from jacobian.contracts.results import (
     Method,
     Verification,
 )
-from jacobian.lean_declarations import (
+from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackendError,
     LeanSubprocessDeclarationBackend,
 )

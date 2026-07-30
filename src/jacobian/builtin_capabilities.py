@@ -36,11 +36,11 @@ from jacobian.contracts.results import (
     ExecutionStatus,
     Verification,
 )
-from jacobian.lean import LeanService
-from jacobian.lean_declarations import (
+from jacobian.lean_frontend.declarations import (
     LeanDeclarationBackendError,
     LeanDeclarationService,
 )
+from jacobian.lean_frontend.service import LeanService
 from jacobian.memory import ResearchMemory
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import model_schema
