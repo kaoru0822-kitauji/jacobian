@@ -241,6 +241,12 @@ class FormalDatasetArtifact(ContractModel):
 
     @model_validator(mode="after")
     def verify_provenance_bindings(self) -> Self:
+        self._verify_identity_and_digests()
+        self._verify_normalized_content()
+        self._verify_derived_provenance()
+        return self
+
+    def _verify_identity_and_digests(self) -> None:
         row_payload = self.canonical_row.model_dump(mode="json")
         if self.dataset_id != self.canonical_row.dataset_id:
             raise ValueError("dataset_id must match canonical_row")
@@ -260,6 +266,8 @@ class FormalDatasetArtifact(ContractModel):
             self.environment.model_dump(mode="json")
         ):
             raise ValueError("environment_digest must bind environment")
+
+    def _verify_normalized_content(self) -> None:
         expected_header = (
             _normalize_text(self.canonical_row.header)
             if self.canonical_row.header
@@ -288,6 +296,8 @@ class FormalDatasetArtifact(ContractModel):
         )
         if self.informal_proof != expected_proof:
             raise ValueError("informal_proof must bind canonical_row")
+
+    def _verify_derived_provenance(self) -> None:
         expected_preprocessing = formal_dataset_preprocessing(self.canonical_row)
         if self.preprocessing != expected_preprocessing:
             raise ValueError("preprocessing must describe the canonical pipeline")
@@ -296,7 +306,6 @@ class FormalDatasetArtifact(ContractModel):
             baseline=self.diagnostic_baseline,
         ):
             raise ValueError("diagnostics must match the declared environment")
-        return self
 
 
 def _json_digest(value: object) -> str:
