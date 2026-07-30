@@ -41,6 +41,7 @@ class _PendingRegistrations:
     schemas: dict[str, bytes] = field(default_factory=dict)
     registrations: dict[tuple[str, str, bytes], str] = field(default_factory=dict)
     model_contracts: dict[str, type[BaseModel]] = field(default_factory=dict)
+    producer_only_schemas: set[str] = field(default_factory=set)
 
 
 @lru_cache(maxsize=1024)
@@ -96,6 +97,7 @@ class SchemaRegistry:
     def __init__(self, store: ArtifactStore) -> None:
         self.store = store
         self._model_contracts: dict[str, type[BaseModel]] = {}
+        self._producer_only_schemas: set[str] = set()
         self._schema_bytes: dict[str, bytes] = {}
         self._registrations: dict[tuple[str, str, bytes], str] = {}
         self._pending: dict[int, _PendingRegistrations] = {}
@@ -151,6 +153,7 @@ class SchemaRegistry:
         name: str,
         version: str,
         model: type[BaseModel],
+        producer_only: bool = False,
     ) -> str:
         """Register JSON shape plus the model's cross-field contract.
 
@@ -166,7 +169,29 @@ class SchemaRegistry:
             schema=model_schema(model),
         )
         self._bind_model_contract(schema_uri, model)
+        if producer_only:
+            transaction_identity = self.store.transaction_identity
+            if transaction_identity is None:
+                self._producer_only_schemas.add(schema_uri)
+            else:
+                self._pending[transaction_identity].producer_only_schemas.add(
+                    schema_uri
+                )
         return schema_uri
+
+    def is_producer_only(self, schema_uri: str) -> bool:
+        """Return whether generic artifact writes are forbidden for this schema."""
+
+        self._reconcile_pending()
+        transaction_identity = self.store.transaction_identity
+        pending = (
+            self._pending.get(transaction_identity)
+            if transaction_identity is not None
+            else None
+        )
+        return schema_uri in self._producer_only_schemas or (
+            pending is not None and schema_uri in pending.producer_only_schemas
+        )
 
     def _bind_model_contract(
         self,
@@ -231,6 +256,7 @@ class SchemaRegistry:
             self._schema_bytes.update(pending.schemas)
             self._registrations.update(pending.registrations)
             self._model_contracts.update(pending.model_contracts)
+            self._producer_only_schemas.update(pending.producer_only_schemas)
             del self._pending[transaction_identity]
 
     def validate(self, schema_uri: str, payload: Any) -> Any:

@@ -37,6 +37,28 @@ class PortfolioPlan:
                 )
             if not bundle.domain_id:
                 raise ValueError("portfolio contains a bundle with a blank domain id")
+            if bundle.managed_installer is None:
+                if bundle.managed_capability_ids:
+                    raise ValueError(
+                        f"bundle {bundle.domain_id} declares managed capability IDs "
+                        "without a managed installer"
+                    )
+            else:
+                if bundle.capabilities:
+                    raise ValueError(
+                        f"managed bundle {bundle.domain_id} must not declare generic "
+                        "operations"
+                    )
+                if not bundle.managed_capability_ids:
+                    raise ValueError(
+                        f"managed bundle {bundle.domain_id} must declare capability IDs"
+                    )
+                if len(bundle.managed_capability_ids) != len(
+                    set(bundle.managed_capability_ids)
+                ):
+                    raise ValueError(
+                        f"managed bundle {bundle.domain_id} has duplicate capability IDs"
+                    )
             domain_ids.append(bundle.domain_id)
         duplicates = sorted(
             domain_id
