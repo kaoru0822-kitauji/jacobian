@@ -144,7 +144,9 @@ def main():
         and set(members) == wanted
         and actual == expected
     )
-    correct = bool(math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound))
+    correct = bool(
+        math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound)
+    )
     good_evidence = False
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good_evidence = True

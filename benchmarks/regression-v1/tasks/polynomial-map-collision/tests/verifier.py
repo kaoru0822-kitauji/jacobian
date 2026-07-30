@@ -111,7 +111,9 @@ def main():
         and r.get("image_q") == iq
         and ip == iq
     )
-    correct = bool(math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound))
+    correct = bool(
+        math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound)
+    )
     good = False
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good = True

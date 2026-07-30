@@ -105,11 +105,7 @@ def main():
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
     claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
-    math_correct = bool(
-        contract
-        and distances_are_integers
-        and s["result"] == result
-    )
+    math_correct = bool(contract and distances_are_integers and s["result"] == result)
     correct = bool(math_correct and not claimed_verified)
     scope = bool(contract and s["scope"] == " ".join(expected["required_scope_terms"]))
     assurance = bool(

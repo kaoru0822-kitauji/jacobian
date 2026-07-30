@@ -185,11 +185,7 @@ def main():
     )
     claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
     record_bound = _record_is_bound(s, x, a, sat) if isinstance(s, dict) else False
-    math_correct = bool(
-        contract
-        and result.get("status") == "SATISFIABLE"
-        and sat
-    )
+    math_correct = bool(contract and result.get("status") == "SATISFIABLE" and sat)
     correct = bool(math_correct and (not claimed_verified or record_bound))
     good = _answer_evidence(s) if contract else False
     if claimed_verified:

@@ -135,12 +135,10 @@ def main():
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
     record_bound = verification_record_is_bound(s) if isinstance(s, dict) else False
-    math_correct = bool(
-        contract
-        and got == want
-        and all(len(k) == 2 for k in got)
+    math_correct = bool(contract and got == want and all(len(k) == 2 for k in got))
+    correct = bool(
+        math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound)
     )
-    correct = bool(math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound))
     good = False
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good = True
