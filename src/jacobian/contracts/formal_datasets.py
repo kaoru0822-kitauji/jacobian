@@ -15,6 +15,10 @@ from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
 
 
 def _require_nfc(value: str) -> str:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValueError("value must be valid UTF-8 text") from exc
     if value != unicodedata.normalize("NFC", value):
         raise ValueError("value must be NFC-normalized")
     return value
@@ -119,12 +123,12 @@ class FormalProjectFile(ContractModel):
     @model_validator(mode="after")
     def require_safe_relative_path(self) -> Self:
         parts = self.path.split("/")
+        _require_nfc(self.path)
         if (
             self.path.startswith("/")
             or "\\" in self.path
             or "\x00" in self.path
             or any(part in {"", ".", ".."} for part in parts)
-            or self.path != unicodedata.normalize("NFC", self.path)
         ):
             raise ValueError("project file path must be canonical NFC and relative")
         return self
@@ -132,6 +136,7 @@ class FormalProjectFile(ContractModel):
 
 class FormalDatasetEnvironment(ContractModel):
     lean_version: str = Field(min_length=1, max_length=64)
+    project_source_url: DatasetSourceUrl
     project_revision: str = Field(min_length=1, max_length=128)
     mathlib_revision: str | None = Field(default=None, max_length=128)
     imports: tuple[BoundedFormalString, ...] = Field(default=(), max_length=128)
@@ -141,7 +146,7 @@ class FormalDatasetEnvironment(ContractModel):
 
     @model_validator(mode="after")
     def require_unique_ordered_bindings(self) -> Self:
-        for field_name in ("lean_version", "project_revision"):
+        for field_name in ("lean_version", "project_source_url", "project_revision"):
             value = getattr(self, field_name)
             if not value.strip():
                 raise ValueError(f"{field_name} must not be blank")
@@ -152,6 +157,7 @@ class FormalDatasetEnvironment(ContractModel):
                     raise ValueError(f"{field_name} must not be blank")
                 _require_nfc(value)
         _require_nfc(self.lean_version)
+        _require_nfc(self.project_source_url)
         _require_nfc(self.project_revision)
         if len(set(self.imports)) != len(self.imports):
             raise ValueError("imports must be unique and ordered")
@@ -302,6 +308,8 @@ def _text_digest(value: str) -> str:
 
 
 def _normalize_text(value: str) -> str:
+    if value == "":
+        return ""
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     normalized = "\n".join(lines)
     if not normalized.endswith("\n"):

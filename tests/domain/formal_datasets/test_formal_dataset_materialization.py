@@ -36,6 +36,7 @@ def _output(result) -> dict[str, object]:
 def _environment() -> dict[str, object]:
     return {
         "lean_version": LEAN_VERSION,
+        "project_source_url": "https://github.com/leanprover-community/mathlib4",
         "project_revision": "project-commit-123",
         "mathlib_revision": MATHLIB_COMMIT,
         "imports": ["Mathlib"],
@@ -179,6 +180,36 @@ def test_preprocessing_reports_only_transformations_that_occurred(
     output = _output(result)
     assert [item["applied"] for item in output["preprocessing"]] == [
         False,
+        False,
+        False,
+    ]
+
+
+@pytest.mark.parametrize("field", ("informal_statement", "informal_proof"))
+def test_empty_optional_text_is_preserved_without_a_reported_rewrite(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _minif2f_request()
+    assert isinstance(payload["row"], dict)
+    payload["row"]["informal_statement"] += "\n"
+    payload["row"]["informal_proof"] += "\n"
+    payload["row"][field] = ""
+    payload["row"]["header"] = "import Mathlib\n"
+    payload["row"]["formal_statement"] += "\n"
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.formal.materialize",
+            input=payload,
+        )
+    )
+
+    output = _output(result)
+    assert output[field] == ""
+    assert [item["applied"] for item in output["preprocessing"]] == [
+        True,
         False,
         False,
     ]

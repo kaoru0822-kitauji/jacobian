@@ -76,6 +76,9 @@ FORMAL_DATASET_BUNDLE = DomainBundle(
                         },
                         "environment": {
                             "lean_version": LEAN_VERSION,
+                            "project_source_url": (
+                                "https://example.invalid/formal-project"
+                            ),
                             "project_revision": "fixture-project-1",
                             "imports": [],
                             "project_files": [],

@@ -31,6 +31,8 @@ def _text_digest(value: str) -> str:
 
 
 def _normalize_text(value: str) -> str:
+    if value == "":
+        return ""
     normalized = value.replace("\r\n", "\n").replace("\r", "\n")
     return normalized if normalized.endswith("\n") else normalized + "\n"
 

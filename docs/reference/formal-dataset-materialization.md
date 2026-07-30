@@ -12,7 +12,7 @@ Every request supplies:
 
 - the dataset ID, immutable revision, sample ID, and source URL;
 - one dataset-specific row;
-- the required Lean version and project revision;
+- the required Lean version, project source URL, and project revision;
 - optional Mathlib revision;
 - ordered imports, namespace, theorem context, and project-file digests; and
 - an optional expected row digest for fail-closed source replay.
@@ -41,6 +41,7 @@ than interpreted heuristically.
     },
     "environment": {
       "lean_version": "4.31.0",
+      "project_source_url": "https://github.com/leanprover-community/mathlib4",
       "project_revision": "project-commit",
       "mathlib_revision": "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f",
       "imports": ["Mathlib"],

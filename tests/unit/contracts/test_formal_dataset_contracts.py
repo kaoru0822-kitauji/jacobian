@@ -24,6 +24,7 @@ def _request() -> dict[str, object]:
         },
         "environment": {
             "lean_version": "4.31.0",
+            "project_source_url": "https://example.invalid/formal-project",
             "project_revision": "fixture-project",
         },
     }
@@ -58,6 +59,7 @@ def test_environment_rejects_duplicate_replay_bindings() -> None:
     with pytest.raises(ValidationError, match="imports must be unique"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             imports=("Mathlib", "Mathlib"),
         )
@@ -65,6 +67,7 @@ def test_environment_rejects_duplicate_replay_bindings() -> None:
     with pytest.raises(ValidationError, match="project file paths must be unique"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             project_files=(
                 {"path": "lakefile.toml", "digest": "sha256:" + "a" * 64},
@@ -86,15 +89,17 @@ def test_environment_rejects_aliased_project_paths(path: str) -> None:
     with pytest.raises(ValidationError, match="canonical NFC and relative"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             project_files=({"path": path, "digest": "sha256:" + "a" * 64},),
         )
 
 
 def test_environment_rejects_non_nfc_and_oversized_items() -> None:
-    with pytest.raises(ValidationError, match="canonical NFC"):
+    with pytest.raises(ValidationError, match="NFC-normalized"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             project_files=(
                 {"path": "Cafe\u0301.lean", "digest": "sha256:" + "a" * 64},
@@ -103,12 +108,14 @@ def test_environment_rejects_non_nfc_and_oversized_items() -> None:
     with pytest.raises(ValidationError):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             imports=("I" * 2_001,),
         )
     with pytest.raises(ValidationError):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             theorem_context=("T" * 2_001,),
         )
@@ -126,6 +133,28 @@ def test_request_rejects_non_nfc_or_blank_formal_source() -> None:
     blank["row"]["formal_statement"] = " \n\t"
     with pytest.raises(ValidationError, match="formal_statement must not be blank"):
         FormalDatasetMaterializeRequest.model_validate(blank)
+
+
+@pytest.mark.parametrize(
+    ("container", "field"),
+    (
+        ("request", "source_url"),
+        ("row", "formal_statement"),
+        ("environment", "project_source_url"),
+        ("environment", "project_revision"),
+    ),
+)
+def test_request_rejects_text_that_is_not_utf8_encodable(
+    container: str,
+    field: str,
+) -> None:
+    payload = _request()
+    target = payload if container == "request" else payload[container]
+    assert isinstance(target, dict)
+    target[field] = "\ud800"
+
+    with pytest.raises(ValidationError):
+        FormalDatasetMaterializeRequest.model_validate(payload)
 
 
 @pytest.mark.parametrize("field", ("name", "goal"))
@@ -160,12 +189,14 @@ def test_environment_rejects_unicode_equivalent_replay_entries() -> None:
     with pytest.raises(ValidationError, match="NFC-normalized"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             imports=("Café", "Cafe\u0301"),
         )
     with pytest.raises(ValidationError, match="NFC-normalized"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             theorem_context=("Café", "Cafe\u0301"),
         )
@@ -176,6 +207,7 @@ def test_environment_rejects_blank_replay_entries(field: str) -> None:
     with pytest.raises(ValidationError, match="must not be blank"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
+            project_source_url="https://example.invalid/formal-project",
             project_revision="fixture",
             **{field: (" \n\t",)},
         )
@@ -187,6 +219,7 @@ def test_environment_rejects_blank_replay_entries(field: str) -> None:
         ("request", "dataset_revision"),
         ("request", "source_url"),
         ("environment", "project_revision"),
+        ("environment", "project_source_url"),
         ("environment", "namespace"),
     ),
 )
@@ -210,6 +243,7 @@ def test_request_rejects_non_nfc_scalar_provenance(
         ("request", "source_url"),
         ("environment", "lean_version"),
         ("environment", "project_revision"),
+        ("environment", "project_source_url"),
         ("environment", "mathlib_revision"),
         ("environment", "namespace"),
     ),
