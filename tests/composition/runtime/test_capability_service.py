@@ -16,6 +16,7 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityDescriptor,
     CapabilityDiscoveryRequest,
+    CapabilityInputKind,
     CapabilityInstallTier,
     CapabilityInvocationExample,
     CapabilityMode,
@@ -456,6 +457,253 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
     )
     assert absent.matches == ()
     assert absent.portfolio_fit == "NO_LEXICAL_MATCHES"
+
+
+def test_discovery_rejects_unsupported_natural_language_proof_routes(
+    capability_core_services: DomainTestServices,
+) -> None:
+    schema = {"type": "object"}
+    capability_core_services.installation.register_capability(
+        DiscoveryAdapter(
+            CapabilityDescriptor(
+                capability_id="fixture_sat.proof.verify",
+                version="1",
+                title="Verify a formal UNSAT proof",
+                description="Replay one structured formal proof certificate.",
+                provider="tests",
+                provider_runtime=TEST_RUNTIME,
+                modes=(CapabilityMode.VERIFY,),
+                input_schema=schema,
+                output_schema=schema,
+                tags=("proof", "verify"),
+            )
+        )
+    )
+    discovered = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query=(
+                "Independently verify this natural-language proof trace: "
+                "suppose n is even, so n = 2k."
+            ),
+            limit=20,
+        )
+    )
+
+    assert discovered.resolved_input_kind == (
+        CapabilityInputKind.NATURAL_LANGUAGE_PROOF
+    )
+    assert discovered.routing_status == "NO_ROUTE"
+    assert discovered.matches == ()
+    assert "No installed capability accepts" in discovered.routing_basis
+
+    formal_method = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="check a formal Lean proof by contradiction",
+            limit=20,
+        )
+    )
+    assert formal_method.resolved_input_kind is None
+    assert formal_method.routing_status == "UNFILTERED"
+
+    written_formal_proof = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="verify the written proof in Lean",
+            limit=20,
+        )
+    )
+    assert written_formal_proof.resolved_input_kind is None
+    assert written_formal_proof.routing_status == "UNFILTERED"
+
+    explicitly_structured = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="formal UNSAT proof",
+            mode=CapabilityMode.VERIFY,
+            input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
+            limit=20,
+        )
+    )
+    assert [match.capability_id for match in explicitly_structured.matches] == [
+        "fixture_sat.proof.verify"
+    ]
+    assert explicitly_structured.routing_status == "ROUTES_FOUND"
+
+    formal_intent = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="formal UNSAT proof",
+            mode=CapabilityMode.VERIFY,
+        )
+    )
+    assert formal_intent.resolved_input_kind is None
+    assert [match.capability_id for match in formal_intent.matches] == [
+        "fixture_sat.proof.verify"
+    ]
+
+    formal_trace = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="verify an LRAT proof trace",
+            mode=CapabilityMode.VERIFY,
+        )
+    )
+    assert formal_trace.resolved_input_kind is None
+
+
+def test_discovery_routes_only_declared_input_and_artifact_contracts(
+    capability_core_services: DomainTestServices,
+) -> None:
+    proof_schema_uri = "artifact://sha256/" + ("1" * 64)
+    other_schema_uri = "artifact://sha256/" + ("2" * 64)
+    schema = {
+        "type": "object",
+        "properties": {"value": {"type": "integer"}},
+        "required": ["value"],
+        "additionalProperties": False,
+    }
+    capability_core_services.installation.register_capability(
+        DiscoveryAdapter(
+            CapabilityDescriptor(
+                capability_id="fixture_claim.elaborate",
+                version="1",
+                title="Elaborate a formal proposition",
+                description="Accept formal proposition syntax.",
+                provider="tests",
+                provider_runtime=TEST_RUNTIME,
+                modes=(CapabilityMode.EXPLORE,),
+                input_schema=schema,
+                output_schema=schema,
+                tags=("formal", "proposition"),
+                accepted_input_kinds=(CapabilityInputKind.FORMAL_PROPOSITION,),
+            )
+        )
+    )
+    capability_core_services.installation.register_capability(
+        DiscoveryAdapter(
+            CapabilityDescriptor(
+                capability_id="fixture_claim.replay",
+                version="1",
+                title="Replay a typed proof artifact",
+                description="Accept one exact bound proof artifact.",
+                provider="tests",
+                provider_runtime=TEST_RUNTIME,
+                modes=(CapabilityMode.VERIFY,),
+                input_schema=schema,
+                output_schema=schema,
+                tags=("proof", "artifact"),
+                accepted_input_kinds=(CapabilityInputKind.TYPED_ARTIFACT,),
+                accepted_artifact_types=(proof_schema_uri,),
+            )
+        )
+    )
+    service = capability_core_services.core.capabilities
+
+    formal = service.discover(
+        CapabilityDiscoveryRequest(
+            query="formal proposition",
+            input_kind=CapabilityInputKind.FORMAL_PROPOSITION,
+        )
+    )
+    assert [match.capability_id for match in formal.matches] == [
+        "fixture_claim.elaborate"
+    ]
+    assert formal.routing_status == "ROUTES_FOUND"
+
+    typed = service.discover(
+        CapabilityDiscoveryRequest(
+            query="proof artifact",
+            mode=CapabilityMode.VERIFY,
+            input_kind=CapabilityInputKind.TYPED_ARTIFACT,
+            artifact_type=proof_schema_uri,
+        )
+    )
+    assert [match.capability_id for match in typed.matches] == ["fixture_claim.replay"]
+    assert typed.routing_status == "ROUTES_FOUND"
+
+    mismatched = service.discover(
+        CapabilityDiscoveryRequest(
+            query="proof artifact",
+            input_kind=CapabilityInputKind.TYPED_ARTIFACT,
+            artifact_type=other_schema_uri,
+        )
+    )
+    assert mismatched.matches == ()
+    assert mismatched.routing_status == "NO_ROUTE"
+
+    lexically_absent = service.discover(
+        CapabilityDiscoveryRequest(
+            query="quuxonium",
+            input_kind=CapabilityInputKind.FORMAL_PROPOSITION,
+        )
+    )
+    assert lexically_absent.matches == ()
+    assert lexically_absent.routing_status == "ROUTES_FOUND"
+    assert lexically_absent.portfolio_fit == "NO_LEXICAL_MATCHES"
+
+    incompatible_lexical_match = service.discover(
+        CapabilityDiscoveryRequest(
+            query="formal proposition",
+            input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
+        )
+    )
+    assert incompatible_lexical_match.matches == ()
+    assert incompatible_lexical_match.routing_status == "NO_ROUTE"
+    assert incompatible_lexical_match.portfolio_fit == "STRONG_CANDIDATES_FOUND"
+
+
+def test_discovery_artifact_type_requires_typed_artifact_input() -> None:
+    proof_schema_uri = "artifact://sha256/" + ("1" * 64)
+    with pytest.raises(
+        ValueError,
+        match="artifact_type requires input_kind=TYPED_ARTIFACT",
+    ):
+        CapabilityDiscoveryRequest(
+            query="proof artifact",
+            input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
+            artifact_type=proof_schema_uri,
+        )
+    with pytest.raises(
+        ValueError,
+        match="TYPED_ARTIFACT input requires artifact_type",
+    ):
+        CapabilityDiscoveryRequest(
+            query="proof artifact",
+            input_kind=CapabilityInputKind.TYPED_ARTIFACT,
+        )
+
+
+def test_descriptor_artifact_contract_requires_typed_artifact_input() -> None:
+    proof_schema_uri = "artifact://sha256/" + ("1" * 64)
+    with pytest.raises(
+        ValueError,
+        match="accepted artifact types require TYPED_ARTIFACT input",
+    ):
+        CapabilityDescriptor(
+            capability_id="fixture.invalid.artifact",
+            version="1",
+            title="Invalid artifact contract",
+            description="Invalid routing metadata fixture.",
+            provider="tests",
+            provider_runtime=TEST_RUNTIME,
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            accepted_artifact_types=(proof_schema_uri,),
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="TYPED_ARTIFACT input requires accepted artifact types",
+    ):
+        CapabilityDescriptor(
+            capability_id="fixture.invalid.typed-artifact",
+            version="1",
+            title="Invalid typed artifact contract",
+            description="Typed artifact routing requires an exact stored schema.",
+            provider="tests",
+            provider_runtime=TEST_RUNTIME,
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            accepted_input_kinds=(CapabilityInputKind.TYPED_ARTIFACT,),
+        )
 
 
 def test_capability_registration_rejects_an_invalid_invocation_example(

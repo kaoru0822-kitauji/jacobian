@@ -31,6 +31,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDiscoveryMatch,
     CapabilityDiscoveryRequest,
     CapabilityDiscoveryResult,
+    CapabilityInputKind,
     CapabilityMode,
     CapabilityObligationStatus,
     CapabilityProviderAvailability,
@@ -326,6 +327,11 @@ class CapabilityService:
         normalized_domain = (
             _normalize_domain(request.domain) if request.domain is not None else None
         )
+        resolved_input_kind = request.input_kind or _infer_discovery_input_kind(
+            request.query
+        )
+        contract_route_count = 0
+        lexical_candidates: list[CapabilityDiscoveryMatch] = []
         ranked: list[tuple[int, CapabilityDiscoveryMatch]] = []
         for descriptor in descriptors:
             if request.mode is not None and request.mode not in descriptor.modes:
@@ -335,6 +341,13 @@ class CapabilityService:
                 normalized_domain,
             ):
                 continue
+            input_compatible = _accepts_discovery_input(
+                descriptor,
+                resolved_input_kind,
+                request.artifact_type,
+            )
+            if input_compatible:
+                contract_route_count += 1
             (
                 score,
                 matched_on,
@@ -346,27 +359,24 @@ class CapabilityService:
                 descriptor,
                 request.query,
             )
-            if request.query is not None and score == 0:
-                continue
-            ranked.append(
-                (
-                    score,
-                    CapabilityDiscoveryMatch(
-                        capability_id=descriptor.capability_id,
-                        title=descriptor.title,
-                        description=descriptor.description,
-                        modes=descriptor.modes,
-                        tags=descriptor.tags,
-                        matched_on=matched_on,
-                        matched_terms=matched_terms,
-                        has_invocation_examples=bool(descriptor.invocation_examples),
-                        relevance_score=score,
-                        query_term_count=query_term_count,
-                        query_coverage_milli=query_coverage_milli,
-                        lexical_fit=lexical_fit,
-                    ),
-                )
+            match = CapabilityDiscoveryMatch(
+                capability_id=descriptor.capability_id,
+                title=descriptor.title,
+                description=descriptor.description,
+                modes=descriptor.modes,
+                tags=descriptor.tags,
+                matched_on=matched_on,
+                matched_terms=matched_terms,
+                has_invocation_examples=bool(descriptor.invocation_examples),
+                relevance_score=score,
+                query_term_count=query_term_count,
+                query_coverage_milli=query_coverage_milli,
+                lexical_fit=lexical_fit,
             )
+            if request.query is None or score > 0:
+                lexical_candidates.append(match)
+                if input_compatible:
+                    ranked.append((score, match))
         ranked.sort(key=lambda item: (-item[0], item[1].capability_id))
         total_matches = len(ranked)
         start = 0
@@ -390,40 +400,23 @@ class CapabilityService:
             if page and start + len(page) < total_matches
             else None
         )
-        portfolio_fit: Literal[
-            "UNFILTERED",
-            "STRONG_CANDIDATES_FOUND",
-            "ONLY_WEAK_LEXICAL_MATCHES",
-            "NO_LEXICAL_MATCHES",
-        ]
-        if request.query is None:
-            portfolio_fit = "UNFILTERED"
-            portfolio_fit_basis = (
-                "No query was supplied; results are an unranked installed-portfolio "
-                "listing and make no suitability claim."
-            )
-        elif not ranked:
-            portfolio_fit = "NO_LEXICAL_MATCHES"
-            portfolio_fit_basis = (
-                "No installed descriptor shared a meaningful query term. This is "
-                "not proof that the mathematical outcome is impossible."
-            )
-        elif any(match.lexical_fit == "STRONG_CANDIDATE" for _, match in ranked):
-            portfolio_fit = "STRONG_CANDIDATES_FOUND"
-            portfolio_fit_basis = (
-                "At least one installed descriptor has substantial lexical query "
-                "coverage; inspect its contract before treating it as suitable."
-            )
-        else:
-            portfolio_fit = "ONLY_WEAK_LEXICAL_MATCHES"
-            portfolio_fit_basis = (
-                "Installed results share only weak lexical evidence with the query. "
-                "Do not infer capability fit from top-N ordering alone."
-            )
+        portfolio_fit, portfolio_fit_basis = _discovery_portfolio_fit(
+            request.query,
+            lexical_candidates,
+        )
+        routing_status, routing_basis = _discovery_routing_status(
+            resolved_input_kind,
+            request.artifact_type,
+            contract_route_count,
+        )
         return CapabilityDiscoveryResult(
             query=request.query,
             domain=normalized_domain,
             mode=request.mode,
+            resolved_input_kind=resolved_input_kind,
+            artifact_type=request.artifact_type,
+            routing_status=routing_status,
+            routing_basis=routing_basis,
             matches=tuple(match for _, match in page),
             total_matches=total_matches,
             truncated=next_cursor is not None,
@@ -810,6 +803,96 @@ def _discovery_terms(query: str) -> frozenset[str]:
         for term in _DISCOVERY_TOKEN_PATTERN.findall(query.casefold())
         if term not in _DISCOVERY_STOP_WORDS
     )
+
+
+def _accepts_discovery_input(
+    descriptor: CapabilityDescriptor,
+    input_kind: CapabilityInputKind | None,
+    artifact_type: str | None,
+) -> bool:
+    return (input_kind is None or input_kind in descriptor.accepted_input_kinds) and (
+        artifact_type is None or artifact_type in descriptor.accepted_artifact_types
+    )
+
+
+def _discovery_portfolio_fit(
+    query: str | None,
+    lexical_candidates: list[CapabilityDiscoveryMatch],
+) -> tuple[
+    Literal[
+        "UNFILTERED",
+        "STRONG_CANDIDATES_FOUND",
+        "ONLY_WEAK_LEXICAL_MATCHES",
+        "NO_LEXICAL_MATCHES",
+    ],
+    str,
+]:
+    if query is None:
+        return (
+            "UNFILTERED",
+            "No query was supplied; results are an unranked installed-portfolio "
+            "listing and make no suitability claim.",
+        )
+    if not lexical_candidates:
+        return (
+            "NO_LEXICAL_MATCHES",
+            "No installed descriptor shared a meaningful query term. This is "
+            "not proof that the mathematical outcome is impossible.",
+        )
+    if any(match.lexical_fit == "STRONG_CANDIDATE" for match in lexical_candidates):
+        return (
+            "STRONG_CANDIDATES_FOUND",
+            "At least one installed descriptor has substantial lexical query "
+            "coverage; inspect its contract before treating it as suitable.",
+        )
+    return (
+        "ONLY_WEAK_LEXICAL_MATCHES",
+        "Installed results share only weak lexical evidence with the query. "
+        "Do not infer capability fit from top-N ordering alone.",
+    )
+
+
+def _discovery_routing_status(
+    input_kind: CapabilityInputKind | None,
+    artifact_type: str | None,
+    route_count: int,
+) -> tuple[Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"], str]:
+    if input_kind is None:
+        return (
+            "UNFILTERED",
+            "No input kind was declared or safely inferred; inspect the selected "
+            "capability contract before invocation.",
+        )
+    artifact_basis = (
+        f" and artifact type {artifact_type!r}." if artifact_type is not None else "."
+    )
+    if route_count:
+        return (
+            "ROUTES_FOUND",
+            "Installed routes match the declared or safely inferred input kind"
+            + artifact_basis,
+        )
+    return (
+        "NO_ROUTE",
+        "No installed capability accepts the declared or safely inferred input kind"
+        + artifact_basis,
+    )
+
+
+def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None:
+    """Conservatively recognize prose that must not enter formal proof routes."""
+
+    if query is None:
+        return None
+    normalized = " ".join(_DISCOVERY_TOKEN_PATTERN.findall(query.casefold()))
+    phrases = (
+        "natural language proof",
+        "informal proof",
+        "proof prose",
+    )
+    if any(phrase in normalized for phrase in phrases):
+        return CapabilityInputKind.NATURAL_LANGUAGE_PROOF
+    return None
 
 
 def _token_set(value: str) -> frozenset[str]:

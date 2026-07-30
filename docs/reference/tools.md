@@ -145,6 +145,16 @@ In particular, top-N ordering among `WEAK_LEXICAL_MATCH` entries must not be
 treated as capability fit. Start with five results, inspect only the strongest
 one or two relevant contracts, then search again only when useful.
 
+Discovery can also be constrained by `input_kind`. Installed descriptors
+declare whether they accept a structured request, formal proposition, or typed
+artifact. A typed artifact search also supplies the exact `schema_uri` from its
+stored artifact manifest as `artifact_type`.
+General natural-language proof prose is not a formal artifact: declaring
+`NATURAL_LANGUAGE_PROOF`, or using an unambiguous phrase such as “informal
+proof” or “proof prose,” returns typed `NO_ROUTE` unless an installed provider
+explicitly accepts that input. The response's `routing_status` and
+`routing_basis` are separate from lexical `portfolio_fit`.
+
 Call `capability.describe` again with one returned `capability_id` to receive
 the default `SUMMARY` exact projection. It is for judging fit and contains the
 one-line outcome, modes, tags, provider availability, input/output field
