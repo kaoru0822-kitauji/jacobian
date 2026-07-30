@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from jacobian.formal_datasets import install_formal_dataset_capability
 from jacobian.graph_composition_capabilities import (
     install_graph_composition_capabilities,
 )
@@ -29,15 +28,6 @@ class ResourceCapabilityInstaller:
         ctx = self.context
         if result.graph is None:
             raise RuntimeError("graph capabilities must precede resource installation")
-        formal_dataset_adapter, result.formal_datasets = (
-            install_formal_dataset_capability(
-                ctx.store,
-                ctx.schemas,
-                ctx.artifacts,
-            )
-        )
-        ctx.register_capability(formal_dataset_adapter)
-
         graph_adapters, result.graph_composition = (
             install_graph_composition_capabilities(
                 ctx.store,

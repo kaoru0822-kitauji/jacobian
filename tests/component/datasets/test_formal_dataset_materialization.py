@@ -10,7 +10,9 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
+from jacobian.domains.formal_datasets import FORMAL_DATASET_BUNDLE
 from jacobian.formal_datasets import install_formal_dataset_capability
+from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
@@ -192,3 +194,70 @@ def test_artifact_tampering_is_detected_by_store(tmp_path: Path) -> None:
 
     assert stored.payload["row_digest"] == result.output["row_digest"]
     assert stored.payload["environment_digest"] == result.output["environment_digest"]
+
+
+def test_materialization_preserves_split_leading_lines_and_nfc(tmp_path: Path) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _proofnet_request()
+    assert isinstance(payload["row"], dict)
+    payload["row"]["header"] = "\nimport Mathlib\n"
+    payload["row"]["formal_statement"] = (
+        'theorem analysis_1 : "e\u0301" = "é" := by rfl'
+    )
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.formal.materialize",
+            input=payload,
+        )
+    )
+
+    assert result.output["split"] == "test"
+    assert result.output["canonical_row"]["split"] == "test"
+    assert result.output["normalized_source"].startswith("\nimport Mathlib\n")
+    assert "e\u0301" not in result.output["normalized_source"]
+    stored = adapter.store.get(result.output["artifact_uri"])
+    assert stored.payload["normalized_source"] == result.output["normalized_source"]
+
+
+def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    schemas = SchemaRegistry(store)
+    artifacts = ArtifactService(store, schemas)
+    installation = OperationInstaller(store, schemas, artifacts).install(
+        FORMAL_DATASET_BUNDLE
+    )
+    adapter = installation.adapters[0]
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.formal.materialize",
+            input=_proofnet_request(),
+        )
+    )
+    replay = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.formal.materialize",
+            input=_proofnet_request(),
+        )
+    )
+    assert result.output == replay.output
+    assert result.output["result"]["split"] == "test"
+    assert result.output["result"]["canonical_row"]["split"] == "test"
+    result_uri = result.output["result_uri"]
+    stored = store.get(result_uri)
+    tampered = dict(stored.payload)
+    tampered["row_digest"] = "sha256:" + "0" * 64
+
+    with pytest.raises(ValueError):
+        artifacts.put(
+            schema_uri=installation.result_schema_uris["dataset.formal.materialize"],
+            semantics_uri=installation.semantics_uri,
+            payload=tampered,
+        )
+
+
+def test_formal_dataset_capability_is_owned_by_domain_bundle() -> None:
+    assert FORMAL_DATASET_BUNDLE.domain_id == "formal_datasets"
+    assert tuple(
+        operation.capability_id for operation in FORMAL_DATASET_BUNDLE.capabilities
+    ) == ("dataset.formal.materialize",)

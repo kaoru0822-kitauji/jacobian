@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import unicodedata
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, model_validator
 
+from jacobian.canonical import canonicalize_json
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 
@@ -47,9 +50,9 @@ class FormalProjectFile(ContractModel):
             self.path.startswith("/")
             or "\\" in self.path
             or "\x00" in self.path
-            or ".." in parts
+            or any(part in {"", ".", ".."} for part in parts)
         ):
-            raise ValueError("project file path must be a safe relative path")
+            raise ValueError("project file path must be canonical and relative")
         return self
 
 
@@ -114,6 +117,8 @@ class FormalDatasetArtifact(ContractModel):
     dataset_revision: str
     sample_id: str
     source_url: str
+    split: str
+    canonical_row: FormalDatasetRow
     row_digest: Sha256Digest
     normalized_source_digest: Sha256Digest
     normalized_source: str
@@ -128,6 +133,71 @@ class FormalDatasetArtifact(ContractModel):
     diagnostics: tuple[FormalDatasetDiagnostic, ...]
     assurance: Literal["UNVERIFIED"] = "UNVERIFIED"
 
+    @model_validator(mode="after")
+    def verify_provenance_bindings(self) -> Self:
+        row_payload = self.canonical_row.model_dump(mode="json")
+        if self.dataset_id != self.canonical_row.dataset_id:
+            raise ValueError("dataset_id must match canonical_row")
+        if self.sample_id != self.canonical_row.name:
+            raise ValueError("sample_id must match canonical_row")
+        if self.split != self.canonical_row.split:
+            raise ValueError("split must match canonical_row")
+        if self.row_digest != _json_digest(row_payload):
+            raise ValueError("row_digest must bind canonical_row")
+        if self.normalized_source != unicodedata.normalize(
+            "NFC", self.normalized_source
+        ):
+            raise ValueError("normalized_source must be NFC-normalized")
+        if self.normalized_source_digest != _text_digest(self.normalized_source):
+            raise ValueError("normalized_source_digest must bind normalized_source")
+        if self.environment_digest != _json_digest(
+            self.environment.model_dump(mode="json")
+        ):
+            raise ValueError("environment_digest must bind environment")
+        expected_header = (
+            _normalize_text(self.canonical_row.header)
+            if self.canonical_row.header
+            else ""
+        )
+        expected_formal = _normalize_text(self.canonical_row.formal_statement)
+        if self.header != expected_header:
+            raise ValueError("header must be the normalized canonical-row header")
+        if self.formal_statement != expected_formal:
+            raise ValueError(
+                "formal_statement must be the normalized canonical-row statement"
+            )
+        if self.normalized_source != f"{expected_header}{expected_formal}":
+            raise ValueError("normalized_source must bind header and formal_statement")
+        expected_informal = (
+            _normalize_text(self.canonical_row.informal_statement)
+            if self.canonical_row.informal_statement is not None
+            else None
+        )
+        if self.informal_statement != expected_informal:
+            raise ValueError("informal_statement must bind canonical_row")
+        expected_proof = (
+            _normalize_text(self.canonical_row.informal_proof)
+            if self.canonical_row.informal_proof is not None
+            else None
+        )
+        if self.informal_proof != expected_proof:
+            raise ValueError("informal_proof must bind canonical_row")
+        return self
+
 
 class FormalDatasetMaterializeOutput(FormalDatasetArtifact):
     artifact_uri: ArtifactUri
+
+
+def _json_digest(value: object) -> str:
+    return "sha256:" + hashlib.sha256(canonicalize_json(value)).hexdigest()
+
+
+def _text_digest(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _normalize_text(value: str) -> str:
+    lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    normalized = "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
+    return unicodedata.normalize("NFC", normalized)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 from dataclasses import dataclass
 
 from pydantic import ValidationError
@@ -31,6 +32,10 @@ from jacobian.contracts.formal_datasets import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
+from jacobian.operations import (
+    ComputedNotApplicable,
+    ComputedSuccess,
+)
 from jacobian.provider_runtime import jacobian_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -47,7 +52,8 @@ def _text_digest(value: str) -> str:
 
 def _normalize_text(value: str) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "\n".join(line.rstrip() for line in lines).strip("\n") + "\n"
+    normalized = "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
+    return unicodedata.normalize("NFC", normalized)
 
 
 def _diagnostics(
@@ -97,6 +103,76 @@ def _diagnostics(
             )
         )
     return tuple(diagnostics)
+
+
+def _materialize_payload(
+    validated: FormalDatasetMaterializeRequest,
+) -> FormalDatasetArtifact:
+    row_payload = validated.row.model_dump(mode="json")
+    row_digest = _json_digest(row_payload)
+    header = _normalize_text(validated.row.header) if validated.row.header else ""
+    formal_statement = _normalize_text(validated.row.formal_statement)
+    normalized_source = f"{header}{formal_statement}"
+    environment_payload = validated.environment.model_dump(mode="json")
+    return FormalDatasetArtifact(
+        dataset_id=validated.row.dataset_id,
+        dataset_revision=validated.dataset_revision,
+        sample_id=validated.sample_id,
+        source_url=validated.source_url,
+        split=validated.row.split,
+        canonical_row=validated.row,
+        row_digest=row_digest,
+        normalized_source_digest=_text_digest(normalized_source),
+        normalized_source=normalized_source,
+        formal_statement=formal_statement,
+        informal_statement=(
+            _normalize_text(validated.row.informal_statement)
+            if validated.row.informal_statement is not None
+            else None
+        ),
+        informal_proof=(
+            _normalize_text(validated.row.informal_proof)
+            if validated.row.informal_proof is not None
+            else None
+        ),
+        header=header,
+        environment=validated.environment,
+        environment_digest=_json_digest(environment_payload),
+        preprocessing=(
+            FormalPreprocessingDecision(
+                operation="NORMALIZE_NEWLINES",
+                applied=True,
+            ),
+            FormalPreprocessingDecision(
+                operation="TRIM_TRAILING_WHITESPACE",
+                applied=True,
+            ),
+            FormalPreprocessingDecision(
+                operation="ENSURE_FINAL_NEWLINE",
+                applied=True,
+            ),
+        ),
+        diagnostics=_diagnostics(validated),
+    )
+
+
+def _materialize_operation(
+    validated: FormalDatasetMaterializeRequest,
+) -> ComputedSuccess[FormalDatasetArtifact] | ComputedNotApplicable:
+    payload = _materialize_payload(validated)
+    if (
+        validated.expected_row_digest is not None
+        and validated.expected_row_digest != payload.row_digest
+    ):
+        return ComputedNotApplicable(
+            CapabilityDiagnostic(
+                code="FORMAL_DATASET_ROW_DIGEST_MISMATCH",
+                stage="source_binding",
+                message="The supplied row does not match expected_row_digest.",
+                hint="Re-fetch the pinned row or update the digest explicitly.",
+            )
+        )
+    return ComputedSuccess(payload)
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,8 +257,8 @@ class FormalDatasetMaterializeAdapter:
                 )
             ) from exc
 
-        row_payload = validated.row.model_dump(mode="json")
-        row_digest = _json_digest(row_payload)
+        artifact_payload = _materialize_payload(validated)
+        row_digest = artifact_payload.row_digest
         if (
             validated.expected_row_digest is not None
             and validated.expected_row_digest != row_digest
@@ -196,49 +272,6 @@ class FormalDatasetMaterializeAdapter:
                 )
             )
 
-        header = _normalize_text(validated.row.header) if validated.row.header else ""
-        formal_statement = _normalize_text(validated.row.formal_statement)
-        normalized_source = f"{header}{formal_statement}"
-        preprocessing = (
-            FormalPreprocessingDecision(
-                operation="NORMALIZE_NEWLINES",
-                applied=True,
-            ),
-            FormalPreprocessingDecision(
-                operation="TRIM_TRAILING_WHITESPACE",
-                applied=True,
-            ),
-            FormalPreprocessingDecision(
-                operation="ENSURE_FINAL_NEWLINE",
-                applied=True,
-            ),
-        )
-        environment_payload = validated.environment.model_dump(mode="json")
-        artifact_payload = FormalDatasetArtifact(
-            dataset_id=validated.row.dataset_id,
-            dataset_revision=validated.dataset_revision,
-            sample_id=validated.sample_id,
-            source_url=validated.source_url,
-            row_digest=row_digest,
-            normalized_source_digest=_text_digest(normalized_source),
-            normalized_source=normalized_source,
-            formal_statement=formal_statement,
-            informal_statement=(
-                _normalize_text(validated.row.informal_statement)
-                if validated.row.informal_statement is not None
-                else None
-            ),
-            informal_proof=(
-                _normalize_text(validated.row.informal_proof)
-                if validated.row.informal_proof is not None
-                else None
-            ),
-            header=header,
-            environment=validated.environment,
-            environment_digest=_json_digest(environment_payload),
-            preprocessing=preprocessing,
-            diagnostics=_diagnostics(validated),
-        )
         artifact = self.artifacts.put(
             schema_uri=self.artifact_schema_uri,
             semantics_uri=self.semantics_uri,
@@ -303,10 +336,10 @@ def install_formal_dataset_capability(
             "verification": "none; materialization never establishes theorem truth",
         },
     )
-    artifact_schema_uri = schemas.register(
+    artifact_schema_uri = schemas.register_model(
         name="jacobian.formal-dataset-row",
         version="1",
-        schema=FormalDatasetArtifact.model_json_schema(),
+        model=FormalDatasetArtifact,
     )
     return (
         FormalDatasetMaterializeAdapter(

@@ -56,10 +56,16 @@ than interpreted heuristically.
 
 ## Replay and diagnostics
 
-The adapter normalizes line endings, removes trailing whitespace, and ensures
-one final newline. It binds separate SHA-256 digests for the canonical source
-row, normalized Lean source, and declared execution environment. Repeating the
-same request produces the same normalized source, digests, and artifact URI.
+The domain-owned producer normalizes line endings, removes trailing whitespace,
+normalizes Unicode to NFC, preserves leading blank lines, and ensures one final
+newline. It binds separate SHA-256 digests for the complete canonical source
+row, normalized Lean source, and declared execution environment. The artifact
+retains the dataset split explicitly. Repeating the same request produces the
+same normalized source, digests, and result artifact URI.
+
+As a standard domain operation, the capability response places the
+materialized record under `output.result` and exposes its content-addressed
+artifact as `output.result_uri`.
 
 The output explicitly reports `NOT_EXECUTED`. Version mismatches and missing
 project-file bindings produce typed diagnostics so a caller can provision the

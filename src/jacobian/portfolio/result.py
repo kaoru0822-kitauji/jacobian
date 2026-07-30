@@ -24,7 +24,6 @@ from jacobian.contracts.lean import LeanEnvironment
 from jacobian.exact_domain_checkers import ExactDomainCheckerInstallation
 from jacobian.finite_coverage import FiniteCoverageInstallation
 from jacobian.finite_partition import FinitePartitionInstallation
-from jacobian.formal_datasets import FormalDatasetInstallation
 from jacobian.geometry_verification import GeometryCheckerInstallation
 from jacobian.graph_capabilities import GraphInstallation
 from jacobian.graph_coloring_capabilities import GraphColoringInstallation
@@ -250,9 +249,6 @@ class PortfolioInstallation:
     # --- Finite ---
     finite_partition: FinitePartitionInstallation | None = None
     finite_coverage: FiniteCoverageInstallation | None = None
-
-    # --- Datasets ---
-    formal_datasets: FormalDatasetInstallation | None = None
 
     # --- Domain bundles ---
     domain_bundles: dict[str, InstalledDomainBundle] = field(default_factory=dict)

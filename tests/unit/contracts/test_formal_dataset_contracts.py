@@ -69,3 +69,21 @@ def test_environment_rejects_duplicate_replay_bindings() -> None:
                 {"path": "lakefile.toml", "digest": "sha256:" + "b" * 64},
             ),
         )
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "lake/./lakefile.toml",
+        "lake//lakefile.toml",
+        "./lakefile.toml",
+        "lake/",
+    ),
+)
+def test_environment_rejects_aliased_project_paths(path: str) -> None:
+    with pytest.raises(ValidationError, match="canonical and relative"):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            project_files=({"path": path, "digest": "sha256:" + "a" * 64},),
+        )
