@@ -73,3 +73,18 @@ def test_lean_resolution_preserves_installed_checker_profile_inputs(
         "profiles": profiles,
         "checker_ids": ("lean.mathlib",),
     }
+
+
+def test_lean_frontend_resolution_uses_dedicated_health_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = known_provider_runtime("lean-frontend")
+    monkeypatch.setattr(
+        provider_resolution,
+        "lean_frontend_provider_runtime",
+        lambda: expected,
+    )
+
+    runtime = ProviderAvailabilityResolver().resolve_lean_frontend()
+
+    assert runtime is expected

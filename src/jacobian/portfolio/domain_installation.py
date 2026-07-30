@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from jacobian.contracts.capabilities import CapabilityProviderAvailability
 from jacobian.installation.context import InstallationContext
 from jacobian.operation_installation import InstalledDomainBundle
+from jacobian.operations import DomainBundle
 from jacobian.portfolio.model import PortfolioPlan
 from jacobian.portfolio.result import (
     PROVIDER_UNAVAILABLE,
@@ -31,9 +32,7 @@ class DomainBundleInstaller:
         diagnostics: list[PortfolioDiagnostic] = []
         outcomes: list[BundleInstallation] = []
         for bundle in plan.domain_bundles:
-            capability_ids = tuple(
-                operation.capability_id for operation in bundle.capabilities
-            )
+            capability_ids = bundle.capability_ids
             runtime = bundle.provider_runtime
             if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
                 diagnostic = PortfolioDiagnostic(
@@ -54,7 +53,11 @@ class DomainBundleInstaller:
                 )
                 continue
 
-            installation = self.context.operations.install(bundle)
+            if bundle.managed_installer is None:
+                installation = self.context.operations.install(bundle)
+            else:
+                installation = bundle.managed_installer(self.context)
+                _validate_managed_installation(bundle, installation)
             installed[bundle.domain_id] = installation
             for adapter in installation.adapters:
                 self.context.register_capability(adapter)
@@ -72,4 +75,28 @@ class DomainBundleInstaller:
             installed=installed,
             diagnostics=tuple(diagnostics),
             outcomes=tuple(outcomes),
+        )
+
+
+def _validate_managed_installation(
+    bundle: DomainBundle,
+    installation: InstalledDomainBundle,
+) -> None:
+    installed_ids = tuple(
+        adapter.descriptor.capability_id for adapter in installation.adapters
+    )
+    if installed_ids != bundle.capability_ids:
+        raise ValueError(
+            f"managed bundle {bundle.domain_id} installed capability IDs "
+            f"{installed_ids!r}, expected {bundle.capability_ids!r}"
+        )
+    mismatched_providers = tuple(
+        adapter.descriptor.capability_id
+        for adapter in installation.adapters
+        if adapter.descriptor.provider_runtime != bundle.provider_runtime
+    )
+    if mismatched_providers:
+        raise ValueError(
+            f"managed bundle {bundle.domain_id} installed adapters with provider "
+            f"runtimes that differ from the bundle: {mismatched_providers!r}"
         )

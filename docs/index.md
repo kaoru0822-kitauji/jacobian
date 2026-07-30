@@ -55,51 +55,18 @@ complete a specific task.
 ## Reference
 
 Reference documents define exact interfaces, records, gates, and test
-expectations.
+expectations. Start with the [tool surface](reference/tools.md) for the public
+MCP contract and the
+[domain operation library](reference/domain-operation-library.md) for the
+shared built-in operation contract. Use the runtime `capability://catalog` and
+`capability.describe` for the installed capability inventory and exact
+operation schemas.
 
-- [Tool surface](reference/tools.md)
-- [Domain operation library](reference/domain-operation-library.md)
-- [Finite probability operations](reference/finite-probability-operations.md)
-- [Bounded Gaussian polynomial moments](reference/gaussian-polynomial-moments.md)
-- [Small exact graph reliability](reference/graph-reliability.md)
-- [Declared graph-symmetry orbits](reference/graph-symmetry-orbits.md)
-- [Exact planar geometry](reference/exact-planar-geometry.md)
-- [Finite simplicial topology](reference/finite-simplicial-topology.md)
-- [Certified Smith normal form and integral homology](reference/certified-smith-integral-homology.md)
-- [Finite posets](reference/finite-posets.md)
-- [Recurrences and rational generating series](reference/recurrences-and-generating-series.md)
-- [Provider runtime contract](reference/provider-runtime.md)
-- [Lean declaration discovery](reference/lean-declaration-discovery.md)
-- [Lean formal intermediates](reference/lean-formal-intermediates.md)
-- [SAT artifact contracts](reference/sat-artifacts.md)
-- [SMT Alethe artifact contracts](reference/smt-artifacts.md)
-- [Exact rational linear-system evidence](reference/linear-rational-solutions.md)
-- [Exact rational matrix determinants](reference/matrix-rational-determinant.md)
-- [Graph counterexample shrinking](reference/graph-counterexample-shrinking.md)
-- [Fixed-registry graph invariant batches](reference/graph-invariant-batch.md)
-- [Maximum-matching certificate and verification](reference/graph-maximum-matching.md)
-- [Graph diameter and radius verification](reference/graph-metric-verification.md)
-- [Graph distance matrix](reference/graph-distance-matrix.md)
-- [Integer prime-factorization verification](reference/integer-prime-factorization-verification.md)
-- [Powerful-number decision](reference/integer-powerful-number-decision.md)
-- [Bounded finite exactly-once coverage](reference/finite-coverage-verification.md)
-- [Integer matrix Hermite normal form](reference/matrix-hermite-normal-form.md)
-- [Typed polynomial expression normalization](reference/polynomial-expression-normalization.md)
-- [Polynomial-map inverse verification](reference/polynomial-map-inverse-verification.md)
-- [Formal-dataset materialization](reference/formal-dataset-materialization.md)
-- [Polynomial-map Keller and inverse-obstruction verification](reference/polynomial-map-conjecture-verification.md)
-- [Lean statement proposal and elaboration](reference/lean-statement-elaboration.md)
-- [Replayable Lean proof-state transitions](reference/lean-replayable-proof-states.md)
-- [v0.2 specification](reference/specifications/v0.2.md)
-- [v0.2 conformance specification](reference/conformance-v0.2.md)
-- [Plugin conformance contract](reference/plugin-conformance.md)
-- [Mathematical scenario catalog](reference/math-scenarios.md)
-- [Reference benchmarks](reference/benchmarks.md)
-- [Performance benchmark protocol](reference/performance-benchmarks.md)
-- [Testing strategy](reference/testing-strategy.md)
-- [Agent evaluation protocol](reference/agent-evaluations.md)
-- [Capability workflow evaluation plan](reference/capability-workflow-evaluations.md)
-- [Capability development handoffs](reference/capability-development-handoffs.md)
+Capability-specific references live with their owning domain or provider.
+They are intentionally not registered in this shared landing page: adding an
+operation or provider must not require editing a central documentation list.
+Release, conformance, benchmark, evaluation, and contributor references are
+linked from the control documents and workflows that own them.
 
 ## Explanation
 

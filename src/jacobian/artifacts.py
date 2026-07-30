@@ -40,9 +40,15 @@ class ArtifactService:
         payload: Any,
         parents: tuple[str, ...] | list[str] = (),
         summary: str = "",
+        producer_write: bool = False,
     ) -> ArtifactPutResult:
         """Validate and store one artifact under its schema and semantics."""
 
+        if self.schemas.is_producer_only(schema_uri) and not producer_write:
+            raise ArtifactValidationError(
+                "This artifact schema is producer-only. Invoke its owning "
+                "capability instead of artifact.put."
+            )
         try:
             normalized = self.schemas.validate(schema_uri, payload)
             self.store.get_descriptor(
