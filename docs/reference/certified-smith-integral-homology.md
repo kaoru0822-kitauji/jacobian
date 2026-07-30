@@ -62,7 +62,7 @@ changes visible instead of retaining only the diagonal.
 The request is bounded to 1–16 rows, 1–16 columns, canonical decimal integer
 strings, and 32 input digits per entry. Certificate matrices support explicit
 zero dimensions for reuse in chain-complex witnesses. Every output integer is
-bounded to 4,096 digits. Complete request validation occurs before computation
+bounded to 32,768 digits. Complete request validation occurs before computation
 or artifact writes.
 
 The implementation uses exact elementary row and column operations and has no

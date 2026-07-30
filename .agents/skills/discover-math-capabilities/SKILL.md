@@ -56,6 +56,12 @@ is explicitly requested. Commit generalized process guidance, stable
 reproduction fixtures, benchmark cases, contracts, and implementation—not a
 one-off URL inventory.
 
+When a public case is ready for reproducible agent evaluation, hand its frozen
+statement, provenance, contamination class, expected mathematical outcome, and
+independent checking boundary to `evaluate-math-capabilities` and the local
+`harbor-benchmarks` skill. Discovery does not own Harbor task packaging, task
+digests, Oracle execution, or model-comparison claims.
+
 ## Inspect Jacobian first
 
 Read `AGENTS.md`, then consult these files as needed:

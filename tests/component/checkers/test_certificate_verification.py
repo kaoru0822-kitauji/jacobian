@@ -110,7 +110,7 @@ def _certificate_case(
             scope.artifact_uri,
         ),
     )
-    registry = CheckerRegistry(store.db_path)
+    registry = CheckerRegistry(store)
     registry.authorize(
         name="graph-path-enumeration-v1",
         entrypoint="jacobian_checkers.graph_paths:check_path_enumeration",

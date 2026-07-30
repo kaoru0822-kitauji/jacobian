@@ -1,6 +1,9 @@
 .DEFAULT_GOAL := help
 
 UV_RUN := uv run --locked
+HARBOR_VERSION ?= 0.20.0
+HARBOR_RUNNER ?= uvx --from harbor==$(HARBOR_VERSION) harbor
+HARBOR_PYTHON ?= uvx --from harbor==$(HARBOR_VERSION) python
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
@@ -14,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-architecture test-plan test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -37,6 +40,10 @@ fix: ## Apply Ruff fixes and formatting.
 lint: ## Run the fast Ruff lint and format checks.
 	$(UV_RUN) ruff check $(RUFF_PATHS)
 	$(UV_RUN) ruff format --check $(RUFF_PATHS)
+	$(MAKE) complexity-check
+
+complexity-check: ## Reject new, increased, or stale C901 baseline entries.
+	$(UV_RUN) python tools/check_complexity.py
 
 lint-full: lint ## Add dependency and dead-code checks.
 	$(UV_RUN) deptry .
@@ -54,6 +61,9 @@ test-architecture: ## Enforce semantic test-layer and provider-import boundaries
 test-plan: ## Print local validation selected for BASE..HEAD and working changes.
 	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-plan BASE=origin/main)" >&2; exit 2; }
 	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"
+
+test-changed: ## Run changed-path tests, defaulting BASE to origin/main.
+	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(or $(BASE),origin/main)" --execute
 
 define run_topology_lane
 	PYTEST_ADDOPTS="$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)" \
@@ -123,7 +133,7 @@ duplicate-code: ## Run the CI duplicate-code detector locally.
 
 npm-test: ## Run the npm package tests and dry-run pack.
 	npm test --prefix npm
-	npm pack --dry-run --prefix npm
+	npm pack --dry-run ./npm
 
 todo-check: ## Fail on TODO comments that do not reference an issue.
 	@violations="$$(rg -n 'TODO' --type py src/ tests/ | rg -v 'TODO\(#\d+\)' || true)"; \
@@ -149,8 +159,25 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
-agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
-	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)
+harbor-check: ## Verify committed Harbor task digests against local task contents.
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py
+
+agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
+	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \
+		echo "Model execution is opt-in. Review the job, then run: make agent-eval EVAL_EXECUTE=1"; \
+		exit 0; \
+	fi; \
+	image=$${JACOBIAN_IMAGE:-}; \
+	if ! printf '%s\n' "$$image" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then \
+		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
+		exit 2; \
+	fi; \
+	if [ -z "$${JACOBIAN_MCP_TOKEN:-}" ] || [ -z "$${JACOBIAN_AUTH_TOKENS_JSON:-}" ] || [ -z "$${JACOBIAN_MODEL:-}" ]; then \
+		echo "JACOBIAN_MCP_TOKEN, JACOBIAN_AUTH_TOKENS_JSON, and JACOBIAN_MODEL must be exported" >&2; \
+		exit 2; \
+	fi; \
+	$(MAKE) harbor-check && \
+	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-jacobian.json $(EVAL_ARGS)
 
 bench-core: ## Run the core performance benchmark script.
 	$(UV_RUN) python benchmarks/benchmark_core.py

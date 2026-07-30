@@ -72,15 +72,22 @@ from jacobian.contracts.polynomials import (
     PolynomialJacobianOutput,
     PolynomialJacobianReplayPayload,
     PolynomialJacobianRequest,
+    PolynomialKellerConditionClaim,
+    PolynomialKellerConditionReplayPayload,
+    PolynomialKellerConditionVerifyOutput,
+    PolynomialKellerConditionVerifyRequest,
     PolynomialMapCompositionResiduals,
     PolynomialMapEvaluation,
     PolynomialMapInverseClaim,
+    PolynomialMapInverseCollisionVerifyOutput,
+    PolynomialMapInverseCollisionVerifyRequest,
     PolynomialMapInverseReplayPayload,
     PolynomialMapInverseSynthesisArtifact,
     PolynomialMapInverseSynthesisOutput,
     PolynomialMapInverseSynthesisRequest,
     PolynomialMapInverseVerifyOutput,
     PolynomialMapInverseVerifyRequest,
+    PolynomialNoTwoSidedInverseClaim,
     RationalPolynomial,
     RationalPolynomialMap,
     RationalPolynomialPoint,
@@ -158,6 +165,8 @@ class PolynomialInstallation:
     right_polynomial_schema_uri: str
     left_polynomial_schema_uri: str
     identity_claim_schema_uri: str
+    keller_claim_schema_uri: str
+    inverse_collision_claim_schema_uri: str
     inverse_claim_schema_uri: str
     inverse_residual_schema_uri: str
     inverse_synthesis_schema_uri: str
@@ -167,8 +176,10 @@ class PolynomialInstallation:
     factorization_schema_uri: str
     collision_checker_id: str | None
     jacobian_checker_id: str | None
+    keller_checker_id: str | None
     identity_checker_id: str | None
     inverse_checker_id: str | None
+    inverse_collision_checker_id: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,10 +202,12 @@ def install_polynomial_capabilities(
     tuple[
         PolynomialMapEvaluationAdapter,
         PolynomialJacobianAdapter,
+        PolynomialKellerConditionVerifyAdapter,
         PolynomialCollisionAdapter,
         PolynomialIdentityAdapter,
         PolynomialCollisionSearchAdapter,
         PolynomialCollisionVerifyAdapter,
+        PolynomialMapInverseCollisionVerifyAdapter,
         PolynomialFactorAdapter,
         PolynomialMapInverseSynthesizeAdapter,
         PolynomialMapInverseVerifyAdapter,
@@ -325,6 +338,16 @@ def install_polynomial_capabilities(
         version="1",
         schema=model_schema(PolynomialIdentityClaim),
     )
+    keller_claim_schema_uri = schemas.register(
+        name="jacobian.polynomial-map-keller-condition-claim",
+        version="1",
+        schema=model_schema(PolynomialKellerConditionClaim),
+    )
+    inverse_collision_claim_schema_uri = schemas.register(
+        name="jacobian.polynomial-map-no-two-sided-inverse-claim",
+        version="1",
+        schema=model_schema(PolynomialNoTwoSidedInverseClaim),
+    )
     inverse_claim_schema_uri = schemas.register(
         name="jacobian.polynomial-map-inverse-claim",
         version="1",
@@ -396,6 +419,27 @@ def install_polynomial_capabilities(
         )
         .checker_id
     )
+    keller_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact polynomial-map Keller-condition checker",
+                entrypoint="jacobian_checkers.polynomial_maps:check_keller_condition",
+                evidence_kind=EvidenceKind.CERTIFICATE,
+                format_id="polynomial.map.keller_condition.replay",
+                format_version="1",
+                claim_schema_uris=(keller_claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(jacobian_schema_uri,),
+                reason=(
+                    "bundled independent exact checker for a nonzero constant "
+                    "polynomial-map Jacobian determinant"
+                ),
+            ),
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     identity_checker_id = (
         CheckerInstaller(checkers)
         .install(
@@ -432,6 +476,29 @@ def install_polynomial_capabilities(
         )
         .checker_id
     )
+    inverse_collision_checker_id = (
+        CheckerInstaller(checkers)
+        .install(
+            CheckerOperation(
+                name="exact polynomial-map inverse-obstruction checker",
+                entrypoint=(
+                    "jacobian_checkers.polynomial_maps:check_collision_refutes_inverse"
+                ),
+                evidence_kind=EvidenceKind.WITNESS,
+                format_id="polynomial.map_collision_refutes_inverse",
+                format_version="1",
+                claim_schema_uris=(inverse_collision_claim_schema_uri,),
+                semantics_uris=(semantics_uri,),
+                candidate_schema_uris=(map_schema_uri,),
+                reason=(
+                    "bundled independent exact collision replay whose logical "
+                    "consequence is absence of a two-sided polynomial inverse"
+                ),
+            ),
+            authorize=authorize_checker,
+        )
+        .checker_id
+    )
     installation = PolynomialInstallation(
         semantics_uri=semantics_uri,
         polynomial_semantics_uri=polynomial_semantics_uri,
@@ -446,6 +513,8 @@ def install_polynomial_capabilities(
         right_polynomial_schema_uri=right_polynomial_schema_uri,
         left_polynomial_schema_uri=left_polynomial_schema_uri,
         identity_claim_schema_uri=identity_claim_schema_uri,
+        keller_claim_schema_uri=keller_claim_schema_uri,
+        inverse_collision_claim_schema_uri=inverse_collision_claim_schema_uri,
         inverse_claim_schema_uri=inverse_claim_schema_uri,
         inverse_residual_schema_uri=inverse_residual_schema_uri,
         inverse_synthesis_schema_uri=inverse_synthesis_schema_uri,
@@ -455,8 +524,10 @@ def install_polynomial_capabilities(
         factorization_schema_uri=factorization_schema_uri,
         collision_checker_id=collision_checker_id,
         jacobian_checker_id=jacobian_checker_id,
+        keller_checker_id=keller_checker_id,
         identity_checker_id=identity_checker_id,
         inverse_checker_id=inverse_checker_id,
+        inverse_collision_checker_id=inverse_collision_checker_id,
     )
     resources = PolynomialResources(
         store=store,
@@ -468,12 +539,22 @@ def install_polynomial_capabilities(
         (
             PolynomialMapEvaluationAdapter(resources),
             PolynomialJacobianAdapter(resources),
+            *(
+                (PolynomialKellerConditionVerifyAdapter(resources),)
+                if keller_checker_id is not None
+                else ()
+            ),
             PolynomialCollisionAdapter(resources),
             PolynomialIdentityAdapter(resources),
             PolynomialCollisionSearchAdapter(resources),
             *(
                 (PolynomialCollisionVerifyAdapter(resources),)
                 if collision_checker_id is not None
+                else ()
+            ),
+            *(
+                (PolynomialMapInverseCollisionVerifyAdapter(resources),)
+                if inverse_collision_checker_id is not None
                 else ()
             ),
             PolynomialFactorAdapter(resources),
@@ -774,6 +855,218 @@ class PolynomialJacobianAdapter:
             completeness_basis=(
                 "every partial derivative and the exact determinant were computed"
             ),
+        )
+
+
+class PolynomialKellerConditionVerifyAdapter:
+    """Verify the exact nonzero-constant Jacobian condition over QQ."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        checker_id = resources.installation.keller_checker_id
+        assert checker_id is not None
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.map.keller_condition.verify",
+            version="1",
+            title="Verify a polynomial-map Keller condition",
+            description=(
+                "Independently replay the exact Jacobian of a sparse square map "
+                "over QQ and decide whether its determinant is a nonzero constant."
+            ),
+            provider="jacobian.polynomial-keller-checker",
+            provider_runtime=known_provider_runtime(
+                "jacobian.polynomial-keller-checker",
+                features=("exact-rational-keller-condition",),
+                checker_ids=(checker_id,),
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=model_schema(PolynomialKellerConditionVerifyRequest),
+            output_schema=model_schema(PolynomialKellerConditionVerifyOutput),
+            tags=("polynomial", "map", "jacobian", "Keller", "verification"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="identity_keller_condition",
+                    description=(
+                        "Verify the identity map's constant nonzero Jacobian "
+                        "determinant over QQ."
+                    ),
+                    mode=CapabilityMode.VERIFY,
+                    input=PolynomialKellerConditionVerifyRequest.model_validate(
+                        {
+                            "map": {
+                                "variables": ["x"],
+                                "coordinates": [
+                                    {
+                                        "terms": [
+                                            {
+                                                "coefficient": {
+                                                    "num": "1",
+                                                    "den": "1",
+                                                },
+                                                "exponents": [1],
+                                            }
+                                        ]
+                                    }
+                                ],
+                            }
+                        }
+                    ).model_dump(mode="json"),
+                ),
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialKellerConditionVerifyRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_KELLER_CONDITION_REQUEST",
+            operation="Keller-condition verification",
+        )
+        checker_id = self.resources.installation.keller_checker_id
+        if checker_id is None:
+            raise _polynomial_error(
+                "POLYNOMIAL_KELLER_CHECKER_UNAVAILABLE",
+                "keller_condition_verification",
+                "No authorized polynomial Keller-condition checker is installed.",
+            )
+        jacobian_result = PolynomialJacobianAdapter(self.resources).invoke(
+            CapabilityRequest(
+                capability_id="polynomial.map.compute_jacobian",
+                mode=CapabilityMode.EXPLORE,
+                input={"map": validated.map.model_dump(mode="json")},
+            )
+        )
+        jacobian = PolynomialJacobianOutput.model_validate(jacobian_result.output)
+        map_uri = jacobian.map_uri
+        jacobian_uri = jacobian.jacobian_uri
+        claim = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.keller_claim_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=PolynomialKellerConditionClaim(
+                map_uri=map_uri,
+                jacobian_uri=jacobian_uri,
+            ).model_dump(mode="json"),
+            parents=(map_uri, jacobian_uri),
+            summary="polynomial-map Keller-condition claim",
+        )
+        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        map_artifact = self.resources.store.get(map_uri)
+        jacobian_artifact = self.resources.store.get(jacobian_uri)
+        replay_payload = PolynomialKellerConditionReplayPayload(
+            map_uri=map_uri,
+            jacobian_uri=jacobian_uri,
+        ).model_dump(mode="json")
+        certificate = CertificateEnvelope(
+            certificate_type="polynomial.map.keller_condition.replay",
+            format_version="1",
+            bindings=EvidenceBindings(
+                claim_digest=claim.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=jacobian_artifact.manifest.object_digest,
+                scope_digest=map_artifact.manifest.object_digest,
+            ),
+            payload_digest=(
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(replay_payload)).hexdigest()
+            ),
+            payload=replay_payload,
+        )
+        certificate_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.certificate_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=certificate.model_dump(mode="json"),
+            parents=(claim.artifact_uri, jacobian_uri, map_uri),
+            summary="exact polynomial-map Keller-condition replay certificate",
+        )
+        checked = self.resources.verification.verify_certificate(
+            certificate_uri=certificate_artifact.artifact_uri,
+            checker_id=checker_id,
+        )
+        verified = checked.verification_record_uri is not None
+        conclusion = checked.conclusion
+        condition = {
+            Conclusion.TRUE: True,
+            Conclusion.FALSE: False,
+            Conclusion.UNKNOWN: None,
+        }[conclusion]
+        output = PolynomialKellerConditionVerifyOutput(
+            keller_condition_verified=condition if verified else None,
+            conclusion=conclusion if verified else Conclusion.UNKNOWN,
+            map_uri=map_uri,
+            jacobian_uri=jacobian_uri,
+            claim_uri=claim.artifact_uri,
+            certificate_uri=certificate_artifact.artifact_uri,
+            determinant=jacobian.determinant,
+            verification_record_uri=checked.verification_record_uri,
+            checker_id=checker_id,
+        )
+        artifact_uris = list(
+            dict.fromkeys(
+                (
+                    *jacobian_result.artifact_uris,
+                    claim.artifact_uri,
+                    certificate_artifact.artifact_uri,
+                )
+            )
+        )
+        if checked.verification_record_uri is not None:
+            artifact_uris.append(checked.verification_record_uri)
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="nonzero-constant Jacobian condition for one QQ map",
+                parameters={"map_uri": map_uri},
+                artifact_uri=map_uri,
+            ),
+            completeness=(
+                CapabilityCompleteness(
+                    status=CapabilityCompletenessStatus.COMPLETE,
+                    basis=(
+                        "the full sparse Jacobian and determinant were replayed "
+                        "independently"
+                    ),
+                    assurance_level=CapabilityAssuranceLevel.COMPUTED,
+                )
+                if verified
+                else CapabilityCompleteness(
+                    status=CapabilityCompletenessStatus.UNKNOWN,
+                    basis="the independent Keller-condition checker did not accept",
+                )
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id="polynomial.relation.keller-condition",
+                    source_artifact_uris=(map_uri,),
+                    target_artifact_uris=(jacobian_uri,),
+                    status=CapabilityRelationshipStatus.VERIFIED,
+                    verification_record_uri=checked.verification_record_uri,
+                ),
+            )
+            if verified and conclusion is Conclusion.TRUE
+            else (),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+                basis=(
+                    "accepted by the authorized independent exact Keller-condition "
+                    "checker"
+                    if verified
+                    else "the independent Keller-condition checker did not accept"
+                ),
+                verification_record_uri=checked.verification_record_uri,
+            ),
+            artifact_uris=tuple(artifact_uris),
         )
 
 
@@ -1378,6 +1671,164 @@ class PolynomialCollisionVerifyAdapter:
                     "accepted by the authorized independent Fraction-based checker"
                     if verified
                     else "the checker did not accept the claimed collision"
+                ),
+                verification_record_uri=checked.verification_record_uri,
+            ),
+            artifact_uris=tuple(artifact_uris),
+        )
+
+
+class PolynomialMapInverseCollisionVerifyAdapter:
+    """Verify that an exact collision rules out a two-sided inverse over QQ."""
+
+    def __init__(self, resources: PolynomialResources) -> None:
+        self.resources = resources
+        checker_id = resources.installation.inverse_collision_checker_id
+        assert checker_id is not None
+        self._descriptor = CapabilityDescriptor(
+            capability_id="polynomial.map.inverse.refute_by_collision",
+            version="1",
+            title="Refute a polynomial-map inverse by collision",
+            description=(
+                "Independently replay two distinct rational preimages with the "
+                "same image and bind that collision to the absence of a two-sided "
+                "polynomial inverse over QQ."
+            ),
+            provider="jacobian.polynomial-inverse-obstruction-checker",
+            provider_runtime=known_provider_runtime(
+                "jacobian.polynomial-inverse-obstruction-checker",
+                features=("exact-rational-collision", "inverse-obstruction"),
+                checker_ids=(checker_id,),
+            ),
+            modes=(CapabilityMode.VERIFY,),
+            input_schema=model_schema(PolynomialMapInverseCollisionVerifyRequest),
+            output_schema=model_schema(PolynomialMapInverseCollisionVerifyOutput),
+            tags=("polynomial", "map", "inverse", "collision", "verification"),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        validated = _validate_request(
+            PolynomialMapInverseCollisionVerifyRequest,
+            request.input,
+            code="INVALID_POLYNOMIAL_MAP_INVERSE_COLLISION_REQUEST",
+            operation="polynomial-map inverse obstruction",
+        )
+        checker_id = self.resources.installation.inverse_collision_checker_id
+        if checker_id is None:
+            raise _polynomial_error(
+                "POLYNOMIAL_INVERSE_COLLISION_CHECKER_UNAVAILABLE",
+                "inverse_obstruction_verification",
+                "No authorized collision inverse-obstruction checker is installed.",
+            )
+        _, map_uri = _materialize_map(self.resources, validated.map)
+        map_artifact = self.resources.store.get(map_uri)
+        candidate = self.resources.store.get(map_uri)
+        claim = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.inverse_collision_claim_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=PolynomialNoTwoSidedInverseClaim(
+                map_uri=map_uri,
+            ).model_dump(mode="json"),
+            parents=(map_uri,),
+            summary="polynomial-map no-two-sided-inverse claim",
+        )
+        semantics = self.resources.store.get(self.resources.installation.semantics_uri)
+        witness = WitnessEnvelope(
+            witness_format="polynomial.map_collision_refutes_inverse",
+            format_version="1",
+            role=WitnessRole.SUPPORTS_CLAIM,
+            bindings=EvidenceBindings(
+                claim_digest=claim.object_digest,
+                semantics_digest=semantics.manifest.object_digest,
+                candidate_digest=candidate.manifest.object_digest,
+            ),
+            payload=PolynomialCollisionPayload(
+                first_point=validated.first_point,
+                second_point=validated.second_point,
+                image=validated.claimed_image,
+            ).model_dump(mode="json"),
+        )
+        witness_artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.installation.witness_schema_uri,
+            semantics_uri=self.resources.installation.semantics_uri,
+            payload=witness.model_dump(mode="json"),
+            parents=(claim.artifact_uri, map_uri),
+            summary="exact collision obstructing a two-sided polynomial inverse",
+        )
+        checked = self.resources.verification.verify_witness(
+            claim_uri=claim.artifact_uri,
+            candidate_uri=map_uri,
+            witness_uri=witness_artifact.artifact_uri,
+            checker_id=checker_id,
+        )
+        verified = (
+            checked.verification_record_uri is not None
+            and checked.conclusion is Conclusion.TRUE
+        )
+        output = PolynomialMapInverseCollisionVerifyOutput(
+            noninvertibility_verified=verified if verified else None,
+            conclusion=Conclusion.TRUE if verified else Conclusion.UNKNOWN,
+            verification_input=checked.input,
+            map_uri=map_uri,
+            claim_uri=claim.artifact_uri,
+            witness_uri=witness_artifact.artifact_uri,
+            verification_record_uri=checked.verification_record_uri,
+            checker_id=checker_id,
+            first_point=validated.first_point,
+            second_point=validated.second_point,
+            claimed_image=validated.claimed_image,
+        )
+        artifact_uris = [map_artifact.artifact_uri, claim.artifact_uri]
+        artifact_uris.append(witness_artifact.artifact_uri)
+        if checked.verification_record_uri is not None:
+            artifact_uris.append(checked.verification_record_uri)
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=checked.execution,
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="one direct collision over QQ",
+                parameters={"map_uri": map_uri},
+                artifact_uri=map_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=CapabilityCompletenessStatus.NOT_APPLICABLE,
+                basis=(
+                    "a direct collision makes no bounded-search or global "
+                    "enumeration claim"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            relationships=(
+                CapabilityRelationship(
+                    relation_id=(
+                        "polynomial.relation.collision-refutes-two-sided-inverse"
+                    ),
+                    source_artifact_uris=(witness_artifact.artifact_uri,),
+                    target_artifact_uris=(claim.artifact_uri,),
+                    status=CapabilityRelationshipStatus.VERIFIED,
+                    verification_record_uri=checked.verification_record_uri,
+                ),
+            )
+            if verified
+            else (),
+            assurance=CapabilityAssurance(
+                level=(
+                    CapabilityAssuranceLevel.VERIFIED
+                    if verified
+                    else CapabilityAssuranceLevel.HEURISTIC
+                ),
+                basis=(
+                    "accepted by the authorized independent collision "
+                    "inverse-obstruction checker"
+                    if verified
+                    else "the independent inverse-obstruction checker did not accept"
                 ),
                 verification_record_uri=checked.verification_record_uri,
             ),
@@ -2413,6 +2864,10 @@ def _solve_inverse_system(
     *,
     timeout_ms: int,
 ) -> tuple[str, dict[Any, Any] | None]:
+    # Spawn is used (not fork) because the Jacobian runtime is multi-threaded.
+    # fork() in a multi-threaded process can deadlock and is deprecated in
+    # Python 3.14+.  The spawn cost (~30ms plus SymPy re-import) is accepted
+    # as the price of process isolation for this unbounded solver.
     context = multiprocessing.get_context("spawn")
     result_queue = context.Queue(maxsize=1)
     process = context.Process(

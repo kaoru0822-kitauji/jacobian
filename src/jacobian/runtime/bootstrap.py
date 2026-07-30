@@ -46,7 +46,7 @@ def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreService
             )
         memory = ResearchMemory(store, schemas)
         workspaces = WorkspaceService(store, schemas)
-        plugins = PluginRegistry(store)
+        plugins = PluginRegistry(store, schemas)
         checkers = CheckerRegistry(store)
         checkers.bind_existing_when_omitted = (
             options.checker_authority is CheckerAuthorityMode.HYDRATE_EXISTING

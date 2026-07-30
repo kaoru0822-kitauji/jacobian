@@ -50,8 +50,8 @@ int unique_reproduction() {
       {Point(FT(4), FT(0)), 1},
       {Point(FT(5), FT(3)), 2},
       {Point(FT(2), FT(5)), 3},
-      {Point(FT(-1), FT(3)), 4},
-      {Point(FT(3) / FT(2), FT(2)), 5},
+      {Point(FT(-1), FT(4)), 4},
+      {Point(FT(3) / FT(2), FT(5) / FT(2)), 5},
   };
   Delaunay triangulation;
   triangulation.insert(sites.begin(), sites.end());

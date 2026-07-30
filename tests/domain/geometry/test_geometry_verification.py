@@ -35,7 +35,7 @@ class _GeometryRuntime:
         self.store = ArtifactStore(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
-        self.checkers = CheckerRegistry(self.store.db_path)
+        self.checkers = CheckerRegistry(self.store)
         self.verification = VerificationService(self.store, self.checkers)
         self.capabilities = CapabilityService(
             self.store, ResearchMemory(self.store, self.schemas)

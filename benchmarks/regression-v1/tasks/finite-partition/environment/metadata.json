@@ -1,0 +1,1 @@
+{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:058a953f55dfbb537df91e94244944488ef78c6a4ecf9add0fef3b140aaeb5b2","derivation_note":"Hand-designed finite coverage contract; no external source is loaded at runtime."}

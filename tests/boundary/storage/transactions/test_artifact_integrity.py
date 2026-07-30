@@ -100,42 +100,38 @@ def test_repeated_put_validates_without_blob_or_metadata_writes(
         summary="candidate",
     )
 
-    original_connect = store._connect
+    def deny_metadata_writes(
+        action: int,
+        _argument_one: str | None,
+        _argument_two: str | None,
+        _database: str | None,
+        _trigger: str | None,
+    ) -> int:
+        if action in {
+            sqlite3.SQLITE_DELETE,
+            sqlite3.SQLITE_INSERT,
+            sqlite3.SQLITE_UPDATE,
+        }:
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
 
-    def connect_read_only() -> sqlite3.Connection:
-        connection = original_connect()
-
-        def deny_metadata_writes(
-            action: int,
-            _argument_one: str | None,
-            _argument_two: str | None,
-            _database: str | None,
-            _trigger: str | None,
-        ) -> int:
-            if action in {
-                sqlite3.SQLITE_DELETE,
-                sqlite3.SQLITE_INSERT,
-                sqlite3.SQLITE_UPDATE,
-            }:
-                return sqlite3.SQLITE_DENY
-            return sqlite3.SQLITE_OK
-
+    with store.connection() as connection:
         connection.set_authorizer(deny_metadata_writes)
-        return connection
-
-    monkeypatch.setattr(store, "_connect", connect_read_only)
 
     def reject_blob_write(_data: bytes) -> str:
         pytest.fail("an idempotent put must not publish blobs")
 
     monkeypatch.setattr(store, "_write_blob", reject_blob_write)
 
-    repeated = store.put(
-        schema_uri=schema,
-        semantics_uri=semantics,
-        payload={"value": "unchanged"},
-        summary="candidate",
-    )
+    try:
+        repeated = store.put(
+            schema_uri=schema,
+            semantics_uri=semantics,
+            payload={"value": "unchanged"},
+            summary="candidate",
+        )
+    finally:
+        connection.set_authorizer(None)
 
     assert repeated == expected
 

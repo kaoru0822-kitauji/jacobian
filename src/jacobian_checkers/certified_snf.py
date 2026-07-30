@@ -13,7 +13,9 @@ _INTEGER = re.compile(r"^(?:0|-?[1-9][0-9]*)$")
 _MAX_DIMENSION = 32
 _MAX_INPUT_DIMENSION = 16
 _MAX_INPUT_DIGITS = 32
-_MAX_OUTPUT_DIGITS = 4_096
+_MAX_OUTPUT_DIGITS = 32_768
+_DECIMAL_CHUNK_DIGITS = 9
+_DECIMAL_CHUNK_BASE = 1_000_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +70,15 @@ def _canonical_integer(value: object, *, maximum_digits: int) -> int:
         or len(value.lstrip("-")) > maximum_digits
     ):
         raise ValueError("integer encoding lies outside the checker scope")
-    return int(value)
+    negative = value.startswith("-")
+    digits = value[1:] if negative else value
+    first = len(digits) % _DECIMAL_CHUNK_DIGITS or _DECIMAL_CHUNK_DIGITS
+    parsed = int(digits[:first])
+    for offset in range(first, len(digits), _DECIMAL_CHUNK_DIGITS):
+        parsed = parsed * _DECIMAL_CHUNK_BASE + int(
+            digits[offset : offset + _DECIMAL_CHUNK_DIGITS]
+        )
+    return -parsed if negative else parsed
 
 
 def parse_matrix(value: object, *, maximum_digits: int) -> ParsedMatrix:

@@ -147,3 +147,45 @@ def test_maximum_certified_smith_payload_stays_within_artifact_budget(
     sizes = [len(canonicalize_json(artifact.payload)) for artifact in artifacts]
     assert all(size < 10 * 1024 * 1024 for size in sizes)
     assert sum(sizes) < 8 * 1024 * 1024
+
+
+def test_dense_bounded_input_can_materialize_large_basis_changes(
+    domain_services: DomainTestServices,
+) -> None:
+    random = Random(2)
+    entries = [
+        [str(random.randrange(-(10**31), 10**31)) for _column in range(16)]
+        for _row in range(16)
+    ]
+
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="matrix.normal_form.smith.certified.compute",
+            input={
+                "matrix": {
+                    "row_count": 16,
+                    "column_count": 16,
+                    "entries": entries,
+                }
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.COMPLETED
+    certificate = result.output["result"]["certificate"]
+    result_integers = [
+        value
+        for matrix_name in (
+            "diagonal",
+            "left_transformation",
+            "right_transformation",
+        )
+        for row in certificate[matrix_name]["entries"]
+        for value in row
+    ]
+    assert max(len(value.lstrip("-")) for value in result_integers) > 4_096
+    artifacts = [domain_services.core.store.get(uri) for uri in result.artifact_uris]
+    assert all(
+        len(canonicalize_json(artifact.payload)) < 10 * 1024 * 1024
+        for artifact in artifacts
+    )

@@ -8,6 +8,7 @@ from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
+from jacobian.canonical import canonicalize_json
 from jacobian.contracts.exact import CanonicalInteger, CanonicalRational
 from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.contracts.results import ContractModel
@@ -25,6 +26,7 @@ MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS = 4096
 MAX_GRAPH_RELIABILITY_VERTICES = 16
 MAX_GRAPH_RELIABILITY_EDGES = 12
 MAX_GRAPH_RELIABILITY_STATES = 1 << MAX_GRAPH_RELIABILITY_EDGES
+MAX_GRAPH_RELIABILITY_LEDGER_BYTES = 9 * 1024 * 1024
 
 
 def _require_bounded_fraction(
@@ -162,6 +164,28 @@ class GaussianPolynomialMomentRequest(ContractModel):
                 "Gaussian polynomial power exceeds the "
                 f"{MAX_GAUSSIAN_EXPANSION_PATHS}-path expansion bound"
             )
+        components = tuple(
+            component
+            for term in self.polynomial.terms
+            for component in (term.coefficient.real, term.coefficient.imaginary)
+        )
+        distinct_denominator_digits = sum(
+            len(denominator)
+            for denominator in {component.den for component in components}
+        )
+        maximum_numerator_digits = max(
+            len(component.num.lstrip("-")) for component in components
+        )
+        result_digit_bound = (
+            self.order * (distinct_denominator_digits + maximum_numerator_digits)
+            + len(str(max(1, expansion_paths)))
+            + 64
+        )
+        if result_digit_bound > MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS:
+            raise ValueError(
+                "Gaussian polynomial coefficient denominators can exceed the "
+                f"{MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS}-digit result bound"
+            )
         return self
 
 
@@ -290,6 +314,44 @@ class GraphConnectionProbabilityRequest(ContractModel):
             or any(terminal not in self.graph.vertices for terminal in self.terminals)
         ):
             raise ValueError("terminals must be two distinct declared graph vertices")
+        edge_count = len(self.graph.edges)
+        state_count = 1 << edge_count
+        repeated_edge_bytes = (
+            (1 << (edge_count - 1))
+            * sum(len(canonicalize_json(list(edge))) + 1 for edge in self.graph.edges)
+            if edge_count
+            else 0
+        )
+        probability_numerator_digits = sum(
+            max(
+                len(str(item.open_probability.as_fraction().numerator)),
+                len(str((1 - item.open_probability.as_fraction()).numerator)),
+            )
+            for item in self.edge_probabilities
+        )
+        probability_denominator_digits = sum(
+            len(str(item.open_probability.as_fraction().denominator))
+            for item in self.edge_probabilities
+        )
+        maximum_state = {
+            "state_index": state_count - 1,
+            "open_edges": [],
+            "terminals_connected": False,
+            "state_probability": {
+                "num": "9" * max(1, probability_numerator_digits),
+                "den": "9" * max(1, probability_denominator_digits),
+            },
+        }
+        estimated_ledger_bytes = (
+            repeated_edge_bytes
+            + state_count * len(canonicalize_json(maximum_state))
+            + 16 * 1024
+        )
+        if estimated_ledger_bytes > MAX_GRAPH_RELIABILITY_LEDGER_BYTES:
+            raise ValueError(
+                "graph reliability request can exceed the complete ledger "
+                f"budget of {MAX_GRAPH_RELIABILITY_LEDGER_BYTES} bytes"
+            )
         return self
 
 

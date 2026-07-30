@@ -105,6 +105,24 @@ unrelated catalog available.
 
 ## Handoff
 
+- Source commit/tree: `420eea171ded58479acdd46d701b85acb2c79b68` /
+  `d49c9b83880490da051a26fe55c6d34c0b10fbbe`.
+- Installed catalog and checker-policy digests: not applicable; this standalone
+  spike registers no capability or checker.
+- Provider/runtime state: the observation targeted the digest-pinned GUDHI
+  3.13.0 CPython 3.12 wheel and exact source archive recorded in
+  `benchmarks/gudhi_persistence_pin.json`; absence and import failure remain
+  typed non-conclusions.
+- Model and prompt settings: not applicable; the reproduction is a deterministic
+  subprocess probe with no model call.
+- Raw trace: no separate raw transcript was retained. The frozen input,
+  expected provider output, source and wheel identities, and replay digest are
+  in `benchmarks/gudhi_persistence_pin.json`; the missing raw transcript is an
+  explicit evidence limitation.
+- Validation recorded by the original handoff: not retained. The maintained
+  regression entry point is
+  `tests/boundary/process/providers/test_gudhi_persistence_spike.py`; run
+  evidence must be recorded separately rather than inferred from its presence.
 - Candidate: `persistent homology`; discovery decision `REVISE`.
 - Producer maximum: `COMPUTED`.
 - Provider: GUDHI 3.13.0, optional T1 CPython 3.12 wheel.

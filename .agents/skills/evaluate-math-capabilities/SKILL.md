@@ -64,14 +64,20 @@ not as an invitation to fill the gap with evaluation fixtures.
 Read `AGENTS.md` and inspect:
 
 - `docs/reference/capability-workflow-evaluations.md`
-- `benchmarks/agent_ab.py`
-- `benchmarks/ab_cases/`
+- `benchmarks/regression-v1/`
 - `src/jacobian/eval_telemetry.py`
-- `tests/integration/agent/test_agent_ab_benchmark.py`
+- the Harbor task and verifier validation checks
 - the relevant capability descriptors, checkers, and contracts.
 
-Extend the established case schemas and runner when practical. Do not create a
-parallel benchmark framework for one experiment.
+Use the repository-local `harbor-benchmarks` skill for Harbor packaging,
+verifier validation, task-digest updates, Oracle runs, and Jacobian observation
+jobs. Extend the committed Harbor task contracts when practical. Keep any
+future control/treatment configuration outside task bundles; do not create a
+custom task runner for one experiment.
+
+Treat the Harbor boundary as a handoff: this skill owns the evaluation
+question, intervention, oracle independence, scoring interpretation, and
+evidence report; `harbor-benchmarks` owns the runnable task/job implementation.
 
 ## State the comparison
 

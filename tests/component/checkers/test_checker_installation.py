@@ -6,6 +6,7 @@ from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.checkers import EvidenceKind
 from jacobian.registry import CheckerRegistry
+from jacobian.store import ArtifactStore
 
 _CLAIM_SCHEMA_URI = "artifact://sha256/" + "1" * 64
 _SEMANTICS_URI = "artifact://sha256/" + "2" * 64
@@ -31,7 +32,8 @@ def _operation() -> CheckerOperation:
 def test_checker_installer_keeps_disabled_operation_unauthorized(
     tmp_path: Path,
 ) -> None:
-    installed = CheckerInstaller(CheckerRegistry(tmp_path / "checkers.sqlite")).install(
+    store = ArtifactStore(tmp_path / "store")
+    installed = CheckerInstaller(CheckerRegistry(store)).install(
         _operation(),
         authorize=False,
     )
@@ -43,7 +45,7 @@ def test_checker_installer_keeps_disabled_operation_unauthorized(
 
 
 def test_checker_installer_authorizes_exact_declared_scope(tmp_path: Path) -> None:
-    registry = CheckerRegistry(tmp_path / "checkers.sqlite")
+    registry = CheckerRegistry(ArtifactStore(tmp_path / "store"))
     installed = CheckerInstaller(registry).install(_operation(), authorize=True)
 
     checker_id = installed.require_checker_id()

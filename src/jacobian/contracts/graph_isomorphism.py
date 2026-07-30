@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -17,6 +18,10 @@ class SimpleUndirectedGraph(ContractModel):
 
     @model_validator(mode="after")
     def require_canonical_simple_graph(self) -> Self:
+        if any(
+            not unicodedata.is_normalized("NFC", vertex) for vertex in self.vertices
+        ):
+            raise ValueError("graph vertices must use Unicode NFC")
         if len(set(self.vertices)) != len(self.vertices):
             raise ValueError("graph vertices must be unique")
         if any(
