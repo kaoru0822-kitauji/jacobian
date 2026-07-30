@@ -3,6 +3,17 @@
 PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON = (
     "the pinned Lean and Mathlib runtime is unavailable"
 )
+PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON = (
+    "the pinned Lean CORE runtime is unavailable"
+)
+
+
+def pinned_lean_core_runtime_available() -> bool:
+    """Return whether the production pinned Lean CORE frontend probe succeeds."""
+
+    from jacobian.provider_runtime import lean_frontend_provider_runtime
+
+    return lean_frontend_provider_runtime().availability.value == "available"
 
 
 def pinned_mathlib_runtime_available() -> bool:

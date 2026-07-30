@@ -19,8 +19,16 @@ execution boundary, artifact ownership, and non-verification semantics.
 `ELABORATE_PROPOSITION` accepts one bounded, single-expression Lean
 proposition. It rejects declarations, imports, option commands, `sorry`,
 `admit`, metaprogramming commands, and other structural input. Version 1
-supports the `CORE` environment; `MATHLIB` remains unavailable through this
-capability.
+supports only the `CORE` environment, and the published request schema exposes
+only that value. `MATHLIB` proof replay remains the separate, independently
+registered `lean.check` boundary when its pinned project is installed.
+
+Both statement capabilities are advertised only after Jacobian resolves and
+health-checks the pinned Lean executable. If the executable is absent, has the
+wrong version or commit, or cannot be resolved through the configured
+toolchain, `lean.statement.propose` and `lean.statement.compare` are absent
+from the installed catalog; the provider diagnostic identifies the failed
+toolchain check before any invocation is attempted.
 
 Lean elaborates the expression against expected type `Prop` with fixed
 pretty-printing options. A completed result records:

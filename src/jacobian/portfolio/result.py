@@ -268,6 +268,7 @@ class PortfolioInstallation:
 
     # --- Lean ---
     lean_statement: LeanStatementInstallation | None = None
+    lean_statement_runtime: CapabilityProviderRuntime | None = None
     lean: LeanService | None = None
     lean_declarations: LeanDeclarationService | None = None
     lean_exploration: LeanExplorationInstallation | None = None

@@ -173,6 +173,35 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
     }.isdisjoint(capability_ids)
 
 
+def test_unhealthy_lean_frontend_is_absent_from_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unavailable = CapabilityProviderRuntime(
+        provider="jacobian.lean4",
+        availability=CapabilityProviderAvailability.UNAVAILABLE,
+        platform="linux-x86_64",
+        install_tier=CapabilityInstallTier.T3,
+        license_id="Apache-2.0",
+        diagnostic=("TOOLCHAIN_RESOLUTION: the pinned Lean executable is unavailable"),
+    )
+    monkeypatch.setattr(
+        "jacobian.portfolio.provider_resolution.lean_frontend_provider_runtime",
+        lambda: unavailable,
+    )
+
+    runtime = create_runtime(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
+
+    assert runtime.portfolio.lean_statement is None
+    assert runtime.portfolio.lean_statement_runtime == unavailable
+    capability_ids = {
+        item.capability_id for item in runtime.core.capabilities.catalog().capabilities
+    }
+    assert {"lean.statement.propose", "lean.statement.compare"}.isdisjoint(
+        capability_ids
+    )
+
+
 def test_invocation_binds_descriptor_runtime_to_result_provenance(
     attached_complete_runtime,
 ) -> None:
