@@ -72,6 +72,27 @@ def test_allowed_record_indexes_normalized_text_as_heuristic(tmp_path: Path) -> 
     assert result.assurance.level is CapabilityAssuranceLevel.HEURISTIC
 
 
+def test_ingestion_persists_normalized_provenance_urls(tmp_path: Path) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _request()
+    payload["source_url"] = " https://example.invalid/source path "
+    payload["license_evidence_url"] = " https://example.invalid/license path "
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.conjecture.ingest",
+            input=payload,
+        )
+    )
+    stored = adapter.store.get(result.output["artifact_uri"])
+
+    assert stored.payload["source_url"] == "https://example.invalid/source%20path"
+    assert (
+        stored.payload["license_evidence_url"]
+        == "https://example.invalid/license%20path"
+    )
+
+
 @pytest.mark.parametrize(
     "license_id",
     ["CC-BY-NC-4.0", "CC-BY-ND-4.0", "RESTRICTED", "PROPRIETARY"],

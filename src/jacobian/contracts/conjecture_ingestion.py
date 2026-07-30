@@ -6,7 +6,14 @@ import hashlib
 from enum import StrEnum
 from typing import Literal, Self
 
-from pydantic import AnyHttpUrl, Field, TypeAdapter, ValidationError, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
@@ -62,17 +69,29 @@ class ExternalConjectureIngestRequest(ContractModel):
     expected_record_digest: Sha256Digest | None = None
     expected_content_digest: Sha256Digest | None = None
 
+    @field_validator("source_url")
+    @classmethod
+    def normalize_source_url(cls, value: str) -> str:
+        return _normalize_http_url(value, "source_url")
+
+    @field_validator("license_evidence_url")
+    @classmethod
+    def normalize_license_evidence_url(cls, value: str | None) -> str | None:
+        return (
+            _normalize_http_url(value, "license evidence URL")
+            if value is not None
+            else None
+        )
+
     @model_validator(mode="after")
     def require_complete_nonblank_evidence(self) -> Self:
         for field_name in (
             "corpus_id",
             "corpus_revision",
-            "source_url",
             "item_id",
         ):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be blank")
-        _require_http_url(self.source_url, "source URL")
         evidence = (
             self.license_evidence_url,
             self.license_evidence_text,
@@ -82,13 +101,6 @@ class ExternalConjectureIngestRequest(ContractModel):
             value is not None for value in evidence
         ):
             raise ValueError("license evidence URL, text, and digest must be complete")
-        if (
-            self.license_evidence_url is not None
-            and not self.license_evidence_url.strip()
-        ):
-            raise ValueError("license evidence URL must not be blank")
-        if self.license_evidence_url is not None:
-            _require_http_url(self.license_evidence_url, "license evidence URL")
         if (
             self.license_evidence_text is not None
             and not self.license_evidence_text.strip()
@@ -180,8 +192,10 @@ def _text_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _require_http_url(value: str, label: str) -> None:
+def _normalize_http_url(value: str, label: str) -> str:
+    if not value.strip():
+        raise ValueError(f"{label} must not be blank")
     try:
-        _HTTP_URL.validate_python(value)
+        return str(_HTTP_URL.validate_python(value))
     except ValidationError as exc:
         raise ValueError(f"{label} must be a valid HTTP(S) URL") from exc

@@ -134,6 +134,24 @@ def test_request_rejects_non_url_source_locator() -> None:
         ExternalConjectureIngestRequest.model_validate(payload)
 
 
+def test_request_persists_normalized_provenance_urls() -> None:
+    request = ExternalConjectureIngestRequest(
+        corpus_id="fixture",
+        corpus_revision="revision-1",
+        source_url=" https://example.invalid/source path ",
+        item_id="item-1",
+        metadata={"title": "Fixture conjecture"},
+        statement="A fixture statement.",
+        source_license="CC-BY-4.0",
+        license_evidence_url=" https://example.invalid/license path ",
+        license_evidence_text="license evidence",
+        license_evidence_digest="sha256:" + "a" * 64,
+    )
+
+    assert request.source_url == "https://example.invalid/source%20path"
+    assert request.license_evidence_url == "https://example.invalid/license%20path"
+
+
 def test_request_rejects_whitespace_only_metadata_title() -> None:
     with pytest.raises(ValidationError, match="title must not be blank"):
         ExternalConjectureIngestRequest(
