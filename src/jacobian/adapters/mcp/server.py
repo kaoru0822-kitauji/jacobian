@@ -999,7 +999,7 @@ def _register_resources_and_prompts(
     )
     _publish_workspace_normalization_aliases(server)
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "jacobian://instructions",
         name="jacobian-instructions",
         title="Jacobian operating guide",
@@ -1012,7 +1012,7 @@ def _register_resources_and_prompts(
     async def jacobian_instructions_resource() -> str:
         return OPERATING_GUIDE
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "artifact://sha256/{digest}",
         name="artifact",
         description="Read an immutable artifact manifest and payload.",
@@ -1036,7 +1036,7 @@ def _register_resources_and_prompts(
             sort_keys=True,
         )
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "capability://catalog",
         name="capability-catalog",
         description=(
@@ -1052,7 +1052,7 @@ def _register_resources_and_prompts(
             sort_keys=True,
         )
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "reference://catalog",
         name="reference-catalog",
         description="Read installed domain schema, semantics, plugin, and checker IDs.",
@@ -1074,7 +1074,7 @@ def _register_resources_and_prompts(
             sort_keys=True,
         )
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "experiment://{experiment_id}",
         name="experiment",
         description="Read the latest durable experiment snapshot.",
@@ -1094,7 +1094,7 @@ def _register_resources_and_prompts(
             sort_keys=True,
         )
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "experiment://{experiment_id}/accounting",
         name="experiment-accounting",
         description="Read durable enumeration accounting and assurance labels.",
@@ -1126,7 +1126,7 @@ def _register_resources_and_prompts(
             sort_keys=True,
         )
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "experiment://{experiment_id}/scope",
         name="experiment-scope",
         description="Read the current enumeration scope artifact, when available.",
@@ -1146,7 +1146,7 @@ def _register_resources_and_prompts(
             snapshot,
         )
 
-    @server.resource(
+    @server.resource(  # type: ignore[untyped-decorator]
         "experiment://{experiment_id}/archive",
         name="experiment-archive",
         description="Read the immutable archive manifest and page handles.",
@@ -1184,7 +1184,7 @@ def _register_resources_and_prompts(
             sort_keys=True,
         )
 
-    @server.prompt(
+    @server.prompt(  # type: ignore[untyped-decorator]
         name="jacobian-discover",
         title="Discover Jacobian capabilities",
         description=(
@@ -1200,7 +1200,7 @@ def _register_resources_and_prompts(
     ) -> str:
         return discovery_prompt(task)
 
-    @server.prompt(
+    @server.prompt(  # type: ignore[untyped-decorator]
         name="jacobian-check-evidence",
         title="Check mathematical evidence with Jacobian",
         description=(
@@ -1228,7 +1228,7 @@ def _register_tools(
 ) -> None:
     """Register all MCP tool handlers on the server."""
 
-    @server.tool(
+    @server.tool(  # type: ignore[untyped-decorator]
         name="capability.describe",
         title="Discover mathematical capabilities",
         description=CAPABILITY_DESCRIBE_DESCRIPTION,
@@ -1410,7 +1410,7 @@ def _register_tools(
             }
         return response
 
-    @server.tool(
+    @server.tool(  # type: ignore[untyped-decorator]
         name="capability.invoke",
         title="Execute a mathematical capability",
         description=CAPABILITY_INVOKE_DESCRIPTION,
@@ -1434,7 +1434,7 @@ def _register_tools(
         )
         return _capability_call_tool_result(result, view=view)
 
-    @server.tool(
+    @server.tool(  # type: ignore[untyped-decorator]
         name="workspace.open",
         description=(
             "Direct tool; do not call capability.describe. Create a durable epistemic "
@@ -1465,7 +1465,7 @@ def _register_tools(
             ),
         )
 
-    @server.tool(
+    @server.tool(  # type: ignore[untyped-decorator]
         name="workspace.write",
         description=(
             "Direct tool. Do not call capability.describe. Arguments are flat: send "
@@ -1611,7 +1611,7 @@ def _register_tools(
             ),
         )
 
-    @server.tool(
+    @server.tool(  # type: ignore[untyped-decorator]
         name="workspace.query",
         description=(
             "Direct tool; do not call capability.describe. Read a compact deterministic "
