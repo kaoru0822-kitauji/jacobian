@@ -408,15 +408,45 @@ def test_discovery_distinguishes_strong_weak_and_absent_lexical_fit(
     assert strong.matches[0].lexical_fit == "STRONG_CANDIDATE"
     assert strong.matches[0].query_coverage_milli == 1000
 
-    weak = runtime.core.capabilities.discover(
+    gaussian = runtime.core.capabilities.discover(
         CapabilityDiscoveryRequest(
-            query="continuous Gaussian Wick moments all orders",
+            query="exact fixed order Gaussian polynomial moment Wick contraction",
             limit=3,
         )
     )
-    assert weak.matches
-    assert weak.portfolio_fit == "ONLY_WEAK_LEXICAL_MATCHES"
-    assert all(match.lexical_fit == "WEAK_LEXICAL_MATCH" for match in weak.matches)
+    assert gaussian.portfolio_fit == "STRONG_CANDIDATES_FOUND"
+    assert gaussian.matches[0].capability_id == (
+        "probability.gaussian_polynomial.moment.compute"
+    )
+    assert gaussian.matches[0].lexical_fit == "STRONG_CANDIDATE"
+    assert "does not establish an identity for every order" in (
+        gaussian.matches[0].description
+    )
+
+    reliability = runtime.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="exact small graph reliability terminal connection probability",
+            limit=3,
+        )
+    )
+    assert reliability.portfolio_fit == "STRONG_CANDIDATES_FOUND"
+    assert reliability.matches[0].capability_id == (
+        "probability.graph_reliability.connection_probability.compute"
+    )
+
+    symmetry = runtime.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query=(
+                "declared graph automorphism generators vertex edge orbit "
+                "symmetry compression"
+            ),
+            limit=3,
+        )
+    )
+    assert symmetry.portfolio_fit == "STRONG_CANDIDATES_FOUND"
+    assert symmetry.matches[0].capability_id == (
+        "graph.symmetry.generator_orbits.compute"
+    )
 
     absent = runtime.core.capabilities.discover(
         CapabilityDiscoveryRequest(

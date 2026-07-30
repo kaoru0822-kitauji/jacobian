@@ -5,6 +5,8 @@ from jacobian.contracts.probability import (
     FiniteConvolutionRequest,
     FiniteEventRequest,
     FinitePushforwardRequest,
+    GaussianPolynomialMomentRequest,
+    GraphConnectionProbabilityRequest,
 )
 from jacobian.contracts.validated_analysis import FiniteRawMomentRequest
 
@@ -58,6 +60,24 @@ PROBABILITY_EXACT_REPLAY_CHECKERS = (
         "probability.finite-convolution.fraction-replay",
         entrypoint_module=_ENTRYPOINT,
         replay_method="standard-library Fraction replay",
+        reason=_REASON,
+    ),
+    ExactReplayCheckerDeclaration(
+        "probability.gaussian_polynomial.moment.compute",
+        GaussianPolynomialMomentRequest,
+        "check_gaussian_polynomial_moment",
+        "probability.gaussian-polynomial-moment.fraction-replay",
+        entrypoint_module=_ENTRYPOINT,
+        replay_method="independent standard-library coefficient contraction",
+        reason=_REASON,
+    ),
+    ExactReplayCheckerDeclaration(
+        "probability.graph_reliability.connection_probability.compute",
+        GraphConnectionProbabilityRequest,
+        "check_graph_connection_probability",
+        "probability.graph-reliability-connection.fraction-replay",
+        entrypoint_module=_ENTRYPOINT,
+        replay_method="independent exhaustive edge-subset replay",
         reason=_REASON,
     ),
 )

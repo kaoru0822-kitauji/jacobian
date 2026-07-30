@@ -60,8 +60,12 @@ expectations.
 - [Tool surface](reference/tools.md)
 - [Domain operation library](reference/domain-operation-library.md)
 - [Finite probability operations](reference/finite-probability-operations.md)
+- [Bounded Gaussian polynomial moments](reference/gaussian-polynomial-moments.md)
+- [Small exact graph reliability](reference/graph-reliability.md)
+- [Declared graph-symmetry orbits](reference/graph-symmetry-orbits.md)
 - [Exact planar geometry](reference/exact-planar-geometry.md)
 - [Finite simplicial topology](reference/finite-simplicial-topology.md)
+- [Certified Smith normal form and integral homology](reference/certified-smith-integral-homology.md)
 - [Finite posets](reference/finite-posets.md)
 - [Recurrences and rational generating series](reference/recurrences-and-generating-series.md)
 - [Provider runtime contract](reference/provider-runtime.md)
@@ -131,6 +135,13 @@ degeneracy semantics, and independent geometry-checker obligations.
 The [GUDHI persistent-homology optional-provider spike](contributing/gudhi-persistence-provider-spike.md)
 records exact-rank transport, selected-module licensing, bounded pairing
 reproduction, and independent modular-reduction obligations.
+The [cddlib exact H/V optional-provider spike](contributing/cddlib-hv-provider-spike.md)
+records the GPL source-build boundary, exact GMP-rational reproduction,
+homogeneous representation semantics, and the unresolved completeness gate.
+The [Regina low-dimensional-topology optional-provider spike](contributing/regina-outcomes-provider-spike.md)
+records the isolated GPL wheel/source boundary, bounded 3-manifold and
+normal-surface reproductions, partial independent replay, and outcome-specific
+production gates.
 
 Recurring agent work is encoded in the repository-local skills under
 `.agents/skills/`. Start with `develop-math-capabilities` for a complete
