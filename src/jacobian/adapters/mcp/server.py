@@ -36,6 +36,7 @@ from jacobian.capabilities import CapabilityDiscoveryCursorError, CapabilityPoli
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiscoveryRequest,
+    CapabilityInputKind,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -425,6 +426,10 @@ def _capability_descriptor_view(
             "provider_runtime": runtime_summary,
             "modes": [mode.value for mode in descriptor.modes],
             "tags": list(descriptor.tags),
+            "accepted_input_kinds": [
+                kind.value for kind in descriptor.accepted_input_kinds
+            ],
+            "accepted_artifact_types": list(descriptor.accepted_artifact_types),
             "input_schema_summary": _input_schema_summary(descriptor.input_schema),
             "output_schema_summary": _output_schema_summary(descriptor.output_schema),
             "has_invocation_examples": bool(descriptor.invocation_examples),
@@ -452,6 +457,10 @@ def _capability_descriptor_view(
         "provider": descriptor.provider,
         "provider_runtime": runtime_summary,
         "modes": [mode.value for mode in descriptor.modes],
+        "accepted_input_kinds": [
+            kind.value for kind in descriptor.accepted_input_kinds
+        ],
+        "accepted_artifact_types": list(descriptor.accepted_artifact_types),
         "input_schema": _compact_json_schema(descriptor.input_schema),
         "output_schema_summary": _output_schema_summary(descriptor.output_schema),
     }
@@ -666,6 +675,8 @@ def _capability_discovery_response(
     query: str | None,
     domain: str | None,
     mode: CapabilityMode | None,
+    input_kind: CapabilityInputKind | None,
+    artifact_type: str | None,
     limit: int | None,
     cursor: str | None,
 ) -> dict[str, Any]:
@@ -676,6 +687,8 @@ def _capability_discovery_response(
                 query=query,
                 domain=domain,
                 mode=mode,
+                input_kind=input_kind,
+                artifact_type=artifact_type,
                 limit=limit if limit is not None else 5,
                 cursor=cursor,
             )
@@ -688,7 +701,8 @@ def _capability_discovery_response(
                 "message": "The capability discovery cursor is not in this result set.",
                 "hint": (
                     "Restart discovery without a cursor, or reuse the same query, "
-                    "domain, mode, and limit that produced next_cursor."
+                    "domain, mode, input_kind, artifact_type, and limit that produced "
+                    "next_cursor."
                 ),
             }
         }
@@ -1240,8 +1254,7 @@ def _register_tools(
             str | None,
             Field(
                 description=(
-                    "Exact installed capability ID. When supplied, omit query, "
-                    "domain, mode, limit, and cursor."
+                    "Exact installed ID; cannot be combined with discovery filters."
                 )
             ),
         ] = None,
@@ -1251,8 +1264,7 @@ def _register_tools(
                 min_length=1,
                 max_length=512,
                 description=(
-                    "Natural-language mathematical outcome to find; no capability "
-                    "ID is required."
+                    "Mathematical outcome to find; no capability ID is required."
                 ),
             ),
         ] = None,
@@ -1269,6 +1281,20 @@ def _register_tools(
         mode: Annotated[
             CapabilityMode | None,
             Field(description="Optional EXPLORE or VERIFY capability filter."),
+        ] = None,
+        input_kind: Annotated[
+            CapabilityInputKind | None,
+            Field(description=("Input boundary used to reject incompatible routes.")),
+        ] = None,
+        artifact_type: Annotated[
+            str | None,
+            Field(
+                pattern=r"^artifact://sha256/[0-9a-f]{64}$",
+                description=(
+                    "Exact schema_uri from the stored artifact manifest; requires "
+                    "TYPED_ARTIFACT."
+                ),
+            ),
         ] = None,
         limit: Annotated[
             StrictInt | None,
@@ -1288,7 +1314,7 @@ def _register_tools(
                 pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
                 description=(
                     "Opaque continuation ID from next_cursor. Reuse the same query, "
-                    "domain, mode, and limit when continuing discovery."
+                    "domain, mode, input kind, artifact type, and limit."
                 ),
             ),
         ] = None,
@@ -1308,13 +1334,22 @@ def _register_tools(
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_runtime = _runtime(ctx)
-        search_arguments = (query, domain, mode, limit, cursor)
+        search_arguments = (
+            query,
+            domain,
+            mode,
+            input_kind,
+            artifact_type,
+            limit,
+            cursor,
+        )
         if capability_id is not None and any(
             argument is not None for argument in search_arguments
         ):
             raise AgentRecoveryError(
                 "capability_id is an exact lookup and cannot be combined with query, "
-                "domain, mode, limit, or cursor. Use one discovery call followed by "
+                "domain, mode, input_kind, artifact_type, limit, or cursor. Use one "
+                "discovery call followed by "
                 "one exact description call."
             )
         if capability_id is None:
@@ -1323,6 +1358,8 @@ def _register_tools(
                 query=query,
                 domain=domain,
                 mode=mode,
+                input_kind=input_kind,
+                artifact_type=artifact_type,
                 limit=limit,
                 cursor=cursor,
             )
