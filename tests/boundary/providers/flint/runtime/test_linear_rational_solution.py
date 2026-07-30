@@ -13,7 +13,7 @@ from tests.component.capabilities.capabilities import invoke_capability as _invo
 from tests.support.rationals import rational_payload as _q
 from tests.support.services import open_domain_services
 
-import jacobian.provider_runtime as provider_runtime
+import jacobian.providers.flint_runtime as flint_runtime
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
@@ -159,7 +159,7 @@ def test_python_flint_runtime_rejects_an_unpinned_binding_version(
         license_files=("python_flint-0.8.0.dist-info/licenses/LICENSE",),
     )
     monkeypatch.setattr(
-        provider_runtime,
+        flint_runtime,
         "python_distribution_provider_runtime",
         lambda *_args, **_kwargs: wrong,
     )
