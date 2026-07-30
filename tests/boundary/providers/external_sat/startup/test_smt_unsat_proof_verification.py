@@ -21,7 +21,7 @@ from jacobian.contracts.evidence import CertificateEnvelope
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.contracts.verification import VerificationRecord
-from jacobian.provider_runtime import carcara_provider_runtime
+from jacobian.providers.external_solver_runtime import carcara_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime
 from jacobian.verification import CheckerExecutionError, _environment_digest

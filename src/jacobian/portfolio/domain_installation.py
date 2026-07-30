@@ -56,7 +56,11 @@ class DomainBundleInstaller:
             if bundle.managed_installer is None:
                 installation = self.context.operations.install(bundle)
             else:
-                installation = bundle.managed_installer(self.context)
+                dependencies = {
+                    dependency_id: installed[dependency_id]
+                    for dependency_id in bundle.dependency_ids
+                }
+                installation = bundle.managed_installer(self.context, dependencies)
                 _validate_managed_installation(bundle, installation)
             installed[bundle.domain_id] = installation
             for adapter in installation.adapters:

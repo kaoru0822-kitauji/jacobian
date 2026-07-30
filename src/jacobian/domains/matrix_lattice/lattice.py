@@ -25,7 +25,7 @@ from jacobian.operations import (
     ComputedSuccess,
     OperationExecutionFailure,
 )
-from jacobian.provider_runtime import python_flint_lll_provider_runtime
+from jacobian.providers.flint_runtime import python_flint_lll_provider_runtime
 
 from .lll_worker import PROTOCOL
 

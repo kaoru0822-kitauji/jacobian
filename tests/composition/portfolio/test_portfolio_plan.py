@@ -4,31 +4,31 @@ from __future__ import annotations
 
 import pytest
 
-from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLES
+from jacobian.domains.builtins import build_builtin_domain_bundles
 from jacobian.operations import DomainBundle
-from jacobian.portfolio import BUILTIN_PORTFOLIO, PortfolioPlan
+from jacobian.portfolio import PortfolioPlan, build_builtin_portfolio
 
 
 def test_builtin_portfolio_is_an_explicit_plan_of_domain_bundles() -> None:
-    plan = BUILTIN_PORTFOLIO
+    plan = build_builtin_portfolio()
 
     assert isinstance(plan, PortfolioPlan)
     assert all(isinstance(bundle, DomainBundle) for bundle in plan.domain_bundles)
     # The plan is a literal ordered tuple, not discovered or registered.
-    assert plan.domain_bundles == BUILTIN_DOMAIN_BUNDLES
+    assert plan.domain_bundles == build_builtin_domain_bundles()
     assert plan.domain_ids == tuple(
-        bundle.domain_id for bundle in BUILTIN_DOMAIN_BUNDLES
+        bundle.domain_id for bundle in build_builtin_domain_bundles()
     )
 
 
 def test_validate_accepts_the_builtin_plan() -> None:
     # Must not raise.
-    BUILTIN_PORTFOLIO.validate()
-    assert BUILTIN_PORTFOLIO.domain_ids
+    build_builtin_portfolio().validate()
+    assert build_builtin_portfolio().domain_ids
 
 
 def test_bundle_for_returns_the_declared_bundle_or_none() -> None:
-    plan = BUILTIN_PORTFOLIO
+    plan = build_builtin_portfolio()
     arithmetic = plan.bundle_for("arithmetic")
     assert isinstance(arithmetic, DomainBundle)
     assert arithmetic.domain_id == "arithmetic"
@@ -36,7 +36,7 @@ def test_bundle_for_returns_the_declared_bundle_or_none() -> None:
 
 
 def test_validate_rejects_duplicate_domain_bundles() -> None:
-    bundle = BUILTIN_DOMAIN_BUNDLES[0]
+    bundle = build_builtin_domain_bundles()[0]
     plan = PortfolioPlan(domain_bundles=(bundle, bundle))
 
     with pytest.raises(ValueError, match="duplicate domain bundles"):

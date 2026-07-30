@@ -1,8 +1,8 @@
 """Bounded graph-optimization capabilities."""
 
-from jacobian.domains.graph_optimization.bundle import GRAPH_OPTIMIZATION_BUNDLE
+from jacobian.domains.graph_optimization.bundle import build_graph_optimization_bundle
 from jacobian.domains.graph_optimization.invariant_bundle import (
-    GRAPH_INVARIANT_BUNDLE,
+    build_graph_invariant_bundle,
 )
 
-__all__ = ["GRAPH_INVARIANT_BUNDLE", "GRAPH_OPTIMIZATION_BUNDLE"]
+__all__ = ["build_graph_invariant_bundle", "build_graph_optimization_bundle"]

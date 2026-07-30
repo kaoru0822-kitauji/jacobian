@@ -280,3 +280,32 @@ class PortfolioInstallation:
     lean_checkers: dict[LeanEnvironment, LeanCheckerInstallation] = field(
         default_factory=dict
     )
+
+    def installed_bundle(self, domain_id: str) -> InstalledDomainBundle | None:
+        """Return one installed mathematical domain bundle, if available."""
+
+        return self.domain_bundles.get(domain_id)
+
+    def outcome_for(self, domain_id: str) -> BundleInstallation | None:
+        """Return the ordered installation outcome for one mathematical domain."""
+
+        for outcome in self.portfolio_outcomes:
+            if outcome.domain_id == domain_id:
+                return outcome
+        return None
+
+    @property
+    def installed_domain_ids(self) -> tuple[str, ...]:
+        return tuple(
+            outcome.domain_id
+            for outcome in self.portfolio_outcomes
+            if outcome.status is BundleInstallationStatus.INSTALLED
+        )
+
+    @property
+    def skipped_domain_ids(self) -> tuple[str, ...]:
+        return tuple(
+            outcome.domain_id
+            for outcome in self.portfolio_outcomes
+            if outcome.status is not BundleInstallationStatus.INSTALLED
+        )

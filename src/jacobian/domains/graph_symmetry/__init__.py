@@ -1,5 +1,5 @@
 """Exact declared graph-symmetry capability bundle."""
 
-from jacobian.domains.graph_symmetry.bundle import GRAPH_SYMMETRY_BUNDLE
+from jacobian.domains.graph_symmetry.bundle import build_graph_symmetry_bundle
 
-__all__ = ["GRAPH_SYMMETRY_BUNDLE"]
+__all__ = ["build_graph_symmetry_bundle"]

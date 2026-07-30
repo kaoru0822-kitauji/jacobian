@@ -1,5 +1,5 @@
 """Exact finite-integer-set capabilities."""
 
-from jacobian.domains.finite_sets.bundle import FINITE_SET_BUNDLE
+from jacobian.domains.finite_sets.bundle import build_finite_set_bundle
 
-__all__ = ["FINITE_SET_BUNDLE"]
+__all__ = ["build_finite_set_bundle"]

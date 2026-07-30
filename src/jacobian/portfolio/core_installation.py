@@ -25,8 +25,9 @@ from jacobian.polynomial_system_capabilities import (
     install_polynomial_system_capabilities,
 )
 from jacobian.polynomial_system_search import PolynomialSystemRationalSearchAdapter
-from jacobian.portfolio.builtin import BUILTIN_PORTFOLIO
+from jacobian.portfolio.builtin import build_builtin_portfolio
 from jacobian.portfolio.domain_installation import DomainBundleInstaller
+from jacobian.portfolio.model import PortfolioPlan
 from jacobian.portfolio.result import PortfolioInstallation
 from jacobian.runtime.services import ApplicationServices
 from jacobian.universal_algebra_capabilities import (
@@ -109,14 +110,15 @@ class CoreApplicationInstaller:
         for coloring_adapter in coloring_adapters:
             self.context.register_capability(coloring_adapter)
 
-        bundle_result = DomainBundleInstaller(ctx).install(BUILTIN_PORTFOLIO)
+        portfolio = build_builtin_portfolio()
+        bundle_result = DomainBundleInstaller(ctx).install(portfolio)
         result.domain_bundles = dict(bundle_result.installed)
         result.portfolio_diagnostics = bundle_result.diagnostics
         result.portfolio_outcomes = bundle_result.outcomes
         result.conjecture_ingestion = _conjecture_ingestion_installation(
             result.domain_bundles
         )
-        self.install_domain_verification(result)
+        self.install_domain_verification(result, portfolio)
 
         graph_isomorphism_adapter, result.graph_isomorphism = install_graph_isomorphism(
             ctx.store,
@@ -207,9 +209,10 @@ class CoreApplicationInstaller:
     def install_domain_verification(
         self,
         result: PortfolioInstallation,
+        plan: PortfolioPlan,
     ) -> None:
         ctx = self.context
-        geometry = result.domain_bundles.get("geometry")
+        geometry = result.installed_bundle("geometry")
         if geometry is not None:
             geometry_adapter, result.geometry_checker = install_geometry_checker(
                 ctx.store,
@@ -223,23 +226,12 @@ class CoreApplicationInstaller:
             if geometry_adapter is not None:
                 self.context.register_capability(geometry_adapter)
 
-        polynomial = result.domain_bundles.get("polynomial")
-        matrix = result.domain_bundles.get("matrix")
         exact_bundles = {
-            "polynomial": polynomial,
-            "matrix": matrix,
-            "certified_snf": result.domain_bundles.get("certified_snf"),
-            "graph": result.domain_bundles.get("graph_optimization"),
-            "graph_invariants": result.domain_bundles.get("graph_invariants"),
-            "graph_symmetry": result.domain_bundles.get("graph_symmetry"),
-            "combinatorics": result.domain_bundles.get("combinatorics"),
-            "number_theory": result.domain_bundles.get("number_theory"),
-            "probability": result.domain_bundles.get("probability"),
-            "poset": result.domain_bundles.get("poset"),
-            "projective_geometry": result.domain_bundles.get("projective_geometry"),
-            "topology": result.domain_bundles.get("topology"),
+            bundle.domain_id: (bundle, result.domain_bundles[bundle.domain_id])
+            for bundle in plan.domain_bundles
+            if bundle.checker_declarations and bundle.domain_id in result.domain_bundles
         }
-        if not any(exact_bundles.values()):
+        if not exact_bundles:
             return
         adapters, result.exact_domain_checkers = install_exact_domain_verification(
             ctx.store,
@@ -247,18 +239,7 @@ class CoreApplicationInstaller:
             ctx.artifacts,
             ctx.verification,
             ctx.checkers,
-            polynomial=polynomial,
-            matrix=matrix,
-            certified_snf=exact_bundles["certified_snf"],
-            graph=exact_bundles["graph"],
-            graph_invariants=exact_bundles["graph_invariants"],
-            graph_symmetry=exact_bundles["graph_symmetry"],
-            combinatorics=exact_bundles["combinatorics"],
-            number_theory=exact_bundles["number_theory"],
-            probability=exact_bundles["probability"],
-            poset=exact_bundles["poset"],
-            projective_geometry=exact_bundles["projective_geometry"],
-            topology=exact_bundles["topology"],
+            bundles=exact_bundles,
             authorize=ctx.authorizes_bundled_checkers,
         )
         for adapter in adapters:

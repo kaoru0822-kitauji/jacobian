@@ -12,7 +12,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.geometry import GEOMETRY_BUNDLE
+from jacobian.domains.geometry import build_geometry_bundle
 from jacobian.geometry_verification import install_geometry_checker
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
@@ -42,7 +42,7 @@ class _GeometryRuntime:
         )
         self.geometry = OperationInstaller(
             self.store, self.schemas, self.artifacts
-        ).install(GEOMETRY_BUNDLE)
+        ).install(build_geometry_bundle())
         for adapter in self.geometry.adapters:
             self.capabilities.register(adapter)
 

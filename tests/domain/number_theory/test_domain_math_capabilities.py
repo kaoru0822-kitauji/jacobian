@@ -9,22 +9,22 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.arithmetic import ARITHMETIC_BUNDLE
-from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
-from jacobian.domains.finite_sets import FINITE_SET_BUNDLE
-from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
-from jacobian.domains.sequences import SEQUENCE_BUNDLE
+from jacobian.domains.arithmetic import build_arithmetic_bundle
+from jacobian.domains.combinatorics import build_combinatorics_bundle
+from jacobian.domains.finite_sets import build_finite_set_bundle
+from jacobian.domains.number_theory import build_number_theory_bundle
+from jacobian.domains.sequences import build_sequence_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
         tmp_path / "state",
-        ARITHMETIC_BUNDLE,
-        COMBINATORICS_BUNDLE,
-        FINITE_SET_BUNDLE,
-        NUMBER_THEORY_BUNDLE,
-        SEQUENCE_BUNDLE,
+        build_arithmetic_bundle(),
+        build_combinatorics_bundle(),
+        build_finite_set_bundle(),
+        build_number_theory_bundle(),
+        build_sequence_bundle(),
     ) as services:
         yield services
 

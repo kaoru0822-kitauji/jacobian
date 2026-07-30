@@ -9,15 +9,17 @@ from tests.support.services import DomainTestServices, open_domain_services
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.graph_optimization import (
-    GRAPH_INVARIANT_BUNDLE,
-    GRAPH_OPTIMIZATION_BUNDLE,
+    build_graph_invariant_bundle,
+    build_graph_optimization_bundle,
 )
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
-        tmp_path / "state", GRAPH_INVARIANT_BUNDLE, GRAPH_OPTIMIZATION_BUNDLE
+        tmp_path / "state",
+        build_graph_invariant_bundle(),
+        build_graph_optimization_bundle(),
     ) as services:
         yield services
 

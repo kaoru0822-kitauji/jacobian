@@ -37,10 +37,8 @@ from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
 from jacobian.flint_hnf_worker import FLINT_HNF_WORKER_PROTOCOL
 from jacobian.matrix_normal_forms import MatrixNormalFormArtifactService
-from jacobian.provider_runtime import (
-    PYTHON_FLINT_VERSION,
-    python_flint_hnf_provider_runtime,
-)
+from jacobian.provider_runtime import PYTHON_FLINT_VERSION
+from jacobian.providers.flint_runtime import python_flint_hnf_provider_runtime
 from jacobian.schema_registry import model_schema
 
 FLINT_HNF_STDOUT_LIMIT = 1_000_000

@@ -18,7 +18,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.provider_measurements import measure_provider
-from jacobian.provider_runtime import cvc5_provider_runtime
+from jacobian.providers.external_solver_runtime import cvc5_provider_runtime
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import JacobianRuntime
 from jacobian.smt import SmtArtifactError

@@ -12,13 +12,15 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityRequest,
 )
-from jacobian.domains.polynomial import POLYNOMIAL_BUNDLE
+from jacobian.domains.polynomial import build_polynomial_bundle
 from jacobian.polynomial_capabilities import install_polynomial_capabilities
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(tmp_path / "state", POLYNOMIAL_BUNDLE) as services:
+    with open_domain_services(
+        tmp_path / "state", build_polynomial_bundle()
+    ) as services:
         adapters, _installation = install_polynomial_capabilities(
             services.core.store,
             services.core.schemas,

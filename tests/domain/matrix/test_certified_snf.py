@@ -16,14 +16,14 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains._certified_snf import smith_reduce
-from jacobian.domains.certified_snf import CERTIFIED_SNF_BUNDLE
+from jacobian.domains.certified_snf import build_certified_snf_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
         tmp_path / "state",
-        CERTIFIED_SNF_BUNDLE,
+        build_certified_snf_bundle(),
     ) as services:
         yield services
 

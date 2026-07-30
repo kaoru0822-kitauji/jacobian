@@ -12,14 +12,14 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.graph_symmetry import GRAPH_SYMMETRY_BUNDLE
+from jacobian.domains.graph_symmetry import build_graph_symmetry_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
         tmp_path / "state",
-        GRAPH_SYMMETRY_BUNDLE,
+        build_graph_symmetry_bundle(),
     ) as services:
         yield services
 

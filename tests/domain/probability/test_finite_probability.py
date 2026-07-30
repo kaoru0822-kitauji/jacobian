@@ -12,13 +12,13 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.probability import FINITE_PROBABILITY_BUNDLE
+from jacobian.domains.probability import build_finite_probability_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
     with open_domain_services(
-        tmp_path / "state", FINITE_PROBABILITY_BUNDLE
+        tmp_path / "state", build_finite_probability_bundle()
     ) as services:
         yield services
 

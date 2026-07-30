@@ -13,12 +13,14 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.graph_invariant_operations import GraphDistanceMatrixResult
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.graph_optimization import GRAPH_INVARIANT_BUNDLE
+from jacobian.domains.graph_optimization import build_graph_invariant_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(tmp_path / "state", GRAPH_INVARIANT_BUNDLE) as services:
+    with open_domain_services(
+        tmp_path / "state", build_graph_invariant_bundle()
+    ) as services:
         yield services
 
 

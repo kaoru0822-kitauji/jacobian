@@ -107,7 +107,7 @@ def _authorized_reference_hydration(root: Path) -> None:
 def _one_domain_installation() -> None:
     """Install one literal domain bundle through production seams."""
 
-    from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLES
+    from jacobian.domains.builtins import build_builtin_domain_bundles
     from jacobian.installation.context import create_installation_context
     from jacobian.portfolio.domain_installation import DomainBundleInstaller
     from jacobian.portfolio.model import PortfolioPlan
@@ -122,7 +122,7 @@ def _one_domain_installation() -> None:
             application = build_application_services(core)
             context = create_installation_context(core, application, options)
             DomainBundleInstaller(context).install(
-                PortfolioPlan(domain_bundles=(BUILTIN_DOMAIN_BUNDLES[0],))
+                PortfolioPlan(domain_bundles=(build_builtin_domain_bundles()[0],))
             )
         finally:
             core.close()

@@ -5,7 +5,10 @@ from tests.support.provider_external_sat import cadical_runtime_available
 
 from jacobian.contracts.capabilities import CapabilityMode, CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.provider_runtime import CADICAL_VERSION, cadical_provider_runtime
+from jacobian.providers.external_solver_runtime import (
+    CADICAL_VERSION,
+    cadical_provider_runtime,
+)
 
 pytestmark = [
     pytest.mark.usefixtures("attached_complete_runtime"),

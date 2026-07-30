@@ -62,11 +62,11 @@ from jacobian.contracts.number_theory import (
 from jacobian.contracts.rationals import RationalPairRequest, RationalValueRequest
 from jacobian.contracts.results import ContractModel, ExecutionStatus
 from jacobian.contracts.sequences import IntegerSequenceRequest
-from jacobian.domains.arithmetic import ARITHMETIC_BUNDLE
-from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
-from jacobian.domains.finite_sets import FINITE_SET_BUNDLE
-from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
-from jacobian.domains.sequences import SEQUENCE_BUNDLE
+from jacobian.domains.arithmetic import build_arithmetic_bundle
+from jacobian.domains.combinatorics import build_combinatorics_bundle
+from jacobian.domains.finite_sets import build_finite_set_bundle
+from jacobian.domains.number_theory import build_number_theory_bundle
+from jacobian.domains.sequences import build_sequence_bundle
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.operations import BoundedSearchOperation
@@ -197,11 +197,11 @@ EXPECTED_IDS: frozenset[str] = frozenset(
 )
 
 ALL_BUNDLES = (
-    ARITHMETIC_BUNDLE,
-    COMBINATORICS_BUNDLE,
-    FINITE_SET_BUNDLE,
-    NUMBER_THEORY_BUNDLE,
-    SEQUENCE_BUNDLE,
+    build_arithmetic_bundle(),
+    build_combinatorics_bundle(),
+    build_finite_set_bundle(),
+    build_number_theory_bundle(),
+    build_sequence_bundle(),
 )
 
 _REPR: list[tuple[type[ContractModel], dict[str, object]]] = [

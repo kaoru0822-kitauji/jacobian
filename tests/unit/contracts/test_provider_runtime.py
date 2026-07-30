@@ -22,10 +22,14 @@ from jacobian.contracts.provider_measurements import (
 from jacobian.provider_runtime import (
     ProviderRuntimeError,
     composite_provider_runtime,
-    exact_domain_checker_provider_runtime,
     python_distribution_provider_runtime,
     require_provider_runtime_unchanged,
 )
+from jacobian.providers.flint_runtime import (
+    exact_domain_checker_provider_runtime,
+    python_flint_exact_checker_provider_runtime,
+)
+from jacobian.providers.lean_runtime import lean_frontend_provider_runtime
 
 
 def _runtime(**updates: object) -> CapabilityProviderRuntime:
@@ -177,7 +181,7 @@ def test_exact_checker_runtime_defers_rational_polynomial_api_probe(
         lambda _name: incomplete_flint,
     )
 
-    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(refresh=True)
+    runtime = python_flint_exact_checker_provider_runtime(refresh=True)
 
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.distribution_required_attributes == (
@@ -193,7 +197,7 @@ def test_exact_checker_runtime_defers_rational_polynomial_api_probe(
 def test_exact_checker_runtime_rejects_different_linked_flint_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    available = provider_runtime.python_flint_exact_checker_provider_runtime()
+    available = python_flint_exact_checker_provider_runtime()
     assert available.availability is CapabilityProviderAvailability.AVAILABLE
     monkeypatch.setattr(
         provider_runtime,
@@ -206,7 +210,7 @@ def test_exact_checker_runtime_rejects_different_linked_flint_version(
         lambda _name: SimpleNamespace(__FLINT_VERSION__="3.5.0"),
     )
 
-    runtime = provider_runtime.python_flint_exact_checker_provider_runtime(refresh=True)
+    runtime = python_flint_exact_checker_provider_runtime(refresh=True)
 
     assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert runtime.digest is None
@@ -270,7 +274,7 @@ def test_lean_frontend_runtime_binds_the_pinned_executable(
         ),
     )
 
-    runtime = provider_runtime.lean_frontend_provider_runtime()
+    runtime = lean_frontend_provider_runtime()
 
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE
@@ -292,7 +296,7 @@ def test_lean_frontend_runtime_preserves_actionable_probe_diagnostic(
 
     monkeypatch.setattr(lean4, "inspect_runtime", fail)
 
-    runtime = provider_runtime.lean_frontend_provider_runtime()
+    runtime = lean_frontend_provider_runtime()
 
     assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert runtime.diagnostic is not None
@@ -311,7 +315,7 @@ def test_lean_frontend_runtime_bounds_probe_diagnostic(
         lambda *, require_mathlib: (_ for _ in ()).throw(OSError("x" * 2_000)),
     )
 
-    runtime = provider_runtime.lean_frontend_provider_runtime()
+    runtime = lean_frontend_provider_runtime()
 
     assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert runtime.diagnostic is not None

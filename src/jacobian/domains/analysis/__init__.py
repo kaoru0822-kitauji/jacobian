@@ -1,5 +1,5 @@
 """Validated real-analysis capabilities."""
 
-from jacobian.domains.analysis.bundle import REAL_ANALYSIS_BUNDLE
+from jacobian.domains.analysis.bundle import build_real_analysis_bundle
 
-__all__ = ["REAL_ANALYSIS_BUNDLE"]
+__all__ = ["build_real_analysis_bundle"]

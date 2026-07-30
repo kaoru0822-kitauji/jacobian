@@ -16,7 +16,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import SatAssignmentArtifact, SatProofArtifact
-from jacobian.provider_runtime import cadical_provider_runtime
+from jacobian.providers.external_solver_runtime import cadical_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime
 

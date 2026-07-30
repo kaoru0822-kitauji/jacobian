@@ -29,6 +29,7 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.flint_linear import install_python_flint_linear_capability
 from jacobian.linear_capabilities import install_linear_rational_solution_checker
 from jacobian.provider_runtime import PYTHON_FLINT_VERSION
+from jacobian.providers.flint_runtime import python_flint_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.services import CoreServices
 
@@ -67,7 +68,7 @@ def _open_linear_runtime(
         else CheckerAuthorityMode.NONE
     )
     with open_domain_services(root, checker_authority=authority) as services:
-        runtime = provider_runtime.python_flint_provider_runtime()
+        runtime = python_flint_provider_runtime()
         producer = install_python_flint_linear_capability(
             services.core.linear,
             runtime,
@@ -132,7 +133,7 @@ def test_python_flint_find_returns_one_exact_unverified_solution(
 
 
 def test_python_flint_runtime_is_exact_optional_distribution_identity() -> None:
-    runtime = provider_runtime.python_flint_provider_runtime()
+    runtime = python_flint_provider_runtime()
 
     assert runtime.version == PYTHON_FLINT_VERSION
     assert runtime.install_tier is CapabilityInstallTier.T1
@@ -163,7 +164,7 @@ def test_python_flint_runtime_rejects_an_unpinned_binding_version(
         lambda *_args, **_kwargs: wrong,
     )
 
-    rejected = provider_runtime.python_flint_provider_runtime()
+    rejected = python_flint_provider_runtime()
 
     assert rejected.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert rejected.version is None

@@ -249,7 +249,7 @@ def _require_python_attributes(
 def available_cvc5() -> CapabilityProviderRuntime:
     """Return the exact usable cvc5 runtime, or skip closed."""
 
-    from jacobian.provider_runtime import cvc5_provider_runtime
+    from jacobian.providers.external_solver_runtime import cvc5_provider_runtime
 
     runtime = _require_available(cvc5_provider_runtime(), name="cvc5")
     return _require_python_attributes(runtime, name="cvc5")
@@ -259,7 +259,7 @@ def available_cvc5() -> CapabilityProviderRuntime:
 def available_flint() -> CapabilityProviderRuntime:
     """Return the exact usable Python-FLINT runtime, or skip closed."""
 
-    from jacobian.provider_runtime import python_flint_provider_runtime
+    from jacobian.providers.flint_runtime import python_flint_provider_runtime
 
     runtime = _require_available(
         python_flint_provider_runtime(refresh=True),
@@ -272,7 +272,7 @@ def available_flint() -> CapabilityProviderRuntime:
 def available_lean() -> CapabilityProviderRuntime:
     """Return the pinned Lean/Mathlib runtime, or skip closed."""
 
-    from jacobian.provider_runtime import lean_provider_runtime
+    from jacobian.providers.lean_runtime import lean_provider_runtime
 
     return _require_available(
         lean_provider_runtime(
@@ -287,7 +287,7 @@ def available_lean() -> CapabilityProviderRuntime:
 def available_external_sat() -> tuple[CapabilityProviderRuntime, ...]:
     """Return the complete pinned external SAT toolchain, or skip closed."""
 
-    from jacobian.provider_runtime import (
+    from jacobian.providers.external_solver_runtime import (
         cadical_provider_runtime,
         carcara_provider_runtime,
         drat_trim_provider_runtime,

@@ -48,16 +48,6 @@
       "complexity": 11
     },
     {
-      "path": "src/jacobian/adapters/mcp/server.py",
-      "symbol": "_register_resources_and_prompts",
-      "complexity": 12
-    },
-    {
-      "path": "src/jacobian/adapters/mcp/server.py",
-      "symbol": "_register_tools",
-      "complexity": 11
-    },
-    {
       "path": "src/jacobian/bounded_process.py",
       "symbol": "run_bounded_process",
       "complexity": 13

@@ -22,6 +22,9 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.polynomial_expression_capabilities import (
     install_polynomial_expression_checker,
 )
+from jacobian.providers.sympy_runtime import (
+    sympy_polynomial_normalization_provider_runtime,
+)
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import JacobianRuntime
 
@@ -229,7 +232,7 @@ def test_sympy_normalization_runtime_has_exact_profile(tmp_path: Path) -> None:
 def test_sympy_normalization_runtime_rejects_unpinned_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    available = provider_runtime.sympy_polynomial_normalization_provider_runtime()
+    available = sympy_polynomial_normalization_provider_runtime()
     wrong = available.model_copy(update={"version": "1.13.3"})
     monkeypatch.setattr(
         provider_runtime,
@@ -237,9 +240,7 @@ def test_sympy_normalization_runtime_rejects_unpinned_version(
         lambda *_args, **_kwargs: wrong,
     )
 
-    rejected = provider_runtime.sympy_polynomial_normalization_provider_runtime(
-        refresh=True
-    )
+    rejected = sympy_polynomial_normalization_provider_runtime(refresh=True)
 
     assert rejected.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert rejected.version is None

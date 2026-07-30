@@ -27,8 +27,11 @@ from jacobian.contracts.polynomial_operations import (
 )
 from jacobian.contracts.projective_geometry import ProjectiveLineArrangementRequest
 from jacobian.contracts.results import ContractModel
-from jacobian.exact_domain_checkers import install_exact_domain_checkers
+from jacobian.exact_domain_checkers import (
+    install_exact_domain_checkers as _install_exact_domain_checkers,
+)
 from jacobian.operation_installation import InstalledDomainBundle
+from jacobian.portfolio import build_builtin_portfolio
 from jacobian.registry import CheckerRegistry
 from jacobian.store import ArtifactStore
 
@@ -50,6 +53,31 @@ def _installed(
             for index, capability_id in enumerate(capability_ids)
         },
         obligation_schema_uris={},
+    )
+
+
+def install_exact_domain_checkers(
+    registry: CheckerRegistry,
+    *,
+    authorize: bool,
+    **installed: InstalledDomainBundle,
+):
+    domain_ids = {
+        "graph": "graph_optimization",
+        "graph_invariants": "graph_invariants",
+        "graph_symmetry": "graph_symmetry",
+    }
+    plan = build_builtin_portfolio()
+    bundles = {}
+    for name, installation in installed.items():
+        domain_id = domain_ids.get(name, name)
+        bundle = plan.bundle_for(domain_id)
+        assert bundle is not None
+        bundles[domain_id] = (bundle, installation)
+    return _install_exact_domain_checkers(
+        registry,
+        bundles=bundles,
+        authorize=authorize,
     )
 
 

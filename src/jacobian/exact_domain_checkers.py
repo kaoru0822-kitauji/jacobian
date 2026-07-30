@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -37,31 +38,9 @@ from jacobian.contracts.results import (
     ExecutionStatus,
     Verification,
 )
-from jacobian.domains.certified_snf.checkers import (
-    CERTIFIED_SNF_EXACT_REPLAY_CHECKERS,
-)
-from jacobian.domains.combinatorics.checkers import (
-    COMBINATORICS_EXACT_REPLAY_CHECKERS,
-)
-from jacobian.domains.graph_optimization.checkers import (
-    GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS,
-)
-from jacobian.domains.graph_symmetry.checkers import (
-    GRAPH_SYMMETRY_EXACT_REPLAY_CHECKERS,
-)
-from jacobian.domains.matrix_lattice.checkers import MATRIX_EXACT_REPLAY_CHECKERS
-from jacobian.domains.number_theory.checkers import (
-    NUMBER_THEORY_EXACT_REPLAY_CHECKERS,
-)
-from jacobian.domains.polynomial.checkers import POLYNOMIAL_EXACT_REPLAY_CHECKERS
-from jacobian.domains.posets.checkers import FINITE_POSET_EXACT_REPLAY_CHECKERS
-from jacobian.domains.probability.checkers import PROBABILITY_EXACT_REPLAY_CHECKERS
-from jacobian.domains.projective_geometry.checkers import (
-    PROJECTIVE_GEOMETRY_EXACT_REPLAY_CHECKERS,
-)
-from jacobian.domains.topology.checkers import TOPOLOGY_EXACT_REPLAY_CHECKERS
 from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.provider_runtime import (
+from jacobian.operations import DomainBundle
+from jacobian.providers.flint_runtime import (
     certified_snf_checker_provider_runtime,
     combinatorics_exact_checker_provider_runtime,
     exact_domain_checker_provider_runtime,
@@ -126,18 +105,7 @@ def _provider_runtime_key(declaration: ExactReplayCheckerDeclaration) -> str:
 def install_exact_domain_checkers(
     checkers: CheckerRegistry,
     *,
-    polynomial: InstalledDomainBundle | None = None,
-    matrix: InstalledDomainBundle | None = None,
-    certified_snf: InstalledDomainBundle | None = None,
-    graph: InstalledDomainBundle | None = None,
-    graph_invariants: InstalledDomainBundle | None = None,
-    graph_symmetry: InstalledDomainBundle | None = None,
-    combinatorics: InstalledDomainBundle | None = None,
-    number_theory: InstalledDomainBundle | None = None,
-    probability: InstalledDomainBundle | None = None,
-    poset: InstalledDomainBundle | None = None,
-    projective_geometry: InstalledDomainBundle | None = None,
-    topology: InstalledDomainBundle | None = None,
+    bundles: Mapping[str, tuple[DomainBundle, InstalledDomainBundle]],
     authorize: bool,
 ) -> ExactDomainCheckerInstallation:
     """Install independent exact replay against dynamically registered schemas."""
@@ -156,58 +124,7 @@ def install_exact_domain_checkers(
     }
     checker_ids: dict[str, str | None] = {}
     declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
-    for installed, declaration in (
-        *(
-            (polynomial, item)
-            for item in POLYNOMIAL_EXACT_REPLAY_CHECKERS
-            if polynomial is not None
-        ),
-        *(
-            (matrix, item)
-            for item in MATRIX_EXACT_REPLAY_CHECKERS
-            if matrix is not None
-        ),
-        *(
-            (certified_snf, item)
-            for item in CERTIFIED_SNF_EXACT_REPLAY_CHECKERS
-            if certified_snf is not None
-        ),
-        *_available_graph_declaration_bundles(
-            graph=graph,
-            graph_invariants=graph_invariants,
-            graph_symmetry=graph_symmetry,
-        ),
-        *(
-            (combinatorics, item)
-            for item in COMBINATORICS_EXACT_REPLAY_CHECKERS
-            if combinatorics is not None
-        ),
-        *(
-            (number_theory, item)
-            for item in NUMBER_THEORY_EXACT_REPLAY_CHECKERS
-            if number_theory is not None
-        ),
-        *(
-            (probability, item)
-            for item in PROBABILITY_EXACT_REPLAY_CHECKERS
-            if probability is not None
-        ),
-        *(
-            (projective_geometry, item)
-            for item in PROJECTIVE_GEOMETRY_EXACT_REPLAY_CHECKERS
-            if projective_geometry is not None
-        ),
-        *(
-            (poset, item)
-            for item in FINITE_POSET_EXACT_REPLAY_CHECKERS
-            if poset is not None
-        ),
-        *(
-            (topology, item)
-            for item in TOPOLOGY_EXACT_REPLAY_CHECKERS
-            if topology is not None
-        ),
-    ):
+    for installed, declaration in _available_declaration_bundles(bundles):
         declarations_by_id[declaration.capability_id] = declaration
         runtime_key = _provider_runtime_key(declaration)
         operation = CheckerOperation(
@@ -280,36 +197,14 @@ def install_exact_domain_verification(
     verification: VerificationService,
     checkers: CheckerRegistry,
     *,
-    polynomial: InstalledDomainBundle | None = None,
-    matrix: InstalledDomainBundle | None = None,
-    certified_snf: InstalledDomainBundle | None = None,
-    graph: InstalledDomainBundle | None = None,
-    graph_invariants: InstalledDomainBundle | None = None,
-    graph_symmetry: InstalledDomainBundle | None = None,
-    combinatorics: InstalledDomainBundle | None = None,
-    number_theory: InstalledDomainBundle | None = None,
-    probability: InstalledDomainBundle | None = None,
-    poset: InstalledDomainBundle | None = None,
-    projective_geometry: InstalledDomainBundle | None = None,
-    topology: InstalledDomainBundle | None = None,
+    bundles: Mapping[str, tuple[DomainBundle, InstalledDomainBundle]],
     authorize: bool,
 ) -> tuple[tuple[CapabilityAdapter, ...], ExactDomainCheckerInstallation]:
     """Authorize exact replay and expose domain-owned verification capabilities."""
 
     installed = install_exact_domain_checkers(
         checkers,
-        polynomial=polynomial,
-        matrix=matrix,
-        certified_snf=certified_snf,
-        graph=graph,
-        graph_invariants=graph_invariants,
-        graph_symmetry=graph_symmetry,
-        combinatorics=combinatorics,
-        number_theory=number_theory,
-        probability=probability,
-        poset=poset,
-        projective_geometry=projective_geometry,
-        topology=topology,
+        bundles=bundles,
         authorize=authorize,
     )
     witness_schema_uri = schemas.register_model(
@@ -326,134 +221,39 @@ def install_exact_domain_verification(
         checker_id is not None for checker_id in installation.checker_ids.values()
     ):
         return (), installation
-    all_polynomial_declarations = (
-        tuple(
-            _installed_declaration(polynomial, declaration, installation)
-            for declaration in POLYNOMIAL_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
+    declarations_by_domain = {
+        domain_id: tuple(
+            _installed_declaration(installed_bundle, declaration, installation)
+            for declaration in declaration_bundle.checker_declarations
+            if declaration.capability_id in installed_bundle.result_schema_uris
+            and installation.checker_ids.get(declaration.capability_id) is not None
         )
-        if polynomial is not None
-        else ()
-    )
+        for domain_id, (declaration_bundle, installed_bundle) in bundles.items()
+    }
+    all_polynomial_declarations = declarations_by_domain.get("polynomial", ())
     polynomial_declarations = tuple(
         declaration
         for declaration in all_polynomial_declarations
         if declaration.declaration.verification_capability_id is None
     )
-    matrix_declarations = (
-        tuple(
-            _installed_declaration(matrix, declaration, installation)
-            for declaration in MATRIX_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if matrix is not None
-        else ()
-    )
-    certified_snf_declarations = (
-        tuple(
-            _installed_declaration(certified_snf, declaration, installation)
-            for declaration in CERTIFIED_SNF_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if certified_snf is not None
-        else ()
-    )
+    matrix_declarations = declarations_by_domain.get("matrix", ())
+    certified_snf_declarations = declarations_by_domain.get("certified_snf", ())
     graph_declarations = tuple(
-        _installed_declaration(
-            bundle,
-            declaration,
-            installation,
-        )
-        for bundle, declaration in _available_graph_declaration_bundles(
-            graph=graph,
-            graph_invariants=graph_invariants,
-            graph_symmetry=graph_symmetry,
-        )
-        if installation.checker_ids.get(declaration.capability_id) is not None
+        declaration
+        for domain_id in ("graph_optimization", "graph_invariants", "graph_symmetry")
+        for declaration in declarations_by_domain.get(domain_id, ())
     )
-    number_theory_declarations = (
-        tuple(
-            _installed_declaration(
-                number_theory,
-                declaration,
-                installation,
-            )
-            for declaration in NUMBER_THEORY_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if number_theory is not None
-        else ()
-    )
-    projective_declarations = (
-        tuple(
-            _installed_declaration(
-                projective_geometry,
-                declaration,
-                installation,
-            )
-            for declaration in PROJECTIVE_GEOMETRY_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if projective_geometry is not None
-        else ()
-    )
-    probability_declarations = (
-        tuple(
-            _installed_declaration(
-                probability,
-                declaration,
-                installation,
-            )
-            for declaration in PROBABILITY_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if probability is not None
-        else ()
-    )
-    combinatorics_declarations = (
-        tuple(
-            _installed_declaration(
-                combinatorics,
-                declaration,
-                installation,
-            )
-            for declaration in COMBINATORICS_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if combinatorics is not None
-        else ()
-    )
-    all_topology_declarations = (
-        tuple(
-            _installed_declaration(
-                topology,
-                declaration,
-                installation,
-            )
-            for declaration in TOPOLOGY_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if topology is not None
-        else ()
-    )
+    number_theory_declarations = declarations_by_domain.get("number_theory", ())
+    projective_declarations = declarations_by_domain.get("projective_geometry", ())
+    probability_declarations = declarations_by_domain.get("probability", ())
+    combinatorics_declarations = declarations_by_domain.get("combinatorics", ())
+    all_topology_declarations = declarations_by_domain.get("topology", ())
     topology_declarations = tuple(
         declaration
         for declaration in all_topology_declarations
         if declaration.declaration.verification_capability_id is None
     )
-    poset_declarations = (
-        tuple(
-            _installed_declaration(
-                poset,
-                declaration,
-                installation,
-            )
-            for declaration in FINITE_POSET_EXACT_REPLAY_CHECKERS
-            if installation.checker_ids.get(declaration.capability_id) is not None
-        )
-        if poset is not None
-        else ()
-    )
+    poset_declarations = declarations_by_domain.get("poset", ())
     dedicated_declarations = (
         *(
             declaration
@@ -643,29 +443,35 @@ def _verification_metadata(
     )
 
 
-def _available_graph_declaration_bundles(
-    *,
-    graph: InstalledDomainBundle | None,
-    graph_invariants: InstalledDomainBundle | None,
-    graph_symmetry: InstalledDomainBundle | None,
+def _available_declaration_bundles(
+    bundles: Mapping[str, tuple[DomainBundle, InstalledDomainBundle]],
 ) -> tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...]:
+    """Pair domain-owned declarations with their unique installed producer."""
+
     available: list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]] = []
-    for declaration in (
-        *GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS,
-        *GRAPH_SYMMETRY_EXACT_REPLAY_CHECKERS,
-    ):
-        installed = tuple(
-            bundle
-            for bundle in (graph, graph_invariants, graph_symmetry)
-            if bundle is not None
-            and declaration.capability_id in bundle.result_schema_uris
+    owners: dict[str, str] = {}
+    for domain_id, (bundle, installed) in bundles.items():
+        for declaration in bundle.checker_declarations:
+            if declaration.capability_id not in installed.result_schema_uris:
+                continue
+            previous = owners.setdefault(declaration.capability_id, domain_id)
+            if previous != domain_id:
+                raise ValueError(
+                    "exact replay declaration is owned by multiple bundles: "
+                    f"{declaration.capability_id}"
+                )
+            available.append((installed, declaration))
+    capability_ids = [declaration.capability_id for _, declaration in available]
+    if len(capability_ids) != len(set(capability_ids)):
+        duplicates = sorted(
+            capability_id
+            for capability_id in set(capability_ids)
+            if capability_ids.count(capability_id) > 1
         )
-        if len(installed) > 1:
+        if duplicates:
             raise ValueError(
-                "graph exact replay declaration is owned by multiple bundles"
+                "bundle repeats exact replay declarations: " + ", ".join(duplicates)
             )
-        if installed:
-            available.append((installed[0], declaration))
     return tuple(available)
 
 

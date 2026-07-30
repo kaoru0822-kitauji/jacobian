@@ -43,7 +43,7 @@ from jacobian.contracts.sat import (
     SatModelFindOutput,
     SatUnsatProofFindOutput,
 )
-from jacobian.provider_runtime import CADICAL_VERSION
+from jacobian.providers.external_solver_runtime import CADICAL_VERSION
 from jacobian.sat import ResolvedSatCnf, SatArtifactError, SatArtifactService
 from jacobian.schema_registry import model_schema
 

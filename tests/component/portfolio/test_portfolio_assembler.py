@@ -39,7 +39,7 @@ from jacobian.portfolio import (
     PROVIDER_UNAVAILABLE,
     PortfolioPlan,
 )
-from jacobian.portfolio.builtin import BUILTIN_PORTFOLIO
+from jacobian.portfolio.builtin import build_builtin_portfolio
 from jacobian.portfolio.domain_installation import DomainBundleInstaller
 from jacobian.portfolio.result import (
     BundleInstallationStatus,
@@ -350,7 +350,7 @@ def test_install_failure_propagates_without_silent_partial_portfolio(
 def test_conjecture_ingestion_installs_through_domain_bundle_outcome(
     assembly: _RecordingContext,
 ) -> None:
-    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    bundle = build_builtin_portfolio().bundle_for("conjecture_ingestion")
 
     assert bundle is not None
     assert bundle.capability_ids == ("dataset.conjecture.ingest",)
@@ -368,7 +368,7 @@ def test_conjecture_ingestion_installs_through_domain_bundle_outcome(
 def test_managed_bundle_rejects_installed_capability_id_mismatch(
     assembly: _RecordingContext,
 ) -> None:
-    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    bundle = build_builtin_portfolio().bundle_for("conjecture_ingestion")
     assert bundle is not None
     mismatched = replace(bundle, managed_capability_ids=("dataset.wrong.ingest",))
 
@@ -381,7 +381,7 @@ def test_managed_bundle_rejects_installed_capability_id_mismatch(
 def test_managed_bundle_rejects_installed_provider_runtime_mismatch(
     assembly: _RecordingContext,
 ) -> None:
-    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    bundle = build_builtin_portfolio().bundle_for("conjecture_ingestion")
     assert bundle is not None
     mismatched = replace(
         bundle,
