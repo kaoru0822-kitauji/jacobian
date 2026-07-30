@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import tomllib
 from pathlib import Path
@@ -42,9 +43,14 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
         assert input_bytes == (task / "environment" / "input.json").read_bytes()
         assert input_bytes == (task / "tests" / "input.json").read_bytes()
         json.loads(input_bytes)
+        input_digest = "sha256:" + hashlib.sha256(input_bytes).hexdigest()
         metadata = json.loads((task / "metadata.json").read_text())
         assert metadata["case_version"] == "regression-v1"
-        assert metadata["fixture_digest"].startswith("sha256:")
+        assert metadata["fixture_digest"] == input_digest
+        assert (
+            json.loads((task / "environment" / "metadata.json").read_text()) == metadata
+        )
+        assert spec["metadata"]["fixture_digest"] == input_digest
         assert metadata["upstream"] is None
 
         instruction = (task / "instruction.md").read_text()

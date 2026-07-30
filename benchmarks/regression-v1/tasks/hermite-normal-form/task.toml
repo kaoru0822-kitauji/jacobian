@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["matrix", "hermite", "certificate", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:hermite-normal-form-input-v1"
+fixture_digest = "sha256:bb764b3ee766e258f0dd5f89bb37e87974264f423db30d5e94a98fdfeec58693"
 derivation = "Fixed full-rank integer matrix with a unimodular row reduction certificate."
 [agent]
 timeout_sec = 600.0

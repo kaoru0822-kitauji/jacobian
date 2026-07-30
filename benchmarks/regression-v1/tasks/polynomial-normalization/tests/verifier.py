@@ -23,9 +23,19 @@ def main():
     want = {k: v for k, v in want.items() if v}
     got = {}
     try:
+        if not isinstance(terms, list):
+            raise TypeError
         for t in terms:
-            got[tuple(t["exponents"])] = Fraction(t["coefficient"])
-    except (TypeError, ValueError, ZeroDivisionError):
+            if not isinstance(t, dict) or not isinstance(t.get("exponents"), list):
+                raise TypeError
+            exponents = t["exponents"]
+            if len(exponents) != 2 or any(type(v) is not int for v in exponents):
+                raise ValueError
+            key = tuple(exponents)
+            if key in got:
+                raise ValueError
+            got[key] = Fraction(t["coefficient"])
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
         got = {}
     contract = (
         isinstance(s, dict)
@@ -60,7 +70,14 @@ def main():
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good = True
         for i in s["evidence"]:
-            p = Path(i.get("path", ""))
+            if (
+                not isinstance(i, dict)
+                or not isinstance(i.get("path"), str)
+                or not isinstance(i.get("sha256"), str)
+            ):
+                good = False
+                continue
+            p = Path(i["path"])
             t = (W / p).resolve()
             good &= (
                 isinstance(i, dict)
@@ -75,7 +92,7 @@ def main():
                     i.get("sha256")
                     == "sha256:" + hashlib.sha256(t.read_bytes()).hexdigest()
                 )
-    scope = bool(contract and all(t in s["scope"] for t in e["required_scope_terms"]))
+    scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(contract and s["claimed_assurance"] == "VERIFIED")
     reward = (

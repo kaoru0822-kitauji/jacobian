@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["linear", "rational", "exact", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:rational-linear-solution-input-v1"
+fixture_digest = "sha256:a24aaad769323b66fa1a0f91d757fc84f6cedeff3dd10ba37c8b15b9d975a3ba"
 derivation = "Fixed two-variable system with a non-integral unique solution."
 [agent]
 timeout_sec = 600.0

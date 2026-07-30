@@ -14,7 +14,7 @@ category = "mathematics"
 tags = ["graph", "counterexample", "offline", "verification"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:graph-counterexample-input-v1"
+fixture_digest = "sha256:5e334b8b22312e495bcf8fd9f94bc288d8d39e84a9e1384eecd74a7ecb3ed0ac"
 derivation = "A fixed six-vertex triangle-free graph with an odd cycle and minimum degree two."
 
 [agent]

@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["graph", "distance", "composition", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:graph-artifact-composition-input-v1"
+fixture_digest = "sha256:afc9c57132594b60e9d309377efd0866109303fc5639d93b8f0ad6b081313e65"
 derivation = "Fixed connected six-vertex graph with a non-singleton distance calculation."
 [agent]
 timeout_sec = 600.0

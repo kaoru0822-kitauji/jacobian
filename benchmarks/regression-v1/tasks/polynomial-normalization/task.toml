@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["polynomial", "normalization", "exact", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:polynomial-normalization-input-v1"
+fixture_digest = "sha256:60acd1fbcd0dc163843512d3e0fd5ad535fe21534115bf63c2e705aaa3b7df27"
 derivation = "Fixed sparse bivariate expression with cancellation and reordered terms."
 [agent]
 timeout_sec = 600.0

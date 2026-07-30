@@ -50,10 +50,20 @@ def main():
         if valid:
             members.extend(g["members"])
     wanted = set(x["universe"])
+    actual = {}
+    if valid:
+        try:
+            for g in groups:
+                if g["name"] in actual:
+                    valid = False
+                    break
+                actual[g["name"]] = frozenset(g["members"])
+        except TypeError:
+            valid = False
     expected = {
-        frozenset(n for n in x["universe"] if int(n) % 3 == r) for r in range(3)
+        f"residue-{r}": frozenset(n for n in x["universe"] if int(n) % 3 == r)
+        for r in range(3)
     }
-    actual = {frozenset(g["members"]) for g in groups} if valid else set()
     correct = bool(
         contract
         and s["claimed_assurance"] != "VERIFIED"
@@ -65,10 +75,14 @@ def main():
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good_evidence = True
         for i in s["evidence"]:
-            if not isinstance(i, dict):
+            if (
+                not isinstance(i, dict)
+                or not isinstance(i.get("path"), str)
+                or not isinstance(i.get("sha256"), str)
+            ):
                 good_evidence = False
                 continue
-            p = Path(i.get("path", ""))
+            p = Path(i["path"])
             t = (W / p).resolve()
             if (
                 p.is_absolute()
@@ -81,7 +95,7 @@ def main():
                 continue
             h = hashlib.sha256(t.read_bytes()).hexdigest()
             good_evidence &= i.get("sha256") == "sha256:" + h
-    scope = bool(contract and all(t in s["scope"] for t in e["required_scope_terms"]))
+    scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(contract and s["claimed_assurance"] == "VERIFIED")
     reward = (

@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["polynomial", "map", "collision", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:polynomial-map-collision-input-v1"
+fixture_digest = "sha256:9206bd2581f20ceabd16a483ffe98eff97cfcd402f84f7866fdc257c704aa8d3"
 derivation = "Fixed symmetric map and two distinct integer points with equal images."
 [agent]
 timeout_sec = 600.0

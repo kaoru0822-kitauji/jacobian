@@ -85,9 +85,7 @@ def main():
     correct = bool(
         contract and s["claimed_assurance"] != "VERIFIED" and s["result"] == result
     )
-    scope = bool(
-        contract and all(t in s["scope"] for t in expected["required_scope_terms"])
-    )
+    scope = bool(contract and s["scope"] == " ".join(expected["required_scope_terms"]))
     assurance = bool(
         contract and s["claimed_assurance"] == expected["maximum_assurance"]
     )

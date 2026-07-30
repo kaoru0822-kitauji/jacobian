@@ -20,6 +20,19 @@ def hnf(a):
     return a == [[2, 0], [0, 4]]
 
 
+def integer_matrix(value):
+    return (
+        isinstance(value, list)
+        and len(value) == 2
+        and all(
+            isinstance(row, list)
+            and len(row) == 2
+            and all(type(entry) is int for entry in row)
+            for row in value
+        )
+    )
+
+
 def main():
     try:
         s = json.loads((W / "submission.json").read_text())
@@ -54,8 +67,8 @@ def main():
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
     valid = (
-        isinstance(h, list)
-        and isinstance(u, list)
+        integer_matrix(h)
+        and integer_matrix(u)
         and h == [[2, 0], [0, 4]]
         and mul(u, x["matrix"]) == h
         and abs(det(u)) == 1
@@ -66,7 +79,14 @@ def main():
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good = True
         for i in s["evidence"]:
-            p = Path(i.get("path", ""))
+            if (
+                not isinstance(i, dict)
+                or not isinstance(i.get("path"), str)
+                or not isinstance(i.get("sha256"), str)
+            ):
+                good = False
+                continue
+            p = Path(i["path"])
             t = (W / p).resolve()
             good &= (
                 isinstance(i, dict)
@@ -81,7 +101,7 @@ def main():
                     i.get("sha256")
                     == "sha256:" + hashlib.sha256(t.read_bytes()).hexdigest()
                 )
-    scope = bool(contract and all(t in s["scope"] for t in e["required_scope_terms"]))
+    scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(contract and s["claimed_assurance"] == "VERIFIED")
     reward = (

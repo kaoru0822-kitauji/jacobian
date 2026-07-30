@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["sat", "boolean", "witness", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:sat-witness-input-v1"
+fixture_digest = "sha256:adc92d0febe95c5950692e8dd7d53f39124978551732bb57bb4bf0a5be87e876"
 derivation = "Fixed four-variable CNF with a nontrivial satisfying assignment."
 [agent]
 timeout_sec = 600.0

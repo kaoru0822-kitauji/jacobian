@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 
 UV_RUN := uv run --locked
+HARBOR_VERSION ?= 0.20.0
+HARBOR_RUNNER ?= uvx --from harbor==$(HARBOR_VERSION) harbor
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
@@ -150,7 +152,7 @@ precommit: ## Fix and run every routine local handoff check.
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
 agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
-	harbor run -c benchmarks/regression-v1/job-jacobian.json $(EVAL_ARGS)
+	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-jacobian.json $(EVAL_ARGS)
 
 bench-core: ## Run the core performance benchmark script.
 	$(UV_RUN) python benchmarks/benchmark_core.py

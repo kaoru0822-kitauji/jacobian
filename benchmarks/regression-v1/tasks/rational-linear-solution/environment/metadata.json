@@ -1,1 +1,1 @@
-{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:rational-linear-solution-input-v1","derivation_note":"Hand-designed exact system; no floating-point arithmetic is needed."}
+{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:a24aaad769323b66fa1a0f91d757fc84f6cedeff3dd10ba37c8b15b9d975a3ba","derivation_note":"Hand-designed exact system; no floating-point arithmetic is needed."}

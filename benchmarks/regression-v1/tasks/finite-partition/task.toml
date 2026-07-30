@@ -12,7 +12,7 @@ category = "mathematics"
 tags = ["finite", "partition", "coverage", "offline"]
 case_version = "regression-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:finite-partition-input-v1"
+fixture_digest = "sha256:058a953f55dfbb537df91e94244944488ef78c6a4ecf9add0fef3b140aaeb5b2"
 derivation = "Fixed twelve-element universe and modulo-three partition relation."
 [agent]
 timeout_sec = 600.0

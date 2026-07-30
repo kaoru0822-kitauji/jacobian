@@ -1,1 +1,1 @@
-{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:graph-counterexample-input-v1","derivation_note":"Hand-designed finite graph; no external source is loaded at runtime."}
+{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:5e334b8b22312e495bcf8fd9f94bc288d8d39e84a9e1384eecd74a7ecb3ed0ac","derivation_note":"Hand-designed finite graph; no external source is loaded at runtime."}

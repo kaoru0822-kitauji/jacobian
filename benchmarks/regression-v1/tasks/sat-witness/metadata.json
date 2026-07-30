@@ -1,1 +1,1 @@
-{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:sat-witness-input-v1","derivation_note":"Hand-designed bounded CNF; no solver or external proof backend is loaded at runtime."}
+{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:adc92d0febe95c5950692e8dd7d53f39124978551732bb57bb4bf0a5be87e876","derivation_note":"Hand-designed bounded CNF; no solver or external proof backend is loaded at runtime."}

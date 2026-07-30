@@ -8,10 +8,16 @@ E = Path("/tests")
 
 
 def q(v):
+    if not isinstance(v, str):
+        return None
     try:
-        return Fraction(v)
+        value = Fraction(v)
     except (ValueError, TypeError, ZeroDivisionError):
         return None
+    canonical = str(value.numerator)
+    if value.denominator != 1:
+        canonical += f"/{value.denominator}"
+    return value if v == canonical else None
 
 
 def main():
@@ -65,7 +71,14 @@ def main():
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good = True
         for i in s["evidence"]:
-            p = Path(i.get("path", ""))
+            if (
+                not isinstance(i, dict)
+                or not isinstance(i.get("path"), str)
+                or not isinstance(i.get("sha256"), str)
+            ):
+                good = False
+                continue
+            p = Path(i["path"])
             t = (W / p).resolve()
             good &= (
                 isinstance(i, dict)
@@ -80,7 +93,7 @@ def main():
                     i.get("sha256")
                     == "sha256:" + hashlib.sha256(t.read_bytes()).hexdigest()
                 )
-    scope = bool(contract and all(t in s["scope"] for t in e["required_scope_terms"]))
+    scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(contract and s["claimed_assurance"] == "VERIFIED")
     reward = (
