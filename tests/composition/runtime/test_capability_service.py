@@ -505,6 +505,15 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
     assert formal_method.resolved_input_kind is None
     assert formal_method.routing_status == "UNFILTERED"
 
+    written_formal_proof = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="verify the written proof in Lean",
+            limit=20,
+        )
+    )
+    assert written_formal_proof.resolved_input_kind is None
+    assert written_formal_proof.routing_status == "UNFILTERED"
+
     explicitly_structured = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
             query="formal UNSAT proof",

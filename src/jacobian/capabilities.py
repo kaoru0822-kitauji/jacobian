@@ -889,7 +889,6 @@ def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None
         "natural language proof",
         "informal proof",
         "proof prose",
-        "written proof",
     )
     if any(phrase in normalized for phrase in phrases):
         return CapabilityInputKind.NATURAL_LANGUAGE_PROOF
