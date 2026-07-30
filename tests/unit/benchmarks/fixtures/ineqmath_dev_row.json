@@ -1,0 +1,12 @@
+[
+{
+    "data_id": "0",
+    "problem": "Let x > 0. Determine the largest C such that x + 1/x >= C.",
+    "answer": "$C = 2$",
+    "type": "bound",
+    "data_split": "dev",
+    "solution": [],
+    "theorems": [],
+    "difficulty": ""
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "content": "def double (n : Nat) := n + n\n\ntheorem double_zero : double 0 = 0 := by rfl\n",
+  "content_sha256": "sha256:2081727fa5ed464fe01b5502772747ee1db805bf41180acb47b3924eea3663e9",
+  "declarations": [
+    "double",
+    "double_zero"
+  ],
+  "language": "lean",
+  "path": "Example.lean",
+  "repository": "example/formal",
+  "revision": "1111111111111111111111111111111111111111",
+  "source_id": "src-111111111111"
+}
