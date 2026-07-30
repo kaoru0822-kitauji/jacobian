@@ -103,9 +103,23 @@ def main():
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
+
+    math_contract = (
+        isinstance(s, dict)
+        and set(s) == required
+        and s.get("task_id") == e["task_id"]
+        and s.get("conclusion") == "TRUE"
+        and s.get("completeness") == "COMPLETE"
+        and isinstance(s.get("scope"), str)
+        and isinstance(s.get("limitations"), list)
+        and isinstance(s.get("claimed_assurance"), str)
+        and s.get("claimed_assurance")
+        in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
+    )
+
     record_bound = verification_record_is_bound(s) if isinstance(s, dict) else False
     math_correct = bool(
-        contract
+        math_contract
         and p != q
         and r.get("image_p") == ip
         and r.get("image_q") == iq
@@ -142,7 +156,10 @@ def main():
     assurance = bool(
         contract
         and (
-            s["claimed_assurance"] == e["maximum_assurance"]
+            (
+                s["claimed_assurance"] == e["maximum_assurance"]
+                and s["claimed_assurance"] != "VERIFIED"
+            )
             or (s["claimed_assurance"] == "VERIFIED" and record_bound)
         )
     )

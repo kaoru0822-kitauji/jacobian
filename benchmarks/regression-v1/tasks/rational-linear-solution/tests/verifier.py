@@ -110,6 +110,7 @@ def main():
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
+
     values = {k: q(v) for k, v in sol.items()} if isinstance(sol, dict) else {}
     valid = (
         contract
@@ -157,7 +158,10 @@ def main():
     assurance = bool(
         contract
         and (
-            s["claimed_assurance"] == e["maximum_assurance"]
+            (
+                s["claimed_assurance"] == e["maximum_assurance"]
+                and s["claimed_assurance"] != "VERIFIED"
+            )
             or (s["claimed_assurance"] == "VERIFIED" and record_bound)
         )
     )

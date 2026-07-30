@@ -104,6 +104,21 @@ def main():
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
+
+    math_contract = (
+        isinstance(s, dict)
+        and set(s) == required
+        and s.get("task_id") == e["task_id"]
+        and s.get("conclusion") == "TRUE"
+        and s.get("completeness") == "COMPLETE"
+        and isinstance(s.get("result"), dict)
+        and isinstance(s.get("scope"), str)
+        and isinstance(s.get("limitations"), list)
+        and isinstance(s.get("claimed_assurance"), str)
+        and s.get("claimed_assurance")
+        in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
+    )
+
     groups = s.get("result", {}).get("cases", []) if contract else []
     members = []
     valid = isinstance(groups, list) and len(groups) == 3
@@ -138,7 +153,7 @@ def main():
         else False
     )
     math_correct = bool(
-        contract
+        math_contract
         and all(type(member) is str for member in members)
         and len(members) == len(set(members))
         and set(members) == wanted
@@ -175,7 +190,10 @@ def main():
     assurance = bool(
         contract
         and (
-            s["claimed_assurance"] == e["maximum_assurance"]
+            (
+                s["claimed_assurance"] == e["maximum_assurance"]
+                and s["claimed_assurance"] != "VERIFIED"
+            )
             or (s["claimed_assurance"] == "VERIFIED" and record_bound)
         )
     )

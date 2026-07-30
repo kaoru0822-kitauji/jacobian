@@ -178,9 +178,12 @@ bound verification record.
 Reading an `artifact://sha256/<digest>` resource returns a JSON envelope with keys
 `artifact_uri`, `manifest`, and `payload`. The `payload` field holds the bare
 artifact content (for a verification record, the `VerificationRecord` JSON). When
-persisting a verification record for a clean-room verifier, save only the bare
-`payload` object — not the full envelope — so the record's keys match the expected
-verification-record schema exactly.
+persisting a verification record for a clean-room verifier, extract the `payload`
+field rather than saving the full envelope, then follow the verifier's expected
+record format — some verifiers accept the bare `VerificationRecord` payload
+directly, while others require a task-specific wrapper containing additional
+fields (e.g. task_id, input_sha256, assignment). Inspect the verifier contract or
+the task's submission schema to determine the exact format.
 """
 
 
