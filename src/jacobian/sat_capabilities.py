@@ -387,6 +387,11 @@ class SatAssignmentVerificationAdapter:
                 "exact-finite-existence",
                 "named-assignment",
             ),
+            accepted_input_kinds=(
+                CapabilityInputKind.STRUCTURED_REQUEST,
+                CapabilityInputKind.TYPED_ARTIFACT,
+            ),
+            accepted_artifact_types=(self.sat.installation.assignment_schema_uri,),
         )
 
     @property
