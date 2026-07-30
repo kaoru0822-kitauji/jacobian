@@ -6,15 +6,27 @@ from fractions import Fraction
 from itertools import pairwise
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, StrictInt, model_validator
 
-from jacobian.contracts.exact import CanonicalRational
+from jacobian.canonical import canonicalize_json
+from jacobian.contracts.exact import CanonicalInteger, CanonicalRational
+from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.contracts.results import ContractModel
 
 MAX_FINITE_DISTRIBUTION_ATOMS = 256
 MAX_FINITE_CONVOLUTION_PAIRS = 4096
 MAX_INPUT_RATIONAL_DIGITS = 128
 MAX_RESULT_RATIONAL_DIGITS = 512
+MAX_GAUSSIAN_VARIABLES = 8
+MAX_GAUSSIAN_POLYNOMIAL_TERMS = 16
+MAX_GAUSSIAN_TERM_DEGREE = 8
+MAX_GAUSSIAN_MOMENT_ORDER = 16
+MAX_GAUSSIAN_EXPANSION_PATHS = 4096
+MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS = 4096
+MAX_GRAPH_RELIABILITY_VERTICES = 16
+MAX_GRAPH_RELIABILITY_EDGES = 12
+MAX_GRAPH_RELIABILITY_STATES = 1 << MAX_GRAPH_RELIABILITY_EDGES
+MAX_GRAPH_RELIABILITY_LEDGER_BYTES = 9 * 1024 * 1024
 
 
 def _require_bounded_fraction(
@@ -52,6 +64,354 @@ def _require_strictly_increasing(
     if any(left >= right for left, right in pairwise(fractions)):
         raise ValueError(f"{label} must be strictly increasing")
     return fractions
+
+
+def _gaussian_univariate_moment(exponent: int) -> int:
+    if exponent % 2:
+        return 0
+    result = 1
+    for factor in range(1, exponent, 2):
+        result *= factor
+    return result
+
+
+class ExactComplexRational(ContractModel):
+    """One exact element of Q(i), encoded without floating-point values."""
+
+    real: CanonicalRational
+    imaginary: CanonicalRational
+
+    def as_fractions(self) -> tuple[Fraction, Fraction]:
+        return self.real.as_fraction(), self.imaginary.as_fraction()
+
+    @model_validator(mode="after")
+    def require_bounded_components(self) -> Self:
+        for label, value in (
+            ("complex real component", self.real),
+            ("complex imaginary component", self.imaginary),
+        ):
+            _require_bounded_rational(
+                value,
+                max_digits=MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS,
+                label=label,
+            )
+        return self
+
+
+class GaussianPolynomialTerm(ContractModel):
+    coefficient: ExactComplexRational
+    exponents: tuple[StrictInt, ...] = Field(
+        min_length=1,
+        max_length=MAX_GAUSSIAN_VARIABLES,
+    )
+
+    @model_validator(mode="after")
+    def require_bounded_nonzero_term(self) -> Self:
+        if any(
+            type(exponent) is not int or exponent < 0 for exponent in self.exponents
+        ):
+            raise ValueError(
+                "Gaussian polynomial exponents must be nonnegative integers"
+            )
+        if sum(self.exponents) > MAX_GAUSSIAN_TERM_DEGREE:
+            raise ValueError(
+                "Gaussian polynomial term exceeds the "
+                f"{MAX_GAUSSIAN_TERM_DEGREE}-degree bound"
+            )
+        if self.coefficient.as_fractions() == (Fraction(), Fraction()):
+            raise ValueError("Gaussian polynomial terms must have nonzero coefficients")
+        for component in (self.coefficient.real, self.coefficient.imaginary):
+            _require_bounded_rational(
+                component,
+                max_digits=MAX_INPUT_RATIONAL_DIGITS,
+                label="Gaussian polynomial input coefficient",
+            )
+        return self
+
+
+class GaussianPolynomial(ContractModel):
+    """A canonical sparse polynomial in independent standard real Gaussians."""
+
+    variable_count: StrictInt = Field(ge=1, le=MAX_GAUSSIAN_VARIABLES)
+    terms: tuple[GaussianPolynomialTerm, ...] = Field(
+        min_length=1,
+        max_length=MAX_GAUSSIAN_POLYNOMIAL_TERMS,
+    )
+
+    @model_validator(mode="after")
+    def require_canonical_sparse_polynomial(self) -> Self:
+        exponents = tuple(term.exponents for term in self.terms)
+        if any(len(item) != self.variable_count for item in exponents):
+            raise ValueError(
+                "every Gaussian polynomial exponent vector must match variable_count"
+            )
+        if any(left >= right for left, right in pairwise(exponents)):
+            raise ValueError(
+                "Gaussian polynomial terms must use strictly increasing exponent order"
+            )
+        return self
+
+
+class GaussianPolynomialMomentRequest(ContractModel):
+    polynomial: GaussianPolynomial
+    order: StrictInt = Field(ge=0, le=MAX_GAUSSIAN_MOMENT_ORDER)
+
+    @model_validator(mode="after")
+    def require_bounded_complete_expansion(self) -> Self:
+        expansion_paths = len(self.polynomial.terms) ** self.order
+        if expansion_paths > MAX_GAUSSIAN_EXPANSION_PATHS:
+            raise ValueError(
+                "Gaussian polynomial power exceeds the "
+                f"{MAX_GAUSSIAN_EXPANSION_PATHS}-path expansion bound"
+            )
+        components = tuple(
+            component
+            for term in self.polynomial.terms
+            for component in (term.coefficient.real, term.coefficient.imaginary)
+        )
+        distinct_denominator_digits = sum(
+            len(denominator)
+            for denominator in {component.den for component in components}
+        )
+        maximum_numerator_digits = max(
+            len(component.num.lstrip("-")) for component in components
+        )
+        result_digit_bound = (
+            self.order * (distinct_denominator_digits + maximum_numerator_digits)
+            + len(str(max(1, expansion_paths)))
+            + 64
+        )
+        if result_digit_bound > MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS:
+            raise ValueError(
+                "Gaussian polynomial coefficient denominators can exceed the "
+                f"{MAX_GAUSSIAN_RESULT_RATIONAL_DIGITS}-digit result bound"
+            )
+        return self
+
+
+class GaussianMomentContraction(ContractModel):
+    exponents: tuple[StrictInt, ...] = Field(
+        min_length=1,
+        max_length=MAX_GAUSSIAN_VARIABLES,
+    )
+    expanded_coefficient: ExactComplexRational
+    variable_moment_factors: tuple[CanonicalInteger, ...] = Field(
+        min_length=1,
+        max_length=MAX_GAUSSIAN_VARIABLES,
+    )
+    gaussian_moment_factor: CanonicalInteger
+    contribution: ExactComplexRational
+
+    @model_validator(mode="after")
+    def bind_gaussian_contraction(self) -> Self:
+        if len(self.exponents) != len(self.variable_moment_factors):
+            raise ValueError("Gaussian contraction dimensions disagree")
+        expected_factors = tuple(
+            _gaussian_univariate_moment(exponent) for exponent in self.exponents
+        )
+        actual_factors = tuple(int(value) for value in self.variable_moment_factors)
+        if actual_factors != expected_factors:
+            raise ValueError("Gaussian variable moment factors are invalid")
+        expected_factor = 1
+        for factor in expected_factors:
+            expected_factor *= factor
+        if int(self.gaussian_moment_factor) != expected_factor:
+            raise ValueError("Gaussian moment factor does not match its variables")
+        coefficient = self.expanded_coefficient.as_fractions()
+        contribution = self.contribution.as_fractions()
+        if contribution != (
+            coefficient[0] * expected_factor,
+            coefficient[1] * expected_factor,
+        ):
+            raise ValueError("Gaussian contraction contribution is invalid")
+        return self
+
+
+class GaussianPolynomialMomentResult(ContractModel):
+    order: StrictInt = Field(ge=0, le=MAX_GAUSSIAN_MOMENT_ORDER)
+    moment: ExactComplexRational
+    expansion_path_count: StrictInt = Field(ge=1, le=MAX_GAUSSIAN_EXPANSION_PATHS)
+    expanded_monomial_count: StrictInt = Field(ge=1, le=MAX_GAUSSIAN_EXPANSION_PATHS)
+    contractions: tuple[GaussianMomentContraction, ...] = Field(
+        min_length=1,
+        max_length=MAX_GAUSSIAN_EXPANSION_PATHS,
+    )
+    gaussian_model: Literal["INDEPENDENT_STANDARD_REAL"] = "INDEPENDENT_STANDARD_REAL"
+    completeness: Literal["COMPLETE_BOUNDED_EXPANSION"] = "COMPLETE_BOUNDED_EXPANSION"
+    exactness: Literal["EXACT_COMPLEX_RATIONAL"] = "EXACT_COMPLEX_RATIONAL"
+    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
+    backend: Literal["python-flint"] = "python-flint"
+    backend_version: Literal["0.9.0"] = "0.9.0"
+    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+
+    @model_validator(mode="after")
+    def bind_complete_contraction_ledger(self) -> Self:
+        if self.expanded_monomial_count != len(self.contractions):
+            raise ValueError("expanded monomial count does not match the ledger")
+        exponents = tuple(item.exponents for item in self.contractions)
+        if any(left >= right for left, right in pairwise(exponents)):
+            raise ValueError(
+                "Gaussian contractions must use strictly increasing exponent order"
+            )
+        if any(len(item) != len(exponents[0]) for item in exponents):
+            raise ValueError("Gaussian contraction dimensions disagree")
+        total_real = Fraction()
+        total_imaginary = Fraction()
+        for item in self.contractions:
+            real, imaginary = item.contribution.as_fractions()
+            total_real += real
+            total_imaginary += imaginary
+        if self.moment.as_fractions() != (total_real, total_imaginary):
+            raise ValueError("Gaussian polynomial moment does not match its ledger")
+        return self
+
+
+class GraphReliabilityEdgeProbability(ContractModel):
+    edge: tuple[str, str]
+    open_probability: CanonicalRational
+
+    @model_validator(mode="after")
+    def require_canonical_bounded_probability(self) -> Self:
+        if len(self.edge) != 2 or self.edge[0] >= self.edge[1]:
+            raise ValueError("reliability edge must contain two ordered vertices")
+        _require_bounded_rational(
+            self.open_probability,
+            max_digits=MAX_INPUT_RATIONAL_DIGITS,
+            label="graph reliability edge probability",
+        )
+        if not 0 <= self.open_probability.as_fraction() <= 1:
+            raise ValueError("graph reliability probabilities must lie in [0, 1]")
+        return self
+
+
+class GraphConnectionProbabilityRequest(ContractModel):
+    graph: SimpleUndirectedGraph
+    edge_probabilities: tuple[GraphReliabilityEdgeProbability, ...] = Field(
+        max_length=MAX_GRAPH_RELIABILITY_EDGES
+    )
+    terminals: tuple[str, str]
+    event: Literal["TERMINALS_CONNECTED"] = "TERMINALS_CONNECTED"
+
+    @model_validator(mode="after")
+    def require_bounded_fully_weighted_graph(self) -> Self:
+        if len(self.graph.vertices) > MAX_GRAPH_RELIABILITY_VERTICES:
+            raise ValueError(
+                "graph reliability exceeds the "
+                f"{MAX_GRAPH_RELIABILITY_VERTICES}-vertex bound"
+            )
+        if len(self.graph.edges) > MAX_GRAPH_RELIABILITY_EDGES:
+            raise ValueError(
+                "graph reliability exceeds the "
+                f"{MAX_GRAPH_RELIABILITY_EDGES}-edge bound"
+            )
+        if tuple(item.edge for item in self.edge_probabilities) != self.graph.edges:
+            raise ValueError(
+                "edge probabilities must cover graph edges in canonical graph order"
+            )
+        if (
+            len(self.terminals) != 2
+            or self.terminals[0] == self.terminals[1]
+            or any(terminal not in self.graph.vertices for terminal in self.terminals)
+        ):
+            raise ValueError("terminals must be two distinct declared graph vertices")
+        edge_count = len(self.graph.edges)
+        state_count = 1 << edge_count
+        repeated_edge_bytes = (
+            (1 << (edge_count - 1))
+            * sum(len(canonicalize_json(list(edge))) + 1 for edge in self.graph.edges)
+            if edge_count
+            else 0
+        )
+        probability_numerator_digits = sum(
+            max(
+                len(str(item.open_probability.as_fraction().numerator)),
+                len(str((1 - item.open_probability.as_fraction()).numerator)),
+            )
+            for item in self.edge_probabilities
+        )
+        probability_denominator_digits = sum(
+            len(str(item.open_probability.as_fraction().denominator))
+            for item in self.edge_probabilities
+        )
+        maximum_state = {
+            "state_index": state_count - 1,
+            "open_edges": [],
+            "terminals_connected": False,
+            "state_probability": {
+                "num": "9" * max(1, probability_numerator_digits),
+                "den": "9" * max(1, probability_denominator_digits),
+            },
+        }
+        estimated_ledger_bytes = (
+            repeated_edge_bytes
+            + state_count * len(canonicalize_json(maximum_state))
+            + 16 * 1024
+        )
+        if estimated_ledger_bytes > MAX_GRAPH_RELIABILITY_LEDGER_BYTES:
+            raise ValueError(
+                "graph reliability request can exceed the complete ledger "
+                f"budget of {MAX_GRAPH_RELIABILITY_LEDGER_BYTES} bytes"
+            )
+        return self
+
+
+class GraphReliabilityState(ContractModel):
+    state_index: StrictInt = Field(ge=0, lt=MAX_GRAPH_RELIABILITY_STATES)
+    open_edges: tuple[tuple[str, str], ...] = Field(
+        max_length=MAX_GRAPH_RELIABILITY_EDGES
+    )
+    terminals_connected: bool
+    state_probability: CanonicalRational
+
+
+class GraphConnectionProbabilityResult(ContractModel):
+    terminals: tuple[str, str]
+    connection_probability: CanonicalRational
+    edge_count: StrictInt = Field(ge=0, le=MAX_GRAPH_RELIABILITY_EDGES)
+    visited_states: StrictInt = Field(ge=1, le=MAX_GRAPH_RELIABILITY_STATES)
+    states: tuple[GraphReliabilityState, ...] = Field(
+        min_length=1,
+        max_length=MAX_GRAPH_RELIABILITY_STATES,
+    )
+    event: Literal["TERMINALS_CONNECTED"] = "TERMINALS_CONNECTED"
+    edge_independence: Literal["INDEPENDENT_BERNOULLI"] = "INDEPENDENT_BERNOULLI"
+    enumeration: Literal["COMPLETE_EDGE_SUBSETS"] = "COMPLETE_EDGE_SUBSETS"
+    completeness: Literal["COMPLETE"] = "COMPLETE"
+    truncated: Literal[False] = False
+    termination_reason: Literal["EXHAUSTED"] = "EXHAUSTED"
+    exactness: Literal["EXACT_RATIONAL"] = "EXACT_RATIONAL"
+    determinism: Literal["DETERMINISTIC"] = "DETERMINISTIC"
+    backend: Literal["python-flint"] = "python-flint"
+    backend_version: Literal["0.9.0"] = "0.9.0"
+    verification: Literal["UNVERIFIED"] = "UNVERIFIED"
+
+    @model_validator(mode="after")
+    def bind_complete_state_mass(self) -> Self:
+        if self.visited_states != 1 << self.edge_count:
+            raise ValueError("visited state count is not the full edge powerset")
+        if len(self.states) != self.visited_states:
+            raise ValueError("state ledger length does not match visited states")
+        if tuple(item.state_index for item in self.states) != tuple(
+            range(self.visited_states)
+        ):
+            raise ValueError("state ledger indices must be complete and canonical")
+        total = sum(
+            (item.state_probability.as_fraction() for item in self.states),
+            start=Fraction(),
+        )
+        connected = sum(
+            (
+                item.state_probability.as_fraction()
+                for item in self.states
+                if item.terminals_connected
+            ),
+            start=Fraction(),
+        )
+        if total != 1:
+            raise ValueError("graph reliability state probabilities must sum to one")
+        if self.connection_probability.as_fraction() != connected:
+            raise ValueError("connection probability does not match connected states")
+        return self
 
 
 class FiniteDistributionAtom(ContractModel):
@@ -487,6 +847,15 @@ class FiniteConvolutionResult(ContractModel):
 __all__ = [
     "MAX_FINITE_CONVOLUTION_PAIRS",
     "MAX_FINITE_DISTRIBUTION_ATOMS",
+    "MAX_GAUSSIAN_EXPANSION_PATHS",
+    "MAX_GAUSSIAN_MOMENT_ORDER",
+    "MAX_GAUSSIAN_POLYNOMIAL_TERMS",
+    "MAX_GAUSSIAN_TERM_DEGREE",
+    "MAX_GAUSSIAN_VARIABLES",
+    "MAX_GRAPH_RELIABILITY_EDGES",
+    "MAX_GRAPH_RELIABILITY_STATES",
+    "MAX_GRAPH_RELIABILITY_VERTICES",
+    "ExactComplexRational",
     "FiniteConditionResult",
     "FiniteConditionalContribution",
     "FiniteConvolutionContribution",
@@ -500,5 +869,14 @@ __all__ = [
     "FinitePushforwardRequest",
     "FinitePushforwardResult",
     "FiniteRationalDistribution",
+    "GaussianMomentContraction",
+    "GaussianPolynomial",
+    "GaussianPolynomialMomentRequest",
+    "GaussianPolynomialMomentResult",
+    "GaussianPolynomialTerm",
+    "GraphConnectionProbabilityRequest",
+    "GraphConnectionProbabilityResult",
+    "GraphReliabilityEdgeProbability",
+    "GraphReliabilityState",
     "require_input_distribution",
 ]

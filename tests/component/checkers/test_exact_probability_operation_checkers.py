@@ -15,6 +15,8 @@ from jacobian_checkers.exact_probability_operations import (
     check_finite_event_probability,
     check_finite_pushforward,
     check_finite_raw_moment,
+    check_gaussian_polynomial_moment,
+    check_graph_connection_probability,
 )
 
 _META = {
@@ -30,6 +32,32 @@ _BIT = {
         {"value": _q(1), "probability": _q(1, 2)},
     ]
 }
+_GAUSSIAN_META = {
+    "gaussian_model": "INDEPENDENT_STANDARD_REAL",
+    "completeness": "COMPLETE_BOUNDED_EXPANSION",
+    "exactness": "EXACT_COMPLEX_RATIONAL",
+    "determinism": "DETERMINISTIC",
+    "backend": "python-flint",
+    "backend_version": "0.9.0",
+    "verification": "UNVERIFIED",
+}
+_GRAPH_RELIABILITY_META = {
+    "event": "TERMINALS_CONNECTED",
+    "edge_independence": "INDEPENDENT_BERNOULLI",
+    "enumeration": "COMPLETE_EDGE_SUBSETS",
+    "completeness": "COMPLETE",
+    "truncated": False,
+    "termination_reason": "EXHAUSTED",
+    "exactness": "EXACT_RATIONAL",
+    "determinism": "DETERMINISTIC",
+    "backend": "python-flint",
+    "backend_version": "0.9.0",
+    "verification": "UNVERIFIED",
+}
+
+
+def _c(real: int, imaginary: int = 0) -> dict[str, dict[str, str]]:
+    return {"real": _q(real), "imaginary": _q(imaginary)}
 
 
 def _artifact(
@@ -215,6 +243,93 @@ _CASES: tuple[
             },
         ),
     ),
+    (
+        check_gaussian_polynomial_moment,
+        _request(
+            "probability.gaussian_polynomial.moment.compute",
+            "probability.gaussian-polynomial-moment.fraction-replay",
+            {
+                "polynomial": {
+                    "variable_count": 1,
+                    "terms": [
+                        {"coefficient": _c(1), "exponents": [0]},
+                        {"coefficient": _c(0, 1), "exponents": [1]},
+                    ],
+                },
+                "order": 2,
+            },
+            {
+                "order": 2,
+                "moment": _c(0),
+                "expansion_path_count": 4,
+                "expanded_monomial_count": 3,
+                "contractions": [
+                    {
+                        "exponents": [0],
+                        "expanded_coefficient": _c(1),
+                        "variable_moment_factors": ["1"],
+                        "gaussian_moment_factor": "1",
+                        "contribution": _c(1),
+                    },
+                    {
+                        "exponents": [1],
+                        "expanded_coefficient": _c(0, 2),
+                        "variable_moment_factors": ["0"],
+                        "gaussian_moment_factor": "0",
+                        "contribution": _c(0),
+                    },
+                    {
+                        "exponents": [2],
+                        "expanded_coefficient": _c(-1),
+                        "variable_moment_factors": ["1"],
+                        "gaussian_moment_factor": "1",
+                        "contribution": _c(-1),
+                    },
+                ],
+                **_GAUSSIAN_META,
+            },
+        ),
+    ),
+    (
+        check_graph_connection_probability,
+        _request(
+            "probability.graph_reliability.connection_probability.compute",
+            "probability.graph-reliability-connection.fraction-replay",
+            {
+                "graph": {
+                    "graph_schema_version": "1",
+                    "vertices": ["a", "b"],
+                    "edges": [["a", "b"]],
+                },
+                "edge_probabilities": [
+                    {"edge": ["a", "b"], "open_probability": _q(1, 3)}
+                ],
+                "terminals": ["a", "b"],
+                "event": "TERMINALS_CONNECTED",
+            },
+            {
+                "terminals": ["a", "b"],
+                "connection_probability": _q(1, 3),
+                "edge_count": 1,
+                "visited_states": 2,
+                "states": [
+                    {
+                        "state_index": 0,
+                        "open_edges": [],
+                        "terminals_connected": False,
+                        "state_probability": _q(2, 3),
+                    },
+                    {
+                        "state_index": 1,
+                        "open_edges": [["a", "b"]],
+                        "terminals_connected": True,
+                        "state_probability": _q(1, 3),
+                    },
+                ],
+                **_GRAPH_RELIABILITY_META,
+            },
+        ),
+    ),
 )
 
 
@@ -246,9 +361,71 @@ def test_probability_checkers_reject_payload_substitution_with_fresh_digest(
 
 
 def test_convolution_checker_rejects_missing_pair_with_fresh_digest() -> None:
-    checker, case_request = _CASES[-1]
+    checker, case_request = next(
+        case for case in _CASES if case[0] is check_finite_convolution
+    )
     forged = copy.deepcopy(case_request)
     forged["candidate"]["payload"]["contributions"].pop()
+    forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
+
+    checked = checker(forged)
+
+    assert checked["accepted"] is False
+    assert checked["conclusion"] == "UNKNOWN"
+
+
+def test_gaussian_checker_rejects_forged_contraction_with_fresh_digest() -> None:
+    checker, case_request = _CASES[-2]
+    forged = copy.deepcopy(case_request)
+    forged["candidate"]["payload"]["contractions"][2]["contribution"] = _c(0)
+    forged["candidate"]["payload"]["moment"] = _c(1)
+    forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
+
+    checked = checker(forged)
+
+    assert checked["accepted"] is False
+    assert checked["conclusion"] == "UNKNOWN"
+
+
+def test_graph_reliability_checker_rejects_forged_connectivity() -> None:
+    checker, case_request = _CASES[-1]
+    forged = copy.deepcopy(case_request)
+    forged["candidate"]["payload"]["states"][0]["terminals_connected"] = True
+    forged["candidate"]["payload"]["connection_probability"] = _q(1)
+    forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
+
+    checked = checker(forged)
+
+    assert checked["accepted"] is False
+    assert checked["conclusion"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value"),
+    (
+        ("edge_count", True),
+        ("visited_states", True),
+    ),
+)
+def test_graph_reliability_checker_rejects_boolean_counts(
+    field: str,
+    forged_value: bool,
+) -> None:
+    checker, case_request = _CASES[-1]
+    forged = copy.deepcopy(case_request)
+    forged["candidate"]["payload"][field] = forged_value
+    forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
+
+    checked = checker(forged)
+
+    assert checked["accepted"] is False
+    assert checked["conclusion"] == "UNKNOWN"
+
+
+def test_graph_reliability_checker_rejects_boolean_state_index() -> None:
+    checker, case_request = _CASES[-1]
+    forged = copy.deepcopy(case_request)
+    forged["candidate"]["payload"]["states"][0]["state_index"] = False
     forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
 
     checked = checker(forged)

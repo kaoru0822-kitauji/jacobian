@@ -2,6 +2,7 @@
 
 from jacobian.domains.analysis import REAL_ANALYSIS_BUNDLE
 from jacobian.domains.arithmetic import ARITHMETIC_BUNDLE
+from jacobian.domains.certified_snf import CERTIFIED_SNF_BUNDLE
 from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
 from jacobian.domains.conjecture_ingestion import CONJECTURE_INGESTION_BUNDLE
 from jacobian.domains.finite_sets import FINITE_SET_BUNDLE
@@ -10,6 +11,7 @@ from jacobian.domains.graph_optimization import (
     GRAPH_INVARIANT_BUNDLE,
     GRAPH_OPTIMIZATION_BUNDLE,
 )
+from jacobian.domains.graph_symmetry import GRAPH_SYMMETRY_BUNDLE
 from jacobian.domains.matrix_lattice import LATTICE_BUNDLE, MATRIX_BUNDLE
 from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
 from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
@@ -31,6 +33,8 @@ BUILTIN_DOMAIN_BUNDLES = (
     PROJECTIVE_GEOMETRY_BUNDLE,
     GRAPH_OPTIMIZATION_BUNDLE,
     GRAPH_INVARIANT_BUNDLE,
+    GRAPH_SYMMETRY_BUNDLE,
+    CERTIFIED_SNF_BUNDLE,
     MATRIX_BUNDLE,
     LATTICE_BUNDLE,
     POLYNOMIAL_BUNDLE,

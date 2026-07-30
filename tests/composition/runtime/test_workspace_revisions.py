@@ -113,7 +113,7 @@ def test_workspace_write_cannot_add_a_second_problem(attached_complete_runtime) 
             WorkspaceReferenceError,
             match=r"only workspace\.open may create the canonical PROBLEM",
         ),
-        attached_complete_runtime.core.workspaces._connect() as connection,
+        attached_complete_runtime.core.store.connection() as connection,
     ):
         attached_complete_runtime.core.workspaces._prepare_write(
             connection,

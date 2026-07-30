@@ -319,7 +319,7 @@ is to revise rather than stabilize, consolidate, or retire:
 - compact catalog discovery; and
 - rerun the frozen held-out evaluation before changing recommendation status.
 
-See [Lean declaration-discovery pilot](../reference/capability-workflow-evaluations.md#lean-declaration-discovery-pilot)
+See [the task and verifier validation boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation)
 for scorer invariants, per-run measurements, and the excluded operationally
 invalid pair.
 
@@ -431,7 +431,7 @@ Treatment cost was materially higher, and the small sample demonstrates
 assurance value rather than completion or efficiency lift. Retain the four
 atomic outcomes while prioritizing compact catalog discovery over another SAT
 operation. See
-[SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
+[the Jacobian-enabled workflow observation boundary](../reference/capability-workflow-evaluations.md#jacobian-enabled-workflow-observation).
 
 ## Wave 3: theory-bounded SMT proof slice
 
@@ -477,7 +477,7 @@ slices are implemented; see the
 [exact rational linear-system evidence contract](../reference/linear-rational-solutions.md)
 and [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md).
 The rational-solution usability evidence is recorded in the
-[Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
+[the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
 The remaining sequence stays demand-gated.
 
 Implement one vertical slice at a time:
@@ -514,7 +514,7 @@ shared exact provider than importing SageMath.
 The first typed normalization slice is implemented; see the
 [typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
 and the
-[SymPy normalization pilot](../reference/capability-workflow-evaluations.md#sympy-typed-polynomial-normalization-pilot).
+[the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
 It defines a small versioned polynomial AST with explicit symbols and
 coefficients, then constructs SymPy objects internally. It never passes
 unsanitized user strings to `sympify`, `parse_expr`, `lambdify`, or Python
@@ -574,7 +574,7 @@ backlog.
    Implemented; see
    [UNSAT proof verification](../reference/sat-artifacts.md#unsat-proof-verification).
 8. SAT public reproductions and held-out portfolio ablation. Implemented; see
-   [SAT certificate portfolio pilot](../reference/capability-workflow-evaluations.md#sat-certificate-portfolio-pilot).
+   [the Jacobian-enabled workflow observation boundary](../reference/capability-workflow-evaluations.md#jacobian-enabled-workflow-observation).
 9. cvc5 Alethe proof-production spike for quantifier-free EUF and linear
    arithmetic. Implemented; see
    [SMT Alethe artifact contracts](../reference/smt-artifacts.md).
@@ -582,20 +582,20 @@ backlog.
     evaluation. Implemented; see
     [SMT Alethe artifact contracts](../reference/smt-artifacts.md#strict-carcara-verification)
     and the
-    [SMT Carcara contract pilot](../reference/capability-workflow-evaluations.md#smt-carcara-contract-pilot).
+    [the task and verifier validation boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
 11. Python-FLINT rational-solution find and verify slice. Implemented; see the
     [exact rational solution contract](../reference/linear-rational-solutions.md)
     and the
-    [Python-FLINT rational-solution pilot](../reference/capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
+    [the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
 12. Python-FLINT integer-matrix row-HNF slice. Implemented; see the
     [integer matrix HNF contract](../reference/matrix-hermite-normal-form.md)
     and the
-    [Python-FLINT HNF pilot](../reference/capability-workflow-evaluations.md#python-flint-hermite-normal-form-pilot).
+    [the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
 13. Typed expression AST and one SymPy polynomial-normalization slice.
     Implemented; see the
     [typed polynomial expression normalization contract](../reference/polynomial-expression-normalization.md)
     and the
-    [SymPy normalization pilot](../reference/capability-workflow-evaluations.md#sympy-typed-polynomial-normalization-pilot).
+    [the committed Harbor task boundary](../reference/capability-workflow-evaluations.md#task-and-verifier-validation).
 14. Python-FLINT rational inconsistency-certificate find and verify slice.
     Implemented; see the
     [exact rational linear-system evidence contract](../reference/linear-rational-solutions.md#inconsistency-certificate).

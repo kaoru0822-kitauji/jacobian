@@ -31,7 +31,8 @@ CLAIM_SCHEMA_B = "artifact://sha256/" + "b" * 64
 
 
 def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
-    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+    store = ArtifactStore(tmp_path)
+    registry = CheckerRegistry(store)
     selection = {
         "evidence_kind": "WITNESS",
         "format_id": "example.witness",
@@ -68,7 +69,7 @@ def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
 
 def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path)
-    registry = CheckerRegistry(store.db_path)
+    registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="reject-all-v1",
         entrypoint="jacobian_checkers.reject:check",
@@ -131,7 +132,7 @@ def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> N
     ):
         pass
 
-    path_backed_registry = CheckerRegistry(store.db_path)
+    second_registry = CheckerRegistry(store)
     with (
         store.transaction(),
         pytest.raises(
@@ -139,7 +140,7 @@ def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> N
             match="policy must be locked before the store transaction",
         ),
     ):
-        path_backed_registry.revoke(checker.checker_id, reason="wrong legacy order")
+        second_registry.revoke(checker.checker_id, reason="wrong lock order")
 
     with registry.policy_transaction(), store.transaction():
         registry.revoke(checker.checker_id, reason="ordered policy change")
@@ -149,7 +150,8 @@ def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> N
 
 
 def test_concurrent_duplicate_authorize_is_serialized(tmp_path: Path) -> None:
-    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+    store = ArtifactStore(tmp_path)
+    registry = CheckerRegistry(store)
     barrier = threading.Barrier(8)
     registrations = []
     errors: list[Exception] = []
@@ -191,7 +193,7 @@ def test_checker_registry_rejects_identity_metadata_corruption(
     corruption: str,
 ) -> None:
     store = ArtifactStore(tmp_path)
-    registry = CheckerRegistry(store.db_path)
+    registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="reject-all-v1",
         entrypoint="jacobian_checkers.reject:check",
@@ -252,7 +254,8 @@ def test_checker_authorization_requires_explicit_compatibility_scope(
     candidate_schemas: tuple[str, ...],
     targets: tuple[str, ...],
 ) -> None:
-    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+    store = ArtifactStore(tmp_path)
+    registry = CheckerRegistry(store)
 
     with pytest.raises(CheckerRegistryError, match="Supply"):
         registry.authorize(
@@ -284,7 +287,8 @@ def test_checker_registry_binds_external_runtime_identity(tmp_path: Path) -> Non
         license_id="MIT",
         configuration={"executable": str(executable.resolve())},
     )
-    registry = CheckerRegistry(ArtifactStore(tmp_path / "store").db_path)
+    store = ArtifactStore(tmp_path / "store")
+    registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="externally-backed-v1",
         entrypoint="jacobian_checkers.reject:check",
@@ -321,7 +325,8 @@ def test_checker_registry_authorizes_python_distribution_runtime(
         configuration={"import_name": "pydantic"},
     )
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
-    registry = CheckerRegistry(ArtifactStore(tmp_path).db_path)
+    store = ArtifactStore(tmp_path)
+    registry = CheckerRegistry(store)
 
     checker = registry.authorize(
         name="distribution-backed-v1",

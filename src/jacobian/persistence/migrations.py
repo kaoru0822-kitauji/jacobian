@@ -1,0 +1,403 @@
+"""Ordered SQLite migrations for the shared Jacobian state database."""
+
+from __future__ import annotations
+
+import sqlite3
+
+from jacobian.persistence.database import Migration
+
+_ARTIFACT_SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS artifacts (
+        artifact_uri TEXT PRIMARY KEY,
+        manifest_digest TEXT NOT NULL UNIQUE,
+        object_digest TEXT NOT NULL,
+        payload_digest TEXT NOT NULL,
+        schema_uri TEXT NOT NULL,
+        semantics_uri TEXT NOT NULL,
+        canonicalizer_digest TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        committed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS artifacts_object_digest ON artifacts(object_digest)",
+    """
+    CREATE TABLE IF NOT EXISTS artifact_parents (
+        artifact_uri TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        parent_uri TEXT NOT NULL,
+        PRIMARY KEY (artifact_uri, position),
+        FOREIGN KEY (artifact_uri)
+            REFERENCES artifacts(artifact_uri)
+            ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS blob_quota (
+        id INTEGER PRIMARY KEY CHECK (id = 0),
+        size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0)
+    )
+    """,
+)
+_ARTIFACT_SCHEMA = "\n-- statement boundary --\n".join(_ARTIFACT_SCHEMA_STATEMENTS)
+
+_QUOTA_RECONCILIATION = """
+Add blob_quota.reconciliation_required as a fail-closed durable marker with a
+default of one for legacy rows. Fresh and legacy stores use the same column
+contract after this revision.
+"""
+
+_CHECKER_SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS checkers (
+        checker_id TEXT PRIMARY KEY,
+        registration_json BLOB NOT NULL,
+        authorized INTEGER NOT NULL CHECK (authorized IN (0, 1)),
+        executable_digest TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS checker_audit (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        checker_id TEXT NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('AUTHORIZED', 'REVOKED')),
+        reason TEXT NOT NULL,
+        recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (checker_id)
+            REFERENCES checkers(checker_id) ON DELETE RESTRICT
+    )
+    """,
+)
+_RUNTIME_SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS experiments (
+        experiment_uri TEXT PRIMARY KEY,
+        state TEXT NOT NULL,
+        snapshot_json BLOB NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS experiment_recovery_failures (
+        experiment_uri TEXT PRIMARY KEY,
+        detected_at TEXT NOT NULL,
+        snapshot_digest TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        FOREIGN KEY (experiment_uri)
+            REFERENCES experiments(experiment_uri) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS search_experiments (
+        experiment_uri TEXT PRIMARY KEY,
+        state TEXT NOT NULL,
+        snapshot_json BLOB NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS search_idempotency (
+        idempotency_key TEXT PRIMARY KEY,
+        request_digest TEXT NOT NULL,
+        experiment_uri TEXT NOT NULL UNIQUE,
+        FOREIGN KEY (experiment_uri)
+            REFERENCES search_experiments(experiment_uri) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS search_events (
+        experiment_uri TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        event_json BLOB NOT NULL,
+        event_digest TEXT NOT NULL UNIQUE,
+        PRIMARY KEY (experiment_uri, sequence),
+        FOREIGN KEY (experiment_uri)
+            REFERENCES search_experiments(experiment_uri) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS search_recovery_failures (
+        experiment_uri TEXT PRIMARY KEY,
+        detected_at TEXT NOT NULL,
+        snapshot_digest TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        FOREIGN KEY (experiment_uri)
+            REFERENCES search_experiments(experiment_uri) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS search_events_no_update
+    BEFORE UPDATE ON search_events
+    BEGIN
+        SELECT RAISE(ABORT, 'search lifecycle events are append-only');
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS search_events_no_delete
+    BEFORE DELETE ON search_events
+    BEGIN
+        SELECT RAISE(ABORT, 'search lifecycle events are append-only');
+    END
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS research_episodes (
+        episode_uri TEXT PRIMARY KEY,
+        capability_id TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        assurance_level TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        tags_json TEXT NOT NULL,
+        search_text TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS research_episodes_lookup
+    ON research_episodes(capability_id, assurance_level, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS research_episode_tags (
+        episode_uri TEXT NOT NULL,
+        tag TEXT NOT NULL,
+        PRIMARY KEY (episode_uri, tag)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS research_episode_tags_lookup
+    ON research_episode_tags(tag, episode_uri)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS research_episode_failures (
+        episode_uri TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        classification TEXT NOT NULL,
+        PRIMARY KEY (episode_uri, stage, classification)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS research_episode_failures_lookup
+    ON research_episode_failures(stage, classification, episode_uri)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS research_episode_index_versions (
+        episode_uri TEXT PRIMARY KEY,
+        index_version TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS installed_plugins (
+        plugin_id TEXT PRIMARY KEY,
+        domain_id TEXT NOT NULL,
+        domain_version TEXT NOT NULL,
+        registry_snapshot_uri TEXT,
+        installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    *_CHECKER_SCHEMA_STATEMENTS,
+    """
+    CREATE TABLE IF NOT EXISTS workspaces (
+        workspace_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        root_branch_id TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (root_branch_id)
+            REFERENCES workspace_branches(branch_id)
+            ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_branches (
+        branch_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        alias TEXT NOT NULL,
+        head_revision_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (workspace_id, alias),
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (head_revision_id)
+            REFERENCES workspace_revisions(revision_id)
+            ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_revisions (
+        revision_id TEXT PRIMARY KEY,
+        revision_artifact_uri TEXT NOT NULL UNIQUE,
+        workspace_id TEXT NOT NULL,
+        branch_id TEXT NOT NULL,
+        parent_revision_id TEXT,
+        request_digest TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (revision_artifact_uri)
+            REFERENCES artifacts(artifact_uri) ON DELETE RESTRICT,
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (branch_id)
+            REFERENCES workspace_branches(branch_id) ON DELETE RESTRICT,
+        FOREIGN KEY (parent_revision_id)
+            REFERENCES workspace_revisions(revision_id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_idempotency (
+        idempotency_key TEXT PRIMARY KEY,
+        operation TEXT NOT NULL,
+        request_digest TEXT NOT NULL,
+        response_json BLOB NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_scratch (
+        scratch_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        branch_id TEXT NOT NULL,
+        created_revision_id TEXT NOT NULL,
+        payload_json BLOB NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (branch_id)
+            REFERENCES workspace_branches(branch_id) ON DELETE RESTRICT,
+        FOREIGN KEY (created_revision_id)
+            REFERENCES workspace_revisions(revision_id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_findings (
+        card_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        branch_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        created_revision_id TEXT NOT NULL,
+        payload_json BLOB NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (branch_id)
+            REFERENCES workspace_branches(branch_id) ON DELETE RESTRICT,
+        FOREIGN KEY (created_revision_id)
+            REFERENCES workspace_revisions(revision_id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS workspace_findings_lookup
+    ON workspace_findings(workspace_id, branch_id, kind, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_attempts (
+        attempt_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        branch_id TEXT NOT NULL,
+        target_card_id TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        created_revision_id TEXT NOT NULL,
+        payload_json BLOB NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (branch_id)
+            REFERENCES workspace_branches(branch_id) ON DELETE RESTRICT,
+        FOREIGN KEY (target_card_id)
+            REFERENCES workspace_findings(card_id) ON DELETE RESTRICT,
+        FOREIGN KEY (created_revision_id)
+            REFERENCES workspace_revisions(revision_id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS workspace_attempts_lookup
+    ON workspace_attempts(workspace_id, branch_id, target_card_id, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_marks (
+        mark_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        branch_id TEXT NOT NULL,
+        target_card_id TEXT NOT NULL,
+        state TEXT NOT NULL,
+        created_revision_id TEXT NOT NULL,
+        payload_json BLOB NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (branch_id)
+            REFERENCES workspace_branches(branch_id) ON DELETE RESTRICT,
+        FOREIGN KEY (target_card_id)
+            REFERENCES workspace_findings(card_id) ON DELETE RESTRICT,
+        FOREIGN KEY (created_revision_id)
+            REFERENCES workspace_revisions(revision_id) ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS workspace_marks_lookup
+    ON workspace_marks(workspace_id, branch_id, target_card_id, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS workspace_focus (
+        branch_id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        updated_revision_id TEXT NOT NULL,
+        payload_json BLOB NOT NULL,
+        FOREIGN KEY (branch_id)
+            REFERENCES workspace_branches(branch_id) ON DELETE RESTRICT,
+        FOREIGN KEY (workspace_id)
+            REFERENCES workspaces(workspace_id) ON DELETE RESTRICT,
+        FOREIGN KEY (updated_revision_id)
+            REFERENCES workspace_revisions(revision_id) ON DELETE RESTRICT
+    )
+    """,
+)
+_RUNTIME_SCHEMA = "\n-- statement boundary --\n".join(_RUNTIME_SCHEMA_STATEMENTS)
+
+
+def _install_artifact_schema(connection: sqlite3.Connection) -> None:
+    for statement in _ARTIFACT_SCHEMA_STATEMENTS:
+        connection.execute(statement)
+
+
+def _install_quota_reconciliation(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row["name"]) for row in connection.execute("PRAGMA table_info(blob_quota)")
+    }
+    if "reconciliation_required" not in columns:
+        connection.execute(
+            """
+            ALTER TABLE blob_quota
+            ADD COLUMN reconciliation_required
+                INTEGER NOT NULL DEFAULT 1
+                CHECK (reconciliation_required IN (0, 1))
+            """
+        )
+
+
+def _install_runtime_schema(connection: sqlite3.Connection) -> None:
+    for statement in _RUNTIME_SCHEMA_STATEMENTS:
+        connection.execute(statement)
+    columns = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(installed_plugins)")
+    }
+    if "registry_snapshot_uri" not in columns:
+        connection.execute(
+            "ALTER TABLE installed_plugins ADD COLUMN registry_snapshot_uri TEXT"
+        )
+
+
+STATE_MIGRATIONS = (
+    Migration(
+        revision=1,
+        name="artifact-metadata-v1",
+        definition=_ARTIFACT_SCHEMA,
+        apply=_install_artifact_schema,
+    ),
+    Migration(
+        revision=2,
+        name="blob-quota-reconciliation-v1",
+        definition=_QUOTA_RECONCILIATION,
+        apply=_install_quota_reconciliation,
+    ),
+    Migration(
+        revision=3,
+        name="runtime-service-schema-v1",
+        definition=_RUNTIME_SCHEMA,
+        apply=_install_runtime_schema,
+    ),
+)

@@ -40,7 +40,6 @@ from jacobian.contracts.workspaces import (
     WorkspaceWriteRequest,
     WorkspaceWriteResult,
 )
-from jacobian.experiment_runtime import open_experiment_database
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreError
 
@@ -111,175 +110,6 @@ class WorkspaceService:
                 )
             },
         )
-        self._initialize_database()
-
-    def _connect(self) -> sqlite3.Connection:
-        return open_experiment_database(self.store.db_path)
-
-    def _initialize_database(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS workspaces (
-                    workspace_id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    root_branch_id TEXT NOT NULL UNIQUE,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (root_branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT
-                        DEFERRABLE INITIALLY DEFERRED
-                );
-                CREATE TABLE IF NOT EXISTS workspace_branches (
-                    branch_id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    alias TEXT NOT NULL,
-                    head_revision_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    UNIQUE (workspace_id, alias),
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (head_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                        DEFERRABLE INITIALLY DEFERRED
-                );
-                CREATE TABLE IF NOT EXISTS workspace_revisions (
-                    revision_id TEXT PRIMARY KEY,
-                    revision_artifact_uri TEXT NOT NULL UNIQUE,
-                    workspace_id TEXT NOT NULL,
-                    branch_id TEXT NOT NULL,
-                    parent_revision_id TEXT,
-                    request_digest TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (revision_artifact_uri)
-                        REFERENCES artifacts(artifact_uri)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (parent_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS workspace_idempotency (
-                    idempotency_key TEXT PRIMARY KEY,
-                    operation TEXT NOT NULL,
-                    request_digest TEXT NOT NULL,
-                    response_json BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS workspace_scratch (
-                    scratch_id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    branch_id TEXT NOT NULL,
-                    created_revision_id TEXT NOT NULL,
-                    payload_json BLOB NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (created_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS workspace_findings (
-                    card_id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    branch_id TEXT NOT NULL,
-                    kind TEXT NOT NULL,
-                    created_revision_id TEXT NOT NULL,
-                    payload_json BLOB NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (created_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                );
-                CREATE INDEX IF NOT EXISTS workspace_findings_lookup
-                    ON workspace_findings(
-                        workspace_id, branch_id, kind, created_at
-                    );
-                CREATE TABLE IF NOT EXISTS workspace_attempts (
-                    attempt_id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    branch_id TEXT NOT NULL,
-                    target_card_id TEXT NOT NULL,
-                    outcome TEXT NOT NULL,
-                    created_revision_id TEXT NOT NULL,
-                    payload_json BLOB NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (target_card_id)
-                        REFERENCES workspace_findings(card_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (created_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                );
-                CREATE INDEX IF NOT EXISTS workspace_attempts_lookup
-                    ON workspace_attempts(
-                        workspace_id, branch_id, target_card_id, created_at
-                    );
-                CREATE TABLE IF NOT EXISTS workspace_marks (
-                    mark_id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    branch_id TEXT NOT NULL,
-                    target_card_id TEXT NOT NULL,
-                    state TEXT NOT NULL,
-                    created_revision_id TEXT NOT NULL,
-                    payload_json BLOB NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (target_card_id)
-                        REFERENCES workspace_findings(card_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (created_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                );
-                CREATE INDEX IF NOT EXISTS workspace_marks_lookup
-                    ON workspace_marks(
-                        workspace_id, branch_id, target_card_id, created_at
-                    );
-                CREATE TABLE IF NOT EXISTS workspace_focus (
-                    branch_id TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    updated_revision_id TEXT NOT NULL,
-                    payload_json BLOB NOT NULL,
-                    FOREIGN KEY (branch_id)
-                        REFERENCES workspace_branches(branch_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (workspace_id)
-                        REFERENCES workspaces(workspace_id)
-                        ON DELETE RESTRICT,
-                    FOREIGN KEY (updated_revision_id)
-                        REFERENCES workspace_revisions(revision_id)
-                        ON DELETE RESTRICT
-                );
-                """
-            )
 
     def open(self, request: WorkspaceOpenRequest) -> WorkspaceOpenResult:
         selected = WorkspaceOpenRequest.model_validate(request)
@@ -287,7 +117,7 @@ class WorkspaceService:
             WorkspaceRevisionOperation.OPEN,
             selected.model_dump(mode="json"),
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             reused = self._reuse(
                 connection,
                 idempotency_key=selected.idempotency_key,
@@ -341,7 +171,7 @@ class WorkspaceService:
             problem_card_id=problem_card_id,
         )
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             reused = self._reuse(
                 connection,
@@ -391,7 +221,7 @@ class WorkspaceService:
             WorkspaceRevisionOperation.WRITE,
             selected.model_dump(mode="json"),
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             reused = self._reuse(
                 connection,
                 idempotency_key=selected.idempotency_key,
@@ -431,7 +261,7 @@ class WorkspaceService:
             ),
         )
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             reused = self._reuse(
                 connection,
@@ -518,7 +348,7 @@ class WorkspaceService:
 
     def query(self, request: WorkspaceQueryRequest) -> WorkspaceQueryResult:
         selected = WorkspaceQueryRequest.model_validate(request)
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN")
             branch = self._branch_row(
                 connection,

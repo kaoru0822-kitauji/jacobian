@@ -18,12 +18,21 @@ from pathlib import Path
 
 import pytest
 
+from jacobian.contracts.discovery import ExperimentHandle
+from jacobian.contracts.search import ExperimentState
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import RuntimeClosedError
 from jacobian.search import SearchError, SearchService
 from jacobian.store import StoreClosedError
 
 pytestmark = pytest.mark.usefixtures("attached_complete_runtime")
+
+
+def test_runtime_uses_one_schema_registry_instance(attached_complete_runtime) -> None:
+    assert (
+        attached_complete_runtime.core.plugins.schemas
+        is attached_complete_runtime.core.schemas
+    )
 
 
 def test_close_is_idempotent(tmp_path: Path) -> None:
@@ -122,6 +131,61 @@ def test_close_quiesces_search_workers_before_closing_store(
             version="1",
             definition={"type": "object"},
         )
+
+
+def test_close_waits_for_a_reserved_search_start_through_worker_launch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = create_runtime(tmp_path)
+    start_reserved = threading.Event()
+    release_start = threading.Event()
+    start_results: list[ExperimentHandle] = []
+    start_errors: list[BaseException] = []
+    experiment_uri = "experiment://" + "a" * 32
+
+    def blocked_start(
+        service: SearchService,
+        _request: object,
+    ) -> ExperimentHandle:
+        start_reserved.set()
+        release_start.wait(timeout=2)
+        service._launch(experiment_uri, lifecycle_reserved=True)
+        return ExperimentHandle(
+            experiment_uri=experiment_uri,
+            state=ExperimentState.PENDING,
+        )
+
+    monkeypatch.setattr(SearchService, "_start_reserved", blocked_start)
+    monkeypatch.setattr(SearchService, "_run", lambda *_args: None)
+
+    def start_search() -> None:
+        try:
+            start_results.append(runtime.services.search.start({}))
+        except BaseException as exc:
+            start_errors.append(exc)
+
+    starter = threading.Thread(target=start_search)
+    starter.start()
+    assert start_reserved.wait(timeout=1)
+
+    def release_after_close_begins() -> None:
+        time.sleep(0.05)
+        release_start.set()
+
+    releaser = threading.Thread(target=release_after_close_begins)
+    releaser.start()
+    runtime.close()
+    starter.join(timeout=1)
+    releaser.join(timeout=1)
+
+    assert start_errors == []
+    assert start_results == [
+        ExperimentHandle(
+            experiment_uri=experiment_uri,
+            state=ExperimentState.PENDING,
+        )
+    ]
 
 
 def test_search_close_timeout_keeps_store_open_for_retry(

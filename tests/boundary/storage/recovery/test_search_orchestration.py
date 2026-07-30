@@ -597,7 +597,7 @@ def test_corrupt_snapshot_is_quarantined_without_blocking_recovery(
     runtime = create_runtime(tmp_path)
     claim_uri, plugin_id = _install_search_plugin(runtime)
     monkeypatch.setattr(
-        runtime.services.search, "_launch", lambda _experiment_uri: None
+        runtime.services.search, "_launch", lambda *_args, **_kwargs: None
     )
     valid = runtime.services.search.start(
         _request(

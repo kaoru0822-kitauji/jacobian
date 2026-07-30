@@ -13,7 +13,7 @@ from jacobian.contracts.results import ContractModel
 CanonicalInteger = Annotated[
     str,
     StringConstraints(
-        pattern=r"^-?(?:0|[1-9][0-9]*)$",
+        pattern=r"^(?:0|-?[1-9][0-9]*)$",
         strict=True,
     ),
 ]

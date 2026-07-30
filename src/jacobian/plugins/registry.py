@@ -52,9 +52,13 @@ class PluginRegistry:
     mathematical trust.
     """
 
-    def __init__(self, store: ArtifactStore) -> None:
+    def __init__(
+        self,
+        store: ArtifactStore,
+        schemas: SchemaRegistry | None = None,
+    ) -> None:
         self.store = store
-        self.schemas = SchemaRegistry(store)
+        self.schemas = schemas or SchemaRegistry(store)
         self.snapshot_schema_uri = self.schemas.register(
             name="jacobian.plugin-registry-snapshot",
             version="1",
@@ -71,34 +75,6 @@ class PluginRegistry:
                 )
             },
         )
-        self._initialize_database()
-
-    def _initialize_database(self) -> None:
-        with self.store.connection() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS installed_plugins (
-                    plugin_id TEXT PRIMARY KEY,
-                    domain_id TEXT NOT NULL,
-                    domain_version TEXT NOT NULL,
-                    registry_snapshot_uri TEXT,
-                    installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            columns = {
-                row["name"]
-                for row in connection.execute(
-                    "PRAGMA table_info(installed_plugins)"
-                ).fetchall()
-            }
-            if "registry_snapshot_uri" not in columns:
-                connection.execute(
-                    """
-                    ALTER TABLE installed_plugins
-                    ADD COLUMN registry_snapshot_uri TEXT
-                    """
-                )
 
     def register_implementation(self, entrypoint: str) -> str:
         """Record an operator-installed entrypoint and its current source digest."""

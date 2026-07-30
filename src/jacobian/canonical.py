@@ -11,7 +11,7 @@ from typing import Any, NoReturn
 
 import rfc8785
 
-_INTEGER = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
+_INTEGER = re.compile(r"^(?:0|-?[1-9][0-9]*)$")
 _MAX_SAFE_JSON_INTEGER = (1 << 53) - 1
 _DECIMAL_CHUNK_BASE = 1_000_000_000
 _DECIMAL_CHUNK_DIGITS = 9

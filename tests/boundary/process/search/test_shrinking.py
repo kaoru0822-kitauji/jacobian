@@ -233,7 +233,7 @@ def _shrink_fixture(
         semantics_uri=semantics,
         payload={"value": 3},
     )
-    checkers = CheckerRegistry(store.db_path)
+    checkers = CheckerRegistry(store)
     checker = checkers.authorize(
         name="positive-preservation fixture",
         entrypoint=checker_entrypoint,

@@ -45,9 +45,9 @@ def test_store_closes_connections_owned_by_worker_threads(tmp_path: Path) -> Non
     # The connection cache is thread-local, while lifecycle ownership remains
     # explicit at the store.  Worker thread-local objects disappear when the
     # pool exits, but their SQLite handles must still be closed by store.close.
-    assert len(store._open_connections) >= 4  # bootstrap + one per worker
+    assert store.database.open_connection_count >= 4  # bootstrap + one per worker
     store.close()
-    assert not store._open_connections
+    assert store.database.open_connection_count == 0
 
 
 def _read_store(store: ArtifactStore, barrier: threading.Barrier) -> None:

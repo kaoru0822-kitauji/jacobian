@@ -108,7 +108,7 @@ def _graph_case(
         ),
         parents=(claim.artifact_uri, candidate.artifact_uri),
     )
-    registry = CheckerRegistry(store.db_path)
+    registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="graph-omitted-path-v1",
         entrypoint=checker_entrypoint,
@@ -547,7 +547,7 @@ def test_revocation_during_checker_execution_prevents_commit(
     )
     worker.start()
     assert entered.wait(timeout=5)
-    CheckerRegistry(store.db_path).revoke(checker_id, reason="concurrent test")
+    CheckerRegistry(store).revoke(checker_id, reason="concurrent test")
     release.set()
     worker.join(timeout=10)
 

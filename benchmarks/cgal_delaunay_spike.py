@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import lzma
+import math
 import re
 import tarfile
 from collections.abc import Callable, Mapping, Sequence
@@ -53,6 +54,63 @@ def _load_pin(path: Path) -> dict[str, Any]:
         ) from exc
     if not isinstance(payload, dict) or payload.get("contract") != (
         "jacobian.cgal-delaunay-spike/v1"
+    ):
+        raise CgalSpikeError(
+            "ERROR", "INVALID_SPIKE_PIN", "The CGAL spike pin is malformed."
+        )
+    required = {
+        "contract",
+        "provider",
+        "version",
+        "download_url",
+        "archive_sha256",
+        "manual_url",
+        "license",
+        "supported_gnu_compiler_minimum",
+        "adapter_source_sha256",
+        "reproductions",
+    }
+    license_info = payload.get("license")
+    reproductions = payload.get("reproductions")
+    unique = reproductions.get("unique") if isinstance(reproductions, dict) else None
+    cocircular = (
+        reproductions.get("cocircular") if isinstance(reproductions, dict) else None
+    )
+    if (
+        set(payload) != required
+        or any(
+            not isinstance(payload.get(key), str)
+            for key in required - {"license", "reproductions"}
+        )
+        or not isinstance(license_info, dict)
+        or set(license_info) != {"commercial_alternative", "open_source_id", "package"}
+        or type(license_info.get("commercial_alternative")) is not bool
+        or not all(
+            isinstance(license_info.get(key), str)
+            for key in ("open_source_id", "package")
+        )
+        or not isinstance(reproductions, dict)
+        or set(reproductions) != {"unique", "cocircular"}
+        or not isinstance(unique, dict)
+        or set(unique)
+        != {
+            "command",
+            "expected_output",
+            "expected_output_sha256",
+            "scope",
+            "site_count",
+        }
+        or not isinstance(cocircular, dict)
+        or set(cocircular) != {"command", "expected_output", "expected_output_sha256"}
+        or not all(
+            isinstance(case.get("command"), list)
+            and all(isinstance(part, str) for part in case["command"])
+            and isinstance(case.get("expected_output"), str)
+            and isinstance(case.get("expected_output_sha256"), str)
+            for case in (unique, cocircular)
+        )
+        or not isinstance(unique.get("scope"), str)
+        or type(unique.get("site_count")) is not int
     ):
         raise CgalSpikeError(
             "ERROR", "INVALID_SPIKE_PIN", "The CGAL spike pin is malformed."
@@ -200,7 +258,7 @@ def run_spike(
     adapter_source: Path = ADAPTER_SOURCE,
 ) -> dict[str, Any]:
     try:
-        if timeout_seconds <= 0:
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise CgalSpikeError(
                 "ERROR", "INVALID_TIMEOUT", "The CGAL spike timeout must be positive."
             )
@@ -249,6 +307,22 @@ def run_spike(
                     f"The CGAL {name} reproduction differs from the frozen result.",
                 )
             observed[name] = _sha256_bytes(output)
+        compiler_support = _compiler_support(
+            toolchain["compiler"],
+            pin["supported_gnu_compiler_minimum"],
+        )
+        limitations = [
+            "the reproduction does not authorize CGAL as an independent checker",
+            "source, adapter, and executable digests are measured but lack build attestation",
+        ]
+        if compiler_support == "BELOW_DOCUMENTED_SUPPORT_FLOOR":
+            limitations.append(
+                "the local compiler is below the CGAL 6.2 documented GNU support floor"
+            )
+        elif compiler_support == "UNKNOWN_COMPILER":
+            limitations.append(
+                "the local compiler version could not be compared with the CGAL 6.2 support floor"
+            )
         return {
             "contract": pin["contract"],
             "status": "COMPLETED",
@@ -270,10 +344,7 @@ def run_spike(
                 "toolchain": {
                     **toolchain,
                     "documented_gnu_minimum": pin["supported_gnu_compiler_minimum"],
-                    "support": _compiler_support(
-                        toolchain["compiler"],
-                        pin["supported_gnu_compiler_minimum"],
-                    ),
+                    "support": compiler_support,
                 },
             },
             "reproductions": {
@@ -298,11 +369,7 @@ def run_spike(
                 ],
             },
             "capability_ids_registered": [],
-            "limitations": [
-                "the reproduction does not authorize CGAL as an independent checker",
-                "source, adapter, and executable digests are measured but lack build attestation",
-                "the local compiler is below the CGAL 6.2 documented GNU support floor",
-            ],
+            "limitations": limitations,
         }
     except CgalSpikeError as exc:
         return {
