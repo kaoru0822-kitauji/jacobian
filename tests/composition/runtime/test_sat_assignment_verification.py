@@ -9,6 +9,7 @@ import pytest
 import jacobian_checkers.sat
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
+    CapabilityInputKind,
     CapabilityInstallTier,
     CapabilityMode,
     CapabilityProviderAvailability,
@@ -61,6 +62,21 @@ def _verify(runtime: JacobianRuntime, assignment_uri: str):
             mode=CapabilityMode.VERIFY,
             input={"assignment_uri": assignment_uri},
         )
+    )
+
+
+def test_sat_assignment_verifier_declares_its_typed_artifact_route(
+    authorized_complete_runtime,
+) -> None:
+    descriptor = next(
+        descriptor
+        for descriptor in authorized_complete_runtime.core.capabilities.catalog().capabilities
+        if descriptor.capability_id == "sat.model.verify"
+    )
+
+    assert CapabilityInputKind.TYPED_ARTIFACT in descriptor.accepted_input_kinds
+    assert descriptor.accepted_artifact_types == (
+        authorized_complete_runtime.core.sat.installation.assignment_schema_uri,
     )
 
 
