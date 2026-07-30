@@ -9,10 +9,10 @@ import sqlite3
 import tempfile
 import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, BinaryIO, Final
+from typing import Any, Final
 
 from jacobian.canonical import (
     CanonicalLimits,
@@ -20,6 +20,12 @@ from jacobian.canonical import (
     loads_strict_json,
 )
 from jacobian.contracts.artifacts import ArtifactManifest, ArtifactPutResult
+from jacobian.persistence import (
+    PersistenceLock,
+    StateDatabase,
+    StateDatabaseError,
+)
+from jacobian.persistence.migrations import STATE_MIGRATIONS
 
 _OBJECT_FORMAT_VERSION: Final = b"jacobian.object.v1"
 _CANONICALIZER_NAME: Final = b"jacobian.rfc8785+nfc+exact-rational.v1"
@@ -77,17 +83,6 @@ class StoredArtifact:
     canonical_bytes: bytes
 
 
-class _ConnectionState(threading.local):
-    """Per-thread ownership for one explicit store transaction."""
-
-    def __init__(self) -> None:
-        self.transaction: sqlite3.Connection | None = None
-        self.connection: sqlite3.Connection | None = None
-        self.connection_factory_token: object | None = None
-        self.blob_lock_depth = 0
-        self.pending_sync_directories: set[Path] = set()
-
-
 class _ActiveTransactionPaths(threading.local):
     """Database paths transaction-owned by the current thread."""
 
@@ -136,47 +131,6 @@ def _framed_digest(tag: bytes, parts: tuple[bytes, ...]) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-def _lock_file(lock_file: BinaryIO) -> None:
-    if os.name == "nt":  # pragma: no cover - exercised in cross-platform CI
-        import msvcrt
-
-        lock_file.seek(0)
-        if not lock_file.read(1):
-            lock_file.seek(0)
-            lock_file.write(b"\0")
-            lock_file.flush()
-        lock_file.seek(0)
-        locking = getattr(msvcrt, "locking")  # noqa: B009
-        locking(
-            lock_file.fileno(),
-            getattr(msvcrt, "LK_LOCK"),  # noqa: B009
-            1,
-        )
-        return
-
-    import fcntl
-
-    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-
-
-def _unlock_file(lock_file: BinaryIO) -> None:
-    if os.name == "nt":  # pragma: no cover - exercised in cross-platform CI
-        import msvcrt
-
-        lock_file.seek(0)
-        locking = getattr(msvcrt, "locking")  # noqa: B009
-        locking(
-            lock_file.fileno(),
-            getattr(msvcrt, "LK_UNLCK"),  # noqa: B009
-            1,
-        )
-        return
-
-    import fcntl
-
-    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-
 class ArtifactStore:
     """Content-addressed blobs plus immutable SQLite artifact metadata."""
 
@@ -205,53 +159,24 @@ class ArtifactStore:
         self.staging_root = self.root / "staging"
         self.db_path = self.root / "metadata.sqlite3"
         self.blob_lock_path = self.root / ".blob-quota.lock"
+        self._blob_lock = PersistenceLock(self.blob_lock_path)
         self.transaction_recovery_path = self.root / ".transaction-recovery"
         self._validated_blobs: dict[str, tuple[int, int, int, int, int]] = {}
-        self._connection_state = _ConnectionState()
-        self._connection_lock = threading.Lock()
-        self._open_connections: set[sqlite3.Connection] = set()
+        self.database = StateDatabase(
+            self.db_path,
+            synchronous=self.synchronous,
+        )
         self._closed = False
         self._recovery_required = False
         self.blob_root.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
-        self._initialize_database()
-
-    def _connect(self) -> sqlite3.Connection:
-        if self._closed:
-            raise StoreClosedError("artifact store is closed")
-        if self._recovery_required:
-            raise StoreError(
-                "artifact store requires recovery by a fresh ArtifactStore instance"
-            )
-        # Connections remain logically thread-owned by ``_ConnectionState``;
-        # disabling sqlite's thread check only lets lifecycle teardown close a
-        # connection when the store is closed from its coordinating thread.
-        connection = sqlite3.connect(
-            self.db_path,
-            timeout=30,
-            check_same_thread=False,
-        )
         try:
-            connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
-            connection.execute(f"PRAGMA synchronous = {self.synchronous}")
-            with self._connection_lock:
-                self._open_connections.add(connection)
-        except BaseException:
-            connection.close()
-            with self._connection_lock:
-                self._open_connections.discard(connection)
-            raise
-        return connection
-
-    def _close_connection(self, connection: sqlite3.Connection) -> None:
-        """Close one owned connection and remove it from lifecycle tracking."""
-
-        try:
-            connection.close()
-        finally:
-            with self._connection_lock:
-                self._open_connections.discard(connection)
+            self.database.migrate(STATE_MIGRATIONS)
+        except Exception as exc:
+            with suppress(StateDatabaseError):
+                self.database.close(checkpoint=False)
+            raise StoreError("artifact store schema migration failed") from exc
+        self._reconcile_blob_quota()
 
     def close(self) -> None:
         """Checkpoint SQLite and end this store's owned lifetime."""
@@ -260,38 +185,10 @@ class ArtifactStore:
             return
         if self.transaction_active:
             raise StoreError("cannot close an artifact store during a transaction")
-        if self._recovery_required:
-            with self._connection_lock:
-                for pooled in tuple(self._open_connections):
-                    try:
-                        pooled.close()
-                    except BaseException:
-                        _LOGGER.exception(
-                            "failed to close pooled artifact connection during recovery"
-                        )
-                    finally:
-                        self._open_connections.discard(pooled)
-            self._connection_state.connection = None
-            self._connection_state.connection_factory_token = None
-            self._closed = True
-            return
-        connection = self._connect()
         try:
-            checkpoint = connection.execute(
-                "PRAGMA wal_checkpoint(TRUNCATE)"
-            ).fetchone()
-            if checkpoint is None or checkpoint[0] != 0:
-                raise StoreError(f"could not checkpoint artifact store: {checkpoint!r}")
-        finally:
-            self._close_connection(connection)
-            with self._connection_lock:
-                for pooled in tuple(self._open_connections):
-                    try:
-                        pooled.close()
-                    finally:
-                        self._open_connections.discard(pooled)
-            self._connection_state.connection = None
-            self._connection_state.connection_factory_token = None
+            self.database.close(checkpoint=not self._recovery_required)
+        except StateDatabaseError as exc:
+            raise StoreError("could not close artifact store database") from exc
         self._closed = True
 
     def __enter__(self) -> ArtifactStore:
@@ -312,45 +209,20 @@ class ArtifactStore:
             raise StoreError(
                 "artifact store requires recovery by a fresh ArtifactStore instance"
             )
-        transaction = self._connection_state.transaction
-        if transaction is not None:
-            yield transaction
-            return
-
-        # Keep one connection per owning thread for the store lifetime.  The
-        # old implementation opened and closed a connection for every query,
-        # which made a complete installation perform hundreds of handshakes
-        # and repeated PRAGMA setup.  ``_connect`` remains a narrow factory so
-        # lifecycle and failure tests can still replace it.
-        factory = self._connect
-        factory_token = getattr(factory, "__func__", factory)
-        connection = self._connection_state.connection
-        if (
-            connection is not None
-            and self._connection_state.connection_factory_token is not factory_token
-        ):
-            self._close_connection(connection)
-            connection = None
-            self._connection_state.connection = None
-        if connection is None:
-            connection = factory()
-            self._connection_state.connection = connection
-            self._connection_state.connection_factory_token = factory_token
-        with connection:
+        with self.database.connection() as connection:
             yield connection
 
     @property
     def transaction_active(self) -> bool:
         """Whether this thread is inside an explicit store transaction."""
 
-        return self._connection_state.transaction is not None
+        return self.database.transaction_active
 
     @property
     def transaction_identity(self) -> int | None:
         """Process-local identity of this thread's active transaction."""
 
-        transaction = self._connection_state.transaction
-        return None if transaction is None else id(transaction)
+        return self.database.transaction_identity
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -367,7 +239,7 @@ class ArtifactStore:
             raise StoreError(
                 "artifact store requires recovery by a fresh ArtifactStore instance"
             )
-        if self._connection_state.transaction is not None:
+        if self.database.transaction_active:
             raise StoreError("nested artifact store transactions are unsupported")
 
         with self._exclusive_blob_lock():
@@ -375,13 +247,13 @@ class ArtifactStore:
                 if self.transaction_recovery_path.exists():
                     self._reconcile_blob_quota(force=True)
                 self._write_transaction_recovery_marker()
-                connection = self._connect()
+                connection = self.database.connect()
             except BaseException:
                 self._recovery_required = True
                 raise
             try:
                 connection.execute("BEGIN IMMEDIATE")
-                self._connection_state.transaction = connection
+                self.database.activate_transaction(connection)
                 _ACTIVE_TRANSACTION_PATHS.paths.add(self.db_path)
                 try:
                     yield
@@ -397,7 +269,7 @@ class ArtifactStore:
                         except BaseException as exc:
                             cleanup_error = exc
                     try:
-                        self._close_connection(connection)
+                        self.database.close_connection(connection)
                     except BaseException as exc:
                         cleanup_error = cleanup_error or exc
                     finally:
@@ -418,11 +290,11 @@ class ArtifactStore:
                     try:
                         self._flush_transaction_directories()
                         connection.commit()
-                        self._close_connection(connection)
+                        self.database.close_connection(connection)
                     except BaseException as exc:
                         self._recovery_required = True
                         try:
-                            self._close_connection(connection)
+                            self.database.close_connection(connection)
                         except BaseException:
                             _LOGGER.exception(
                                 "failed to close an uncertain artifact transaction"
@@ -439,9 +311,9 @@ class ArtifactStore:
                         self._recovery_required = True
                         raise
             except BaseException:
-                if self._connection_state.transaction is not None:
+                if self.database.transaction_active:
                     try:
-                        self._close_connection(connection)
+                        self.database.close_connection(connection)
                     except BaseException:
                         _LOGGER.exception(
                             "failed to close artifact transaction during setup cleanup"
@@ -452,7 +324,7 @@ class ArtifactStore:
                     and not self._recovery_required
                 ):
                     try:
-                        self._close_connection(connection)
+                        self.database.close_connection(connection)
                     except BaseException:
                         _LOGGER.exception(
                             "failed to close artifact transaction after setup failure"
@@ -463,8 +335,7 @@ class ArtifactStore:
     def _clear_transaction_state(self) -> None:
         """Release process-local ownership even when durable cleanup fails."""
 
-        self._connection_state.transaction = None
-        self._connection_state.pending_sync_directories.clear()
+        self.database.clear_transaction()
         _ACTIVE_TRANSACTION_PATHS.paths.discard(self.db_path)
 
     def _sync_directory(self, path: Path) -> None:
@@ -485,7 +356,7 @@ class ArtifactStore:
         *,
         prefix_created: bool,
     ) -> None:
-        directories = self._connection_state.pending_sync_directories
+        directories = self.database.pending_sync_directories
         if self.transaction_active:
             directories.add(prefix)
             if prefix_created:
@@ -499,7 +370,7 @@ class ArtifactStore:
     def _flush_transaction_directories(self) -> None:
         """Make published blob names durable before committing their metadata."""
 
-        directories = self._connection_state.pending_sync_directories
+        directories = self.database.pending_sync_directories
         for directory in sorted(
             directories,
             key=lambda path: (len(path.parts), str(path)),
@@ -518,57 +389,6 @@ class ArtifactStore:
     def _remove_transaction_recovery_marker(self) -> None:
         self.transaction_recovery_path.unlink(missing_ok=True)
         self._sync_root_directory()
-
-    def _initialize_database(self) -> None:
-        with self._exclusive_blob_lock(), self.connection() as connection:
-            connection.execute("PRAGMA journal_mode = WAL")
-            connection.execute(f"PRAGMA synchronous = {self.synchronous}")
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS artifacts (
-                    artifact_uri TEXT PRIMARY KEY,
-                    manifest_digest TEXT NOT NULL UNIQUE,
-                    object_digest TEXT NOT NULL,
-                    payload_digest TEXT NOT NULL,
-                    schema_uri TEXT NOT NULL,
-                    semantics_uri TEXT NOT NULL,
-                    canonicalizer_digest TEXT NOT NULL,
-                    summary TEXT NOT NULL,
-                    committed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE INDEX IF NOT EXISTS artifacts_object_digest
-                    ON artifacts(object_digest);
-                CREATE TABLE IF NOT EXISTS artifact_parents (
-                    artifact_uri TEXT NOT NULL,
-                    position INTEGER NOT NULL,
-                    parent_uri TEXT NOT NULL,
-                    PRIMARY KEY (artifact_uri, position),
-                    FOREIGN KEY (artifact_uri)
-                        REFERENCES artifacts(artifact_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS blob_quota (
-                    id INTEGER PRIMARY KEY CHECK (id = 0),
-                    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
-                    reconciliation_required INTEGER NOT NULL DEFAULT 1
-                        CHECK (reconciliation_required IN (0, 1))
-                );
-                """
-            )
-            quota_columns = {
-                str(row["name"])
-                for row in connection.execute("PRAGMA table_info(blob_quota)")
-            }
-            if "reconciliation_required" not in quota_columns:
-                connection.execute(
-                    """
-                    ALTER TABLE blob_quota
-                    ADD COLUMN reconciliation_required
-                        INTEGER NOT NULL DEFAULT 1
-                        CHECK (reconciliation_required IN (0, 1))
-                    """
-                )
-        self._reconcile_blob_quota()
 
     def _blob_path(self, digest: str) -> Path:
         hex_digest = digest.removeprefix("sha256:")
@@ -721,22 +541,8 @@ class ArtifactStore:
     def _exclusive_blob_lock(self) -> Iterator[None]:
         """Serialize quota accounting and blob publication across processes."""
 
-        if self._connection_state.blob_lock_depth:
-            self._connection_state.blob_lock_depth += 1
-            try:
-                yield
-            finally:
-                self._connection_state.blob_lock_depth -= 1
-            return
-
-        with self.blob_lock_path.open("a+b") as lock_file:
-            _lock_file(lock_file)
-            self._connection_state.blob_lock_depth = 1
-            try:
-                yield
-            finally:
-                self._connection_state.blob_lock_depth = 0
-                _unlock_file(lock_file)
+        with self._blob_lock.hold():
+            yield
 
     def _write_blob(self, data: bytes) -> str:
         try:

@@ -46,11 +46,11 @@ def test_root_conftest_has_no_high_cost_imports_or_runtime_construction() -> Non
     assert "JacobianRuntime" not in source
 
 
-def test_complete_runtime_fixtures_are_composition_owned() -> None:
-    """Expensive fixture names and construction live in the composition tier."""
+def test_complete_runtime_fixtures_use_an_explicit_shared_plugin() -> None:
+    """Owning tiers register one support module rather than importing conftests."""
 
-    composition = ROOT / "composition" / "conftest.py"
-    source = composition.read_text(encoding="utf-8")
+    plugin = ROOT / "support" / "runtime_fixtures.py"
+    source = plugin.read_text(encoding="utf-8")
     for name in (
         "fresh_complete_runtime",
         "attached_complete_runtime",
@@ -59,6 +59,12 @@ def test_complete_runtime_fixtures_are_composition_owned() -> None:
     ):
         assert f"def {name}(" in source
     assert "create_runtime" in source
+
+    expected_registration = 'pytest_plugins = ("tests.support.runtime_fixtures",)'
+    for tier in ("composition", "boundary", "e2e"):
+        tier_source = (ROOT / tier / "conftest.py").read_text(encoding="utf-8")
+        assert expected_registration in tier_source
+        assert ".conftest import" not in tier_source
 
     for tier in ("component", "domain"):
         tier_source = (ROOT / tier / "conftest.py").read_text(encoding="utf-8")

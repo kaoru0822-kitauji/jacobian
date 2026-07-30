@@ -224,7 +224,7 @@ def _witness_fixture(
             plugins,
             ClaimValidationService(store, schemas, plugins),
             PluginExecutor(),
-            VerificationService(store, CheckerRegistry(store.db_path)),
+            VerificationService(store, CheckerRegistry(store)),
         ),
         store,
         claim.artifact_uri,

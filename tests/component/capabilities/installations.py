@@ -20,7 +20,7 @@ def install_capability_bundle(
     store = ArtifactStore(tmp_path / "store")
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
-    checkers = CheckerRegistry(tmp_path / "checkers.sqlite3")
+    checkers = CheckerRegistry(store)
     verification = VerificationService(store, checkers)
     adapters, installed = installer(
         store,

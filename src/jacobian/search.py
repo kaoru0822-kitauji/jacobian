@@ -50,7 +50,7 @@ from jacobian.evaluation import (
     EvaluationService,
     require_complete_evaluation_batch,
 )
-from jacobian.experiment_runtime import new_experiment_uri, open_experiment_database
+from jacobian.experiment_identity import new_experiment_uri
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import (
     PluginRegistry,
@@ -158,7 +158,7 @@ class SearchService:
             version="1",
             schema=model_schema(EvaluationBatchResult),
         )
-        self._initialize_database()
+        self._recover_interrupted_searches()
 
     def close(self, *, timeout_seconds: float = 30) -> None:
         """Quiesce runtime-owned workers before their shared store is closed."""
@@ -192,11 +192,8 @@ class SearchService:
             if self._closing or self._closed:
                 raise SearchError("search service is closing")
 
-    def _connect(self) -> sqlite3.Connection:
-        return open_experiment_database(self.store.db_path)
-
-    def _initialize_database(self) -> None:
-        """Create metadata tables and isolate recovery one row at a time.
+    def _recover_interrupted_searches(self) -> None:
+        """Isolate interrupted search state one row at a time.
 
         Active runs recover as paused, pending cancellation recovers as
         cancelled, and malformed or index-inconsistent snapshots are
@@ -205,53 +202,7 @@ class SearchService:
         """
 
         archive_recoveries: list[SearchExperimentSnapshot] = []
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS search_experiments (
-                    experiment_uri TEXT PRIMARY KEY,
-                    state TEXT NOT NULL,
-                    snapshot_json BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS search_idempotency (
-                    idempotency_key TEXT PRIMARY KEY,
-                    request_digest TEXT NOT NULL,
-                    experiment_uri TEXT NOT NULL UNIQUE,
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES search_experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS search_events (
-                    experiment_uri TEXT NOT NULL,
-                    sequence INTEGER NOT NULL,
-                    event_json BLOB NOT NULL,
-                    event_digest TEXT NOT NULL UNIQUE,
-                    PRIMARY KEY (experiment_uri, sequence),
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES search_experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS search_recovery_failures (
-                    experiment_uri TEXT PRIMARY KEY,
-                    detected_at TEXT NOT NULL,
-                    snapshot_digest TEXT NOT NULL,
-                    detail TEXT NOT NULL,
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES search_experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TRIGGER IF NOT EXISTS search_events_no_update
-                BEFORE UPDATE ON search_events
-                BEGIN
-                    SELECT RAISE(ABORT, 'search lifecycle events are append-only');
-                END;
-                CREATE TRIGGER IF NOT EXISTS search_events_no_delete
-                BEFORE DELETE ON search_events
-                BEGIN
-                    SELECT RAISE(ABORT, 'search lifecycle events are append-only');
-                END;
-                """
-            )
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """
@@ -392,7 +343,7 @@ class SearchService:
         snapshot: SearchExperimentSnapshot,
     ) -> None:
         archive = self._store_archive(snapshot, snapshot.accounting)
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             latest = self._read_snapshot(connection, snapshot.experiment_uri)
             if (
@@ -422,7 +373,7 @@ class SearchService:
         self._require_open()
         selected = SearchRunRequest.model_validate(request)
         request_digest = _digest(selected.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_handle = self._reuse_request(
                 connection,
@@ -498,7 +449,7 @@ class SearchService:
         )
 
         created = False
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_handle = self._reuse_request(
                 connection,
@@ -601,13 +552,13 @@ class SearchService:
     def inspect(self, experiment_uri: str) -> SearchExperimentSnapshot:
         """Read the latest durable search snapshot."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             return self._read_snapshot(connection, experiment_uri)
 
     def contains(self, experiment_uri: str) -> bool:
         """Return whether this service owns the experiment identity."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             row = connection.execute(
                 """
                 SELECT 1
@@ -671,7 +622,7 @@ class SearchService:
         """Resume the same invocation from its immutable checkpoint."""
 
         self._require_open()
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             snapshot = self._read_snapshot(connection, experiment_uri)
             if snapshot.state != ExperimentState.PAUSED:
@@ -708,7 +659,7 @@ class SearchService:
     def events(self, experiment_uri: str) -> tuple[SearchLifecycleEvent, ...]:
         """Return the validated append-only lifecycle event chain."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             if (
                 connection.execute(
                     """
@@ -1490,7 +1441,7 @@ class SearchService:
         self,
         snapshot: SearchExperimentSnapshot,
     ) -> ExperimentState:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, snapshot.experiment_uri)
             if current.state == ExperimentState.PAUSE_REQUESTED:
@@ -1531,7 +1482,7 @@ class SearchService:
         self,
         progress: SearchExperimentSnapshot,
     ) -> ExperimentState:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, progress.experiment_uri)
             if current.state == ExperimentState.PAUSE_REQUESTED:
@@ -1651,7 +1602,7 @@ class SearchService:
             accounting=terminal_accounting,
             detail=detail,
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             latest = self._read_snapshot(connection, experiment_uri)
             if latest.state == ExperimentState.CANCEL_REQUESTED:
@@ -1730,7 +1681,7 @@ class SearchService:
             "search terminal archive persistence failed",
             exc_info=error,
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, experiment_uri)
             if current.state in _TERMINAL_STATES:
@@ -1779,7 +1730,7 @@ class SearchService:
         event_type: str,
         detail: str,
     ) -> ExperimentControlResult:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             snapshot = self._read_snapshot(connection, experiment_uri)
             if snapshot.state in _TERMINAL_STATES:
@@ -1835,7 +1786,7 @@ class SearchService:
         event_type: str,
         payload: dict[str, Any],
     ) -> None:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._append_event(
                 connection,

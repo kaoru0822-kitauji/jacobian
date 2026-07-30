@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-architecture test-plan test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -40,6 +40,10 @@ fix: ## Apply Ruff fixes and formatting.
 lint: ## Run the fast Ruff lint and format checks.
 	$(UV_RUN) ruff check $(RUFF_PATHS)
 	$(UV_RUN) ruff format --check $(RUFF_PATHS)
+	$(MAKE) complexity-check
+
+complexity-check: ## Reject new, increased, or stale C901 baseline entries.
+	$(UV_RUN) python tools/check_complexity.py
 
 lint-full: lint ## Add dependency and dead-code checks.
 	$(UV_RUN) deptry .
@@ -57,6 +61,9 @@ test-architecture: ## Enforce semantic test-layer and provider-import boundaries
 test-plan: ## Print local validation selected for BASE..HEAD and working changes.
 	@test -n "$(BASE)" || { echo "BASE is required (for example: make test-plan BASE=origin/main)" >&2; exit 2; }
 	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"
+
+test-changed: ## Run changed-path tests, defaulting BASE to origin/main.
+	@$(UV_RUN) python .github/scripts/plan-local-tests --base "$(or $(BASE),origin/main)" --execute
 
 define run_topology_lane
 	PYTEST_ADDOPTS="$(PYTEST_DIAGNOSTIC_ARGS) $(PYTEST_ARGS)" \

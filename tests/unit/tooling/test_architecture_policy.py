@@ -102,6 +102,30 @@ def test_root_conftest_rejects_high_cost_fixture(tmp_path: Path) -> None:
     assert [item.code for item in report.violations] == ["root-high-cost-fixture"]
 
 
+def test_sibling_conftest_imports_are_rejected(tmp_path: Path) -> None:
+    _test_file(
+        tmp_path,
+        "tests/boundary/conftest.py",
+        "from tests.composition.conftest import complete_runtime\n",
+    )
+
+    report = check_test_architecture(tmp_path)
+
+    assert [item.code for item in report.violations] == ["conftest-import"]
+
+
+def test_runtime_fixture_plugin_is_the_explicit_shared_construction_owner(
+    tmp_path: Path,
+) -> None:
+    _test_file(
+        tmp_path,
+        "tests/support/runtime_fixtures.py",
+        "from jacobian.runtime import create_runtime\n",
+    )
+
+    assert check_test_architecture(tmp_path).ok
+
+
 def test_support_modules_cannot_hide_complete_runtime_construction(
     tmp_path: Path,
 ) -> None:
