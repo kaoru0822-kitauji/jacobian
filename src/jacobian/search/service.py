@@ -831,7 +831,6 @@ class SearchService:
             raise SearchError("evaluator identity changed after request acceptance")
         return proposer, refiner, evaluator.implementation_digest
 
-
     def _validate_archive_page(
         self,
         *,
