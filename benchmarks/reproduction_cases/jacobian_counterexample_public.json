@@ -1,0 +1,97 @@
+{
+  "suite_id": "JACOBIAN-COUNTEREXAMPLE-PUBLIC-001",
+  "version": "1",
+  "scored": false,
+  "purpose": "Public reference replay only; not a hidden model evaluation",
+  "source": [
+    "https://github.com/KitaKen1/jacobian-conjecture-counterexample-lean",
+    "https://github.com/DrAlexHarrison/jacobian-anatomy",
+    "https://github.com/google-deepmind/formal-conjectures/pull/4474"
+  ],
+  "map": {
+    "map_schema_version": "1",
+    "domain": "QQ",
+    "variables": ["x", "y", "z"],
+    "coordinates": [
+      {
+        "terms": [
+          {"coefficient": {"num": "1", "den": "1"}, "exponents": [3, 3, 1]},
+          {"coefficient": {"num": "3", "den": "1"}, "exponents": [2, 4, 0]},
+          {"coefficient": {"num": "3", "den": "1"}, "exponents": [2, 2, 1]},
+          {"coefficient": {"num": "7", "den": "1"}, "exponents": [1, 3, 0]},
+          {"coefficient": {"num": "3", "den": "1"}, "exponents": [1, 1, 1]},
+          {"coefficient": {"num": "4", "den": "1"}, "exponents": [0, 2, 0]},
+          {"coefficient": {"num": "1", "den": "1"}, "exponents": [0, 0, 1]}
+        ]
+      },
+      {
+        "terms": [
+          {"coefficient": {"num": "3", "den": "1"}, "exponents": [3, 2, 1]},
+          {"coefficient": {"num": "9", "den": "1"}, "exponents": [2, 3, 0]},
+          {"coefficient": {"num": "6", "den": "1"}, "exponents": [2, 1, 1]},
+          {"coefficient": {"num": "12", "den": "1"}, "exponents": [1, 2, 0]},
+          {"coefficient": {"num": "3", "den": "1"}, "exponents": [1, 0, 1]},
+          {"coefficient": {"num": "1", "den": "1"}, "exponents": [0, 1, 0]}
+        ]
+      },
+      {
+        "terms": [
+          {"coefficient": {"num": "-1", "den": "1"}, "exponents": [3, 0, 1]},
+          {"coefficient": {"num": "-3", "den": "1"}, "exponents": [2, 1, 0]},
+          {"coefficient": {"num": "2", "den": "1"}, "exponents": [1, 0, 0]}
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "JACOBIAN-KELLER-001",
+      "capability_id": "polynomial.map.keller_condition.verify",
+      "input": {"map_ref": "map"},
+      "expected": {
+        "conclusion": "TRUE",
+        "keller_condition_verified": true,
+        "determinant": {
+          "terms": [
+            {"coefficient": {"num": "-2", "den": "1"}, "exponents": [0, 0, 0]}
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "JACOBIAN-INVERSE-OBSTRUCTION-001",
+      "capability_id": "polynomial.map.inverse.refute_by_collision",
+      "input": {
+        "map_ref": "map",
+        "first_point": [
+          {"num": "0", "den": "1"},
+          {"num": "0", "den": "1"},
+          {"num": "-1", "den": "4"}
+        ],
+        "second_point": [
+          {"num": "1", "den": "1"},
+          {"num": "-3", "den": "2"},
+          {"num": "13", "den": "2"}
+        ],
+        "claimed_image": [
+          {"num": "-1", "den": "4"},
+          {"num": "0", "den": "1"},
+          {"num": "0", "den": "1"}
+        ]
+      },
+      "expected": {
+        "conclusion": "TRUE",
+        "noninvertibility_verified": true
+      }
+    },
+    {
+      "case_id": "JACOBIAN-NEGATIVE-CONTROL-001",
+      "capability_id": "polynomial.map.inverse.refute_by_collision",
+      "input_mutation": "replace claimed_image[0] -1/4 with -1/3",
+      "expected": {
+        "conclusion": "UNKNOWN",
+        "verification_record_uri": null
+      }
+    }
+  ]
+}
