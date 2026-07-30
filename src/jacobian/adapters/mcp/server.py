@@ -93,6 +93,11 @@ def _json_bytes(value: object) -> bytes:
     return _compact_json(value).encode("utf-8")
 
 
+def _mcp_text_json_bytes(value: object) -> bytes:
+    """Measure JSON as FastMCP renders structured tool results."""
+    return json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")
+
+
 def _json_digest(value: object) -> str:
     return f"sha256:{hashlib.sha256(_json_bytes(value)).hexdigest()}"
 
@@ -737,7 +742,7 @@ def _capability_discovery_response(
     }
     matches = cast(list[dict[str, Any]], response["matches"])
     while (
-        len(canonicalize_json(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
+        len(_mcp_text_json_bytes(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
         and len(matches) > 1
     ):
         matches.pop()
@@ -748,7 +753,7 @@ def _capability_discovery_response(
     response["available_domains_total"] = len(available_domains)
     response["available_domains_truncated"] = False
     while (
-        len(canonicalize_json(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
+        len(_mcp_text_json_bytes(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
         and available_domains
     ):
         available_domains.pop()
@@ -756,7 +761,9 @@ def _capability_discovery_response(
         response["truncation_reason"] = "BYTE_LIMIT"
     response["match_metadata_truncated"] = False
     compact_fields = ("tags", "matched_on", "matched_terms")
-    while len(canonicalize_json(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT:
+    while (
+        len(_mcp_text_json_bytes(response)) > CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT
+    ):
         removed = False
         for match in matches:
             for field in compact_fields:
