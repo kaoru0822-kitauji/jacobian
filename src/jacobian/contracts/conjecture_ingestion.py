@@ -139,49 +139,59 @@ class ExternalConjectureIngestArtifact(ContractModel):
 
     @model_validator(mode="after")
     def enforce_publication_invariants(self) -> Self:
-        text_allowed = self.source_license in {
-            ConjectureLicenseClass.CC0_1_0,
-            ConjectureLicenseClass.CC_BY_4_0,
-            ConjectureLicenseClass.APACHE_2_0,
-            ConjectureLicenseClass.MIT,
-        }
         if self.license_decision is ConjectureLicenseDecision.ALLOW_TEXT:
-            if not text_allowed:
-                raise ValueError("ALLOW_TEXT requires an allowlisted source license")
-            if (
-                self.license_evidence_url is None
-                or self.license_evidence_digest is None
-            ):
-                raise ValueError("ALLOW_TEXT requires bound license evidence")
-            if self.indexed_statement is None:
-                raise ValueError("ALLOW_TEXT requires indexed_statement")
-            expected_digest = _text_digest(self.indexed_statement)
-            if self.supplied_content_digest != expected_digest:
-                raise ValueError("supplied_content_digest must bind indexed_statement")
-            if self.indexed_content_digest != expected_digest:
-                raise ValueError("indexed_content_digest must bind indexed_statement")
-            if self.withheld_fields:
-                raise ValueError("indexed text cannot also be withheld")
-            if self.ingestion_status != "INDEXED":
-                raise ValueError("ALLOW_TEXT requires INDEXED status")
+            _validate_text_publication(self)
             return self
 
-        if (
-            self.indexed_statement is not None
-            or self.indexed_content_digest is not None
-        ):
-            raise ValueError("METADATA_ONLY cannot contain indexed text")
-        if self.supplied_content_digest is None:
-            if self.withheld_fields:
-                raise ValueError("no-text records cannot report withheld fields")
-            if self.ingestion_status != "METADATA_INDEXED_NO_TEXT":
-                raise ValueError("absent text requires METADATA_INDEXED_NO_TEXT")
-        else:
-            if self.withheld_fields != ("statement",):
-                raise ValueError("supplied metadata-only text must be withheld")
-            if self.ingestion_status != "METADATA_INDEXED_TEXT_WITHHELD":
-                raise ValueError("withheld text requires the withheld status")
+        _validate_metadata_only_publication(self)
         return self
+
+
+def _validate_text_publication(artifact: ExternalConjectureIngestArtifact) -> None:
+    text_allowed = artifact.source_license in {
+        ConjectureLicenseClass.CC0_1_0,
+        ConjectureLicenseClass.CC_BY_4_0,
+        ConjectureLicenseClass.APACHE_2_0,
+        ConjectureLicenseClass.MIT,
+    }
+    if not text_allowed:
+        raise ValueError("ALLOW_TEXT requires an allowlisted source license")
+    if (
+        artifact.license_evidence_url is None
+        or artifact.license_evidence_digest is None
+    ):
+        raise ValueError("ALLOW_TEXT requires bound license evidence")
+    if artifact.indexed_statement is None:
+        raise ValueError("ALLOW_TEXT requires indexed_statement")
+    expected_digest = _text_digest(artifact.indexed_statement)
+    if artifact.supplied_content_digest != expected_digest:
+        raise ValueError("supplied_content_digest must bind indexed_statement")
+    if artifact.indexed_content_digest != expected_digest:
+        raise ValueError("indexed_content_digest must bind indexed_statement")
+    if artifact.withheld_fields:
+        raise ValueError("indexed text cannot also be withheld")
+    if artifact.ingestion_status != "INDEXED":
+        raise ValueError("ALLOW_TEXT requires INDEXED status")
+
+
+def _validate_metadata_only_publication(
+    artifact: ExternalConjectureIngestArtifact,
+) -> None:
+    if (
+        artifact.indexed_statement is not None
+        or artifact.indexed_content_digest is not None
+    ):
+        raise ValueError("METADATA_ONLY cannot contain indexed text")
+    if artifact.supplied_content_digest is None:
+        if artifact.withheld_fields:
+            raise ValueError("no-text records cannot report withheld fields")
+        if artifact.ingestion_status != "METADATA_INDEXED_NO_TEXT":
+            raise ValueError("absent text requires METADATA_INDEXED_NO_TEXT")
+        return
+    if artifact.withheld_fields != ("statement",):
+        raise ValueError("supplied metadata-only text must be withheld")
+    if artifact.ingestion_status != "METADATA_INDEXED_TEXT_WITHHELD":
+        raise ValueError("withheld text requires the withheld status")
 
 
 class ExternalConjectureIngestOutput(ExternalConjectureIngestArtifact):
