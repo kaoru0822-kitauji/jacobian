@@ -997,8 +997,7 @@ def create_server(
             str | None,
             Field(
                 description=(
-                    "Exact installed capability ID. When supplied, omit query, "
-                    "domain, mode, limit, and cursor."
+                    "Exact installed ID; cannot be combined with discovery filters."
                 )
             ),
         ] = None,
@@ -1008,8 +1007,7 @@ def create_server(
                 min_length=1,
                 max_length=512,
                 description=(
-                    "Natural-language mathematical outcome to find; no capability "
-                    "ID is required."
+                    "Mathematical outcome to find; no capability ID is required."
                 ),
             ),
         ] = None,
@@ -1029,23 +1027,14 @@ def create_server(
         ] = None,
         input_kind: Annotated[
             CapabilityInputKind | None,
-            Field(
-                description=(
-                    "Optional input boundary. Use NATURAL_LANGUAGE_PROOF for proof "
-                    "prose, FORMAL_PROPOSITION for formal syntax, or TYPED_ARTIFACT "
-                    "with artifact_type for a bound artifact."
-                )
-            ),
+            Field(description=("Input boundary used to reject incompatible routes.")),
         ] = None,
         artifact_type: Annotated[
             str | None,
             Field(
                 pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
                 max_length=128,
-                description=(
-                    "Typed artifact contract ID; valid only with "
-                    "input_kind=TYPED_ARTIFACT."
-                ),
+                description=("Exact artifact contract; requires TYPED_ARTIFACT."),
             ),
         ] = None,
         limit: Annotated[

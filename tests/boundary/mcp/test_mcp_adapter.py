@@ -741,7 +741,10 @@ def test_mcp_compact_capability_index_is_searchable_and_paginated(
 
             searched = await client.call_tool(
                 "capability.describe",
-                {"query": "SAT UNSAT proof"},
+                {
+                    "query": "SAT UNSAT proof",
+                    "input_kind": "STRUCTURED_REQUEST",
+                },
             )
             search_index = json.loads(searched.content[0].text)
             search_ids = {
