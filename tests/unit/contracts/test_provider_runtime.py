@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 import jacobian.provider_runtime as provider_runtime
+import jacobian.providers.flint_runtime as flint_runtime
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityInstallTier,
@@ -168,7 +169,7 @@ def test_exact_checker_runtime_defers_rational_polynomial_api_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     incomplete_flint = SimpleNamespace(
-        __FLINT_VERSION__=provider_runtime.PYTHON_FLINT_HNF_FLINT_VERSION,
+        __FLINT_VERSION__=flint_runtime.PYTHON_FLINT_HNF_FLINT_VERSION,
         fmpq=object(),
         fmpq_mat=object(),
         fmpz=object(),
@@ -176,7 +177,7 @@ def test_exact_checker_runtime_defers_rational_polynomial_api_probe(
         fmpz_poly=object(),
     )
     monkeypatch.setattr(
-        provider_runtime.importlib,
+        flint_runtime.importlib,
         "import_module",
         lambda _name: incomplete_flint,
     )
@@ -200,12 +201,12 @@ def test_exact_checker_runtime_rejects_different_linked_flint_version(
     available = python_flint_exact_checker_provider_runtime()
     assert available.availability is CapabilityProviderAvailability.AVAILABLE
     monkeypatch.setattr(
-        provider_runtime,
+        flint_runtime,
         "python_distribution_provider_runtime",
         lambda *_args, **_kwargs: available,
     )
     monkeypatch.setattr(
-        provider_runtime.importlib,
+        flint_runtime.importlib,
         "import_module",
         lambda _name: SimpleNamespace(__FLINT_VERSION__="3.5.0"),
     )

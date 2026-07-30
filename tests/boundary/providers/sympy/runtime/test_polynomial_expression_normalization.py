@@ -8,7 +8,7 @@ import pytest
 from tests.component.capabilities.capabilities import invoke_capability as _invoke
 from tests.support.rationals import rational_payload as _q
 
-import jacobian.provider_runtime as provider_runtime
+import jacobian.providers.sympy_runtime as sympy_runtime
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
@@ -235,7 +235,7 @@ def test_sympy_normalization_runtime_rejects_unpinned_version(
     available = sympy_polynomial_normalization_provider_runtime()
     wrong = available.model_copy(update={"version": "1.13.3"})
     monkeypatch.setattr(
-        provider_runtime,
+        sympy_runtime,
         "python_distribution_provider_runtime",
         lambda *_args, **_kwargs: wrong,
     )

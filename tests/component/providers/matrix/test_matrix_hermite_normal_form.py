@@ -12,7 +12,7 @@ import pytest
 from tests.component.capabilities.capabilities import invoke_capability as _invoke
 from tests.support.services import open_domain_services
 
-import jacobian.provider_runtime as provider_runtime
+import jacobian.providers.flint_runtime as flint_runtime
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
@@ -152,12 +152,12 @@ def test_hnf_runtime_rejects_a_different_linked_flint_version(
     available = python_flint_hnf_provider_runtime()
     assert available.availability is CapabilityProviderAvailability.AVAILABLE
     monkeypatch.setattr(
-        provider_runtime,
+        flint_runtime,
         "python_distribution_provider_runtime",
         lambda *_args, **_kwargs: available,
     )
     monkeypatch.setattr(
-        provider_runtime.importlib,
+        flint_runtime.importlib,
         "import_module",
         lambda _name: SimpleNamespace(__FLINT_VERSION__="3.5.0"),
     )
