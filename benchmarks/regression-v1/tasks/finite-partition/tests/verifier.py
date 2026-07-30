@@ -137,14 +137,14 @@ def main():
         if isinstance(s, dict)
         else False
     )
-    correct = bool(
+    math_correct = bool(
         contract
-        and (s["claimed_assurance"] != "VERIFIED" or record_bound)
         and all(type(member) is str for member in members)
         and len(members) == len(set(members))
         and set(members) == wanted
         and actual == expected
     )
+    correct = bool(math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound))
     good_evidence = False
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good_evidence = True
@@ -191,7 +191,7 @@ def main():
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(correct),
+                "correctness": float(math_correct),
                 "evidence_validity": float(good_evidence),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),

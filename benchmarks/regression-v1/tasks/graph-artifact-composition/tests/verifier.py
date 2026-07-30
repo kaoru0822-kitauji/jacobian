@@ -105,12 +105,12 @@ def main():
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
     claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
-    correct = bool(
+    math_correct = bool(
         contract
         and distances_are_integers
-        and not claimed_verified
         and s["result"] == result
     )
+    correct = bool(math_correct and not claimed_verified)
     scope = bool(contract and s["scope"] == " ".join(expected["required_scope_terms"]))
     assurance = bool(
         contract and s["claimed_assurance"] == expected["maximum_assurance"]
@@ -126,7 +126,7 @@ def main():
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(correct),
+                "correctness": float(math_correct),
                 "evidence_validity": float(evidence),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),

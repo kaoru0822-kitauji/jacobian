@@ -185,12 +185,12 @@ def main():
     )
     claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
     record_bound = _record_is_bound(s, x, a, sat) if isinstance(s, dict) else False
-    correct = bool(
+    math_correct = bool(
         contract
         and result.get("status") == "SATISFIABLE"
         and sat
-        and (not claimed_verified or record_bound)
     )
+    correct = bool(math_correct and (not claimed_verified or record_bound))
     good = _answer_evidence(s) if contract else False
     if claimed_verified:
         good = good and record_bound
@@ -212,7 +212,7 @@ def main():
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(correct),
+                "correctness": float(math_correct),
                 "evidence_validity": float(good),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),
