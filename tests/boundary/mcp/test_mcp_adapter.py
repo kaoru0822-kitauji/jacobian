@@ -86,6 +86,8 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 "query",
                 "domain",
                 "mode",
+                "input_kind",
+                "artifact_type",
                 "limit",
                 "cursor",
                 "view",
