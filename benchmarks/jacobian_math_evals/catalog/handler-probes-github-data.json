@@ -1,0 +1,235 @@
+{
+  "probe_version": 1,
+  "records": [
+    {
+      "family": "statement-alignment",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:206a50a56739123ffe6405cccd40cf3d9bf4b415c9c2eaa6b0f4c559b112fa0f",
+      "source_id": "src-1fd1ef9613d9",
+      "source_revision": "d80349d93a80305765492014f0b395cec46e5023",
+      "status": "supported"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-a1d1a5a460dd/structured-data-row.json",
+      "source_id": "src-a1d1a5a460dd",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-7d17cdfdcaa5/structured-data-row.json",
+      "source_id": "src-7d17cdfdcaa5",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-dfbdf98bd30d/structured-data-row.json",
+      "source_id": "src-dfbdf98bd30d",
+      "status": "unavailable"
+    },
+    {
+      "family": "tool-application",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:1f697dce682ad3e5b7000e3b141ea6734c21e0accbd01339ae422c999e74558e",
+      "source_id": "src-e3b1511bce82",
+      "source_revision": "e06c9b900177be3f60d6a3f99135bb5de9af9bed",
+      "status": "supported"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-b0339eb74939/structured-data-row.json",
+      "source_id": "src-b0339eb74939",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-197c2fc904a6/structured-data-row.json",
+      "source_id": "src-197c2fc904a6",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-6d093a61a6e1/structured-data-row.json",
+      "source_id": "src-6d093a61a6e1",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-8afd7e43dead/structured-data-row.json",
+      "source_id": "src-8afd7e43dead",
+      "status": "unavailable"
+    },
+    {
+      "family": "formal-proof",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:7b1adddab2f57923b0ed86f7d390e9b22ced91902799d547cb625b2b5b2550e5",
+      "source_id": "src-bd6fac10e242",
+      "source_revision": "2c4ba9119eef74d0d611f494261b2c5bae98c69a",
+      "status": "supported"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-f78db5bf0927/structured-data-row.json",
+      "source_id": "src-f78db5bf0927",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-aae2368cd8c0/structured-data-row.json",
+      "source_id": "src-aae2368cd8c0",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-b8a0d3dacc21/structured-data-row.json",
+      "source_id": "src-b8a0d3dacc21",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-9b4fe151ab24/structured-data-row.json",
+      "source_id": "src-9b4fe151ab24",
+      "status": "unavailable"
+    },
+    {
+      "family": "statement-alignment",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:cb0f2d2a162683a6dc57957e220e2d92690a190567f333384464de129f445528",
+      "source_id": "src-e4bc996f66c7",
+      "source_revision": "835e18e34717df8247295199cd00cc8487a95e03",
+      "status": "supported"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-8ab85a23775a/structured-data-row.json",
+      "source_id": "src-8ab85a23775a",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-1e9e73fb4337/structured-data-row.json",
+      "source_id": "src-1e9e73fb4337",
+      "status": "unavailable"
+    },
+    {
+      "family": "statement-alignment",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:55f44cf2d6914afc8663747bfc07c166a44c93b33b43c21f4fa43d4ac4b3a14d",
+      "source_id": "src-07e3afb076ed",
+      "source_revision": "94f4888cbaf9f4322535755f86cbac690ec18080",
+      "status": "supported"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-77506d58cc7d/structured-data-row.json",
+      "source_id": "src-77506d58cc7d",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-0534cd3fda87/structured-data-row.json",
+      "source_id": "src-0534cd3fda87",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-8f183cccdab9/structured-data-row.json",
+      "source_id": "src-8f183cccdab9",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-0ab5a4bb362c/structured-data-row.json",
+      "source_id": "src-0ab5a4bb362c",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-79c6c7f9871a/structured-data-row.json",
+      "source_id": "src-79c6c7f9871a",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-4f8f5768b734/structured-data-row.json",
+      "source_id": "src-4f8f5768b734",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-cd7ab0b358d0/structured-data-row.json",
+      "source_id": "src-cd7ab0b358d0",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-e28676441028/structured-data-row.json",
+      "source_id": "src-e28676441028",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-0ff2a951b3fc/structured-data-row.json",
+      "source_id": "src-0ff2a951b3fc",
+      "status": "unavailable"
+    },
+    {
+      "family": "exact-answer",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:241e1961d360ee93a0d957f1bd7379f48a68acf759a5ac71d280b659fdf6bc55",
+      "source_id": "src-ab6e10a26134",
+      "source_revision": "b9b800aaae3ea4b16c87d3636ce2a0973486dd1f",
+      "status": "supported"
+    },
+    {
+      "family": "exact-answer",
+      "handler": "github-structured-data-v1",
+      "snapshot_sha256": "sha256:42f40b4e9033641f9dcf5b79e7725261d7d56363cf7938aec37227a6203a93ec",
+      "source_id": "src-0744b9558bcb",
+      "source_revision": "3101c7d5072418e28b9008a6636bde82a006892c",
+      "status": "supported"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-7405f4b3f386/structured-data-row.json",
+      "source_id": "src-7405f4b3f386",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-7ab36a0fda93/structured-data-row.json",
+      "source_id": "src-7ab36a0fda93",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-461dd69c4bdf/structured-data-row.json",
+      "source_id": "src-461dd69c4bdf",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-92325162fae4/structured-data-row.json",
+      "source_id": "src-92325162fae4",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-a0f49158337a/structured-data-row.json",
+      "source_id": "src-a0f49158337a",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-ba91593142cb/structured-data-row.json",
+      "source_id": "src-ba91593142cb",
+      "status": "unavailable"
+    },
+    {
+      "handler": "github-structured-data-v1",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-2ac33f3bb3d5/structured-data-row.json",
+      "source_id": "src-2ac33f3bb3d5",
+      "status": "unavailable"
+    }
+  ]
+}

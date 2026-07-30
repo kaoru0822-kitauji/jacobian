@@ -1,0 +1,17 @@
+{
+  "config": "default",
+  "dataset": "example/math",
+  "features": [],
+  "rows": [
+    {
+      "row": {
+        "answer": "42",
+        "problem": "Compute 6 * 7."
+      },
+      "row_idx": 7,
+      "truncated_cells": []
+    }
+  ],
+  "split": "dev",
+  "truncated": false
+}

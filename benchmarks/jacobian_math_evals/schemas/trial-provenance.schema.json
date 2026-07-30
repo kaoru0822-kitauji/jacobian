@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jacobian.invalid/schemas/trial-provenance-1.json",
+  "title": "Jacobian Harbor trial provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "condition",
+    "jacobian_commit",
+    "jacobian_image_digest",
+    "catalog_digest",
+    "policy_digest",
+    "checker_identities",
+    "state_directory",
+    "task_digest",
+    "agent",
+    "model",
+    "budget",
+    "seed"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "condition": {"enum": ["control", "treatment"]},
+    "jacobian_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "jacobian_image_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "catalog_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "policy_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "checker_identities": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "state_directory": {"type": "string", "minLength": 1},
+    "task_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "agent": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout_seconds", "max_tokens"],
+      "properties": {
+        "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "max_tokens": {"type": "integer", "exclusiveMinimum": 0}
+      }
+    },
+    "seed": {"type": "integer"}
+  }
+}
