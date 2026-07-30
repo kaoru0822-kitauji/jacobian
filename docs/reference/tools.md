@@ -223,23 +223,11 @@ Read `capability://catalog` when a client or operator needs the complete
 machine-readable inventory in one response. Do not infer current installation
 membership or payload fields from static documentation.
 
-Domain reference documents define constraints that remain useful independent
-of catalog membership:
-
-- [domain operation library](domain-operation-library.md);
-- [SAT artifact contracts](sat-artifacts.md);
-- [SMT Alethe artifact contracts](smt-artifacts.md);
-- [exact rational linear-system evidence](linear-rational-solutions.md);
-- [exact rational matrix determinants](matrix-rational-determinant.md);
-- [graph counterexample shrinking](graph-counterexample-shrinking.md);
-- [integer matrix Hermite normal form](matrix-hermite-normal-form.md);
-- [fixed-registry graph invariant batches](graph-invariant-batch.md);
-- [bounded finite exactly-once coverage](finite-coverage-verification.md);
-- [typed polynomial expression normalization](polynomial-expression-normalization.md);
-- [Lean declaration discovery contract](lean-declaration-discovery.md);
-- [Lean formal intermediates](lean-formal-intermediates.md);
-- [Lean statement proposal and direct elaboration](lean-statement-elaboration.md); and
-- [replayable Lean proof-state transitions](lean-replayable-proof-states.md).
+The [domain operation library](domain-operation-library.md) defines the shared
+contract for built-in mathematical operations. Capability-specific artifact,
+provider, and verification references live with their owning domain. They are
+intentionally not registered here: installing or documenting a capability
+does not change the generic MCP tool contract.
 
 ## Mathematical operation portfolio
 
