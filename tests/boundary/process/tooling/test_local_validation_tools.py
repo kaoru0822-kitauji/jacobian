@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import subprocess
+import sys
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 from types import ModuleType
+
+import pytest
 
 ROOT = Path(__file__).parents[4]
 SCRIPTS = ROOT / ".github" / "scripts"
@@ -79,6 +83,99 @@ def test_domain_lane_dry_run_is_explicit_and_topology_owned() -> None:
 
     assert "tests/domain" in result.stdout
     assert "--timeout 120" in result.stdout
+
+
+def test_posix_topology_runner_replaces_itself_with_pytest(monkeypatch) -> None:
+    if os.name == "nt":
+        pytest.skip("POSIX exec is not used on Windows")
+    from tools import test_topology
+
+    topology = test_topology.load_topology()
+    observed: dict[str, object] = {}
+
+    def stop_after_exec(
+        executable: str,
+        arguments: list[str],
+        environment: dict[str, str],
+    ) -> None:
+        observed.update(
+            executable=executable,
+            arguments=arguments,
+            environment=environment,
+        )
+        raise RuntimeError("exec intercepted")
+
+    monkeypatch.setattr(os, "execvpe", stop_after_exec)
+    monkeypatch.delenv("JACOBIAN_TEST_LANE", raising=False)
+
+    with pytest.raises(RuntimeError, match="exec intercepted"):
+        test_topology.run_lane(
+            topology,
+            "unit",
+            ["tests/unit/tooling/test_fixture_architecture.py"],
+            ["-q"],
+        )
+
+    assert observed["executable"] == sys.executable
+    assert observed["arguments"] == [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests/unit/tooling/test_fixture_architecture.py",
+        "-q",
+        "--timeout",
+        "10",
+    ]
+    environment = observed["environment"]
+    assert isinstance(environment, dict)
+    assert environment["JACOBIAN_TEST_LANE"] == "unit"
+
+
+@pytest.mark.parametrize("surface", ["help", "version"])
+def test_cheap_cli_surfaces_do_not_import_runtime_or_math_backends(
+    surface: str,
+) -> None:
+    probe = """
+import json
+import sys
+
+if sys.argv[1] == "help":
+    from jacobian.cli import app
+    app(args=["--help"], prog_name="jacobian", standalone_mode=False)
+else:
+    import jacobian
+    assert jacobian.__version__
+
+forbidden = (
+    "jacobian.adapters.mcp.server",
+    "jacobian.domains",
+    "jacobian.lean",
+    "sympy",
+    "cvc5",
+    "flint",
+    "z3",
+)
+loaded = sorted(
+    name
+    for name in sys.modules
+    if any(name == prefix or name.startswith(prefix + ".") for prefix in forbidden)
+)
+print("JACOBIAN_IMPORT_SURFACE=" + json.dumps(loaded))
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", probe, surface],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    marker = next(
+        line
+        for line in completed.stdout.splitlines()
+        if line.startswith("JACOBIAN_IMPORT_SURFACE=")
+    )
+
+    assert json.loads(marker.partition("=")[2]) == []
 
 
 def test_plan_preserves_both_sides_of_rename(monkeypatch) -> None:
