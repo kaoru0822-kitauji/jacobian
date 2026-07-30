@@ -18,6 +18,13 @@ EXPECTED_TASKS = {
     "polynomial-normalization",
     "polynomial-map-collision",
 }
+VERIFIED_TASKS = {
+    "finite-partition",
+    "hermite-normal-form",
+    "rational-linear-solution",
+    "polynomial-normalization",
+    "polynomial-map-collision",
+}
 
 
 def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
@@ -69,6 +76,10 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
             "evidence",
             "limitations",
         }
+        if task_name in VERIFIED_TASKS:
+            assert "verification_record_uri" in submission_schema["properties"]
+            assert submission_schema["then"]["required"] == ["verification_record_uri"]
+            assert (task / "tests" / "authorized_record.json").is_file()
         assert "submission_schema.json" in instruction
         assert "evidence/answer.txt" in instruction
         assert "capability_id" not in instruction

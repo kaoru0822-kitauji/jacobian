@@ -11,6 +11,9 @@
     "scope": {"const": "hermite-normal-form complete finite input"},
     "completeness": {"const": "COMPLETE"},
     "evidence": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/answer.txt"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
+    "verification_record_uri": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/verification-record.json"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}},
     "limitations": {"type": "array", "items": {"type": "string"}}
-  }
+  },
+  "if": {"properties": {"claimed_assurance": {"const": "VERIFIED"}}},
+  "then": {"required": ["verification_record_uri"]}
 }

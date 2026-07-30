@@ -5,3 +5,5 @@ canonical rational coefficients and exponent vectors, omitting zero terms.
 Record the cancellation and resulting terms in `evidence/answer.txt`, and use
 its SHA-256 digest in the evidence list. Write `submission.json` to the exact
 agent-visible `submission_schema.json`.
+Claim `VERIFIED` only with the exact independently bound verification record
+from the schema; otherwise claim `COMPUTED`.

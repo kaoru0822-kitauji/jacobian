@@ -27,7 +27,7 @@ def contract(s, expected):
     }
     return (
         isinstance(s, dict)
-        and required <= s.keys()
+        and set(s) == required
         and s["task_id"] == expected["task_id"]
         and s["conclusion"] == expected["conclusion"]
         and isinstance(s["result"], dict)
