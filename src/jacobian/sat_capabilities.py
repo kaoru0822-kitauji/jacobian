@@ -599,7 +599,7 @@ class SatUnsatProofVerificationAdapter:
                 CapabilityInputKind.STRUCTURED_REQUEST,
                 CapabilityInputKind.TYPED_ARTIFACT,
             ),
-            accepted_artifact_types=("sat.unsat_proof.artifact",),
+            accepted_artifact_types=(self.sat.installation.proof_schema_uri,),
         )
 
     @property

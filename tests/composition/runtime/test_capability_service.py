@@ -496,14 +496,14 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
     assert discovered.matches == ()
     assert "No installed capability accepts" in discovered.routing_basis
 
-    ambiguous = capability_core_services.core.capabilities.discover(
+    formal_method = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
-            query="Verify this proof: suppose n is even, hence n = 2k.",
+            query="check a formal Lean proof by contradiction",
             limit=20,
         )
     )
-    assert ambiguous.resolved_input_kind == (CapabilityInputKind.NATURAL_LANGUAGE_PROOF)
-    assert ambiguous.routing_status == "NO_ROUTE"
+    assert formal_method.resolved_input_kind is None
+    assert formal_method.routing_status == "UNFILTERED"
 
     explicitly_structured = capability_core_services.core.capabilities.discover(
         CapabilityDiscoveryRequest(
@@ -541,6 +541,8 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
 def test_discovery_routes_only_declared_input_and_artifact_contracts(
     capability_core_services: DomainTestServices,
 ) -> None:
+    proof_schema_uri = "artifact://sha256/" + ("1" * 64)
+    other_schema_uri = "artifact://sha256/" + ("2" * 64)
     schema = {
         "type": "object",
         "properties": {"value": {"type": "integer"}},
@@ -578,7 +580,7 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
                 output_schema=schema,
                 tags=("proof", "artifact"),
                 accepted_input_kinds=(CapabilityInputKind.TYPED_ARTIFACT,),
-                accepted_artifact_types=("lean.proof_state.artifact",),
+                accepted_artifact_types=(proof_schema_uri,),
             )
         )
     )
@@ -600,7 +602,7 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
             query="proof artifact",
             mode=CapabilityMode.VERIFY,
             input_kind=CapabilityInputKind.TYPED_ARTIFACT,
-            artifact_type="lean.proof_state.artifact",
+            artifact_type=proof_schema_uri,
         )
     )
     assert [match.capability_id for match in typed.matches] == ["fixture_claim.replay"]
@@ -610,7 +612,7 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
         CapabilityDiscoveryRequest(
             query="proof artifact",
             input_kind=CapabilityInputKind.TYPED_ARTIFACT,
-            artifact_type="sat.lrat.artifact",
+            artifact_type=other_schema_uri,
         )
     )
     assert mismatched.matches == ()
@@ -638,6 +640,7 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
 
 
 def test_discovery_artifact_type_requires_typed_artifact_input() -> None:
+    proof_schema_uri = "artifact://sha256/" + ("1" * 64)
     with pytest.raises(
         ValueError,
         match="artifact_type requires input_kind=TYPED_ARTIFACT",
@@ -645,7 +648,7 @@ def test_discovery_artifact_type_requires_typed_artifact_input() -> None:
         CapabilityDiscoveryRequest(
             query="proof artifact",
             input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
-            artifact_type="lean.proof_state.artifact",
+            artifact_type=proof_schema_uri,
         )
     with pytest.raises(
         ValueError,
@@ -658,6 +661,7 @@ def test_discovery_artifact_type_requires_typed_artifact_input() -> None:
 
 
 def test_descriptor_artifact_contract_requires_typed_artifact_input() -> None:
+    proof_schema_uri = "artifact://sha256/" + ("1" * 64)
     with pytest.raises(
         ValueError,
         match="accepted artifact types require TYPED_ARTIFACT input",
@@ -672,7 +676,24 @@ def test_descriptor_artifact_contract_requires_typed_artifact_input() -> None:
             modes=(CapabilityMode.EXPLORE,),
             input_schema={"type": "object"},
             output_schema={"type": "object"},
-            accepted_artifact_types=("lean.proof_state.artifact",),
+            accepted_artifact_types=(proof_schema_uri,),
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="TYPED_ARTIFACT input requires accepted artifact types",
+    ):
+        CapabilityDescriptor(
+            capability_id="fixture.invalid.typed-artifact",
+            version="1",
+            title="Invalid typed artifact contract",
+            description="Typed artifact routing requires an exact stored schema.",
+            provider="tests",
+            provider_runtime=TEST_RUNTIME,
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            accepted_input_kinds=(CapabilityInputKind.TYPED_ARTIFACT,),
         )
 
 

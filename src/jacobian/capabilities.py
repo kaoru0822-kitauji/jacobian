@@ -866,22 +866,7 @@ def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None
         "proof prose",
         "written proof",
     )
-    discourse = frozenset(
-        {
-            "assume",
-            "because",
-            "contradiction",
-            "follows",
-            "hence",
-            "suppose",
-            "therefore",
-            "thus",
-        }
-    )
-    tokens = frozenset(normalized.split())
-    if any(phrase in normalized for phrase in phrases) or (
-        "proof" in tokens and tokens & discourse
-    ):
+    if any(phrase in normalized for phrase in phrases):
         return CapabilityInputKind.NATURAL_LANGUAGE_PROOF
     return None
 

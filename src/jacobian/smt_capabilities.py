@@ -154,7 +154,7 @@ class SmtUnsatProofVerificationAdapter:
                 CapabilityInputKind.STRUCTURED_REQUEST,
                 CapabilityInputKind.TYPED_ARTIFACT,
             ),
-            accepted_artifact_types=("smt.alethe_proof.artifact",),
+            accepted_artifact_types=(self.smt.installation.proof_schema_uri,),
         )
 
     @property

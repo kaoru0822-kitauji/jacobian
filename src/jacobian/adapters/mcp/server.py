@@ -1041,9 +1041,11 @@ def create_server(
         artifact_type: Annotated[
             str | None,
             Field(
-                pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
-                max_length=128,
-                description=("Exact artifact contract; requires TYPED_ARTIFACT."),
+                pattern=r"^artifact://sha256/[0-9a-f]{64}$",
+                description=(
+                    "Exact schema_uri from the stored artifact manifest; requires "
+                    "TYPED_ARTIFACT."
+                ),
             ),
         ] = None,
         limit: Annotated[

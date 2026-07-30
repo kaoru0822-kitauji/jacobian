@@ -66,7 +66,7 @@ class CapabilityDiscoveryRequest(ContractModel):
     )
     mode: CapabilityMode | None = None
     input_kind: CapabilityInputKind | None = None
-    artifact_type: CapabilityId | None = None
+    artifact_type: ArtifactUri | None = None
     limit: int = Field(default=5, ge=1, le=20, strict=True)
     cursor: CapabilityId | None = None
 
@@ -115,7 +115,7 @@ class CapabilityDiscoveryResult(ContractModel):
     domain: str | None = None
     mode: CapabilityMode | None = None
     resolved_input_kind: CapabilityInputKind | None = None
-    artifact_type: CapabilityId | None = None
+    artifact_type: ArtifactUri | None = None
     routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"] = "UNFILTERED"
     routing_basis: str = Field(min_length=1, max_length=512)
     matches: tuple[CapabilityDiscoveryMatch, ...]
@@ -300,7 +300,7 @@ class CapabilityDescriptor(ContractModel):
     accepted_input_kinds: tuple[CapabilityInputKind, ...] = (
         CapabilityInputKind.STRUCTURED_REQUEST,
     )
-    accepted_artifact_types: tuple[CapabilityId, ...] = ()
+    accepted_artifact_types: tuple[ArtifactUri, ...] = ()
     invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
 
     @model_validator(mode="after")
@@ -319,6 +319,11 @@ class CapabilityDescriptor(ContractModel):
             CapabilityInputKind.TYPED_ARTIFACT not in self.accepted_input_kinds
         ):
             raise ValueError("accepted artifact types require TYPED_ARTIFACT input")
+        if (
+            CapabilityInputKind.TYPED_ARTIFACT in self.accepted_input_kinds
+            and not self.accepted_artifact_types
+        ):
+            raise ValueError("TYPED_ARTIFACT input requires accepted artifact types")
         if len({example.name for example in self.invocation_examples}) != len(
             self.invocation_examples
         ):

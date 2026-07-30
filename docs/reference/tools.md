@@ -147,10 +147,11 @@ one or two relevant contracts, then search again only when useful.
 
 Discovery can also be constrained by `input_kind`. Installed descriptors
 declare whether they accept a structured request, formal proposition, or typed
-artifact. A typed artifact search also supplies its exact `artifact_type`.
+artifact. A typed artifact search also supplies the exact `schema_uri` from its
+stored artifact manifest as `artifact_type`.
 General natural-language proof prose is not a formal artifact: declaring
 `NATURAL_LANGUAGE_PROOF`, or using an unambiguous phrase such as “informal
-proof” or “proof trace,” returns typed `NO_ROUTE` unless an installed provider
+proof” or “proof prose,” returns typed `NO_ROUTE` unless an installed provider
 explicitly accepts that input. The response's `routing_status` and
 `routing_basis` are separate from lexical `portfolio_fit`.
 
