@@ -268,21 +268,6 @@
       "complexity": 17
     },
     {
-      "path": "src/jacobian/search/run_loop.py",
-      "symbol": "execute_search",
-      "complexity": 25
-    },
-    {
-      "path": "src/jacobian/search/service.py",
-      "symbol": "_validate_archive_page",
-      "complexity": 11
-    },
-    {
-      "path": "src/jacobian/shrinking.py",
-      "symbol": "run",
-      "complexity": 19
-    },
-    {
       "path": "src/jacobian/store.py",
       "symbol": "_put",
       "complexity": 11

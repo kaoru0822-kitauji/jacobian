@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Any
 
@@ -42,6 +43,35 @@ from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class _ShrinkState:
+    """Mutable progress for one bounded shrinking operation."""
+
+    kind: ShrinkTargetKind
+    target_uri: str
+    claim_uri: str
+    preservation_checker_id: str
+    claim: StoredArtifact
+    initial: StoredArtifact
+    current: StoredArtifact
+    manifest: Any
+    reducer_capability: Any
+    expected_schema: str
+    preservation_format: str
+    semantics_digest: str
+    requested_reducers: tuple[str, ...]
+    requested_objectives: tuple[str, ...]
+    evaluation_budget: int
+    reducer_timeout_seconds: int
+    proposal_validator: Callable[[str, Any, Any], None] | None
+    evaluations: int = 0
+    steps: list[ShrinkStep] = field(default_factory=list)
+    operational_failure: tuple[ExecutionStatus, str] | None = None
+    current_objectives: dict[str, Any] = field(default_factory=dict)
+    expected_objective_values: tuple[Fraction, ...] | None = None
+    checked_boundary_rejection: bool = False
 
 
 class ShrinkService:
@@ -221,224 +251,250 @@ class ShrinkService:
             semantics_digest,
         ) = loaded
 
-        current = initial
-        evaluations = 0
-        steps: list[ShrinkStep] = []
-        operational_failure: tuple[ExecutionStatus, str] | None = None
-        current_objectives: dict[str, Any] = {}
-        expected_objective_values: tuple[Fraction, ...] | None = None
-        checked_boundary_rejection = False
+        state = _ShrinkState(
+            kind=kind,
+            target_uri=target_uri,
+            claim_uri=claim_uri,
+            preservation_checker_id=preservation_checker_id,
+            claim=claim,
+            initial=initial,
+            current=initial,
+            manifest=manifest,
+            reducer_capability=reducer_capability,
+            expected_schema=expected_schema,
+            preservation_format=preservation_format,
+            semantics_digest=semantics_digest,
+            requested_reducers=requested_reducers,
+            requested_objectives=requested_objectives,
+            evaluation_budget=evaluation_budget,
+            reducer_timeout_seconds=reducer_timeout_seconds,
+            proposal_validator=proposal_validator,
+        )
+        while state.evaluations < evaluation_budget and self._run_round(state):
+            pass
+        return self._finalize(state, evaluation_budget)
 
-        while evaluations < evaluation_budget:
-            checked_boundary_rejection = False
-            execution = self.executor.run(
-                entrypoint=reducer_capability.descriptor.entrypoint,
-                implementation_digest=reducer_capability.implementation_digest,
-                request={
-                    "request_version": "1",
-                    "target_kind": kind.value,
-                    "target": current.payload,
-                    "claim": claim.payload,
-                    "reducers": list(requested_reducers),
-                    "objectives": list(requested_objectives),
-                    "bindings": {
-                        "claim_digest": claim.manifest.object_digest,
-                        "target_digest": current.manifest.object_digest,
-                        "semantics_digest": semantics_digest,
-                    },
+    def _run_round(self, state: _ShrinkState) -> bool:
+        """Run one reducer response and accept at most one proposal."""
+
+        state.checked_boundary_rejection = False
+        execution = self.executor.run(
+            entrypoint=state.reducer_capability.descriptor.entrypoint,
+            implementation_digest=state.reducer_capability.implementation_digest,
+            request={
+                "request_version": "1",
+                "target_kind": state.kind.value,
+                "target": state.current.payload,
+                "claim": state.claim.payload,
+                "reducers": list(state.requested_reducers),
+                "objectives": list(state.requested_objectives),
+                "bindings": {
+                    "claim_digest": state.claim.manifest.object_digest,
+                    "target_digest": state.current.manifest.object_digest,
+                    "semantics_digest": state.semantics_digest,
                 },
-                timeout_seconds=reducer_timeout_seconds,
+            },
+            timeout_seconds=state.reducer_timeout_seconds,
+        )
+        if execution.status != ExecutionStatus.COMPLETED:
+            state.operational_failure = (
+                execution.status,
+                execution.detail or "reducer execution failed",
             )
-            if execution.status != ExecutionStatus.COMPLETED:
-                operational_failure = (
-                    execution.status,
-                    execution.detail or "reducer execution failed",
+            return False
+        try:
+            response = PluginReductionResponse.model_validate(execution.output)
+            declared_values = _ordered_objective_values(
+                response.current_objectives,
+                state.requested_objectives,
+            )
+            if (
+                state.expected_objective_values is not None
+                and declared_values != state.expected_objective_values
+            ):
+                raise ValueError(
+                    "reducer changed the declared objectives for the current target"
                 )
+            state.current_objectives = dict(response.current_objectives)
+        except ValidationError as exc:
+            _LOGGER.warning("reducer returned an invalid response", exc_info=exc)
+            state.operational_failure = (
+                ExecutionStatus.ERROR,
+                (
+                    "The reducer returned an invalid response. Check the "
+                    "reference contract and inspect the local plugin log."
+                ),
+            )
+            return False
+        except ValueError as exc:
+            _LOGGER.warning("reducer objective validation failed", exc_info=exc)
+            state.operational_failure = (
+                ExecutionStatus.ERROR,
+                _shrink_failure_detail(exc),
+            )
+            return False
+        if not response.reductions:
+            return False
+
+        for proposal in response.reductions:
+            if state.evaluations >= state.evaluation_budget:
                 break
-            try:
-                response = PluginReductionResponse.model_validate(execution.output)
-                declared_values = _ordered_objective_values(
-                    response.current_objectives,
-                    requested_objectives,
+            state.evaluations += 1
+            if self._evaluate_proposal(state, proposal, declared_values):
+                return True
+        return False
+
+    def _evaluate_proposal(
+        self,
+        state: _ShrinkState,
+        proposal: Any,
+        declared_values: tuple[Fraction, ...],
+    ) -> bool:
+        if proposal.reducer not in state.requested_reducers:
+            state.steps.append(
+                ShrinkStep(
+                    index=len(state.steps),
+                    reducer=proposal.reducer,
+                    from_uri=state.current.artifact_uri,
+                    accepted=False,
+                    execution_status=ExecutionStatus.COMPLETED,
+                    input_status=InputStatus.REJECTED,
+                    objectives=proposal.objectives,
+                    detail="plugin used a reducer that was not requested",
                 )
-                if (
-                    expected_objective_values is not None
-                    and declared_values != expected_objective_values
-                ):
-                    raise ValueError(
-                        "reducer changed the declared objectives for the current target"
-                    )
-                current_objectives = dict(response.current_objectives)
-            except ValidationError as exc:
-                _LOGGER.warning("reducer returned an invalid response", exc_info=exc)
-                operational_failure = (
-                    ExecutionStatus.ERROR,
-                    (
-                        "The reducer returned an invalid response. Check the "
-                        "reference contract and inspect the local plugin log."
+            )
+            return False
+        try:
+            proposed_values = _ordered_objective_values(
+                proposal.objectives,
+                state.requested_objectives,
+            )
+            if proposed_values >= declared_values:
+                raise ValueError(
+                    "proposal does not strictly improve the ordered objectives"
+                )
+            proposed = self._materialize_proposal(
+                reducer=proposal.reducer,
+                payload=proposal.payload,
+                current=state.current,
+                expected_schema=state.expected_schema,
+                semantics_uri=state.manifest.semantics_uri,
+                proposal_validator=state.proposal_validator,
+            )
+            decision = self.verification.verify_preservation(
+                claim_uri=state.claim_uri,
+                original_uri=state.current.artifact_uri,
+                reduced_uri=proposed.artifact_uri,
+                checker_id=state.preservation_checker_id,
+                preservation_format=state.preservation_format,
+                reducer=proposal.reducer,
+            )
+            accepted = decision.assurance.verification == Verification.VERIFIED
+            state.steps.append(
+                ShrinkStep(
+                    index=len(state.steps),
+                    reducer=proposal.reducer,
+                    from_uri=state.current.artifact_uri,
+                    proposed_uri=proposed.artifact_uri,
+                    accepted=accepted,
+                    execution_status=decision.execution.status,
+                    input_status=decision.input.status,
+                    verification_record_uri=(
+                        decision.verification_record_uri if accepted else None
+                    ),
+                    objectives=proposal.objectives,
+                    detail=(
+                        "preservation verified"
+                        if accepted
+                        else "; ".join(decision.input.errors)
                     ),
                 )
-                break
-            except ValueError as exc:
-                _LOGGER.warning("reducer objective validation failed", exc_info=exc)
-                operational_failure = (
-                    ExecutionStatus.ERROR,
-                    _shrink_failure_detail(exc),
+            )
+            if accepted:
+                state.current = self.store.get(proposed.artifact_uri)
+                state.current_objectives = dict(proposal.objectives)
+                state.expected_objective_values = proposed_values
+                state.checked_boundary_rejection = False
+                return True
+            state.checked_boundary_rejection = (
+                decision.execution.status is ExecutionStatus.COMPLETED
+                and decision.input.status is InputStatus.REJECTED
+            )
+        except (StoreError, SchemaRegistryError, ValueError) as exc:
+            state.steps.append(
+                ShrinkStep(
+                    index=len(state.steps),
+                    reducer=proposal.reducer,
+                    from_uri=state.current.artifact_uri,
+                    accepted=False,
+                    execution_status=ExecutionStatus.ERROR,
+                    input_status=InputStatus.REJECTED,
+                    objectives=proposal.objectives,
+                    detail=_shrink_failure_detail(exc),
                 )
-                break
-            if not response.reductions:
-                break
+            )
+        return False
 
-            accepted_in_round = False
-            for proposal in response.reductions:
-                if evaluations >= evaluation_budget:
-                    break
-                evaluations += 1
-                if proposal.reducer not in requested_reducers:
-                    steps.append(
-                        ShrinkStep(
-                            index=len(steps),
-                            reducer=proposal.reducer,
-                            from_uri=current.artifact_uri,
-                            accepted=False,
-                            execution_status=ExecutionStatus.COMPLETED,
-                            input_status=InputStatus.REJECTED,
-                            objectives=proposal.objectives,
-                            detail="plugin used a reducer that was not requested",
-                        )
-                    )
-                    continue
-                try:
-                    proposed_values = _ordered_objective_values(
-                        proposal.objectives,
-                        requested_objectives,
-                    )
-                    if proposed_values >= declared_values:
-                        raise ValueError(
-                            "proposal does not strictly improve the ordered objectives"
-                        )
-                    proposed = self._materialize_proposal(
-                        reducer=proposal.reducer,
-                        payload=proposal.payload,
-                        current=current,
-                        expected_schema=expected_schema,
-                        semantics_uri=manifest.semantics_uri,
-                        proposal_validator=proposal_validator,
-                    )
-                    decision = self.verification.verify_preservation(
-                        claim_uri=claim_uri,
-                        original_uri=current.artifact_uri,
-                        reduced_uri=proposed.artifact_uri,
-                        checker_id=preservation_checker_id,
-                        preservation_format=preservation_format,
-                        reducer=proposal.reducer,
-                    )
-                    accepted = decision.assurance.verification == Verification.VERIFIED
-                    steps.append(
-                        ShrinkStep(
-                            index=len(steps),
-                            reducer=proposal.reducer,
-                            from_uri=current.artifact_uri,
-                            proposed_uri=proposed.artifact_uri,
-                            accepted=accepted,
-                            execution_status=decision.execution.status,
-                            input_status=decision.input.status,
-                            verification_record_uri=(
-                                decision.verification_record_uri if accepted else None
-                            ),
-                            objectives=proposal.objectives,
-                            detail=(
-                                "preservation verified"
-                                if accepted
-                                else "; ".join(decision.input.errors)
-                            ),
-                        )
-                    )
-                    if accepted:
-                        current = self.store.get(proposed.artifact_uri)
-                        current_objectives = dict(proposal.objectives)
-                        expected_objective_values = proposed_values
-                        checked_boundary_rejection = False
-                        accepted_in_round = True
-                        break
-                    checked_boundary_rejection = (
-                        decision.execution.status is ExecutionStatus.COMPLETED
-                        and decision.input.status is InputStatus.REJECTED
-                    )
-                except (StoreError, SchemaRegistryError, ValueError) as exc:
-                    steps.append(
-                        ShrinkStep(
-                            index=len(steps),
-                            reducer=proposal.reducer,
-                            from_uri=current.artifact_uri,
-                            accepted=False,
-                            execution_status=ExecutionStatus.ERROR,
-                            input_status=InputStatus.REJECTED,
-                            objectives=proposal.objectives,
-                            detail=_shrink_failure_detail(exc),
-                        )
-                    )
-            if accepted_in_round:
-                continue
-            break
-
-        if operational_failure is not None:
-            status, detail = operational_failure
+    def _finalize(self, state: _ShrinkState, evaluation_budget: int) -> ShrinkResult:
+        if state.operational_failure is not None:
+            status, detail = state.operational_failure
             final_result = _unverified_result(
                 status=status,
                 detail=detail,
-                claim_digest=claim.manifest.object_digest,
-                semantics_digest=semantics_digest,
-                candidate_digest=current.manifest.object_digest,
+                claim_digest=state.claim.manifest.object_digest,
+                semantics_digest=state.semantics_digest,
+                candidate_digest=state.current.manifest.object_digest,
             )
-        elif evaluations < evaluation_budget:
-            evaluations += 1
+        elif state.evaluations < evaluation_budget:
+            state.evaluations += 1
             final_result = self.verification.verify_preservation(
-                claim_uri=claim_uri,
-                original_uri=current.artifact_uri,
-                reduced_uri=current.artifact_uri,
-                checker_id=preservation_checker_id,
-                preservation_format=preservation_format,
+                claim_uri=state.claim_uri,
+                original_uri=state.current.artifact_uri,
+                reduced_uri=state.current.artifact_uri,
+                checker_id=state.preservation_checker_id,
+                preservation_format=state.preservation_format,
                 reducer="identity-final-verification",
             )
         else:
             final_result = _unverified_result(
                 status=ExecutionStatus.COMPLETED,
                 detail="budget ended before fresh final verification",
-                claim_digest=claim.manifest.object_digest,
-                semantics_digest=semantics_digest,
-                candidate_digest=current.manifest.object_digest,
+                claim_digest=state.claim.manifest.object_digest,
+                semantics_digest=state.semantics_digest,
+                candidate_digest=state.current.manifest.object_digest,
             )
-
         verified_final = final_result.assurance.verification == Verification.VERIFIED
-        if (
-            current.artifact_uri != initial.artifact_uri
-            and verified_final
-            and checked_boundary_rejection
-        ):
-            minimality = Minimality.LOCAL
-        else:
-            minimality = Minimality.NONE
+        minimality = (
+            Minimality.LOCAL
+            if (
+                state.current.artifact_uri != state.initial.artifact_uri
+                and verified_final
+                and state.checked_boundary_rejection
+            )
+            else Minimality.NONE
+        )
         return ShrinkResult(
             execution=Execution(
                 status=(
-                    operational_failure[0]
-                    if operational_failure is not None
+                    state.operational_failure[0]
+                    if state.operational_failure is not None
                     else ExecutionStatus.COMPLETED
                 ),
                 detail=(
-                    operational_failure[1] if operational_failure is not None else None
+                    state.operational_failure[1]
+                    if state.operational_failure is not None
+                    else None
                 ),
             ),
             input=InputValidation(status=InputStatus.ACCEPTED),
             result=final_result,
-            target_kind=kind,
-            initial_target_uri=target_uri,
-            final_target_uri=current.artifact_uri,
+            target_kind=state.kind,
+            initial_target_uri=state.target_uri,
+            final_target_uri=state.current.artifact_uri,
             minimality=minimality,
-            evaluations=evaluations,
-            steps=tuple(steps),
-            objectives=current_objectives,
+            evaluations=state.evaluations,
+            steps=tuple(state.steps),
+            objectives=state.current_objectives,
         )
 
     def _materialize_proposal(
