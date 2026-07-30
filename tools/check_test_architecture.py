@@ -276,6 +276,8 @@ def _tier(path: PurePosixPath) -> str | None:
 
 
 def _runtime_allowed(path: PurePosixPath, tier_override: str | None = None) -> bool:
+    if path == PurePosixPath("tests/support/runtime_fixtures.py"):
+        return True
     tier = tier_override or _tier(path)
     if tier in {"composition", "e2e"}:
         return True
@@ -305,6 +307,24 @@ def _imported_module(node: ast.Import | ast.ImportFrom) -> str:
     if node.level:
         return ""
     return node.module or ""
+
+
+def _conftest_import_violations(
+    module: str,
+    relative: str,
+    node: ast.Import | ast.ImportFrom,
+) -> tuple[Violation, ...]:
+    if module != "conftest" and not module.endswith(".conftest"):
+        return ()
+    return (
+        Violation(
+            relative,
+            "conftest-import",
+            "fixtures must be registered from a support plugin, not imported from conftest.py",
+            node.lineno,
+            node.col_offset,
+        ),
+    )
 
 
 def _provider_module(module: str) -> bool:
@@ -462,6 +482,7 @@ def check_test_architecture(
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 module = _imported_module(node)
+                violations.extend(_conftest_import_violations(module, relative, node))
                 for alias in node.names:
                     imported = (
                         alias.name.split(".", 1)[0]
@@ -533,7 +554,9 @@ def check_test_architecture(
                                 node.col_offset,
                             )
                         )
-                    process_import = module == "subprocess" or imported_full == "subprocess"
+                    process_import = (
+                        module == "subprocess" or imported_full == "subprocess"
+                    )
                     if tier == "unit" and process_import:
                         violations.append(
                             Violation(

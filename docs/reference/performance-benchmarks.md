@@ -211,6 +211,24 @@ Use pyperf's ordinary CLI flags to select a faster development run or write raw
 JSON. These measurements are baselines only; no timing threshold is a v0.2
 release gate.
 
+Architecture work that changes runtime construction uses the startup phase
+harness and compares the base and head revisions on the same host:
+
+```sh
+uv run python benchmarks/benchmark_startup_phases.py -o /tmp/startup-base.json
+uv run python benchmarks/benchmark_startup_phases.py -o /tmp/startup-head.json
+uv run python benchmarks/compare_startup.py \
+  --baseline /tmp/startup-base.json \
+  --current /tmp/startup-head.json
+```
+
+Run the first command from the intended base tree and the second from the head
+tree with the same dependency lock and pyperf options. The comparison keeps
+fresh materialization, core service assembly, populated attachment, and
+authorized hydration separate and reports the cleanup program's phase-specific
+improvement gates. Raw pyperf JSON remains the evidence; the Markdown table is
+only its projection.
+
 The scheduled core benchmark job downloads the previous successful `main` run
 when available and publishes a report-only comparison using a ±20% change
 threshold. A reported regression is a prompt to investigate, not a CI failure;

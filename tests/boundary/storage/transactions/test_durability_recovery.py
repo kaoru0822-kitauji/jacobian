@@ -281,7 +281,7 @@ def test_cleanup_failure_clears_ownership_and_defers_recovery(
     failure: str,
 ) -> None:
     store = ArtifactStore(tmp_path)
-    real_connect = store._connect
+    real_connect = store.database.connect
     connection = real_connect()
     closed = False
 
@@ -301,7 +301,11 @@ def test_cleanup_failure_clears_ownership_and_defers_recovery(
             if failure == "close":
                 raise sqlite3.OperationalError("simulated close failure")
 
-    monkeypatch.setattr(store, "_connect", lambda: CleanupFailureConnection())
+    monkeypatch.setattr(
+        store.database,
+        "connect",
+        lambda: CleanupFailureConnection(),
+    )
     with (
         pytest.raises(StoreError, match="cleanup was not durable"),
         store.transaction(),
@@ -311,7 +315,7 @@ def test_cleanup_failure_clears_ownership_and_defers_recovery(
     assert not store.transaction_active
     assert not transaction_active_for(store.db_path)
     assert store.transaction_recovery_path.exists()
-    monkeypatch.setattr(store, "_connect", real_connect)
+    monkeypatch.setattr(store.database, "connect", real_connect)
     with pytest.raises(StoreError, match="requires recovery"):
         store.find_by_object_digest("sha256:" + "0" * 64)
     assert not ArtifactStore(tmp_path).transaction_recovery_path.exists()

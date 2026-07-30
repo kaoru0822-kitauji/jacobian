@@ -36,6 +36,7 @@ Linux has no official pycddlib wheel, so the recorded CPython 3.12 reproduction
 used an isolated source build. One equivalent setup is:
 
 ```bash
+mkdir -p /tmp/cddlib-source
 tar -xzf /tmp/cddlib-0.94n.tar.gz -C /tmp/cddlib-source
 cd /tmp/cddlib-source/cddlib-0.94n
 ./configure --prefix=/tmp/cddlib-prefix

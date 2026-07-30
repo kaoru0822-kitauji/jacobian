@@ -16,7 +16,11 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -337,12 +341,10 @@ class CapabilityService:
                 normalized_domain,
             ):
                 continue
-            input_compatible = not (
-                resolved_input_kind is not None
-                and resolved_input_kind not in descriptor.accepted_input_kinds
-            ) and not (
-                request.artifact_type is not None
-                and request.artifact_type not in descriptor.accepted_artifact_types
+            input_compatible = _accepts_discovery_input(
+                descriptor,
+                resolved_input_kind,
+                request.artifact_type,
             )
             if input_compatible:
                 contract_route_count += 1
@@ -398,66 +400,15 @@ class CapabilityService:
             if page and start + len(page) < total_matches
             else None
         )
-        portfolio_fit: Literal[
-            "UNFILTERED",
-            "STRONG_CANDIDATES_FOUND",
-            "ONLY_WEAK_LEXICAL_MATCHES",
-            "NO_LEXICAL_MATCHES",
-        ]
-        if request.query is None:
-            portfolio_fit = "UNFILTERED"
-            portfolio_fit_basis = (
-                "No query was supplied; results are an unranked installed-portfolio "
-                "listing and make no suitability claim."
-            )
-        elif not lexical_candidates:
-            portfolio_fit = "NO_LEXICAL_MATCHES"
-            portfolio_fit_basis = (
-                "No installed descriptor shared a meaningful query term. This is "
-                "not proof that the mathematical outcome is impossible."
-            )
-        elif any(
-            match.lexical_fit == "STRONG_CANDIDATE" for match in lexical_candidates
-        ):
-            portfolio_fit = "STRONG_CANDIDATES_FOUND"
-            portfolio_fit_basis = (
-                "At least one installed descriptor has substantial lexical query "
-                "coverage; inspect its contract before treating it as suitable."
-            )
-        else:
-            portfolio_fit = "ONLY_WEAK_LEXICAL_MATCHES"
-            portfolio_fit_basis = (
-                "Installed results share only weak lexical evidence with the query. "
-                "Do not infer capability fit from top-N ordering alone."
-            )
-        routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"]
-        if resolved_input_kind is None:
-            routing_status = "UNFILTERED"
-            routing_basis = (
-                "No input kind was declared or safely inferred; inspect the selected "
-                "capability contract before invocation."
-            )
-        elif contract_route_count:
-            routing_status = "ROUTES_FOUND"
-            routing_basis = (
-                "Installed routes match the declared or safely inferred input kind"
-                + (
-                    f" and artifact type {request.artifact_type!r}."
-                    if request.artifact_type is not None
-                    else "."
-                )
-            )
-        else:
-            routing_status = "NO_ROUTE"
-            routing_basis = (
-                "No installed capability accepts the declared or safely inferred "
-                "input kind"
-                + (
-                    f" and artifact type {request.artifact_type!r}."
-                    if request.artifact_type is not None
-                    else "."
-                )
-            )
+        portfolio_fit, portfolio_fit_basis = _discovery_portfolio_fit(
+            request.query,
+            lexical_candidates,
+        )
+        routing_status, routing_basis = _discovery_routing_status(
+            resolved_input_kind,
+            request.artifact_type,
+            contract_route_count,
+        )
         return CapabilityDiscoveryResult(
             query=request.query,
             domain=normalized_domain,
@@ -854,6 +805,80 @@ def _discovery_terms(query: str) -> frozenset[str]:
     )
 
 
+def _accepts_discovery_input(
+    descriptor: CapabilityDescriptor,
+    input_kind: CapabilityInputKind | None,
+    artifact_type: str | None,
+) -> bool:
+    return (input_kind is None or input_kind in descriptor.accepted_input_kinds) and (
+        artifact_type is None or artifact_type in descriptor.accepted_artifact_types
+    )
+
+
+def _discovery_portfolio_fit(
+    query: str | None,
+    lexical_candidates: list[CapabilityDiscoveryMatch],
+) -> tuple[
+    Literal[
+        "UNFILTERED",
+        "STRONG_CANDIDATES_FOUND",
+        "ONLY_WEAK_LEXICAL_MATCHES",
+        "NO_LEXICAL_MATCHES",
+    ],
+    str,
+]:
+    if query is None:
+        return (
+            "UNFILTERED",
+            "No query was supplied; results are an unranked installed-portfolio "
+            "listing and make no suitability claim.",
+        )
+    if not lexical_candidates:
+        return (
+            "NO_LEXICAL_MATCHES",
+            "No installed descriptor shared a meaningful query term. This is "
+            "not proof that the mathematical outcome is impossible.",
+        )
+    if any(match.lexical_fit == "STRONG_CANDIDATE" for match in lexical_candidates):
+        return (
+            "STRONG_CANDIDATES_FOUND",
+            "At least one installed descriptor has substantial lexical query "
+            "coverage; inspect its contract before treating it as suitable.",
+        )
+    return (
+        "ONLY_WEAK_LEXICAL_MATCHES",
+        "Installed results share only weak lexical evidence with the query. "
+        "Do not infer capability fit from top-N ordering alone.",
+    )
+
+
+def _discovery_routing_status(
+    input_kind: CapabilityInputKind | None,
+    artifact_type: str | None,
+    route_count: int,
+) -> tuple[Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"], str]:
+    if input_kind is None:
+        return (
+            "UNFILTERED",
+            "No input kind was declared or safely inferred; inspect the selected "
+            "capability contract before invocation.",
+        )
+    artifact_basis = (
+        f" and artifact type {artifact_type!r}." if artifact_type is not None else "."
+    )
+    if route_count:
+        return (
+            "ROUTES_FOUND",
+            "Installed routes match the declared or safely inferred input kind"
+            + artifact_basis,
+        )
+    return (
+        "NO_ROUTE",
+        "No installed capability accepts the declared or safely inferred input kind"
+        + artifact_basis,
+    )
+
+
 def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None:
     """Conservatively recognize prose that must not enter formal proof routes."""
 
@@ -960,7 +985,15 @@ def _validate_payload(
     schema: dict[str, object],
     payload: dict[str, object],
 ) -> dict[str, object]:
-    normalized = loads_strict_json(canonicalize_json(payload))
+    try:
+        normalized = loads_strict_json(canonicalize_json(payload))
+    except CanonicalizationError as exc:
+        raise _PayloadValidationError(
+            str(exc),
+            path="$",
+            actual_type=_json_value_type(payload),
+            expected="bounded canonical JSON",
+        ) from exc
     if not isinstance(normalized, dict):
         raise CapabilityError("capability payload must normalize to an object")
     errors = sorted(

@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 import tarfile
 import zipfile
+import zlib
 from collections.abc import Callable, Mapping, Sequence
 from fractions import Fraction
 from pathlib import Path
@@ -25,6 +27,7 @@ _SOURCE_MEMBERS = {
 }
 _ENVIRONMENT = {"LANG": "C", "LC_ALL": "C", "TZ": "UTC"}
 ProcessRunner = Callable[..., Any]
+_WORKER_ERROR_PREFIX = b"JACOBIAN_SPIKE_ERROR "
 
 
 def _default_runner(*args: object, **kwargs: object) -> Any:
@@ -49,9 +52,16 @@ def _sha256_bytes(payload: bytes) -> str:
 
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
+    try:
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+    except OSError as exc:
+        raise GudhiSpikeError(
+            "UNAVAILABLE",
+            "PROVIDER_FILE_UNAVAILABLE",
+            "A selected GUDHI spike artifact could not be read.",
+        ) from exc
     return f"sha256:{digest.hexdigest()}"
 
 
@@ -72,6 +82,76 @@ def _load_pin(path: Path) -> dict[str, Any]:
     if (
         not isinstance(payload, dict)
         or payload.get("contract") != "jacobian.gudhi-persistence-spike/v1"
+    ):
+        raise GudhiSpikeError(
+            "ERROR", "INVALID_SPIKE_PIN", "The GUDHI spike pin is malformed."
+        )
+    required = {
+        "contract",
+        "provider",
+        "version",
+        "documentation_url",
+        "licensing_url",
+        "adapter_source_sha256",
+        "source",
+        "wheel",
+        "reproduction",
+    }
+    source = payload.get("source")
+    wheel = payload.get("wheel")
+    reproduction = payload.get("reproduction")
+    module_licenses = (
+        source.get("module_licenses") if isinstance(source, dict) else None
+    )
+    module_licenses_valid = (
+        isinstance(module_licenses, dict)
+        and set(module_licenses) == set(_SOURCE_MEMBERS)
+        and all(
+            isinstance(module, dict)
+            and set(module) == {"header_sha256", "license_id"}
+            and all(isinstance(value, str) for value in module.values())
+            for module in module_licenses.values()
+        )
+    )
+    if (
+        set(payload) != required
+        or any(
+            not isinstance(payload.get(key), str)
+            for key in required - {"source", "wheel", "reproduction"}
+        )
+        or not isinstance(source, dict)
+        or set(source)
+        != {"download_url", "archive_sha256", "tag", "tag_commit", "module_licenses"}
+        or not all(
+            isinstance(source.get(key), str)
+            for key in ("download_url", "archive_sha256", "tag", "tag_commit")
+        )
+        or not module_licenses_valid
+        or not isinstance(wheel, dict)
+        or set(wheel)
+        != {
+            "download_url",
+            "filename",
+            "sha256",
+            "metadata_member",
+            "license_member",
+            "license_sha256",
+        }
+        or not all(isinstance(value, str) for value in wheel.values())
+        or not isinstance(reproduction, dict)
+        or set(reproduction)
+        != {
+            "scope",
+            "coefficient_prime",
+            "simplices",
+            "expected_provider_output",
+            "expected_mathematical_output_sha256",
+        }
+        or not isinstance(reproduction.get("scope"), str)
+        or type(reproduction.get("coefficient_prime")) is not int
+        or not isinstance(reproduction.get("simplices"), list)
+        or not isinstance(reproduction.get("expected_provider_output"), dict)
+        or not isinstance(reproduction.get("expected_mathematical_output_sha256"), str)
     ):
         raise GudhiSpikeError(
             "ERROR", "INVALID_SPIKE_PIN", "The GUDHI spike pin is malformed."
@@ -174,7 +254,7 @@ def _inspect_wheel(path: Path, pin: Mapping[str, Any]) -> dict[str, Any]:
         with zipfile.ZipFile(resolved) as archive:
             license_payload = archive.read(wheel_pin["license_member"])
             metadata = archive.read(wheel_pin["metadata_member"])
-    except (KeyError, OSError, zipfile.BadZipFile, RuntimeError) as exc:
+    except (KeyError, OSError, RuntimeError, zipfile.BadZipFile, zlib.error) as exc:
         raise GudhiSpikeError(
             "REJECTED",
             "WHEEL_MALFORMED",
@@ -287,6 +367,23 @@ def _run_checked(
             "ERROR", "PROVIDER_OUTPUT_LIMIT", "The GUDHI spike exceeded output bounds."
         )
     if completed.returncode != 0:
+        if completed.stderr.startswith(_WORKER_ERROR_PREFIX):
+            try:
+                worker_error = json.loads(
+                    completed.stderr[len(_WORKER_ERROR_PREFIX) :].decode("ascii")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                worker_error = None
+            if (
+                isinstance(worker_error, dict)
+                and set(worker_error) == {"status", "code", "detail"}
+                and all(isinstance(value, str) for value in worker_error.values())
+            ):
+                raise GudhiSpikeError(
+                    worker_error["status"],
+                    worker_error["code"],
+                    worker_error["detail"],
+                )
         raise GudhiSpikeError(
             "ERROR", "PROVIDER_CRASH", "The GUDHI spike exited unsuccessfully."
         )
@@ -450,6 +547,12 @@ def run_spike(
 ) -> dict[str, Any]:
     """Run the bounded provider reproduction and independent exact replay."""
     try:
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+            raise GudhiSpikeError(
+                "ERROR",
+                "INVALID_TIMEOUT",
+                "The GUDHI spike timeout must be finite and positive.",
+            )
         pin = _load_pin(pin_path)
         resolved_python = _resolve_interpreter(python_executable)
         source = _inspect_source_archive(source_archive, pin)
@@ -531,7 +634,7 @@ def run_spike(
                 "GUDHI receives integer ranks because its Python filtration API uses float",
                 "the provider is a producer and is not authorized as its own checker",
                 "the spike records a wheel digest, not an installed RECORD runtime digest",
-                "only one bounded F_2 case was reproduced",
+                f"only one bounded F_{prime} case was reproduced",
             ],
         }
     except GudhiSpikeError as exc:
@@ -642,7 +745,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
     if args.worker:
-        return _worker(args.pin)
+        try:
+            return _worker(args.pin)
+        except GudhiSpikeError as exc:
+            payload = {
+                "status": exc.status,
+                "code": exc.code,
+                "detail": exc.detail,
+            }
+            sys.stderr.buffer.write(_WORKER_ERROR_PREFIX + _canonical_json(payload))
+            return 64
     if (
         args.python_executable is None
         or args.wheel is None

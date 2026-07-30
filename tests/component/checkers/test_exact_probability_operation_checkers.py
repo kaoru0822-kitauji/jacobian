@@ -398,3 +398,37 @@ def test_graph_reliability_checker_rejects_forged_connectivity() -> None:
 
     assert checked["accepted"] is False
     assert checked["conclusion"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value"),
+    (
+        ("edge_count", True),
+        ("visited_states", True),
+    ),
+)
+def test_graph_reliability_checker_rejects_boolean_counts(
+    field: str,
+    forged_value: bool,
+) -> None:
+    checker, case_request = _CASES[-1]
+    forged = copy.deepcopy(case_request)
+    forged["candidate"]["payload"][field] = forged_value
+    forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
+
+    checked = checker(forged)
+
+    assert checked["accepted"] is False
+    assert checked["conclusion"] == "UNKNOWN"
+
+
+def test_graph_reliability_checker_rejects_boolean_state_index() -> None:
+    checker, case_request = _CASES[-1]
+    forged = copy.deepcopy(case_request)
+    forged["candidate"]["payload"]["states"][0]["state_index"] = False
+    forged["candidate"]["payload_digest"] = _digest(forged["candidate"]["payload"])
+
+    checked = checker(forged)
+
+    assert checked["accepted"] is False
+    assert checked["conclusion"] == "UNKNOWN"

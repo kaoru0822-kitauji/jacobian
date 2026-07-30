@@ -192,15 +192,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("tests/composition/portfolio/test_agent_ab_protocol.py",),
-            _expected_plan(
-                "python",
-                "run-python",
-                "run-domain",
-                "run-static",
-            ),
-        ),
-        (
             ("src/jacobian/graph_capabilities.py",),
             _expected_plan(
                 "selective",

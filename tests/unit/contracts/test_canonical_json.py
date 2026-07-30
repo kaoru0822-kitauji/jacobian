@@ -61,6 +61,13 @@ def test_canonical_rational_wire_model_rejects_unreduced_input() -> None:
         CanonicalRational.model_validate({"num": "2", "den": "4"})
 
 
+def test_negative_zero_is_not_a_canonical_integer_encoding() -> None:
+    with pytest.raises(CanonicalizationError):
+        canonicalize_json({"num": "-0", "den": "1"})
+    with pytest.raises(ValidationError):
+        CanonicalRational.model_validate({"num": "-0", "den": "1"})
+
+
 def test_num_den_is_a_reserved_exact_rational_shape() -> None:
     assert canonicalize_json({"num": "2", "den": "4"}) == canonicalize_json(
         {"num": "1", "den": "2"}

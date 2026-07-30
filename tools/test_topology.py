@@ -274,13 +274,16 @@ def run_lane(
     selectors: list[str] | None = None,
     extra_args: list[str] | None = None,
 ) -> int:
-    """Execute pytest for a lane and return its exit status."""
+    """Execute pytest without retaining an extra POSIX control-plane process."""
     command = pytest_command(topology, lane_name, selectors, extra_args)
     environment = os.environ.copy()
     environment.setdefault("JACOBIAN_TEST_LANE", lane_name)
-    return subprocess.run(
-        command, cwd=topology.root, env=environment, check=False
-    ).returncode
+    if os.name == "nt":  # pragma: no cover - exercised by Windows CI
+        return subprocess.run(
+            command, cwd=topology.root, env=environment, check=False
+        ).returncode
+    os.chdir(topology.root)
+    os.execvpe(command[0], command, environment)
 
 
 def main(argv: list[str] | None = None) -> int:

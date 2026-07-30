@@ -82,6 +82,22 @@ _GAUSSIAN_POLYNOMIAL = {
                 "terminals": ["a", "b"],
             },
         ),
+        (
+            "probability.graph_reliability.connection_probability.compute",
+            {
+                "graph": {
+                    "vertices": ["", "a"],
+                    "edges": [["", "a"]],
+                },
+                "edge_probabilities": [
+                    {
+                        "edge": ["", "a"],
+                        "open_probability": _q(1, 3),
+                    }
+                ],
+                "terminals": ["", "a"],
+            },
+        ),
     ),
 )
 def test_probability_results_are_independently_replayed(

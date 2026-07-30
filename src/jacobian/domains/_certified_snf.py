@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Literal
 
+from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.certified_snf import (
     CertifiedIntegerMatrix,
     SmithNormalFormCertificate,
@@ -325,7 +326,9 @@ def _contract_matrix(
     return CertifiedIntegerMatrix(
         row_count=rows,
         column_count=columns,
-        entries=tuple(tuple(str(value) for value in row) for row in entries),
+        entries=tuple(
+            tuple(format_canonical_integer(value) for value in row) for row in entries
+        ),
     )
 
 
@@ -354,7 +357,9 @@ def certificate_from_reduction(
             columns=columns,
         ),
         rank=reduction.rank,
-        invariant_factors=tuple(str(value) for value in reduction.invariant_factors),
+        invariant_factors=tuple(
+            format_canonical_integer(value) for value in reduction.invariant_factors
+        ),
         left_determinant=left_determinant,
         right_determinant=right_determinant,
     )

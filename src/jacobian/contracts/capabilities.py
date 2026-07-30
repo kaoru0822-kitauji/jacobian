@@ -38,6 +38,23 @@ class CapabilityInputKind(StrEnum):
     NATURAL_LANGUAGE_PROOF = "NATURAL_LANGUAGE_PROOF"
 
 
+def _validate_descriptor_input_contract(
+    accepted_input_kinds: tuple[CapabilityInputKind, ...],
+    accepted_artifact_types: tuple[ArtifactUri, ...],
+) -> None:
+    if not accepted_input_kinds:
+        raise ValueError("a capability must accept at least one input kind")
+    if len(set(accepted_input_kinds)) != len(accepted_input_kinds):
+        raise ValueError("accepted input kinds must be unique")
+    if len(set(accepted_artifact_types)) != len(accepted_artifact_types):
+        raise ValueError("accepted artifact types must be unique")
+    accepts_typed_artifact = CapabilityInputKind.TYPED_ARTIFACT in accepted_input_kinds
+    if accepted_artifact_types and not accepts_typed_artifact:
+        raise ValueError("accepted artifact types require TYPED_ARTIFACT input")
+    if accepts_typed_artifact and not accepted_artifact_types:
+        raise ValueError("TYPED_ARTIFACT input requires accepted artifact types")
+
+
 class CapabilityInvocationExample(ContractModel):
     """One operator-authored, schema-valid example for an advertised mode."""
 
@@ -309,21 +326,10 @@ class CapabilityDescriptor(ContractModel):
             raise ValueError("a capability must support at least one mode")
         if len(set(self.modes)) != len(self.modes):
             raise ValueError("capability modes must be unique")
-        if not self.accepted_input_kinds:
-            raise ValueError("a capability must accept at least one input kind")
-        if len(set(self.accepted_input_kinds)) != len(self.accepted_input_kinds):
-            raise ValueError("accepted input kinds must be unique")
-        if len(set(self.accepted_artifact_types)) != len(self.accepted_artifact_types):
-            raise ValueError("accepted artifact types must be unique")
-        if self.accepted_artifact_types and (
-            CapabilityInputKind.TYPED_ARTIFACT not in self.accepted_input_kinds
-        ):
-            raise ValueError("accepted artifact types require TYPED_ARTIFACT input")
-        if (
-            CapabilityInputKind.TYPED_ARTIFACT in self.accepted_input_kinds
-            and not self.accepted_artifact_types
-        ):
-            raise ValueError("TYPED_ARTIFACT input requires accepted artifact types")
+        _validate_descriptor_input_contract(
+            self.accepted_input_kinds,
+            self.accepted_artifact_types,
+        )
         if len({example.name for example in self.invocation_examples}) != len(
             self.invocation_examples
         ):
@@ -353,11 +359,6 @@ class CapabilityRequest(ContractModel):
     capability_id: CapabilityId
     mode: CapabilityMode = CapabilityMode.EXPLORE
     input: dict[str, Any]
-
-    @model_validator(mode="after")
-    def require_canonical_input(self) -> Self:
-        canonicalize_json(self.input)
-        return self
 
 
 class CapabilityAssurance(ContractModel):
