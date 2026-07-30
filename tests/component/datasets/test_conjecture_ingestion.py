@@ -77,6 +77,9 @@ def test_ingestion_persists_normalized_provenance_urls(tmp_path: Path) -> None:
     payload = _request()
     payload["source_url"] = " https://example.invalid/source path "
     payload["license_evidence_url"] = " https://example.invalid/license path "
+    metadata = payload["metadata"]
+    assert isinstance(metadata, dict)
+    metadata["source_item_url"] = " https://example.invalid/item path "
 
     result = adapter.invoke(
         CapabilityRequest(
@@ -90,6 +93,51 @@ def test_ingestion_persists_normalized_provenance_urls(tmp_path: Path) -> None:
     assert (
         stored.payload["license_evidence_url"]
         == "https://example.invalid/license%20path"
+    )
+    assert (
+        stored.payload["metadata"]["source_item_url"]
+        == "https://example.invalid/item%20path"
+    )
+
+
+@pytest.mark.parametrize("source_item_url", ["not a URL", "   "])
+def test_ingestion_rejects_invalid_source_item_urls(
+    tmp_path: Path,
+    source_item_url: str,
+) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _request()
+    metadata = payload["metadata"]
+    assert isinstance(metadata, dict)
+    metadata["source_item_url"] = source_item_url
+
+    with pytest.raises(CapabilityInvocationError):
+        adapter.invoke(
+            CapabilityRequest(
+                capability_id="dataset.conjecture.ingest",
+                input=payload,
+            )
+        )
+
+
+def test_ingestion_nfc_normalizes_statement_before_digesting(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _request()
+    payload["statement"] = "Cafe\u0301"
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.conjecture.ingest",
+            input=payload,
+        )
+    )
+
+    assert result.output["indexed_statement"] == "Café"
+    assert (
+        result.output["indexed_content_digest"]
+        == result.output["supplied_content_digest"]
     )
 
 

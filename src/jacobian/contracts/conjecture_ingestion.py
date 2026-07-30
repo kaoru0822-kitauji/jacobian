@@ -45,6 +45,13 @@ class ExternalConjectureMetadata(ContractModel):
     source_name: str | None = Field(default=None, max_length=512)
     source_item_url: str | None = Field(default=None, max_length=2_000)
 
+    @field_validator("source_item_url")
+    @classmethod
+    def normalize_source_item_url(cls, value: str | None) -> str | None:
+        return (
+            _normalize_http_url(value, "source item URL") if value is not None else None
+        )
+
     @model_validator(mode="after")
     def require_nonblank_title(self) -> Self:
         if not self.title.strip():

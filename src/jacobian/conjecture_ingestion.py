@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 
@@ -58,7 +59,8 @@ def _text_digest(value: str) -> str:
 
 def _normalize_statement(value: str) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "\n".join(line.rstrip() for line in lines).strip()
+    normalized = "\n".join(line.rstrip() for line in lines).strip()
+    return unicodedata.normalize("NFC", normalized)
 
 
 def _license_decision(
