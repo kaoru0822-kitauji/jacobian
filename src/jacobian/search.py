@@ -57,6 +57,10 @@ from jacobian.plugins.registry import (
     PluginRegistryError,
     ResolvedCapability,
 )
+from jacobian.persistence.recovery import (
+    put_internal_artifact,
+    quarantine_recovery_snapshot,
+)
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
@@ -292,41 +296,21 @@ class SearchService:
     ) -> None:
         """Isolate one corrupt row without blocking unrelated recovery."""
 
-        experiment_uri = str(row["experiment_uri"])
-        raw = row["snapshot_json"]
-        if isinstance(raw, bytes):
-            raw_bytes = raw
-        elif isinstance(raw, str):
-            raw_bytes = raw.encode("utf-8")
-        else:
-            raw_bytes = repr(raw).encode("utf-8")
-        snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
         detail = (
             "Stored search state is invalid. Restore the Jacobian state directory "
             "from a trusted backup or start a new search."
         )
-        _LOGGER.warning(
-            "quarantining invalid search snapshot for %s",
-            experiment_uri,
-            exc_info=error,
+        snapshot_digest = quarantine_recovery_snapshot(
+            connection,
+            row,
+            error,
+            experiments_table="search_experiments",
+            recovery_table="search_recovery_failures",
+            detail=detail,
+            logger=_LOGGER,
+            logger_message="quarantining invalid search snapshot for %s",
         )
-        detected_at = _now()
-        connection.execute(
-            """
-            UPDATE search_experiments
-            SET state = 'ERROR'
-            WHERE experiment_uri = ?
-            """,
-            (experiment_uri,),
-        )
-        connection.execute(
-            """
-            INSERT OR REPLACE INTO search_recovery_failures (
-                experiment_uri, detected_at, snapshot_digest, detail
-            ) VALUES (?, ?, ?, ?)
-            """,
-            (experiment_uri, detected_at.isoformat(), snapshot_digest, detail),
-        )
+        experiment_uri = str(row["experiment_uri"])
         try:
             self._append_event(
                 connection,
@@ -1827,15 +1811,12 @@ class SearchService:
         parents: tuple[str, ...] = (),
         summary: str,
     ) -> ArtifactPutResult:
-        normalized = self.schemas.validate(schema_uri, payload)
-        self.store.get_descriptor(
+        return put_internal_artifact(
+            self.store,
+            self.schemas,
             self.semantics_uri,
-            expected_kind="semantics",
-        )
-        return self.store.put(
             schema_uri=schema_uri,
-            semantics_uri=self.semantics_uri,
-            payload=normalized,
+            payload=payload,
             parents=parents,
             summary=summary,
         )
