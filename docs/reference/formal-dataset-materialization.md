@@ -36,6 +36,7 @@ than interpreted heuristically.
       "split": "test",
       "header": "import Mathlib",
       "formal_statement": "theorem mathd_algebra_1 : True := by trivial",
+      "goal": "True",
       "informal_statement": "A fixture statement."
     },
     "environment": {

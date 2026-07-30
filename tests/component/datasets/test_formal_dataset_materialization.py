@@ -57,6 +57,7 @@ def _minif2f_request() -> dict[str, object]:
             "formal_statement": (
                 "theorem mathd_algebra_1 : (1 : Nat) = 1 := by  \r\n  rfl  "
             ),
+            "goal": "(1 : Nat) = 1",
             "informal_statement": "One equals one.  ",
             "informal_proof": "This is reflexive.  ",
         },

@@ -175,6 +175,7 @@ class FormalDatasetMaterializeAdapter:
                             "name": "core_true",
                             "split": "test",
                             "formal_statement": "theorem core_true : True := by trivial",
+                            "goal": "True",
                             "informal_statement": "True holds.",
                             "header": "",
                         },

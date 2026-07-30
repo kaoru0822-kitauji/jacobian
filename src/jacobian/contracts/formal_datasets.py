@@ -37,6 +37,7 @@ def _validate_row_text(row: MiniF2FRow | ProofNetRow) -> None:
         row.formal_statement,
         row.informal_statement,
         row.informal_proof,
+        row.goal if isinstance(row, MiniF2FRow) else None,
     ):
         if value is not None:
             _require_nfc(value)
@@ -49,6 +50,7 @@ class MiniF2FRow(ContractModel):
     formal_statement: str = Field(min_length=1, max_length=40_000)
     informal_statement: str | None = Field(default=None, max_length=40_000)
     informal_proof: str | None = Field(default=None, max_length=80_000)
+    goal: str = Field(min_length=1, max_length=40_000)
     header: str = Field(default="", max_length=20_000)
 
     @model_validator(mode="after")
@@ -107,14 +109,18 @@ class FormalDatasetEnvironment(ContractModel):
 
     @model_validator(mode="after")
     def require_unique_ordered_bindings(self) -> Self:
-        for value in (
-            self.lean_version,
-            self.project_revision,
-            self.mathlib_revision,
-            self.namespace,
-        ):
+        for field_name in ("lean_version", "project_revision"):
+            value = getattr(self, field_name)
+            if not value.strip():
+                raise ValueError(f"{field_name} must not be blank")
+        for field_name in ("mathlib_revision", "namespace"):
+            value = getattr(self, field_name)
             if value is not None:
+                if not value.strip():
+                    raise ValueError(f"{field_name} must not be blank")
                 _require_nfc(value)
+        _require_nfc(self.lean_version)
+        _require_nfc(self.project_revision)
         if len(set(self.imports)) != len(self.imports):
             raise ValueError("imports must be unique and ordered")
         if len(set(self.theorem_context)) != len(self.theorem_context):
@@ -144,7 +150,10 @@ class FormalDatasetMaterializeRequest(ContractModel):
 
     @model_validator(mode="after")
     def bind_dataset_identity(self) -> Self:
-        for value in (self.dataset_revision, self.sample_id, self.source_url):
+        for field_name in ("dataset_revision", "sample_id", "source_url"):
+            value = getattr(self, field_name)
+            if not value.strip():
+                raise ValueError(f"{field_name} must not be blank")
             _require_nfc(value)
         if self.sample_id != self.row.name:
             raise ValueError("sample_id must equal the dataset row name")

@@ -18,7 +18,7 @@ from jacobian.operations import (
     DomainSemantics,
 )
 from jacobian.provider_runtime import jacobian_provider_runtime
-from jacobian_checkers.lean4 import LEAN_VERSION
+from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
 
 FORMAL_DATASET_BUNDLE = DomainBundle(
     domain_id="formal_datasets",
@@ -38,7 +38,10 @@ FORMAL_DATASET_BUNDLE = DomainBundle(
         "jacobian.formal-datasets",
         features=("MINIF2F", "PROOFNET", "deterministic-materialization"),
     ),
-    backend_version=f"python-{platform.python_version()}",
+    backend_version=(
+        f"python-{platform.python_version()};lean-{LEAN_VERSION};"
+        f"mathlib-{MATHLIB_COMMIT}"
+    ),
     capabilities=(
         ComputedOperation(
             capability_id="dataset.formal.materialize",
@@ -67,6 +70,7 @@ FORMAL_DATASET_BUNDLE = DomainBundle(
                             "formal_statement": (
                                 "theorem core_true : True := by trivial"
                             ),
+                            "goal": "True",
                             "informal_statement": "True holds.",
                             "header": "",
                         },

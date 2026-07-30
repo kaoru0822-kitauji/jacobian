@@ -19,6 +19,7 @@ def _request() -> dict[str, object]:
             "name": "mathd_algebra_1",
             "split": "test",
             "formal_statement": "theorem mathd_algebra_1 : True := by trivial",
+            "goal": "True",
             "informal_statement": "A fixture statement.",
         },
         "environment": {
@@ -33,6 +34,7 @@ def test_request_dispatches_to_minif2f_contract() -> None:
 
     assert request.row.dataset_id == "MINIF2F"
     assert request.row.name == request.sample_id
+    assert request.row.goal == "True"
 
 
 def test_request_rejects_sample_identity_mismatch() -> None:
@@ -160,4 +162,28 @@ def test_request_rejects_non_nfc_scalar_provenance(
     target[field] = "Revision-Cafe\u0301"
 
     with pytest.raises(ValidationError, match="NFC-normalized"):
+        FormalDatasetMaterializeRequest.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("container", "field"),
+    (
+        ("request", "dataset_revision"),
+        ("request", "source_url"),
+        ("environment", "lean_version"),
+        ("environment", "project_revision"),
+        ("environment", "mathlib_revision"),
+        ("environment", "namespace"),
+    ),
+)
+def test_request_rejects_blank_scalar_provenance(
+    container: str,
+    field: str,
+) -> None:
+    payload = _request()
+    target = payload if container == "request" else payload["environment"]
+    assert isinstance(target, dict)
+    target[field] = "       "
+
+    with pytest.raises(ValidationError, match=f"{field} must not be blank"):
         FormalDatasetMaterializeRequest.model_validate(payload)
