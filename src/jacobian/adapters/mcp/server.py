@@ -12,10 +12,13 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
+from mcp.server.extension import Extension, ResourceBinding, ToolBinding
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.resources import FunctionResource, TextResource
 from mcp.shared.exceptions import MCPError
 from mcp_types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import Field, StrictInt
@@ -474,6 +477,39 @@ def _capability_descriptor_view(
 WORKSPACE_TOOL_NAMES = frozenset(
     {"workspace.open", "workspace.write", "workspace.query"}
 )
+WORKSPACE_OPEN_DESCRIPTION = (
+    "Direct tool; do not call capability.describe. Create a durable epistemic "
+    "workspace with one canonical problem, a main branch, and an immutable initial "
+    "revision. Workspace content is agent-authored and UNVERIFIED."
+)
+WORKSPACE_WRITE_DESCRIPTION = (
+    "Direct tool. Do not call capability.describe. Arguments are flat: send "
+    "base_revision (never revision_id) and top-level findings, attempts, marks, "
+    "scratch, or focus (never a batch wrapper). Every draft uses client_ref, never "
+    "ref. Append at an exact base revision. Finding fields are client_ref, kind, "
+    "title, body; optional links are dependency_refs and assumption_refs (never "
+    "depends_on_refs). Attempt fields are client_ref, target_ref, method, outcome, "
+    "summary. Margin marks append an explicit ACTIVE, CLOSED, RETRACTED, SUPERSEDED, "
+    "or ARCHIVED state; only SUPERSEDED carries superseded_by_ref. References may "
+    "use a client_ref from the same batch. "
+    "PROBLEM is reserved for workspace.open. A RETRACTED or SUPERSEDED card must "
+    "receive an ACTIVE mark before CLOSED or ARCHIVED. Set focus with "
+    "active_ref/pinned_refs, clear it with clear=true, or omit it; focus references "
+    "finding cards, never attempts, marks, or scratch. Never send "
+    "verification/assertion/stale fields: all workspace assertions remain "
+    "AGENT_RECORDED and UNVERIFIED. Canonical batch example: "
+    'findings=[{"client_ref":"C1","kind":"CLAIM","title":"...","body":"..."}], '
+    'attempts=[{"client_ref":"T1","target_ref":"C1","method":"...",'
+    '"outcome":"COMPLETED","summary":"..."}], '
+    'focus={"active_ref":"C1","pinned_refs":["C1"]}.'
+)
+WORKSPACE_QUERY_DESCRIPTION = (
+    "Direct tool; do not call capability.describe. Read a compact deterministic "
+    "RESUME, FRONTIER, ATTEMPTS, CONTEXT, or STALE view from agent-authored workspace "
+    "state. CONTEXT requires target_card_id and follows only explicit "
+    "dependency/assumption links. Derived staleness is a paper-like warning, not a "
+    "mathematical conclusion. Retrieval preserves UNVERIFIED status."
+)
 
 
 class AgentRecoveryError(RuntimeError):
@@ -783,61 +819,204 @@ def _capability_discovery_response(
     return response
 
 
-def _forbid_extra_tool_arguments(server: Any, *tool_names: str) -> None:
-    """Close SDK-generated argument models that otherwise ignore unknown fields."""
-
-    # MCP 2.0.0b2 creates flat function argument models with Pydantic's default
-    # ``extra="ignore"``. Workspace writes must reject the entire request instead of
-    # silently committing a partial batch when a caller misspells a top-level field.
-    manager = server._tool_manager
-    for tool_name in tool_names:
-        tool = manager.get_tool(tool_name)
-        if tool is None:  # pragma: no cover - registration invariant
-            raise RuntimeError(f"MCP tool was not registered: {tool_name}")
-        argument_model = tool.fn_metadata.arg_model
-        argument_model.model_config["extra"] = "forbid"
-        argument_model.model_rebuild(force=True)
-        tool.parameters = argument_model.model_json_schema(by_alias=True)
-
-
-def _publish_workspace_normalization_aliases(server: Any) -> None:
-    """Advertise exactly the input aliases normalized by workspace contracts."""
-
-    tool = server._tool_manager.get_tool("workspace.write")
-    if tool is None:  # pragma: no cover - registration invariant
-        raise RuntimeError("workspace tool was not registered: workspace.write")
-    schema = tool.parameters
-    definitions = schema["$defs"]
-    definitions["WorkspaceFindingKind"]["enum"].remove("PROBLEM")
-    definitions["WorkspaceFindingKind"]["enum"].append("OPEN_GOAL")
-    definitions["WorkspaceAttemptOutcome"]["enum"].append("SUCCEEDED")
-
-    mark_schema = definitions["WorkspaceMarkDraft"]
-    reason_schema = mark_schema["properties"]["reason"]
-    mark_schema["properties"]["summary"] = {
-        **reason_schema,
-        "title": "Summary",
-        "description": (
-            "Input alias for reason. Supplying both summary and reason is rejected."
-        ),
-    }
-    mark_schema["required"].remove("reason")
-    mark_schema["oneOf"] = [
-        {
-            "required": ["reason"],
-            "not": {"required": ["summary"]},
-        },
-        {
-            "required": ["summary"],
-            "not": {"required": ["reason"]},
-        },
-    ]
-
-
 @dataclass(frozen=True, slots=True)
 class AppState:
     runtime: JacobianRuntime | None
     tenant_router: TenantRuntimeRouter | None = None
+
+
+class JacobianCoreExtension(Extension):
+    """Stable Jacobian tools and static resources contributed through MCP v2."""
+
+    identifier = "io.jacobian/core"
+
+    def __init__(
+        self,
+        runtime: JacobianRuntime | None,
+        tenant_router: TenantRuntimeRouter | None,
+    ) -> None:
+        self._runtime = runtime
+        self._tenant_router = tenant_router
+
+    def settings(self) -> dict[str, Any]:
+        return {"version": "1"}
+
+    def tools(self) -> tuple[ToolBinding, ...]:
+        return (
+            ToolBinding(
+                _safe_tool_handler("capability.describe", capability_describe),
+                kwargs={
+                    "name": "capability.describe",
+                    "title": "Discover mathematical capabilities",
+                    "description": CAPABILITY_DESCRIBE_DESCRIPTION,
+                    "annotations": _tool_annotations(read_only=True, idempotent=True),
+                    "structured_output": True,
+                },
+            ),
+            ToolBinding(
+                _safe_tool_handler("capability.invoke", capability_invoke),
+                kwargs={
+                    "name": "capability.invoke",
+                    "title": "Execute a mathematical capability",
+                    "description": CAPABILITY_INVOKE_DESCRIPTION,
+                    "annotations": _tool_annotations(),
+                    "structured_output": True,
+                },
+            ),
+            ToolBinding(
+                _safe_tool_handler("workspace.open", workspace_open),
+                kwargs={
+                    "name": "workspace.open",
+                    "description": WORKSPACE_OPEN_DESCRIPTION,
+                    "annotations": _tool_annotations(idempotent=True),
+                    "structured_output": False,
+                },
+            ),
+            ToolBinding(
+                _safe_tool_handler("workspace.write", workspace_write),
+                kwargs={
+                    "name": "workspace.write",
+                    "description": WORKSPACE_WRITE_DESCRIPTION,
+                    "annotations": _tool_annotations(idempotent=True),
+                    "structured_output": False,
+                },
+            ),
+            ToolBinding(
+                _safe_tool_handler("workspace.query", workspace_query),
+                kwargs={
+                    "name": "workspace.query",
+                    "description": WORKSPACE_QUERY_DESCRIPTION,
+                    "annotations": _tool_annotations(read_only=True, idempotent=True),
+                    "structured_output": False,
+                },
+            ),
+        )
+
+    def resources(self) -> tuple[ResourceBinding, ...]:
+        return (
+            ResourceBinding(
+                TextResource(
+                    uri="jacobian://instructions",
+                    name="jacobian-instructions",
+                    title="Jacobian operating guide",
+                    description=(
+                        "Complete guidance for discovering, invoking, and independently "
+                        "checking Jacobian mathematical capabilities."
+                    ),
+                    mime_type="text/markdown",
+                    text=OPERATING_GUIDE,
+                )
+            ),
+            ResourceBinding(
+                FunctionResource.from_function(
+                    self._capability_catalog,
+                    uri="capability://catalog",
+                    name="capability-catalog",
+                    description=(
+                        "Installed model-facing operations, supported lanes, and "
+                        "compact schemas."
+                    ),
+                    mime_type="application/json",
+                )
+            ),
+            ResourceBinding(
+                FunctionResource.from_function(
+                    self._reference_catalog,
+                    uri="reference://catalog",
+                    name="reference-catalog",
+                    description=(
+                        "Read installed domain schema, semantics, plugin, and checker IDs."
+                    ),
+                    mime_type="application/json",
+                )
+            ),
+        )
+
+    async def _capability_catalog(self) -> str:
+        active_runtime = _resource_runtime(self._runtime, self._tenant_router)
+        return json.dumps(
+            active_runtime.core.capabilities.catalog().model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    async def _reference_catalog(self) -> str:
+        active_runtime = _resource_runtime(self._runtime, self._tenant_router)
+        return json.dumps(
+            reference_catalog(
+                active_runtime.portfolio.references,
+                graph=active_runtime.portfolio.graph,
+                polytope=active_runtime.services.polytope,
+                polytope_checkers=active_runtime.portfolio.polytope_checkers,
+                polynomial=active_runtime.portfolio.polynomial,
+                universal_algebra=active_runtime.portfolio.universal_algebra,
+                lean=active_runtime.portfolio.lean_checkers,
+            ),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    async def intercept_tool_call(
+        self,
+        params: Any,
+        ctx: Any,
+        call_next: Any,
+    ) -> Any:
+        started = time.monotonic()
+        arguments = params.arguments or {}
+        argument_digest = _argument_digest(arguments)
+        try:
+            result = await call_next(ctx)
+        except MCPError:
+            _log_tool_call(params.name, started, argument_digest, status="error")
+            raise
+        except Exception as exc:
+            _LOGGER.warning("MCP tool %s failed", params.name, exc_info=exc)
+            _log_tool_call(params.name, started, argument_digest, status="error")
+            raise ToolError(_public_tool_error(params.name, exc)) from exc
+        _log_tool_call(
+            params.name,
+            started,
+            argument_digest,
+            status="success",
+            result=result,
+        )
+        return result
+
+
+def _safe_tool_handler(tool_name: str, handler: Any) -> Any:
+    """Translate internal failures at the handler boundary before SDK rendering."""
+
+    @wraps(handler)
+    async def wrapped(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return await handler(*args, **kwargs)
+        except MCPError:
+            raise
+        except Exception as exc:
+            _LOGGER.warning("MCP tool %s failed", tool_name, exc_info=exc)
+            raise ToolError(_public_tool_error(tool_name, exc)) from exc
+
+    return wrapped
+
+
+def _log_tool_call(
+    name: str,
+    started: float,
+    argument_digest: str,
+    *,
+    status: str,
+    result: Any | None = None,
+) -> None:
+    _LOGGER.info(
+        "MCP tool call tool=%s status=%s duration_ms=%.3f "
+        "response_bytes=%d argument_digest=%s",
+        name,
+        status,
+        (time.monotonic() - started) * 1000,
+        0 if result is None else _response_size(result),
+        argument_digest,
+    )
 
 
 def _selected_checker_authority(
@@ -906,50 +1085,6 @@ def create_server(
         }
     )
 
-    class JacobianMCPServer(MCPServer[AppState]):
-        async def call_tool(
-            self,
-            name: str,
-            arguments: dict[str, Any],
-            context: Context[AppState, Any] | None = None,
-        ) -> Any:
-            started = time.monotonic()
-            argument_digest = _argument_digest(arguments)
-            try:
-                result = await super().call_tool(name, arguments, context)
-            except MCPError:
-                _LOGGER.info(
-                    "MCP tool call tool=%s status=error duration_ms=%.3f "
-                    "response_bytes=0 argument_digest=%s",
-                    name,
-                    (time.monotonic() - started) * 1000,
-                    argument_digest,
-                )
-                raise
-            except Exception as exc:
-                _LOGGER.warning(
-                    "MCP tool %s failed",
-                    name,
-                    exc_info=exc,
-                )
-                _LOGGER.info(
-                    "MCP tool call tool=%s status=error duration_ms=%.3f "
-                    "response_bytes=0 argument_digest=%s",
-                    name,
-                    (time.monotonic() - started) * 1000,
-                    argument_digest,
-                )
-                raise ValueError(_public_tool_error(name, exc)) from None
-            _LOGGER.info(
-                "MCP tool call tool=%s status=success duration_ms=%.3f "
-                "response_bytes=%d argument_digest=%s",
-                name,
-                (time.monotonic() - started) * 1000,
-                _response_size(result),
-                argument_digest,
-            )
-            return result
-
     selected_authority = _selected_checker_authority(checker_authority)
     configured_root = _configured_root(state_dir)
     runtime = (
@@ -990,7 +1125,7 @@ def create_server(
         ) as state:
             yield state
 
-    server: MCPServer[AppState] = JacobianMCPServer(
+    server: MCPServer[AppState] = MCPServer(
         name="jacobian",
         title="Jacobian Mathematical Workbench",
         description=SERVER_DESCRIPTION,
@@ -999,9 +1134,9 @@ def create_server(
         lifespan=lifespan,
         token_verifier=token_verifier,
         auth=auth,
+        extensions=[JacobianCoreExtension(runtime, tenant_router)],
     )
 
-    _register_tools(server, runtime, tenant_router)
     _register_resources_and_prompts(server, runtime, tenant_router)
     return server
 
@@ -1012,26 +1147,6 @@ def _register_resources_and_prompts(
     tenant_router: Any,
 ) -> None:
     """Register all MCP resource and prompt handlers on the server."""
-    _forbid_extra_tool_arguments(
-        server,
-        "capability.describe",
-        "capability.invoke",
-        *WORKSPACE_TOOL_NAMES,
-    )
-    _publish_workspace_normalization_aliases(server)
-
-    @server.resource(  # type: ignore[untyped-decorator]
-        "jacobian://instructions",
-        name="jacobian-instructions",
-        title="Jacobian operating guide",
-        description=(
-            "Complete guidance for discovering, invoking, and independently checking "
-            "Jacobian mathematical capabilities."
-        ),
-        mime_type="text/markdown",
-    )
-    async def jacobian_instructions_resource() -> str:
-        return OPERATING_GUIDE
 
     @server.resource(  # type: ignore[untyped-decorator]
         "artifact://sha256/{digest}",
@@ -1053,44 +1168,6 @@ def _register_resources_and_prompts(
                 "manifest": artifact.manifest.model_dump(mode="json"),
                 "payload": artifact.payload,
             },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(  # type: ignore[untyped-decorator]
-        "capability://catalog",
-        name="capability-catalog",
-        description=(
-            "Installed model-facing operations, supported lanes, and compact schemas."
-        ),
-        mime_type="application/json",
-    )
-    async def capability_catalog_resource() -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        return json.dumps(
-            active_runtime.core.capabilities.catalog().model_dump(mode="json"),
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-
-    @server.resource(  # type: ignore[untyped-decorator]
-        "reference://catalog",
-        name="reference-catalog",
-        description="Read installed domain schema, semantics, plugin, and checker IDs.",
-        mime_type="application/json",
-    )
-    async def reference_catalog_resource() -> str:
-        active_runtime = _resource_runtime(runtime, tenant_router)
-        return json.dumps(
-            reference_catalog(
-                active_runtime.portfolio.references,
-                graph=active_runtime.portfolio.graph,
-                polytope=active_runtime.services.polytope,
-                polytope_checkers=active_runtime.portfolio.polytope_checkers,
-                polynomial=active_runtime.portfolio.polynomial,
-                universal_algebra=active_runtime.portfolio.universal_algebra,
-                lean=active_runtime.portfolio.lean_checkers,
-            ),
             ensure_ascii=False,
             sort_keys=True,
         )
@@ -1242,460 +1319,387 @@ def _register_resources_and_prompts(
         return evidence_check_prompt(claim, artifact_uri)
 
 
-def _register_tools(
-    server: Any,
-    runtime: JacobianRuntime | None,
-    tenant_router: Any,
-) -> None:
-    """Register all MCP tool handlers on the server."""
-
-    @server.tool(  # type: ignore[untyped-decorator]
-        name="capability.describe",
-        title="Discover mathematical capabilities",
-        description=CAPABILITY_DESCRIBE_DESCRIPTION,
-        annotations=_tool_annotations(read_only=True, idempotent=True),
-        structured_output=True,
+async def capability_describe(
+    capability_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Exact installed ID; cannot be combined with discovery filters."
+            )
+        ),
+    ] = None,
+    query: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            max_length=512,
+            description=("Mathematical outcome to find; no capability ID is required."),
+        ),
+    ] = None,
+    domain: Annotated[
+        str | None,
+        Field(
+            pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
+            description=(
+                "Optional domain tag filter, such as universal_algebra, graph, "
+                "polynomial, or lean."
+            ),
+        ),
+    ] = None,
+    mode: Annotated[
+        CapabilityMode | None,
+        Field(description="Optional EXPLORE or VERIFY capability filter."),
+    ] = None,
+    input_kind: Annotated[
+        CapabilityInputKind | None,
+        Field(description=("Input boundary used to reject incompatible routes.")),
+    ] = None,
+    artifact_type: Annotated[
+        str | None,
+        Field(
+            pattern=r"^artifact://sha256/[0-9a-f]{64}$",
+            description=(
+                "Exact schema_uri from the stored artifact manifest; requires "
+                "TYPED_ARTIFACT."
+            ),
+        ),
+    ] = None,
+    limit: Annotated[
+        StrictInt | None,
+        Field(
+            ge=1,
+            le=20,
+            description=(
+                "Maximum compact discovery matches; defaults to 5. Start with "
+                "5 and inspect only the strongest one or two candidates."
+            ),
+        ),
+    ] = None,
+    cursor: Annotated[
+        str | None,
+        Field(
+            max_length=128,
+            pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
+            description=(
+                "Opaque continuation ID from next_cursor. Reuse the same query, "
+                "domain, mode, input kind, artifact type, and limit."
+            ),
+        ),
+    ] = None,
+    view: Annotated[
+        CapabilityDescriptionView,
+        Field(
+            description=(
+                "Exact-lookup projection. SUMMARY is the small agent-facing "
+                "default for judging fit. CONTRACT adds the validation-equivalent "
+                "input schema, runtime identity, related operations, and validated "
+                "invocation examples; request it before invoking. FULL returns "
+                "the complete installed descriptor for audit or client generation. "
+                "Omit for discovery."
+            )
+        ),
+    ] = "SUMMARY",
+    ctx: Context[AppState, Any] | None = None,
+) -> dict[str, Any]:
+    active_runtime = _runtime(ctx)
+    search_arguments = (
+        query,
+        domain,
+        mode,
+        input_kind,
+        artifact_type,
+        limit,
+        cursor,
     )
-    async def capability_describe(
-        capability_id: Annotated[
-            str | None,
-            Field(
-                description=(
-                    "Exact installed ID; cannot be combined with discovery filters."
-                )
-            ),
-        ] = None,
-        query: Annotated[
-            str | None,
-            Field(
-                min_length=1,
-                max_length=512,
-                description=(
-                    "Mathematical outcome to find; no capability ID is required."
-                ),
-            ),
-        ] = None,
-        domain: Annotated[
-            str | None,
-            Field(
-                pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
-                description=(
-                    "Optional domain tag filter, such as universal_algebra, graph, "
-                    "polynomial, or lean."
-                ),
-            ),
-        ] = None,
-        mode: Annotated[
-            CapabilityMode | None,
-            Field(description="Optional EXPLORE or VERIFY capability filter."),
-        ] = None,
-        input_kind: Annotated[
-            CapabilityInputKind | None,
-            Field(description=("Input boundary used to reject incompatible routes.")),
-        ] = None,
-        artifact_type: Annotated[
-            str | None,
-            Field(
-                pattern=r"^artifact://sha256/[0-9a-f]{64}$",
-                description=(
-                    "Exact schema_uri from the stored artifact manifest; requires "
-                    "TYPED_ARTIFACT."
-                ),
-            ),
-        ] = None,
-        limit: Annotated[
-            StrictInt | None,
-            Field(
-                ge=1,
-                le=20,
-                description=(
-                    "Maximum compact discovery matches; defaults to 5. Start with "
-                    "5 and inspect only the strongest one or two candidates."
-                ),
-            ),
-        ] = None,
-        cursor: Annotated[
-            str | None,
-            Field(
-                max_length=128,
-                pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
-                description=(
-                    "Opaque continuation ID from next_cursor. Reuse the same query, "
-                    "domain, mode, input kind, artifact type, and limit."
-                ),
-            ),
-        ] = None,
-        view: Annotated[
-            CapabilityDescriptionView,
-            Field(
-                description=(
-                    "Exact-lookup projection. SUMMARY is the small agent-facing "
-                    "default for judging fit. CONTRACT adds the validation-equivalent "
-                    "input schema, runtime identity, related operations, and validated "
-                    "invocation examples; request it before invoking. FULL returns "
-                    "the complete installed descriptor for audit or client generation. "
-                    "Omit for discovery."
-                )
-            ),
-        ] = "SUMMARY",
-        ctx: Context[AppState, Any] | None = None,
-    ) -> dict[str, Any]:
-        active_runtime = _runtime(ctx)
-        search_arguments = (
-            query,
-            domain,
-            mode,
-            input_kind,
-            artifact_type,
-            limit,
-            cursor,
+    if capability_id is not None and any(
+        argument is not None for argument in search_arguments
+    ):
+        raise AgentRecoveryError(
+            "capability_id is an exact lookup and cannot be combined with query, "
+            "domain, mode, input_kind, artifact_type, limit, or cursor. Use one "
+            "discovery call followed by "
+            "one exact description call."
         )
-        if capability_id is not None and any(
-            argument is not None for argument in search_arguments
-        ):
-            raise AgentRecoveryError(
-                "capability_id is an exact lookup and cannot be combined with query, "
-                "domain, mode, input_kind, artifact_type, limit, or cursor. Use one "
-                "discovery call followed by "
-                "one exact description call."
-            )
-        if capability_id is None:
-            return _capability_discovery_response(
-                active_runtime,
-                query=query,
-                domain=domain,
-                mode=mode,
-                input_kind=input_kind,
-                artifact_type=artifact_type,
-                limit=limit,
-                cursor=cursor,
-            )
-        capability_catalog = active_runtime.core.capabilities.catalog()
-        descriptors = {
-            item.capability_id: item for item in capability_catalog.capabilities
-        }
-        try:
-            descriptor = descriptors[capability_id]
-        except KeyError:
-            hint = (
-                "workspace.* names are direct MCP tools, not capability IDs; call the "
-                "workspace tool directly using its published input schema."
-                if capability_id.startswith("workspace.")
-                else (
-                    "Call capability.describe with a mathematical query to search "
-                    "installed capabilities."
-                )
-            )
-            return {
-                "error": {
-                    "code": "UNKNOWN_CAPABILITY",
-                    "stage": "capability_resolution",
-                    "message": f"Unknown capability: {capability_id}",
-                    "hint": hint,
-                    "available_capability_ids": sorted(descriptors),
-                }
-            }
-        response: dict[str, Any] = {
-            "kind": "capability",
-            "view": view,
-            "policy_profile": capability_catalog.policy_profile,
-            "policy_digest": capability_catalog.policy_digest,
-            "capability": _capability_descriptor_view(descriptor, view=view),
-            "scope_rule": _CAPABILITY_SCOPE_RULE,
-        }
-        if view == "SUMMARY":
-            response["next_views"] = {
-                "CONTRACT": (
-                    "Request before invocation for the validation-equivalent input "
-                    "schema and validated examples."
-                ),
-                "FULL": (
-                    "Request only for complete output schema, provider configuration, "
-                    "licensing, or audit metadata."
-                ),
-            }
-        else:
-            response["invocations"] = [
-                {
-                    "name": example.name,
-                    **(
-                        {
-                            "description": example.description,
-                        }
-                        if view == "FULL"
-                        else {}
-                    ),
-                    "tool": "capability.invoke",
-                    "arguments": {
-                        "capability_id": descriptor.capability_id,
-                        "mode": example.mode.value,
-                        "payload": example.input,
-                    },
-                }
-                for example in descriptor.invocation_examples
-            ]
-            response.update(
-                _capability_inspection_extensions(capability_id, descriptors)
-            )
-        if (
-            view != "SUMMARY"
-            and capability_id == "lean.check"
-            and active_runtime.portfolio.lean_checkers
-        ):
-            response["cache"] = {
-                "key": "exact content-addressed certificate and active checker digest",
-                "max_entries": 128,
-                "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
-                "mathlib_warmup": (
-                    active_runtime.portfolio.lean.mathlib_warmup_health()
-                    if active_runtime.portfolio.lean is not None
-                    else {"status": "UNAVAILABLE", "detail": None}
-                ),
-            }
-        return response
-
-    @server.tool(  # type: ignore[untyped-decorator]
-        name="capability.invoke",
-        title="Execute a mathematical capability",
-        description=CAPABILITY_INVOKE_DESCRIPTION,
-        annotations=_tool_annotations(),
-        structured_output=True,
-    )
-    async def capability_invoke(
-        capability_id: str,
-        payload: dict[str, Any],
-        mode: CapabilityMode = CapabilityMode.EXPLORE,
-        view: CapabilityInvocationView = "STANDARD",
-        ctx: Context[AppState, Any] | None = None,
-    ) -> Annotated[CallToolResult, CapabilityResult]:
-        active_runtime = _runtime(ctx)
-        result = await _invoke_capability_attempt(
+    if capability_id is None:
+        return _capability_discovery_response(
             active_runtime,
-            capability_id=capability_id,
-            payload=payload,
+            query=query,
+            domain=domain,
             mode=mode,
-            ctx=ctx,
+            input_kind=input_kind,
+            artifact_type=artifact_type,
+            limit=limit,
+            cursor=cursor,
         )
-        return _capability_call_tool_result(result, view=view)
-
-    @server.tool(  # type: ignore[untyped-decorator]
-        name="workspace.open",
-        description=(
-            "Direct tool; do not call capability.describe. Create a durable epistemic "
-            "workspace with one canonical problem, a main branch, and an immutable "
-            "initial revision. Workspace content is agent-authored and UNVERIFIED."
-        ),
-        annotations=_tool_annotations(idempotent=True),
-        structured_output=False,
-    )
-    async def workspace_open(
-        idempotency_key: WorkspaceIdempotencyKey,
-        name: Annotated[str, Field(min_length=1, max_length=128)],
-        problem: Annotated[str, Field(min_length=1, max_length=16_384)],
-        tags: Annotated[
-            list[WorkspaceTag] | None,
-            Field(max_length=16),
-        ] = None,
-        ctx: Context[AppState, Any] | None = None,
-    ) -> WorkspaceOpenResult:
-        active_runtime = _runtime(ctx)
-        return await asyncio.to_thread(
-            active_runtime.core.workspaces.open,
-            WorkspaceOpenRequest(
-                idempotency_key=idempotency_key,
-                name=name,
-                problem=problem,
-                tags=tuple(tags or ()),
-            ),
+    capability_catalog = active_runtime.core.capabilities.catalog()
+    descriptors = {item.capability_id: item for item in capability_catalog.capabilities}
+    try:
+        descriptor = descriptors[capability_id]
+    except KeyError:
+        hint = (
+            "workspace.* names are direct MCP tools, not capability IDs; call the "
+            "workspace tool directly using its published input schema."
+            if capability_id.startswith("workspace.")
+            else (
+                "Call capability.describe with a mathematical query to search "
+                "installed capabilities."
+            )
         )
-
-    @server.tool(  # type: ignore[untyped-decorator]
-        name="workspace.write",
-        description=(
-            "Direct tool. Do not call capability.describe. Arguments are flat: send "
-            "base_revision (never revision_id) and top-level findings, attempts, marks, "
-            "scratch, or focus (never a batch wrapper). Every draft uses client_ref, "
-            "never ref. Append at an exact base revision. Finding fields are client_ref, "
-            "kind, title, body; optional links are dependency_refs and assumption_refs "
-            "(never depends_on_refs). Attempt fields are client_ref, target_ref, method, "
-            "outcome, summary. Margin marks append an explicit ACTIVE, CLOSED, "
-            "RETRACTED, SUPERSEDED, or ARCHIVED state; only SUPERSEDED carries "
-            "superseded_by_ref, and summary is accepted as an alias for reason. "
-            "References may use a client_ref from the same batch. OPEN_GOAL normalizes "
-            "to GOAL and SUCCEEDED normalizes to COMPLETED. PROBLEM is reserved for "
-            "workspace.open. A RETRACTED or SUPERSEDED card must receive an ACTIVE mark "
-            "before CLOSED or ARCHIVED. Set focus with active_ref/pinned_refs, clear it "
-            "with clear=true, or omit it; focus references finding cards, never "
-            "attempts, marks, or scratch. Never send verification/assertion/stale "
-            "fields: all workspace assertions remain AGENT_RECORDED and UNVERIFIED. "
-            "Canonical batch example: "
-            'findings=[{"client_ref":"C1","kind":"CLAIM","title":"...","body":"..."}], '
-            'attempts=[{"client_ref":"T1","target_ref":"C1","method":"...",'
-            '"outcome":"COMPLETED","summary":"..."}], '
-            'focus={"active_ref":"C1","pinned_refs":["C1"]}.'
-        ),
-        annotations=_tool_annotations(idempotent=True),
-        structured_output=False,
-    )
-    async def workspace_write(
-        workspace_id: Annotated[
-            WorkspaceId,
-            Field(description="workspace:// handle returned by workspace.open"),
-        ],
-        branch_id: Annotated[
-            WorkspaceBranchId,
-            Field(description="branch:// handle returned by workspace.open"),
-        ],
-        base_revision: Annotated[
-            WorkspaceRevisionId,
-            Field(
-                description=(
-                    "Exact current revision:// head returned by workspace.open, "
-                    "workspace.write, or workspace.query."
-                )
+        return {
+            "error": {
+                "code": "UNKNOWN_CAPABILITY",
+                "stage": "capability_resolution",
+                "message": f"Unknown capability: {capability_id}",
+                "hint": hint,
+                "available_capability_ids": sorted(descriptors),
+            }
+        }
+    response: dict[str, Any] = {
+        "kind": "capability",
+        "view": view,
+        "policy_profile": capability_catalog.policy_profile,
+        "policy_digest": capability_catalog.policy_digest,
+        "capability": _capability_descriptor_view(descriptor, view=view),
+        "scope_rule": _CAPABILITY_SCOPE_RULE,
+    }
+    if view == "SUMMARY":
+        response["next_views"] = {
+            "CONTRACT": (
+                "Request before invocation for the validation-equivalent input "
+                "schema and validated examples."
             ),
-        ],
-        idempotency_key: Annotated[
-            WorkspaceIdempotencyKey,
-            Field(
-                description=(
-                    "Caller-chosen key unique to this exact write payload; reuse only "
-                    "to retry the identical request."
-                )
+            "FULL": (
+                "Request only for complete output schema, provider configuration, "
+                "licensing, or audit metadata."
             ),
-        ],
-        scratch: Annotated[
-            list[WorkspaceScratchDraft] | None,
-            Field(
-                max_length=64,
-                description="Optional unverified scratch entries to append.",
-            ),
-        ] = None,
-        findings: Annotated[
-            list[WorkspaceFindingDraft] | None,
-            Field(
-                max_length=64,
-                description="Optional typed, unverified cards to append.",
-                examples=[
-                    [
-                        {
-                            "client_ref": "C1",
-                            "kind": "CLAIM",
-                            "title": "Candidate conclusion",
-                            "body": "Agent-authored reasoning; still unverified.",
-                        }
-                    ]
-                ],
-            ),
-        ] = None,
-        attempts: Annotated[
-            list[WorkspaceAttemptDraft] | None,
-            Field(
-                max_length=64,
-                description="Optional unverified operational attempts to append.",
-                examples=[
-                    [
-                        {
-                            "client_ref": "T1",
-                            "target_ref": "C1",
-                            "method": "direct",
-                            "outcome": "COMPLETED",
-                            "summary": "The operational attempt finished.",
-                        }
-                    ]
-                ],
-            ),
-        ] = None,
-        marks: Annotated[
-            list[WorkspaceMarkDraft] | None,
-            Field(
-                max_length=64,
-                description=(
-                    "Optional append-only lifecycle marks. CLOSED is workflow state, "
-                    "not proof; RETRACTED and SUPERSEDED deterministically make explicit "
-                    "dependents stale."
+        }
+    else:
+        response["invocations"] = [
+            {
+                "name": example.name,
+                **(
+                    {
+                        "description": example.description,
+                    }
+                    if view == "FULL"
+                    else {}
                 ),
-                examples=[
-                    [
-                        {
-                            "client_ref": "M1",
-                            "target_ref": "C1",
-                            "state": "RETRACTED",
-                            "reason": "The recorded premise was withdrawn.",
-                        }
-                    ]
-                ],
+                "tool": "capability.invoke",
+                "arguments": {
+                    "capability_id": descriptor.capability_id,
+                    "mode": example.mode.value,
+                    "payload": example.input,
+                },
+            }
+            for example in descriptor.invocation_examples
+        ]
+        response.update(_capability_inspection_extensions(capability_id, descriptors))
+    if (
+        view != "SUMMARY"
+        and capability_id == "lean.check"
+        and active_runtime.portfolio.lean_checkers
+    ):
+        response["cache"] = {
+            "key": "exact content-addressed certificate and active checker digest",
+            "max_entries": 128,
+            "warmup_environment_variable": "JACOBIAN_LEAN_WARMUP=1",
+            "mathlib_warmup": (
+                active_runtime.portfolio.lean.mathlib_warmup_health()
+                if active_runtime.portfolio.lean is not None
+                else {"status": "UNAVAILABLE", "detail": None}
             ),
-        ] = None,
-        focus: Annotated[
-            WorkspaceFocusDraft | None,
-            Field(
-                description=(
-                    "Optional explicit focus update: set active_ref/pinned_refs, use "
-                    "clear=true to clear, or omit to preserve current focus."
-                ),
-                examples=[{"active_ref": "C1", "pinned_refs": ["C1"]}],
-            ),
-        ] = None,
-        ctx: Context[AppState, Any] | None = None,
-    ) -> WorkspaceWriteResult:
-        active_runtime = _runtime(ctx)
-        return await asyncio.to_thread(
-            active_runtime.core.workspaces.write,
-            WorkspaceWriteRequest(
-                idempotency_key=idempotency_key,
-                workspace_id=workspace_id,
-                branch_id=branch_id,
-                base_revision=base_revision,
-                scratch=tuple(scratch or ()),
-                findings=tuple(findings or ()),
-                attempts=tuple(attempts or ()),
-                marks=tuple(marks or ()),
-                focus=focus,
-            ),
-        )
+        }
+    return response
 
-    @server.tool(  # type: ignore[untyped-decorator]
-        name="workspace.query",
-        description=(
-            "Direct tool; do not call capability.describe. Read a compact deterministic "
-            "RESUME, FRONTIER, ATTEMPTS, CONTEXT, or STALE view from agent-authored "
-            "workspace state. CONTEXT requires target_card_id and follows only explicit "
-            "dependency/assumption links. Derived staleness is a paper-like warning, "
-            "not a mathematical conclusion. Retrieval preserves UNVERIFIED status."
-        ),
-        annotations=_tool_annotations(read_only=True, idempotent=True),
-        structured_output=False,
+
+async def capability_invoke(
+    capability_id: str,
+    payload: dict[str, Any],
+    mode: CapabilityMode = CapabilityMode.EXPLORE,
+    view: CapabilityInvocationView = "STANDARD",
+    ctx: Context[AppState, Any] | None = None,
+) -> Annotated[CallToolResult, CapabilityResult]:
+    active_runtime = _runtime(ctx)
+    result = await _invoke_capability_attempt(
+        active_runtime,
+        capability_id=capability_id,
+        payload=payload,
+        mode=mode,
+        ctx=ctx,
     )
-    async def workspace_query(
-        workspace_id: WorkspaceId,
-        branch_id: WorkspaceBranchId,
-        revision_id: Annotated[
-            WorkspaceRevisionId | None,
-            Field(
-                description=(
-                    "Optional expected branch head revision:// handle. The query "
-                    "fails if the current head differs; omit to read the latest."
-                )
+    return _capability_call_tool_result(result, view=view)
+
+
+async def workspace_open(
+    idempotency_key: WorkspaceIdempotencyKey,
+    name: Annotated[str, Field(min_length=1, max_length=128)],
+    problem: Annotated[str, Field(min_length=1, max_length=16_384)],
+    tags: Annotated[
+        list[WorkspaceTag] | None,
+        Field(max_length=16),
+    ] = None,
+    ctx: Context[AppState, Any] | None = None,
+) -> WorkspaceOpenResult:
+    active_runtime = _runtime(ctx)
+    return await asyncio.to_thread(
+        active_runtime.core.workspaces.open,
+        WorkspaceOpenRequest(
+            idempotency_key=idempotency_key,
+            name=name,
+            problem=problem,
+            tags=tuple(tags or ()),
+        ),
+    )
+
+
+async def workspace_write(
+    workspace_id: Annotated[
+        WorkspaceId,
+        Field(description="workspace:// handle returned by workspace.open"),
+    ],
+    branch_id: Annotated[
+        WorkspaceBranchId,
+        Field(description="branch:// handle returned by workspace.open"),
+    ],
+    base_revision: Annotated[
+        WorkspaceRevisionId,
+        Field(
+            description=(
+                "Exact current revision:// head returned by workspace.open, "
+                "workspace.write, or workspace.query."
+            )
+        ),
+    ],
+    idempotency_key: Annotated[
+        WorkspaceIdempotencyKey,
+        Field(
+            description=(
+                "Caller-chosen key unique to this exact write payload; reuse only "
+                "to retry the identical request."
+            )
+        ),
+    ],
+    scratch: Annotated[
+        list[WorkspaceScratchDraft] | None,
+        Field(
+            max_length=64,
+            description="Optional unverified scratch entries to append.",
+        ),
+    ] = None,
+    findings: Annotated[
+        list[WorkspaceFindingDraft] | None,
+        Field(
+            max_length=64,
+            description="Optional typed, unverified cards to append.",
+            examples=[
+                [
+                    {
+                        "client_ref": "C1",
+                        "kind": "CLAIM",
+                        "title": "Candidate conclusion",
+                        "body": "Agent-authored reasoning; still unverified.",
+                    }
+                ]
+            ],
+        ),
+    ] = None,
+    attempts: Annotated[
+        list[WorkspaceAttemptDraft] | None,
+        Field(
+            max_length=64,
+            description="Optional unverified operational attempts to append.",
+            examples=[
+                [
+                    {
+                        "client_ref": "T1",
+                        "target_ref": "C1",
+                        "method": "direct",
+                        "outcome": "COMPLETED",
+                        "summary": "The operational attempt finished.",
+                    }
+                ]
+            ],
+        ),
+    ] = None,
+    marks: Annotated[
+        list[WorkspaceMarkDraft] | None,
+        Field(
+            max_length=64,
+            description=(
+                "Optional append-only lifecycle marks. CLOSED is workflow state, "
+                "not proof; RETRACTED and SUPERSEDED deterministically make explicit "
+                "dependents stale."
             ),
-        ] = None,
-        view: WorkspaceQueryView = WorkspaceQueryView.RESUME,
-        target_card_id: WorkspaceCardId | None = None,
-        limit: Annotated[StrictInt, Field(ge=1, le=50)] = 10,
-        ctx: Context[AppState, Any] | None = None,
-    ) -> WorkspaceQueryResult:
-        active_runtime = _runtime(ctx)
-        return await asyncio.to_thread(
-            active_runtime.core.workspaces.query,
-            WorkspaceQueryRequest(
-                workspace_id=workspace_id,
-                branch_id=branch_id,
-                revision_id=revision_id,
-                view=view,
-                target_card_id=target_card_id,
-                limit=limit,
+            examples=[
+                [
+                    {
+                        "client_ref": "M1",
+                        "target_ref": "C1",
+                        "state": "RETRACTED",
+                        "reason": "The recorded premise was withdrawn.",
+                    }
+                ]
+            ],
+        ),
+    ] = None,
+    focus: Annotated[
+        WorkspaceFocusDraft | None,
+        Field(
+            description=(
+                "Optional explicit focus update: set active_ref/pinned_refs, use "
+                "clear=true to clear, or omit to preserve current focus."
             ),
-        )
+            examples=[{"active_ref": "C1", "pinned_refs": ["C1"]}],
+        ),
+    ] = None,
+    ctx: Context[AppState, Any] | None = None,
+) -> WorkspaceWriteResult:
+    active_runtime = _runtime(ctx)
+    return await asyncio.to_thread(
+        active_runtime.core.workspaces.write,
+        WorkspaceWriteRequest(
+            idempotency_key=idempotency_key,
+            workspace_id=workspace_id,
+            branch_id=branch_id,
+            base_revision=base_revision,
+            scratch=tuple(scratch or ()),
+            findings=tuple(findings or ()),
+            attempts=tuple(attempts or ()),
+            marks=tuple(marks or ()),
+            focus=focus,
+        ),
+    )
+
+
+async def workspace_query(
+    workspace_id: WorkspaceId,
+    branch_id: WorkspaceBranchId,
+    revision_id: Annotated[
+        WorkspaceRevisionId | None,
+        Field(
+            description=(
+                "Optional expected branch head revision:// handle. The query "
+                "fails if the current head differs; omit to read the latest."
+            )
+        ),
+    ] = None,
+    view: WorkspaceQueryView = WorkspaceQueryView.RESUME,
+    target_card_id: WorkspaceCardId | None = None,
+    limit: Annotated[StrictInt, Field(ge=1, le=50)] = 10,
+    ctx: Context[AppState, Any] | None = None,
+) -> WorkspaceQueryResult:
+    active_runtime = _runtime(ctx)
+    return await asyncio.to_thread(
+        active_runtime.core.workspaces.query,
+        WorkspaceQueryRequest(
+            workspace_id=workspace_id,
+            branch_id=branch_id,
+            revision_id=revision_id,
+            view=view,
+            target_card_id=target_card_id,
+            limit=limit,
+        ),
+    )
 
 
 def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:

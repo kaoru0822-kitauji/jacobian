@@ -11,7 +11,6 @@ from pydantic import (
     StrictBool,
     StrictInt,
     StringConstraints,
-    field_validator,
     model_validator,
 )
 
@@ -176,7 +175,7 @@ class WorkspaceFindingDraft(ContractModel):
             "Card type. Use GOAL for unfinished work and CLAIM or COUNTEREXAMPLE for "
             "a result. Use FINDING for a generic observation. PROBLEM is reserved for "
             "the canonical card created by workspace.open and is rejected by "
-            "workspace.write. OPEN_GOAL is normalized to GOAL."
+            "workspace.write."
         )
     )
     title: str = Field(
@@ -213,11 +212,6 @@ class WorkspaceFindingDraft(ContractModel):
         max_length=16,
         description="Optional unique, whitespace-free tags.",
     )
-
-    @field_validator("kind", mode="before")
-    @classmethod
-    def normalize_open_goal_alias(cls, value: object) -> object:
-        return WorkspaceFindingKind.GOAL if value == "OPEN_GOAL" else value
 
     @model_validator(mode="after")
     def require_unique_references(self) -> Self:
@@ -257,8 +251,7 @@ class WorkspaceAttemptDraft(ContractModel):
     outcome: WorkspaceAttemptOutcome = Field(
         description=(
             "Operational status: PROPOSED, PROMISING, BLOCKED, FAILED, or COMPLETED. "
-            "SUCCEEDED is normalized to COMPLETED. A finished attempt never means "
-            "VERIFIED."
+            "A finished attempt never means VERIFIED."
         )
     )
     summary: str = Field(
@@ -279,11 +272,6 @@ class WorkspaceAttemptDraft(ContractModel):
         max_length=16,
         description="Optional unique, whitespace-free tags.",
     )
-
-    @field_validator("outcome", mode="before")
-    @classmethod
-    def normalize_succeeded_alias(cls, value: object) -> object:
-        return WorkspaceAttemptOutcome.COMPLETED if value == "SUCCEEDED" else value
 
     @model_validator(mode="after")
     def require_unique_attachments(self) -> Self:
@@ -366,8 +354,7 @@ class WorkspaceMarkDraft(ContractModel):
         min_length=1,
         max_length=2048,
         description=(
-            "Why the margin mark was made. The unambiguous input alias summary "
-            "normalizes to reason. Stored as AGENT_RECORDED and UNVERIFIED."
+            "Why the margin mark was made. Stored as AGENT_RECORDED and UNVERIFIED."
         ),
     )
     superseded_by_ref: WorkspaceReference | None = Field(
@@ -377,17 +364,6 @@ class WorkspaceMarkDraft(ContractModel):
             "when state is SUPERSEDED."
         ),
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_summary_alias(cls, value: object) -> object:
-        if not isinstance(value, dict) or "summary" not in value:
-            return value
-        if "reason" in value:
-            raise ValueError("mark input cannot provide both reason and summary")
-        normalized = dict(value)
-        normalized["reason"] = normalized.pop("summary")
-        return normalized
 
     @model_validator(mode="after")
     def bind_replacement_to_superseded_state(self) -> Self:

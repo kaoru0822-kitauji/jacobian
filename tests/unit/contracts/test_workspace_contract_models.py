@@ -30,11 +30,11 @@ def test_workspace_drafts_do_not_accept_caller_controlled_verification() -> None
         )
 
 
-def test_workspace_drafts_normalize_unambiguous_operational_aliases() -> None:
+def test_workspace_drafts_use_canonical_operational_values() -> None:
     goal = WorkspaceFindingDraft.model_validate(
         {
             "client_ref": "G1",
-            "kind": "OPEN_GOAL",
+            "kind": "GOAL",
             "title": "Finish the proof",
             "body": "This remains agent-authored and unverified.",
         }
@@ -44,7 +44,7 @@ def test_workspace_drafts_normalize_unambiguous_operational_aliases() -> None:
             "client_ref": "T1",
             "target_ref": "G1",
             "method": "direct",
-            "outcome": "SUCCEEDED",
+            "outcome": "COMPLETED",
             "summary": "The operational attempt finished.",
         }
     )
@@ -53,7 +53,7 @@ def test_workspace_drafts_normalize_unambiguous_operational_aliases() -> None:
             "client_ref": "M1",
             "target_ref": "G1",
             "state": "CLOSED",
-            "summary": "The agent explicitly closed this work item.",
+            "reason": "The agent explicitly closed this work item.",
         }
     )
 
@@ -122,7 +122,7 @@ def test_workspace_focus_rejects_attempt_and_scratch_client_refs() -> None:
 def test_workspace_mark_contracts_fail_closed() -> None:
     with pytest.raises(
         ValidationError,
-        match="cannot provide both reason and summary",
+        match="Extra inputs are not permitted",
     ):
         WorkspaceMarkDraft.model_validate(
             {

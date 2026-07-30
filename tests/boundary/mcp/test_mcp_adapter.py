@@ -33,6 +33,9 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
         async with Client(server, raise_exceptions=True) as client:
             assert client.instructions == server.instructions
             assert client.server_info.version == version("jacobian")
+            assert client.server_capabilities.extensions == {
+                "io.jacobian/core": {"version": "1"}
+            }
             listed = await client.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
             assert set(tools) == MCP_TOOL_NAMES
@@ -68,10 +71,6 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 "cursor",
                 "view",
             }
-            assert describe_schema["additionalProperties"] is False
-            assert (
-                tools["capability.invoke"].input_schema["additionalProperties"] is False
-            )
             assert set(tools["capability.invoke"].input_schema["properties"]) == {
                 "capability_id",
                 "payload",
@@ -216,7 +215,7 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
     asyncio.run(scenario())
 
 
-def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
+def test_mcp_workspace_schema_and_fail_closed_round_trip(
     tmp_path: Path,
 ) -> None:
     server = create_server(tmp_path)
@@ -243,7 +242,6 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
             assert "never a batch wrapper" in write_tool.description
             assert "client_ref, never ref" in write_tool.description
             assert "never depends_on_refs" in write_tool.description
-            assert write_schema["additionalProperties"] is False
             write_properties = write_schema["properties"]
             assert write_properties["workspace_id"]["pattern"] == (
                 "^workspace://[0-9a-f]{32}$"
@@ -268,24 +266,25 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
 
             finding_kinds = write_schema["$defs"]["WorkspaceFindingKind"]["enum"]
             attempt_outcomes = write_schema["$defs"]["WorkspaceAttemptOutcome"]["enum"]
-            assert "OPEN_GOAL" in finding_kinds
-            assert "PROBLEM" not in finding_kinds
-            assert "SUCCEEDED" in attempt_outcomes
+            assert "GOAL" in finding_kinds
+            assert "OPEN_GOAL" not in finding_kinds
+            assert "COMPLETED" in attempt_outcomes
+            assert "SUCCEEDED" not in attempt_outcomes
             mark_schema = write_schema["$defs"]["WorkspaceMarkDraft"]
-            assert "summary" in mark_schema["properties"]
-            assert mark_schema["oneOf"]
+            assert "reason" in mark_schema["properties"]
+            assert "summary" not in mark_schema["properties"]
 
-            alias_payload = {
+            canonical_payload = {
                 "workspace_id": "workspace://" + ("0" * 32),
                 "branch_id": "branch://" + ("0" * 32),
                 "base_revision": "revision://" + ("0" * 32),
-                "idempotency_key": "schema-aliases-001",
+                "idempotency_key": "schema-canonical-001",
                 "findings": [
                     {
                         "client_ref": "G1",
-                        "kind": "OPEN_GOAL",
+                        "kind": "GOAL",
                         "title": "Open work",
-                        "body": "A documented finding-kind alias.",
+                        "body": "Canonical unfinished work.",
                     }
                 ],
                 "attempts": [
@@ -293,8 +292,8 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                         "client_ref": "T1",
                         "target_ref": "G1",
                         "method": "direct",
-                        "outcome": "SUCCEEDED",
-                        "summary": "A documented attempt-outcome alias.",
+                        "outcome": "COMPLETED",
+                        "summary": "The operational attempt completed.",
                     }
                 ],
                 "marks": [
@@ -302,42 +301,13 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                         "client_ref": "M1",
                         "target_ref": "G1",
                         "state": "CLOSED",
-                        "summary": "A documented mark-reason alias.",
+                        "reason": "The goal was explicitly closed.",
                     }
                 ],
             }
             write_validator = Draft202012Validator(write_schema)
-            assert write_validator.is_valid(alias_payload), list(
-                write_validator.iter_errors(alias_payload)
-            )
-            assert not write_validator.is_valid(
-                {
-                    **alias_payload,
-                    "marks": [
-                        {
-                            "client_ref": "M1",
-                            "target_ref": "G1",
-                            "state": "CLOSED",
-                            "reason": "Canonical reason.",
-                            "summary": "Conflicting alias.",
-                        }
-                    ],
-                }
-            )
-            assert not write_validator.is_valid(
-                {
-                    **alias_payload,
-                    "findings": [
-                        {
-                            "client_ref": "P2",
-                            "kind": "PROBLEM",
-                            "title": "Hidden second problem",
-                            "body": "Only workspace.open creates the problem.",
-                        }
-                    ],
-                    "attempts": [],
-                    "marks": [],
-                }
+            assert write_validator.is_valid(canonical_payload), list(
+                write_validator.iter_errors(canonical_payload)
             )
 
             misdirected_result = await client.call_tool(
@@ -358,29 +328,6 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
             )
             opened = json.loads(opened_result.content[0].text)
 
-            rejected_result = await client.call_tool(
-                "workspace.write",
-                {
-                    "idempotency_key": "mcp-workspace-unknown-field-001",
-                    "workspace_id": opened["workspace_id"],
-                    "branch_id": opened["branch_id"],
-                    "base_revision": opened["revision_id"],
-                    "cards": [],
-                    "attempts": [
-                        {
-                            "client_ref": "T0",
-                            "target_ref": opened["problem_card_id"],
-                            "method": "must-not-commit",
-                            "outcome": "COMPLETED",
-                            "summary": "Unknown input rejects the entire write.",
-                        }
-                    ],
-                },
-            )
-            assert rejected_result.is_error is True
-            rejected = json.loads(rejected_result.content[0].text)
-            assert rejected["error"]["code"] == "INVALID_INPUT"
-
             second_problem_result = await client.call_tool(
                 "workspace.write",
                 {
@@ -399,8 +346,7 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                 },
             )
             assert second_problem_result.is_error is True
-            second_problem = json.loads(second_problem_result.content[0].text)
-            assert second_problem["error"]["code"] == "INVALID_INPUT"
+            assert '"code": "INVALID_INPUT"' in second_problem_result.content[0].text
 
             unchanged_result = await client.call_tool(
                 "workspace.query",
@@ -431,7 +377,7 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                         },
                         {
                             "client_ref": "G1",
-                            "kind": "OPEN_GOAL",
+                            "kind": "GOAL",
                             "title": "MCP goal",
                             "body": "Close the remaining case.",
                             "assumption_refs": ["A1"],
@@ -442,7 +388,7 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                             "client_ref": "T1",
                             "target_ref": "G1",
                             "method": "direct",
-                            "outcome": "SUCCEEDED",
+                            "outcome": "COMPLETED",
                             "summary": "The operational attempt completed.",
                         }
                     ],
@@ -458,28 +404,6 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                 in written["assurance_notice"]
             )
 
-            conflicting_mark_result = await client.call_tool(
-                "workspace.write",
-                {
-                    "idempotency_key": "mcp-workspace-mark-conflict-001",
-                    "workspace_id": opened["workspace_id"],
-                    "branch_id": opened["branch_id"],
-                    "base_revision": written["revision_id"],
-                    "marks": [
-                        {
-                            "client_ref": "M0",
-                            "target_ref": written["id_map"]["A1"],
-                            "state": "RETRACTED",
-                            "reason": "Canonical reason.",
-                            "summary": "Conflicting alias.",
-                        }
-                    ],
-                },
-            )
-            assert conflicting_mark_result.is_error is True
-            conflicting_mark = json.loads(conflicting_mark_result.content[0].text)
-            assert conflicting_mark["error"]["code"] == "INVALID_INPUT"
-
             mark_result = await client.call_tool(
                 "workspace.write",
                 {
@@ -492,7 +416,7 @@ def test_mcp_workspace_schema_aliases_and_fail_closed_round_trip(
                             "client_ref": "M1",
                             "target_ref": written["id_map"]["A1"],
                             "state": "RETRACTED",
-                            "summary": "The temporary scope was withdrawn.",
+                            "reason": "The temporary scope was withdrawn.",
                         }
                     ],
                 },
