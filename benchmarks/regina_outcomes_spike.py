@@ -11,6 +11,7 @@ import re
 import sys
 import tarfile
 import zipfile
+import zlib
 from collections.abc import Callable, Mapping, Sequence
 from itertools import combinations
 from pathlib import Path
@@ -28,6 +29,7 @@ _SOURCE_MEMBERS = {
 _ENVIRONMENT = {"LANG": "C", "LC_ALL": "C", "TZ": "UTC"}
 _INTEGER = re.compile(r"^(?:0|[1-9][0-9]*)$")
 ProcessRunner = Callable[..., Any]
+_WORKER_ERROR_PREFIX = b"JACOBIAN_SPIKE_ERROR "
 
 
 def _default_runner(*args: object, **kwargs: object) -> Any:
@@ -75,6 +77,82 @@ def _load_pin(path: Path) -> dict[str, Any]:
     if (
         not isinstance(payload, dict)
         or payload.get("contract") != "jacobian.regina-outcomes-spike/v1"
+    ):
+        raise ReginaSpikeError(
+            "ERROR", "INVALID_SPIKE_PIN", "The Regina spike pin is malformed."
+        )
+    required = {
+        "contract",
+        "provider",
+        "distribution_version",
+        "engine_version",
+        "documentation_url",
+        "licensing_url",
+        "adapter_source_sha256",
+        "source",
+        "wheel",
+        "reproduction",
+    }
+    source = payload.get("source")
+    wheel = payload.get("wheel")
+    reproduction = payload.get("reproduction")
+    if (
+        set(payload) != required
+        or any(
+            not isinstance(payload.get(key), str)
+            for key in required - {"source", "wheel", "reproduction"}
+        )
+        or not isinstance(source, dict)
+        or set(source)
+        != {
+            "download_url",
+            "signed_checksums_url",
+            "archive_sha256",
+            "members",
+        }
+        or not all(
+            isinstance(source.get(key), str)
+            for key in ("download_url", "signed_checksums_url", "archive_sha256")
+        )
+        or not isinstance(source.get("members"), dict)
+        or set(source["members"]) != set(_SOURCE_MEMBERS)
+        or not all(
+            isinstance(member, dict)
+            and set(member) == {"path", "sha256"}
+            and all(isinstance(value, str) for value in member.values())
+            for member in source["members"].values()
+        )
+        or not isinstance(wheel, dict)
+        or set(wheel)
+        != {
+            "download_url",
+            "filename",
+            "sha256",
+            "metadata_member",
+            "metadata_sha256",
+            "wheel_member",
+            "wheel_sha256",
+            "license_members",
+        }
+        or not all(
+            isinstance(wheel.get(key), str) for key in set(wheel) - {"license_members"}
+        )
+        or not isinstance(wheel.get("license_members"), list)
+        or not all(isinstance(value, str) for value in wheel["license_members"])
+        or not isinstance(reproduction, dict)
+        or set(reproduction)
+        != {
+            "scope",
+            "cases",
+            "normal_surface_case_id",
+            "expected_provider_output",
+            "expected_mathematical_output_sha256",
+        }
+        or not isinstance(reproduction.get("scope"), str)
+        or not isinstance(reproduction.get("cases"), list)
+        or not isinstance(reproduction.get("normal_surface_case_id"), str)
+        or not isinstance(reproduction.get("expected_provider_output"), dict)
+        or not isinstance(reproduction.get("expected_mathematical_output_sha256"), str)
     ):
         raise ReginaSpikeError(
             "ERROR", "INVALID_SPIKE_PIN", "The Regina spike pin is malformed."
@@ -283,6 +361,23 @@ def _run_checked(
             "ERROR", "PROVIDER_OUTPUT_LIMIT", "The Regina spike exceeded output bounds."
         )
     if completed.returncode != 0:
+        if completed.stderr.startswith(_WORKER_ERROR_PREFIX):
+            try:
+                worker_error = json.loads(
+                    completed.stderr[len(_WORKER_ERROR_PREFIX) :].decode("ascii")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                worker_error = None
+            if (
+                isinstance(worker_error, dict)
+                and set(worker_error) == {"status", "code", "detail"}
+                and all(isinstance(value, str) for value in worker_error.values())
+            ):
+                raise ReginaSpikeError(
+                    worker_error["status"],
+                    worker_error["code"],
+                    worker_error["detail"],
+                )
         raise ReginaSpikeError(
             "ERROR", "PROVIDER_CRASH", "The Regina spike exited unsuccessfully."
         )
@@ -309,6 +404,9 @@ def _parse_provider_output(output: bytes, pin: Mapping[str, Any]) -> dict[str, A
         or runtime.get("engine") != pin["engine_version"]
         or not isinstance(runtime.get("python"), str)
         or not runtime["python"].startswith("3.12.")
+        or runtime.get("wheel_sha256") != pin["wheel"]["sha256"]
+        or type(runtime.get("verified_runtime_files")) is not int
+        or runtime["verified_runtime_files"] < 1
     ):
         raise ReginaSpikeError(
             "REJECTED",
@@ -595,6 +693,8 @@ def run_spike(
                 "--worker",
                 "--pin",
                 str(pin_path.resolve()),
+                "--wheel",
+                wheel_identity["path"],
             ],
             timeout_seconds=timeout_seconds,
         )
@@ -716,7 +816,50 @@ def _gluing_payload(triangulation: Any) -> list[list[dict[str, Any] | None]]:
     return result
 
 
-def _worker(pin_path: Path) -> int:
+def _verify_installed_runtime(wheel_path: Path) -> int:
+    distribution = importlib.metadata.distribution("regina")
+    installed = {
+        str(item).replace("\\", "/"): Path(distribution.locate_file(item))
+        for item in distribution.files or ()
+    }
+    verified = 0
+    try:
+        with zipfile.ZipFile(wheel_path) as archive:
+            for member in archive.namelist():
+                if member.endswith("/") or ".dist-info/" in member:
+                    continue
+                if not member.split("/", 1)[0].startswith("regina"):
+                    continue
+                installed_path = installed.get(member)
+                if installed_path is None or not installed_path.is_file():
+                    raise ReginaSpikeError(
+                        "REJECTED",
+                        "PROVIDER_RUNTIME_MISMATCH",
+                        "The installed Regina runtime is missing a pinned wheel member.",
+                    )
+                if _sha256_file(installed_path) != _sha256_bytes(archive.read(member)):
+                    raise ReginaSpikeError(
+                        "REJECTED",
+                        "PROVIDER_RUNTIME_MISMATCH",
+                        "The installed Regina runtime differs from the pinned wheel.",
+                    )
+                verified += 1
+    except (OSError, RuntimeError, zipfile.BadZipFile, zlib.error) as exc:
+        raise ReginaSpikeError(
+            "REJECTED",
+            "PROVIDER_RUNTIME_MISMATCH",
+            "The installed Regina runtime could not be bound to the pinned wheel.",
+        ) from exc
+    if verified < 1:
+        raise ReginaSpikeError(
+            "REJECTED",
+            "PROVIDER_RUNTIME_MISMATCH",
+            "The pinned wheel contains no Regina runtime files.",
+        )
+    return verified
+
+
+def _worker(pin_path: Path, wheel_path: Path) -> int:
     """Run only inside the explicitly selected Regina interpreter."""
     pin = _load_pin(pin_path)
     cases = _validate_reproduction(pin)
@@ -728,6 +871,7 @@ def _worker(pin_path: Path) -> int:
         ) from exc
     distribution_version = importlib.metadata.version("regina")
     engine_version = regina.versionString()
+    verified_runtime_files = _verify_installed_runtime(wheel_path)
     payload_cases = []
     triangulations: dict[str, Any] = {}
     for case in cases:
@@ -806,6 +950,8 @@ def _worker(pin_path: Path) -> int:
             "distribution": distribution_version,
             "engine": engine_version,
             "python": sys.version.split()[0],
+            "wheel_sha256": _sha256_file(wheel_path),
+            "verified_runtime_files": verified_runtime_files,
         },
     }
     sys.stdout.buffer.write(_canonical_json(payload))
@@ -822,7 +968,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
     if args.worker:
-        return _worker(args.pin)
+        if args.wheel is None:
+            parser.error("--wheel is required in worker mode")
+        try:
+            return _worker(args.pin, args.wheel)
+        except ReginaSpikeError as exc:
+            payload = {
+                "status": exc.status,
+                "code": exc.code,
+                "detail": exc.detail,
+            }
+            sys.stderr.buffer.write(_WORKER_ERROR_PREFIX + _canonical_json(payload))
+            return 64
     if (
         args.python_executable is None
         or args.wheel is None

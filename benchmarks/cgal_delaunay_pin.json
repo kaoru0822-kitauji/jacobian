@@ -1,5 +1,5 @@
 {
-  "adapter_source_sha256": "sha256:7f063945328bf766d981c3a55df07de4adb659d2c86fde9653179c7644112886",
+  "adapter_source_sha256": "sha256:22c836bb7030f8f51fc20ec38b8ea0f8560f7546e703d17655a7f6f0c74c6768",
   "archive_sha256": "sha256:f75d2b2486842fb47222c780c7241c262d392802d0811143c4e9b539972ee55b",
   "contract": "jacobian.cgal-delaunay-spike/v1",
   "download_url": "https://github.com/CGAL/cgal/releases/download/v6.2/CGAL-6.2-library.tar.xz",
@@ -8,7 +8,7 @@
     "open_source_id": "GPL-3.0-or-later",
     "package": "2D Triangulations"
   },
-  "manual_url": "https://doc.cgal.org/latest/Triangulation_2/index.html",
+  "manual_url": "https://doc.cgal.org/6.2/Triangulation_2/index.html",
   "provider": "cgal",
   "reproductions": {
     "cocircular": {

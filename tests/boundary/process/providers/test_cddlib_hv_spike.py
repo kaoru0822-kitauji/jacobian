@@ -35,13 +35,14 @@ def _canonical(payload: object) -> bytes:
 def _result(
     *,
     stdout: bytes = b"",
+    stderr: bytes = b"",
     returncode: int | None = 0,
     timed_out: bool = False,
 ) -> BoundedProcessResult:
     return BoundedProcessResult(
         returncode=returncode,
         stdout=stdout,
-        stderr=b"",
+        stderr=stderr,
         stdout_exceeded=False,
         stderr_exceeded=False,
         timed_out=timed_out,
@@ -293,6 +294,54 @@ def test_independent_replay_rejects_self_consistent_unsound_output(
 
     assert report["status"] == "REJECTED"
     assert report["diagnostic"]["code"] == "INDEPENDENT_REPLAY_MISMATCH"
+
+
+def test_incomplete_pin_is_a_typed_non_conclusion(tmp_path: Path) -> None:
+    python, cdd_source, pycdd_source, adapter, pin_path = _fixture(tmp_path)
+    pin = json.loads(pin_path.read_text(encoding="utf-8"))
+    del pin["sources"]["cddlib"]["identity_members"]
+    pin_path.write_text(json.dumps(pin), encoding="utf-8")
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        cddlib_source_archive=cdd_source,
+        pycddlib_source_archive=pycdd_source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["diagnostic"]["code"] == "INVALID_SPIKE_PIN"
+
+
+def test_worker_import_failure_preserves_unavailable_status(tmp_path: Path) -> None:
+    python, cdd_source, pycdd_source, adapter, pin_path = _fixture(tmp_path)
+    worker_error = _canonical(
+        {
+            "status": "UNAVAILABLE",
+            "code": "PROVIDER_IMPORT_ERROR",
+            "detail": "The pycddlib cdd.gmp module is unavailable.",
+        }
+    )
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        cddlib_source_archive=cdd_source,
+        pycddlib_source_archive=pycdd_source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+        runner=_runner(
+            [
+                _result(
+                    stderr=b"JACOBIAN_SPIKE_ERROR " + worker_error,
+                    returncode=64,
+                )
+            ]
+        ),
+    )
+
+    assert report["status"] == "UNAVAILABLE"
+    assert report["diagnostic"]["code"] == "PROVIDER_IMPORT_ERROR"
     assert report["capability_ids_registered"] == []
 
 

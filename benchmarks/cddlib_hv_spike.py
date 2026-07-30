@@ -24,6 +24,7 @@ _KIND_ORDER = {
     "LINEALITY": 4,
 }
 ProcessRunner = Callable[..., Any]
+_WORKER_ERROR_PREFIX = b"JACOBIAN_SPIKE_ERROR "
 
 
 def _default_runner(*args: object, **kwargs: object) -> Any:
@@ -71,6 +72,106 @@ def _load_pin(path: Path) -> dict[str, Any]:
     if (
         not isinstance(payload, dict)
         or payload.get("contract") != "jacobian.cddlib-hv-spike/v1"
+    ):
+        raise CddlibSpikeError(
+            "ERROR", "INVALID_SPIKE_PIN", "The cddlib spike pin is malformed."
+        )
+    required = {
+        "contract",
+        "provider",
+        "versions",
+        "sources",
+        "reproduction",
+        "adapter_source_sha256",
+    }
+    versions = payload.get("versions")
+    sources = payload.get("sources")
+    reproduction = payload.get("reproduction")
+    scope = reproduction.get("scope") if isinstance(reproduction, dict) else None
+    scope_valid = (
+        isinstance(scope, dict)
+        and set(scope)
+        == {
+            "ambient_dimension",
+            "case_count",
+            "covers",
+            "exact_input",
+            "max_homogeneous_rows_per_case",
+        }
+        and type(scope.get("ambient_dimension")) is int
+        and type(scope.get("case_count")) is int
+        and type(scope.get("max_homogeneous_rows_per_case")) is int
+        and isinstance(scope.get("exact_input"), str)
+        and isinstance(scope.get("covers"), list)
+        and all(isinstance(item, str) for item in scope["covers"])
+    )
+    sources_valid = isinstance(sources, dict) and set(sources) == {
+        "cddlib",
+        "pycddlib",
+    }
+    if sources_valid:
+        for source in sources.values():
+            if (
+                not isinstance(source, dict)
+                or set(source)
+                != {
+                    "download_url",
+                    "archive_sha256",
+                    "tag",
+                    "tag_commit",
+                    "license_id",
+                    "identity_members",
+                }
+                or not all(
+                    isinstance(source.get(key), str)
+                    for key in (
+                        "download_url",
+                        "archive_sha256",
+                        "tag",
+                        "tag_commit",
+                        "license_id",
+                    )
+                )
+                or not isinstance(source.get("identity_members"), dict)
+                or not source["identity_members"]
+            ):
+                sources_valid = False
+                break
+            for member_name, member in source["identity_members"].items():
+                if (
+                    not isinstance(member_name, str)
+                    or not isinstance(member, dict)
+                    or set(member) != {"sha256", "max_bytes", "required_ascii_markers"}
+                    or not isinstance(member.get("sha256"), str)
+                    or type(member.get("max_bytes")) is not int
+                    or not isinstance(member.get("required_ascii_markers"), list)
+                    or not all(
+                        isinstance(marker, str)
+                        for marker in member["required_ascii_markers"]
+                    )
+                ):
+                    sources_valid = False
+                    break
+    if (
+        set(payload) != required
+        or not isinstance(payload.get("provider"), str)
+        or not isinstance(payload.get("adapter_source_sha256"), str)
+        or not isinstance(versions, dict)
+        or set(versions) != {"cddlib", "pycddlib"}
+        or not all(isinstance(value, str) for value in versions.values())
+        or not sources_valid
+        or not isinstance(reproduction, dict)
+        or set(reproduction)
+        != {
+            "scope",
+            "cases",
+            "exact_arithmetic_probe",
+            "expected_mathematical_output_sha256",
+        }
+        or not scope_valid
+        or not isinstance(reproduction.get("cases"), list)
+        or not isinstance(reproduction.get("exact_arithmetic_probe"), str)
+        or not isinstance(reproduction.get("expected_mathematical_output_sha256"), str)
     ):
         raise CddlibSpikeError(
             "ERROR", "INVALID_SPIKE_PIN", "The cddlib spike pin is malformed."
@@ -580,6 +681,23 @@ def _run_checked(
             "The pycddlib spike exceeded output bounds.",
         )
     if completed.returncode != 0:
+        if completed.stderr.startswith(_WORKER_ERROR_PREFIX):
+            try:
+                worker_error = json.loads(
+                    completed.stderr[len(_WORKER_ERROR_PREFIX) :].decode("ascii")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                worker_error = None
+            if (
+                isinstance(worker_error, dict)
+                and set(worker_error) == {"status", "code", "detail"}
+                and all(isinstance(value, str) for value in worker_error.values())
+            ):
+                raise CddlibSpikeError(
+                    worker_error["status"],
+                    worker_error["code"],
+                    worker_error["detail"],
+                )
         raise CddlibSpikeError(
             "ERROR", "PROVIDER_CRASH", "The pycddlib spike exited unsuccessfully."
         )
@@ -899,7 +1017,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args(argv)
     if args.worker:
-        return _worker(args.pin)
+        try:
+            return _worker(args.pin)
+        except CddlibSpikeError as exc:
+            payload = {
+                "status": exc.status,
+                "code": exc.code,
+                "detail": exc.detail,
+            }
+            sys.stderr.buffer.write(_WORKER_ERROR_PREFIX + _canonical_json(payload))
+            return 64
     if (
         args.python_executable is None
         or args.cddlib_source_archive is None

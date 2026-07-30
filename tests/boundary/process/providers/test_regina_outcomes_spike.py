@@ -38,13 +38,14 @@ def _canonical(payload: object) -> bytes:
 def _result(
     *,
     stdout: bytes = b"",
+    stderr: bytes = b"",
     returncode: int | None = 0,
     timed_out: bool = False,
 ) -> BoundedProcessResult:
     return BoundedProcessResult(
         returncode=returncode,
         stdout=stdout,
-        stderr=b"",
+        stderr=stderr,
         stdout_exceeded=False,
         stderr_exceeded=False,
         timed_out=timed_out,
@@ -68,6 +69,7 @@ def _provider_output(
     distribution_version: str = "7.4.1",
     engine_version: str = "7.4",
     python_version: str = "3.12.13",
+    wheel_sha256: str | None = None,
 ) -> bytes:
     payload = {
         **(mathematical or BASE_PIN["reproduction"]["expected_provider_output"]),
@@ -75,6 +77,8 @@ def _provider_output(
             "distribution": distribution_version,
             "engine": engine_version,
             "python": python_version,
+            "wheel_sha256": wheel_sha256 or BASE_PIN["wheel"]["sha256"],
+            "verified_runtime_files": 1,
         },
     }
     return _canonical(payload)
@@ -154,7 +158,9 @@ def test_regina_spike_replays_partial_evidence_and_defers_production(
         source_archive=source,
         adapter_source=adapter,
         pin_path=pin,
-        runner=_runner([_result(stdout=_provider_output())]),
+        runner=_runner(
+            [_result(stdout=_provider_output(wheel_sha256=_sha256(wheel.read_bytes())))]
+        ),
     )
 
     assert report["status"] == "COMPLETED"
@@ -338,10 +344,85 @@ def test_independent_replay_rejects_a_reciprocal_gluing_forgery(
         source_archive=source,
         adapter_source=adapter,
         pin_path=pin_path,
-        runner=_runner([_result(stdout=_provider_output(mathematical))]),
+        runner=_runner(
+            [
+                _result(
+                    stdout=_provider_output(
+                        mathematical,
+                        wheel_sha256=_sha256(wheel.read_bytes()),
+                    )
+                )
+            ]
+        ),
     )
 
     assert report["status"] == "REJECTED"
     assert report["conclusion"] == "NO_CONCLUSION"
     assert report["diagnostic"]["code"] == "INDEPENDENT_REPLAY_MISMATCH"
+
+
+def test_incomplete_pin_is_a_typed_non_conclusion(tmp_path: Path) -> None:
+    python, wheel, source, adapter, pin_path = _fixture(tmp_path)
+    pin = json.loads(pin_path.read_text(encoding="utf-8"))
+    del pin["source"]["members"]
+    pin_path.write_text(json.dumps(pin), encoding="utf-8")
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        wheel=wheel,
+        source_archive=source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["diagnostic"]["code"] == "INVALID_SPIKE_PIN"
+
+
+def test_worker_import_failure_preserves_unavailable_status(tmp_path: Path) -> None:
+    python, wheel, source, adapter, pin_path = _fixture(tmp_path)
+    worker_error = _canonical(
+        {
+            "status": "UNAVAILABLE",
+            "code": "PROVIDER_IMPORT_ERROR",
+            "detail": "Regina is unavailable.",
+        }
+    )
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        wheel=wheel,
+        source_archive=source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+        runner=_runner(
+            [
+                _result(
+                    stderr=b"JACOBIAN_SPIKE_ERROR " + worker_error,
+                    returncode=64,
+                )
+            ]
+        ),
+    )
+
+    assert report["status"] == "UNAVAILABLE"
+    assert report["diagnostic"]["code"] == "PROVIDER_IMPORT_ERROR"
+
+
+def test_runtime_must_bind_to_the_pinned_wheel(tmp_path: Path) -> None:
+    python, wheel, source, adapter, pin_path = _fixture(tmp_path)
+    payload = json.loads(_provider_output())
+    payload["runtime"]["wheel_sha256"] = "sha256:" + "0" * 64
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        wheel=wheel,
+        source_archive=source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+        runner=_runner([_result(stdout=_canonical(payload))]),
+    )
+
+    assert report["status"] == "REJECTED"
+    assert report["diagnostic"]["code"] == "PROVIDER_RUNTIME_MISMATCH"
     assert report["capability_ids_registered"] == []
