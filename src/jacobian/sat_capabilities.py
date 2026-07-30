@@ -21,6 +21,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInputKind,
     CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
@@ -594,6 +595,11 @@ class SatUnsatProofVerificationAdapter:
                 "forbidden-configurations",
                 "certified-exhaustive-search",
             ),
+            accepted_input_kinds=(
+                CapabilityInputKind.STRUCTURED_REQUEST,
+                CapabilityInputKind.TYPED_ARTIFACT,
+            ),
+            accepted_artifact_types=(self.sat.installation.proof_schema_uri,),
         )
 
     @property

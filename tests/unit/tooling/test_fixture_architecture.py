@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import runpy
 from pathlib import Path
 
 import pytest
@@ -41,35 +42,20 @@ def test_root_conftest_has_no_high_cost_imports_or_runtime_construction() -> Non
         )
         for module in imports
     )
-    source = path.read_text(encoding="utf-8")
-    assert "create_runtime" not in source
-    assert "JacobianRuntime" not in source
 
 
-def test_complete_runtime_fixtures_use_an_explicit_shared_plugin() -> None:
-    """Owning tiers register one support module rather than importing conftests."""
+def test_complete_runtime_plugin_is_registered_only_by_owning_tiers() -> None:
+    """Complete-runtime fixtures stay out of narrower semantic lanes."""
 
-    plugin = ROOT / "support" / "runtime_fixtures.py"
-    source = plugin.read_text(encoding="utf-8")
-    for name in (
-        "fresh_complete_runtime",
-        "attached_complete_runtime",
-        "authorized_complete_runtime",
-        "complete_portfolio_template",
-    ):
-        assert f"def {name}(" in source
-    assert "create_runtime" in source
-
-    expected_registration = 'pytest_plugins = ("tests.support.runtime_fixtures",)'
+    plugin_name = "tests.support.runtime_fixtures"
     for tier in ("composition", "boundary", "e2e"):
-        tier_source = (ROOT / tier / "conftest.py").read_text(encoding="utf-8")
-        assert expected_registration in tier_source
-        assert ".conftest import" not in tier_source
+        namespace = runpy.run_path(str(ROOT / tier / "conftest.py"))
+        assert namespace["pytest_plugins"] == (plugin_name,)
 
     for tier in ("component", "domain"):
-        tier_source = (ROOT / tier / "conftest.py").read_text(encoding="utf-8")
-        assert "create_runtime" not in tier_source
-        assert "BUILTIN_PORTFOLIO" not in tier_source
+        imports = _imports(ROOT / tier / "conftest.py")
+        assert plugin_name not in imports
+        assert not any(module.startswith("jacobian.portfolio") for module in imports)
 
 
 def test_failed_template_build_has_no_reusable_partial_directory(

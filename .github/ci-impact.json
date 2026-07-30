@@ -378,6 +378,16 @@
       ]
     },
     {
+      "name": "provider-spike-isolation-support",
+      "patterns": [
+        "tests/support/provider_spike_isolation.py"
+      ],
+      "suites": [
+        "composition",
+        "static"
+      ]
+    },
+    {
       "name": "lean-readiness-test-support",
       "patterns": [
         "tests/support/provider_lean.py"

@@ -18,6 +18,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInputKind,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -139,6 +140,7 @@ class SatLratVerificationAdapter:
             input_schema=model_schema(SatLratVerificationRequest),
             output_schema=model_schema(SatLratVerificationOutput),
             tags=("sat", "cnf", "lrat", "unsat", "certificate", "verification"),
+            accepted_input_kinds=(CapabilityInputKind.STRUCTURED_REQUEST,),
         )
 
     @property

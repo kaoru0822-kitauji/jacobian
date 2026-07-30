@@ -39,6 +39,7 @@ from jacobian.contracts.capabilities import (
     CapabilityCompletenessStatus,
     CapabilityDescriptor,
     CapabilityDiagnostic,
+    CapabilityInputKind,
     CapabilityInvocationExample,
     CapabilityMode,
     CapabilityProviderAvailability,
@@ -567,6 +568,10 @@ class LeanStatementProposalAdapter:
             input_schema=LeanStatementProposalRequest.model_json_schema(),
             output_schema=LeanStatementProposalOutput.model_json_schema(),
             tags=("lean", "statement", "elaboration", "proposal", "proposition"),
+            accepted_input_kinds=(
+                CapabilityInputKind.STRUCTURED_REQUEST,
+                CapabilityInputKind.FORMAL_PROPOSITION,
+            ),
             invocation_examples=(
                 CapabilityInvocationExample(
                     name="elaborate_true",
