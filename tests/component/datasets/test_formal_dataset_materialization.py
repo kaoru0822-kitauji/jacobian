@@ -11,7 +11,6 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.domains.formal_datasets import FORMAL_DATASET_BUNDLE
-from jacobian.formal_datasets import install_formal_dataset_capability
 from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -22,8 +21,16 @@ def _adapter(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
-    adapter, _ = install_formal_dataset_capability(store, schemas, artifacts)
-    return adapter
+    installation = OperationInstaller(store, schemas, artifacts).install(
+        FORMAL_DATASET_BUNDLE
+    )
+    return installation.adapters[0]
+
+
+def _output(result) -> dict[str, object]:
+    output = result.output["result"]
+    assert isinstance(output, dict)
+    return output
 
 
 def _environment() -> dict[str, object]:
@@ -104,15 +111,16 @@ def test_supported_row_materializes_deterministically(
         )
     )
 
+    first_output = _output(first)
     assert first.output == second.output
-    assert first.output["artifact_uri"] == second.output["artifact_uri"]
-    assert first.output["row_digest"].startswith("sha256:")
-    assert first.output["normalized_source_digest"].startswith("sha256:")
-    assert first.output["environment_digest"].startswith("sha256:")
-    assert first.output["execution_status"] == "NOT_EXECUTED"
-    assert first.output["assurance"] == "UNVERIFIED"
+    assert first.output["result_uri"] == second.output["result_uri"]
+    assert str(first_output["row_digest"]).startswith("sha256:")
+    assert str(first_output["normalized_source_digest"]).startswith("sha256:")
+    assert str(first_output["environment_digest"]).startswith("sha256:")
+    assert first_output["execution_status"] == "NOT_EXECUTED"
+    assert first_output["assurance"] == "UNVERIFIED"
     assert first.assurance.level is CapabilityAssuranceLevel.COMPUTED
-    assert first.output["normalized_source"].endswith("\n")
+    assert str(first_output["normalized_source"]).endswith("\n")
 
 
 def test_materialization_preserves_environment_and_preprocessing(
@@ -127,21 +135,22 @@ def test_materialization_preserves_environment_and_preprocessing(
         )
     )
 
-    assert result.output["normalized_source"] == (
+    output = _output(result)
+    assert output["normalized_source"] == (
         "import Mathlib  \ntheorem mathd_algebra_1 : (1 : Nat) = 1 := by  \n  rfl  \n"
     )
-    assert result.output["environment"] == _environment()
-    assert [item["operation"] for item in result.output["preprocessing"]] == [
+    assert output["environment"] == _environment()
+    assert [item["operation"] for item in output["preprocessing"]] == [
         "NORMALIZE_NEWLINES",
         "TRIM_TRAILING_WHITESPACE",
         "ENSURE_FINAL_NEWLINE",
     ]
-    assert [item["applied"] for item in result.output["preprocessing"]] == [
+    assert [item["applied"] for item in output["preprocessing"]] == [
         True,
         False,
         True,
     ]
-    assert [item["code"] for item in result.output["diagnostics"]] == [
+    assert [item["code"] for item in output["diagnostics"]] == [
         "EXECUTION_NOT_REQUESTED"
     ]
 
@@ -164,7 +173,8 @@ def test_incompatible_environment_has_explicit_diagnostics(tmp_path: Path) -> No
         )
     )
 
-    assert {item["code"] for item in result.output["diagnostics"]} == {
+    output = _output(result)
+    assert {item["code"] for item in output["diagnostics"]} == {
         "EXECUTION_NOT_REQUESTED",
         "LEAN_VERSION_NOT_PINNED_RUNTIME",
         "MATHLIB_REVISION_NOT_PINNED_RUNTIME",
@@ -196,10 +206,11 @@ def test_artifact_tampering_is_detected_by_store(tmp_path: Path) -> None:
             input=_proofnet_request(),
         )
     )
-    stored = adapter.store.get(result.output["artifact_uri"])
+    output = _output(result)
+    stored = adapter.resources.artifacts.store.get(result.output["result_uri"])
 
-    assert stored.payload["row_digest"] == result.output["row_digest"]
-    assert stored.payload["environment_digest"] == result.output["environment_digest"]
+    assert stored.payload["row_digest"] == output["row_digest"]
+    assert stored.payload["environment_digest"] == output["environment_digest"]
 
 
 def test_materialization_preserves_split_and_leading_lines(tmp_path: Path) -> None:
@@ -215,11 +226,12 @@ def test_materialization_preserves_split_and_leading_lines(tmp_path: Path) -> No
         )
     )
 
-    assert result.output["split"] == "test"
-    assert result.output["canonical_row"]["split"] == "test"
-    assert result.output["normalized_source"].startswith("\nimport Mathlib\n")
-    stored = adapter.store.get(result.output["artifact_uri"])
-    assert stored.payload["normalized_source"] == result.output["normalized_source"]
+    output = _output(result)
+    assert output["split"] == "test"
+    assert output["canonical_row"]["split"] == "test"
+    assert str(output["normalized_source"]).startswith("\nimport Mathlib\n")
+    stored = adapter.resources.artifacts.store.get(result.output["result_uri"])
+    assert stored.payload["normalized_source"] == output["normalized_source"]
 
 
 def test_materialization_preserves_trailing_spaces_inside_source(
@@ -240,7 +252,7 @@ def test_materialization_preserves_trailing_spaces_inside_source(
         )
     )
 
-    assert "spaces  \\n" in result.output["normalized_source"]
+    assert "spaces  \\n" in str(_output(result)["normalized_source"])
 
 
 def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
@@ -281,6 +293,9 @@ def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
     for field, replacement in (
         ("preprocessing", []),
         ("diagnostics", []),
+        ("dataset_revision", "       "),
+        ("source_url", " "),
+        ("source_url", "https://example.invalid/" + "x" * 2_000),
     ):
         malformed = dict(stored.payload)
         malformed[field] = replacement

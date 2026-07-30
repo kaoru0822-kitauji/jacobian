@@ -128,6 +128,34 @@ def test_request_rejects_non_nfc_or_blank_formal_source() -> None:
         FormalDatasetMaterializeRequest.model_validate(blank)
 
 
+@pytest.mark.parametrize("field", ("name", "goal"))
+def test_minif2f_request_rejects_blank_required_row_metadata(field: str) -> None:
+    payload = _request()
+    assert isinstance(payload["row"], dict)
+    payload["row"][field] = " \n\t"
+
+    with pytest.raises(ValidationError, match=f"{field} must not be blank"):
+        FormalDatasetMaterializeRequest.model_validate(payload)
+
+
+@pytest.mark.parametrize("field", ("name", "split", "informal_statement"))
+def test_proofnet_request_rejects_blank_required_row_metadata(field: str) -> None:
+    payload = _request()
+    payload["sample_id"] = "analysis_1"
+    payload["row"] = {
+        "dataset_id": "PROOFNET",
+        "name": "analysis_1",
+        "split": "test",
+        "formal_statement": "theorem analysis_1 : True := by trivial",
+        "informal_statement": "Immediate.",
+    }
+    assert isinstance(payload["row"], dict)
+    payload["row"][field] = " \n\t"
+
+    with pytest.raises(ValidationError, match=f"{field} must not be blank"):
+        FormalDatasetMaterializeRequest.model_validate(payload)
+
+
 def test_environment_rejects_unicode_equivalent_replay_entries() -> None:
     with pytest.raises(ValidationError, match="NFC-normalized"):
         FormalDatasetEnvironment(
@@ -185,5 +213,5 @@ def test_request_rejects_blank_scalar_provenance(
     assert isinstance(target, dict)
     target[field] = "       "
 
-    with pytest.raises(ValidationError, match=f"{field} must not be blank"):
+    with pytest.raises(ValidationError, match="must not be blank"):
         FormalDatasetMaterializeRequest.model_validate(payload)

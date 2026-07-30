@@ -9,7 +9,7 @@ from typing import Annotated, Literal, Self
 from pydantic import AfterValidator, Field, model_validator
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.common import ArtifactUri, Sha256Digest
+from jacobian.contracts.common import Sha256Digest
 from jacobian.contracts.results import ContractModel
 from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
 
@@ -20,16 +20,48 @@ def _require_nfc(value: str) -> str:
     return value
 
 
+def _require_nonblank_nfc(value: str) -> str:
+    if not value.strip():
+        raise ValueError("value must not be blank")
+    return _require_nfc(value)
+
+
 BoundedFormalString = Annotated[
     str,
     Field(min_length=1, max_length=2_000),
     AfterValidator(_require_nfc),
 ]
 
+DatasetRevision = Annotated[
+    str,
+    Field(min_length=7, max_length=128),
+    AfterValidator(_require_nonblank_nfc),
+]
+DatasetSampleId = Annotated[
+    str,
+    Field(min_length=1, max_length=512),
+    AfterValidator(_require_nonblank_nfc),
+]
+DatasetSourceUrl = Annotated[
+    str,
+    Field(min_length=1, max_length=2_000),
+    AfterValidator(_require_nonblank_nfc),
+]
+
 
 def _validate_row_text(row: MiniF2FRow | ProofNetRow) -> None:
-    if not row.formal_statement.strip():
-        raise ValueError("formal_statement must not be blank")
+    required = {
+        "name": row.name,
+        "split": row.split,
+        "formal_statement": row.formal_statement,
+    }
+    if isinstance(row, MiniF2FRow):
+        required["goal"] = row.goal
+    else:
+        required["informal_statement"] = row.informal_statement
+    for field_name, required_value in required.items():
+        if not required_value.strip():
+            raise ValueError(f"{field_name} must not be blank")
     for value in (
         row.name,
         row.split,
@@ -141,20 +173,15 @@ class FormalPreprocessingDecision(ContractModel):
 
 
 class FormalDatasetMaterializeRequest(ContractModel):
-    dataset_revision: str = Field(min_length=7, max_length=128)
-    sample_id: str = Field(min_length=1, max_length=512)
-    source_url: str = Field(min_length=1, max_length=2_000)
+    dataset_revision: DatasetRevision
+    sample_id: DatasetSampleId
+    source_url: DatasetSourceUrl
     row: FormalDatasetRow
     environment: FormalDatasetEnvironment
     expected_row_digest: Sha256Digest | None = None
 
     @model_validator(mode="after")
     def bind_dataset_identity(self) -> Self:
-        for field_name in ("dataset_revision", "sample_id", "source_url"):
-            value = getattr(self, field_name)
-            if not value.strip():
-                raise ValueError(f"{field_name} must not be blank")
-            _require_nfc(value)
         if self.sample_id != self.row.name:
             raise ValueError("sample_id must equal the dataset row name")
         return self
@@ -173,9 +200,9 @@ class FormalDatasetDiagnostic(ContractModel):
 class FormalDatasetArtifact(ContractModel):
     artifact_version: Literal["1"] = "1"
     dataset_id: Literal["MINIF2F", "PROOFNET"]
-    dataset_revision: str
-    sample_id: str
-    source_url: str
+    dataset_revision: DatasetRevision
+    sample_id: DatasetSampleId
+    source_url: DatasetSourceUrl
     split: str
     canonical_row: FormalDatasetRow
     row_digest: Sha256Digest
@@ -260,10 +287,6 @@ class FormalDatasetArtifact(ContractModel):
         if self.diagnostics != formal_dataset_diagnostics(self.environment):
             raise ValueError("diagnostics must match the declared environment")
         return self
-
-
-class FormalDatasetMaterializeOutput(FormalDatasetArtifact):
-    artifact_uri: ArtifactUri
 
 
 def _json_digest(value: object) -> str:
