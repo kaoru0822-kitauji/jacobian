@@ -25,10 +25,10 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.formal_datasets import (
     FormalDatasetArtifact,
-    FormalDatasetDiagnostic,
     FormalDatasetMaterializeOutput,
     FormalDatasetMaterializeRequest,
     FormalPreprocessingDecision,
+    formal_dataset_diagnostics,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
@@ -39,7 +39,7 @@ from jacobian.operations import (
 from jacobian.provider_runtime import jacobian_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
-from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
+from jacobian_checkers.lean4 import LEAN_VERSION
 
 
 def _json_digest(value: object) -> str:
@@ -54,55 +54,6 @@ def _normalize_text(value: str) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     normalized = "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
     return unicodedata.normalize("NFC", normalized)
-
-
-def _diagnostics(
-    request: FormalDatasetMaterializeRequest,
-) -> tuple[FormalDatasetDiagnostic, ...]:
-    diagnostics = [
-        FormalDatasetDiagnostic(
-            code="EXECUTION_NOT_REQUESTED",
-            message=(
-                "The row was materialized but not executed; submit the normalized "
-                "source to a compatible Lean project or verification capability."
-            ),
-        )
-    ]
-    environment = request.environment
-    if environment.lean_version != LEAN_VERSION:
-        diagnostics.append(
-            FormalDatasetDiagnostic(
-                code="LEAN_VERSION_NOT_PINNED_RUNTIME",
-                message=(
-                    f"The row requires Lean {environment.lean_version}; Jacobian's "
-                    f"pinned runtime is Lean {LEAN_VERSION}."
-                ),
-            )
-        )
-    if (
-        environment.mathlib_revision is not None
-        and environment.mathlib_revision != MATHLIB_COMMIT
-    ):
-        diagnostics.append(
-            FormalDatasetDiagnostic(
-                code="MATHLIB_REVISION_NOT_PINNED_RUNTIME",
-                message=(
-                    "The declared Mathlib revision differs from Jacobian's pinned "
-                    "runtime; execution requires the declared project checkout."
-                ),
-            )
-        )
-    if not environment.project_files:
-        diagnostics.append(
-            FormalDatasetDiagnostic(
-                code="PROJECT_FILES_UNDECLARED",
-                message=(
-                    "No project-file digests were supplied; materialization is "
-                    "deterministic, but project compatibility is not established."
-                ),
-            )
-        )
-    return tuple(diagnostics)
 
 
 def _materialize_payload(
@@ -152,7 +103,7 @@ def _materialize_payload(
                 applied=True,
             ),
         ),
-        diagnostics=_diagnostics(validated),
+        diagnostics=formal_dataset_diagnostics(validated.environment),
     )
 
 

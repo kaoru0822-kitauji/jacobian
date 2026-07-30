@@ -81,9 +81,32 @@ def test_environment_rejects_duplicate_replay_bindings() -> None:
     ),
 )
 def test_environment_rejects_aliased_project_paths(path: str) -> None:
-    with pytest.raises(ValidationError, match="canonical and relative"):
+    with pytest.raises(ValidationError, match="canonical NFC and relative"):
         FormalDatasetEnvironment(
             lean_version="4.31.0",
             project_revision="fixture",
             project_files=({"path": path, "digest": "sha256:" + "a" * 64},),
+        )
+
+
+def test_environment_rejects_non_nfc_and_oversized_items() -> None:
+    with pytest.raises(ValidationError, match="canonical NFC"):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            project_files=(
+                {"path": "Cafe\u0301.lean", "digest": "sha256:" + "a" * 64},
+            ),
+        )
+    with pytest.raises(ValidationError):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            imports=("I" * 2_001,),
+        )
+    with pytest.raises(ValidationError):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            theorem_context=("T" * 2_001,),
         )

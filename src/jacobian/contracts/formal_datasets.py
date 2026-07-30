@@ -11,6 +11,9 @@ from pydantic import Field, model_validator
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
+from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
+
+BoundedFormalString = Annotated[str, Field(min_length=1, max_length=2_000)]
 
 
 class MiniF2FRow(ContractModel):
@@ -51,8 +54,9 @@ class FormalProjectFile(ContractModel):
             or "\\" in self.path
             or "\x00" in self.path
             or any(part in {"", ".", ".."} for part in parts)
+            or self.path != unicodedata.normalize("NFC", self.path)
         ):
-            raise ValueError("project file path must be canonical and relative")
+            raise ValueError("project file path must be canonical NFC and relative")
         return self
 
 
@@ -60,9 +64,9 @@ class FormalDatasetEnvironment(ContractModel):
     lean_version: str = Field(min_length=1, max_length=64)
     project_revision: str = Field(min_length=1, max_length=128)
     mathlib_revision: str | None = Field(default=None, max_length=128)
-    imports: tuple[str, ...] = Field(default=(), max_length=128)
+    imports: tuple[BoundedFormalString, ...] = Field(default=(), max_length=128)
     namespace: str | None = Field(default=None, max_length=512)
-    theorem_context: tuple[str, ...] = Field(default=(), max_length=128)
+    theorem_context: tuple[BoundedFormalString, ...] = Field(default=(), max_length=128)
     project_files: tuple[FormalProjectFile, ...] = Field(default=(), max_length=512)
 
     @model_validator(mode="after")
@@ -182,6 +186,24 @@ class FormalDatasetArtifact(ContractModel):
         )
         if self.informal_proof != expected_proof:
             raise ValueError("informal_proof must bind canonical_row")
+        expected_preprocessing = (
+            FormalPreprocessingDecision(
+                operation="NORMALIZE_NEWLINES",
+                applied=True,
+            ),
+            FormalPreprocessingDecision(
+                operation="TRIM_TRAILING_WHITESPACE",
+                applied=True,
+            ),
+            FormalPreprocessingDecision(
+                operation="ENSURE_FINAL_NEWLINE",
+                applied=True,
+            ),
+        )
+        if self.preprocessing != expected_preprocessing:
+            raise ValueError("preprocessing must describe the canonical pipeline")
+        if self.diagnostics != formal_dataset_diagnostics(self.environment):
+            raise ValueError("diagnostics must match the declared environment")
         return self
 
 
@@ -201,3 +223,51 @@ def _normalize_text(value: str) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     normalized = "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
     return unicodedata.normalize("NFC", normalized)
+
+
+def formal_dataset_diagnostics(
+    environment: FormalDatasetEnvironment,
+) -> tuple[FormalDatasetDiagnostic, ...]:
+    diagnostics = [
+        FormalDatasetDiagnostic(
+            code="EXECUTION_NOT_REQUESTED",
+            message=(
+                "The row was materialized but not executed; submit the normalized "
+                "source to a compatible Lean project or verification capability."
+            ),
+        )
+    ]
+    if environment.lean_version != LEAN_VERSION:
+        diagnostics.append(
+            FormalDatasetDiagnostic(
+                code="LEAN_VERSION_NOT_PINNED_RUNTIME",
+                message=(
+                    f"The row requires Lean {environment.lean_version}; Jacobian's "
+                    f"pinned runtime is Lean {LEAN_VERSION}."
+                ),
+            )
+        )
+    if (
+        environment.mathlib_revision is not None
+        and environment.mathlib_revision != MATHLIB_COMMIT
+    ):
+        diagnostics.append(
+            FormalDatasetDiagnostic(
+                code="MATHLIB_REVISION_NOT_PINNED_RUNTIME",
+                message=(
+                    "The declared Mathlib revision differs from Jacobian's pinned "
+                    "runtime; execution requires the declared project checkout."
+                ),
+            )
+        )
+    if not environment.project_files:
+        diagnostics.append(
+            FormalDatasetDiagnostic(
+                code="PROJECT_FILES_UNDECLARED",
+                message=(
+                    "No project-file digests were supplied; materialization is "
+                    "deterministic, but project compatibility is not established."
+                ),
+            )
+        )
+    return tuple(diagnostics)

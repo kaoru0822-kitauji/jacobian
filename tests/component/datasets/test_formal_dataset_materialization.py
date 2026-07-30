@@ -255,6 +255,21 @@ def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
             payload=tampered,
         )
 
+    for field, replacement in (
+        ("preprocessing", []),
+        ("diagnostics", []),
+    ):
+        malformed = dict(stored.payload)
+        malformed[field] = replacement
+        with pytest.raises(ValueError):
+            artifacts.put(
+                schema_uri=installation.result_schema_uris[
+                    "dataset.formal.materialize"
+                ],
+                semantics_uri=installation.semantics_uri,
+                payload=malformed,
+            )
+
 
 def test_formal_dataset_capability_is_owned_by_domain_bundle() -> None:
     assert FORMAL_DATASET_BUNDLE.domain_id == "formal_datasets"
