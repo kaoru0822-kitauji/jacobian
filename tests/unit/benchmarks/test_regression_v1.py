@@ -54,6 +54,23 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
         assert metadata["upstream"] is None
 
         instruction = (task / "instruction.md").read_text()
+        submission_schema = json.loads(
+            (task / "environment" / "submission_schema.json").read_text()
+        )
+        assert submission_schema["type"] == "object"
+        assert submission_schema["additionalProperties"] is False
+        assert set(submission_schema["required"]) == {
+            "task_id",
+            "conclusion",
+            "result",
+            "claimed_assurance",
+            "scope",
+            "completeness",
+            "evidence",
+            "limitations",
+        }
+        assert "submission_schema.json" in instruction
+        assert "evidence/answer.txt" in instruction
         assert "capability_id" not in instruction
         assert "agent-specific" not in instruction.lower()
         assert "jacobian" not in instruction.lower()

@@ -29,6 +29,7 @@ def ev(s):
         t = (W / p).resolve()
         if (
             p.is_absolute()
+            or p != Path("evidence/answer.txt")
             or ".." in p.parts
             or (W / p).is_symlink()
             or not t.is_relative_to(W.resolve())

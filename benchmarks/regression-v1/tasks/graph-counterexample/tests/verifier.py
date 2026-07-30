@@ -50,7 +50,7 @@ def evidence(s):
         ):
             return False
         p = Path(item["path"])
-        if p.is_absolute() or ".." in p.parts:
+        if p.is_absolute() or p != Path("evidence/answer.txt") or ".." in p.parts:
             return False
         target = (W / p).resolve()
         if (

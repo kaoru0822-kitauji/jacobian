@@ -69,6 +69,7 @@ def main():
             good &= (
                 isinstance(i, dict)
                 and not pth.is_absolute()
+                and pth == Path("evidence/answer.txt")
                 and ".." not in pth.parts
                 and not (W / pth).is_symlink()
                 and t.is_relative_to(W.resolve())
