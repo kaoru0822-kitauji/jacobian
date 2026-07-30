@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -147,7 +147,15 @@ def test_propose_rejects_mathlib_environment(tmp_path: Path) -> None:
 def test_propose_returns_diagnostic_when_lean_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(shutil, "which", lambda _: None)
+    from jacobian_checkers import lean4
+
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (_ for _ in ()).throw(
+            RuntimeError("pinned Lean unavailable")
+        ),
+    )
     propose, _ = _build_adapters(tmp_path)
 
     with pytest.raises(CapabilityInvocationError) as exc_info:
@@ -172,7 +180,7 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     monkeypatch.setattr(
         lean_statements,
         "_elaborate_proposition",
-        lambda _statement: lean_statements._ElaborationResult(
+        lambda _statement, **_kwargs: lean_statements._ElaborationResult(
             elaborates=True,
             sorry_count=0,
             messages=(
@@ -197,7 +205,7 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     monkeypatch.setattr(
         lean_statements,
         "_lean_version_info",
-        lambda: ("4.31.0", "lean-commit"),
+        lambda _executable=None: ("4.31.0", "lean-commit"),
     )
     propose, _ = _build_adapters(tmp_path)
 
@@ -353,7 +361,15 @@ def test_compare_different_statements(tmp_path: Path) -> None:
 def test_compare_works_without_lean_for_syntactic_comparison(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(shutil, "which", lambda _: None)
+    from jacobian_checkers import lean4
+
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (_ for _ in ()).throw(
+            RuntimeError("pinned Lean unavailable")
+        ),
+    )
     _, compare = _build_adapters(tmp_path)
 
     result = compare.invoke(
@@ -372,6 +388,38 @@ def test_compare_works_without_lean_for_syntactic_comparison(
     assert result.output["elaboration_checked"] is False
     assert result.output["both_elaborate"] is False
     assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
+
+
+def test_execution_uses_the_exact_pinned_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian_checkers import lean4
+
+    executable = tmp_path / "pinned-lean"
+    executable.write_bytes(b"fixture")
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (executable, None),
+    )
+    calls: list[list[str]] = []
+
+    def run(args, **_kwargs):
+        calls.append([str(value) for value in args])
+        return subprocess.CompletedProcess(args, 0, stdout="True : Prop\n", stderr="")
+
+    monkeypatch.setattr(lean_statements.subprocess, "run", run)
+    lean_statements._lean_version_info.cache_clear()
+
+    result = lean_statements._elaborate_proposition("True")
+    version, commit = lean_statements._lean_version_info()
+
+    assert result.elaborates is True
+    assert version == "unknown"
+    assert commit == "unknown"
+    assert calls
+    assert all(call[0] == str(executable) for call in calls)
 
 
 def test_compare_normalizes_whitespace(tmp_path: Path) -> None:

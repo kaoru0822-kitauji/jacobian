@@ -6,9 +6,16 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from mcp import Client
 
 from jacobian.adapters.mcp.server import create_server
+from jacobian.contracts.capabilities import (
+    CapabilityInstallTier,
+    CapabilityProviderAvailability,
+    CapabilityProviderRuntime,
+)
+from jacobian.portfolio.provider_resolution import ProviderAvailabilityResolver
 
 SNAPSHOT_PATH = (
     Path(__file__).resolve().parents[2] / "snapshots" / "mcp_agent_surface.sha256"
@@ -101,7 +108,23 @@ async def _capture_surface(state_dir: Path) -> dict[str, Any]:
         }
 
 
-def test_complete_agent_facing_mcp_surface_matches_snapshot(tmp_path: Path) -> None:
+def test_complete_agent_facing_mcp_surface_matches_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unavailable_lean = CapabilityProviderRuntime(
+        provider="jacobian.lean4",
+        availability=CapabilityProviderAvailability.UNAVAILABLE,
+        install_tier=CapabilityInstallTier.T3,
+        license_id="Apache-2.0",
+        platform="fixture",
+        diagnostic="fixture: pinned Lean frontend unavailable",
+    )
+    monkeypatch.setattr(
+        ProviderAvailabilityResolver,
+        "resolve_lean_frontend",
+        lambda _self: unavailable_lean,
+    )
     actual = asyncio.run(_capture_surface(tmp_path))
     canonical = json.dumps(
         actual,

@@ -87,7 +87,12 @@ def test_installed_public_pilot_examples_use_descriptor_mechanism(
         "polynomial.identity.verify",
         "polynomial.map.inverse.candidate_synthesize",
     }
-    assert checked == public_example_capabilities & installed.keys()
+    mandatory_capabilities = public_example_capabilities - {"lean.statement.propose"}
+    assert mandatory_capabilities <= installed.keys()
+    expected = set(mandatory_capabilities)
+    if "lean.statement.propose" in installed:
+        expected.add("lean.statement.propose")
+    assert checked == expected
 
 
 def test_search_pilot_boundaries_use_typed_public_results(

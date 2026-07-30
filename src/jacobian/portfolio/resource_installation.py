@@ -74,12 +74,14 @@ class ResourceCapabilityInstaller:
                 ctx.register_capability(positivity_adapter)
 
         lean_runtime = self.provider_resolver.resolve_lean_frontend()
-        lean_adapters, result.lean_statement = install_lean_statement_capabilities(
+        result.lean_statement_runtime = lean_runtime
+        lean_adapters, lean_statement = install_lean_statement_capabilities(
             ctx.store,
             ctx.schemas,
             ctx.artifacts,
             provider_runtime=lean_runtime,
         )
         if lean_runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+            result.lean_statement = lean_statement
             for lean_adapter in lean_adapters:
                 ctx.register_capability(lean_adapter)
