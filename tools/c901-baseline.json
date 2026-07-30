@@ -38,11 +38,6 @@
       "complexity": 14
     },
     {
-      "path": "src/jacobian/adapters/mcp/context.py",
-      "symbol": "_public_tool_error",
-      "complexity": 11
-    },
-    {
       "path": "src/jacobian/adapters/mcp/remote.py",
       "symbol": "load_static_token_file",
       "complexity": 11
@@ -279,8 +274,8 @@
     },
     {
       "path": "src/jacobian/search/service.py",
-      "symbol": "_restore",
-      "complexity": 21
+      "symbol": "_validate_archive_page",
+      "complexity": 11
     },
     {
       "path": "src/jacobian/shrinking.py",
