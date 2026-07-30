@@ -4,53 +4,14 @@ from pathlib import Path
 
 W = Path("/app")
 E = Path("/tests")
-AUTHORIZED_CHECKER_ID = (
-    "checker://sha256/4f4ab2af490f33c77f9035ef1bef083f145553fb1ab3c578cb5b1dcf2f2f2cc0"
-)
-AUTHORIZED_CHECKER_DIGEST = (
-    "sha256:b9c178342e86f2d533db8336162c063b64034aa99f6e84856058a0d1df4a831f"
-)
-AUTHORIZED_VERIFICATION_RECORD = {
-    "record_schema_version": "1",
-    "checker_id": AUTHORIZED_CHECKER_ID,
-    "checker_digest": AUTHORIZED_CHECKER_DIGEST,
-    "evidence_kind": "WITNESS",
-    "evidence_uri": (
-        "artifact://sha256/"
-        "d98a2a68ff7ef2c48d50eca71a1618a99d8f35005f2ff82c64701a02efe71342"
-    ),
-    "bindings": {
-        "claim_digest": (
-            "sha256:6204650d53228c9801de367990c10bb3541a82ab33cef3f81165d337712b0b7a"
-        ),
-        "semantics_digest": (
-            "sha256:663ed4ee4e97d0474bca04a9ffe71a56fc6569cb92d864ec208256a438e779622"
-        ),
-        "candidate_digest": (
-            "sha256:0067fcba7f58ea779b0d88af49944b41d9127b8ca177d766b2f99962741d55ff"
-        ),
-        "scope_digest": None,
-        "encoding_digest": None,
-    },
-    "conclusion": "TRUE",
-    "arithmetic": "EXACT_INTEGER",
-    "method": "DIRECT_WITNESS",
-    "coverage": "NOT_APPLICABLE",
-    "request_digest": (
-        "sha256:557d49f80ad560c762200f3ad8f2288eb5940ff83130ce6aa640b3601388f94e"
-    ),
-    "environment_digest": (
-        "sha256:a308d74b82cc9e43e018cb17c79180e1da140e3034feb4be03be9a6d9778d7a2"
-    ),
-    "relation_id": None,
-    "relationship_source_artifact_uris": [],
-    "relationship_target_artifact_uris": [],
-    "obligation_uri": None,
-}
 
 
 def _digest(path):
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(65536), b""):
+            digest.update(block)
+    return "sha256:" + digest.hexdigest()
 
 
 def _descriptor_target(descriptor, expected_path):
@@ -145,6 +106,17 @@ def _record_is_bound(submission, input_data, assignment, sat):
         "encoding_digest",
     }:
         return False
+    try:
+        authorized_records = json.loads((E / "authorized_records.json").read_text())
+        assignment_key = ",".join(
+            "1" if assignment[name] else "0" for name in input_data["variables"]
+        )
+        authorized_record = authorized_records[assignment_key]
+    except (KeyError, OSError, TypeError, ValueError):
+        return False
+    if not isinstance(authorized_record, dict):
+        return False
+    environment_digest = verification_record.get("environment_digest")
     return (
         record["task_id"] == input_data["task_id"]
         and record["input_sha256"] == _digest(W / "input.json")
@@ -152,7 +124,14 @@ def _record_is_bound(submission, input_data, assignment, sat):
         and record["status"] == "VERIFIED_SATISFYING"
         and record["assignment"] == assignment
         and record["scope"] == "sat-witness complete finite input"
-        and verification_record == AUTHORIZED_VERIFICATION_RECORD
+        and isinstance(environment_digest, str)
+        and len(environment_digest) == 71
+        and environment_digest.startswith("sha256:")
+        and all(char in "0123456789abcdef" for char in environment_digest[7:])
+        and all(
+            key == "environment_digest" or verification_record[key] == value
+            for key, value in authorized_record.items()
+        )
     )
 
 
@@ -184,6 +163,7 @@ def main():
         and isinstance(s.get("result"), dict)
         and isinstance(s.get("scope"), str)
         and isinstance(s.get("limitations"), list)
+        and isinstance(s.get("claimed_assurance"), str)
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )

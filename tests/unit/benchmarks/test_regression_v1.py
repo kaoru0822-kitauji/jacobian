@@ -24,6 +24,7 @@ VERIFIED_TASKS = {
     "rational-linear-solution",
     "polynomial-normalization",
     "polynomial-map-collision",
+    "sat-witness",
 }
 
 
@@ -79,7 +80,12 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
         if task_name in VERIFIED_TASKS:
             assert "verification_record_uri" in submission_schema["properties"]
             assert submission_schema["then"]["required"] == ["verification_record_uri"]
-            assert (task / "tests" / "authorized_record.json").is_file()
+            record_name = (
+                "authorized_records.json"
+                if task_name == "sat-witness"
+                else "authorized_record.json"
+            )
+            assert (task / "tests" / record_name).is_file()
         assert "submission_schema.json" in instruction
         assert "evidence/answer.txt" in instruction
         assert "capability_id" not in instruction

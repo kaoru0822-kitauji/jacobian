@@ -31,6 +31,7 @@ def contract(s, expected):
         and s["task_id"] == expected["task_id"]
         and s["conclusion"] == expected["conclusion"]
         and isinstance(s["result"], dict)
+        and isinstance(s["claimed_assurance"], str)
         and s["claimed_assurance"] in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
         and isinstance(s["scope"], str)
         and s["completeness"] == "COMPLETE"
@@ -119,13 +120,12 @@ def main():
     s = load_submission()
     expected = json.loads((E / "expected.json").read_text())
     valid = contract(s, expected)
-    correct = bool(
-        valid and s["claimed_assurance"] != "VERIFIED" and graph_ok(s["result"])
-    )
     scope = bool(valid and s["scope"] == " ".join(expected["required_scope_terms"]))
     assurance = bool(valid and s["claimed_assurance"] == expected["maximum_assurance"])
     ev = evidence(s) if valid else False
-    false_cert = bool(valid and s["claimed_assurance"] == "VERIFIED")
+    claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
+    correct = bool(valid and not claimed_verified and graph_ok(s["result"]))
+    false_cert = claimed_verified
     reward = (
         0.0
         if not correct or false_cert

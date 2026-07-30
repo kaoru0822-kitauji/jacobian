@@ -7,6 +7,14 @@ W = Path("/app")
 E = Path("/tests")
 
 
+def _digest(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(65536), b""):
+            digest.update(block)
+    return "sha256:" + digest.hexdigest()
+
+
 def q(v):
     if not isinstance(v, str):
         return None
@@ -22,7 +30,12 @@ def q(v):
 
 def verification_record_is_bound(submission):
     descriptor = submission.get("verification_record_uri")
-    if not isinstance(descriptor, dict) or set(descriptor) != {"path", "sha256"}:
+    if (
+        not isinstance(descriptor, dict)
+        or set(descriptor) != {"path", "sha256"}
+        or not isinstance(descriptor["path"], str)
+        or not isinstance(descriptor["sha256"], str)
+    ):
         return False
     path = Path(descriptor["path"])
     if (
@@ -35,17 +48,29 @@ def verification_record_is_bound(submission):
     target = (W / path).resolve()
     if not target.is_relative_to(W.resolve()) or not target.is_file():
         return False
-    if (
-        descriptor["sha256"]
-        != "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
-    ):
+    if descriptor["sha256"] != _digest(target):
         return False
     try:
-        return json.loads(target.read_text()) == json.loads(
-            (E / "authorized_record.json").read_text()
-        )
+        actual = json.loads(target.read_text())
+        authorized = json.loads((E / "authorized_record.json").read_text())
     except (OSError, ValueError):
         return False
+    if not isinstance(actual, dict) or not isinstance(authorized, dict):
+        return False
+    if set(actual) != set(authorized):
+        return False
+    environment_digest = actual.get("environment_digest")
+    if (
+        not isinstance(environment_digest, str)
+        or len(environment_digest) != 71
+        or not environment_digest.startswith("sha256:")
+        or any(char not in "0123456789abcdef" for char in environment_digest[7:])
+    ):
+        return False
+    return all(
+        key == "environment_digest" or actual[key] == value
+        for key, value in authorized.items()
+    )
 
 
 def main():
@@ -81,6 +106,7 @@ def main():
         and s.get("completeness") == "COMPLETE"
         and isinstance(s.get("scope"), str)
         and isinstance(s.get("limitations"), list)
+        and isinstance(s.get("claimed_assurance"), str)
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
@@ -123,10 +149,7 @@ def main():
                 and t.is_file()
             )
             if good:
-                good &= (
-                    i.get("sha256")
-                    == "sha256:" + hashlib.sha256(t.read_bytes()).hexdigest()
-                )
+                good &= i.get("sha256") == _digest(t)
     scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
     assurance = bool(
         contract

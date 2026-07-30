@@ -81,21 +81,34 @@ def main():
         )
         and type(s["result"].get("maximum_distance_to_set")) is int
     )
+    required = {
+        "task_id",
+        "conclusion",
+        "result",
+        "claimed_assurance",
+        "scope",
+        "completeness",
+        "evidence",
+        "limitations",
+    }
     contract = (
         isinstance(s, dict)
+        and set(s) == required
         and s.get("task_id") == expected["task_id"]
         and s.get("conclusion") == expected["conclusion"]
         and isinstance(s.get("result"), dict)
         and s.get("completeness") == "COMPLETE"
         and isinstance(s.get("scope"), str)
         and isinstance(s.get("limitations"), list)
+        and isinstance(s.get("claimed_assurance"), str)
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
+    claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
     correct = bool(
         contract
         and distances_are_integers
-        and s["claimed_assurance"] != "VERIFIED"
+        and not claimed_verified
         and s["result"] == result
     )
     scope = bool(contract and s["scope"] == " ".join(expected["required_scope_terms"]))
@@ -103,7 +116,7 @@ def main():
         contract and s["claimed_assurance"] == expected["maximum_assurance"]
     )
     evidence = ev(s) if contract else False
-    false = bool(contract and s["claimed_assurance"] == "VERIFIED")
+    false = claimed_verified
     reward = (
         0
         if not correct or false
