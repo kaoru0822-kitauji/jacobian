@@ -50,7 +50,11 @@ from jacobian.evaluation import (
     EvaluationService,
     require_complete_evaluation_batch,
 )
-from jacobian.experiment_runtime import new_experiment_uri, open_experiment_database
+from jacobian.experiment_identity import new_experiment_uri
+from jacobian.persistence.recovery import (
+    put_internal_artifact,
+    quarantine_recovery_snapshot,
+)
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import (
     PluginRegistry,
@@ -126,6 +130,7 @@ class SearchService:
         self._clock = clock
         self._threads: dict[str, threading.Thread] = {}
         self._thread_lock = threading.Lock()
+        self._starts_in_flight = 0
         self._closing = False
         self._closed = False
         self.semantics_uri = store.register_descriptor(
@@ -158,7 +163,7 @@ class SearchService:
             version="1",
             schema=model_schema(EvaluationBatchResult),
         )
-        self._initialize_database()
+        self._recover_interrupted_searches()
 
     def close(self, *, timeout_seconds: float = 30) -> None:
         """Quiesce runtime-owned workers before their shared store is closed."""
@@ -175,7 +180,7 @@ class SearchService:
                 active = tuple(
                     thread for thread in self._threads.values() if thread.is_alive()
                 )
-                if not active:
+                if not active and self._starts_in_flight == 0:
                     self._closed = True
                     self._closing = False
                     return
@@ -184,6 +189,9 @@ class SearchService:
                 raise SearchError(
                     "search workers did not quiesce before runtime shutdown"
                 )
+            if not active:
+                time.sleep(min(remaining, 0.01))
+                continue
             for thread in active:
                 thread.join(timeout=min(remaining, 0.05))
 
@@ -192,11 +200,8 @@ class SearchService:
             if self._closing or self._closed:
                 raise SearchError("search service is closing")
 
-    def _connect(self) -> sqlite3.Connection:
-        return open_experiment_database(self.store.db_path)
-
-    def _initialize_database(self) -> None:
-        """Create metadata tables and isolate recovery one row at a time.
+    def _recover_interrupted_searches(self) -> None:
+        """Isolate interrupted search state one row at a time.
 
         Active runs recover as paused, pending cancellation recovers as
         cancelled, and malformed or index-inconsistent snapshots are
@@ -205,53 +210,7 @@ class SearchService:
         """
 
         archive_recoveries: list[SearchExperimentSnapshot] = []
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS search_experiments (
-                    experiment_uri TEXT PRIMARY KEY,
-                    state TEXT NOT NULL,
-                    snapshot_json BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS search_idempotency (
-                    idempotency_key TEXT PRIMARY KEY,
-                    request_digest TEXT NOT NULL,
-                    experiment_uri TEXT NOT NULL UNIQUE,
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES search_experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS search_events (
-                    experiment_uri TEXT NOT NULL,
-                    sequence INTEGER NOT NULL,
-                    event_json BLOB NOT NULL,
-                    event_digest TEXT NOT NULL UNIQUE,
-                    PRIMARY KEY (experiment_uri, sequence),
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES search_experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TABLE IF NOT EXISTS search_recovery_failures (
-                    experiment_uri TEXT PRIMARY KEY,
-                    detected_at TEXT NOT NULL,
-                    snapshot_digest TEXT NOT NULL,
-                    detail TEXT NOT NULL,
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES search_experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                CREATE TRIGGER IF NOT EXISTS search_events_no_update
-                BEFORE UPDATE ON search_events
-                BEGIN
-                    SELECT RAISE(ABORT, 'search lifecycle events are append-only');
-                END;
-                CREATE TRIGGER IF NOT EXISTS search_events_no_delete
-                BEFORE DELETE ON search_events
-                BEGIN
-                    SELECT RAISE(ABORT, 'search lifecycle events are append-only');
-                END;
-                """
-            )
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """
@@ -337,41 +296,21 @@ class SearchService:
     ) -> None:
         """Isolate one corrupt row without blocking unrelated recovery."""
 
-        experiment_uri = str(row["experiment_uri"])
-        raw = row["snapshot_json"]
-        if isinstance(raw, bytes):
-            raw_bytes = raw
-        elif isinstance(raw, str):
-            raw_bytes = raw.encode("utf-8")
-        else:
-            raw_bytes = repr(raw).encode("utf-8")
-        snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
         detail = (
             "Stored search state is invalid. Restore the Jacobian state directory "
             "from a trusted backup or start a new search."
         )
-        _LOGGER.warning(
-            "quarantining invalid search snapshot for %s",
-            experiment_uri,
-            exc_info=error,
+        snapshot_digest = quarantine_recovery_snapshot(
+            connection,
+            row,
+            error,
+            experiments_table="search_experiments",
+            recovery_table="search_recovery_failures",
+            detail=detail,
+            logger=_LOGGER,
+            logger_message="quarantining invalid search snapshot for %s",
         )
-        detected_at = _now()
-        connection.execute(
-            """
-            UPDATE search_experiments
-            SET state = 'ERROR'
-            WHERE experiment_uri = ?
-            """,
-            (experiment_uri,),
-        )
-        connection.execute(
-            """
-            INSERT OR REPLACE INTO search_recovery_failures (
-                experiment_uri, detected_at, snapshot_digest, detail
-            ) VALUES (?, ?, ?, ?)
-            """,
-            (experiment_uri, detected_at.isoformat(), snapshot_digest, detail),
-        )
+        experiment_uri = str(row["experiment_uri"])
         try:
             self._append_event(
                 connection,
@@ -392,7 +331,7 @@ class SearchService:
         snapshot: SearchExperimentSnapshot,
     ) -> None:
         archive = self._store_archive(snapshot, snapshot.accounting)
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             latest = self._read_snapshot(connection, snapshot.experiment_uri)
             if (
@@ -419,10 +358,25 @@ class SearchService:
     ) -> ExperimentHandle:
         """Commit one idempotent search request and launch it locally."""
 
-        self._require_open()
+        with self._thread_lock:
+            if self._closing or self._closed:
+                raise SearchError("search service is closing")
+            self._starts_in_flight += 1
+        try:
+            return self._start_reserved(request)
+        finally:
+            with self._thread_lock:
+                self._starts_in_flight -= 1
+
+    def _start_reserved(
+        self,
+        request: SearchRunRequest | dict[str, Any],
+    ) -> ExperimentHandle:
+        """Start after reserving the service lifecycle through worker launch."""
+
         selected = SearchRunRequest.model_validate(request)
         request_digest = _digest(selected.model_dump(mode="json"))
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_handle = self._reuse_request(
                 connection,
@@ -498,7 +452,7 @@ class SearchService:
         )
 
         created = False
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing_handle = self._reuse_request(
                 connection,
@@ -552,7 +506,7 @@ class SearchService:
             created = True
 
         if created:
-            self._launch(experiment_uri)
+            self._launch(experiment_uri, lifecycle_reserved=True)
         return ExperimentHandle(
             experiment_uri=experiment_uri,
             state=ExperimentState.PENDING,
@@ -601,13 +555,13 @@ class SearchService:
     def inspect(self, experiment_uri: str) -> SearchExperimentSnapshot:
         """Read the latest durable search snapshot."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             return self._read_snapshot(connection, experiment_uri)
 
     def contains(self, experiment_uri: str) -> bool:
         """Return whether this service owns the experiment identity."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             row = connection.execute(
                 """
                 SELECT 1
@@ -671,7 +625,7 @@ class SearchService:
         """Resume the same invocation from its immutable checkpoint."""
 
         self._require_open()
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             snapshot = self._read_snapshot(connection, experiment_uri)
             if snapshot.state != ExperimentState.PAUSED:
@@ -708,7 +662,7 @@ class SearchService:
     def events(self, experiment_uri: str) -> tuple[SearchLifecycleEvent, ...]:
         """Return the validated append-only lifecycle event chain."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             if (
                 connection.execute(
                     """
@@ -777,9 +731,14 @@ class SearchService:
             workers=requested.workers,
         )
 
-    def _launch(self, experiment_uri: str) -> None:
+    def _launch(
+        self,
+        experiment_uri: str,
+        *,
+        lifecycle_reserved: bool = False,
+    ) -> None:
         with self._thread_lock:
-            if self._closing or self._closed:
+            if self._closed or (self._closing and not lifecycle_reserved):
                 raise SearchError("search service is closing")
             current = self._threads.get(experiment_uri)
             if current is not None and current.is_alive():
@@ -794,6 +753,52 @@ class SearchService:
             )
             self._threads[experiment_uri] = thread
             thread.start()
+
+    def _budget_exhausted(
+        self,
+        experiment_uri: str,
+        accounting: SearchAccounting,
+        budget: SearchBudget,
+        *,
+        wall_time_ms: int,
+    ) -> bool:
+        """Check if the search budget is exhausted, finishing if so.
+
+        Returns True when the search has been finished as TIMEOUT or COMPLETED.
+        The caller should return immediately when this returns True.
+        """
+
+        if wall_time_ms >= budget.wall_seconds * 1000:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.TIMEOUT,
+                stop_reason=SearchStopReason.WALL_TIME_LIMIT,
+                strategy_complete=False,
+                detail="search wall-clock budget exhausted",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        if accounting.iterations >= budget.iterations_max:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.COMPLETED,
+                stop_reason=SearchStopReason.ITERATION_LIMIT,
+                strategy_complete=False,
+                detail="search iteration limit reached",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        if accounting.proposed_candidates >= budget.candidates_max:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.COMPLETED,
+                stop_reason=SearchStopReason.CANDIDATE_LIMIT,
+                strategy_complete=False,
+                detail="search candidate limit reached",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        return False
 
     def _run(self, experiment_uri: str) -> None:
         started = self._clock()
@@ -834,35 +839,12 @@ class SearchService:
             while True:
                 total_wall_ms = _used_wall_ms(accounting, started, self._clock)
                 budget = snapshot.effective_budget
-                if total_wall_ms >= budget.wall_seconds * 1000:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.TIMEOUT,
-                        stop_reason=SearchStopReason.WALL_TIME_LIMIT,
-                        strategy_complete=False,
-                        detail="search wall-clock budget exhausted",
-                        wall_time_ms=total_wall_ms,
-                    )
-                    return
-                if accounting.iterations >= budget.iterations_max:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.COMPLETED,
-                        stop_reason=SearchStopReason.ITERATION_LIMIT,
-                        strategy_complete=False,
-                        detail="search iteration limit reached",
-                        wall_time_ms=total_wall_ms,
-                    )
-                    return
-                if accounting.proposed_candidates >= budget.candidates_max:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.COMPLETED,
-                        stop_reason=SearchStopReason.CANDIDATE_LIMIT,
-                        strategy_complete=False,
-                        detail="search candidate limit reached",
-                        wall_time_ms=total_wall_ms,
-                    )
+                if self._budget_exhausted(
+                    experiment_uri,
+                    accounting,
+                    budget,
+                    wall_time_ms=total_wall_ms,
+                ):
                     return
 
                 remaining_candidates = (
@@ -1490,7 +1472,7 @@ class SearchService:
         self,
         snapshot: SearchExperimentSnapshot,
     ) -> ExperimentState:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, snapshot.experiment_uri)
             if current.state == ExperimentState.PAUSE_REQUESTED:
@@ -1531,7 +1513,7 @@ class SearchService:
         self,
         progress: SearchExperimentSnapshot,
     ) -> ExperimentState:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, progress.experiment_uri)
             if current.state == ExperimentState.PAUSE_REQUESTED:
@@ -1651,7 +1633,7 @@ class SearchService:
             accounting=terminal_accounting,
             detail=detail,
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             latest = self._read_snapshot(connection, experiment_uri)
             if latest.state == ExperimentState.CANCEL_REQUESTED:
@@ -1730,7 +1712,7 @@ class SearchService:
             "search terminal archive persistence failed",
             exc_info=error,
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = self._read_snapshot(connection, experiment_uri)
             if current.state in _TERMINAL_STATES:
@@ -1779,7 +1761,7 @@ class SearchService:
         event_type: str,
         detail: str,
     ) -> ExperimentControlResult:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             snapshot = self._read_snapshot(connection, experiment_uri)
             if snapshot.state in _TERMINAL_STATES:
@@ -1835,7 +1817,7 @@ class SearchService:
         event_type: str,
         payload: dict[str, Any],
     ) -> None:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._append_event(
                 connection,
@@ -1852,15 +1834,12 @@ class SearchService:
         parents: tuple[str, ...] = (),
         summary: str,
     ) -> ArtifactPutResult:
-        normalized = self.schemas.validate(schema_uri, payload)
-        self.store.get_descriptor(
+        return put_internal_artifact(
+            self.store,
+            self.schemas,
             self.semantics_uri,
-            expected_kind="semantics",
-        )
-        return self.store.put(
             schema_uri=schema_uri,
-            semantics_uri=self.semantics_uri,
-            payload=normalized,
+            payload=payload,
             parents=parents,
             summary=summary,
         )

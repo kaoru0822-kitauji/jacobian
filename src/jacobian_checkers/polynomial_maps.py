@@ -227,6 +227,74 @@ def check_collision(request: dict[str, Any]) -> dict[str, Any]:
         return _reject("malformed polynomial-map collision request")
 
 
+def check_collision_refutes_inverse(request: dict[str, Any]) -> dict[str, Any]:
+    """Replay a collision whose exact consequence is no two-sided inverse."""
+
+    try:
+        if request.get("request_version") != "1":
+            return _reject("unsupported request version")
+        claim_artifact = request["claim"]
+        claim = claim_artifact["payload"]
+        candidate_artifact = request["candidate"]
+        if (
+            not isinstance(claim, dict)
+            or set(claim) != {"claim_schema_version", "predicate", "domain", "map_uri"}
+            or claim.get("claim_schema_version") != "1"
+            or claim.get("predicate") != "POLYNOMIAL_MAP_NO_TWO_SIDED_INVERSE"
+            or claim.get("domain") != "QQ"
+            or not isinstance(candidate_artifact, dict)
+            or claim.get("map_uri") != candidate_artifact.get("artifact_uri")
+        ):
+            return _reject("unexpected non-invertibility claim")
+        witness_artifact = request["witness"]
+        witness = witness_artifact["payload"]
+        if (
+            not isinstance(witness, dict)
+            or witness.get("evidence_schema_version") != "1"
+            or witness.get("witness_format")
+            != "polynomial.map_collision_refutes_inverse"
+            or witness.get("format_version") != "1"
+            or witness.get("role") != "SUPPORTS_CLAIM"
+        ):
+            return _reject("unexpected inverse-obstruction witness format or role")
+        if witness.get("bindings") != request.get("expected_bindings"):
+            return _reject("inverse-obstruction witness bindings do not match")
+        dimension, _, coordinates = _parse_map(candidate_artifact["payload"])
+        payload = witness.get("payload")
+        if not isinstance(payload, dict) or set(payload) != {
+            "first_point",
+            "second_point",
+            "image",
+        }:
+            return _reject("inverse-obstruction witness payload is malformed")
+        first = _parse_point(payload["first_point"], dimension)
+        second = _parse_point(payload["second_point"], dimension)
+        declared_image = _parse_point(payload["image"], dimension)
+        if first == second:
+            return _reject("collision points are not distinct")
+        first_image = _evaluate(coordinates, first)
+        second_image = _evaluate(coordinates, second)
+        if first_image != second_image or first_image != declared_image:
+            return _reject("declared collision does not replay exactly")
+        witness_uri = witness_artifact.get("artifact_uri")
+        claim_uri = claim_artifact.get("artifact_uri")
+        if not isinstance(witness_uri, str) or not isinstance(claim_uri, str):
+            return _reject("inverse-obstruction relationship endpoints are unavailable")
+        return {
+            "accepted": True,
+            "conclusion": "TRUE",
+            "arithmetic": "EXACT_RATIONAL",
+            "method": "DIRECT_WITNESS",
+            "coverage": "NOT_APPLICABLE",
+            "detail": ("a collision over QQ rules out a two-sided polynomial inverse"),
+            "relation_id": "polynomial.relation.collision-refutes-two-sided-inverse",
+            "relationship_source_artifact_uris": [witness_uri],
+            "relationship_target_artifact_uris": [claim_uri],
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return _reject("malformed inverse-obstruction witness request")
+
+
 def check_identity(request: dict[str, Any]) -> dict[str, Any]:
     """Independently compare two canonical sparse polynomials over QQ."""
 
@@ -593,6 +661,109 @@ def check_jacobian(request: dict[str, Any]) -> dict[str, Any]:
         }
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return _reject("malformed polynomial Jacobian replay request")
+
+
+def check_keller_condition(request: dict[str, Any]) -> dict[str, Any]:
+    """Replay a Jacobian and decide whether its determinant is nonzero constant."""
+
+    try:
+        if request.get("request_version") != "1":
+            return _reject("unsupported request version")
+        claim_artifact = request["claim"]
+        candidate_artifact = request["candidate"]
+        scope_artifact = request["scope"]
+        certificate = request["certificate"]["payload"]
+        if (
+            not isinstance(claim_artifact, dict)
+            or not isinstance(candidate_artifact, dict)
+            or not isinstance(scope_artifact, dict)
+            or not isinstance(certificate, dict)
+        ):
+            return _reject("Keller-condition replay artifacts are malformed")
+        claim = claim_artifact.get("payload")
+        if (
+            not isinstance(claim, dict)
+            or set(claim)
+            != {
+                "claim_schema_version",
+                "predicate",
+                "domain",
+                "map_uri",
+                "jacobian_uri",
+            }
+            or claim.get("claim_schema_version") != "1"
+            or claim.get("predicate") != "POLYNOMIAL_MAP_KELLER_CONDITION"
+            or claim.get("domain") != "QQ"
+        ):
+            return _reject("unexpected Keller-condition claim")
+        payload = certificate.get("payload")
+        if (
+            certificate.get("evidence_schema_version") != "1"
+            or certificate.get("certificate_type")
+            != "polynomial.map.keller_condition.replay"
+            or certificate.get("format_version") != "1"
+            or certificate.get("bindings") != request.get("expected_bindings")
+            or not isinstance(payload, dict)
+            or set(payload) != {"method", "map_uri", "jacobian_uri"}
+            or payload.get("method") != "DIRECT_SPARSE_KELLER_REPLAY"
+        ):
+            return _reject("unexpected Keller-condition certificate")
+        map_uri = scope_artifact.get("artifact_uri")
+        jacobian_uri = candidate_artifact.get("artifact_uri")
+        if (
+            claim.get("map_uri") != map_uri
+            or claim.get("jacobian_uri") != jacobian_uri
+            or payload.get("map_uri") != map_uri
+            or payload.get("jacobian_uri") != jacobian_uri
+        ):
+            return _reject("Keller-condition artifact identities do not match")
+        dimension, variables, coordinates = _parse_map(scope_artifact.get("payload"))
+        matrix, determinant = _parse_jacobian_candidate(
+            candidate_artifact.get("payload"),
+            dimension=dimension,
+            variables=variables,
+            source_map_uri=map_uri,
+        )
+        expected_matrix = tuple(
+            tuple(
+                _differentiate(_as_polynomial(poly), column)
+                for column in range(dimension)
+            )
+            for poly in coordinates
+        )
+        if matrix != expected_matrix:
+            return _reject("declared Keller Jacobian matrix does not replay exactly")
+        expected_determinant = _determinant(expected_matrix, dimension)
+        if determinant != expected_determinant:
+            return _reject("declared Keller determinant does not replay exactly")
+        nonzero_constant = (
+            len(determinant) == 1
+            and (0,) * dimension in determinant
+            and determinant[(0,) * dimension] != 0
+        )
+        return {
+            "accepted": True,
+            "conclusion": "TRUE" if nonzero_constant else "FALSE",
+            "arithmetic": "EXACT_RATIONAL",
+            "method": "CHECKED_CERTIFICATE",
+            "coverage": "NOT_APPLICABLE",
+            "detail": (
+                "the exact Jacobian determinant is a nonzero constant"
+                if nonzero_constant
+                else "the exact Jacobian determinant is not a nonzero constant"
+            ),
+            **(
+                {
+                    "relation_id": "polynomial.relation.keller-condition",
+                    "relationship_source_artifact_uris": [map_uri],
+                    "relationship_target_artifact_uris": [jacobian_uri],
+                }
+                if nonzero_constant
+                else {}
+            ),
+        }
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return _reject("malformed Keller-condition replay request")
 
 
 def _parse_jacobian_candidate(

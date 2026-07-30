@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sqlite3
 from datetime import datetime
 from typing import Any
 
@@ -14,7 +13,6 @@ from jacobian.contracts.capabilities import (
     CapabilityMode,
 )
 from jacobian.contracts.memory import MemoryHit, MemorySearchResult, ResearchEpisode
-from jacobian.experiment_runtime import open_experiment_database
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore
 
@@ -41,72 +39,10 @@ class ResearchMemory:
                 )
             },
         )
-        self._initialize_database()
+        self._upgrade_legacy_index()
 
-    def _connect(self) -> sqlite3.Connection:
-        return open_experiment_database(self.store.db_path)
-
-    def _initialize_database(self) -> None:
-        with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS research_episodes (
-                    episode_uri TEXT PRIMARY KEY,
-                    capability_id TEXT NOT NULL,
-                    mode TEXT NOT NULL,
-                    assurance_level TEXT NOT NULL,
-                    summary TEXT NOT NULL,
-                    tags_json TEXT NOT NULL,
-                    search_text TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS research_episodes_lookup
-                ON research_episodes(capability_id, assurance_level, created_at)
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS research_episode_tags (
-                    episode_uri TEXT NOT NULL,
-                    tag TEXT NOT NULL,
-                    PRIMARY KEY (episode_uri, tag)
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS research_episode_tags_lookup
-                ON research_episode_tags(tag, episode_uri)
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS research_episode_failures (
-                    episode_uri TEXT NOT NULL,
-                    stage TEXT NOT NULL,
-                    classification TEXT NOT NULL,
-                    PRIMARY KEY (episode_uri, stage, classification)
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS research_episode_failures_lookup
-                ON research_episode_failures(stage, classification, episode_uri)
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS research_episode_index_versions (
-                    episode_uri TEXT PRIMARY KEY,
-                    index_version TEXT NOT NULL
-                )
-                """
-            )
+    def _upgrade_legacy_index(self) -> None:
+        with self.store.connection() as connection:
             existing = connection.execute(
                 """
                 SELECT episode_uri, tags_json
@@ -181,7 +117,7 @@ class ResearchMemory:
                 json.dumps(episode.result, sort_keys=True),
             )
         ).casefold()
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO research_episodes(
@@ -331,7 +267,7 @@ class ResearchMemory:
             clauses.append("created_at <= ?")
             parameters.append(cutoff.isoformat())
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             snapshot_rows = connection.execute(
                 "SELECT episode_uri FROM research_episodes ORDER BY episode_uri"
             ).fetchall()

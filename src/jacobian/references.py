@@ -784,12 +784,22 @@ def reference_catalog(
             "jacobian_schema_uri": polynomial.jacobian_schema_uri,
             "claim_schema_uri": polynomial.claim_schema_uri,
             "jacobian_claim_schema_uri": polynomial.jacobian_claim_schema_uri,
+            "keller_claim_schema_uri": polynomial.keller_claim_schema_uri,
+            "inverse_collision_claim_schema_uri": (
+                polynomial.inverse_collision_claim_schema_uri
+            ),
             "witness_schema_uri": polynomial.witness_schema_uri,
             "certificate_schema_uri": polynomial.certificate_schema_uri,
             "witness_format": "polynomial.map_collision",
             "collision_checker_id": polynomial.collision_checker_id,
             "jacobian_certificate_format": "polynomial.jacobian_replay",
             "jacobian_checker_id": polynomial.jacobian_checker_id,
+            "keller_certificate_format": ("polynomial.map.keller_condition.replay"),
+            "keller_checker_id": polynomial.keller_checker_id,
+            "inverse_collision_witness_format": (
+                "polynomial.map_collision_refutes_inverse"
+            ),
+            "inverse_collision_checker_id": (polynomial.inverse_collision_checker_id),
         }
     if universal_algebra is not None:
         catalog["finite_magmas"] = {

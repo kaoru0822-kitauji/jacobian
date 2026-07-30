@@ -16,7 +16,11 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -897,7 +901,15 @@ def _validate_payload(
     schema: dict[str, object],
     payload: dict[str, object],
 ) -> dict[str, object]:
-    normalized = loads_strict_json(canonicalize_json(payload))
+    try:
+        normalized = loads_strict_json(canonicalize_json(payload))
+    except CanonicalizationError as exc:
+        raise _PayloadValidationError(
+            str(exc),
+            path="$",
+            actual_type=_json_value_type(payload),
+            expected="bounded canonical JSON",
+        ) from exc
     if not isinstance(normalized, dict):
         raise CapabilityError("capability payload must normalize to an object")
     errors = sorted(

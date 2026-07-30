@@ -8,6 +8,7 @@ from typing import Any
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.probability import (
+    ExactComplexRational,
     FiniteConditionalContribution,
     FiniteConditionResult,
     FiniteConvolutionContribution,
@@ -20,6 +21,12 @@ from jacobian.contracts.probability import (
     FinitePushforwardRequest,
     FinitePushforwardResult,
     FiniteRationalDistribution,
+    GaussianMomentContraction,
+    GaussianPolynomialMomentRequest,
+    GaussianPolynomialMomentResult,
+    GraphConnectionProbabilityRequest,
+    GraphConnectionProbabilityResult,
+    GraphReliabilityState,
 )
 from jacobian.contracts.validated_analysis import (
     FiniteRawMomentContribution,
@@ -43,6 +50,29 @@ def _fmpq(value: CanonicalRational) -> Any:
     from flint import fmpq
 
     return fmpq(int(value.num), int(value.den))
+
+
+def _complex_wire(value: tuple[Any, Any]) -> ExactComplexRational:
+    return ExactComplexRational(real=_wire(value[0]), imaginary=_wire(value[1]))
+
+
+def _complex_multiply(
+    left: tuple[Any, Any],
+    right: tuple[Any, Any],
+) -> tuple[Any, Any]:
+    return (
+        left[0] * right[0] - left[1] * right[1],
+        left[0] * right[1] + left[1] * right[0],
+    )
+
+
+def _gaussian_univariate_moment(exponent: int) -> int:
+    if exponent % 2:
+        return 0
+    result = 1
+    for factor in range(1, exponent, 2):
+        result *= factor
+    return result
 
 
 def _distribution(values: dict[Fraction, Any]) -> FiniteRationalDistribution:
@@ -221,6 +251,152 @@ def _convolution(
     )
 
 
+def _gaussian_polynomial_moment(
+    request: GaussianPolynomialMomentRequest,
+) -> ComputedOutcome[GaussianPolynomialMomentResult]:
+    from flint import fmpq
+
+    zero = fmpq(0)
+    one = fmpq(1)
+    dimension = request.polynomial.variable_count
+    base = tuple(
+        (
+            term.exponents,
+            (
+                _fmpq(term.coefficient.real),
+                _fmpq(term.coefficient.imaginary),
+            ),
+        )
+        for term in request.polynomial.terms
+    )
+    expanded: dict[tuple[int, ...], tuple[Any, Any]] = {(0,) * dimension: (one, zero)}
+    for _ in range(request.order):
+        next_expanded: dict[tuple[int, ...], tuple[Any, Any]] = {}
+        for left_exponents, left_coefficient in sorted(expanded.items()):
+            for right_exponents, right_coefficient in base:
+                exponents = tuple(
+                    left + right
+                    for left, right in zip(
+                        left_exponents,
+                        right_exponents,
+                        strict=True,
+                    )
+                )
+                product = _complex_multiply(left_coefficient, right_coefficient)
+                previous = next_expanded.get(exponents, (zero, zero))
+                next_expanded[exponents] = (
+                    previous[0] + product[0],
+                    previous[1] + product[1],
+                )
+        expanded = {
+            exponents: coefficient
+            for exponents, coefficient in next_expanded.items()
+            if coefficient != (zero, zero)
+        }
+
+    contractions: list[GaussianMomentContraction] = []
+    total = (zero, zero)
+    for exponents, coefficient in sorted(expanded.items()):
+        variable_factors = tuple(
+            _gaussian_univariate_moment(exponent) for exponent in exponents
+        )
+        gaussian_factor = 1
+        for factor in variable_factors:
+            gaussian_factor *= factor
+        contribution = (
+            coefficient[0] * gaussian_factor,
+            coefficient[1] * gaussian_factor,
+        )
+        total = (total[0] + contribution[0], total[1] + contribution[1])
+        contractions.append(
+            GaussianMomentContraction(
+                exponents=exponents,
+                expanded_coefficient=_complex_wire(coefficient),
+                variable_moment_factors=tuple(str(value) for value in variable_factors),
+                gaussian_moment_factor=str(gaussian_factor),
+                contribution=_complex_wire(contribution),
+            )
+        )
+
+    return ComputedSuccess(
+        GaussianPolynomialMomentResult(
+            order=request.order,
+            moment=_complex_wire(total),
+            expansion_path_count=len(base) ** request.order,
+            expanded_monomial_count=len(contractions),
+            contractions=tuple(contractions),
+        )
+    )
+
+
+def _terminals_connected(
+    vertices: tuple[str, ...],
+    open_edges: tuple[tuple[str, str], ...],
+    terminals: tuple[str, str],
+) -> bool:
+    adjacency: dict[str, set[str]] = {vertex: set() for vertex in vertices}
+    for left, right in open_edges:
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+    seen = {terminals[0]}
+    pending = [terminals[0]]
+    while pending:
+        vertex = pending.pop()
+        for neighbor in adjacency[vertex] - seen:
+            if neighbor == terminals[1]:
+                return True
+            seen.add(neighbor)
+            pending.append(neighbor)
+    return terminals[1] in seen
+
+
+def _graph_connection_probability(
+    request: GraphConnectionProbabilityRequest,
+) -> ComputedOutcome[GraphConnectionProbabilityResult]:
+    from flint import fmpq
+
+    probabilities = tuple(
+        _fmpq(item.open_probability) for item in request.edge_probabilities
+    )
+    states: list[GraphReliabilityState] = []
+    connection_probability = fmpq(0)
+    for state_index in range(1 << len(request.graph.edges)):
+        open_edges = tuple(
+            edge
+            for index, edge in enumerate(request.graph.edges)
+            if state_index & (1 << index)
+        )
+        state_probability = fmpq(1)
+        for index, probability in enumerate(probabilities):
+            state_probability *= (
+                probability if state_index & (1 << index) else 1 - probability
+            )
+        connected = _terminals_connected(
+            request.graph.vertices,
+            open_edges,
+            request.terminals,
+        )
+        if connected:
+            connection_probability += state_probability
+        states.append(
+            GraphReliabilityState(
+                state_index=state_index,
+                open_edges=open_edges,
+                terminals_connected=connected,
+                state_probability=_wire(state_probability),
+            )
+        )
+    return ComputedSuccess(
+        GraphConnectionProbabilityResult(
+            terminals=request.terminals,
+            connection_probability=_wire(connection_probability),
+            edge_count=len(request.graph.edges),
+            visited_states=len(states),
+            states=tuple(states),
+        )
+    )
+
+
 _FAIR_BIT = {
     "atoms": [
         {
@@ -361,6 +537,110 @@ FINITE_PROBABILITY_CAPABILITIES = (
                 "two_fair_bits",
                 "Compute the exact distribution of the sum of two fair bits.",
                 {"left": _FAIR_BIT, "right": _FAIR_BIT},
+            ),
+        ),
+    ),
+    ComputedOperation(
+        capability_id="probability.gaussian_polynomial.moment.compute",
+        title="Exact bounded Gaussian polynomial moment",
+        description=(
+            "Compute one fixed-order exact moment of a bounded sparse complex-"
+            "rational polynomial in independent standard real Gaussian variables, "
+            "preserving the complete coefficient-contraction ledger. This does not "
+            "establish an identity for every order."
+        ),
+        request_model=GaussianPolynomialMomentRequest,
+        result_model=GaussianPolynomialMomentResult,
+        implementation=_gaussian_polynomial_moment,
+        relation_id="probability.gaussian_polynomial.moment.relation",
+        tags=(
+            "probability",
+            "Gaussian",
+            "polynomial",
+            "moment",
+            "Wick",
+            "Isserlis",
+            "exact",
+            "bounded",
+            "python-flint",
+        ),
+        invocation_examples=(
+            example(
+                "sum_of_two_gaussians_second_moment",
+                "Compute E[(X_1 + X_2)^2] for independent standard real Gaussians.",
+                {
+                    "polynomial": {
+                        "variable_count": 2,
+                        "terms": [
+                            {
+                                "coefficient": {
+                                    "real": {"num": "1", "den": "1"},
+                                    "imaginary": {"num": "0", "den": "1"},
+                                },
+                                "exponents": [0, 1],
+                            },
+                            {
+                                "coefficient": {
+                                    "real": {"num": "1", "den": "1"},
+                                    "imaginary": {"num": "0", "den": "1"},
+                                },
+                                "exponents": [1, 0],
+                            },
+                        ],
+                    },
+                    "order": 2,
+                },
+            ),
+        ),
+    ),
+    ComputedOperation(
+        capability_id="probability.graph_reliability.connection_probability.compute",
+        title="Exact small-graph terminal connection probability",
+        description=(
+            "Compute the exact probability that two explicit terminals are "
+            "connected in one bounded undirected graph with independent rational "
+            "edge-open probabilities, preserving the complete edge-subset ledger."
+        ),
+        request_model=GraphConnectionProbabilityRequest,
+        result_model=GraphConnectionProbabilityResult,
+        implementation=_graph_connection_probability,
+        relation_id="probability.graph_reliability.connection_probability.relation",
+        tags=(
+            "probability",
+            "graph",
+            "reliability",
+            "percolation",
+            "connection",
+            "terminals",
+            "exact",
+            "bounded",
+            "python-flint",
+        ),
+        invocation_examples=(
+            example(
+                "triangle_terminal_reliability",
+                "Compute the exact terminal connection probability in a fair-edge triangle.",
+                {
+                    "graph": {
+                        "vertices": ["a", "b", "c"],
+                        "edges": [["a", "b"], ["a", "c"], ["b", "c"]],
+                    },
+                    "edge_probabilities": [
+                        {
+                            "edge": ["a", "b"],
+                            "open_probability": {"num": "1", "den": "2"},
+                        },
+                        {
+                            "edge": ["a", "c"],
+                            "open_probability": {"num": "1", "den": "2"},
+                        },
+                        {
+                            "edge": ["b", "c"],
+                            "open_probability": {"num": "1", "den": "2"},
+                        },
+                    ],
+                    "terminals": ["a", "c"],
+                },
             ),
         ),
     ),

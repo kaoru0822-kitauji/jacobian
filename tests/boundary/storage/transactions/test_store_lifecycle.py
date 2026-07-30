@@ -240,19 +240,12 @@ def test_reopened_store_after_close_is_usable(tmp_path: Path) -> None:
 
 def test_failed_bootstrap_does_not_leave_recovery_marker(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # A store whose constructor fails partway through initialization must not
     # leave a transaction-recovery marker that would force a rescan on reopen.
-    original_initialize = ArtifactStore._initialize_database
+    (tmp_path / "metadata.sqlite3").mkdir()
 
-    def failing_initialize(self: ArtifactStore) -> None:
-        original_initialize(self)
-        raise RuntimeError("bootstrap failure")
-
-    monkeypatch.setattr(ArtifactStore, "_initialize_database", failing_initialize)
-
-    with pytest.raises(RuntimeError, match="bootstrap failure"):
+    with pytest.raises(StoreError, match="schema migration failed"):
         ArtifactStore(tmp_path)
 
     assert not (tmp_path / ".transaction-recovery").exists()

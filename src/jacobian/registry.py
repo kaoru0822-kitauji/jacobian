@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import sqlite3
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
-from typing import BinaryIO
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.capabilities import (
@@ -23,6 +20,7 @@ from jacobian.contracts.checkers import (
     EvidenceKind,
 )
 from jacobian.implementation import ImplementationError, package_source_digest
+from jacobian.persistence import PersistenceLock
 from jacobian.provider_runtime import (
     ProviderRuntimeError,
     require_provider_runtime_unchanged,
@@ -89,19 +87,15 @@ def _require_runtime_unchanged(runtime: CapabilityProviderRuntime | None) -> Non
 class CheckerRegistry:
     """Persist operator authorization, compatibility, audit, and revocation."""
 
-    def __init__(self, database: str | Path | ArtifactStore) -> None:
-        if isinstance(database, ArtifactStore):
-            self._store: ArtifactStore | None = database
-            self.database_path = database.db_path
-        else:
-            self._store = None
-            self.database_path = Path(database)
+    def __init__(self, store: ArtifactStore) -> None:
+        self.store = store
+        self.database_path = store.db_path
         self.policy_lock_path = self.database_path.with_name(
             self.database_path.name + ".checker-policy.lock"
         )
+        self._policy_lock = PersistenceLock(self.policy_lock_path)
         self._policy_lock_state = _PolicyLockState()
         self.bind_existing_when_omitted = False
-        self._initialize_database()
 
     @contextmanager
     def policy_transaction(self) -> Iterator[None]:
@@ -119,15 +113,12 @@ class CheckerRegistry:
                 "checker policy must be locked before the store transaction"
             )
 
-        self.policy_lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.policy_lock_path.open("a+b") as lock_file:
-            _lock_file(lock_file)
+        with self._policy_lock.hold():
             self._policy_lock_state.depth = 1
             try:
                 yield
             finally:
                 self._policy_lock_state.depth = 0
-                _unlock_file(lock_file)
 
     @contextmanager
     def _policy_write_lock(self) -> Iterator[None]:
@@ -156,43 +147,8 @@ class CheckerRegistry:
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
-        if self._store is not None:
-            with self._store.connection() as connection:
-                yield connection
-            return
-
-        connection = sqlite3.connect(self.database_path, timeout=30)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
-
-    def _initialize_database(self) -> None:
-        with self._connection() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS checkers (
-                    checker_id TEXT PRIMARY KEY,
-                    registration_json BLOB NOT NULL,
-                    authorized INTEGER NOT NULL CHECK (authorized IN (0, 1)),
-                    executable_digest TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS checker_audit (
-                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-                    checker_id TEXT NOT NULL,
-                    action TEXT NOT NULL
-                        CHECK (action IN ('AUTHORIZED', 'REVOKED')),
-                    reason TEXT NOT NULL,
-                    recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (checker_id)
-                        REFERENCES checkers(checker_id)
-                        ON DELETE RESTRICT
-                );
-                """
-            )
+        with self.store.connection() as connection:
+            yield connection
 
     def authorize(
         self,
@@ -629,42 +585,3 @@ def _compatibility_scope_error(
             "Supply both or omit both, then retry."
         )
     return None
-
-
-def _lock_file(lock_file: BinaryIO) -> None:
-    if os.name == "nt":  # pragma: no cover - exercised in Windows CI
-        import msvcrt
-
-        lock_file.seek(0)
-        if not lock_file.read(1):
-            lock_file.seek(0)
-            lock_file.write(b"\0")
-            lock_file.flush()
-        lock_file.seek(0)
-        locking = getattr(msvcrt, "locking")  # noqa: B009
-        locking(
-            lock_file.fileno(),
-            getattr(msvcrt, "LK_LOCK"),  # noqa: B009
-            1,
-        )
-    else:
-        import fcntl
-
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-
-
-def _unlock_file(lock_file: BinaryIO) -> None:
-    if os.name == "nt":  # pragma: no cover - exercised in Windows CI
-        import msvcrt
-
-        lock_file.seek(0)
-        locking = getattr(msvcrt, "locking")  # noqa: B009
-        locking(
-            lock_file.fileno(),
-            getattr(msvcrt, "LK_UNLCK"),  # noqa: B009
-            1,
-        )
-    else:
-        import fcntl
-
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)

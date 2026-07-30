@@ -25,9 +25,9 @@ The exact-kernel reproduction passes; a production capability remains
   own triangulation.
 
 The [official 6.2 release](https://www.cgal.org/2026/06/11/cgal62/),
-[2D Triangulations manual](https://doc.cgal.org/latest/Triangulation_2/index.html),
-[kernel manual](https://doc.cgal.org/latest/Kernel_23/index.html), and
-[package license inventory](https://doc.cgal.org/latest/Manual/packages.html)
+[2D Triangulations manual](https://doc.cgal.org/6.2/Triangulation_2/index.html),
+[kernel manual](https://doc.cgal.org/6.2/Kernel_23/index.html), and
+[package license inventory](https://doc.cgal.org/6.2/Manual/packages.html)
 define the upstream boundary. The frozen source, adapter, commands, and outputs
 are in
 [`benchmarks/cgal_delaunay_pin.json`](../../benchmarks/cgal_delaunay_pin.json).

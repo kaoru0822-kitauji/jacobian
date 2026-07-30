@@ -37,11 +37,17 @@ from jacobian.contracts.results import (
     ExecutionStatus,
     Verification,
 )
+from jacobian.domains.certified_snf.checkers import (
+    CERTIFIED_SNF_EXACT_REPLAY_CHECKERS,
+)
 from jacobian.domains.combinatorics.checkers import (
     COMBINATORICS_EXACT_REPLAY_CHECKERS,
 )
 from jacobian.domains.graph_optimization.checkers import (
     GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS,
+)
+from jacobian.domains.graph_symmetry.checkers import (
+    GRAPH_SYMMETRY_EXACT_REPLAY_CHECKERS,
 )
 from jacobian.domains.matrix_lattice.checkers import MATRIX_EXACT_REPLAY_CHECKERS
 from jacobian.domains.number_theory.checkers import (
@@ -56,6 +62,7 @@ from jacobian.domains.projective_geometry.checkers import (
 from jacobian.domains.topology.checkers import TOPOLOGY_EXACT_REPLAY_CHECKERS
 from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.provider_runtime import (
+    certified_snf_checker_provider_runtime,
     combinatorics_exact_checker_provider_runtime,
     exact_domain_checker_provider_runtime,
     graded_syzygy_checker_provider_runtime,
@@ -107,6 +114,8 @@ def _provider_runtime_key(declaration: ExactReplayCheckerDeclaration) -> str:
         return "projective-arrangement"
     if declaration.entrypoint_module == "jacobian_checkers.simplicial_topology":
         return "topology"
+    if declaration.entrypoint_module == "jacobian_checkers.certified_snf":
+        return "certified-snf"
     if declaration.entrypoint_module == "jacobian_checkers.finite_posets":
         return "poset"
     raise ValueError(
@@ -119,8 +128,10 @@ def install_exact_domain_checkers(
     *,
     polynomial: InstalledDomainBundle | None = None,
     matrix: InstalledDomainBundle | None = None,
+    certified_snf: InstalledDomainBundle | None = None,
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
+    graph_symmetry: InstalledDomainBundle | None = None,
     combinatorics: InstalledDomainBundle | None = None,
     number_theory: InstalledDomainBundle | None = None,
     probability: InstalledDomainBundle | None = None,
@@ -134,6 +145,7 @@ def install_exact_domain_checkers(
     installer = CheckerInstaller(checkers)
     provider_runtimes = {
         "python-flint": exact_domain_checker_provider_runtime(),
+        "certified-snf": certified_snf_checker_provider_runtime(),
         "finite-graph": graph_exact_checker_provider_runtime(),
         "finite-probability": probability_exact_checker_provider_runtime(),
         "combinatorics": combinatorics_exact_checker_provider_runtime(),
@@ -155,9 +167,15 @@ def install_exact_domain_checkers(
             for item in MATRIX_EXACT_REPLAY_CHECKERS
             if matrix is not None
         ),
+        *(
+            (certified_snf, item)
+            for item in CERTIFIED_SNF_EXACT_REPLAY_CHECKERS
+            if certified_snf is not None
+        ),
         *_available_graph_declaration_bundles(
             graph=graph,
             graph_invariants=graph_invariants,
+            graph_symmetry=graph_symmetry,
         ),
         *(
             (combinatorics, item)
@@ -225,6 +243,9 @@ def install_exact_domain_checkers(
             "python-flint": exact_domain_checker_provider_runtime(
                 checker_ids=authorized_ids["python-flint"]
             ),
+            "certified-snf": certified_snf_checker_provider_runtime(
+                checker_ids=authorized_ids["certified-snf"]
+            ),
             "finite-graph": graph_exact_checker_provider_runtime(
                 checker_ids=authorized_ids["finite-graph"]
             ),
@@ -261,8 +282,10 @@ def install_exact_domain_verification(
     *,
     polynomial: InstalledDomainBundle | None = None,
     matrix: InstalledDomainBundle | None = None,
+    certified_snf: InstalledDomainBundle | None = None,
     graph: InstalledDomainBundle | None = None,
     graph_invariants: InstalledDomainBundle | None = None,
+    graph_symmetry: InstalledDomainBundle | None = None,
     combinatorics: InstalledDomainBundle | None = None,
     number_theory: InstalledDomainBundle | None = None,
     probability: InstalledDomainBundle | None = None,
@@ -277,8 +300,10 @@ def install_exact_domain_verification(
         checkers,
         polynomial=polynomial,
         matrix=matrix,
+        certified_snf=certified_snf,
         graph=graph,
         graph_invariants=graph_invariants,
+        graph_symmetry=graph_symmetry,
         combinatorics=combinatorics,
         number_theory=number_theory,
         probability=probability,
@@ -324,6 +349,15 @@ def install_exact_domain_verification(
         if matrix is not None
         else ()
     )
+    certified_snf_declarations = (
+        tuple(
+            _installed_declaration(certified_snf, declaration, installation)
+            for declaration in CERTIFIED_SNF_EXACT_REPLAY_CHECKERS
+            if installation.checker_ids.get(declaration.capability_id) is not None
+        )
+        if certified_snf is not None
+        else ()
+    )
     graph_declarations = tuple(
         _installed_declaration(
             bundle,
@@ -333,6 +367,7 @@ def install_exact_domain_verification(
         for bundle, declaration in _available_graph_declaration_bundles(
             graph=graph,
             graph_invariants=graph_invariants,
+            graph_symmetry=graph_symmetry,
         )
         if installation.checker_ids.get(declaration.capability_id) is not None
     )
@@ -388,7 +423,7 @@ def install_exact_domain_verification(
         if combinatorics is not None
         else ()
     )
-    topology_declarations = (
+    all_topology_declarations = (
         tuple(
             _installed_declaration(
                 topology,
@@ -400,6 +435,11 @@ def install_exact_domain_verification(
         )
         if topology is not None
         else ()
+    )
+    topology_declarations = tuple(
+        declaration
+        for declaration in all_topology_declarations
+        if declaration.declaration.verification_capability_id is None
     )
     poset_declarations = (
         tuple(
@@ -420,9 +460,15 @@ def install_exact_domain_verification(
             for declaration in all_polynomial_declarations
             if declaration.declaration.verification_capability_id is not None
         ),
+        *certified_snf_declarations,
         *graph_declarations,
         *number_theory_declarations,
         *projective_declarations,
+        *(
+            declaration
+            for declaration in all_topology_declarations
+            if declaration.declaration.verification_capability_id is not None
+        ),
     )
     dedicated_adapters: tuple[CapabilityAdapter, ...] = tuple(
         ExactDomainResultVerificationAdapter(
@@ -601,12 +647,16 @@ def _available_graph_declaration_bundles(
     *,
     graph: InstalledDomainBundle | None,
     graph_invariants: InstalledDomainBundle | None,
+    graph_symmetry: InstalledDomainBundle | None,
 ) -> tuple[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration], ...]:
     available: list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]] = []
-    for declaration in GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS:
+    for declaration in (
+        *GRAPH_OPTIMIZATION_EXACT_REPLAY_CHECKERS,
+        *GRAPH_SYMMETRY_EXACT_REPLAY_CHECKERS,
+    ):
         installed = tuple(
             bundle
-            for bundle in (graph, graph_invariants)
+            for bundle in (graph, graph_invariants, graph_symmetry)
             if bundle is not None
             and declaration.capability_id in bundle.result_schema_uris
         )

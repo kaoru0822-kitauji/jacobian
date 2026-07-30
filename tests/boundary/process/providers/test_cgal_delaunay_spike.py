@@ -119,6 +119,10 @@ def test_exact_delaunay_spike_passes_but_defers_production(tmp_path: Path) -> No
         "DO_NOT_DISTRIBUTE_WITH_MIT_CORE"
     )
     assert report["provider"]["toolchain"]["support"] == "SUPPORTED"
+    assert not any(
+        "below the CGAL 6.2 documented GNU support floor" in limitation
+        for limitation in report["limitations"]
+    )
     assert report["checker_feasibility"]["decision"] == "REVISE"
     assert report["capability_ids_registered"] == []
 
@@ -231,3 +235,35 @@ def test_malformed_xz_archive_does_not_escape_as_an_exception(
 
     assert report["status"] == "REJECTED"
     assert report["diagnostic"]["code"] == "SOURCE_ARCHIVE_MALFORMED"
+
+
+def test_incomplete_pin_is_a_typed_non_conclusion(tmp_path: Path) -> None:
+    executable, archive, adapter, pin = _fixture(tmp_path)
+    payload = json.loads(pin.read_text(encoding="utf-8"))
+    del payload["reproductions"]["unique"]["scope"]
+    pin.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = RUN_SPIKE(
+        executable=executable,
+        source_archive=archive,
+        adapter_source=adapter,
+        pin_path=pin,
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["diagnostic"]["code"] == "INVALID_SPIKE_PIN"
+
+
+def test_non_finite_timeout_is_rejected_before_launch(tmp_path: Path) -> None:
+    executable, archive, adapter, pin = _fixture(tmp_path)
+
+    report = RUN_SPIKE(
+        executable=executable,
+        source_archive=archive,
+        adapter_source=adapter,
+        pin_path=pin,
+        timeout_seconds=float("nan"),
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["diagnostic"]["code"] == "INVALID_TIMEOUT"

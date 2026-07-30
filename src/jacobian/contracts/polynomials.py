@@ -155,6 +155,12 @@ class PolynomialJacobianRequest(ContractModel):
         return self
 
 
+class PolynomialKellerConditionVerifyRequest(ContractModel):
+    """Verify that an exact polynomial map has a nonzero constant Jacobian."""
+
+    map: RationalPolynomialMap
+
+
 class PolynomialFactorRequest(ContractModel):
     variable: PolynomialVariable
     polynomial: SparseRationalPolynomial
@@ -469,6 +475,32 @@ class PolynomialCollisionVerifyRequest(ContractModel):
         return self
 
 
+class PolynomialMapInverseCollisionVerifyRequest(ContractModel):
+    """Use one exact collision to refute a two-sided polynomial inverse."""
+
+    map: RationalPolynomialMap
+    first_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    second_point: tuple[CanonicalRational, ...] = Field(min_length=1, max_length=4)
+    claimed_image: tuple[CanonicalRational, ...] = Field(
+        min_length=1,
+        max_length=4,
+    )
+
+    @model_validator(mode="after")
+    def require_collision_dimensions_and_distinct_points(self) -> Self:
+        dimension = len(self.map.variables)
+        if not (
+            len(self.first_point)
+            == len(self.second_point)
+            == len(self.claimed_image)
+            == dimension
+        ):
+            raise ValueError("collision points and image must match the map dimension")
+        if self.first_point == self.second_point:
+            raise ValueError("collision verification requires distinct points")
+        return self
+
+
 class PolynomialMapEvaluation(ContractModel):
     evaluation_schema_version: Literal["1"] = "1"
     map_uri: ArtifactUri
@@ -519,6 +551,25 @@ class PolynomialJacobian(ContractModel):
 class PolynomialInjectivityClaim(ContractModel):
     claim_schema_version: Literal["1"] = "1"
     predicate: Literal["POLYNOMIAL_MAP_INJECTIVE"] = "POLYNOMIAL_MAP_INJECTIVE"
+    domain: Literal["QQ"] = "QQ"
+    map_uri: ArtifactUri
+
+
+class PolynomialKellerConditionClaim(ContractModel):
+    claim_schema_version: Literal["1"] = "1"
+    predicate: Literal["POLYNOMIAL_MAP_KELLER_CONDITION"] = (
+        "POLYNOMIAL_MAP_KELLER_CONDITION"
+    )
+    domain: Literal["QQ"] = "QQ"
+    map_uri: ArtifactUri
+    jacobian_uri: ArtifactUri
+
+
+class PolynomialNoTwoSidedInverseClaim(ContractModel):
+    claim_schema_version: Literal["1"] = "1"
+    predicate: Literal["POLYNOMIAL_MAP_NO_TWO_SIDED_INVERSE"] = (
+        "POLYNOMIAL_MAP_NO_TWO_SIDED_INVERSE"
+    )
     domain: Literal["QQ"] = "QQ"
     map_uri: ArtifactUri
 
@@ -600,6 +651,12 @@ class PolynomialMapInverseReplayPayload(ContractModel):
 class PolynomialJacobianReplayPayload(ContractModel):
     method: Literal["DIRECT_SPARSE_REPLAY"] = "DIRECT_SPARSE_REPLAY"
     source_map_uri: ArtifactUri
+    jacobian_uri: ArtifactUri
+
+
+class PolynomialKellerConditionReplayPayload(ContractModel):
+    method: Literal["DIRECT_SPARSE_KELLER_REPLAY"] = "DIRECT_SPARSE_KELLER_REPLAY"
+    map_uri: ArtifactUri
     jacobian_uri: ArtifactUri
 
 
@@ -829,3 +886,67 @@ class PolynomialCollisionVerifyOutput(ContractModel):
     claimed_image: tuple[CanonicalRational, ...]
     exactness: PolynomialExactness = PolynomialExactness.EXACT
     coverage: Literal["NOT_APPLICABLE"] = "NOT_APPLICABLE"
+
+
+class PolynomialKellerConditionVerifyOutput(ContractModel):
+    keller_condition_verified: bool | None
+    conclusion: Conclusion
+    map_uri: ArtifactUri
+    jacobian_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    certificate_uri: ArtifactUri
+    determinant: SparseRationalPolynomial
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri
+    domain: Literal["QQ"] = "QQ"
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+
+    @model_validator(mode="after")
+    def condition_matches_conclusion(self) -> Self:
+        expected = {
+            Conclusion.TRUE: True,
+            Conclusion.FALSE: False,
+            Conclusion.UNKNOWN: None,
+        }
+        if self.conclusion not in expected:
+            raise ValueError(
+                "Keller-condition conclusion must be TRUE, FALSE, or UNKNOWN"
+            )
+        if self.keller_condition_verified is not expected[self.conclusion]:
+            raise ValueError(
+                "keller_condition_verified must preserve the checker conclusion"
+            )
+        return self
+
+
+class PolynomialMapInverseCollisionVerifyOutput(ContractModel):
+    noninvertibility_verified: bool | None
+    conclusion: Conclusion
+    verification_input: InputValidation
+    map_uri: ArtifactUri
+    claim_uri: ArtifactUri
+    witness_uri: ArtifactUri
+    verification_record_uri: ArtifactUri | None = None
+    checker_id: CheckerUri
+    first_point: tuple[CanonicalRational, ...]
+    second_point: tuple[CanonicalRational, ...]
+    claimed_image: tuple[CanonicalRational, ...]
+    domain: Literal["QQ"] = "QQ"
+    exactness: PolynomialExactness = PolynomialExactness.EXACT
+
+    @model_validator(mode="after")
+    def noninvertibility_matches_conclusion(self) -> Self:
+        expected = {
+            Conclusion.TRUE: True,
+            Conclusion.FALSE: False,
+            Conclusion.UNKNOWN: None,
+        }
+        if self.conclusion not in expected:
+            raise ValueError(
+                "non-invertibility conclusion must be TRUE, FALSE, or UNKNOWN"
+            )
+        if self.noninvertibility_verified is not expected[self.conclusion]:
+            raise ValueError(
+                "noninvertibility_verified must preserve the checker conclusion"
+            )
+        return self

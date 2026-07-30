@@ -37,13 +37,14 @@ def _canonical(payload: object) -> bytes:
 def _result(
     *,
     stdout: bytes = b"",
+    stderr: bytes = b"",
     returncode: int | None = 0,
     timed_out: bool = False,
 ) -> BoundedProcessResult:
     return BoundedProcessResult(
         returncode=returncode,
         stdout=stdout,
-        stderr=b"",
+        stderr=stderr,
         stdout_exceeded=False,
         stderr_exceeded=False,
         timed_out=timed_out,
@@ -357,3 +358,67 @@ def test_malformed_archives_do_not_escape_as_exceptions(tmp_path: Path) -> None:
     )
     assert wheel_report["status"] == "REJECTED"
     assert wheel_report["diagnostic"]["code"] == "WHEEL_MALFORMED"
+
+
+def test_incomplete_pin_is_a_typed_non_conclusion(tmp_path: Path) -> None:
+    python, wheel, source, adapter, pin_path = _fixture(tmp_path)
+    pin = json.loads(pin_path.read_text(encoding="utf-8"))
+    del pin["wheel"]["metadata_member"]
+    pin_path.write_text(json.dumps(pin), encoding="utf-8")
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        wheel=wheel,
+        source_archive=source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["diagnostic"]["code"] == "INVALID_SPIKE_PIN"
+
+
+def test_worker_import_failure_preserves_unavailable_status(tmp_path: Path) -> None:
+    python, wheel, source, adapter, pin_path = _fixture(tmp_path)
+    worker_error = _canonical(
+        {
+            "status": "UNAVAILABLE",
+            "code": "PROVIDER_IMPORT_ERROR",
+            "detail": "GUDHI or NumPy is unavailable.",
+        }
+    )
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        wheel=wheel,
+        source_archive=source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+        runner=_runner(
+            [
+                _result(
+                    stderr=b"JACOBIAN_SPIKE_ERROR " + worker_error,
+                    returncode=64,
+                )
+            ]
+        ),
+    )
+
+    assert report["status"] == "UNAVAILABLE"
+    assert report["diagnostic"]["code"] == "PROVIDER_IMPORT_ERROR"
+
+
+def test_non_finite_timeout_is_rejected_before_launch(tmp_path: Path) -> None:
+    python, wheel, source, adapter, pin_path = _fixture(tmp_path)
+
+    report = RUN_SPIKE(
+        python_executable=python,
+        wheel=wheel,
+        source_archive=source,
+        adapter_source=adapter,
+        pin_path=pin_path,
+        timeout_seconds=float("inf"),
+    )
+
+    assert report["status"] == "ERROR"
+    assert report["diagnostic"]["code"] == "INVALID_TIMEOUT"
