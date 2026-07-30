@@ -1,0 +1,42 @@
+# Harbor dataset manifest. Task digests are updated with `harbor sync` after a
+# deliberate task change and are part of the dataset identity.
+[dataset]
+name = "jacobian/regression-v1"
+description = "Eight self-contained mathematical workflow observation tasks for Jacobian."
+keywords = [ "mathematics", "jacobian", "regression", "verification", "offline",]
+[[dataset.authors]]
+name = "Jacobian contributors"
+email = "maintainers@jacobian.invalid"
+
+
+[[tasks]]
+name = "jacobian/regression-v1-finite-partition"
+digest = "sha256:cb5f61202cc69f5565a58fe894b9bfab6a3ae56b6b8a7076fb6e28b70e6eae9b"
+
+[[tasks]]
+name = "jacobian/regression-v1-graph-artifact-composition"
+digest = "sha256:44617a912071e555b79d9a2d1dfe72c5c39b7679a013924aceef5360c85bab46"
+
+[[tasks]]
+name = "jacobian/regression-v1-graph-counterexample"
+digest = "sha256:882788a2da19e188b316aa62acad90819512230f1cea99bd48cf3660768b1b0b"
+
+[[tasks]]
+name = "jacobian/regression-v1-hermite-normal-form"
+digest = "sha256:7a33689f00ca320a2d36c3d4a4b687974df3037352deb5c2c88d258924d4874e"
+
+[[tasks]]
+name = "jacobian/regression-v1-polynomial-map-collision"
+digest = "sha256:60e6144cccb7087a83e78c6b8bf04aaf899acc3e764e32927cb6e80de6cac6a3"
+
+[[tasks]]
+name = "jacobian/regression-v1-polynomial-normalization"
+digest = "sha256:a2bb5f28cfc2d6ccdb09a9c52b5126cba8de4d84d6026e92f12043f34f4d5dcc"
+
+[[tasks]]
+name = "jacobian/regression-v1-rational-linear-solution"
+digest = "sha256:7bfd356f13ebc3a7502d8b932a4b9077927d5a9353a8e5cb3a6d13c3ba14bb3a"
+
+[[tasks]]
+name = "jacobian/regression-v1-sat-witness"
+digest = "sha256:b64e4f300905bd35a3c0260ef59e7ff37ad2be582991060441a17d924e152b69"

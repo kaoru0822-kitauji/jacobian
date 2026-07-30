@@ -1,0 +1,1 @@
+{"case_version":"regression-v1","contamination_class":"hand-designed-structural-variant","upstream":null,"fixture_digest":"sha256:polynomial-map-collision-input-v1","derivation_note":"Hand-designed symmetric polynomial map; no external source is loaded at runtime."}

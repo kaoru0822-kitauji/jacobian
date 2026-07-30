@@ -149,8 +149,8 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
-agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
-	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)
+agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
+	harbor run -c benchmarks/regression-v1/job-jacobian.json $(EVAL_ARGS)
 
 bench-core: ## Run the core performance benchmark script.
 	$(UV_RUN) python benchmarks/benchmark_core.py
