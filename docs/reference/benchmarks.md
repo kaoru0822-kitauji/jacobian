@@ -12,11 +12,14 @@ evaluated separately in [Agent evaluations](agent-evaluations.md).
 The exact component fixtures and their public oracles are specified in the
 [Mathematical scenario catalog](math-scenarios.md).
 
-The internal
-[Harbor math evaluation suite](../../benchmarks/jacobian_math_evals/README.md)
-compiles a versioned source catalog into bounded, offline agent tasks. Its
-README is the canonical source for generation, verification, and rollout
-status; this reference only places that suite in the benchmark hierarchy.
+The committed
+[Harbor regression-v1 dataset](../../benchmarks/regression-v1/README.md)
+contains eight bounded, offline mathematical workflow tasks. Its task digests,
+clean-room verifiers, and Oracle job are the canonical validation surface.
+
+The 18 public research challenges remain candidate material under
+`benchmarks/research_challenges/`; they are not source-oriented dataset splits
+and are not silently promoted into regression-v1.
 
 ## Benchmark hierarchy
 

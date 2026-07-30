@@ -154,10 +154,11 @@ Separate two evaluation classes:
   intervention dimension, use the same visible task/model/budget/environment,
   randomize condition order, and run enough repetitions for the stated claim.
 
-Prefer the established harness in `benchmarks/agent_ab.py` and telemetry in
-`src/jacobian/eval_telemetry.py`. Record git tree, case-bundle and catalog
-digests, provider/runtime, model/settings, prompt, oracle/scorer identities,
-seeds, raw transcripts, and structured reports.
+Use Harbor directly through the committed
+`benchmarks/regression-v1/job-jacobian.json` observation config and inspect
+Harbor ATIF together with Jacobian telemetry. Record the git tree, task
+digests, provider/runtime, model/settings, prompt, oracle/verifier identities,
+seeds, raw traces, and structured reports.
 
 Compare the observed git, catalog, policy-profile, provider, prompt, and model
 fingerprints with the declared evaluation manifest before combining results.
