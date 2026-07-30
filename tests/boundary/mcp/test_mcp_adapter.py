@@ -77,6 +77,12 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 "mode",
                 "view",
             }
+            unknown_argument = await client.call_tool(
+                "capability.describe",
+                {"capabilty_id": "polynomial.compute.gcd"},
+            )
+            assert unknown_argument.is_error is True
+            assert '"code": "INVALID_INPUT"' in unknown_argument.content[0].text
             assert tools["workspace.open"].annotations is not None
             assert tools["workspace.open"].annotations.idempotent_hint is True
             assert tools["workspace.write"].annotations is not None

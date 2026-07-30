@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -966,6 +967,21 @@ class JacobianCoreExtension(Extension):
         arguments = params.arguments or {}
         argument_digest = _argument_digest(arguments)
         try:
+            binding = next(
+                binding
+                for binding in self.tools()
+                if binding.kwargs["name"] == params.name
+            )
+            accepted_arguments = {
+                name
+                for name in inspect.signature(binding.fn).parameters
+                if name != "ctx"
+            }
+            unknown_arguments = sorted(set(arguments) - accepted_arguments)
+            if unknown_arguments:
+                raise ValueError(
+                    "unknown tool arguments: " + ", ".join(unknown_arguments)
+                )
             if params.name == "workspace.write":
                 WorkspaceWriteRequest.model_validate(arguments)
             result = await call_next(ctx)

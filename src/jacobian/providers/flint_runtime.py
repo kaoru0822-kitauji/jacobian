@@ -103,7 +103,7 @@ def python_flint_exact_checker_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} exact-checker profile."
             ),
         )
-    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+    if refresh and runtime.availability is CapabilityProviderAvailability.AVAILABLE:
         try:
             flint = importlib.import_module("flint")
         except (ImportError, OSError):
@@ -627,7 +627,7 @@ def python_flint_hnf_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} HNF compatibility profile."
             ),
         )
-    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+    if refresh and runtime.availability is CapabilityProviderAvailability.AVAILABLE:
         try:
             flint = importlib.import_module("flint")
         except (ImportError, OSError):
@@ -686,7 +686,7 @@ def python_flint_lll_provider_runtime(
                 f"{PYTHON_FLINT_VERSION} LLL profile."
             ),
         )
-    if runtime.availability is CapabilityProviderAvailability.AVAILABLE:
+    if refresh and runtime.availability is CapabilityProviderAvailability.AVAILABLE:
         try:
             flint = importlib.import_module("flint")
         except (ImportError, OSError):
