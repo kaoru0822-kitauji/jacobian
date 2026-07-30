@@ -27,6 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDiscoveryMatch,
     CapabilityDiscoveryRequest,
     CapabilityDiscoveryResult,
+    CapabilityInputKind,
     CapabilityMode,
     CapabilityObligationStatus,
     CapabilityProviderAvailability,
@@ -322,6 +323,9 @@ class CapabilityService:
         normalized_domain = (
             _normalize_domain(request.domain) if request.domain is not None else None
         )
+        resolved_input_kind = request.input_kind or _infer_discovery_input_kind(
+            request.query
+        )
         ranked: list[tuple[int, CapabilityDiscoveryMatch]] = []
         for descriptor in descriptors:
             if request.mode is not None and request.mode not in descriptor.modes:
@@ -329,6 +333,16 @@ class CapabilityService:
             if normalized_domain is not None and not _matches_domain(
                 descriptor,
                 normalized_domain,
+            ):
+                continue
+            if (
+                resolved_input_kind is not None
+                and resolved_input_kind not in descriptor.accepted_input_kinds
+            ):
+                continue
+            if (
+                request.artifact_type is not None
+                and request.artifact_type not in descriptor.accepted_artifact_types
             ):
                 continue
             (
@@ -416,10 +430,42 @@ class CapabilityService:
                 "Installed results share only weak lexical evidence with the query. "
                 "Do not infer capability fit from top-N ordering alone."
             )
+        routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"]
+        if resolved_input_kind is None:
+            routing_status = "UNFILTERED"
+            routing_basis = (
+                "No input kind was declared or safely inferred; inspect the selected "
+                "capability contract before invocation."
+            )
+        elif ranked:
+            routing_status = "ROUTES_FOUND"
+            routing_basis = (
+                "Installed routes match the declared or safely inferred input kind"
+                + (
+                    f" and artifact type {request.artifact_type!r}."
+                    if request.artifact_type is not None
+                    else "."
+                )
+            )
+        else:
+            routing_status = "NO_ROUTE"
+            routing_basis = (
+                "No installed capability accepts the declared or safely inferred "
+                "input kind"
+                + (
+                    f" and artifact type {request.artifact_type!r}."
+                    if request.artifact_type is not None
+                    else "."
+                )
+            )
         return CapabilityDiscoveryResult(
             query=request.query,
             domain=normalized_domain,
             mode=request.mode,
+            resolved_input_kind=resolved_input_kind,
+            artifact_type=request.artifact_type,
+            routing_status=routing_status,
+            routing_basis=routing_basis,
             matches=tuple(match for _, match in page),
             total_matches=total_matches,
             truncated=next_cursor is not None,
@@ -806,6 +852,18 @@ def _discovery_terms(query: str) -> frozenset[str]:
         for term in _DISCOVERY_TOKEN_PATTERN.findall(query.casefold())
         if term not in _DISCOVERY_STOP_WORDS
     )
+
+
+def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None:
+    """Conservatively recognize prose that must not enter formal proof routes."""
+
+    if query is None:
+        return None
+    normalized = " ".join(_DISCOVERY_TOKEN_PATTERN.findall(query.casefold()))
+    tokens = frozenset(normalized.split())
+    if "proof" in tokens:
+        return CapabilityInputKind.NATURAL_LANGUAGE_PROOF
+    return None
 
 
 def _token_set(value: str) -> frozenset[str]:

@@ -36,6 +36,7 @@ from jacobian.capabilities import CapabilityDiscoveryCursorError, CapabilityPoli
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiscoveryRequest,
+    CapabilityInputKind,
     CapabilityMode,
     CapabilityRequest,
     CapabilityResult,
@@ -665,6 +666,8 @@ def _capability_discovery_response(
     query: str | None,
     domain: str | None,
     mode: CapabilityMode | None,
+    input_kind: CapabilityInputKind | None,
+    artifact_type: str | None,
     limit: int | None,
     cursor: str | None,
 ) -> dict[str, Any]:
@@ -675,6 +678,8 @@ def _capability_discovery_response(
                 query=query,
                 domain=domain,
                 mode=mode,
+                input_kind=input_kind,
+                artifact_type=artifact_type,
                 limit=limit if limit is not None else 5,
                 cursor=cursor,
             )
@@ -1022,6 +1027,27 @@ def create_server(
             CapabilityMode | None,
             Field(description="Optional EXPLORE or VERIFY capability filter."),
         ] = None,
+        input_kind: Annotated[
+            CapabilityInputKind | None,
+            Field(
+                description=(
+                    "Optional input boundary. Use NATURAL_LANGUAGE_PROOF for proof "
+                    "prose, FORMAL_PROPOSITION for formal syntax, or TYPED_ARTIFACT "
+                    "with artifact_type for a bound artifact."
+                )
+            ),
+        ] = None,
+        artifact_type: Annotated[
+            str | None,
+            Field(
+                pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
+                max_length=128,
+                description=(
+                    "Typed artifact contract ID; valid only with "
+                    "input_kind=TYPED_ARTIFACT."
+                ),
+            ),
+        ] = None,
         limit: Annotated[
             StrictInt | None,
             Field(
@@ -1060,13 +1086,22 @@ def create_server(
         ctx: Context[AppState, Any] | None = None,
     ) -> dict[str, Any]:
         active_runtime = _runtime(ctx)
-        search_arguments = (query, domain, mode, limit, cursor)
+        search_arguments = (
+            query,
+            domain,
+            mode,
+            input_kind,
+            artifact_type,
+            limit,
+            cursor,
+        )
         if capability_id is not None and any(
             argument is not None for argument in search_arguments
         ):
             raise AgentRecoveryError(
                 "capability_id is an exact lookup and cannot be combined with query, "
-                "domain, mode, limit, or cursor. Use one discovery call followed by "
+                "domain, mode, input_kind, artifact_type, limit, or cursor. Use one "
+                "discovery call followed by "
                 "one exact description call."
             )
         if capability_id is None:
@@ -1075,6 +1110,8 @@ def create_server(
                 query=query,
                 domain=domain,
                 mode=mode,
+                input_kind=input_kind,
+                artifact_type=artifact_type,
                 limit=limit,
                 cursor=cursor,
             )

@@ -29,6 +29,15 @@ class CapabilityMode(StrEnum):
     VERIFY = "VERIFY"
 
 
+class CapabilityInputKind(StrEnum):
+    """Coarse input boundary used to prevent incompatible discovery routes."""
+
+    STRUCTURED_REQUEST = "STRUCTURED_REQUEST"
+    FORMAL_PROPOSITION = "FORMAL_PROPOSITION"
+    TYPED_ARTIFACT = "TYPED_ARTIFACT"
+    NATURAL_LANGUAGE_PROOF = "NATURAL_LANGUAGE_PROOF"
+
+
 class CapabilityInvocationExample(ContractModel):
     """One operator-authored, schema-valid example for an advertised mode."""
 
@@ -56,6 +65,8 @@ class CapabilityDiscoveryRequest(ContractModel):
         pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$",
     )
     mode: CapabilityMode | None = None
+    input_kind: CapabilityInputKind | None = None
+    artifact_type: CapabilityId | None = None
     limit: int = Field(default=5, ge=1, le=20, strict=True)
     cursor: CapabilityId | None = None
 
@@ -65,6 +76,10 @@ class CapabilityDiscoveryRequest(ContractModel):
             raise ValueError("query must contain a non-whitespace character")
         if self.domain is not None and not self.domain.strip():
             raise ValueError("domain must contain a non-whitespace character")
+        if self.artifact_type is not None and (
+            self.input_kind is not CapabilityInputKind.TYPED_ARTIFACT
+        ):
+            raise ValueError("artifact_type requires input_kind=TYPED_ARTIFACT")
         return self
 
 
@@ -94,6 +109,10 @@ class CapabilityDiscoveryResult(ContractModel):
     query: str | None = None
     domain: str | None = None
     mode: CapabilityMode | None = None
+    resolved_input_kind: CapabilityInputKind | None = None
+    artifact_type: CapabilityId | None = None
+    routing_status: Literal["UNFILTERED", "ROUTES_FOUND", "NO_ROUTE"] = "UNFILTERED"
+    routing_basis: str = Field(min_length=1, max_length=512)
     matches: tuple[CapabilityDiscoveryMatch, ...]
     total_matches: int = Field(ge=0, strict=True)
     truncated: bool
@@ -273,6 +292,10 @@ class CapabilityDescriptor(ContractModel):
     read_only: bool = False
     records_episode: bool = True
     tags: tuple[str, ...] = ()
+    accepted_input_kinds: tuple[CapabilityInputKind, ...] = (
+        CapabilityInputKind.STRUCTURED_REQUEST,
+    )
+    accepted_artifact_types: tuple[CapabilityId, ...] = ()
     invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
 
     @model_validator(mode="after")
@@ -281,6 +304,16 @@ class CapabilityDescriptor(ContractModel):
             raise ValueError("a capability must support at least one mode")
         if len(set(self.modes)) != len(self.modes):
             raise ValueError("capability modes must be unique")
+        if not self.accepted_input_kinds:
+            raise ValueError("a capability must accept at least one input kind")
+        if len(set(self.accepted_input_kinds)) != len(self.accepted_input_kinds):
+            raise ValueError("accepted input kinds must be unique")
+        if len(set(self.accepted_artifact_types)) != len(self.accepted_artifact_types):
+            raise ValueError("accepted artifact types must be unique")
+        if self.accepted_artifact_types and (
+            CapabilityInputKind.TYPED_ARTIFACT not in self.accepted_input_kinds
+        ):
+            raise ValueError("accepted artifact types require TYPED_ARTIFACT input")
         if len({example.name for example in self.invocation_examples}) != len(
             self.invocation_examples
         ):
