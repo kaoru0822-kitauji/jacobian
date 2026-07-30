@@ -2,7 +2,6 @@ services:
   jacobian:
     image: ${JACOBIAN_IMAGE:?JACOBIAN_IMAGE must be digest-pinned}
     command:
-      - jacobian-mcp
       - --transport
       - streamable-http
       - --host

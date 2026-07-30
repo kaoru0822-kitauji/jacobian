@@ -2,17 +2,18 @@
   "jobs_dir": "benchmarks/results/regression-v1",
   "n_attempts": 1,
   "timeout_multiplier": 1.0,
-  "orchestrator": {"type": "local", "n_concurrent_trials": 1, "quiet": false},
+  "orchestrator": {
+    "type": "local",
+    "n_concurrent_trials": 1,
+    "quiet": false
+  },
   "environment": {
     "type": "docker",
     "force_build": true,
     "delete": true,
-    "extra_docker_compose": ["benchmarks/regression-v1/jacobian-observation.compose.yaml"],
-    "env": {
-      "JACOBIAN_IMAGE": "${JACOBIAN_IMAGE}",
-      "JACOBIAN_MCP_TOKEN": "${JACOBIAN_MCP_TOKEN}",
-      "JACOBIAN_AUTH_TOKENS_JSON": "${JACOBIAN_AUTH_TOKENS_JSON}"
-    }
+    "extra_docker_compose": [
+      "benchmarks/regression-v1/jacobian-observation.compose.yaml"
+    ]
   },
   "agents": [
     {
@@ -27,5 +28,9 @@
       ]
     }
   ],
-  "datasets": [{"path": "benchmarks/regression-v1/tasks"}]
+  "datasets": [
+    {
+      "path": "benchmarks/regression-v1/tasks"
+    }
+  ]
 }
