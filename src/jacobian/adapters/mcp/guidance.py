@@ -174,6 +174,13 @@ superseding, archiving, or pinning a workspace entry never promotes mathematical
 assurance. In particular, a workspace card titled as an exact value remains
 UNVERIFIED unless a separate checker-backed capability returns VERIFIED with its
 bound verification record.
+
+Reading an `artifact://sha256/<digest>` resource returns a JSON envelope with keys
+`artifact_uri`, `manifest`, and `payload`. The `payload` field holds the bare
+artifact content (for a verification record, the `VerificationRecord` JSON). When
+persisting a verification record for a clean-room verifier, save only the bare
+`payload` object — not the full envelope — so the record's keys match the expected
+verification-record schema exactly.
 """
 
 
