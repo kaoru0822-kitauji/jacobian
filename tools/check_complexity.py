@@ -42,6 +42,30 @@ class ComplexityBaseline:
     violations: tuple[ComplexityViolation, ...]
 
 
+def serialize_baseline(baseline: ComplexityBaseline) -> str:
+    """Serialize a baseline in the repository's canonical order and format."""
+
+    payload = {
+        "version": 1,
+        "max_complexity": baseline.max_complexity,
+        "violations": [
+            {
+                "path": violation.path,
+                "symbol": violation.symbol,
+                "complexity": violation.complexity,
+            }
+            for violation in sorted(baseline.violations)
+        ],
+    }
+    return f"{json.dumps(payload, indent=2)}\n"
+
+
+def write_baseline(path: Path, baseline: ComplexityBaseline) -> None:
+    """Write a canonical complexity baseline."""
+
+    path.write_text(serialize_baseline(baseline), encoding="utf-8")
+
+
 def _violation(raw: Any, *, max_complexity: int) -> ComplexityViolation:
     if not isinstance(raw, dict) or set(raw) != {"path", "symbol", "complexity"}:
         raise ComplexityBaselineError(
@@ -234,11 +258,31 @@ def run_ruff(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="replace the baseline with the current canonical Ruff C901 snapshot",
+    )
     parser.add_argument("paths", nargs="*", default=DEFAULT_PATHS)
     args = parser.parse_args(argv)
     try:
         baseline = load_baseline(args.baseline)
         current = run_ruff(tuple(args.paths), max_complexity=baseline.max_complexity)
+        current_baseline = ComplexityBaseline(baseline.max_complexity, current)
+        if args.update:
+            write_baseline(args.baseline, current_baseline)
+            print(
+                f"Updated {args.baseline} with {len(current)} known violations, "
+                f"limit {baseline.max_complexity}."
+            )
+            return 0
+        if args.baseline.read_text(encoding="utf-8") != serialize_baseline(baseline):
+            print(
+                "C901 complexity baseline is not canonically formatted; "
+                "run `uv run --locked python tools/check_complexity.py --update`.",
+                file=sys.stderr,
+            )
+            return 1
         problems = compare_violations(baseline, current)
     except ComplexityBaselineError as exc:
         parser.error(str(exc))

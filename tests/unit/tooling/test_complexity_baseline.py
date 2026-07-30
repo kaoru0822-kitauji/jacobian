@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from tools.check_complexity import (
     ComplexityViolation,
     compare_violations,
     load_baseline,
+    write_baseline,
 )
 
 
@@ -74,3 +76,30 @@ def test_complexity_baseline_rejects_duplicate_path_symbol_keys(
 
     with pytest.raises(ComplexityBaselineError, match="keys must be unique"):
         load_baseline(baseline)
+
+
+def test_complexity_baseline_writer_uses_canonical_order_and_trailing_newline(
+    tmp_path: Path,
+) -> None:
+    baseline = ComplexityBaseline(
+        10,
+        (
+            ComplexityViolation("src/z.py", "run", 12),
+            ComplexityViolation("src/a.py", "walk", 11),
+            ComplexityViolation("src/a.py", "run", 13),
+        ),
+    )
+    path = tmp_path / "baseline.json"
+
+    write_baseline(path, baseline)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert [
+        (item["path"], item["symbol"], item["complexity"])
+        for item in payload["violations"]
+    ] == [
+        ("src/a.py", "run", 13),
+        ("src/a.py", "walk", 11),
+        ("src/z.py", "run", 12),
+    ]
+    assert path.read_text(encoding="utf-8").endswith("\n")
