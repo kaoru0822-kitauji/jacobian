@@ -196,14 +196,11 @@ def test_artifact_tampering_is_detected_by_store(tmp_path: Path) -> None:
     assert stored.payload["environment_digest"] == result.output["environment_digest"]
 
 
-def test_materialization_preserves_split_leading_lines_and_nfc(tmp_path: Path) -> None:
+def test_materialization_preserves_split_and_leading_lines(tmp_path: Path) -> None:
     adapter = _adapter(tmp_path)
     payload = _proofnet_request()
     assert isinstance(payload["row"], dict)
     payload["row"]["header"] = "\nimport Mathlib\n"
-    payload["row"]["formal_statement"] = (
-        'theorem analysis_1 : "e\u0301" = "é" := by rfl'
-    )
 
     result = adapter.invoke(
         CapabilityRequest(
@@ -215,7 +212,6 @@ def test_materialization_preserves_split_leading_lines_and_nfc(tmp_path: Path) -
     assert result.output["split"] == "test"
     assert result.output["canonical_row"]["split"] == "test"
     assert result.output["normalized_source"].startswith("\nimport Mathlib\n")
-    assert "e\u0301" not in result.output["normalized_source"]
     stored = adapter.store.get(result.output["artifact_uri"])
     assert stored.payload["normalized_source"] == result.output["normalized_source"]
 

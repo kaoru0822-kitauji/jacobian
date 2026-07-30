@@ -110,3 +110,32 @@ def test_environment_rejects_non_nfc_and_oversized_items() -> None:
             project_revision="fixture",
             theorem_context=("T" * 2_001,),
         )
+
+
+def test_request_rejects_non_nfc_or_blank_formal_source() -> None:
+    non_nfc = _request()
+    assert isinstance(non_nfc["row"], dict)
+    non_nfc["row"]["formal_statement"] = 'theorem t : "e\u0301" = "é" := by rfl'
+    with pytest.raises(ValidationError, match="NFC-normalized"):
+        FormalDatasetMaterializeRequest.model_validate(non_nfc)
+
+    blank = _request()
+    assert isinstance(blank["row"], dict)
+    blank["row"]["formal_statement"] = " \n\t"
+    with pytest.raises(ValidationError, match="formal_statement must not be blank"):
+        FormalDatasetMaterializeRequest.model_validate(blank)
+
+
+def test_environment_rejects_unicode_equivalent_replay_entries() -> None:
+    with pytest.raises(ValidationError, match="NFC-normalized"):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            imports=("Café", "Cafe\u0301"),
+        )
+    with pytest.raises(ValidationError, match="NFC-normalized"):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            theorem_context=("Café", "Cafe\u0301"),
+        )

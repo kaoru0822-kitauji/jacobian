@@ -6,14 +6,38 @@ import hashlib
 import unicodedata
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import AfterValidator, Field, model_validator
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
 
-BoundedFormalString = Annotated[str, Field(min_length=1, max_length=2_000)]
+
+def _require_nfc(value: str) -> str:
+    if value != unicodedata.normalize("NFC", value):
+        raise ValueError("value must be NFC-normalized")
+    return value
+
+
+BoundedFormalString = Annotated[
+    str,
+    Field(min_length=1, max_length=2_000),
+    AfterValidator(_require_nfc),
+]
+
+
+def _validate_row_text(row: MiniF2FRow | ProofNetRow) -> None:
+    if not row.formal_statement.strip():
+        raise ValueError("formal_statement must not be blank")
+    for value in (
+        row.header,
+        row.formal_statement,
+        row.informal_statement,
+        row.informal_proof,
+    ):
+        if value is not None:
+            _require_nfc(value)
 
 
 class MiniF2FRow(ContractModel):
@@ -25,6 +49,11 @@ class MiniF2FRow(ContractModel):
     informal_proof: str | None = Field(default=None, max_length=80_000)
     header: str = Field(default="", max_length=20_000)
 
+    @model_validator(mode="after")
+    def require_replay_safe_text(self) -> Self:
+        _validate_row_text(self)
+        return self
+
 
 class ProofNetRow(ContractModel):
     dataset_id: Literal["PROOFNET"]
@@ -34,6 +63,11 @@ class ProofNetRow(ContractModel):
     informal_statement: str = Field(min_length=1, max_length=80_000)
     informal_proof: str | None = Field(default=None, max_length=120_000)
     header: str = Field(default="", max_length=20_000)
+
+    @model_validator(mode="after")
+    def require_replay_safe_text(self) -> Self:
+        _validate_row_text(self)
+        return self
 
 
 FormalDatasetRow = Annotated[

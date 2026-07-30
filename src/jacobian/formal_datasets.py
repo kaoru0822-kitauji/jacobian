@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import unicodedata
 from dataclasses import dataclass
 
 from pydantic import ValidationError
@@ -52,8 +51,7 @@ def _text_digest(value: str) -> str:
 
 def _normalize_text(value: str) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    normalized = "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
-    return unicodedata.normalize("NFC", normalized)
+    return "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
 
 
 def _materialize_payload(
