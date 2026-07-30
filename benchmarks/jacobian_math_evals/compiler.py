@@ -82,6 +82,8 @@ def _clear_previous_generation(output_dir: Path) -> None:
         if destination.is_dir():
             shutil.rmtree(destination)
     manifest_path.unlink()
+
+
 FAMILIES = (
     "exact-answer",
     "counterexample",
@@ -710,7 +712,8 @@ def compile_tasks(
         raise ValueError("limit must be non-negative")
     report_cache_dir = (
         None
-        if split == Split.PUBLIC or (split == Split.FULL and not strict_coverage)
+        if split == Split.PUBLIC
+        or (split == Split.FULL and not strict_coverage)
         or (
             task_ids and task_ids <= frozenset(spec.task_id for spec in _public_tasks())
         )

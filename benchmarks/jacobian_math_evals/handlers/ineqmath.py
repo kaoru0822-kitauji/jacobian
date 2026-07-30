@@ -76,9 +76,11 @@ class IneqMathHandler:
             "payload_sha256": f"sha256:{DEV_SNAPSHOT_SHA256}",
         }
         if destination.exists():
-            if not metadata_path.exists() or json.loads(
-                metadata_path.read_text(encoding="utf-8")
-            ) != expected_metadata:
+            if (
+                not metadata_path.exists()
+                or json.loads(metadata_path.read_text(encoding="utf-8"))
+                != expected_metadata
+            ):
                 raise ValueError("cached IneqMath snapshot provenance mismatch")
             digest = _sha256(destination.read_bytes())
             if digest != DEV_SNAPSHOT_SHA256:
