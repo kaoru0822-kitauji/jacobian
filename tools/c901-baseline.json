@@ -654,13 +654,13 @@
     },
     {
       "path": "src/jacobian/adapters/mcp/server.py",
-      "symbol": "_register_tools",
-      "complexity": 11
+      "symbol": "_register_resources_and_prompts",
+      "complexity": 12
     },
     {
       "path": "src/jacobian/adapters/mcp/server.py",
-      "symbol": "_register_resources_and_prompts",
-      "complexity": 12
+      "symbol": "_register_tools",
+      "complexity": 11
     }
   ]
 }
