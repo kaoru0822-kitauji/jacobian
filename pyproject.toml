@@ -54,6 +54,7 @@ dev = [
     "pytest-timeout>=2.4,<3",
     "pytest-xdist>=3.6,<4",
     "ruff==0.16.0",  # pinned to match .pre-commit-config.yaml rev
+    "tomli-w==1.2.0",
     "types-jsonschema>=4.23,<5",
     "types-networkx>=3.4,<4",
     "vulture>=2.14,<3",
@@ -119,7 +120,9 @@ known_first_party = ["jacobian", "jacobian_checkers"]
 # not part of Jacobian's runtime or locked application dependencies.
 # The maintained deployment smoke configures the HTTP client bundled by the
 # exactly pinned MCP transport; deploy/ is not part of the Python wheel.
-per_rule_ignores = { "DEP001" = ["harbor"], "DEP002" = ["cvc5", "mcp-types", "python-flint"], "DEP003" = ["httpx2"] }
+# The Harbor manifest writer is repository tooling and uses the direct dev-only
+# tomli-w dependency; it is intentionally absent from the runtime wheel.
+per_rule_ignores = { "DEP001" = ["harbor"], "DEP002" = ["cvc5", "mcp-types", "python-flint"], "DEP003" = ["httpx2"], "DEP004" = ["tomli_w"] }
 
 [tool.coverage.run]
 branch = true

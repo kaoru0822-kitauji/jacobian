@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from jacobian.domains.analysis import REAL_ANALYSIS_BUNDLE
-from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
-from jacobian.domains.probability import FINITE_PROBABILITY_BUNDLE
+from jacobian.domains.analysis import build_real_analysis_bundle
+from jacobian.domains.optimization import build_rational_optimization_bundle
+from jacobian.domains.probability import build_finite_probability_bundle
 
 
 def test_subject_bundles_preserve_wire_contracts_and_report_one_backend() -> None:
@@ -13,9 +13,9 @@ def test_subject_bundles_preserve_wire_contracts_and_report_one_backend() -> Non
             tuple(operation.capability_id for operation in bundle.capabilities),
         )
         for bundle in (
-            REAL_ANALYSIS_BUNDLE,
-            FINITE_PROBABILITY_BUNDLE,
-            RATIONAL_OPTIMIZATION_BUNDLE,
+            build_real_analysis_bundle(),
+            build_finite_probability_bundle(),
+            build_rational_optimization_bundle(),
         )
     } == {
         "analysis": (

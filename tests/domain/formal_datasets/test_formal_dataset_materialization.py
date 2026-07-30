@@ -10,7 +10,7 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
-from jacobian.domains.formal_datasets import FORMAL_DATASET_BUNDLE
+from jacobian.domains.formal_datasets import build_formal_dataset_bundle
 from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
@@ -22,7 +22,7 @@ def _adapter(tmp_path: Path):
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     installation = OperationInstaller(store, schemas, artifacts).install(
-        FORMAL_DATASET_BUNDLE
+        build_formal_dataset_bundle()
     )
     return installation.adapters[0]
 
@@ -320,7 +320,7 @@ def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     installation = OperationInstaller(store, schemas, artifacts).install(
-        FORMAL_DATASET_BUNDLE
+        build_formal_dataset_bundle()
     )
     adapter = installation.adapters[0]
     result = adapter.invoke(
@@ -374,7 +374,8 @@ def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
 
 
 def test_formal_dataset_capability_is_owned_by_domain_bundle() -> None:
-    assert FORMAL_DATASET_BUNDLE.domain_id == "formal_datasets"
+    assert build_formal_dataset_bundle().domain_id == "formal_datasets"
     assert tuple(
-        operation.capability_id for operation in FORMAL_DATASET_BUNDLE.capabilities
+        operation.capability_id
+        for operation in build_formal_dataset_bundle().capabilities
     ) == ("dataset.formal.materialize",)

@@ -11,7 +11,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.topology import TOPOLOGY_BUNDLE
+from jacobian.domains.topology import build_topology_bundle
 
 _CIRCLE = {
     "vertices": ["a", "b", "c"],
@@ -73,7 +73,9 @@ def _betti(
 def test_topology_bundle_exposes_four_atomic_capabilities(
     fresh_complete_runtime,
 ) -> None:
-    ids = tuple(operation.capability_id for operation in TOPOLOGY_BUNDLE.capabilities)
+    ids = tuple(
+        operation.capability_id for operation in build_topology_bundle().capabilities
+    )
 
     assert ids == (
         "topology.simplicial_complex.materialize",

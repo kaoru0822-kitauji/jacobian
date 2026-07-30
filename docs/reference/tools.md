@@ -41,7 +41,7 @@ through the returned immutable `revision_artifact_uri`.
 Within a write, entries use unique `client_ref` values. Findings record a
 `kind`, `title`, `body`, and optional explicit dependency or assumption
 references. Attempts record a target, method, operational outcome, and summary.
-`OPEN_GOAL` normalizes to `GOAL`; `SUCCEEDED` normalizes to `COMPLETED`.
+Use the canonical `GOAL` finding kind and `COMPLETED` attempt outcome.
 Completion never means `VERIFIED` and never closes a goal automatically.
 
 Append-only margin marks record paper-like lifecycle state:

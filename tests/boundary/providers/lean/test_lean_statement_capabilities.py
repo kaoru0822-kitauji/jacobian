@@ -443,7 +443,7 @@ def test_replaced_pinned_executable_is_rejected_before_execution(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from jacobian.provider_runtime import lean_frontend_provider_runtime
+    from jacobian.providers.lean_runtime import lean_frontend_provider_runtime
     from jacobian_checkers import lean4
 
     executable = tmp_path / "pinned-lean"

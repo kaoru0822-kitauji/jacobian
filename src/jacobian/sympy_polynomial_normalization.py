@@ -40,9 +40,8 @@ from jacobian.contracts.polynomials import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.polynomial_expressions import PolynomialExpressionArtifactService
-from jacobian.provider_runtime import (
-    SYMPY_POLYNOMIAL_WORKER_PROTOCOL,
-    SYMPY_VERSION,
+from jacobian.provider_runtime import SYMPY_POLYNOMIAL_WORKER_PROTOCOL, SYMPY_VERSION
+from jacobian.providers.sympy_runtime import (
     sympy_polynomial_normalization_provider_runtime,
 )
 from jacobian.schema_registry import model_schema

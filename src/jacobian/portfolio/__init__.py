@@ -1,9 +1,10 @@
 """Explicit mathematical portfolio installation."""
 
 from jacobian.portfolio.assembler import install_portfolio
-from jacobian.portfolio.builtin import BUILTIN_PORTFOLIO
+from jacobian.portfolio.builtin import build_builtin_portfolio
 from jacobian.portfolio.model import PortfolioPlan
 from jacobian.portfolio.result import (
+    DEPENDENCY_UNAVAILABLE,
     PROVIDER_UNAVAILABLE,
     BundleInstallation,
     BundleInstallationStatus,
@@ -13,7 +14,7 @@ from jacobian.portfolio.result import (
 )
 
 __all__ = [
-    "BUILTIN_PORTFOLIO",
+    "DEPENDENCY_UNAVAILABLE",
     "PROVIDER_UNAVAILABLE",
     "BundleInstallation",
     "BundleInstallationStatus",
@@ -21,5 +22,6 @@ __all__ = [
     "PortfolioInstallation",
     "PortfolioInstallationResult",
     "PortfolioPlan",
+    "build_builtin_portfolio",
     "install_portfolio",
 ]

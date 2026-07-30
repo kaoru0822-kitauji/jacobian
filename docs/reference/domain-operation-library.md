@@ -177,3 +177,8 @@ Keep additions domain-owned and follow the nearby bundle:
 Do not add a mechanical wrapper for every backend function, hide a research
 workflow in one operation, authorize a checker from domain code, or interpret
 missing witnesses and incomplete searches as negative conclusions.
+
+A new built-in domain changes its own package and the explicit ordered factory
+tuple. It does not change generic MCP tools, checker authority, shared
+documentation landing-page registries, `tests/topology.toml`, or
+`.github/ci-impact.json`. The latter two remain CI-owned control planes.

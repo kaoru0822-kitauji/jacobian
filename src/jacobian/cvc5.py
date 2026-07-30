@@ -45,7 +45,7 @@ from jacobian.cvc5_worker import (
     CVC5_PROOF_LIMIT,
     CVC5_WORKER_PROTOCOL,
 )
-from jacobian.provider_runtime import CVC5_VERSION
+from jacobian.providers.external_solver_runtime import CVC5_VERSION
 from jacobian.schema_registry import model_schema
 from jacobian.smt import ResolvedSmtProblem, SmtArtifactService
 

@@ -23,8 +23,8 @@ from jacobian.contracts.number_theory import (
     PowerfulNumberResult,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
-from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
+from jacobian.domains.combinatorics import build_combinatorics_bundle
+from jacobian.domains.number_theory import build_number_theory_bundle
 from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.runtime import create_runtime
@@ -40,7 +40,7 @@ def _service(tmp_path: Path) -> CapabilityService:
     artifacts = ArtifactService(store, schemas)
     service = CapabilityService(store, ResearchMemory(store, schemas))
     installer = OperationInstaller(store, schemas, artifacts)
-    for bundle in (NUMBER_THEORY_BUNDLE, COMBINATORICS_BUNDLE):
+    for bundle in (build_number_theory_bundle(), build_combinatorics_bundle()):
         for adapter in installer.install(bundle).adapters:
             service.register(adapter)
     return service

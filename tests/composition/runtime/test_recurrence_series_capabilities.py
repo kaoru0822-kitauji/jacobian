@@ -11,7 +11,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
+from jacobian.domains.combinatorics import build_combinatorics_bundle
 
 _RECURRENCE_CONVENTION = "A_N_EQUALS_SUM_C_J_TIMES_A_N_MINUS_J_FOR_J_FROM_1"
 _OVERLAP_CASES = json.loads(
@@ -61,7 +61,10 @@ def _series_payload() -> dict[str, object]:
 def test_combinatorics_bundle_preserves_named_sequences_and_adds_atomic_generic_ops(
     fresh_complete_runtime,
 ) -> None:
-    ids = {operation.capability_id for operation in COMBINATORICS_BUNDLE.capabilities}
+    ids = {
+        operation.capability_id
+        for operation in build_combinatorics_bundle().capabilities
+    }
     assert {
         "combinatorics.compute.fibonacci",
         "combinatorics.compute.fibonacci_pair",

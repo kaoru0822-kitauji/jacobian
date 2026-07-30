@@ -15,45 +15,48 @@ from jacobian.operations import (
 )
 from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 
-GEOMETRY_BUNDLE = DomainBundle(
-    domain_id="geometry",
-    schema_namespace="jacobian.geometry",
-    semantics=DomainSemantics(
-        name="jacobian.exact-rational-plane-geometry",
-        version="2",
-        definition={
-            "description": "Euclidean plane geometry over exact rational coordinates",
-            "degeneracy": "operation-specific and fail-closed",
-            "assurance": (
-                "computed producers; selected results admit separately "
-                "authorized independent exact replay"
-            ),
-        },
-    ),
-    provider_runtime=known_provider_runtime(
-        "jacobian.sympy",
-        features=("exact-rational-geometry",),
-    ),
-    backend_version=SYMPY_VERSION,
-    capabilities=(
-        *POINT_CAPABILITIES,
-        *SEGMENT_CAPABILITIES,
-        *LINE_CAPABILITIES,
-        *TRIANGLE_CAPABILITIES,
-        *POLYGON_CAPABILITIES,
-    ),
-    diagnostics=DomainDiagnostics(
-        invalid_request=CapabilityDiagnostic(
-            code="INVALID_GEOMETRY_REQUEST",
-            stage="geometry_input_validation",
-            message="Input does not satisfy the exact planar-geometry contract.",
-            hint="Use canonical rationals and inspect the operation's point/line schema.",
-        )
-    ),
-    scope_description="the complete supplied exact rational geometry input",
-    completeness_basis=(
-        "exact symbolic computation covered the supplied finite input; "
-        "not independently verified"
-    ),
-    assurance_basis="exact SymPy rational geometry; no independent checker invoked",
-)
+
+def build_geometry_bundle() -> DomainBundle:
+    """Build this domain-owned installation unit explicitly."""
+    return DomainBundle(
+        domain_id="geometry",
+        schema_namespace="jacobian.geometry",
+        semantics=DomainSemantics(
+            name="jacobian.exact-rational-plane-geometry",
+            version="2",
+            definition={
+                "description": "Euclidean plane geometry over exact rational coordinates",
+                "degeneracy": "operation-specific and fail-closed",
+                "assurance": (
+                    "computed producers; selected results admit separately "
+                    "authorized independent exact replay"
+                ),
+            },
+        ),
+        provider_runtime=known_provider_runtime(
+            "jacobian.sympy",
+            features=("exact-rational-geometry",),
+        ),
+        backend_version=SYMPY_VERSION,
+        capabilities=(
+            *POINT_CAPABILITIES,
+            *SEGMENT_CAPABILITIES,
+            *LINE_CAPABILITIES,
+            *TRIANGLE_CAPABILITIES,
+            *POLYGON_CAPABILITIES,
+        ),
+        diagnostics=DomainDiagnostics(
+            invalid_request=CapabilityDiagnostic(
+                code="INVALID_GEOMETRY_REQUEST",
+                stage="geometry_input_validation",
+                message="Input does not satisfy the exact planar-geometry contract.",
+                hint="Use canonical rationals and inspect the operation's point/line schema.",
+            )
+        ),
+        scope_description="the complete supplied exact rational geometry input",
+        completeness_basis=(
+            "exact symbolic computation covered the supplied finite input; "
+            "not independently verified"
+        ),
+        assurance_basis="exact SymPy rational geometry; no independent checker invoked",
+    )

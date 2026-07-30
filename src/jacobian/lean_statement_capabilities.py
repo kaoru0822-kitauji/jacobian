@@ -61,7 +61,7 @@ from jacobian.contracts.lean_statement import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
-from jacobian.provider_runtime import lean_frontend_provider_runtime
+from jacobian.providers.lean_runtime import lean_frontend_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 

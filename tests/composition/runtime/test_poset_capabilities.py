@@ -11,7 +11,7 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.posets import FINITE_POSET_BUNDLE
+from jacobian.domains.posets import build_finite_poset_bundle
 
 _DIAMOND = {
     "elements": ["0", "a", "b", "1"],
@@ -51,7 +51,8 @@ def _invoke(
 
 def test_poset_bundle_exposes_four_atomic_capabilities(fresh_complete_runtime) -> None:
     ids = tuple(
-        operation.capability_id for operation in FINITE_POSET_BUNDLE.capabilities
+        operation.capability_id
+        for operation in build_finite_poset_bundle().capabilities
     )
     assert ids == (
         "poset.finite.materialize",

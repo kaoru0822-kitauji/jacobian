@@ -124,6 +124,7 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
         if task_name in VERIFICATION_RECORD_TASKS:
             assert "verification_record_schema.json" in environment_dockerfile
         tests_dockerfile = (task / "tests" / "Dockerfile").read_text()
+        assert "verifier_support.py" in tests_dockerfile
         verifier_dockerfile_sizes.append((task / "tests" / "Dockerfile").stat().st_size)
         verifier_digest = hashlib.sha256(
             (task / "tests" / "verifier.py").read_bytes()

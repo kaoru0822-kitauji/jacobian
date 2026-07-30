@@ -24,7 +24,7 @@ from jacobian.flint_linear import install_python_flint_inconsistency_capability
 from jacobian.linear_capabilities import (
     install_linear_rational_inconsistency_checker,
 )
-from jacobian.provider_runtime import python_flint_provider_runtime
+from jacobian.providers.flint_runtime import python_flint_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode
 from jacobian.runtime.services import CoreServices
 

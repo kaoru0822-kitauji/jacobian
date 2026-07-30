@@ -10,6 +10,7 @@ from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.operations import DomainBundle
 from jacobian.portfolio.model import PortfolioPlan
 from jacobian.portfolio.result import (
+    DEPENDENCY_UNAVAILABLE,
     PROVIDER_UNAVAILABLE,
     BundleInstallation,
     BundleInstallationStatus,
@@ -53,10 +54,43 @@ class DomainBundleInstaller:
                 )
                 continue
 
+            unavailable_dependencies = tuple(
+                dependency_id
+                for dependency_id in bundle.dependency_ids
+                if dependency_id not in installed
+            )
+            if unavailable_dependencies:
+                diagnostic = PortfolioDiagnostic(
+                    code=DEPENDENCY_UNAVAILABLE,
+                    component_id=bundle.domain_id,
+                    stage="dependency_availability",
+                    message=(
+                        "required domain bundle dependencies are unavailable: "
+                        + ", ".join(unavailable_dependencies)
+                    ),
+                )
+                diagnostics.append(diagnostic)
+                outcomes.append(
+                    BundleInstallation(
+                        domain_id=bundle.domain_id,
+                        status=(
+                            BundleInstallationStatus.SKIPPED_DEPENDENCY_UNAVAILABLE
+                        ),
+                        capability_ids=capability_ids,
+                        installed=None,
+                        diagnostic=diagnostic,
+                    )
+                )
+                continue
+
             if bundle.managed_installer is None:
                 installation = self.context.operations.install(bundle)
             else:
-                installation = bundle.managed_installer(self.context)
+                dependencies = {
+                    dependency_id: installed[dependency_id]
+                    for dependency_id in bundle.dependency_ids
+                }
+                installation = bundle.managed_installer(self.context, dependencies)
                 _validate_managed_installation(bundle, installation)
             installed[bundle.domain_id] = installation
             for adapter in installation.adapters:

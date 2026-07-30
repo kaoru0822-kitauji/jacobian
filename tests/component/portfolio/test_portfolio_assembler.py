@@ -1,9 +1,9 @@
 """Behavioral tests for the portfolio assembler's installation absorption.
 
-The assembler records only one per-bundle omission: a declared unavailable
-provider, which removes only that bundle's capabilities. Every other
-installation failure (programming, schema, store, or configuration defects)
-must propagate so the caller's enclosing transaction rolls back atomically.
+The assembler records declared provider unavailability and bundles affected by
+an unavailable declared dependency. Every other installation failure
+(programming, schema, store, or configuration defects) must propagate so the
+caller's enclosing transaction rolls back atomically.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ContractModel
 from jacobian.installation.context import InstallationContext
 from jacobian.memory import ResearchMemory
-from jacobian.operation_installation import OperationInstaller
+from jacobian.operation_installation import InstalledDomainBundle, OperationInstaller
 from jacobian.operations import (
     ComputedOperation,
     ComputedSuccess,
@@ -36,10 +36,11 @@ from jacobian.operations import (
     DomainSemantics,
 )
 from jacobian.portfolio import (
+    DEPENDENCY_UNAVAILABLE,
     PROVIDER_UNAVAILABLE,
     PortfolioPlan,
 )
-from jacobian.portfolio.builtin import BUILTIN_PORTFOLIO
+from jacobian.portfolio.builtin import build_builtin_portfolio
 from jacobian.portfolio.domain_installation import DomainBundleInstaller
 from jacobian.portfolio.result import (
     BundleInstallationStatus,
@@ -276,6 +277,49 @@ def test_unavailable_provider_does_not_block_subsequent_bundles(
     ]
 
 
+def test_unavailable_dependency_skips_affected_bundle_and_continues(
+    assembly: _RecordingContext,
+) -> None:
+    def dependent_installer(*_args: object, **_kwargs: object) -> InstalledDomainBundle:
+        raise AssertionError("an installer with unavailable dependencies must not run")
+
+    dependent = replace(
+        _synthetic_bundle(domain_id="dependent"),
+        capabilities=(),
+        managed_capability_ids=("dependent.compute.double",),
+        managed_installer=dependent_installer,
+        dependency_ids=("optional",),
+    )
+    plan = PortfolioPlan(
+        domain_bundles=(
+            _synthetic_bundle(
+                domain_id="optional",
+                runtime=_unavailable_runtime("optional provider is missing"),
+            ),
+            dependent,
+            _synthetic_bundle(domain_id="unrelated"),
+        )
+    )
+
+    result = DomainBundleInstaller(assembly.context).install(plan)
+
+    assert result.installed_domain_ids == ("unrelated",)
+    assert result.skipped_domain_ids == ("optional", "dependent")
+    assert assembly.registered == ["unrelated.compute.double"]
+
+    diagnostic = result.diagnostic_for("dependent")
+    assert diagnostic is not None
+    assert diagnostic.code == DEPENDENCY_UNAVAILABLE
+    assert diagnostic.stage == "dependency_availability"
+    assert "optional" in diagnostic.message
+
+    outcome = result.outcome_for("dependent")
+    assert outcome is not None
+    assert outcome.status is BundleInstallationStatus.SKIPPED_DEPENDENCY_UNAVAILABLE
+    assert outcome.capability_ids == ("dependent.compute.double",)
+    assert outcome.installed is None
+
+
 def test_install_domains_validates_the_plan_before_installing(
     assembly: _RecordingContext,
 ) -> None:
@@ -350,7 +394,7 @@ def test_install_failure_propagates_without_silent_partial_portfolio(
 def test_conjecture_ingestion_installs_through_domain_bundle_outcome(
     assembly: _RecordingContext,
 ) -> None:
-    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    bundle = build_builtin_portfolio().bundle_for("conjecture_ingestion")
 
     assert bundle is not None
     assert bundle.capability_ids == ("dataset.conjecture.ingest",)
@@ -368,7 +412,7 @@ def test_conjecture_ingestion_installs_through_domain_bundle_outcome(
 def test_managed_bundle_rejects_installed_capability_id_mismatch(
     assembly: _RecordingContext,
 ) -> None:
-    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    bundle = build_builtin_portfolio().bundle_for("conjecture_ingestion")
     assert bundle is not None
     mismatched = replace(bundle, managed_capability_ids=("dataset.wrong.ingest",))
 
@@ -381,7 +425,7 @@ def test_managed_bundle_rejects_installed_capability_id_mismatch(
 def test_managed_bundle_rejects_installed_provider_runtime_mismatch(
     assembly: _RecordingContext,
 ) -> None:
-    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    bundle = build_builtin_portfolio().bundle_for("conjecture_ingestion")
     assert bundle is not None
     mismatched = replace(
         bundle,

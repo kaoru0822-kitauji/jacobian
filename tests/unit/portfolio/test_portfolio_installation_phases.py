@@ -16,6 +16,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.installation.context import InstallationContext
 from jacobian.portfolio.core_installation import CoreApplicationInstaller
 from jacobian.portfolio.foundation_installation import FoundationInstaller
+from jacobian.portfolio.model import PortfolioPlan
 from jacobian.portfolio.provider_resolution import (
     ProviderAvailabilityResolver,
     ProviderRuntimePlan,
@@ -78,7 +79,7 @@ def test_core_domain_verification_phase_accepts_empty_bundle_result() -> None:
     result = PortfolioInstallation()
     CoreApplicationInstaller(
         cast(InstallationContext, object())
-    ).install_domain_verification(result)
+    ).install_domain_verification(result, PortfolioPlan(domain_bundles=()))
 
     assert result.geometry_checker is None
     assert result.exact_domain_checkers is None

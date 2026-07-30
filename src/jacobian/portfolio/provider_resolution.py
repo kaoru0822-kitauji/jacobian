@@ -6,15 +6,21 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
-from jacobian.provider_runtime import (
+from jacobian.providers.external_solver_runtime import (
     cadical_provider_runtime,
     carcara_provider_runtime,
     cvc5_provider_runtime,
     drat_trim_provider_runtime,
-    lean_frontend_provider_runtime,
-    lean_provider_runtime,
+)
+from jacobian.providers.flint_runtime import (
     python_flint_hnf_provider_runtime,
     python_flint_provider_runtime,
+)
+from jacobian.providers.lean_runtime import (
+    lean_frontend_provider_runtime,
+    lean_provider_runtime,
+)
+from jacobian.providers.sympy_runtime import (
     sympy_polynomial_normalization_provider_runtime,
 )
 

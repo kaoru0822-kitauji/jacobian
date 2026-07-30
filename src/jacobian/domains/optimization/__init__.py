@@ -1,5 +1,5 @@
 """Exact optimization capabilities."""
 
-from jacobian.domains.optimization.bundle import RATIONAL_OPTIMIZATION_BUNDLE
+from jacobian.domains.optimization.bundle import build_rational_optimization_bundle
 
-__all__ = ["RATIONAL_OPTIMIZATION_BUNDLE"]
+__all__ = ["build_rational_optimization_bundle"]

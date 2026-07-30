@@ -140,6 +140,35 @@ def test_mcp_protocol_and_authentication_errors_remain_distinct(tmp_path: Path) 
     asyncio.run(scenario())
 
 
+def test_direct_tool_calls_reject_unknown_and_malformed_arguments(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        server = create_server(tmp_path)
+
+        unknown = await server.call_tool(
+            "workspace.write",
+            {
+                "workspace_id": "workspace_fixture",
+                "expected_revision": 0,
+                "idempotency_key": "write_fixture",
+                "unexpected": True,
+            },
+        )
+        assert unknown.is_error is True
+        assert '"code": "INVALID_INPUT"' in unknown.content[0].text
+
+        malformed = await server.call_tool(
+            "capability.describe",
+            {"limit": "not-an-integer"},
+        )
+        assert malformed.is_error is True
+        assert '"code": "INVALID_INPUT"' in malformed.content[0].text
+        assert "not-an-integer" not in malformed.content[0].text
+
+    asyncio.run(scenario())
+
+
 def test_mcp_stdio_entrypoint_exposes_capability_and_workspace_tools(
     tmp_path: Path,
 ) -> None:

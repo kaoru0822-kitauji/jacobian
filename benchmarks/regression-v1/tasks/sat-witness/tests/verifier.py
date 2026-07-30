@@ -1,40 +1,18 @@
-import hashlib
 import json
 from pathlib import Path
+
+from verifier_support import evidence_list_is_bound, resolve_evidence, sha256_uri
 
 W = Path("/app")
 E = Path("/tests")
 
 
 def _digest(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(65536), b""):
-            digest.update(block)
-    return "sha256:" + digest.hexdigest()
+    return sha256_uri(path)
 
 
 def _descriptor_target(descriptor, expected_path):
-    if not isinstance(descriptor, dict) or set(descriptor) != {"path", "sha256"}:
-        return None
-    if not isinstance(descriptor.get("path"), str) or not isinstance(
-        descriptor.get("sha256"), str
-    ):
-        return None
-    p = Path(descriptor["path"])
-    if (
-        p != Path(expected_path)
-        or p.is_absolute()
-        or ".." in p.parts
-        or (W / p).is_symlink()
-    ):
-        return None
-    target = (W / p).resolve()
-    if not target.is_relative_to(W.resolve()) or not target.is_file():
-        return None
-    if descriptor["sha256"] != _digest(target):
-        return None
-    return target
+    return resolve_evidence(descriptor, expected_path=expected_path)
 
 
 def _descriptor_json(descriptor, expected_path):
@@ -48,13 +26,7 @@ def _descriptor_json(descriptor, expected_path):
 
 
 def _answer_evidence(submission):
-    entries = submission.get("evidence") if isinstance(submission, dict) else None
-    if not isinstance(entries, list) or not entries:
-        return False
-    return all(
-        _descriptor_target(entry, "evidence/answer.txt") is not None
-        for entry in entries
-    )
+    return evidence_list_is_bound(submission.get("evidence"))
 
 
 def _record_is_bound(submission, input_data, assignment, sat):

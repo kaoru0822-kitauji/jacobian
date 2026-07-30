@@ -3,7 +3,7 @@
 UV_RUN := uv run --locked
 HARBOR_VERSION ?= 0.20.0
 HARBOR_RUNNER ?= uvx --from harbor==$(HARBOR_VERSION) harbor
-HARBOR_PYTHON ?= uvx --from harbor==$(HARBOR_VERSION) python
+HARBOR_PYTHON ?= uvx --from harbor==$(HARBOR_VERSION) --with tomli-w==1.2.0 python
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-oracle agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-sync harbor-oracle agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -160,7 +160,12 @@ precommit: ## Fix and run every routine local handoff check.
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
 harbor-check: ## Verify committed Harbor task digests against local task contents.
-	$(HARBOR_PYTHON) tools/check_harbor_dataset.py
+	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
+
+harbor-sync: ## Update vendored verifier support and deterministic task digests.
+	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
 
 harbor-oracle: harbor-check ## Run the Harbor Oracle contract gate.
 	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-oracle.json $(EVAL_ARGS)

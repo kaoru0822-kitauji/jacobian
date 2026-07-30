@@ -1,5 +1,5 @@
 """Exact integer and rational arithmetic capabilities."""
 
-from jacobian.domains.arithmetic.bundle import ARITHMETIC_BUNDLE
+from jacobian.domains.arithmetic.bundle import build_arithmetic_bundle
 
-__all__ = ["ARITHMETIC_BUNDLE"]
+__all__ = ["build_arithmetic_bundle"]

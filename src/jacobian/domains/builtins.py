@@ -1,50 +1,71 @@
-"""Explicit built-in domain portfolio."""
+"""Explicit factories for the built-in domain portfolio.
 
-from jacobian.domains.analysis import REAL_ANALYSIS_BUNDLE
-from jacobian.domains.arithmetic import ARITHMETIC_BUNDLE
-from jacobian.domains.certified_snf import CERTIFIED_SNF_BUNDLE
-from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
-from jacobian.domains.conjecture_ingestion import CONJECTURE_INGESTION_BUNDLE
-from jacobian.domains.finite_sets import FINITE_SET_BUNDLE
-from jacobian.domains.formal_datasets import FORMAL_DATASET_BUNDLE
-from jacobian.domains.geometry import GEOMETRY_BUNDLE
+This is the only module allowed to know every built-in mathematical domain.
+The tuple is deliberately literal and ordered: adding a domain changes this
+composition root, without package scanning or import-time registration.
+"""
+
+from collections.abc import Callable
+
+from jacobian.domains.analysis import build_real_analysis_bundle
+from jacobian.domains.arithmetic import build_arithmetic_bundle
+from jacobian.domains.certified_snf import build_certified_snf_bundle
+from jacobian.domains.combinatorics import build_combinatorics_bundle
+from jacobian.domains.conjecture_ingestion import build_conjecture_ingestion_bundle
+from jacobian.domains.finite_sets import build_finite_set_bundle
+from jacobian.domains.formal_datasets import build_formal_dataset_bundle
+from jacobian.domains.geometry import build_geometry_bundle
 from jacobian.domains.graph_optimization import (
-    GRAPH_INVARIANT_BUNDLE,
-    GRAPH_OPTIMIZATION_BUNDLE,
+    build_graph_invariant_bundle,
+    build_graph_optimization_bundle,
 )
-from jacobian.domains.graph_symmetry import GRAPH_SYMMETRY_BUNDLE
-from jacobian.domains.matrix_lattice import LATTICE_BUNDLE, MATRIX_BUNDLE
-from jacobian.domains.number_theory import NUMBER_THEORY_BUNDLE
-from jacobian.domains.optimization import RATIONAL_OPTIMIZATION_BUNDLE
-from jacobian.domains.polynomial import POLYNOMIAL_BUNDLE
-from jacobian.domains.posets import FINITE_POSET_BUNDLE
-from jacobian.domains.probability import FINITE_PROBABILITY_BUNDLE
-from jacobian.domains.projective_geometry import PROJECTIVE_GEOMETRY_BUNDLE
-from jacobian.domains.sequences import SEQUENCE_BUNDLE
-from jacobian.domains.topology import TOPOLOGY_BUNDLE
+from jacobian.domains.graph_symmetry import build_graph_symmetry_bundle
+from jacobian.domains.matrix_lattice import build_lattice_bundle, build_matrix_bundle
+from jacobian.domains.number_theory import build_number_theory_bundle
+from jacobian.domains.optimization import build_rational_optimization_bundle
+from jacobian.domains.polynomial import build_polynomial_bundle
+from jacobian.domains.posets import build_finite_poset_bundle
+from jacobian.domains.probability import build_finite_probability_bundle
+from jacobian.domains.projective_geometry import build_projective_geometry_bundle
+from jacobian.domains.sequences import build_sequence_bundle
+from jacobian.domains.topology import build_topology_bundle
+from jacobian.operations import DomainBundle
 
-BUILTIN_DOMAIN_BUNDLES = (
-    ARITHMETIC_BUNDLE,
-    CONJECTURE_INGESTION_BUNDLE,
-    NUMBER_THEORY_BUNDLE,
-    COMBINATORICS_BUNDLE,
-    FINITE_SET_BUNDLE,
-    FORMAL_DATASET_BUNDLE,
-    SEQUENCE_BUNDLE,
-    GEOMETRY_BUNDLE,
-    PROJECTIVE_GEOMETRY_BUNDLE,
-    GRAPH_OPTIMIZATION_BUNDLE,
-    GRAPH_INVARIANT_BUNDLE,
-    GRAPH_SYMMETRY_BUNDLE,
-    CERTIFIED_SNF_BUNDLE,
-    MATRIX_BUNDLE,
-    LATTICE_BUNDLE,
-    POLYNOMIAL_BUNDLE,
-    REAL_ANALYSIS_BUNDLE,
-    FINITE_PROBABILITY_BUNDLE,
-    RATIONAL_OPTIMIZATION_BUNDLE,
-    TOPOLOGY_BUNDLE,
-    FINITE_POSET_BUNDLE,
+type DomainBundleFactory = Callable[[], DomainBundle]
+
+BUILTIN_DOMAIN_BUNDLE_FACTORIES: tuple[DomainBundleFactory, ...] = (
+    build_arithmetic_bundle,
+    build_conjecture_ingestion_bundle,
+    build_number_theory_bundle,
+    build_combinatorics_bundle,
+    build_finite_set_bundle,
+    build_formal_dataset_bundle,
+    build_sequence_bundle,
+    build_geometry_bundle,
+    build_projective_geometry_bundle,
+    build_graph_optimization_bundle,
+    build_graph_invariant_bundle,
+    build_graph_symmetry_bundle,
+    build_certified_snf_bundle,
+    build_matrix_bundle,
+    build_lattice_bundle,
+    build_polynomial_bundle,
+    build_real_analysis_bundle,
+    build_finite_probability_bundle,
+    build_rational_optimization_bundle,
+    build_topology_bundle,
+    build_finite_poset_bundle,
 )
 
-__all__ = ["BUILTIN_DOMAIN_BUNDLES"]
+
+def build_builtin_domain_bundles() -> tuple[DomainBundle, ...]:
+    """Construct the ordered built-in portfolio without import-time instances."""
+
+    return tuple(factory() for factory in BUILTIN_DOMAIN_BUNDLE_FACTORIES)
+
+
+__all__ = [
+    "BUILTIN_DOMAIN_BUNDLE_FACTORIES",
+    "DomainBundleFactory",
+    "build_builtin_domain_bundles",
+]

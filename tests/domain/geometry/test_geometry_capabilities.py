@@ -20,12 +20,12 @@ from jacobian.contracts.geometry import (
     SimplePolygonPointRequest,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.geometry import GEOMETRY_BUNDLE
+from jacobian.domains.geometry import build_geometry_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(tmp_path / "state", GEOMETRY_BUNDLE) as services:
+    with open_domain_services(tmp_path / "state", build_geometry_bundle()) as services:
         yield services
 
 
@@ -108,11 +108,13 @@ def test_geometry_capabilities_are_distinct_and_every_contract_completes(
             "point": {"x": ONE, "y": ONE},
         },
     }
-    ids = [operation.capability_id for operation in GEOMETRY_BUNDLE.capabilities]
+    ids = [
+        operation.capability_id for operation in build_geometry_bundle().capabilities
+    ]
 
     assert len(ids) == 16
     assert len(ids) == len(set(ids))
-    for operation in GEOMETRY_BUNDLE.capabilities:
+    for operation in build_geometry_bundle().capabilities:
         result = domain_services.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id=operation.capability_id,

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
+    from jacobian.checker_operations import ExactReplayCheckerDeclaration
     from jacobian.installation.context import InstallationContext
     from jacobian.operation_installation import InstalledDomainBundle
 
@@ -240,6 +241,7 @@ class ManagedDomainInstaller(Protocol):
     def __call__(
         self,
         context: InstallationContext,
+        dependencies: Mapping[str, InstalledDomainBundle],
     ) -> InstalledDomainBundle: ...
 
 
@@ -259,6 +261,8 @@ class DomainBundle:
     assurance_basis: str
     managed_capability_ids: tuple[str, ...] = ()
     managed_installer: ManagedDomainInstaller | None = None
+    dependency_ids: tuple[str, ...] = ()
+    checker_declarations: tuple[ExactReplayCheckerDeclaration, ...] = ()
 
     @property
     def capability_ids(self) -> tuple[str, ...]:

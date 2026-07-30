@@ -9,7 +9,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.sat import SatProofArtifact
-from jacobian.provider_runtime import (
+from jacobian.providers.external_solver_runtime import (
     CADICAL_VERSION,
     DRAT_TRIM_RELEASE_TAG,
     cadical_provider_runtime,

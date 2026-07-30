@@ -12,7 +12,7 @@ import pytest
 from tests.component.capabilities.capabilities import invoke_capability as _invoke
 from tests.support.services import open_domain_services
 
-import jacobian.provider_runtime as provider_runtime
+import jacobian.providers.flint_runtime as flint_runtime
 from jacobian.bounded_process import BoundedProcessResult
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
@@ -27,6 +27,7 @@ from jacobian.flint_hnf import install_python_flint_hnf_capability
 from jacobian.matrix_normal_form_capabilities import (
     install_matrix_normal_form_checker,
 )
+from jacobian.providers.flint_runtime import python_flint_hnf_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode
 from jacobian.runtime.services import CoreServices
 
@@ -53,7 +54,7 @@ def _open_hnf_runtime(
         else CheckerAuthorityMode.NONE
     )
     with open_domain_services(root, checker_authority=authority) as services:
-        runtime = provider_runtime.python_flint_hnf_provider_runtime()
+        runtime = python_flint_hnf_provider_runtime()
         producer = install_python_flint_hnf_capability(
             services.core.matrix_normal_forms,
             runtime,
@@ -127,7 +128,7 @@ def test_python_flint_produces_bound_rectangular_row_hnf(
 
 
 def test_hnf_runtime_has_a_distinct_exact_operation_profile() -> None:
-    runtime = provider_runtime.python_flint_hnf_provider_runtime()
+    runtime = python_flint_hnf_provider_runtime()
 
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
     assert runtime.version == "0.9.0"
@@ -148,20 +149,20 @@ def test_hnf_runtime_has_a_distinct_exact_operation_profile() -> None:
 def test_hnf_runtime_rejects_a_different_linked_flint_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    available = provider_runtime.python_flint_hnf_provider_runtime()
+    available = python_flint_hnf_provider_runtime()
     assert available.availability is CapabilityProviderAvailability.AVAILABLE
     monkeypatch.setattr(
-        provider_runtime,
+        flint_runtime,
         "python_distribution_provider_runtime",
         lambda *_args, **_kwargs: available,
     )
     monkeypatch.setattr(
-        provider_runtime.importlib,
+        flint_runtime.importlib,
         "import_module",
         lambda _name: SimpleNamespace(__FLINT_VERSION__="3.5.0"),
     )
 
-    rejected = provider_runtime.python_flint_hnf_provider_runtime(refresh=True)
+    rejected = python_flint_hnf_provider_runtime(refresh=True)
 
     assert rejected.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert rejected.version is None

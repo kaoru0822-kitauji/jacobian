@@ -9,6 +9,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.exact_domain_checkers import install_exact_domain_verification
+from jacobian.portfolio.builtin import build_builtin_portfolio
 from jacobian.runtime.model import JacobianRuntime
 
 
@@ -45,15 +46,21 @@ def _poly_xy(*terms: tuple[tuple[int, int], int]) -> dict[str, object]:
 def _install_verification(
     fresh_complete_runtime: JacobianRuntime, *, authorize: bool
 ) -> tuple[object, ...]:
+    portfolio = build_builtin_portfolio()
+    bundles = {
+        domain_id: (
+            portfolio.bundle_for(domain_id),
+            fresh_complete_runtime.portfolio.domain_bundles[domain_id],
+        )
+        for domain_id in ("polynomial", "matrix", "probability")
+    }
     adapters, _ = install_exact_domain_verification(
         fresh_complete_runtime.core.store,
         fresh_complete_runtime.core.schemas,
         fresh_complete_runtime.core.artifacts,
         fresh_complete_runtime.services.verification,
         fresh_complete_runtime.core.checkers,
-        polynomial=fresh_complete_runtime.portfolio.domain_bundles["polynomial"],
-        matrix=fresh_complete_runtime.portfolio.domain_bundles["matrix"],
-        probability=fresh_complete_runtime.portfolio.domain_bundles.get("probability"),
+        bundles=bundles,
         authorize=authorize,
     )
     for adapter in adapters:

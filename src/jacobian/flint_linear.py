@@ -41,10 +41,8 @@ from jacobian.flint_linear_worker import (
     FLINT_LINEAR_WORKER_PROTOCOL,
 )
 from jacobian.linear import LinearArtifactService
-from jacobian.provider_runtime import (
-    PYTHON_FLINT_VERSION,
-    python_flint_provider_runtime,
-)
+from jacobian.provider_runtime import PYTHON_FLINT_VERSION
+from jacobian.providers.flint_runtime import python_flint_provider_runtime
 from jacobian.schema_registry import model_schema
 
 FLINT_LINEAR_STDOUT_LIMIT = 64_000

@@ -18,10 +18,10 @@ from jacobian.contracts.capabilities import (
     CapabilityResult,
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
-from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLES
-from jacobian.domains.graph_optimization.bundle import GRAPH_OPTIMIZATION_BUNDLE
+from jacobian.domains.builtins import build_builtin_domain_bundles
+from jacobian.domains.graph_optimization.bundle import build_graph_optimization_bundle
 from jacobian.domains.graph_optimization.invariant_bundle import (
-    GRAPH_INVARIANT_BUNDLE,
+    build_graph_invariant_bundle,
 )
 from jacobian.provider_measurements import _cold_install_spec
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
@@ -81,12 +81,12 @@ def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
     )
     built_in_ids = {
         operation.capability_id
-        for bundle in BUILTIN_DOMAIN_BUNDLES
+        for bundle in build_builtin_domain_bundles()
         for operation in bundle.capabilities
     }
     assert built_in_ids <= descriptors.keys()
     assert set(runtime.portfolio.domain_bundles) == {
-        bundle.domain_id for bundle in BUILTIN_DOMAIN_BUNDLES
+        bundle.domain_id for bundle in build_builtin_domain_bundles()
     }
     assert {
         "matrix.integer.row_hermite_normal_form",
@@ -110,12 +110,12 @@ def test_unavailable_adapter_is_rejected_before_catalog_advertisement(
 
 
 def test_graph_domain_runtime_identities_bind_every_executed_backend() -> None:
-    optimization_components = GRAPH_OPTIMIZATION_BUNDLE.provider_runtime.configuration[
-        "components"
-    ]
-    invariant_components = GRAPH_INVARIANT_BUNDLE.provider_runtime.configuration[
-        "components"
-    ]
+    optimization_components = (
+        build_graph_optimization_bundle().provider_runtime.configuration["components"]
+    )
+    invariant_components = (
+        build_graph_invariant_bundle().provider_runtime.configuration["components"]
+    )
 
     assert {component["provider"] for component in optimization_components} == {
         "jacobian.networkx",
@@ -127,11 +127,11 @@ def test_graph_domain_runtime_identities_bind_every_executed_backend() -> None:
         "jacobian.sympy",
     }
     assert (
-        GRAPH_OPTIMIZATION_BUNDLE.provider_runtime.digest_kind
+        build_graph_optimization_bundle().provider_runtime.digest_kind
         is CapabilityProviderDigestKind.COMPOSITE
     )
     assert (
-        GRAPH_INVARIANT_BUNDLE.provider_runtime.digest_kind
+        build_graph_invariant_bundle().provider_runtime.digest_kind
         is CapabilityProviderDigestKind.COMPOSITE
     )
 

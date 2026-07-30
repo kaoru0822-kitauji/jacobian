@@ -6,12 +6,12 @@ from tests.support.services import DomainTestServices, open_domain_services
 
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.domains.sequences import SEQUENCE_BUNDLE
+from jacobian.domains.sequences import build_sequence_bundle
 
 
 @pytest.fixture
 def domain_services(tmp_path: Path) -> Iterator[DomainTestServices]:
-    with open_domain_services(tmp_path / "state", SEQUENCE_BUNDLE) as services:
+    with open_domain_services(tmp_path / "state", build_sequence_bundle()) as services:
         yield services
 
 
