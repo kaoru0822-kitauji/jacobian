@@ -28,7 +28,7 @@ digest but is not copied into the output artifact.
 Policy `jacobian.external-conjecture-publication/v1` allows statement text only
 for the registered `CC0-1.0`, `CC-BY-4.0`, `Apache-2.0`, and `MIT`
 classifications and only when both a license-evidence URL and verified evidence
-digest are supplied.
+digest are supplied. Blank or incomplete evidence tuples are rejected.
 
 `CC-BY-NC-4.0`, `CC-BY-ND-4.0`, proprietary, restricted, unknown, and missing
 license classifications produce `METADATA_ONLY`. In that state:
@@ -37,6 +37,12 @@ license classifications produce `METADATA_ONLY`. In that state:
 - supplied text receives a digest so the decision remains source-bound;
 - statement text and its indexable digest are withheld; and
 - the output records an explicit withholding reason.
+
+A metadata record for which no statement was supplied uses
+`METADATA_INDEXED_NO_TEXT`; it is not mislabeled as policy-withheld content.
+Because an input request can contain restricted text and raw license evidence,
+this capability disables automatic research-episode recording. Only its
+policy-filtered artifact and output are persisted.
 
 This mirrors OpenConjecture's public-release pattern of publishing permitted
 text while retaining more restrictive sources as metadata-only records. The

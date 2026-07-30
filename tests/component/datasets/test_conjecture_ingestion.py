@@ -5,12 +5,13 @@ from pathlib import Path
 import pytest
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capabilities import CapabilityInvocationError, CapabilityService
 from jacobian.conjecture_ingestion import install_conjecture_ingestion_capability
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
 )
+from jacobian.memory import ResearchMemory
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
@@ -200,4 +201,77 @@ def test_metadata_only_source_without_statement_is_retained(tmp_path: Path) -> N
 
     assert result.output["supplied_content_digest"] is None
     assert result.output["withheld_fields"] == []
+    assert result.output["ingestion_status"] == "METADATA_INDEXED_NO_TEXT"
     assert result.output["metadata"]["source_item_url"].endswith("fixture-1")
+
+
+def test_descriptor_disables_episode_recording(tmp_path: Path) -> None:
+    adapter = _adapter(tmp_path)
+
+    assert adapter.descriptor.records_episode is False
+
+
+def test_restricted_request_is_not_copied_to_research_memory(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    schemas = SchemaRegistry(store)
+    artifacts = ArtifactService(store, schemas)
+    adapter, _ = install_conjecture_ingestion_capability(store, schemas, artifacts)
+    service = CapabilityService(store, ResearchMemory(store, schemas))
+    service.register(adapter)
+
+    result = service.invoke(
+        CapabilityRequest(
+            capability_id="dataset.conjecture.ingest",
+            input=_request(license_id="PROPRIETARY"),
+        )
+    )
+
+    assert result.episode_uri is None
+
+
+def test_generic_artifact_write_rejects_policy_bypass(tmp_path: Path) -> None:
+    adapter = _adapter(tmp_path)
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.conjecture.ingest",
+            input=_request(license_id="PROPRIETARY"),
+        )
+    )
+    stored = adapter.store.get(result.output["artifact_uri"])
+    tampered = dict(stored.payload)
+    statement = "restricted text"
+    digest = "sha256:7c0c7787821e7fbbba7a1800d41c046eb55dc2f6758cec309c2c28fe9c7b24f4"
+    tampered.update(
+        {
+            "license_decision": "ALLOW_TEXT",
+            "indexed_statement": statement,
+            "supplied_content_digest": digest,
+            "indexed_content_digest": digest,
+            "withheld_fields": [],
+            "ingestion_status": "INDEXED",
+        }
+    )
+
+    with pytest.raises(ValueError):
+        adapter.artifacts.put(
+            schema_uri=adapter.artifact_schema_uri,
+            semantics_uri=adapter.semantics_uri,
+            payload=tampered,
+        )
+
+
+def test_maximum_identifiers_keep_summary_within_store_limit(tmp_path: Path) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _request()
+    payload["corpus_id"] = "c" * 256
+    payload["item_id"] = "i" * 512
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.conjecture.ingest",
+            input=payload,
+        )
+    )
+    stored = adapter.store.get(result.output["artifact_uri"])
+
+    assert len(stored.manifest.summary) <= 512

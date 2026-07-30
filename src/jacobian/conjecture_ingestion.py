@@ -124,6 +124,7 @@ class ExternalConjectureIngestAdapter:
                 features=("license-policy", "metadata-withholding", "provenance"),
             ),
             modes=(CapabilityMode.EXPLORE,),
+            records_episode=False,
             input_schema=ExternalConjectureIngestRequest.model_json_schema(),
             output_schema=ExternalConjectureIngestOutput.model_json_schema(),
             tags=("conjecture", "dataset", "ingestion", "license", "provenance"),
@@ -242,9 +243,17 @@ class ExternalConjectureIngestAdapter:
             if normalized_statement is not None and not index_text
             else ()
         )
-        status: Literal["INDEXED", "METADATA_INDEXED_TEXT_WITHHELD"] = (
-            "INDEXED" if index_text else "METADATA_INDEXED_TEXT_WITHHELD"
-        )
+        status: Literal[
+            "INDEXED",
+            "METADATA_INDEXED_TEXT_WITHHELD",
+            "METADATA_INDEXED_NO_TEXT",
+        ]
+        if index_text:
+            status = "INDEXED"
+        elif normalized_statement is not None:
+            status = "METADATA_INDEXED_TEXT_WITHHELD"
+        else:
+            status = "METADATA_INDEXED_NO_TEXT"
         artifact_payload = ExternalConjectureIngestArtifact(
             corpus_id=validated.corpus_id,
             corpus_revision=validated.corpus_revision,
@@ -268,9 +277,7 @@ class ExternalConjectureIngestAdapter:
             schema_uri=self.artifact_schema_uri,
             semantics_uri=self.semantics_uri,
             payload=artifact_payload.model_dump(mode="json"),
-            summary=(
-                f"{validated.corpus_id} item {validated.item_id}: {decision.value}"
-            ),
+            summary=_artifact_summary(validated, decision),
         )
         output = ExternalConjectureIngestOutput(
             **artifact_payload.model_dump(mode="python"),
@@ -328,10 +335,10 @@ def install_conjecture_ingestion_capability(
             ),
         },
     )
-    artifact_schema_uri = schemas.register(
+    artifact_schema_uri = schemas.register_model(
         name="jacobian.external-conjecture-record",
         version="1",
-        schema=ExternalConjectureIngestArtifact.model_json_schema(),
+        model=ExternalConjectureIngestArtifact,
     )
     return (
         ExternalConjectureIngestAdapter(
@@ -345,3 +352,13 @@ def install_conjecture_ingestion_capability(
             artifact_schema_uri=artifact_schema_uri,
         ),
     )
+
+
+def _artifact_summary(
+    request: ExternalConjectureIngestRequest,
+    decision: ConjectureLicenseDecision,
+) -> str:
+    prefix = f"{request.corpus_id} item "
+    suffix = f": {decision.value}"
+    available = max(0, 512 - len(prefix) - len(suffix))
+    return f"{prefix}{request.item_id[:available]}{suffix}"

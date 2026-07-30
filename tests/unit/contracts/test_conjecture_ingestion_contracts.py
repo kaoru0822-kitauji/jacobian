@@ -40,6 +40,34 @@ def test_request_rejects_unknown_license_tokens() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("license_evidence_url", ""),
+        ("license_evidence_url", "   "),
+        ("license_evidence_text", ""),
+        ("license_evidence_text", "\n\t"),
+    ),
+)
+def test_request_rejects_blank_license_evidence(field: str, value: str) -> None:
+    payload = {
+        "corpus_id": "fixture",
+        "corpus_revision": "revision-1",
+        "source_url": "https://example.invalid/corpus",
+        "item_id": "item-1",
+        "metadata": {"title": "Fixture conjecture"},
+        "statement": "A fixture statement.",
+        "source_license": "CC-BY-4.0",
+        "license_evidence_url": "https://example.invalid/license",
+        "license_evidence_text": "license evidence",
+        "license_evidence_digest": "sha256:" + "a" * 64,
+    }
+    payload[field] = value
+
+    with pytest.raises(ValidationError, match="must not be blank"):
+        ExternalConjectureIngestRequest.model_validate(payload)
+
+
 def test_artifact_cannot_claim_verification() -> None:
     with pytest.raises(ValidationError):
         ExternalConjectureIngestArtifact(
