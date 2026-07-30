@@ -30,11 +30,11 @@ digest = "sha256:5899d3eb53d12c34336f867088db008d3397d5772db9ffb857f5f6e115f7846
 
 [[tasks]]
 name = "jacobian/regression-v1-log-exponent-recovery"
-digest = "sha256:18d409d42fe3151fc7c30a44be7709e4c035dd0c6264fa72b6ac8eeae176141e"
+digest = "sha256:2ac493194118377e41e4d91ed1a45dcace984cb65d8abae98c857a23e122dd7b"
 
 [[tasks]]
 name = "jacobian/regression-v1-matrix-square-zero-counterexample"
-digest = "sha256:34167d791537297896663f41d1e5382506d7d3001720524c0291efb5a66301bf"
+digest = "sha256:197ac8160a9852093e5746622b5524c1461620c4d7b9eaaff7c525cea93ef78a"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
@@ -46,7 +46,7 @@ digest = "sha256:1aa2fc7f6945a0e79ba97d88dbe2283ab27ac735535e0aeb90ca433bb225e03
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-tail-counterexample"
-digest = "sha256:938118afe9b82b8f5f3a75bbc796f3b3b0db25af0d588021006a9086953c0fee"
+digest = "sha256:fa8283b70fa4f92c843dfaefd39cf08afa4defcaa9db139011c8808b6953cde0"
 
 [[tasks]]
 name = "jacobian/regression-v1-rational-linear-solution"
@@ -58,4 +58,4 @@ digest = "sha256:eaef68473845c6005be2767906f1fa4933b9bc79b02bd00b0b0def384863d8e
 
 [[tasks]]
 name = "jacobian/regression-v1-subspace-direct-sum-counterexample"
-digest = "sha256:0e8af5f93b96c877ece10e1b582c66075dd4ffc658db7886fce999912d37b83c"
+digest = "sha256:f954a07e75a37d2c3d0afe50a8ffe38246fbbaa8a67d06a83970bede0c16497f"

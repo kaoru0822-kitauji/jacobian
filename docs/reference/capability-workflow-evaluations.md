@@ -4,10 +4,11 @@
 
 This document defines the boundary between Jacobian capability development and
 agent-evaluation evidence. The current Harbor surface is the committed
-[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: eight
+[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: twelve
 self-contained tasks for graph counterexamples, graph artifact composition,
 finite coverage, SAT witnesses, exact rational systems, Hermite normal form,
-polynomial normalization, and polynomial-map collisions.
+polynomial normalization, polynomial-map collisions, matrix and subspace
+counterexamples, polynomial-tail reasoning, and exact logarithmic algebra.
 
 ## Task and verifier validation
 
