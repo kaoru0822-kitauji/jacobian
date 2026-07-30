@@ -398,6 +398,42 @@ def test_gaussian_expansion_above_bound_fails_before_artifact_writes(
     assert result.artifact_uris == ()
 
 
+def test_gaussian_denominator_growth_fails_before_artifact_writes(
+    domain_services: DomainTestServices,
+) -> None:
+    denominators = [str(10**127 + offset) for offset in range(1, 17)]
+    exponents = [
+        [(index >> bit) & 1 for bit in reversed(range(4))] for index in range(16)
+    ]
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="probability.gaussian_polynomial.moment.compute",
+            input={
+                "polynomial": {
+                    "variable_count": 4,
+                    "terms": [
+                        {
+                            "coefficient": {
+                                "real": {"num": "1", "den": denominator},
+                                "imaginary": _rational(0),
+                            },
+                            "exponents": exponent,
+                        }
+                        for denominator, exponent in zip(
+                            denominators, exponents, strict=True
+                        )
+                    ],
+                },
+                "order": 3,
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_FINITE_PROBABILITY_REQUEST"
+    assert result.artifact_uris == ()
+
+
 def test_graph_reliability_exhausts_all_edge_states_exactly(
     domain_services: DomainTestServices,
 ) -> None:
@@ -478,4 +514,34 @@ def test_graph_reliability_rejects_incomplete_edge_probability_binding(
     )
 
     assert result.execution.status is ExecutionStatus.ERROR
+    assert result.artifact_uris == ()
+
+
+def test_graph_reliability_rejects_ledger_above_artifact_budget(
+    domain_services: DomainTestServices,
+) -> None:
+    vertices = [f"{index}" + "x" * 255 for index in range(6)]
+    edges = [
+        [vertices[left], vertices[right]]
+        for left in range(6)
+        for right in range(left + 1, 6)
+    ][:12]
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=(
+                "probability.graph_reliability.connection_probability.compute"
+            ),
+            input={
+                "graph": {"vertices": vertices, "edges": edges},
+                "edge_probabilities": [
+                    {"edge": edge, "open_probability": _rational(1, 2)}
+                    for edge in edges
+                ],
+                "terminals": [vertices[0], vertices[-1]],
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_FINITE_PROBABILITY_REQUEST"
     assert result.artifact_uris == ()

@@ -494,7 +494,7 @@ def _canonical_graph(value: object) -> tuple[list[str], list[tuple[str, str]]]:
         or not isinstance(edges, list)
         or len(vertices) > 16
         or len(edges) > 12
-        or any(not isinstance(vertex, str) or not vertex for vertex in vertices)
+        or any(not isinstance(vertex, str) for vertex in vertices)
         or len(set(vertices)) != len(vertices)
     ):
         raise ValueError("graph bounds or vertices are invalid")
@@ -584,6 +584,8 @@ def _replay_graph_connection_probability(
     expected_count = 1 << len(edges)
     if (
         result["terminals"] != list(terminals)
+        or type(result["edge_count"]) is not int
+        or type(result["visited_states"]) is not int
         or result["edge_count"] != len(edges)
         or result["visited_states"] != expected_count
         or not isinstance(raw_states, list)
@@ -609,7 +611,8 @@ def _replay_graph_connection_probability(
             )
         connected = _connected(vertices, open_edges, terminals)
         if (
-            item["state_index"] != state_index
+            type(item["state_index"]) is not int
+            or item["state_index"] != state_index
             or item["open_edges"] != [list(edge) for edge in open_edges]
             or item["terminals_connected"] is not connected
             or _fraction(item["state_probability"]) != probability

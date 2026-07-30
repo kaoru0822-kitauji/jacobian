@@ -311,11 +311,6 @@ class CapabilityRequest(ContractModel):
     mode: CapabilityMode = CapabilityMode.EXPLORE
     input: dict[str, Any]
 
-    @model_validator(mode="after")
-    def require_canonical_input(self) -> Self:
-        canonicalize_json(self.input)
-        return self
-
 
 class CapabilityAssurance(ContractModel):
     level: CapabilityAssuranceLevel

@@ -218,3 +218,39 @@ def test_maximum_contract_payloads_fit_artifact_and_checker_budgets(
     assert input_bytes < 10 * 1024 * 1024
     assert output_bytes < 10 * 1024 * 1024
     assert input_bytes + output_bytes < 8 * 1024 * 1024
+
+
+def test_multibyte_payload_over_artifact_budget_is_a_scored_input_error(
+    domain_services: DomainTestServices,
+) -> None:
+    vertices = [f"v{index:03d}" + "🧮" * 60 for index in range(256)]
+    edges = [
+        [vertices[left], vertices[right]]
+        for left in range(256)
+        for right in range(left + 1, 256)
+    ][:4_096]
+    identity = {vertex: vertex for vertex in vertices}
+
+    result = domain_services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="graph.symmetry.generator_orbits.compute",
+            input={
+                "graph": {"vertices": vertices, "edges": edges},
+                "generators": [
+                    {
+                        "generator_id": f"g{index:02d}" + "🧮" * 61,
+                        "mapping": identity,
+                    }
+                    for index in range(64)
+                ],
+                "vertex_colors": [
+                    {"vertex": vertex, "color": "🧮" * 128} for vertex in vertices
+                ],
+                "edge_colors": [{"edge": edge, "color": "🧮" * 128} for edge in edges],
+            },
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "INVALID_REQUEST"
+    assert result.artifact_uris == ()
