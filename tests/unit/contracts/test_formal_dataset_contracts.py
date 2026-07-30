@@ -171,6 +171,16 @@ def test_environment_rejects_unicode_equivalent_replay_entries() -> None:
         )
 
 
+@pytest.mark.parametrize("field", ("imports", "theorem_context"))
+def test_environment_rejects_blank_replay_entries(field: str) -> None:
+    with pytest.raises(ValidationError, match="must not be blank"):
+        FormalDatasetEnvironment(
+            lean_version="4.31.0",
+            project_revision="fixture",
+            **{field: (" \n\t",)},
+        )
+
+
 @pytest.mark.parametrize(
     ("container", "field"),
     (

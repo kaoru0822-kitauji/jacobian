@@ -29,7 +29,7 @@ def _require_nonblank_nfc(value: str) -> str:
 BoundedFormalString = Annotated[
     str,
     Field(min_length=1, max_length=2_000),
-    AfterValidator(_require_nfc),
+    AfterValidator(_require_nonblank_nfc),
 ]
 
 DatasetRevision = Annotated[
@@ -197,6 +197,19 @@ class FormalDatasetDiagnostic(ContractModel):
     message: str = Field(min_length=1, max_length=2_000)
 
 
+class FormalDatasetDiagnosticBaseline(ContractModel):
+    """Pinned runtime baseline used to derive replay-stable diagnostics."""
+
+    lean_version: str = Field(min_length=1, max_length=64)
+    mathlib_revision: str = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def require_pinned_nonblank_values(self) -> Self:
+        _require_nonblank_nfc(self.lean_version)
+        _require_nonblank_nfc(self.mathlib_revision)
+        return self
+
+
 class FormalDatasetArtifact(ContractModel):
     artifact_version: Literal["1"] = "1"
     dataset_id: Literal["MINIF2F", "PROOFNET"]
@@ -216,6 +229,7 @@ class FormalDatasetArtifact(ContractModel):
     environment_digest: Sha256Digest
     preprocessing: tuple[FormalPreprocessingDecision, ...]
     execution_status: Literal["NOT_EXECUTED"] = "NOT_EXECUTED"
+    diagnostic_baseline: FormalDatasetDiagnosticBaseline
     diagnostics: tuple[FormalDatasetDiagnostic, ...]
     assurance: Literal["UNVERIFIED"] = "UNVERIFIED"
 
@@ -268,23 +282,13 @@ class FormalDatasetArtifact(ContractModel):
         )
         if self.informal_proof != expected_proof:
             raise ValueError("informal_proof must bind canonical_row")
-        expected_preprocessing = (
-            FormalPreprocessingDecision(
-                operation="NORMALIZE_NEWLINES",
-                applied=True,
-            ),
-            FormalPreprocessingDecision(
-                operation="TRIM_TRAILING_WHITESPACE",
-                applied=False,
-            ),
-            FormalPreprocessingDecision(
-                operation="ENSURE_FINAL_NEWLINE",
-                applied=True,
-            ),
-        )
+        expected_preprocessing = formal_dataset_preprocessing(self.canonical_row)
         if self.preprocessing != expected_preprocessing:
             raise ValueError("preprocessing must describe the canonical pipeline")
-        if self.diagnostics != formal_dataset_diagnostics(self.environment):
+        if self.diagnostics != formal_dataset_diagnostics(
+            self.environment,
+            baseline=self.diagnostic_baseline,
+        ):
             raise ValueError("diagnostics must match the declared environment")
         return self
 
@@ -305,9 +309,41 @@ def _normalize_text(value: str) -> str:
     return unicodedata.normalize("NFC", normalized)
 
 
+def formal_dataset_preprocessing(
+    row: MiniF2FRow | ProofNetRow,
+) -> tuple[FormalPreprocessingDecision, ...]:
+    values = (
+        row.header,
+        row.formal_statement,
+        row.informal_statement,
+        row.informal_proof,
+    )
+    present = tuple(value for value in values if value is not None and value != "")
+    return (
+        FormalPreprocessingDecision(
+            operation="NORMALIZE_NEWLINES",
+            applied=any("\r" in value for value in present),
+        ),
+        FormalPreprocessingDecision(
+            operation="TRIM_TRAILING_WHITESPACE",
+            applied=False,
+        ),
+        FormalPreprocessingDecision(
+            operation="ENSURE_FINAL_NEWLINE",
+            applied=any(not value.endswith(("\n", "\r")) for value in present),
+        ),
+    )
+
+
 def formal_dataset_diagnostics(
     environment: FormalDatasetEnvironment,
+    *,
+    baseline: FormalDatasetDiagnosticBaseline | None = None,
 ) -> tuple[FormalDatasetDiagnostic, ...]:
+    effective_baseline = baseline or FormalDatasetDiagnosticBaseline(
+        lean_version=LEAN_VERSION,
+        mathlib_revision=MATHLIB_COMMIT,
+    )
     diagnostics = [
         FormalDatasetDiagnostic(
             code="EXECUTION_NOT_REQUESTED",
@@ -317,19 +353,19 @@ def formal_dataset_diagnostics(
             ),
         )
     ]
-    if environment.lean_version != LEAN_VERSION:
+    if environment.lean_version != effective_baseline.lean_version:
         diagnostics.append(
             FormalDatasetDiagnostic(
                 code="LEAN_VERSION_NOT_PINNED_RUNTIME",
                 message=(
                     f"The row requires Lean {environment.lean_version}; Jacobian's "
-                    f"pinned runtime is Lean {LEAN_VERSION}."
+                    f"pinned runtime is Lean {effective_baseline.lean_version}."
                 ),
             )
         )
     if (
         environment.mathlib_revision is not None
-        and environment.mathlib_revision != MATHLIB_COMMIT
+        and environment.mathlib_revision != effective_baseline.mathlib_revision
     ):
         diagnostics.append(
             FormalDatasetDiagnostic(

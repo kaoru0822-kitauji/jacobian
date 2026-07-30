@@ -153,6 +153,35 @@ def test_materialization_preserves_environment_and_preprocessing(
     assert [item["code"] for item in output["diagnostics"]] == [
         "EXECUTION_NOT_REQUESTED"
     ]
+    assert output["diagnostic_baseline"] == {
+        "lean_version": LEAN_VERSION,
+        "mathlib_revision": MATHLIB_COMMIT,
+    }
+
+
+def test_preprocessing_reports_only_transformations_that_occurred(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _proofnet_request()
+    assert isinstance(payload["row"], dict)
+    payload["row"]["formal_statement"] += "\n"
+    payload["row"]["informal_statement"] += "\n"
+    payload["row"]["informal_proof"] += "\n"
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.formal.materialize",
+            input=payload,
+        )
+    )
+
+    output = _output(result)
+    assert [item["applied"] for item in output["preprocessing"]] == [
+        False,
+        False,
+        False,
+    ]
 
 
 def test_incompatible_environment_has_explicit_diagnostics(tmp_path: Path) -> None:
@@ -293,6 +322,10 @@ def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
     for field, replacement in (
         ("preprocessing", []),
         ("diagnostics", []),
+        (
+            "diagnostic_baseline",
+            {"lean_version": "0.0.0", "mathlib_revision": "different"},
+        ),
         ("dataset_revision", "       "),
         ("source_url", " "),
         ("source_url", "https://example.invalid/" + "x" * 2_000),

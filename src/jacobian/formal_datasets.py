@@ -10,14 +10,16 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.contracts.formal_datasets import (
     FormalDatasetArtifact,
+    FormalDatasetDiagnosticBaseline,
     FormalDatasetMaterializeRequest,
-    FormalPreprocessingDecision,
     formal_dataset_diagnostics,
+    formal_dataset_preprocessing,
 )
 from jacobian.operations import (
     ComputedNotApplicable,
     ComputedSuccess,
 )
+from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
 
 
 def _json_digest(value: object) -> str:
@@ -66,19 +68,10 @@ def _materialize_payload(
         header=header,
         environment=validated.environment,
         environment_digest=_json_digest(environment_payload),
-        preprocessing=(
-            FormalPreprocessingDecision(
-                operation="NORMALIZE_NEWLINES",
-                applied=True,
-            ),
-            FormalPreprocessingDecision(
-                operation="TRIM_TRAILING_WHITESPACE",
-                applied=False,
-            ),
-            FormalPreprocessingDecision(
-                operation="ENSURE_FINAL_NEWLINE",
-                applied=True,
-            ),
+        preprocessing=formal_dataset_preprocessing(validated.row),
+        diagnostic_baseline=FormalDatasetDiagnosticBaseline(
+            lean_version=LEAN_VERSION,
+            mathlib_revision=MATHLIB_COMMIT,
         ),
         diagnostics=formal_dataset_diagnostics(validated.environment),
     )
