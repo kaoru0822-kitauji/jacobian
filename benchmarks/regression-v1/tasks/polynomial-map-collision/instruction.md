@@ -4,5 +4,4 @@ Verify or refute the supplied collision claim for the exact polynomial map and
 two points in `input.json`. Return the evaluated image of each point and state
 `TRUE` only when the points are distinct and their images are equal. Show both
 evaluations in `evidence/answer.txt`, then write the standard submission
-contract. A toolbox may be available, but no capability or call sequence is
-prescribed.
+contract.

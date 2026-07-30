@@ -50,6 +50,8 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
         instruction = (task / "instruction.md").read_text()
         assert "capability_id" not in instruction
         assert "agent-specific" not in instruction.lower()
+        assert "jacobian" not in instruction.lower()
+        assert "toolbox" not in instruction.lower()
 
         for dockerfile in (
             task / "environment" / "Dockerfile",

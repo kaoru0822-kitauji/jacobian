@@ -4,10 +4,10 @@ This is the small committed Harbor dataset for observing Jacobian-enabled
 mathematical workflows. It contains eight self-contained, answerable tasks;
 the task digests in `dataset.toml` are the task identities.
 
-The tasks are agent-agnostic. They mention that a mathematical toolbox may be
-available, but do not prescribe capability IDs or an invocation order. Each
-task has an offline input, schema 1.4 metadata, an Oracle-only solution, and a
-separate clean-room verifier. The verifier reports `correctness`,
+The tasks are agent-agnostic. Their instructions name no tool, capability, or
+invocation order. Each task has an offline input, schema 1.4 metadata, an
+Oracle-only solution, and a separate clean-room verifier. The verifier reports
+`correctness`,
 `evidence_validity`, `scope_accuracy`, `assurance_calibration`, and the
 weighted `reward`; a wrong result or an unsupported `VERIFIED` claim forces the
 aggregate reward to zero.
