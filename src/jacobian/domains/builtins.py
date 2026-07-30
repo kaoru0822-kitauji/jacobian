@@ -6,6 +6,7 @@ from jacobian.domains.certified_snf import CERTIFIED_SNF_BUNDLE
 from jacobian.domains.combinatorics import COMBINATORICS_BUNDLE
 from jacobian.domains.conjecture_ingestion import CONJECTURE_INGESTION_BUNDLE
 from jacobian.domains.finite_sets import FINITE_SET_BUNDLE
+from jacobian.domains.formal_datasets import FORMAL_DATASET_BUNDLE
 from jacobian.domains.geometry import GEOMETRY_BUNDLE
 from jacobian.domains.graph_optimization import (
     GRAPH_INVARIANT_BUNDLE,
@@ -28,6 +29,7 @@ BUILTIN_DOMAIN_BUNDLES = (
     NUMBER_THEORY_BUNDLE,
     COMBINATORICS_BUNDLE,
     FINITE_SET_BUNDLE,
+    FORMAL_DATASET_BUNDLE,
     SEQUENCE_BUNDLE,
     GEOMETRY_BUNDLE,
     PROJECTIVE_GEOMETRY_BUNDLE,
