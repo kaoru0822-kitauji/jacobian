@@ -218,6 +218,32 @@ def test_model_backed_schema_applies_cross_field_contracts(
         registry.validate(schema_uri, {"first": 2, "second": 1})
 
 
+@pytest.mark.parametrize("inside_transaction", [False, True])
+def test_producer_only_model_registration_is_runtime_enforced(
+    tmp_path: Path,
+    inside_transaction: bool,
+) -> None:
+    store = ArtifactStore(tmp_path)
+    registry = SchemaRegistry(store)
+
+    def register() -> str:
+        return registry.register_model(
+            name="producer-owned",
+            version="1",
+            model=_CachedSchemaModel,
+            producer_only=True,
+        )
+
+    if inside_transaction:
+        with store.transaction():
+            schema_uri = register()
+            assert registry.is_producer_only(schema_uri)
+    else:
+        schema_uri = register()
+
+    assert registry.is_producer_only(schema_uri)
+
+
 def test_existing_model_schema_reattaches_without_durable_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

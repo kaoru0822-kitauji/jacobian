@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 from tests.support.provider_lean import (
-    PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
-    pinned_mathlib_runtime_available,
+    PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
+    pinned_lean_core_runtime_available,
 )
 
 import jacobian.lean_statement_capabilities as lean_statements
@@ -29,7 +29,7 @@ from jacobian.lean_statement_capabilities import (
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
-LEAN_AVAILABLE = pinned_mathlib_runtime_available()
+LEAN_AVAILABLE = pinned_lean_core_runtime_available()
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ def _build_adapters(
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
     propose, _ = _build_adapters(tmp_path)
@@ -86,7 +86,7 @@ def test_propose_elaborates_valid_statement(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_propose_reports_elaboration_failure(tmp_path: Path) -> None:
     propose, _ = _build_adapters(tmp_path)
@@ -141,13 +141,21 @@ def test_propose_rejects_mathlib_environment(tmp_path: Path) -> None:
             )
         )
 
-    assert exc_info.value.diagnostic.code == "LEAN_ENVIRONMENT_UNSUPPORTED"
+    assert exc_info.value.diagnostic.code == "INVALID_LEAN_STATEMENT_PROPOSAL"
 
 
 def test_propose_returns_diagnostic_when_lean_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(shutil, "which", lambda _: None)
+    from jacobian_checkers import lean4
+
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (_ for _ in ()).throw(
+            RuntimeError("pinned Lean unavailable")
+        ),
+    )
     propose, _ = _build_adapters(tmp_path)
 
     with pytest.raises(CapabilityInvocationError) as exc_info:
@@ -172,7 +180,7 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     monkeypatch.setattr(
         lean_statements,
         "_elaborate_proposition",
-        lambda _statement: lean_statements._ElaborationResult(
+        lambda _statement, **_kwargs: lean_statements._ElaborationResult(
             elaborates=True,
             sorry_count=0,
             messages=(
@@ -197,7 +205,7 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     monkeypatch.setattr(
         lean_statements,
         "_lean_version_info",
-        lambda: ("4.31.0", "lean-commit"),
+        lambda *_args: ("4.31.0", "lean-commit"),
     )
     propose, _ = _build_adapters(tmp_path)
 
@@ -255,7 +263,7 @@ def test_direct_elaboration_parser_accepts_plain_lean_check_output() -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_direct_elaboration_core_runtime_matrix() -> None:
     successful_cases = (
@@ -299,7 +307,7 @@ def test_direct_elaboration_parser_preserves_coded_lean_error() -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_compare_identical_statements(tmp_path: Path) -> None:
     _, compare = _build_adapters(tmp_path)
@@ -328,7 +336,7 @@ def test_compare_identical_statements(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(
     not LEAN_AVAILABLE,
-    reason=PINNED_MATHLIB_RUNTIME_UNAVAILABLE_REASON,
+    reason=PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON,
 )
 def test_compare_different_statements(tmp_path: Path) -> None:
     _, compare = _build_adapters(tmp_path)
@@ -353,7 +361,15 @@ def test_compare_different_statements(tmp_path: Path) -> None:
 def test_compare_works_without_lean_for_syntactic_comparison(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(shutil, "which", lambda _: None)
+    from jacobian_checkers import lean4
+
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (_ for _ in ()).throw(
+            RuntimeError("pinned Lean unavailable")
+        ),
+    )
     _, compare = _build_adapters(tmp_path)
 
     result = compare.invoke(
@@ -372,6 +388,89 @@ def test_compare_works_without_lean_for_syntactic_comparison(
     assert result.output["elaboration_checked"] is False
     assert result.output["both_elaborate"] is False
     assert result.completeness.status is CapabilityCompletenessStatus.PARTIAL
+
+
+def test_execution_uses_the_exact_pinned_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian_checkers import lean4
+
+    executable = tmp_path / "pinned-lean"
+    executable.write_bytes(b"fixture")
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (executable, None),
+    )
+    calls: list[list[str]] = []
+
+    def run(args, **_kwargs):
+        calls.append([str(value) for value in args])
+        return subprocess.CompletedProcess(args, 0, stdout="True : Prop\n", stderr="")
+
+    monkeypatch.setattr(lean_statements.subprocess, "run", run)
+    result = lean_statements._elaborate_proposition("True")
+    version, commit = lean_statements._lean_version_info()
+
+    assert result.elaborates is True
+    assert version == "unknown"
+    assert commit == "unknown"
+    assert calls
+    assert all(call[0] == str(executable) for call in calls)
+
+
+def test_stale_pinned_executable_becomes_backend_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stale_executable = tmp_path / "removed-lean"
+
+    def run(_args, **_kwargs):
+        raise FileNotFoundError(stale_executable)
+
+    monkeypatch.setattr(lean_statements.subprocess, "run", run)
+
+    with pytest.raises(lean_statements._LeanUnavailableError, match="could not run"):
+        lean_statements._execute_lean_source(
+            "#check True",
+            executable=str(stale_executable),
+            timeout_seconds=1,
+        )
+
+
+def test_replaced_pinned_executable_is_rejected_before_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian.provider_runtime import lean_frontend_provider_runtime
+    from jacobian_checkers import lean4
+
+    executable = tmp_path / "pinned-lean"
+    executable.write_bytes(b"original")
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (executable, None),
+    )
+    runtime = lean_frontend_provider_runtime()
+    executable.write_bytes(b"replacement")
+
+    def unexpected_run(*_args, **_kwargs):
+        pytest.fail("replaced Lean executable was launched")
+
+    monkeypatch.setattr(lean_statements.subprocess, "run", unexpected_run)
+
+    with pytest.raises(
+        lean_statements._LeanUnavailableError,
+        match="identity changed",
+    ):
+        lean_statements._execute_lean_source(
+            "#check True",
+            executable=str(executable),
+            provider_runtime=runtime,
+            timeout_seconds=1,
+        )
 
 
 def test_compare_normalizes_whitespace(tmp_path: Path) -> None:

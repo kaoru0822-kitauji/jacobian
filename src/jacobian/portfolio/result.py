@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
 
+from jacobian.conjecture_ingestion import ConjectureIngestionInstallation
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.exact_domain_checkers import ExactDomainCheckerInstallation
@@ -250,6 +251,9 @@ class PortfolioInstallation:
     finite_partition: FinitePartitionInstallation | None = None
     finite_coverage: FiniteCoverageInstallation | None = None
 
+    # --- Datasets ---
+    conjecture_ingestion: ConjectureIngestionInstallation | None = None
+
     # --- Domain bundles ---
     domain_bundles: dict[str, InstalledDomainBundle] = field(default_factory=dict)
     portfolio_diagnostics: tuple[PortfolioDiagnostic, ...] = ()
@@ -264,6 +268,7 @@ class PortfolioInstallation:
 
     # --- Lean ---
     lean_statement: LeanStatementInstallation | None = None
+    lean_statement_runtime: CapabilityProviderRuntime | None = None
     lean: LeanService | None = None
     lean_declarations: LeanDeclarationService | None = None
     lean_exploration: LeanExplorationInstallation | None = None

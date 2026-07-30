@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from jacobian.atomic_capabilities import install_atomic_capabilities
 from jacobian.builtin_capabilities import KnowledgeSearchAdapter
+from jacobian.conjecture_ingestion import ConjectureIngestionInstallation
 from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.finite_coverage import install_finite_coverage
 from jacobian.finite_partition import install_finite_partition
@@ -18,6 +19,7 @@ from jacobian.installation.context import InstallationContext
 from jacobian.matrix_capabilities import install_matrix_capabilities
 from jacobian.matrix_determinant_capabilities import install_matrix_determinant_checker
 from jacobian.matrix_rank_capabilities import install_matrix_rank_checker
+from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.polynomial_capabilities import install_polynomial_capabilities
 from jacobian.polynomial_system_capabilities import (
     install_polynomial_system_capabilities,
@@ -111,6 +113,9 @@ class CoreApplicationInstaller:
         result.domain_bundles = dict(bundle_result.installed)
         result.portfolio_diagnostics = bundle_result.diagnostics
         result.portfolio_outcomes = bundle_result.outcomes
+        result.conjecture_ingestion = _conjecture_ingestion_installation(
+            result.domain_bundles
+        )
         self.install_domain_verification(result)
 
         graph_isomorphism_adapter, result.graph_isomorphism = install_graph_isomorphism(
@@ -258,3 +263,15 @@ class CoreApplicationInstaller:
         )
         for adapter in adapters:
             self.context.register_capability(adapter)
+
+
+def _conjecture_ingestion_installation(
+    domain_bundles: dict[str, InstalledDomainBundle],
+) -> ConjectureIngestionInstallation | None:
+    installed = domain_bundles.get("conjecture_ingestion")
+    if installed is None:
+        return None
+    return ConjectureIngestionInstallation(
+        semantics_uri=installed.semantics_uri,
+        artifact_schema_uri=installed.result_schema_uris["dataset.conjecture.ingest"],
+    )

@@ -16,6 +16,8 @@ from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.results import ContractModel
 
+LeanCoreEnvironment = Literal[LeanEnvironment.CORE]
+
 # ---------------------------------------------------------------------------
 # lean.statement.propose
 # ---------------------------------------------------------------------------
@@ -25,7 +27,7 @@ class LeanStatementProposalRequest(ContractModel):
     """Type-check one proposed Lean statement against an informal claim."""
 
     operation: Literal["PROPOSE", "ELABORATE_PROPOSITION"] = "PROPOSE"
-    environment: LeanEnvironment = LeanEnvironment.CORE
+    environment: LeanCoreEnvironment = LeanEnvironment.CORE
     informal_claim: str | None = Field(default=None, min_length=1, max_length=4_000)
     proposed_statement: str = Field(min_length=1, max_length=2_000)
     source_locator: str | None = Field(default=None, max_length=512)
@@ -123,7 +125,7 @@ class LeanStatementProposalOutput(LeanStatementProposalArtifact):
 class LeanStatementComparisonRequest(ContractModel):
     """Compare two Lean statements and their axiom sets (fail-closed)."""
 
-    environment: LeanEnvironment = LeanEnvironment.CORE
+    environment: LeanCoreEnvironment = LeanEnvironment.CORE
     statement_a: str = Field(min_length=1, max_length=2_000)
     statement_b: str = Field(min_length=1, max_length=2_000)
     axiom_set_a: tuple[str, ...] = Field(default=(), max_length=64)
