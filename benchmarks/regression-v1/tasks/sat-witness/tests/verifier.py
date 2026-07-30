@@ -48,7 +48,8 @@ def _answer_evidence(submission):
     if not isinstance(entries, list) or not entries:
         return False
     return all(
-        _descriptor_target(entry, "evidence/answer.txt") is not None for entry in entries
+        _descriptor_target(entry, "evidence/answer.txt") is not None
+        for entry in entries
     )
 
 

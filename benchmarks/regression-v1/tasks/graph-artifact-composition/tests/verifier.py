@@ -76,8 +76,7 @@ def main():
         isinstance(s, dict)
         and isinstance(s.get("result"), dict)
         and all(
-            isinstance(item, dict)
-            and type(item.get("distance")) is int
+            isinstance(item, dict) and type(item.get("distance")) is int
             for item in s["result"].get("distance_to_set", [])
         )
         and type(s["result"].get("maximum_distance_to_set")) is int
