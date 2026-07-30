@@ -7,9 +7,6 @@ provider identity.  Process fixtures expose launchers so a test can choose the
 exact command while teardown still owns every child it started.
 """
 
-# Imported fixture definitions are intentionally exported for pytest.
-# ruff: noqa: F401
-
 from __future__ import annotations
 
 import os
@@ -32,16 +29,7 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.store import ArtifactStore
 
-# Startup/recovery boundary tests may consume the explicitly named complete
-# runtime fixtures.  Importing the fixture objects keeps construction in the
-# composition module without a second fixture implementation.
-from tests.composition.conftest import (
-    attached_complete_runtime,
-    authorized_complete_runtime,
-    authorized_portfolio_template,
-    complete_portfolio_template,
-    fresh_complete_runtime,
-)
+pytest_plugins = ("tests.support.runtime_fixtures",)
 
 
 @dataclass
