@@ -73,6 +73,7 @@ from jacobian.universal_algebra_capabilities import UniversalAlgebraInstallation
 
 # Diagnostic codes follows the same convention as CapabilityDiagnostic codes.
 PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+DEPENDENCY_UNAVAILABLE = "DEPENDENCY_UNAVAILABLE"
 _DIAGNOSTIC_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 
 
@@ -81,6 +82,7 @@ class BundleInstallationStatus(StrEnum):
 
     INSTALLED = "INSTALLED"
     SKIPPED_PROVIDER_UNAVAILABLE = "SKIPPED_PROVIDER_UNAVAILABLE"
+    SKIPPED_DEPENDENCY_UNAVAILABLE = "SKIPPED_DEPENDENCY_UNAVAILABLE"
 
 
 @dataclass(frozen=True, slots=True)

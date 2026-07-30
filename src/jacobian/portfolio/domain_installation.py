@@ -10,6 +10,7 @@ from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.operations import DomainBundle
 from jacobian.portfolio.model import PortfolioPlan
 from jacobian.portfolio.result import (
+    DEPENDENCY_UNAVAILABLE,
     PROVIDER_UNAVAILABLE,
     BundleInstallation,
     BundleInstallationStatus,
@@ -46,6 +47,35 @@ class DomainBundleInstaller:
                     BundleInstallation(
                         domain_id=bundle.domain_id,
                         status=BundleInstallationStatus.SKIPPED_PROVIDER_UNAVAILABLE,
+                        capability_ids=capability_ids,
+                        installed=None,
+                        diagnostic=diagnostic,
+                    )
+                )
+                continue
+
+            unavailable_dependencies = tuple(
+                dependency_id
+                for dependency_id in bundle.dependency_ids
+                if dependency_id not in installed
+            )
+            if unavailable_dependencies:
+                diagnostic = PortfolioDiagnostic(
+                    code=DEPENDENCY_UNAVAILABLE,
+                    component_id=bundle.domain_id,
+                    stage="dependency_availability",
+                    message=(
+                        "required domain bundle dependencies are unavailable: "
+                        + ", ".join(unavailable_dependencies)
+                    ),
+                )
+                diagnostics.append(diagnostic)
+                outcomes.append(
+                    BundleInstallation(
+                        domain_id=bundle.domain_id,
+                        status=(
+                            BundleInstallationStatus.SKIPPED_DEPENDENCY_UNAVAILABLE
+                        ),
                         capability_ids=capability_ids,
                         installed=None,
                         diagnostic=diagnostic,
