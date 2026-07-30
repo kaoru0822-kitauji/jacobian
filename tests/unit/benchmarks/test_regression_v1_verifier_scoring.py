@@ -23,6 +23,12 @@ VERIFICATION_RECORD_TASKS = (
     "sat-witness",
 )
 RATIONAL_TASK = "rational-linear-solution"
+RESOURCE_DERIVED_TASKS = (
+    "log-exponent-recovery",
+    "matrix-square-zero-counterexample",
+    "polynomial-tail-counterexample",
+    "subspace-direct-sum-counterexample",
+)
 
 
 def _digest(path: Path) -> str:
@@ -172,3 +178,56 @@ def test_rational_solution_rejects_unsupported_verified_claim(
         assert result["correctness"] == 1.0
         assert result["reward"] == 0.0
         assert result["false_certification"] is True
+
+
+@pytest.mark.parametrize("task_name", RESOURCE_DERIVED_TASKS)
+def test_resource_derived_oracles_and_assurance_boundary(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    computed = _run_verifier(*_prepare_case(tmp_path, task_name, "computed"))
+    assert computed["correctness"] == 1.0
+    assert computed["reward"] == pytest.approx(1.0)
+    assert computed["false_certification"] is False
+
+    unsupported = _run_verifier(*_prepare_case(tmp_path, task_name, "missing"))
+    assert unsupported["correctness"] == 1.0
+    assert unsupported["reward"] == 0.0
+    assert unsupported["false_certification"] is True
+
+
+@pytest.mark.parametrize(
+    ("task_name", "mutate"),
+    [
+        (
+            "matrix-square-zero-counterexample",
+            lambda result: result.update(matrix=[[1, 0], [0, 0]]),
+        ),
+        (
+            "polynomial-tail-counterexample",
+            lambda result: result.update(x2="1"),
+        ),
+        (
+            "subspace-direct-sum-counterexample",
+            lambda result: result.update(dependence_coefficients=[1, 1, 1, 1]),
+        ),
+        (
+            "log-exponent-recovery",
+            lambda result: result.update(value=59),
+        ),
+    ],
+)
+def test_resource_derived_verifiers_reject_corrupted_witnesses(
+    tmp_path: Path,
+    task_name: str,
+    mutate,
+) -> None:
+    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    mutate(submission["result"])
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0

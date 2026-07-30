@@ -19,6 +19,10 @@ EXPECTED_TASKS = {
     "hermite-normal-form",
     "polynomial-normalization",
     "polynomial-map-collision",
+    "matrix-square-zero-counterexample",
+    "polynomial-tail-counterexample",
+    "subspace-direct-sum-counterexample",
+    "log-exponent-recovery",
 }
 VERIFICATION_RECORD_TASKS = {
     "finite-partition",
@@ -29,7 +33,7 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
+def test_regression_v1_is_a_frozen_twelve_task_dataset() -> None:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/regression-v1"
     assert {
@@ -61,7 +65,19 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
             json.loads((task / "environment" / "metadata.json").read_text()) == metadata
         )
         assert spec["metadata"]["fixture_digest"] == input_digest
-        assert metadata["upstream"] is None
+        upstream = metadata["upstream"]
+        if task_name in {
+            "matrix-square-zero-counterexample",
+            "polynomial-tail-counterexample",
+            "subspace-direct-sum-counterexample",
+            "log-exponent-recovery",
+        }:
+            assert isinstance(upstream, dict)
+            assert upstream["revision"]
+            assert upstream["row"] >= 0
+            assert upstream["source_url"].startswith("https://huggingface.co/datasets/")
+        else:
+            assert upstream is None
 
         instruction = (task / "instruction.md").read_text()
         submission_schema = json.loads(

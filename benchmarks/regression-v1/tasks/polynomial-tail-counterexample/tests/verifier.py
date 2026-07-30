@@ -1,0 +1,89 @@
+import json
+from fractions import Fraction
+from pathlib import Path
+
+from verifier_support import evidence_list_is_bound
+from verifier_support import load_submission as load_strict_submission
+
+E = Path("/tests")
+
+
+def contract(s, expected):
+    required = {
+        "task_id", "conclusion", "result", "claimed_assurance", "scope",
+        "completeness", "evidence", "limitations",
+    }
+    return (
+        isinstance(s, dict)
+        and set(s) == required
+        and s["task_id"] == expected["task_id"]
+        and s["conclusion"] == expected["conclusion"]
+        and isinstance(s["result"], dict)
+        and s["claimed_assurance"] in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
+        and s["completeness"] == "COMPLETE"
+        and isinstance(s["evidence"], list)
+        and isinstance(s["limitations"], list)
+    )
+
+
+def parse_fraction(value):
+    if not isinstance(value, str) or len(value) > 80:
+        raise ValueError
+    return Fraction(value)
+
+
+def evaluate(coefficients, x):
+    value = Fraction(0)
+    for coefficient in coefficients:
+        value = value * x + coefficient
+    return value
+
+
+def witness_ok(result):
+    keys = {"p_coefficients", "q_coefficients", "p_roots", "q_roots", "x1", "x2"}
+    if not isinstance(result, dict) or set(result) != keys:
+        return False
+    try:
+        p = [parse_fraction(x) for x in result["p_coefficients"]]
+        q = [parse_fraction(x) for x in result["q_coefficients"]]
+        proots = [parse_fraction(x) for x in result["p_roots"]]
+        qroots = [parse_fraction(x) for x in result["q_roots"]]
+        x1, x2 = parse_fraction(result["x1"]), parse_fraction(result["x2"])
+    except (TypeError, ValueError, ZeroDivisionError):
+        return False
+    if len(p) < 3 or len(q) < 2 or not p[0] or not q[0]:
+        return False
+    if not (len(p) - 1 > len(q) - 1 > 1 and p[0] > q[0] > 0):
+        return False
+    if len(proots) != len(p) - 1 or len(qroots) != len(q) - 1:
+        return False
+    if len(set(proots)) != len(proots) or len(set(qroots)) != len(qroots):
+        return False
+    if any(evaluate(p, root) for root in proots) or any(evaluate(q, root) for root in qroots):
+        return False
+    largest_root = max(proots + qroots)
+    if not (largest_root <= x1 and Fraction(0) <= x1 < x2):
+        return False
+    return evaluate(p, x1) - evaluate(q, x1) >= evaluate(p, x2) - evaluate(q, x2)
+
+
+def main():
+    s = load_strict_submission()
+    expected = json.loads((E / "expected.json").read_text())
+    valid = contract(s, expected)
+    math_correct = bool(valid and witness_ok(s["result"]))
+    ev = bool(valid and evidence_list_is_bound(s["evidence"]))
+    scope = bool(valid and s["scope"] == " ".join(expected["required_scope_terms"]))
+    assurance = bool(valid and s["claimed_assurance"] == expected["maximum_assurance"])
+    false_cert = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
+    reward = 0.0 if not math_correct or false_cert else 0.7 + 0.1 * ev + 0.1 * scope + 0.1 * assurance
+    Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+    Path("/logs/verifier/reward.json").write_text(json.dumps({
+        "correctness": float(math_correct), "evidence_validity": float(ev),
+        "scope_accuracy": float(scope), "assurance_calibration": float(assurance),
+        "reward": reward, "false_certification": false_cert,
+    }))
+
+
+if __name__ == "__main__":
+    main()

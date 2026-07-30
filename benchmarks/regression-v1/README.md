@@ -1,7 +1,7 @@
 # Jacobian regression-v1
 
 This is the small committed Harbor dataset for observing Jacobian-enabled
-mathematical workflows. It contains eight self-contained, answerable tasks;
+mathematical workflows. It contains twelve self-contained, answerable tasks;
 the task digests in `dataset.toml` are the task identities.
 
 The tasks are agent-agnostic. Their instructions name no tool, capability, or
@@ -46,3 +46,9 @@ env blocks.
 The 18 public research challenges under `benchmarks/research/challenges/` are
 candidate material only. They are not silently promoted into this scored
 dataset.
+
+Four tasks were selected from the Resources inventory after a quality review:
+an exact square-zero matrix counterexample, a polynomial-tail counterexample,
+a four-subspace counterexample, and logarithmic exponent recovery. Their
+source revisions and derivations are frozen in each task's `metadata.json`.
+See `RESOURCE_SELECTION.md` for the selection and rejection record.
