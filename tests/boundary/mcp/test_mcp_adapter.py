@@ -328,6 +328,28 @@ def test_mcp_workspace_schema_and_fail_closed_round_trip(
             )
             opened = json.loads(opened_result.content[0].text)
 
+            rejected_result = await client.call_tool(
+                "workspace.write",
+                {
+                    "idempotency_key": "mcp-workspace-unknown-field-001",
+                    "workspace_id": opened["workspace_id"],
+                    "branch_id": opened["branch_id"],
+                    "base_revision": opened["revision_id"],
+                    "cards": [],
+                    "attempts": [
+                        {
+                            "client_ref": "T0",
+                            "target_ref": opened["problem_card_id"],
+                            "method": "must-not-commit",
+                            "outcome": "COMPLETED",
+                            "summary": "Unknown input rejects the entire write.",
+                        }
+                    ],
+                },
+            )
+            assert rejected_result.is_error is True
+            assert '"code": "INVALID_INPUT"' in rejected_result.content[0].text
+
             second_problem_result = await client.call_tool(
                 "workspace.write",
                 {

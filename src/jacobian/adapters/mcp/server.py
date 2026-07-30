@@ -966,14 +966,31 @@ class JacobianCoreExtension(Extension):
         arguments = params.arguments or {}
         argument_digest = _argument_digest(arguments)
         try:
+            if params.name == "workspace.write":
+                WorkspaceWriteRequest.model_validate(arguments)
             result = await call_next(ctx)
         except MCPError:
             _log_tool_call(params.name, started, argument_digest, status="error")
             raise
         except Exception as exc:
             _LOGGER.warning("MCP tool %s failed", params.name, exc_info=exc)
-            _log_tool_call(params.name, started, argument_digest, status="error")
-            raise ToolError(_public_tool_error(params.name, exc)) from exc
+            result = CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=_public_tool_error(params.name, exc),
+                    )
+                ],
+                is_error=True,
+            )
+            _log_tool_call(
+                params.name,
+                started,
+                argument_digest,
+                status="error",
+                result=result,
+            )
+            return result
         _log_tool_call(
             params.name,
             started,
