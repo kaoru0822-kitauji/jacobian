@@ -1,18 +1,15 @@
-import hashlib
 import json
 from fractions import Fraction
 from pathlib import Path
+
+from verifier_support import authorized_record_is_bound, sha256_uri
 
 W = Path("/app")
 E = Path("/tests")
 
 
 def _digest(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(65536), b""):
-            digest.update(block)
-    return "sha256:" + digest.hexdigest()
+    return sha256_uri(path)
 
 
 def q(v):
@@ -29,47 +26,9 @@ def q(v):
 
 
 def verification_record_is_bound(submission):
-    descriptor = submission.get("verification_record_uri")
-    if (
-        not isinstance(descriptor, dict)
-        or set(descriptor) != {"path", "sha256"}
-        or not isinstance(descriptor["path"], str)
-        or not isinstance(descriptor["sha256"], str)
-    ):
-        return False
-    path = Path(descriptor["path"])
-    if (
-        path != Path("evidence/verification-record.json")
-        or path.is_absolute()
-        or ".." in path.parts
-        or (W / path).is_symlink()
-    ):
-        return False
-    target = (W / path).resolve()
-    if not target.is_relative_to(W.resolve()) or not target.is_file():
-        return False
-    if descriptor["sha256"] != _digest(target):
-        return False
-    try:
-        actual = json.loads(target.read_text())
-        authorized = json.loads((E / "authorized_record.json").read_text())
-    except (OSError, ValueError):
-        return False
-    if not isinstance(actual, dict) or not isinstance(authorized, dict):
-        return False
-    if set(actual) != set(authorized):
-        return False
-    environment_digest = actual.get("environment_digest")
-    if (
-        not isinstance(environment_digest, str)
-        or len(environment_digest) != 71
-        or not environment_digest.startswith("sha256:")
-        or any(char not in "0123456789abcdef" for char in environment_digest[7:])
-    ):
-        return False
-    return all(
-        key == "environment_digest" or actual[key] == value
-        for key, value in authorized.items()
+    return authorized_record_is_bound(
+        submission.get("verification_record_uri"),
+        authorized_path=E / "authorized_record.json",
     )
 
 

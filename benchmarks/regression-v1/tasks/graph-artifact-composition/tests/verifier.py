@@ -1,49 +1,24 @@
-import hashlib
 import json
 from collections import deque
 from pathlib import Path
+
+from verifier_support import (
+    evidence_list_is_bound,
+)
+from verifier_support import (
+    load_submission as load_strict_submission,
+)
 
 W = Path("/app")
 E = Path("/tests")
 
 
 def sub():
-    try:
-        x = json.loads((W / "submission.json").read_text())
-        return x if isinstance(x, dict) else None
-    except (OSError, ValueError):
-        return None
+    return load_strict_submission()
 
 
 def ev(s):
-    if not s or not isinstance(s.get("evidence"), list) or not s["evidence"]:
-        return False
-    for i in s["evidence"]:
-        if (
-            not isinstance(i, dict)
-            or not isinstance(i.get("path"), str)
-            or not isinstance(i.get("sha256"), str)
-        ):
-            return False
-        p = Path(i["path"])
-        t = (W / p).resolve()
-        if (
-            p.is_absolute()
-            or p != Path("evidence/answer.txt")
-            or ".." in p.parts
-            or (W / p).is_symlink()
-            or not t.is_relative_to(W.resolve())
-            or not t.is_file()
-        ):
-            return False
-        h = hashlib.sha256()
-        f = t.open("rb")
-        for b in iter(f.read, b""):
-            h.update(b)
-        f.close()
-        if i["sha256"] != "sha256:" + h.hexdigest():
-            return False
-    return True
+    return bool(s and evidence_list_is_bound(s.get("evidence")))
 
 
 def main():

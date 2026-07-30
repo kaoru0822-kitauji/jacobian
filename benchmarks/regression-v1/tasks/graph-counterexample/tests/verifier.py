@@ -1,17 +1,19 @@
-import hashlib
 import json
 from pathlib import Path
+
+from verifier_support import (
+    evidence_list_is_bound,
+)
+from verifier_support import (
+    load_submission as load_strict_submission,
+)
 
 W = Path("/app")
 E = Path("/tests")
 
 
 def load_submission():
-    try:
-        value = json.loads((W / "submission.json").read_text())
-    except (OSError, ValueError):
-        return None
-    return value if isinstance(value, dict) else None
+    return load_strict_submission()
 
 
 def contract(s, expected):
@@ -41,32 +43,7 @@ def contract(s, expected):
 
 
 def evidence(s):
-    if not s or not s.get("evidence"):
-        return False
-    for item in s["evidence"]:
-        if (
-            not isinstance(item, dict)
-            or not isinstance(item.get("path"), str)
-            or not isinstance(item.get("sha256"), str)
-        ):
-            return False
-        p = Path(item["path"])
-        if p.is_absolute() or p != Path("evidence/answer.txt") or ".." in p.parts:
-            return False
-        target = (W / p).resolve()
-        if (
-            (W / p).is_symlink()
-            or not target.is_relative_to(W.resolve())
-            or not target.is_file()
-        ):
-            return False
-        h = hashlib.sha256()
-        with target.open("rb") as f:
-            for block in iter(lambda: f.read(65536), b""):
-                h.update(block)
-        if item["sha256"] != "sha256:" + h.hexdigest():
-            return False
-    return True
+    return bool(s and evidence_list_is_bound(s.get("evidence")))
 
 
 def _graph_arrays(result):

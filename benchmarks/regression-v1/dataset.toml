@@ -1,42 +1,45 @@
-# Harbor dataset manifest. Task digests are updated with `harbor sync` after a
-# deliberate task change and are part of the dataset identity.
 [dataset]
 name = "jacobian/regression-v1"
 description = "Eight self-contained mathematical workflow observation tasks for Jacobian."
-keywords = [ "mathematics", "jacobian", "regression", "verification", "offline",]
-[[dataset.authors]]
-name = "Jacobian contributors"
-email = "maintainers@jacobian.invalid"
-
+keywords = [
+    "mathematics",
+    "jacobian",
+    "regression",
+    "verification",
+    "offline",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
-digest = "sha256:0c6a19cc9751eec9fcdfd8e6ffcca5fd0cebd6a6e313c8f1d448b71a9fe1a99b"
+digest = "sha256:bbd890e359d2c6a12536caea5194dd14035c8c531df32beef4f8c4d207fea27b"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-artifact-composition"
-digest = "sha256:dd3974a6d332743040dcae6dd39b0d7720fbacc46f206b12357012960c8b3cbc"
+digest = "sha256:15550464d9fa0346052e384da184b4975fdd3aa3193e1828f1809e4cd6ce3d00"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-counterexample"
-digest = "sha256:d25222c924d6f5c7a0a44d3bfe2d7a551bf80e252f98209ac33eaa6a4a83cce3"
+digest = "sha256:66abb6718b57b9e963f03d124a63c2205025d0d8e8d1b9af410fcd49bae3e70d"
 
 [[tasks]]
 name = "jacobian/regression-v1-hermite-normal-form"
-digest = "sha256:df2378e2cee1652deff0a96961e6e3da8c62ce9fce7913a46fec185a5489ccd8"
+digest = "sha256:470dab5cee866ec23377a6dc1f9b72ae9fcb0ab7d174b7f83fead18c6328d52c"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
-digest = "sha256:86428dae8705b077f0a89986065260d16203feaea4b53a3f7d2d66ba97f6942f"
+digest = "sha256:929065cad9aa83a3fd2c5239bc4180db82313645e93d6fef94d1fb94459f21d9"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-normalization"
-digest = "sha256:1635c79f6ce1facfec543ded71c4aae57f4a99dbf7c06ba841ff8eccf7048459"
+digest = "sha256:9d49df037397ffbde9853d21aaa5609c13bb64700d458dfaab801e138186aaca"
 
 [[tasks]]
 name = "jacobian/regression-v1-rational-linear-solution"
-digest = "sha256:ce2692417679fdbe26fe53edb9c8f46b2b082ce2317d2a636b6555c6a9feeb74"
+digest = "sha256:fb3bbb45a669871647140f0209f5205555f063d8d304f5c9e38c7c1d3e35f11c"
 
 [[tasks]]
 name = "jacobian/regression-v1-sat-witness"
-digest = "sha256:bf62a2ace64aafbd6ff069cc4e3b152e7902ebc328529732a04783f38077e0dc"
+digest = "sha256:e62af5de4cc5dcfcea7bd75b8528300816580eb402398b326c39bbbdab45e867"
