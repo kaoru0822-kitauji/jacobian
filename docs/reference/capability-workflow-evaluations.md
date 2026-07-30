@@ -40,8 +40,8 @@ token, keeping credentials out of task prompts.
 
 ```sh
 export JACOBIAN_IMAGE='registry.example/jacobian@sha256:...'
-export JACOBIAN_MCP_TOKEN='opaque-per-trial-token'
-export JACOBIAN_AUTH_TOKENS_JSON='{"opaque-per-trial-token":"observation"}'
+export JACOBIAN_MCP_TOKEN='replace-with-at-least-32-character-token'
+export JACOBIAN_AUTH_TOKENS_JSON='{"tokens":[{"tenant_id":"observation","token":"replace-with-at-least-32-character-token","scopes":["jacobian:use"]}]}'
 export JACOBIAN_MODEL='your-model'
 harbor run -c benchmarks/regression-v1/job-jacobian.json
 ```

@@ -63,7 +63,7 @@ checker error remains `UNKNOWN` and cannot produce `VERIFIED`.
 ## Public composition evidence
 
 The frozen public matched evaluation in
-[Capability workflow evaluations](capability-workflow-evaluations.md#graph-distance-matrix-composition-pilot)
+[Capability workflow evaluations](capability-workflow-evaluations.md#task-and-verifier-validation)
 used three control/treatment pairs. All treatments autonomously discovered the
 producer and verifier, preserved independently replayable matrix evidence, and
 correctly derived a restricted-set distance profile without substituting

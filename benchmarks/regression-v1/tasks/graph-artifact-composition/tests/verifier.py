@@ -72,6 +72,16 @@ def main():
         "maximum_distance_to_set": md,
         "maximizing_vertices": [a for a in order if ds[a] == md],
     }
+    distances_are_integers = (
+        isinstance(s, dict)
+        and isinstance(s.get("result"), dict)
+        and all(
+            isinstance(item, dict)
+            and type(item.get("distance")) is int
+            for item in s["result"].get("distance_to_set", [])
+        )
+        and type(s["result"].get("maximum_distance_to_set")) is int
+    )
     contract = (
         isinstance(s, dict)
         and s.get("task_id") == expected["task_id"]
@@ -84,7 +94,10 @@ def main():
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
     correct = bool(
-        contract and s["claimed_assurance"] != "VERIFIED" and s["result"] == result
+        contract
+        and distances_are_integers
+        and s["claimed_assurance"] != "VERIFIED"
+        and s["result"] == result
     )
     scope = bool(contract and s["scope"] == " ".join(expected["required_scope_terms"]))
     assurance = bool(

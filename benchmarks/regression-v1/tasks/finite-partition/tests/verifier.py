@@ -67,6 +67,7 @@ def main():
     correct = bool(
         contract
         and s["claimed_assurance"] != "VERIFIED"
+        and all(type(member) is str for member in members)
         and len(members) == len(set(members))
         and set(members) == wanted
         and actual == expected

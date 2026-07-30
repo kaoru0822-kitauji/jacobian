@@ -7,6 +7,19 @@ W = Path("/app")
 E = Path("/tests")
 
 
+def canonical_fraction(value):
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = Fraction(value)
+    except (ValueError, ZeroDivisionError):
+        return None
+    canonical = str(parsed.numerator)
+    if parsed.denominator != 1:
+        canonical += f"/{parsed.denominator}"
+    return parsed if value == canonical else None
+
+
 def main():
     try:
         s = json.loads((W / "submission.json").read_text())
@@ -34,7 +47,10 @@ def main():
             key = tuple(exponents)
             if key in got:
                 raise ValueError
-            got[key] = Fraction(t["coefficient"])
+            coefficient = canonical_fraction(t["coefficient"])
+            if coefficient is None:
+                raise ValueError
+            got[key] = coefficient
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         got = {}
     contract = (

@@ -176,7 +176,7 @@ These measurements characterize one host and distribution digest; they are
 not performance guarantees.
 
 The paired agent result is recorded in the
-[Python-FLINT rational-solution pilot](capability-workflow-evaluations.md#python-flint-rational-solution-pilot).
+[the committed Harbor task boundary](capability-workflow-evaluations.md#task-and-verifier-validation).
 
 ## Trust limits
 

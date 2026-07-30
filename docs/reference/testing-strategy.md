@@ -162,7 +162,7 @@ their loaders, scorers, replay paths, telemetry parsing, and dispatch guards
 with deterministic fixtures, but never start an evaluated model. A human must
 use the separate `make agent-eval` entry point, select cases explicitly, review
 the plan, and opt into execution with a bounded model-run count. See
-[Agent evaluations](agent-evaluations.md#local-execution-boundary).
+[Agent evaluations](agent-evaluations.md#validation-boundary).
 
 ## Criticality classes
 
