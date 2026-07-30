@@ -127,13 +127,20 @@ def test_materialization_preserves_environment_and_preprocessing(
     )
 
     assert result.output["normalized_source"] == (
-        "import Mathlib\ntheorem mathd_algebra_1 : (1 : Nat) = 1 := by\n  rfl\n"
+        "import Mathlib  \n"
+        "theorem mathd_algebra_1 : (1 : Nat) = 1 := by  \n"
+        "  rfl  \n"
     )
     assert result.output["environment"] == _environment()
     assert [item["operation"] for item in result.output["preprocessing"]] == [
         "NORMALIZE_NEWLINES",
         "TRIM_TRAILING_WHITESPACE",
         "ENSURE_FINAL_NEWLINE",
+    ]
+    assert [item["applied"] for item in result.output["preprocessing"]] == [
+        True,
+        False,
+        True,
     ]
     assert [item["code"] for item in result.output["diagnostics"]] == [
         "EXECUTION_NOT_REQUESTED"
@@ -214,6 +221,27 @@ def test_materialization_preserves_split_and_leading_lines(tmp_path: Path) -> No
     assert result.output["normalized_source"].startswith("\nimport Mathlib\n")
     stored = adapter.store.get(result.output["artifact_uri"])
     assert stored.payload["normalized_source"] == result.output["normalized_source"]
+
+
+def test_materialization_preserves_trailing_spaces_inside_source(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _proofnet_request()
+    assert isinstance(payload["row"], dict)
+    payload["row"]["formal_statement"] = (
+        'theorem analysis_1 : "line with spaces  \\n" = '
+        '"line with spaces  \\n" := by rfl'
+    )
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.formal.materialize",
+            input=payload,
+        )
+    )
+
+    assert "spaces  \\n" in result.output["normalized_source"]
 
 
 def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:

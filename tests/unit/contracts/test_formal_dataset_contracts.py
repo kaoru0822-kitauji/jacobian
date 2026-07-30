@@ -139,3 +139,25 @@ def test_environment_rejects_unicode_equivalent_replay_entries() -> None:
             project_revision="fixture",
             theorem_context=("Café", "Cafe\u0301"),
         )
+
+
+@pytest.mark.parametrize(
+    ("container", "field"),
+    (
+        ("request", "dataset_revision"),
+        ("request", "source_url"),
+        ("environment", "project_revision"),
+        ("environment", "namespace"),
+    ),
+)
+def test_request_rejects_non_nfc_scalar_provenance(
+    container: str,
+    field: str,
+) -> None:
+    payload = _request()
+    target = payload if container == "request" else payload["environment"]
+    assert isinstance(target, dict)
+    target[field] = "Revision-Cafe\u0301"
+
+    with pytest.raises(ValidationError, match="NFC-normalized"):
+        FormalDatasetMaterializeRequest.model_validate(payload)

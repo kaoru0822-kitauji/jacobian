@@ -56,12 +56,14 @@ than interpreted heuristically.
 
 ## Replay and diagnostics
 
-The domain-owned producer normalizes line endings, removes trailing whitespace,
-normalizes Unicode to NFC, preserves leading blank lines, and ensures one final
-newline. It binds separate SHA-256 digests for the complete canonical source
-row, normalized Lean source, and declared execution environment. The artifact
-retains the dataset split explicitly. Repeating the same request produces the
-same normalized source, digests, and result artifact URI.
+The domain-owned producer normalizes line endings, preserves all source
+whitespace, preserves leading blank lines, and ensures at least one final
+newline. Inputs must already be NFC-normalized so the adapter never rewrites
+Unicode tokens inside Lean source. It binds separate SHA-256 digests for the
+complete canonical source row, normalized Lean source, and declared execution
+environment. The artifact retains the dataset split explicitly. Repeating the
+same request produces the same normalized source, digests, and result artifact
+URI.
 
 As a standard domain operation, the capability response places the
 materialized record under `output.result` and exposes its content-addressed

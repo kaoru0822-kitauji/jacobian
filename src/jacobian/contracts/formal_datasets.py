@@ -31,6 +31,8 @@ def _validate_row_text(row: MiniF2FRow | ProofNetRow) -> None:
     if not row.formal_statement.strip():
         raise ValueError("formal_statement must not be blank")
     for value in (
+        row.name,
+        row.split,
         row.header,
         row.formal_statement,
         row.informal_statement,
@@ -105,6 +107,14 @@ class FormalDatasetEnvironment(ContractModel):
 
     @model_validator(mode="after")
     def require_unique_ordered_bindings(self) -> Self:
+        for value in (
+            self.lean_version,
+            self.project_revision,
+            self.mathlib_revision,
+            self.namespace,
+        ):
+            if value is not None:
+                _require_nfc(value)
         if len(set(self.imports)) != len(self.imports):
             raise ValueError("imports must be unique and ordered")
         if len(set(self.theorem_context)) != len(self.theorem_context):
@@ -134,6 +144,8 @@ class FormalDatasetMaterializeRequest(ContractModel):
 
     @model_validator(mode="after")
     def bind_dataset_identity(self) -> Self:
+        for value in (self.dataset_revision, self.sample_id, self.source_url):
+            _require_nfc(value)
         if self.sample_id != self.row.name:
             raise ValueError("sample_id must equal the dataset row name")
         return self
@@ -227,7 +239,7 @@ class FormalDatasetArtifact(ContractModel):
             ),
             FormalPreprocessingDecision(
                 operation="TRIM_TRAILING_WHITESPACE",
-                applied=True,
+                applied=False,
             ),
             FormalPreprocessingDecision(
                 operation="ENSURE_FINAL_NEWLINE",
@@ -255,7 +267,9 @@ def _text_digest(value: str) -> str:
 
 def _normalize_text(value: str) -> str:
     lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    normalized = "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
+    normalized = "\n".join(lines)
+    if not normalized.endswith("\n"):
+        normalized += "\n"
     return unicodedata.normalize("NFC", normalized)
 
 

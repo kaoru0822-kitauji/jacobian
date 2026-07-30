@@ -50,8 +50,8 @@ def _text_digest(value: str) -> str:
 
 
 def _normalize_text(value: str) -> str:
-    lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "\n".join(line.rstrip() for line in lines).rstrip("\n") + "\n"
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
+    return normalized if normalized.endswith("\n") else normalized + "\n"
 
 
 def _materialize_payload(
@@ -94,7 +94,7 @@ def _materialize_payload(
             ),
             FormalPreprocessingDecision(
                 operation="TRIM_TRAILING_WHITESPACE",
-                applied=True,
+                applied=False,
             ),
             FormalPreprocessingDecision(
                 operation="ENSURE_FINAL_NEWLINE",
