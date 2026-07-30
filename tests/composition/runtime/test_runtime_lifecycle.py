@@ -26,6 +26,13 @@ from jacobian.store import StoreClosedError
 pytestmark = pytest.mark.usefixtures("attached_complete_runtime")
 
 
+def test_runtime_uses_one_schema_registry_instance(attached_complete_runtime) -> None:
+    assert (
+        attached_complete_runtime.core.plugins.schemas
+        is attached_complete_runtime.core.schemas
+    )
+
+
 def test_close_is_idempotent(tmp_path: Path) -> None:
     runtime = create_runtime(tmp_path)
 

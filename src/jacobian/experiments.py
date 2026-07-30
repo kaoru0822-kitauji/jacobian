@@ -40,7 +40,7 @@ from jacobian.evaluation import (
     EvaluationService,
     require_complete_evaluation_batch,
 )
-from jacobian.experiment_runtime import new_experiment_uri, open_experiment_database
+from jacobian.experiment_identity import new_experiment_uri
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
@@ -91,7 +91,7 @@ class ExperimentService:
         self.structures = structures
         self._threads: dict[str, threading.Thread] = {}
         self._thread_lock = threading.Lock()
-        self._initialize_database()
+        self._recover_interrupted_experiments()
         self.semantics_uri = store.register_descriptor(
             kind="semantics",
             name="jacobian.bounded-enumeration",
@@ -146,29 +146,8 @@ class ExperimentService:
             summary=summary,
         )
 
-    def _connect(self) -> sqlite3.Connection:
-        return open_experiment_database(self.store.db_path)
-
-    def _initialize_database(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS experiments (
-                    experiment_uri TEXT PRIMARY KEY,
-                    state TEXT NOT NULL,
-                    snapshot_json BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS experiment_recovery_failures (
-                    experiment_uri TEXT PRIMARY KEY,
-                    detected_at TEXT NOT NULL,
-                    snapshot_digest TEXT NOT NULL,
-                    detail TEXT NOT NULL,
-                    FOREIGN KEY (experiment_uri)
-                        REFERENCES experiments(experiment_uri)
-                        ON DELETE RESTRICT
-                );
-                """
-            )
+    def _recover_interrupted_experiments(self) -> None:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """
@@ -334,7 +313,7 @@ class ExperimentService:
     def inspect(self, experiment_uri: str) -> ExperimentSnapshot:
         """Read the latest durable experiment snapshot."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             row = connection.execute(
                 """
                 SELECT snapshot_json
@@ -356,7 +335,7 @@ class ExperimentService:
     def contains(self, experiment_uri: str) -> bool:
         """Return whether this service owns the experiment identity."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             row = connection.execute(
                 """
                 SELECT 1
@@ -396,7 +375,7 @@ class ExperimentService:
     def cancel(self, experiment_uri: str) -> ExperimentCancelResult:
         """Request cooperative cancellation without deleting committed artifacts."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
@@ -943,7 +922,7 @@ class ExperimentService:
             "enumeration terminal archive persistence failed",
             exc_info=error,
         )
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
@@ -1006,7 +985,7 @@ class ExperimentService:
         canonicalizer_digest: str | None,
         evaluator_digest: str,
     ) -> bool:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
@@ -1051,7 +1030,7 @@ class ExperimentService:
         return True
 
     def _write_new(self, snapshot: ExperimentSnapshot) -> None:
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute(
                 """
                 INSERT INTO experiments (
@@ -1068,7 +1047,7 @@ class ExperimentService:
     def _replace_running(self, snapshot: ExperimentSnapshot) -> bool:
         """Commit progress unless cancellation won the transaction race."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
@@ -1110,7 +1089,7 @@ class ExperimentService:
     def _commit_terminal(self, snapshot: ExperimentSnapshot) -> None:
         """Atomically commit a terminal snapshot while honoring cancellation."""
 
-        with self._connect() as connection:
+        with self.store.connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
