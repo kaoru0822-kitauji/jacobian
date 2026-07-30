@@ -75,6 +75,8 @@ class ExternalConjectureIngestRequest(ContractModel):
             and not self.license_evidence_text.strip()
         ):
             raise ValueError("license evidence text must not be blank")
+        if self.statement is not None and not self.statement.strip():
+            raise ValueError("statement must not be blank")
         return self
 
 

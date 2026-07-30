@@ -44,6 +44,10 @@ Because an input request can contain restricted text and raw license evidence,
 this capability disables automatic research-episode recording. Only its
 policy-filtered artifact and output are persisted.
 
+The policy artifact schema is producer-only: generic `artifact.put` calls
+cannot issue an `ALLOW_TEXT` decision because they do not possess the
+capability's validated license-evidence context.
+
 This mirrors OpenConjecture's public-release pattern of publishing permitted
 text while retaining more restrictive sources as metadata-only records. The
 policy is repository code, not a claim that any caller-supplied license label

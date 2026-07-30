@@ -68,6 +68,20 @@ def test_request_rejects_blank_license_evidence(field: str, value: str) -> None:
         ExternalConjectureIngestRequest.model_validate(payload)
 
 
+@pytest.mark.parametrize("statement", (" ", "\n\r\t"))
+def test_request_rejects_statement_that_normalizes_to_empty(statement: str) -> None:
+    with pytest.raises(ValidationError, match="statement must not be blank"):
+        ExternalConjectureIngestRequest(
+            corpus_id="fixture",
+            corpus_revision="revision-1",
+            source_url="https://example.invalid/corpus",
+            item_id="item-1",
+            metadata={"title": "Fixture conjecture"},
+            statement=statement,
+            source_license="MISSING",
+        )
+
+
 def test_artifact_cannot_claim_verification() -> None:
     with pytest.raises(ValidationError):
         ExternalConjectureIngestArtifact(

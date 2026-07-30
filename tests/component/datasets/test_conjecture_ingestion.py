@@ -205,6 +205,26 @@ def test_metadata_only_source_without_statement_is_retained(tmp_path: Path) -> N
     assert result.output["metadata"]["source_item_url"].endswith("fixture-1")
 
 
+def test_allowlisted_source_without_statement_uses_no_text_status(
+    tmp_path: Path,
+) -> None:
+    adapter = _adapter(tmp_path)
+    payload = _request()
+    payload["statement"] = None
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="dataset.conjecture.ingest",
+            input=payload,
+        )
+    )
+
+    assert result.output["license_decision"] == "METADATA_ONLY"
+    assert result.output["ingestion_status"] == "METADATA_INDEXED_NO_TEXT"
+    assert result.output["indexed_statement"] is None
+    assert result.output["withheld_fields"] == []
+
+
 def test_descriptor_disables_episode_recording(tmp_path: Path) -> None:
     adapter = _adapter(tmp_path)
 
@@ -252,7 +272,7 @@ def test_generic_artifact_write_rejects_policy_bypass(tmp_path: Path) -> None:
         }
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="producer-only"):
         adapter.artifacts.put(
             schema_uri=adapter.artifact_schema_uri,
             semantics_uri=adapter.semantics_uri,

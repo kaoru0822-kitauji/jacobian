@@ -63,6 +63,11 @@ def _license_decision(
     request: ExternalConjectureIngestRequest,
 ) -> tuple[ConjectureLicenseDecision, str]:
     license_class = request.source_license
+    if request.statement is None:
+        return (
+            ConjectureLicenseDecision.METADATA_ONLY,
+            "No statement text was supplied; metadata was retained without withholding.",
+        )
     if license_class in _TEXT_ALLOWED:
         if (
             request.license_evidence_url is None
@@ -278,6 +283,7 @@ class ExternalConjectureIngestAdapter:
             semantics_uri=self.semantics_uri,
             payload=artifact_payload.model_dump(mode="json"),
             summary=_artifact_summary(validated, decision),
+            producer_write=True,
         )
         output = ExternalConjectureIngestOutput(
             **artifact_payload.model_dump(mode="python"),
@@ -339,6 +345,7 @@ def install_conjecture_ingestion_capability(
         name="jacobian.external-conjecture-record",
         version="1",
         model=ExternalConjectureIngestArtifact,
+        producer_only=True,
     )
     return (
         ExternalConjectureIngestAdapter(
