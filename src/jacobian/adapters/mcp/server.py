@@ -17,6 +17,8 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
+from jsonschema import Draft202012Validator
+from mcp.server import MCPServer
 from mcp.server.extension import Extension, ResourceBinding, ToolBinding
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.mcpserver.resources import FunctionResource, TextResource
@@ -302,7 +304,6 @@ _RELATED_CAPABILITIES: dict[str, tuple[tuple[str, str], ...]] = {
 }
 
 if TYPE_CHECKING:
-    from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
     from jacobian.adapters.mcp.remote import TenantRuntimeRouter
@@ -826,6 +827,35 @@ class AppState:
     tenant_router: TenantRuntimeRouter | None = None
 
 
+class JacobianMCPServer(MCPServer[AppState]):
+    """MCP server with strict validation at the public invocation boundary."""
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: Any | None = None,
+    ) -> Any:
+        tool = next((tool for tool in await self.list_tools() if tool.name == name), None)
+        if tool is not None:
+            schema = {**tool.input_schema, "additionalProperties": False}
+            errors = list(Draft202012Validator(schema).iter_errors(arguments))
+            if errors:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=_public_tool_error(
+                                name,
+                                ValueError("tool arguments failed schema validation"),
+                            ),
+                        )
+                    ],
+                    is_error=True,
+                )
+        return await super().call_tool(name, arguments, context)
+
+
 class JacobianCoreExtension(Extension):
     """Stable Jacobian tools and static resources contributed through MCP v2."""
 
@@ -1101,7 +1131,6 @@ def create_server(
 
     # Keep ``--help`` and ``--version`` independent of the MCP runtime's
     # heavier imports and shutdown hooks.
-    from mcp.server import MCPServer
     from mcp.server.mcpserver import Context
 
     from jacobian.adapters.mcp.remote import (
@@ -1158,7 +1187,7 @@ def create_server(
         ) as state:
             yield state
 
-    server: MCPServer[AppState] = MCPServer(
+    server: MCPServer[AppState] = JacobianMCPServer(
         name="jacobian",
         title="Jacobian Mathematical Workbench",
         description=SERVER_DESCRIPTION,
