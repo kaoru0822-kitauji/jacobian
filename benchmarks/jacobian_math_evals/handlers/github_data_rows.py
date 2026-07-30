@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from ..models import OracleKind, SourceRecord, Split, TaskReadiness, TaskSpec
-from .github_declarations import _gh_bytes, _gh_json, _repo_name
+from .github_declarations import (
+    _gh_bytes,
+    _gh_json,
+    _repo_name,
+    _validated_cached_snapshot,
+)
 from .huggingface_structured import RowRecipe, choose_recipe
 
 MAX_DATA_BYTES = 1_048_576
@@ -114,29 +119,35 @@ class GitHubStructuredDataHandler:
     ) -> Path:
         if source.immutable_revision is None:
             raise ValueError("GitHub source lacks immutable revision")
+        if source.snapshot_sha256 is None:
+            raise ValueError("GitHub source lacks locked snapshot digest")
         destination = cache_dir / source.source_id / "structured-data-row.json"
         digest_path = destination.with_suffix(".sha256")
-        if destination.exists() and digest_path.exists():
-            actual = hashlib.sha256(destination.read_bytes()).hexdigest()
-            if actual != digest_path.read_text(encoding="utf-8").strip():
-                raise ValueError("cached GitHub data snapshot digest mismatch")
+        if _validated_cached_snapshot(
+            destination, digest_path, source, label="GitHub data"
+        ):
             return destination
         if offline:
             raise FileNotFoundError(
                 f"offline GitHub data snapshot missing: {destination}"
             )
         repo = _repo_name(source)
-        tree = _gh_json(
-            [
-                "--method",
-                "GET",
-                f"repos/{repo}/git/trees/{source.immutable_revision}",
-                "-f",
-                "recursive=1",
-            ]
-        )
+        candidate_paths: tuple[str, ...]
+        if source.subresource_path:
+            candidate_paths = (source.subresource_path,)
+        else:
+            tree = _gh_json(
+                [
+                    "--method",
+                    "GET",
+                    f"repos/{repo}/git/trees/{source.immutable_revision}",
+                    "-f",
+                    "recursive=1",
+                ]
+            )
+            candidate_paths = _candidate_paths(tree)
         selected: dict[str, Any] | None = None
-        for path in _candidate_paths(tree):
+        for path in candidate_paths:
             payload = _gh_bytes(
                 [
                     "--method",
@@ -158,6 +169,7 @@ class GitHubStructuredDataHandler:
                 "source_id": source.source_id,
                 "repository": repo,
                 "revision": source.immutable_revision,
+                "source_snapshot_sha256": source.snapshot_sha256,
                 "path": path,
                 "family": recipe.family,
                 "instruction": recipe.instruction,

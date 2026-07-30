@@ -1083,17 +1083,19 @@
     },
     {
       "access_state": "public",
-      "canonical_url": "https://github.com/neelsomani/gpt-erdos",
+      "canonical_url": "https://github.com/neelsomani/gpt-erdos/blob/21b48ae6b97279e9fe6781e3744e1cdd835e2cc1/data/unsolved.jsonl",
       "evidence_timestamp": "2026-07-29T22:16:24+00:00",
       "gitcontribute_job_id": "dfd2676f-f732-40cf-bd2b-15d5d0f60edf",
       "immutable_revision": "21b48ae6b97279e9fe6781e3744e1cdd835e2cc1",
       "license": "Apache-2.0",
       "metadata_evidence_timestamp": "2026-07-29T23:21:46+00:00",
       "provider": "gitcontribute-metadata+github-rest-v3-via-gh",
+      "repository_url": "https://github.com/neelsomani/gpt-erdos",
       "redirect_from": [
         "https://github.com/neelsomani/gpt-erdos/blob/main/data/unsolved.jsonl"
       ],
       "snapshot_sha256": "sha256:1204c24eb116f74178ab4d5627e979e93abdee57b85894ccc100413c3094d064",
+      "subresource_path": "data/unsolved.jsonl",
       "source_id": "src-ed12e2650dc9"
     },
     {

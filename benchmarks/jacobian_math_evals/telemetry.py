@@ -58,6 +58,8 @@ def summarize_events(
         )
         for event in events
         if event.get("kind") == "capability.invoke"
+        and isinstance(event.get("capability_id"), str)
+        and isinstance(event.get("arguments_digest"), str)
     ]
     repeated = len(invocations) - len(set(invocations))
     produced = {

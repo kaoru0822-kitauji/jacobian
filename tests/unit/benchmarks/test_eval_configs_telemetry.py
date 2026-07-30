@@ -78,6 +78,18 @@ def test_process_summary_uses_only_observable_events() -> None:
     assert summary.false_certification is True
 
 
+def test_process_summary_does_not_conflate_unidentified_invocations() -> None:
+    summary = summarize_events(
+        [
+            {"kind": "capability.invoke"},
+            {"kind": "capability.invoke", "capability_id": "algebra.factor"},
+        ],
+        outcome={},
+    )
+    assert summary.event_counts["capability.invoke"] == 2
+    assert summary.repeated_invocations == 0
+
+
 def test_treatment_preflight_requires_pinned_image_and_matching_token() -> None:
     validate_treatment_environment(
         {

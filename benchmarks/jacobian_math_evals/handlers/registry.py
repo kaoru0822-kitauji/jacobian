@@ -12,7 +12,7 @@ from ..models import TaskSpec
 from ..partitions import FAMILY_ALIASES, source_family_key
 from .base import SourceHandler
 from .github_data_rows import GitHubStructuredDataHandler
-from .github_declarations import GitHubFormalDeclarationHandler
+from .github_declarations import LANGUAGES, GitHubFormalDeclarationHandler
 from .huggingface_rows import HuggingFaceExactAnswerHandler
 from .huggingface_structured import HuggingFaceStructuredDiagnosticHandler
 from .ineqmath import IneqMathHandler
@@ -24,58 +24,59 @@ GITHUB_DATA_PROBE_PATH = PACKAGE_ROOT / "catalog" / "handler-probes-github-data.
 SOURCE_RELATIONS_PATH = PACKAGE_ROOT / "catalog" / "source-relations.json"
 
 
-def _supported_huggingface_ids() -> tuple[str, ...]:
-    report = json.loads(PROBE_PATH.read_text(encoding="utf-8"))
+def _supported_ids(path: Path, handler: str) -> tuple[str, ...]:
+    report = json.loads(path.read_text(encoding="utf-8"))
     if report.get("probe_version") != 1:
-        raise ValueError("unsupported handler probe version")
-    return tuple(
-        record["source_id"]
-        for record in report["records"]
-        if record.get("handler") == "huggingface-scalar-exact-answer-v1"
-        and record.get("status") == "supported"
-    )
+        raise ValueError(f"unsupported {handler} probe version")
+    sources = {source.source_id: source for source in load_sources()}
+    supported: list[str] = []
+    for record in report["records"]:
+        if record.get("handler") != handler or record.get("status") != "supported":
+            continue
+        source = sources.get(record.get("source_id"))
+        if (
+            source is None
+            or not source.immutable_revision
+            or not source.snapshot_sha256
+            or record.get("source_revision") != source.immutable_revision
+            or record.get("snapshot_sha256") != source.snapshot_sha256
+        ):
+            continue
+        if (
+            handler == "github-formal-declarations-v1"
+            and source.subresource_path
+            and Path(source.subresource_path).suffix.lower() not in LANGUAGES
+        ):
+            continue
+        supported.append(source.source_id)
+    return tuple(supported)
+
+
+def _supported_huggingface_ids() -> tuple[str, ...]:
+    return _supported_ids(PROBE_PATH, "huggingface-scalar-exact-answer-v1")
 
 
 def _supported_github_ids() -> tuple[str, ...]:
-    report = json.loads(GITHUB_PROBE_PATH.read_text(encoding="utf-8"))
-    if report.get("probe_version") != 1:
-        raise ValueError("unsupported GitHub handler probe version")
-    return tuple(
-        record["source_id"]
-        for record in report["records"]
-        if record.get("handler") == "github-formal-declarations-v1"
-        and record.get("status") == "supported"
-    )
+    return _supported_ids(GITHUB_PROBE_PATH, "github-formal-declarations-v1")
 
 
 def _supported_structured_ids() -> tuple[str, ...]:
     if not STRUCTURED_PROBE_PATH.exists():
         return ()
-    report = json.loads(STRUCTURED_PROBE_PATH.read_text(encoding="utf-8"))
-    if report.get("probe_version") != 1:
-        raise ValueError("unsupported structured handler probe version")
     exact_ids = frozenset(_supported_huggingface_ids())
     return tuple(
-        record["source_id"]
-        for record in report["records"]
-        if record.get("handler") == "huggingface-structured-diagnostic-v1"
-        and record.get("status") == "supported"
-        and record["source_id"] not in exact_ids
+        source_id
+        for source_id in _supported_ids(
+            STRUCTURED_PROBE_PATH, "huggingface-structured-diagnostic-v1"
+        )
+        if source_id not in exact_ids
     )
 
 
 def _supported_github_data_ids() -> tuple[str, ...]:
     if not GITHUB_DATA_PROBE_PATH.exists():
         return ()
-    report = json.loads(GITHUB_DATA_PROBE_PATH.read_text(encoding="utf-8"))
-    if report.get("probe_version") != 1:
-        raise ValueError("unsupported GitHub data handler probe version")
-    return tuple(
-        record["source_id"]
-        for record in report["records"]
-        if record.get("handler") == "github-structured-data-v1"
-        and record.get("status") == "supported"
-    )
+    return _supported_ids(GITHUB_DATA_PROBE_PATH, "github-structured-data-v1")
 
 
 HANDLERS: tuple[SourceHandler, ...] = (
@@ -136,13 +137,14 @@ def materialize_handler_specs(
     cache_dir: Path,
     offline: bool,
     full: bool,
+    selected_source_ids: frozenset[str] = frozenset(),
 ) -> tuple[TaskSpec, ...]:
     return tuple(
         iter_materialized_handler_specs(
             cache_dir=cache_dir,
             offline=offline,
             full=full,
-            selected_source_ids=frozenset(),
+            selected_source_ids=selected_source_ids,
         )
     )
 

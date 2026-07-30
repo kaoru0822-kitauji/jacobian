@@ -71,10 +71,38 @@ class NoFormalDeclarationsError(ValueError):
 
 
 def _repo_name(source: SourceRecord) -> str:
-    parts = urllib.parse.urlparse(source.canonical_url).path.strip("/").split("/")
+    repository_url = source.repository_url or source.canonical_url
+    parts = urllib.parse.urlparse(repository_url).path.strip("/").split("/")
     if len(parts) < 2:
         raise ValueError(f"not a GitHub repository URL: {source.canonical_url}")
     return "/".join(parts[:2]).removesuffix(".git")
+
+
+def _validated_cached_snapshot(
+    destination: Path,
+    digest_path: Path,
+    source: SourceRecord,
+    *,
+    label: str,
+) -> bool:
+    if not destination.exists() or not digest_path.exists():
+        return False
+    actual = hashlib.sha256(destination.read_bytes()).hexdigest()
+    expected = digest_path.read_text(encoding="utf-8").strip()
+    if actual != expected:
+        raise ValueError(f"cached {label} snapshot digest mismatch")
+    try:
+        value: Any = json.loads(destination.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"cached {label} snapshot is invalid JSON") from exc
+    if (
+        not isinstance(value, dict)
+        or value.get("source_id") != source.source_id
+        or value.get("revision") != source.immutable_revision
+        or value.get("source_snapshot_sha256") != source.snapshot_sha256
+    ):
+        raise ValueError(f"cached {label} snapshot does not match source lock")
+    return True
 
 
 def _gh_json(args: list[str]) -> dict[str, Any]:
@@ -153,30 +181,40 @@ class GitHubFormalDeclarationHandler:
             raise ValueError(f"handler does not own {source.source_id}")
         if source.immutable_revision is None:
             raise ValueError("GitHub source lacks immutable revision")
+        if source.snapshot_sha256 is None:
+            raise ValueError("GitHub source lacks locked snapshot digest")
         destination = cache_dir / source.source_id / "formal-declarations.json"
         digest_path = destination.with_suffix(".sha256")
-        if destination.exists() and digest_path.exists():
-            actual = hashlib.sha256(destination.read_bytes()).hexdigest()
-            expected = digest_path.read_text(encoding="utf-8").strip()
-            if actual != expected:
-                raise ValueError("cached GitHub declaration snapshot digest mismatch")
+        if _validated_cached_snapshot(
+            destination, digest_path, source, label="GitHub declaration"
+        ):
             return destination
         if offline:
             raise FileNotFoundError(
                 f"offline GitHub declaration snapshot missing: {destination}"
             )
         repo = _repo_name(source)
-        tree = _gh_json(
-            [
-                "--method",
-                "GET",
-                f"repos/{repo}/git/trees/{source.immutable_revision}",
-                "-f",
-                "recursive=1",
-            ]
-        )
+        candidate_paths: tuple[tuple[str, str], ...]
+        if source.subresource_path:
+            language = LANGUAGES.get(Path(source.subresource_path).suffix.lower())
+            if language is None:
+                raise NoFormalDeclarationsError(
+                    "scoped GitHub artifact is not a supported formal source file"
+                )
+            candidate_paths = ((source.subresource_path, language),)
+        else:
+            tree = _gh_json(
+                [
+                    "--method",
+                    "GET",
+                    f"repos/{repo}/git/trees/{source.immutable_revision}",
+                    "-f",
+                    "recursive=1",
+                ]
+            )
+            candidate_paths = _candidate_paths(tree)
         selected: dict[str, Any] | None = None
-        for path, language in _candidate_paths(tree):
+        for path, language in candidate_paths:
             payload = _gh_bytes(
                 [
                     "--method",
@@ -196,6 +234,7 @@ class GitHubFormalDeclarationHandler:
                     "source_id": source.source_id,
                     "repository": repo,
                     "revision": source.immutable_revision,
+                    "source_snapshot_sha256": source.snapshot_sha256,
                     "path": path,
                     "language": language,
                     "content": content,

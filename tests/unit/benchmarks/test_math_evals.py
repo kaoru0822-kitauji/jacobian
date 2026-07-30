@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
+import benchmarks.jacobian_math_evals.compiler as compiler
 import pytest
+from benchmarks.jacobian_math_evals.acquisition import _github_subresource_path
 from benchmarks.jacobian_math_evals.catalog import load_sources
 from benchmarks.jacobian_math_evals.compiler import (
     FAMILIES,
@@ -17,6 +20,7 @@ from benchmarks.jacobian_math_evals.configs import (
     experiment_fingerprint,
     matched_configs,
 )
+from benchmarks.jacobian_math_evals.handlers import registry
 from benchmarks.jacobian_math_evals.main import parser
 from benchmarks.jacobian_math_evals.manual_specs import (
     TEMPLATES,
@@ -103,6 +107,53 @@ def test_resolved_sources_have_immutable_provenance() -> None:
         locked[source_id]["snapshot_sha256"].startswith("sha256:")
         for source_id in acquired_ids
     )
+    scoped = next(
+        source for source in sources if source.source_id == "src-ed12e2650dc9"
+    )
+    assert scoped.repository_url == "https://github.com/neelsomani/gpt-erdos"
+    assert scoped.subresource_path == "data/unsolved.jsonl"
+    assert scoped.immutable_revision in scoped.canonical_url
+
+
+def test_github_subresource_parser_preserves_file_scope() -> None:
+    assert (
+        _github_subresource_path(
+            "https://github.com/example/math/blob/main/data/unsolved.jsonl"
+        )
+        == "data/unsolved.jsonl"
+    )
+    assert _github_subresource_path("https://github.com/example/math") is None
+
+
+def test_supported_probe_must_match_locked_revision_and_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = load_sources()[0]
+    source = replace(
+        source,
+        immutable_revision="current",
+        snapshot_sha256="sha256:" + "1" * 64,
+    )
+    report = tmp_path / "probe.json"
+    report.write_text(
+        json.dumps(
+            {
+                "probe_version": 1,
+                "records": [
+                    {
+                        "source_id": source.source_id,
+                        "handler": "example-handler",
+                        "status": "supported",
+                        "source_revision": "stale",
+                        "snapshot_sha256": source.snapshot_sha256,
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setattr(registry, "load_sources", lambda: (source,))
+    assert registry._supported_ids(report, "example-handler") == ()
 
 
 def test_all_task_families_are_represented() -> None:
@@ -169,7 +220,36 @@ def test_generated_task_uses_harbor_14_and_clean_room_rewardkit(
     assert 'artifacts = ["/app/submission.json", "/app/evidence"]' in toml
     assert (task / "tests" / "test.sh").read_text().endswith("rewardkit /tests\n")
     assert "harbor-rewardkit==0.1.7" in (task / "tests" / "Dockerfile").read_text()
+    assert "@sha256:" in (task / "environment" / "Dockerfile").read_text()
+    assert "@sha256:" in (task / "tests" / "Dockerfile").read_text()
     assert (task / "solution" / "solve.sh").stat().st_mode & 0o111
+
+
+def test_public_diagnostic_oracle_uses_known_conclusion(tmp_path: Path) -> None:
+    [task] = compile_tasks(
+        output_dir=tmp_path,
+        split=Split.PUBLIC,
+        task_ids=frozenset({"jcb-postdoc-001"}),
+        cache_dir=tmp_path / "empty-cache",
+        offline=True,
+    )
+    expected = json.loads((task / "tests" / "expected.json").read_text())
+    submission = json.loads((task / "solution" / "submission.json").read_text())
+    assert expected["allowed_conclusions"] == ["DISPROVED"]
+    assert submission["conclusion"] == "DISPROVED"
+
+
+def test_targeted_public_generation_does_not_acquire_unrelated_sources(
+    tmp_path: Path,
+) -> None:
+    written = compile_tasks(
+        output_dir=tmp_path / "out",
+        split=Split.PUBLIC,
+        task_ids=frozenset({"jcb-postdoc-001"}),
+        cache_dir=tmp_path / "empty-cache",
+        offline=True,
+    )
+    assert len(written) == 1
 
 
 def test_required_cli_flags_parse(tmp_path: Path) -> None:
@@ -228,6 +308,32 @@ def test_generation_manifest_records_publishability(tmp_path: Path) -> None:
     assert isinstance(manifest["tasks"][0]["admissible_for_publish"], bool)
     assert manifest["coverage"]["complete"] is False
     assert manifest["coverage"]["meaningful_source_count"] == 8
+
+
+def test_full_generation_streams_task_source_mappings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = task_specs()[0]
+    monkeypatch.setattr(
+        compiler,
+        "iter_full_task_specs",
+        lambda **_kwargs: iter((spec,)),
+    )
+    compile_tasks(
+        output_dir=tmp_path / "out",
+        split=Split.FULL,
+        cache_dir=tmp_path / "cache",
+        offline=True,
+    )
+    manifest = json.loads(
+        (tmp_path / "out" / "generation-manifest.json").read_text()
+    )
+    records_path = tmp_path / "out" / manifest["task_records"]["path"]
+    [record] = [json.loads(line) for line in records_path.read_text().splitlines()]
+    assert record["task_id"] == spec.task_id
+    assert record["source_ids"] == list(spec.source_ids)
+    assert manifest["task_records"]["count"] == 1
 
 
 def test_strict_coverage_refuses_placeholder_tasks(tmp_path: Path) -> None:

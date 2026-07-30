@@ -245,6 +245,7 @@ class HuggingFaceExactAnswerHandler:
                 "config": config,
                 "split": split,
                 "source_revision": source.immutable_revision,
+                "source_snapshot_sha256": source.snapshot_sha256,
                 "num_rows": matched[0]["num_rows"],
                 "page_size": 100,
             }
@@ -254,6 +255,7 @@ class HuggingFaceExactAnswerHandler:
             or manifest.get("config") != config
             or manifest.get("split") != split
             or manifest.get("source_revision") != source.immutable_revision
+            or manifest.get("source_snapshot_sha256") != source.snapshot_sha256
             or not isinstance(manifest.get("num_rows"), int)
             or manifest.get("page_size") != 100
         ):
@@ -262,10 +264,25 @@ class HuggingFaceExactAnswerHandler:
         yielded_rows = 0
         for offset in range(0, num_rows, 100):
             page_path = full_dir / f"{offset:012d}.json"
-            if not _validated_cache(page_path):
+            page_value: Any = (
+                json.loads(page_path.read_text(encoding="utf-8"))
+                if _validated_cache(page_path)
+                else None
+            )
+            page_identity_matches = (
+                isinstance(page_value, dict)
+                and page_value.get("dataset") == dataset
+                and page_value.get("config") == config
+                and page_value.get("split") == split
+                and page_value.get("source_revision") == source.immutable_revision
+                and page_value.get("source_snapshot_sha256")
+                == source.snapshot_sha256
+                and page_value.get("offset") == offset
+            )
+            if not page_identity_matches:
                 if offline:
-                    raise FileNotFoundError(
-                        f"offline full snapshot page missing: {page_path}"
+                    raise ValueError(
+                        f"offline full snapshot page identity mismatch: {page_path}"
                     )
                 page = _json_get(
                     "https://datasets-server.huggingface.co/rows?"
@@ -279,8 +296,18 @@ class HuggingFaceExactAnswerHandler:
                         }
                     )
                 )
+                page.update(
+                    {
+                        "dataset": dataset,
+                        "config": config,
+                        "split": split,
+                        "source_revision": source.immutable_revision,
+                        "source_snapshot_sha256": source.snapshot_sha256,
+                        "offset": offset,
+                    }
+                )
                 _write_cache(page_path, page)
-            page_value: Any = json.loads(page_path.read_text(encoding="utf-8"))
+                page_value = page
             rows = page_value.get("rows") if isinstance(page_value, dict) else None
             if not isinstance(rows, list) or not rows:
                 raise ValueError(f"full snapshot page has no rows: {page_path}")

@@ -42,6 +42,14 @@ FAMILIES = (
     "formal-library",
     "tool-application",
 )
+AGENT_IMAGE = (
+    "python:3.12-slim@"
+    "sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de"
+)
+VERIFIER_IMAGE = (
+    "ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim@"
+    "sha256:dc7e1d08f8ca979826ec0b68b31c783e0b35b568be6a078d4cbedf38c4cc085e"
+)
 
 
 def _digest(value: str, length: int = 12) -> str:
@@ -211,6 +219,9 @@ def _public_tasks() -> Iterator[TaskSpec]:
                 expected={
                     "answer_visible": True,
                     "oracle": case["oracle"],
+                    "allowed_conclusions": [
+                        case["oracle"]["expected_conclusion"]
+                    ],
                     "maximum_assurance": "UNVERIFIED",
                 },
                 admissible_for_publish=True,
@@ -236,6 +247,7 @@ def task_specs(
     cache_dir: Path | None = None,
     offline: bool = False,
     full: bool = False,
+    selected_source_ids: frozenset[str] = frozenset(),
 ) -> tuple[TaskSpec, ...]:
     sources = load_sources()
     handled = handled_source_ids() if cache_dir is not None else frozenset()
@@ -258,11 +270,24 @@ def task_specs(
             family_of=_family,
             partition_of=_partition,
         )
-        specs += materialize_handler_specs(
+        handler_specs = materialize_handler_specs(
             cache_dir=cache_dir,
             offline=offline,
             full=full,
+            selected_source_ids=selected_source_ids,
         )
+        specs += handler_specs
+        if selected_source_ids:
+            covered_by_handlers = {
+                source_id for spec in handler_specs for source_id in spec.source_ids
+            }
+            specs += tuple(
+                _source_task(source)
+                for source in sources
+                if source.source_id in handled
+                and source.source_id not in covered_by_handlers
+                and source.source_id not in public_catalog_ids
+            )
     specs += tuple(_public_tasks())
     ids = [spec.task_id for spec in specs]
     if len(ids) != len(set(ids)):
@@ -320,14 +345,22 @@ def select_tasks(
     cache_dir: Path | None = None,
     offline: bool = False,
 ) -> tuple[TaskSpec, ...]:
+    if split == Split.PUBLIC:
+        selected = list(_public_tasks())
+        if task_ids:
+            selected = [spec for spec in selected if spec.task_id in task_ids]
+        if source_ids:
+            selected = [
+                spec for spec in selected if source_ids.intersection(spec.source_ids)
+            ]
+        return tuple(sorted(selected, key=lambda spec: spec.task_id))
     specs = task_specs(
         cache_dir=cache_dir,
         offline=offline,
         full=split == Split.FULL,
+        selected_source_ids=source_ids,
     )
-    if split == Split.PUBLIC:
-        selected = [spec for spec in specs if spec.split == Split.PUBLIC]
-    elif split == Split.COVERAGE:
+    if split == Split.COVERAGE:
         selected = [spec for spec in specs if spec.split != Split.PUBLIC]
     elif split == Split.FULL:
         selected = list(specs)
@@ -483,7 +516,7 @@ def _write_task(root: Path, spec: TaskSpec) -> None:
         submission_schema, encoding="utf-8"
     )
     (root / "environment" / "Dockerfile").write_text(
-        "FROM python:3.12-slim\nWORKDIR /app\n"
+        f"FROM {AGENT_IMAGE}\nWORKDIR /app\n"
         "COPY source.json submission.schema.json /app/input/\n"
         "ENV PYTHONDONTWRITEBYTECODE=1\n",
         encoding="utf-8",
@@ -535,7 +568,7 @@ def _write_task(root: Path, spec: TaskSpec) -> None:
     expected = dict(spec.expected)
     expected["task_id"] = spec.task_id
     expected["source_ids"] = list(spec.source_ids)
-    if not spec.scored:
+    if not spec.scored and "allowed_conclusions" not in expected:
         expected.update(
             {
                 "allowed_conclusions": [
@@ -575,7 +608,7 @@ def _write_task(root: Path, spec: TaskSpec) -> None:
         encoding="utf-8",
     )
     (tests / "Dockerfile").write_text(
-        "FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim\n"
+        f"FROM {VERIFIER_IMAGE}\n"
         "RUN uv tool install 'harbor-rewardkit==0.1.7'\n"
         'ENV PATH="/root/.local/bin:$PATH"\n'
         "COPY . /tests\n"
@@ -600,10 +633,21 @@ def compile_tasks(
 ) -> tuple[Path, ...]:
     if limit is not None and limit < 0:
         raise ValueError("limit must be non-negative")
+    report_cache_dir = (
+        None
+        if split in {Split.PUBLIC, Split.FULL}
+        or (
+            task_ids
+            and task_ids
+            <= frozenset(spec.task_id for spec in _public_tasks())
+        )
+        else cache_dir
+    )
     all_specs = task_specs(
-        cache_dir=cache_dir,
+        cache_dir=report_cache_dir,
         offline=offline,
         full=False,
+        selected_source_ids=source_ids,
     )
     report = coverage_report(load_sources(), all_specs)
     if strict_coverage and split != Split.PUBLIC:
@@ -633,6 +677,9 @@ def compile_tasks(
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     manifest_tasks: list[dict[str, object]] = []
+    full_records_path = output_dir / "generation-task-records.jsonl"
+    if split == Split.FULL:
+        full_records_path.write_text("", encoding="utf-8")
     dataset_hasher = hashlib.sha256()
     for spec in selected:
         destination = output_dir / stable_task_name(spec).split("/", 1)[1]
@@ -661,7 +708,15 @@ def compile_tasks(
         dataset_hasher.update(
             json.dumps(task_record, sort_keys=True, separators=(",", ":")).encode()
         )
-        if split != Split.FULL:
+        if split == Split.FULL:
+            with full_records_path.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    json.dumps(
+                        task_record, sort_keys=True, separators=(",", ":")
+                    )
+                    + "\n"
+                )
+        else:
             manifest_tasks.append(task_record)
     manifest = {
         "adapter": "jacobian-math-evals",
@@ -670,6 +725,15 @@ def compile_tasks(
         "task_count": len(written),
         "dataset_digest": "sha256:" + dataset_hasher.hexdigest(),
         "tasks": manifest_tasks,
+        "task_records": (
+            {
+                "format": "jsonl",
+                "path": full_records_path.name,
+                "count": len(written),
+            }
+            if split == Split.FULL
+            else None
+        ),
         "coverage": {
             "complete": report.complete,
             "catalog_source_count": report.catalog_source_count,

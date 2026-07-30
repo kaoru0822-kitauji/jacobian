@@ -88,6 +88,8 @@ def load_sources() -> tuple[SourceRecord, ...]:
                 license=locked.get("license"),
                 evidence_timestamp=locked.get("evidence_timestamp"),
                 snapshot_sha256=locked.get("snapshot_sha256"),
+                repository_url=locked.get("repository_url"),
+                subresource_path=locked.get("subresource_path"),
                 redirect_from=tuple(locked.get("redirect_from", [])),
                 configurations=tuple(locked.get("configurations", [])),
                 splits=tuple(locked.get("splits", [])),

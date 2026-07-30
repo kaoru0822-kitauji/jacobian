@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -29,6 +31,7 @@ def _source():
         source_id="src-111111111111",
         canonical_url="https://github.com/example/formal",
         immutable_revision="1" * 40,
+        snapshot_sha256="sha256:" + "1" * 64,
     )
 
 
@@ -80,8 +83,11 @@ def test_probe_registers_declaration_supported_github_sources() -> None:
         for handler in HANDLERS
         if isinstance(handler, GitHubFormalDeclarationHandler)
     ]
-    assert len(github_handlers) == 61
-    assert len({handler.source_id for handler in github_handlers}) == 61
+    assert len(github_handlers) == 60
+    assert len({handler.source_id for handler in github_handlers}) == 60
+    assert "src-ed12e2650dc9" not in {
+        handler.source_id for handler in github_handlers
+    }
 
 
 def test_formal_handler_offline_missing_snapshot_fails_closed(
@@ -92,6 +98,35 @@ def test_formal_handler_offline_missing_snapshot_fails_closed(
         FileNotFoundError,
         match="offline GitHub declaration snapshot missing",
     ):
+        GitHubFormalDeclarationHandler(source.source_id).acquire(
+            source,
+            cache_dir=tmp_path,
+            offline=True,
+        )
+
+
+def test_formal_handler_rejects_cache_from_another_revision(tmp_path: Path) -> None:
+    source = _source()
+    destination = (
+        tmp_path / source.source_id / "formal-declarations.json"
+    )
+    destination.parent.mkdir(parents=True)
+    payload = (
+        json.dumps(
+            {
+                "source_id": source.source_id,
+                "revision": "stale",
+                "source_snapshot_sha256": source.snapshot_sha256,
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode()
+    destination.write_bytes(payload)
+    destination.with_suffix(".sha256").write_text(
+        hashlib.sha256(payload).hexdigest()
+    )
+    with pytest.raises(ValueError, match="does not match source lock"):
         GitHubFormalDeclarationHandler(source.source_id).acquire(
             source,
             cache_dir=tmp_path,

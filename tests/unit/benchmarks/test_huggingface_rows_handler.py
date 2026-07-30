@@ -140,6 +140,7 @@ def test_hf_full_offline_stream_replays_every_manifest_row(
             "config": "default",
             "split": "dev",
             "source_revision": source.immutable_revision,
+            "source_snapshot_sha256": source.snapshot_sha256,
             "num_rows": 2,
             "page_size": 100,
         },
@@ -147,6 +148,12 @@ def test_hf_full_offline_stream_replays_every_manifest_row(
     _write_digest_bound_json(
         full_dir / "000000000000.json",
         {
+            "dataset": "example/math",
+            "config": "default",
+            "split": "dev",
+            "source_revision": source.immutable_revision,
+            "source_snapshot_sha256": source.snapshot_sha256,
+            "offset": 0,
             "rows": [
                 {"row_idx": 0, "row": {"problem": "1+1", "answer": "2"}},
                 {"row_idx": 1, "row": {"problem": "2+2", "answer": "4"}},
@@ -164,6 +171,45 @@ def test_hf_full_offline_stream_replays_every_manifest_row(
         "hf-111111111111-000000",
         "hf-111111111111-000001",
     ]
+
+
+def test_hf_full_offline_rejects_page_from_another_revision(
+    tmp_path: Path,
+) -> None:
+    source = _source()
+    full_dir = tmp_path / source.source_id / "full" / "default--dev"
+    _write_digest_bound_json(
+        full_dir / "manifest.json",
+        {
+            "dataset": "example/math",
+            "config": "default",
+            "split": "dev",
+            "source_revision": source.immutable_revision,
+            "source_snapshot_sha256": source.snapshot_sha256,
+            "num_rows": 1,
+            "page_size": 100,
+        },
+    )
+    _write_digest_bound_json(
+        full_dir / "000000000000.json",
+        {
+            "dataset": "example/math",
+            "config": "default",
+            "split": "dev",
+            "source_revision": "stale",
+            "source_snapshot_sha256": source.snapshot_sha256,
+            "offset": 0,
+            "rows": [{"row_idx": 0, "row": {"problem": "1+1", "answer": "2"}}],
+        },
+    )
+    with pytest.raises(ValueError, match="page identity mismatch"):
+        list(
+            HuggingFaceExactAnswerHandler(source.source_id).iter_full_specs(
+                source,
+                cache_dir=tmp_path,
+                offline=True,
+            )
+        )
 
 
 def test_hf_full_offline_requires_complete_snapshot(tmp_path: Path) -> None:

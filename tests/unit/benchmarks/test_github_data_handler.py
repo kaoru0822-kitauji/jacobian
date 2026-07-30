@@ -5,6 +5,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from benchmarks.jacobian_math_evals.catalog import load_sources
 from benchmarks.jacobian_math_evals.handlers.github_data_rows import (
     GitHubStructuredDataHandler,
@@ -26,6 +27,7 @@ def _source():
         source_id="src-333333333333",
         canonical_url="https://github.com/example/math",
         immutable_revision="3" * 40,
+        snapshot_sha256="sha256:" + "3" * 64,
     )
 
 
@@ -45,6 +47,7 @@ def test_repository_snapshot_produces_exact_public_task(
                 "source_id": source.source_id,
                 "repository": "example/math",
                 "revision": source.immutable_revision,
+                "source_snapshot_sha256": source.snapshot_sha256,
                 "path": "data/example.json",
                 "family": "exact-answer",
                 "instruction": "Solve the supplied mathematical problem",
@@ -65,3 +68,32 @@ def test_repository_snapshot_produces_exact_public_task(
     assert spec.expected["expected_answer"] == "72"
     assert spec.readiness == TaskReadiness.PUBLIC_DIAGNOSTIC
     assert spec.oracle_kind == OracleKind.PUBLIC_ANSWER
+
+
+def test_repository_handler_rejects_cache_from_another_snapshot(
+    tmp_path: Path,
+) -> None:
+    source = _source()
+    destination = tmp_path / source.source_id / "structured-data-row.json"
+    destination.parent.mkdir(parents=True)
+    payload = (
+        json.dumps(
+            {
+                "source_id": source.source_id,
+                "revision": source.immutable_revision,
+                "source_snapshot_sha256": "sha256:" + "0" * 64,
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode()
+    destination.write_bytes(payload)
+    destination.with_suffix(".sha256").write_text(
+        hashlib.sha256(payload).hexdigest()
+    )
+    with pytest.raises(ValueError, match="does not match source lock"):
+        GitHubStructuredDataHandler(source.source_id).acquire(
+            source,
+            cache_dir=tmp_path,
+            offline=True,
+        )

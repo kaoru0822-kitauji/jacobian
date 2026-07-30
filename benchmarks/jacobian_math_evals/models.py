@@ -66,6 +66,8 @@ class SourceRecord:
     license: str | None = None
     evidence_timestamp: str | None = None
     snapshot_sha256: str | None = None
+    repository_url: str | None = None
+    subresource_path: str | None = None
     redirect_from: tuple[str, ...] = ()
     configurations: tuple[str, ...] = ()
     splits: tuple[str, ...] = ()

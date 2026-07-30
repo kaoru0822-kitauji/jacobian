@@ -39,6 +39,14 @@ def _github_repo(url: str) -> str | None:
     return "/".join(parts[:2]).removesuffix(".git")
 
 
+def _github_subresource_path(url: str) -> str | None:
+    parts = urllib.parse.urlparse(url).path.strip("/").split("/")
+    if len(parts) >= 5 and parts[2] in {"blob", "tree"}:
+        path = "/".join(parts[4:])
+        return path or None
+    return None
+
+
 def _hf_dataset(url: str) -> str | None:
     parts = urllib.parse.urlparse(url).path.strip("/").split("/")
     if parts and parts[0] == "datasets":
@@ -74,7 +82,15 @@ def _resolve_github(source: SourceRecord, timestamp: str) -> dict[str, Any]:
         text=True,
         timeout=45,
     ).stdout.strip()
-    canonical_url = metadata["html_url"]
+    repository_url = metadata["html_url"]
+    subresource_path = _github_subresource_path(source.url) or _github_subresource_path(
+        source.canonical_url
+    )
+    canonical_url = (
+        f"{repository_url}/blob/{head}/{subresource_path}"
+        if subresource_path
+        else repository_url
+    )
     redirects = (
         [source.canonical_url]
         if source.canonical_url.rstrip("/") != canonical_url.rstrip("/")
@@ -87,6 +103,8 @@ def _resolve_github(source: SourceRecord, timestamp: str) -> dict[str, Any]:
         "source_id": source.source_id,
         "access_state": state,
         "canonical_url": canonical_url,
+        "repository_url": repository_url,
+        "subresource_path": subresource_path,
         "immutable_revision": head,
         "license": (metadata.get("license") or {}).get("spdx_id") or "NOASSERTION",
         "evidence_timestamp": timestamp,
