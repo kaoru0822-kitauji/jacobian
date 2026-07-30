@@ -36,7 +36,6 @@ build/
 dist/
 htmlcov/
 benchmarks/results/
-benchmarks/jacobian_math_evals/.cache/
 lean/.lake/
 
 # Test infrastructure state

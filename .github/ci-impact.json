@@ -341,7 +341,6 @@
       "name": "generic-test-support",
       "patterns": [
         "tests/support/__init__.py",
-        "tests/support/_agent_ab_support.py",
         "tests/support/commands.py",
         "tests/support/domains.py",
         "tests/support/services.py",

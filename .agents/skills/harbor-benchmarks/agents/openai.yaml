@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harbor Benchmarks"
+  short_description: "Build and validate Jacobian Harbor evaluations"
+  default_prompt: "Use $harbor-benchmarks to build or validate a Jacobian Harbor evaluation dataset."

@@ -1,6 +1,9 @@
 .DEFAULT_GOAL := help
 
 UV_RUN := uv run --locked
+HARBOR_VERSION ?= 0.20.0
+HARBOR_RUNNER ?= uvx --from harbor==$(HARBOR_VERSION) harbor
+HARBOR_PYTHON ?= uvx --from harbor==$(HARBOR_VERSION) python
 PYTEST_ARGS ?=
 TESTS ?=
 EVAL_ARGS ?=
@@ -14,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-architecture test-plan test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint lint-full security-audit typecheck test-architecture test-plan test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check agent-eval bench-core clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -149,8 +152,21 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
-agent-eval: ## Plan a local agent eval; execution requires explicit EVAL_ARGS.
-	$(UV_RUN) python benchmarks/agent_ab.py $(EVAL_ARGS)
+harbor-check: ## Verify committed Harbor task digests against local task contents.
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py
+
+agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
+	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \
+		echo "Model execution is opt-in. Review the job, then run: make agent-eval EVAL_EXECUTE=1"; \
+		exit 0; \
+	fi; \
+	image="$${JACOBIAN_IMAGE:-}"; \
+	if ! printf '%s\n' "$$image" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then \
+		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
+		exit 2; \
+	fi; \
+	$(MAKE) harbor-check; \
+	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-jacobian.json $(EVAL_ARGS)
 
 bench-core: ## Run the core performance benchmark script.
 	$(UV_RUN) python benchmarks/benchmark_core.py

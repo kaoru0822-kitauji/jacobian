@@ -1,0 +1,31 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/regression-v1-polynomial-normalization"
+version = "1.0.0"
+description = "Normalize a sparse polynomial while combining like terms."
+keywords = ["polynomial", "normalization", "algebra", "verification"]
+[metadata]
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["polynomial", "normalization", "exact", "offline"]
+case_version = "regression-v1"
+contamination_class = "hand-designed-structural-variant"
+fixture_digest = "sha256:60acd1fbcd0dc163843512d3e0fd5ad535fe21534115bf63c2e705aaa3b7df27"
+derivation = "Fixed sparse bivariate expression with cancellation and reordered terms."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
