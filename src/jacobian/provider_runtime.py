@@ -176,7 +176,7 @@ def _unavailable_runtime(
         platform=_platform_tag(),
         install_tier=install_tier,
         license_id=license_id,
-        diagnostic=diagnostic,
+        diagnostic=diagnostic[:512],
     )
 
 

@@ -205,7 +205,7 @@ def test_propose_directly_elaborates_environment_bound_proposition(
     monkeypatch.setattr(
         lean_statements,
         "_lean_version_info",
-        lambda _executable=None: ("4.31.0", "lean-commit"),
+        lambda *_args: ("4.31.0", "lean-commit"),
     )
     propose, _ = _build_adapters(tmp_path)
 
@@ -410,8 +410,6 @@ def test_execution_uses_the_exact_pinned_executable(
         return subprocess.CompletedProcess(args, 0, stdout="True : Prop\n", stderr="")
 
     monkeypatch.setattr(lean_statements.subprocess, "run", run)
-    lean_statements._lean_version_info.cache_clear()
-
     result = lean_statements._elaborate_proposition("True")
     version, commit = lean_statements._lean_version_info()
 
@@ -437,6 +435,40 @@ def test_stale_pinned_executable_becomes_backend_unavailable(
         lean_statements._execute_lean_source(
             "#check True",
             executable=str(stale_executable),
+            timeout_seconds=1,
+        )
+
+
+def test_replaced_pinned_executable_is_rejected_before_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian.provider_runtime import lean_frontend_provider_runtime
+    from jacobian_checkers import lean4
+
+    executable = tmp_path / "pinned-lean"
+    executable.write_bytes(b"original")
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (executable, None),
+    )
+    runtime = lean_frontend_provider_runtime()
+    executable.write_bytes(b"replacement")
+
+    def unexpected_run(*_args, **_kwargs):
+        pytest.fail("replaced Lean executable was launched")
+
+    monkeypatch.setattr(lean_statements.subprocess, "run", unexpected_run)
+
+    with pytest.raises(
+        lean_statements._LeanUnavailableError,
+        match="identity changed",
+    ):
+        lean_statements._execute_lean_source(
+            "#check True",
+            executable=str(executable),
+            provider_runtime=runtime,
             timeout_seconds=1,
         )
 

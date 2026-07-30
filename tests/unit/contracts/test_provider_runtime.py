@@ -298,3 +298,21 @@ def test_lean_frontend_runtime_preserves_actionable_probe_diagnostic(
     assert runtime.diagnostic is not None
     assert "TOOLCHAIN_RESOLUTION" in runtime.diagnostic
     assert "executable is unavailable" in runtime.diagnostic
+
+
+def test_lean_frontend_runtime_bounds_probe_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jacobian_checkers import lean4
+
+    monkeypatch.setattr(
+        lean4,
+        "inspect_runtime",
+        lambda *, require_mathlib: (_ for _ in ()).throw(OSError("x" * 2_000)),
+    )
+
+    runtime = provider_runtime.lean_frontend_provider_runtime()
+
+    assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
+    assert runtime.diagnostic is not None
+    assert len(runtime.diagnostic) == 512

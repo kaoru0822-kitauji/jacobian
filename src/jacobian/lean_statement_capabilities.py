@@ -24,7 +24,6 @@ import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from functools import cache
 from pathlib import Path
 from typing import Literal
 
@@ -131,11 +130,14 @@ _LEAN_KEYWORDS = frozenset(
 )
 
 
-@cache
-def _lean_version_info(executable: str | None = None) -> tuple[str, str]:
+def _lean_version_info(
+    executable: str | None = None,
+    provider_runtime: CapabilityProviderRuntime | None = None,
+) -> tuple[str, str]:
     """Return (version, commit) from ``lean --version``; ``unknown`` on failure."""
 
     try:
+        _require_current_runtime(provider_runtime)
         lean_bin = executable or _lean_executable()
     except _LeanUnavailableError:
         return ("unknown", "unknown")
@@ -161,6 +163,7 @@ def _elaborate_statement(
     statement: str,
     *,
     executable: str | None = None,
+    provider_runtime: CapabilityProviderRuntime | None = None,
     timeout_seconds: int = _ELAPSED_TIMEOUT_SECONDS,
 ) -> _ElaborationResult:
     """Elaborate ``example : {statement} := by sorry`` via the ``lean`` binary."""
@@ -171,6 +174,7 @@ def _elaborate_statement(
     return _run_lean_source(
         source,
         executable=lean_bin,
+        provider_runtime=provider_runtime,
         timeout_seconds=timeout_seconds,
     )
 
@@ -179,6 +183,7 @@ def _elaborate_proposition(
     statement: str,
     *,
     executable: str | None = None,
+    provider_runtime: CapabilityProviderRuntime | None = None,
     timeout_seconds: int = _ELAPSED_TIMEOUT_SECONDS,
 ) -> _ElaborationResult:
     """Elaborate one expression against expected type ``Prop``."""
@@ -196,6 +201,7 @@ def _elaborate_proposition(
     output = _execute_lean_source(
         source,
         executable=lean_bin,
+        provider_runtime=provider_runtime,
         timeout_seconds=timeout_seconds,
     )
     messages = tuple(_parse_lean_messages(output))
@@ -234,6 +240,7 @@ def _check_proof(
     proof: str,
     *,
     executable: str | None = None,
+    provider_runtime: CapabilityProviderRuntime | None = None,
     timeout_seconds: int = _ELAPSED_TIMEOUT_SECONDS,
 ) -> _ElaborationResult:
     """Check whether ``example : {statement} := by {proof}`` elaborates."""
@@ -245,6 +252,7 @@ def _check_proof(
     return _run_lean_source(
         source,
         executable=lean_bin,
+        provider_runtime=provider_runtime,
         timeout_seconds=timeout_seconds,
     )
 
@@ -253,11 +261,13 @@ def _run_lean_source(
     source: str,
     *,
     executable: str | None = None,
+    provider_runtime: CapabilityProviderRuntime | None = None,
     timeout_seconds: int,
 ) -> _ElaborationResult:
     output = _execute_lean_source(
         source,
         executable=executable,
+        provider_runtime=provider_runtime,
         timeout_seconds=timeout_seconds,
     )
     messages = _parse_lean_messages(output)
@@ -277,8 +287,10 @@ def _execute_lean_source(
     source: str,
     *,
     executable: str | None = None,
+    provider_runtime: CapabilityProviderRuntime | None = None,
     timeout_seconds: int,
 ) -> str:
+    _require_current_runtime(provider_runtime)
     fd, temp_path = tempfile.mkstemp(suffix=".lean")
     try:
         with os.fdopen(fd, "w") as handle:
@@ -314,6 +326,24 @@ def _lean_executable() -> str:
             or f"The pinned Lean {lean4.LEAN_VERSION} executable is unavailable."
         ) from exc
     return str(executable)
+
+
+def _require_current_runtime(
+    provider_runtime: CapabilityProviderRuntime | None,
+) -> None:
+    if provider_runtime is None:
+        return
+    from jacobian.provider_runtime import (
+        ProviderRuntimeError,
+        require_provider_runtime_unchanged,
+    )
+
+    try:
+        require_provider_runtime_unchanged(provider_runtime)
+    except (OSError, ProviderRuntimeError) as exc:
+        raise _LeanUnavailableError(
+            "The pinned Lean executable identity changed or became unavailable."
+        ) from exc
 
 
 def _parse_elaborated_expression(output: str) -> str | None:
@@ -581,11 +611,13 @@ class LeanStatementProposalAdapter:
                 _elaborate_statement(
                     validated.proposed_statement,
                     executable=self.resources.lean_executable,
+                    provider_runtime=self.resources.provider_runtime,
                 )
                 if validated.operation == "PROPOSE"
                 else _elaborate_proposition(
                     validated.proposed_statement,
                     executable=self.resources.lean_executable,
+                    provider_runtime=self.resources.provider_runtime,
                 )
             )
         except _LeanUnavailableError as exc:
@@ -600,7 +632,10 @@ class LeanStatementProposalAdapter:
                     ),
                 )
             ) from exc
-        version, commit = _lean_version_info(self.resources.lean_executable)
+        version, commit = _lean_version_info(
+            self.resources.lean_executable,
+            self.resources.provider_runtime,
+        )
         imports = elaboration.used_imports
         options = elaboration.options
         artifact_payload = LeanStatementProposalArtifact(
@@ -754,10 +789,12 @@ class LeanStatementCompareAdapter:
             result_a = _elaborate_statement(
                 validated.statement_a,
                 executable=self.resources.lean_executable,
+                provider_runtime=self.resources.provider_runtime,
             )
             result_b = _elaborate_statement(
                 validated.statement_b,
                 executable=self.resources.lean_executable,
+                provider_runtime=self.resources.provider_runtime,
             )
             elaboration_checked = True
             both_elaborate = result_a.elaborates and result_b.elaborates
@@ -765,7 +802,10 @@ class LeanStatementCompareAdapter:
             elaboration_messages_b = result_b.messages
         except _LeanUnavailableError:
             pass
-        version, commit = _lean_version_info(self.resources.lean_executable)
+        version, commit = _lean_version_info(
+            self.resources.lean_executable,
+            self.resources.provider_runtime,
+        )
         artifact_payload = LeanStatementComparisonArtifact(
             environment=validated.environment,
             statement_a=validated.statement_a,
