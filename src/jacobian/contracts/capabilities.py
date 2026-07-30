@@ -80,6 +80,11 @@ class CapabilityDiscoveryRequest(ContractModel):
             self.input_kind is not CapabilityInputKind.TYPED_ARTIFACT
         ):
             raise ValueError("artifact_type requires input_kind=TYPED_ARTIFACT")
+        if (
+            self.input_kind is CapabilityInputKind.TYPED_ARTIFACT
+            and self.artifact_type is None
+        ):
+            raise ValueError("TYPED_ARTIFACT input requires artifact_type")
         return self
 
 

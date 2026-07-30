@@ -326,6 +326,8 @@ class CapabilityService:
         resolved_input_kind = request.input_kind or _infer_discovery_input_kind(
             request.query
         )
+        contract_route_count = 0
+        lexical_candidates: list[CapabilityDiscoveryMatch] = []
         ranked: list[tuple[int, CapabilityDiscoveryMatch]] = []
         for descriptor in descriptors:
             if request.mode is not None and request.mode not in descriptor.modes:
@@ -335,16 +337,15 @@ class CapabilityService:
                 normalized_domain,
             ):
                 continue
-            if (
+            input_compatible = not (
                 resolved_input_kind is not None
                 and resolved_input_kind not in descriptor.accepted_input_kinds
-            ):
-                continue
-            if (
+            ) and not (
                 request.artifact_type is not None
                 and request.artifact_type not in descriptor.accepted_artifact_types
-            ):
-                continue
+            )
+            if input_compatible:
+                contract_route_count += 1
             (
                 score,
                 matched_on,
@@ -356,27 +357,24 @@ class CapabilityService:
                 descriptor,
                 request.query,
             )
-            if request.query is not None and score == 0:
-                continue
-            ranked.append(
-                (
-                    score,
-                    CapabilityDiscoveryMatch(
-                        capability_id=descriptor.capability_id,
-                        title=descriptor.title,
-                        description=descriptor.description,
-                        modes=descriptor.modes,
-                        tags=descriptor.tags,
-                        matched_on=matched_on,
-                        matched_terms=matched_terms,
-                        has_invocation_examples=bool(descriptor.invocation_examples),
-                        relevance_score=score,
-                        query_term_count=query_term_count,
-                        query_coverage_milli=query_coverage_milli,
-                        lexical_fit=lexical_fit,
-                    ),
-                )
+            match = CapabilityDiscoveryMatch(
+                capability_id=descriptor.capability_id,
+                title=descriptor.title,
+                description=descriptor.description,
+                modes=descriptor.modes,
+                tags=descriptor.tags,
+                matched_on=matched_on,
+                matched_terms=matched_terms,
+                has_invocation_examples=bool(descriptor.invocation_examples),
+                relevance_score=score,
+                query_term_count=query_term_count,
+                query_coverage_milli=query_coverage_milli,
+                lexical_fit=lexical_fit,
             )
+            if request.query is None or score > 0:
+                lexical_candidates.append(match)
+                if input_compatible:
+                    ranked.append((score, match))
         ranked.sort(key=lambda item: (-item[0], item[1].capability_id))
         total_matches = len(ranked)
         start = 0
@@ -412,13 +410,15 @@ class CapabilityService:
                 "No query was supplied; results are an unranked installed-portfolio "
                 "listing and make no suitability claim."
             )
-        elif not ranked:
+        elif not lexical_candidates:
             portfolio_fit = "NO_LEXICAL_MATCHES"
             portfolio_fit_basis = (
                 "No installed descriptor shared a meaningful query term. This is "
                 "not proof that the mathematical outcome is impossible."
             )
-        elif any(match.lexical_fit == "STRONG_CANDIDATE" for _, match in ranked):
+        elif any(
+            match.lexical_fit == "STRONG_CANDIDATE" for match in lexical_candidates
+        ):
             portfolio_fit = "STRONG_CANDIDATES_FOUND"
             portfolio_fit_basis = (
                 "At least one installed descriptor has substantial lexical query "
@@ -437,7 +437,7 @@ class CapabilityService:
                 "No input kind was declared or safely inferred; inspect the selected "
                 "capability contract before invocation."
             )
-        elif ranked:
+        elif contract_route_count:
             routing_status = "ROUTES_FOUND"
             routing_basis = (
                 "Installed routes match the declared or safely inferred input kind"
@@ -860,8 +860,29 @@ def _infer_discovery_input_kind(query: str | None) -> CapabilityInputKind | None
     if query is None:
         return None
     normalized = " ".join(_DISCOVERY_TOKEN_PATTERN.findall(query.casefold()))
+    phrases = (
+        "natural language proof",
+        "informal proof",
+        "proof prose",
+        "proof trace",
+        "written proof",
+    )
+    discourse = frozenset(
+        {
+            "assume",
+            "because",
+            "contradiction",
+            "follows",
+            "hence",
+            "suppose",
+            "therefore",
+            "thus",
+        }
+    )
     tokens = frozenset(normalized.split())
-    if "proof" in tokens:
+    if any(phrase in normalized for phrase in phrases) or (
+        "proof" in tokens and tokens & discourse
+    ):
         return CapabilityInputKind.NATURAL_LANGUAGE_PROOF
     return None
 

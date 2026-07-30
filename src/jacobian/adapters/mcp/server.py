@@ -692,7 +692,8 @@ def _capability_discovery_response(
                 "message": "The capability discovery cursor is not in this result set.",
                 "hint": (
                     "Restart discovery without a cursor, or reuse the same query, "
-                    "domain, mode, and limit that produced next_cursor."
+                    "domain, mode, input_kind, artifact_type, and limit that produced "
+                    "next_cursor."
                 ),
             }
         }
@@ -1055,7 +1056,7 @@ def create_server(
                 pattern=r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
                 description=(
                     "Opaque continuation ID from next_cursor. Reuse the same query, "
-                    "domain, mode, and limit when continuing discovery."
+                    "domain, mode, input kind, artifact type, and limit."
                 ),
             ),
         ] = None,

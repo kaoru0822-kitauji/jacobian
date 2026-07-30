@@ -518,6 +518,17 @@ def test_discovery_rejects_unsupported_natural_language_proof_routes(
     ]
     assert explicitly_structured.routing_status == "ROUTES_FOUND"
 
+    formal_intent = capability_core_services.core.capabilities.discover(
+        CapabilityDiscoveryRequest(
+            query="formal UNSAT proof",
+            mode=CapabilityMode.VERIFY,
+        )
+    )
+    assert formal_intent.resolved_input_kind is None
+    assert [match.capability_id for match in formal_intent.matches] == [
+        "fixture_sat.proof.verify"
+    ]
+
 
 def test_discovery_routes_only_declared_input_and_artifact_contracts(
     capability_core_services: DomainTestServices,
@@ -597,6 +608,26 @@ def test_discovery_routes_only_declared_input_and_artifact_contracts(
     assert mismatched.matches == ()
     assert mismatched.routing_status == "NO_ROUTE"
 
+    lexically_absent = service.discover(
+        CapabilityDiscoveryRequest(
+            query="quuxonium",
+            input_kind=CapabilityInputKind.FORMAL_PROPOSITION,
+        )
+    )
+    assert lexically_absent.matches == ()
+    assert lexically_absent.routing_status == "ROUTES_FOUND"
+    assert lexically_absent.portfolio_fit == "NO_LEXICAL_MATCHES"
+
+    incompatible_lexical_match = service.discover(
+        CapabilityDiscoveryRequest(
+            query="formal proposition",
+            input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
+        )
+    )
+    assert incompatible_lexical_match.matches == ()
+    assert incompatible_lexical_match.routing_status == "NO_ROUTE"
+    assert incompatible_lexical_match.portfolio_fit == "STRONG_CANDIDATES_FOUND"
+
 
 def test_discovery_artifact_type_requires_typed_artifact_input() -> None:
     with pytest.raises(
@@ -607,6 +638,14 @@ def test_discovery_artifact_type_requires_typed_artifact_input() -> None:
             query="proof artifact",
             input_kind=CapabilityInputKind.STRUCTURED_REQUEST,
             artifact_type="lean.proof_state.artifact",
+        )
+    with pytest.raises(
+        ValueError,
+        match="TYPED_ARTIFACT input requires artifact_type",
+    ):
+        CapabilityDiscoveryRequest(
+            query="proof artifact",
+            input_kind=CapabilityInputKind.TYPED_ARTIFACT,
         )
 
 
