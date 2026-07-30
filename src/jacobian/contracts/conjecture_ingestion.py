@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 from enum import StrEnum
 from typing import Literal, Self
-from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
+from pydantic import AnyHttpUrl, Field, TypeAdapter, ValidationError, model_validator
 
 from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
+
+_HTTP_URL = TypeAdapter(AnyHttpUrl)
 
 
 class ConjectureLicenseClass(StrEnum):
@@ -71,6 +72,7 @@ class ExternalConjectureIngestRequest(ContractModel):
         ):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be blank")
+        _require_http_url(self.source_url, "source URL")
         evidence = (
             self.license_evidence_url,
             self.license_evidence_text,
@@ -179,6 +181,7 @@ def _text_digest(value: str) -> str:
 
 
 def _require_http_url(value: str, label: str) -> None:
-    parsed = urlsplit(value)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError(f"{label} must be an HTTP(S) URL")
+    try:
+        _HTTP_URL.validate_python(value)
+    except ValidationError as exc:
+        raise ValueError(f"{label} must be a valid HTTP(S) URL") from exc
