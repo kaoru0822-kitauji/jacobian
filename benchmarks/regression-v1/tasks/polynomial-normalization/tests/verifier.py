@@ -134,12 +134,24 @@ def main():
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
+
+    math_contract = (
+        isinstance(s, dict)
+        and set(s) == required
+        and s.get("task_id") == e["task_id"]
+        and s.get("conclusion") == "TRUE"
+        and s.get("completeness") == "COMPLETE"
+        and isinstance(s.get("scope"), str)
+        and isinstance(s.get("limitations"), list)
+        and isinstance(s.get("claimed_assurance"), str)
+        and s.get("claimed_assurance")
+        in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
+    )
+
     record_bound = verification_record_is_bound(s) if isinstance(s, dict) else False
+    math_correct = bool(math_contract and got == want and all(len(k) == 2 for k in got))
     correct = bool(
-        contract
-        and (s["claimed_assurance"] != "VERIFIED" or record_bound)
-        and got == want
-        and all(len(k) == 2 for k in got)
+        math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound)
     )
     good = False
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
@@ -169,7 +181,10 @@ def main():
     assurance = bool(
         contract
         and (
-            s["claimed_assurance"] == e["maximum_assurance"]
+            (
+                s["claimed_assurance"] == e["maximum_assurance"]
+                and s["claimed_assurance"] != "VERIFIED"
+            )
             or (s["claimed_assurance"] == "VERIFIED" and record_bound)
         )
     )
@@ -187,7 +202,7 @@ def main():
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(correct),
+                "correctness": float(math_correct),
                 "evidence_validity": float(good),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),

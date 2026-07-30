@@ -110,6 +110,7 @@ def main():
         and s.get("claimed_assurance")
         in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
     )
+
     values = {k: q(v) for k, v in sol.items()} if isinstance(sol, dict) else {}
     valid = (
         contract
@@ -125,7 +126,10 @@ def main():
         )
     )
     record_bound = verification_record_is_bound(s) if isinstance(s, dict) else False
-    correct = bool(valid and (s["claimed_assurance"] != "VERIFIED" or record_bound))
+    math_correct = bool(valid)
+    correct = bool(
+        math_correct and (s["claimed_assurance"] != "VERIFIED" or record_bound)
+    )
     good = False
     if contract and isinstance(s["evidence"], list) and s["evidence"]:
         good = True
@@ -154,7 +158,10 @@ def main():
     assurance = bool(
         contract
         and (
-            s["claimed_assurance"] == e["maximum_assurance"]
+            (
+                s["claimed_assurance"] == e["maximum_assurance"]
+                and s["claimed_assurance"] != "VERIFIED"
+            )
             or (s["claimed_assurance"] == "VERIFIED" and record_bound)
         )
     )
@@ -172,7 +179,7 @@ def main():
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(correct),
+                "correctness": float(math_correct),
                 "evidence_validity": float(good),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),

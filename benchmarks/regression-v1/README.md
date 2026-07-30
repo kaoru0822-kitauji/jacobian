@@ -29,6 +29,11 @@ harbor run -c benchmarks/regression-v1/job-oracle.json
 The Oracle job is the contract gate. Run it again after changing a task,
 verifier, dependency, or image. `job-jacobian.json` is the observation config;
 fill its deployment URL and token through the environment before running it.
+The required environment variables are `JACOBIAN_IMAGE`, `JACOBIAN_MCP_TOKEN`,
+`JACOBIAN_AUTH_TOKENS_JSON`, and `JACOBIAN_MODEL`. They are resolved from the
+shell environment by `make agent-eval` — do not embed them in the job JSON
+because Harbor's Docker compose mode does not resolve `${VAR}` templates in
+job-level env blocks.
 
 The 18 public research challenges under `benchmarks/research_challenges/` are
 candidate material only. They are not silently promoted into this scored

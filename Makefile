@@ -167,9 +167,13 @@ agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
 		echo "Model execution is opt-in. Review the job, then run: make agent-eval EVAL_EXECUTE=1"; \
 		exit 0; \
 	fi; \
-	image="$${JACOBIAN_IMAGE:-}"; \
+	image=$${JACOBIAN_IMAGE:-}; \
 	if ! printf '%s\n' "$$image" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then \
 		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
+		exit 2; \
+	fi; \
+	if [ -z "$${JACOBIAN_MCP_TOKEN:-}" ] || [ -z "$${JACOBIAN_AUTH_TOKENS_JSON:-}" ] || [ -z "$${JACOBIAN_MODEL:-}" ]; then \
+		echo "JACOBIAN_MCP_TOKEN, JACOBIAN_AUTH_TOKENS_JSON, and JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
 	$(MAKE) harbor-check && \

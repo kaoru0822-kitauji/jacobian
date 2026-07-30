@@ -1,1 +1,1 @@
-{"task_id":"polynomial-normalization","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["polynomial-normalization","complete finite input"]}
+{"task_id": "polynomial-normalization", "conclusion": "TRUE", "maximum_assurance": "COMPUTED", "required_scope_terms": ["polynomial-normalization", "complete finite input"]}

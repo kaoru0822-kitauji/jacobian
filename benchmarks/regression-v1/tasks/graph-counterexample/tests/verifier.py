@@ -136,7 +136,8 @@ def main():
     assurance = bool(valid and s["claimed_assurance"] == expected["maximum_assurance"])
     ev = evidence(s) if valid else False
     claimed_verified = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
-    correct = bool(valid and not claimed_verified and graph_ok(s["result"]))
+    math_correct = bool(valid and graph_ok(s["result"]))
+    correct = bool(math_correct and not claimed_verified)
     false_cert = claimed_verified
     reward = (
         0.0
@@ -147,7 +148,7 @@ def main():
     (Path("/logs/verifier/reward.json")).write_text(
         json.dumps(
             {
-                "correctness": float(correct),
+                "correctness": float(math_correct),
                 "evidence_validity": float(ev),
                 "scope_accuracy": float(scope),
                 "assurance_calibration": float(assurance),

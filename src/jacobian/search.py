@@ -51,6 +51,10 @@ from jacobian.evaluation import (
     require_complete_evaluation_batch,
 )
 from jacobian.experiment_identity import new_experiment_uri
+from jacobian.persistence.recovery import (
+    put_internal_artifact,
+    quarantine_recovery_snapshot,
+)
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import (
     PluginRegistry,
@@ -292,41 +296,21 @@ class SearchService:
     ) -> None:
         """Isolate one corrupt row without blocking unrelated recovery."""
 
-        experiment_uri = str(row["experiment_uri"])
-        raw = row["snapshot_json"]
-        if isinstance(raw, bytes):
-            raw_bytes = raw
-        elif isinstance(raw, str):
-            raw_bytes = raw.encode("utf-8")
-        else:
-            raw_bytes = repr(raw).encode("utf-8")
-        snapshot_digest = "sha256:" + hashlib.sha256(raw_bytes).hexdigest()
         detail = (
             "Stored search state is invalid. Restore the Jacobian state directory "
             "from a trusted backup or start a new search."
         )
-        _LOGGER.warning(
-            "quarantining invalid search snapshot for %s",
-            experiment_uri,
-            exc_info=error,
+        snapshot_digest = quarantine_recovery_snapshot(
+            connection,
+            row,
+            error,
+            experiments_table="search_experiments",
+            recovery_table="search_recovery_failures",
+            detail=detail,
+            logger=_LOGGER,
+            logger_message="quarantining invalid search snapshot for %s",
         )
-        detected_at = _now()
-        connection.execute(
-            """
-            UPDATE search_experiments
-            SET state = 'ERROR'
-            WHERE experiment_uri = ?
-            """,
-            (experiment_uri,),
-        )
-        connection.execute(
-            """
-            INSERT OR REPLACE INTO search_recovery_failures (
-                experiment_uri, detected_at, snapshot_digest, detail
-            ) VALUES (?, ?, ?, ?)
-            """,
-            (experiment_uri, detected_at.isoformat(), snapshot_digest, detail),
-        )
+        experiment_uri = str(row["experiment_uri"])
         try:
             self._append_event(
                 connection,
@@ -770,6 +754,52 @@ class SearchService:
             self._threads[experiment_uri] = thread
             thread.start()
 
+    def _budget_exhausted(
+        self,
+        experiment_uri: str,
+        accounting: SearchAccounting,
+        budget: SearchBudget,
+        *,
+        wall_time_ms: int,
+    ) -> bool:
+        """Check if the search budget is exhausted, finishing if so.
+
+        Returns True when the search has been finished as TIMEOUT or COMPLETED.
+        The caller should return immediately when this returns True.
+        """
+
+        if wall_time_ms >= budget.wall_seconds * 1000:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.TIMEOUT,
+                stop_reason=SearchStopReason.WALL_TIME_LIMIT,
+                strategy_complete=False,
+                detail="search wall-clock budget exhausted",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        if accounting.iterations >= budget.iterations_max:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.COMPLETED,
+                stop_reason=SearchStopReason.ITERATION_LIMIT,
+                strategy_complete=False,
+                detail="search iteration limit reached",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        if accounting.proposed_candidates >= budget.candidates_max:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.COMPLETED,
+                stop_reason=SearchStopReason.CANDIDATE_LIMIT,
+                strategy_complete=False,
+                detail="search candidate limit reached",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        return False
+
     def _run(self, experiment_uri: str) -> None:
         started = self._clock()
         accounting = SearchAccounting()
@@ -809,35 +839,12 @@ class SearchService:
             while True:
                 total_wall_ms = _used_wall_ms(accounting, started, self._clock)
                 budget = snapshot.effective_budget
-                if total_wall_ms >= budget.wall_seconds * 1000:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.TIMEOUT,
-                        stop_reason=SearchStopReason.WALL_TIME_LIMIT,
-                        strategy_complete=False,
-                        detail="search wall-clock budget exhausted",
-                        wall_time_ms=total_wall_ms,
-                    )
-                    return
-                if accounting.iterations >= budget.iterations_max:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.COMPLETED,
-                        stop_reason=SearchStopReason.ITERATION_LIMIT,
-                        strategy_complete=False,
-                        detail="search iteration limit reached",
-                        wall_time_ms=total_wall_ms,
-                    )
-                    return
-                if accounting.proposed_candidates >= budget.candidates_max:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.COMPLETED,
-                        stop_reason=SearchStopReason.CANDIDATE_LIMIT,
-                        strategy_complete=False,
-                        detail="search candidate limit reached",
-                        wall_time_ms=total_wall_ms,
-                    )
+                if self._budget_exhausted(
+                    experiment_uri,
+                    accounting,
+                    budget,
+                    wall_time_ms=total_wall_ms,
+                ):
                     return
 
                 remaining_candidates = (
@@ -1827,15 +1834,12 @@ class SearchService:
         parents: tuple[str, ...] = (),
         summary: str,
     ) -> ArtifactPutResult:
-        normalized = self.schemas.validate(schema_uri, payload)
-        self.store.get_descriptor(
+        return put_internal_artifact(
+            self.store,
+            self.schemas,
             self.semantics_uri,
-            expected_kind="semantics",
-        )
-        return self.store.put(
             schema_uri=schema_uri,
-            semantics_uri=self.semantics_uri,
-            payload=normalized,
+            payload=payload,
             parents=parents,
             summary=summary,
         )
