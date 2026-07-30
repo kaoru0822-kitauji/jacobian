@@ -63,25 +63,17 @@ class ShrinkService:
         self.executor = executor
         self.verification = verification
 
-    def run(
+    def _reject_invalid_run_request(
         self,
         *,
-        target_kind: ShrinkTargetKind | str,
+        kind: ShrinkTargetKind,
         target_uri: str,
+        evaluation_budget: int,
+        requested_reducers: tuple[str, ...],
+        requested_objectives: tuple[str, ...],
         claim_uri: str,
         plugin_id: str,
-        preservation_checker_id: str,
-        reducers: tuple[str, ...] | list[str],
-        objectives: tuple[str, ...] | list[str],
-        evaluation_budget: int,
-        reducer_timeout_seconds: int = 30,
-        proposal_validator: Callable[[str, Any, Any], None] | None = None,
-    ) -> ShrinkResult:
-        """Run bounded shrinking and report the achieved minimality level."""
-
-        kind = ShrinkTargetKind(target_kind)
-        requested_reducers = tuple(reducers)
-        requested_objectives = tuple(objectives)
+    ) -> ShrinkResult | None:
         if evaluation_budget < 1:
             return self._rejected(
                 kind=kind,
@@ -119,6 +111,17 @@ class ShrinkService:
                 target_uri=target_uri,
                 detail="; ".join(validation.input.errors),
             )
+        return None
+
+    def _load_shrink_context(
+        self,
+        *,
+        kind: ShrinkTargetKind,
+        target_uri: str,
+        claim_uri: str,
+        plugin_id: str,
+        preservation_checker_id: str,
+    ) -> tuple[Any, Any, Any, Any, str, str, str] | ShrinkResult:
         try:
             claim = self.store.get(claim_uri)
             initial = self.store.get(target_uri)
@@ -159,6 +162,64 @@ class ShrinkService:
                 target_uri=target_uri,
                 detail=_shrink_failure_detail(exc),
             )
+        return (
+            claim,
+            initial,
+            manifest,
+            reducer_capability,
+            expected_schema,
+            preservation_format,
+            semantics_digest,
+        )
+
+    def run(
+        self,
+        *,
+        target_kind: ShrinkTargetKind | str,
+        target_uri: str,
+        claim_uri: str,
+        plugin_id: str,
+        preservation_checker_id: str,
+        reducers: tuple[str, ...] | list[str],
+        objectives: tuple[str, ...] | list[str],
+        evaluation_budget: int,
+        reducer_timeout_seconds: int = 30,
+        proposal_validator: Callable[[str, Any, Any], None] | None = None,
+    ) -> ShrinkResult:
+        """Run bounded shrinking and report the achieved minimality level."""
+
+        kind = ShrinkTargetKind(target_kind)
+        requested_reducers = tuple(reducers)
+        requested_objectives = tuple(objectives)
+        early = self._reject_invalid_run_request(
+            kind=kind,
+            target_uri=target_uri,
+            evaluation_budget=evaluation_budget,
+            requested_reducers=requested_reducers,
+            requested_objectives=requested_objectives,
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+        )
+        if early is not None:
+            return early
+        loaded = self._load_shrink_context(
+            kind=kind,
+            target_uri=target_uri,
+            claim_uri=claim_uri,
+            plugin_id=plugin_id,
+            preservation_checker_id=preservation_checker_id,
+        )
+        if isinstance(loaded, ShrinkResult):
+            return loaded
+        (
+            claim,
+            initial,
+            manifest,
+            reducer_capability,
+            expected_schema,
+            preservation_format,
+            semantics_digest,
+        ) = loaded
 
         current = initial
         evaluations = 0

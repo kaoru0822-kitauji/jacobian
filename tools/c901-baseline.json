@@ -3,22 +3,22 @@
   "max_complexity": 10,
   "violations": [
     {
-      "path": "benchmarks/cddlib_hv_spike.py",
+      "path": "benchmarks/provider_spikes/cddlib_hv_spike.py",
       "symbol": "_independent_soundness",
       "complexity": 13
     },
     {
-      "path": "benchmarks/cddlib_hv_spike.py",
+      "path": "benchmarks/provider_spikes/cddlib_hv_spike.py",
       "symbol": "_summarize",
       "complexity": 13
     },
     {
-      "path": "benchmarks/gudhi_persistence_spike.py",
+      "path": "benchmarks/provider_spikes/gudhi_persistence_spike.py",
       "symbol": "_independent_reduction",
       "complexity": 11
     },
     {
-      "path": "benchmarks/regina_outcomes_spike.py",
+      "path": "benchmarks/provider_spikes/regina_outcomes_spike.py",
       "symbol": "_replay_triangulation",
       "complexity": 14
     },
@@ -38,29 +38,19 @@
       "complexity": 14
     },
     {
-      "path": "src/jacobian/adapters/mcp/remote.py",
-      "symbol": "load_static_token_file",
+      "path": "src/jacobian/adapters/mcp/context.py",
+      "symbol": "_public_tool_error",
       "complexity": 11
     },
     {
-      "path": "src/jacobian/adapters/mcp/server.py",
-      "symbol": "_public_tool_error",
+      "path": "src/jacobian/adapters/mcp/remote.py",
+      "symbol": "load_static_token_file",
       "complexity": 11
     },
     {
       "path": "src/jacobian/bounded_process.py",
       "symbol": "run_bounded_process",
       "complexity": 13
-    },
-    {
-      "path": "src/jacobian/cadical.py",
-      "symbol": "_parse_solver_output",
-      "complexity": 11
-    },
-    {
-      "path": "src/jacobian/cadical.py",
-      "symbol": "_run",
-      "complexity": 15
     },
     {
       "path": "src/jacobian/canonical.py",
@@ -168,11 +158,6 @@
       "complexity": 12
     },
     {
-      "path": "src/jacobian/cvc5_worker.py",
-      "symbol": "_run",
-      "complexity": 17
-    },
-    {
       "path": "src/jacobian/domains/_certified_snf.py",
       "symbol": "inverse_unimodular",
       "complexity": 11
@@ -188,17 +173,17 @@
       "complexity": 11
     },
     {
-      "path": "src/jacobian/eval_telemetry.py",
+      "path": "src/jacobian/eval/telemetry.py",
       "symbol": "parse_agent_transcript",
       "complexity": 18
     },
     {
-      "path": "src/jacobian/experiments.py",
+      "path": "src/jacobian/experiments/service.py",
       "symbol": "_run_enumeration",
       "complexity": 22
     },
     {
-      "path": "src/jacobian/graph_capabilities.py",
+      "path": "src/jacobian/graphs/capabilities.py",
       "symbol": "_compute_property",
       "complexity": 22
     },
@@ -208,12 +193,12 @@
       "complexity": 15
     },
     {
-      "path": "src/jacobian/lean_declarations.py",
+      "path": "src/jacobian/lean_frontend/declarations.py",
       "symbol": "query",
       "complexity": 12
     },
     {
-      "path": "src/jacobian/lean_exploration.py",
+      "path": "src/jacobian/lean_frontend/exploration.py",
       "symbol": "invoke",
       "complexity": 13
     },
@@ -258,7 +243,7 @@
       "complexity": 12
     },
     {
-      "path": "src/jacobian/polynomial_capabilities.py",
+      "path": "src/jacobian/polynomials/inverse.py",
       "symbol": "invoke",
       "complexity": 16
     },
@@ -273,19 +258,34 @@
       "complexity": 14
     },
     {
-      "path": "src/jacobian/search.py",
+      "path": "src/jacobian/sat_smt/cadical.py",
+      "symbol": "_parse_solver_output",
+      "complexity": 11
+    },
+    {
+      "path": "src/jacobian/sat_smt/cadical.py",
+      "symbol": "_run",
+      "complexity": 15
+    },
+    {
+      "path": "src/jacobian/sat_smt/cvc5_worker.py",
+      "symbol": "_run",
+      "complexity": 17
+    },
+    {
+      "path": "src/jacobian/search/run_loop.py",
+      "symbol": "execute_search",
+      "complexity": 25
+    },
+    {
+      "path": "src/jacobian/search/service.py",
       "symbol": "_restore",
       "complexity": 21
     },
     {
-      "path": "src/jacobian/search.py",
-      "symbol": "_run",
-      "complexity": 25
-    },
-    {
       "path": "src/jacobian/shrinking.py",
       "symbol": "run",
-      "complexity": 27
+      "complexity": 19
     },
     {
       "path": "src/jacobian/store.py",
@@ -303,27 +303,27 @@
       "complexity": 22
     },
     {
-      "path": "src/jacobian/verification.py",
+      "path": "src/jacobian/verification/service.py",
       "symbol": "_run_checker",
       "complexity": 12
     },
     {
-      "path": "src/jacobian/verification.py",
+      "path": "src/jacobian/verification/service.py",
       "symbol": "verify_certificate",
       "complexity": 22
     },
     {
-      "path": "src/jacobian/verification.py",
+      "path": "src/jacobian/verification/service.py",
       "symbol": "verify_preservation",
       "complexity": 12
     },
     {
-      "path": "src/jacobian/verification.py",
+      "path": "src/jacobian/verification/service.py",
       "symbol": "verify_transformation",
       "complexity": 13
     },
     {
-      "path": "src/jacobian/verification.py",
+      "path": "src/jacobian/verification/service.py",
       "symbol": "verify_witness",
       "complexity": 21
     },
@@ -333,19 +333,19 @@
       "complexity": 13
     },
     {
-      "path": "src/jacobian/workspaces.py",
+      "path": "src/jacobian/workspaces/_helpers.py",
       "symbol": "_dependency_postorder",
       "complexity": 12
     },
     {
-      "path": "src/jacobian/workspaces.py",
-      "symbol": "_prepare_write",
-      "complexity": 25
-    },
-    {
-      "path": "src/jacobian/workspaces.py",
+      "path": "src/jacobian/workspaces/_helpers.py",
       "symbol": "_reject_supersession_cycles",
       "complexity": 11
+    },
+    {
+      "path": "src/jacobian/workspaces/service.py",
+      "symbol": "_prepare_write",
+      "complexity": 25
     },
     {
       "path": "src/jacobian_checkers/erdos_straus.py",
@@ -371,11 +371,6 @@
       "path": "src/jacobian_checkers/exact_probability_operations.py",
       "symbol": "_replay_graph_connection_probability",
       "complexity": 16
-    },
-    {
-      "path": "src/jacobian_checkers/finite_coverage.py",
-      "symbol": "check_finite_coverage",
-      "complexity": 31
     },
     {
       "path": "src/jacobian_checkers/finite_partition.py",
