@@ -26,7 +26,18 @@ def _load_lock() -> dict[str, dict[str, Any]]:
     data = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     if data.get("lock_version") != 1:
         raise ValueError("unsupported source lock version")
-    return {item["source_id"]: item for item in data["sources"]}
+    items = data.get("sources")
+    if not isinstance(items, list):
+        raise ValueError("source lock must contain a sources array")
+    if not all(
+        isinstance(item, dict) and isinstance(item.get("source_id"), str)
+        for item in items
+    ):
+        raise ValueError("source lock record lacks source_id")
+    ids = [item["source_id"] for item in items]
+    if len(ids) != len(set(ids)):
+        raise ValueError("source lock contains duplicate source IDs")
+    return {item["source_id"]: item for item in items}
 
 
 def load_sources() -> tuple[SourceRecord, ...]:
@@ -35,9 +46,21 @@ def load_sources() -> tuple[SourceRecord, ...]:
         raise ValueError("unsupported source manifest version")
     if raw.get("record_count") != EXPECTED_SOURCE_COUNT:
         raise ValueError("catalog record_count is not 176")
+    items = raw.get("records")
+    if not isinstance(items, list) or len(items) != EXPECTED_SOURCE_COUNT:
+        raise ValueError("catalog must contain exactly 176 records")
     locks = _load_lock()
+    catalog_ids = {
+        stable_source_id(item["canonical_url"])
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("canonical_url"), str)
+    }
+    if len(catalog_ids) != EXPECTED_SOURCE_COUNT:
+        raise ValueError("catalog records need unique canonical URLs")
+    if set(locks) != catalog_ids:
+        raise ValueError("source lock IDs must exactly match the catalog")
     records: list[SourceRecord] = []
-    for item in raw["records"]:
+    for item in items:
         source_id = stable_source_id(item["canonical_url"])
         if item.get("source_id") != source_id:
             raise ValueError(f"catalog source_id mismatch for {item['canonical_url']}")

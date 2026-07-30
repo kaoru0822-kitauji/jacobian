@@ -157,7 +157,13 @@ class HuggingFaceExactAnswerHandler:
         config, split = _select_split(source)
         destination = cache_dir / source.source_id / f"{config}--{split}.json"
         if _validated_cache(destination):
-            return destination
+            actual_snapshot = (
+                "sha256:" + hashlib.sha256(destination.read_bytes()).hexdigest()
+            )
+            if source.snapshot_sha256 == actual_snapshot:
+                return destination
+            if offline:
+                raise ValueError("cached snapshot does not match source lock")
         if offline:
             raise FileNotFoundError(
                 f"offline Dataset Viewer snapshot missing: {destination}"

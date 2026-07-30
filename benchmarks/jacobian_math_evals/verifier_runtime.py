@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+
+SOURCE_ID_PATTERN = re.compile(r"^(?:src|research)-[a-f0-9]{12}$")
+SHA256_PATTERN = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,48 @@ def load_json(path: Path) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def submission_contract_valid(submission: dict[str, Any]) -> bool:
+    required = {
+        "task_id",
+        "source_ids",
+        "claimed_assurance",
+        "evidence",
+        "scope",
+        "completeness",
+        "limitations",
+    }
+    source_ids = submission.get("source_ids")
+    limitations = submission.get("limitations")
+    return (
+        required <= submission.keys()
+        and ("answer" in submission or "conclusion" in submission)
+        and isinstance(submission.get("task_id"), str)
+        and bool(submission["task_id"])
+        and isinstance(source_ids, list)
+        and bool(source_ids)
+        and len(source_ids) == len(set(source_ids))
+        and all(
+            isinstance(source_id, str) and SOURCE_ID_PATTERN.fullmatch(source_id)
+            for source_id in source_ids
+        )
+        and submission.get("claimed_assurance")
+        in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
+        and isinstance(submission.get("evidence"), list)
+        and isinstance(submission.get("scope"), str)
+        and bool(submission["scope"])
+        and submission.get("completeness") in {"COMPLETE", "PARTIAL", "UNKNOWN"}
+        and isinstance(limitations, list)
+        and all(isinstance(item, str) for item in limitations)
+        and (
+            "claim_digest" not in submission
+            or (
+                isinstance(submission["claim_digest"], str)
+                and SHA256_PATTERN.fullmatch(submission["claim_digest"]) is not None
+            )
+        )
+    )
+
+
 def evidence_valid(workspace: Path, submission: dict[str, Any] | None) -> bool:
     if not submission or not isinstance(submission.get("evidence"), list):
         return False
@@ -56,7 +102,11 @@ def evidence_valid(workspace: Path, submission: dict[str, Any] | None) -> bool:
         if path.is_absolute() or ".." in path.parts:
             return False
         target = workspace / path
-        if not target.is_file():
+        if (
+            target.is_symlink()
+            or not target.resolve().is_relative_to(workspace.resolve())
+            or not target.is_file()
+        ):
             return False
         digest = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
         if digest != digest_value:
@@ -224,7 +274,7 @@ def score_submission(
     expected: dict[str, Any],
 ) -> Scores:
     submission = load_json(workspace / "submission.json")
-    if submission is None:
+    if submission is None or not submission_contract_valid(submission):
         return Scores(0.0, 0.0, 0.0, 0.0, False)
     correctness = float(_correctness(submission, expected))
     evidence = float(evidence_valid(workspace, submission))

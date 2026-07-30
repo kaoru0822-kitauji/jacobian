@@ -15,6 +15,7 @@ from .handlers.huggingface_rows import (
     HuggingFaceExactAnswerHandler,
     UnsupportedDatasetSchemaError,
 )
+from .probe_reporting import probe_error_message
 
 DEFAULT_OUTPUT = PACKAGE_ROOT / "catalog" / "handler-probes.json"
 
@@ -44,7 +45,7 @@ def _probe(source: Any, cache_dir: Path, offline: bool) -> dict[str, Any]:
             "handler": "huggingface-scalar-exact-answer-v1",
             "status": "manual-required",
             "source_revision": source.immutable_revision,
-            "reason": str(error),
+            "reason": probe_error_message(error, cache_dir=cache_dir),
         }
     except Exception as error:
         return {
@@ -52,7 +53,10 @@ def _probe(source: Any, cache_dir: Path, offline: bool) -> dict[str, Any]:
             "handler": "huggingface-scalar-exact-answer-v1",
             "status": "unavailable",
             "source_revision": source.immutable_revision,
-            "reason": f"{type(error).__name__}: {error}",
+            "reason": (
+                f"{type(error).__name__}: "
+                f"{probe_error_message(error, cache_dir=cache_dir)}"
+            ),
         }
 
 

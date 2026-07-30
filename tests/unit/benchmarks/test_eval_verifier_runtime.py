@@ -68,6 +68,18 @@ def test_empty_output_scores_zero(tmp_path: Path) -> None:
     assert scores == type(scores)(0.0, 0.0, 0.0, 0.0, False)
 
 
+def test_missing_required_submission_field_scores_zero(tmp_path: Path) -> None:
+    _write_submission(tmp_path)
+    submission_path = tmp_path / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    del submission["limitations"]
+    submission_path.write_text(json.dumps(submission))
+
+    scores = score_submission(tmp_path, _expected())
+
+    assert scores == type(scores)(0.0, 0.0, 0.0, 0.0, False)
+
+
 def test_wrong_answer_forces_aggregate_zero(tmp_path: Path) -> None:
     _write_submission(tmp_path, answer="41")
     scores = score_submission(tmp_path, _expected())
@@ -89,6 +101,19 @@ def test_forged_evidence_digest_loses_evidence_reward(tmp_path: Path) -> None:
     assert scores.correctness == 1
     assert scores.evidence_validity == 0
     assert scores.reward == pytest.approx(0.9)
+
+
+def test_evidence_symlink_cannot_escape_workspace(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "outside-evidence.txt"
+    outside.write_text("6 * 7 = 42\n")
+    _write_submission(tmp_path)
+    evidence = tmp_path / "evidence" / "answer.txt"
+    evidence.unlink()
+    evidence.symlink_to(outside)
+
+    scores = score_submission(tmp_path, _expected())
+
+    assert scores.evidence_validity == 0
 
 
 def test_mismatched_statement_forces_zero(tmp_path: Path) -> None:

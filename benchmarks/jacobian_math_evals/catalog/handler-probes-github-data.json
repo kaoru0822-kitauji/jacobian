@@ -11,19 +11,19 @@
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-a1d1a5a460dd/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-a1d1a5a460dd/structured-data-row.json",
       "source_id": "src-a1d1a5a460dd",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-7d17cdfdcaa5/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-7d17cdfdcaa5/structured-data-row.json",
       "source_id": "src-7d17cdfdcaa5",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-dfbdf98bd30d/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-dfbdf98bd30d/structured-data-row.json",
       "source_id": "src-dfbdf98bd30d",
       "status": "unavailable"
     },
@@ -37,25 +37,25 @@
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-b0339eb74939/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-b0339eb74939/structured-data-row.json",
       "source_id": "src-b0339eb74939",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-197c2fc904a6/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-197c2fc904a6/structured-data-row.json",
       "source_id": "src-197c2fc904a6",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-6d093a61a6e1/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-6d093a61a6e1/structured-data-row.json",
       "source_id": "src-6d093a61a6e1",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-8afd7e43dead/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-8afd7e43dead/structured-data-row.json",
       "source_id": "src-8afd7e43dead",
       "status": "unavailable"
     },
@@ -69,25 +69,25 @@
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-f78db5bf0927/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-f78db5bf0927/structured-data-row.json",
       "source_id": "src-f78db5bf0927",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-aae2368cd8c0/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-aae2368cd8c0/structured-data-row.json",
       "source_id": "src-aae2368cd8c0",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-b8a0d3dacc21/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-b8a0d3dacc21/structured-data-row.json",
       "source_id": "src-b8a0d3dacc21",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-9b4fe151ab24/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-9b4fe151ab24/structured-data-row.json",
       "source_id": "src-9b4fe151ab24",
       "status": "unavailable"
     },
@@ -101,13 +101,13 @@
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-8ab85a23775a/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-8ab85a23775a/structured-data-row.json",
       "source_id": "src-8ab85a23775a",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-1e9e73fb4337/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-1e9e73fb4337/structured-data-row.json",
       "source_id": "src-1e9e73fb4337",
       "status": "unavailable"
     },
@@ -121,55 +121,55 @@
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-77506d58cc7d/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-77506d58cc7d/structured-data-row.json",
       "source_id": "src-77506d58cc7d",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-0534cd3fda87/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-0534cd3fda87/structured-data-row.json",
       "source_id": "src-0534cd3fda87",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-8f183cccdab9/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-8f183cccdab9/structured-data-row.json",
       "source_id": "src-8f183cccdab9",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-0ab5a4bb362c/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-0ab5a4bb362c/structured-data-row.json",
       "source_id": "src-0ab5a4bb362c",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-79c6c7f9871a/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-79c6c7f9871a/structured-data-row.json",
       "source_id": "src-79c6c7f9871a",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-4f8f5768b734/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-4f8f5768b734/structured-data-row.json",
       "source_id": "src-4f8f5768b734",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-cd7ab0b358d0/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-cd7ab0b358d0/structured-data-row.json",
       "source_id": "src-cd7ab0b358d0",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-e28676441028/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-e28676441028/structured-data-row.json",
       "source_id": "src-e28676441028",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-0ff2a951b3fc/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-0ff2a951b3fc/structured-data-row.json",
       "source_id": "src-0ff2a951b3fc",
       "status": "unavailable"
     },
@@ -191,43 +191,43 @@
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-7405f4b3f386/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-7405f4b3f386/structured-data-row.json",
       "source_id": "src-7405f4b3f386",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-7ab36a0fda93/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-7ab36a0fda93/structured-data-row.json",
       "source_id": "src-7ab36a0fda93",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-461dd69c4bdf/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-461dd69c4bdf/structured-data-row.json",
       "source_id": "src-461dd69c4bdf",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-92325162fae4/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-92325162fae4/structured-data-row.json",
       "source_id": "src-92325162fae4",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-a0f49158337a/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-a0f49158337a/structured-data-row.json",
       "source_id": "src-a0f49158337a",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-ba91593142cb/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-ba91593142cb/structured-data-row.json",
       "source_id": "src-ba91593142cb",
       "status": "unavailable"
     },
     {
       "handler": "github-structured-data-v1",
-      "reason": "FileNotFoundError: offline GitHub data snapshot missing: /root/jacobian/benchmarks/jacobian_math_evals/.cache/src-2ac33f3bb3d5/structured-data-row.json",
+      "reason": "FileNotFoundError: offline GitHub data snapshot missing: <cache-dir>/src-2ac33f3bb3d5/structured-data-row.json",
       "source_id": "src-2ac33f3bb3d5",
       "status": "unavailable"
     }

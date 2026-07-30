@@ -112,6 +112,22 @@ def _write_digest_bound_json(path: Path, value: object) -> None:
     path.with_suffix(".sha256").write_text(hashlib.sha256(payload).hexdigest())
 
 
+def test_hf_handler_rejects_cache_not_bound_to_source_lock(tmp_path: Path) -> None:
+    source = replace(
+        _source(),
+        snapshot_sha256="sha256:" + "0" * 64,
+    )
+    snapshot = tmp_path / source.source_id / "default--dev.json"
+    _write_digest_bound_json(snapshot, json.loads(FIXTURE.read_text()))
+
+    with pytest.raises(ValueError, match="does not match source lock"):
+        HuggingFaceExactAnswerHandler(source.source_id).acquire(
+            source,
+            cache_dir=tmp_path,
+            offline=True,
+        )
+
+
 def test_hf_full_offline_stream_replays_every_manifest_row(
     tmp_path: Path,
 ) -> None:

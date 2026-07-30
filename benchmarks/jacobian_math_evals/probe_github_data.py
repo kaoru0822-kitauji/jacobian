@@ -15,6 +15,7 @@ from .handlers.github_data_rows import (
     NoStructuredDataRowError,
 )
 from .handlers.registry import HANDLERS
+from .probe_reporting import probe_error_message
 
 
 def _probe(source: Any, cache_dir: Path, offline: bool) -> dict[str, object]:
@@ -36,14 +37,17 @@ def _probe(source: Any, cache_dir: Path, offline: bool) -> dict[str, object]:
             "source_id": source.source_id,
             "status": "manual-required",
             "handler": "github-structured-data-v1",
-            "reason": str(error),
+            "reason": probe_error_message(error, cache_dir=cache_dir),
         }
     except Exception as error:
         return {
             "source_id": source.source_id,
             "status": "unavailable",
             "handler": "github-structured-data-v1",
-            "reason": f"{type(error).__name__}: {error}",
+            "reason": (
+                f"{type(error).__name__}: "
+                f"{probe_error_message(error, cache_dir=cache_dir)}"
+            ),
         }
 
 

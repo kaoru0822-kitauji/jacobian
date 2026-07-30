@@ -576,7 +576,7 @@ def _write_task(root: Path, spec: TaskSpec) -> None:
     )
     (tests / "Dockerfile").write_text(
         "FROM ghcr.io/astral-sh/uv:0.8.4-python3.12-bookworm-slim\n"
-        "RUN uv tool install 'harbor-rewardkit==0.1.*'\n"
+        "RUN uv tool install 'harbor-rewardkit==0.1.7'\n"
         'ENV PATH="/root/.local/bin:$PATH"\n'
         "COPY . /tests\n"
         "RUN chmod +x /tests/test.sh\n",

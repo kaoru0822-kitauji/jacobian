@@ -17,6 +17,7 @@ from .handlers.github_declarations import (
     GitHubFormalDeclarationHandler,
     NoFormalDeclarationsError,
 )
+from .probe_reporting import probe_error_message
 
 DEFAULT_OUTPUT = PACKAGE_ROOT / "catalog" / "handler-probes-github.json"
 
@@ -49,7 +50,7 @@ def _probe(source: Any, cache_dir: Path, offline: bool) -> dict[str, Any]:
             "handler": "github-formal-declarations-v1",
             "status": "manual-required",
             "source_revision": source.immutable_revision,
-            "reason": str(error),
+            "reason": probe_error_message(error, cache_dir=cache_dir),
         }
     except (
         FileNotFoundError,
@@ -64,7 +65,10 @@ def _probe(source: Any, cache_dir: Path, offline: bool) -> dict[str, Any]:
             "handler": "github-formal-declarations-v1",
             "status": "unavailable",
             "source_revision": source.immutable_revision,
-            "reason": f"{type(error).__name__}: {error}",
+            "reason": (
+                f"{type(error).__name__}: "
+                f"{probe_error_message(error, cache_dir=cache_dir)}"
+            ),
         }
 
 

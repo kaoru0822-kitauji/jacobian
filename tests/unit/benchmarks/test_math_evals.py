@@ -168,7 +168,7 @@ def test_generated_task_uses_harbor_14_and_clean_room_rewardkit(
     assert 'network_mode = "no-network"' in toml
     assert 'artifacts = ["/app/submission.json", "/app/evidence"]' in toml
     assert (task / "tests" / "test.sh").read_text().endswith("rewardkit /tests\n")
-    assert "harbor-rewardkit==0.1.*" in (task / "tests" / "Dockerfile").read_text()
+    assert "harbor-rewardkit==0.1.7" in (task / "tests" / "Dockerfile").read_text()
     assert (task / "solution" / "solve.sh").stat().st_mode & 0o111
 
 
