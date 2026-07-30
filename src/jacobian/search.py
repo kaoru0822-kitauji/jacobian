@@ -754,6 +754,52 @@ class SearchService:
             self._threads[experiment_uri] = thread
             thread.start()
 
+    def _budget_exhausted(
+        self,
+        experiment_uri: str,
+        accounting: SearchAccounting,
+        budget: SearchBudget,
+        *,
+        wall_time_ms: int,
+    ) -> bool:
+        """Check if the search budget is exhausted, finishing if so.
+
+        Returns True when the search has been finished as TIMEOUT or COMPLETED.
+        The caller should return immediately when this returns True.
+        """
+
+        if wall_time_ms >= budget.wall_seconds * 1000:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.TIMEOUT,
+                stop_reason=SearchStopReason.WALL_TIME_LIMIT,
+                strategy_complete=False,
+                detail="search wall-clock budget exhausted",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        if accounting.iterations >= budget.iterations_max:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.COMPLETED,
+                stop_reason=SearchStopReason.ITERATION_LIMIT,
+                strategy_complete=False,
+                detail="search iteration limit reached",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        if accounting.proposed_candidates >= budget.candidates_max:
+            self._finish(
+                experiment_uri,
+                state=ExperimentState.COMPLETED,
+                stop_reason=SearchStopReason.CANDIDATE_LIMIT,
+                strategy_complete=False,
+                detail="search candidate limit reached",
+                wall_time_ms=wall_time_ms,
+            )
+            return True
+        return False
+
     def _run(self, experiment_uri: str) -> None:
         started = self._clock()
         accounting = SearchAccounting()
@@ -793,35 +839,12 @@ class SearchService:
             while True:
                 total_wall_ms = _used_wall_ms(accounting, started, self._clock)
                 budget = snapshot.effective_budget
-                if total_wall_ms >= budget.wall_seconds * 1000:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.TIMEOUT,
-                        stop_reason=SearchStopReason.WALL_TIME_LIMIT,
-                        strategy_complete=False,
-                        detail="search wall-clock budget exhausted",
-                        wall_time_ms=total_wall_ms,
-                    )
-                    return
-                if accounting.iterations >= budget.iterations_max:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.COMPLETED,
-                        stop_reason=SearchStopReason.ITERATION_LIMIT,
-                        strategy_complete=False,
-                        detail="search iteration limit reached",
-                        wall_time_ms=total_wall_ms,
-                    )
-                    return
-                if accounting.proposed_candidates >= budget.candidates_max:
-                    self._finish(
-                        experiment_uri,
-                        state=ExperimentState.COMPLETED,
-                        stop_reason=SearchStopReason.CANDIDATE_LIMIT,
-                        strategy_complete=False,
-                        detail="search candidate limit reached",
-                        wall_time_ms=total_wall_ms,
-                    )
+                if self._budget_exhausted(
+                    experiment_uri,
+                    accounting,
+                    budget,
+                    wall_time_ms=total_wall_ms,
+                ):
                     return
 
                 remaining_candidates = (
