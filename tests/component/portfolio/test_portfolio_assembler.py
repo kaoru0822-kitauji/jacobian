@@ -378,6 +378,25 @@ def test_managed_bundle_rejects_installed_capability_id_mismatch(
         )
 
 
+def test_managed_bundle_rejects_installed_provider_runtime_mismatch(
+    assembly: _RecordingContext,
+) -> None:
+    bundle = BUILTIN_PORTFOLIO.bundle_for("conjecture_ingestion")
+    assert bundle is not None
+    mismatched = replace(
+        bundle,
+        provider_runtime=known_provider_runtime(
+            "jacobian.different-provider",
+            features=("license-policy",),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="provider runtimes"):
+        DomainBundleInstaller(assembly.context).install(
+            PortfolioPlan(domain_bundles=(mismatched,))
+        )
+
+
 def test_duplicate_capability_id_within_a_bundle_propagates(
     assembly: _RecordingContext,
 ) -> None:
