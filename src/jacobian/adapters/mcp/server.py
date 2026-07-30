@@ -984,6 +984,7 @@ def create_server(
     _register_resources_and_prompts(server, runtime, tenant_router)
     return server
 
+
 def _register_resources_and_prompts(
     server: Any,
     runtime: JacobianRuntime | None,
@@ -1220,13 +1221,13 @@ def _register_resources_and_prompts(
         return evidence_check_prompt(claim, artifact_uri)
 
 
-
 def _register_tools(
     server: Any,
     runtime: JacobianRuntime | None,
     tenant_router: Any,
 ) -> None:
     """Register all MCP tool handlers on the server."""
+
     @server.tool(
         name="capability.describe",
         title="Discover mathematical capabilities",
@@ -1651,8 +1652,6 @@ def _register_tools(
                 limit=limit,
             ),
         )
-
-
 
 
 def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
