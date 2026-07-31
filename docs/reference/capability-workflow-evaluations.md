@@ -2,11 +2,21 @@
 
 [Documentation home](../index.md)
 
-Jacobian packages executable evaluation cases into six Harbor datasets listed
-in [`benchmarks/README.md`](../../benchmarks/README.md). Dataset identity is a
-claim boundary: workflow observations, public reproductions, answer-visible
-research diagnostics, runtime measurements, provider feasibility, and examples
-must not share an interpretation merely because they use one task format.
+Jacobian packages executable evaluation cases into the six Harbor datasets
+listed in [`benchmarks/README.md`](../../benchmarks/README.md). The comparison
+plan and discovery handoffs for capability research live separately in
+[`research/evaluations/capability-workflow-v1/`](../../research/evaluations/capability-workflow-v1/).
+Dataset identity is a claim boundary: workflow observations, public
+reproductions, answer-visible research diagnostics, runtime measurements,
+provider feasibility, and examples must not share an interpretation merely
+because they use one task format.
+
+The ownership boundary is deliberate. `benchmarks/datasets/` contains
+executable Harbor cases, `benchmarks/tooling/` contains reusable Harbor
+infrastructure, and `research/evaluations/` contains non-runnable plans,
+discovery handoffs, and reports. Research records may point at a canonical
+dataset, but they do not duplicate its tasks, become Harbor job input, or enter
+an agent container.
 
 ## Task and verifier validation
 

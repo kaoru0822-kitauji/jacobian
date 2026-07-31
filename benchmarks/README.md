@@ -5,6 +5,10 @@ dataset identities below keep workflow observations, public reproductions,
 research diagnostics, operational measurements, provider feasibility, and
 examples from making incompatible claims look comparable.
 
+`benchmarks/datasets/` is the home for executable Harbor cases. Reusable Harbor
+infrastructure belongs under `benchmarks/tooling/`; non-runnable evaluation
+plans and research handoffs belong under `research/evaluations/`.
+
 | Dataset | Purpose | Default execution |
 | --- | --- | --- |
 | `jacobian/agent-workflow-v1` | Fixed Jacobian-enabled mathematical workflows | Oracle and optional observation |

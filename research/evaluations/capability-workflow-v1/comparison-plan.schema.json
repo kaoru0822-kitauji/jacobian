@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jacobian.invalid/schemas/capability-comparison-plan-v1.json",
-  "title": "Jacobian C1/C2 capability comparison plan",
+  "title": "Jacobian non-runnable C1/C2 capability comparison plan",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -212,6 +212,43 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "execution_gate"
+        ],
+        "properties": {
+          "execution_gate": {
+            "required": [
+              "model_execution_allowed"
+            ],
+            "properties": {
+              "model_execution_allowed": {
+                "const": false
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "conditions": {
+            "items": {
+              "properties": {
+                "public_job_config": {
+                  "type": "null"
+                },
+                "image_environment_variable": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "digest": {
       "type": "string",
@@ -277,12 +314,14 @@
           "minLength": 1
         },
         "public_job_config": {
+          "description": "A committed Harbor job configuration, or null while the execution gate is closed.",
           "type": [
             "string",
             "null"
           ]
         },
         "image_environment_variable": {
+          "description": "The image selector used by a committed job, or null while the execution gate is closed.",
           "type": [
             "string",
             "null"
