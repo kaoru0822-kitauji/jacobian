@@ -17,6 +17,7 @@ Review date: 2026-07-30. Source inventory: the `Resources` tab of spreadsheet
 | `euler-line-symbolic-certificate` | Hard | Euclidean geometry / symbolic theorem verification | IDEF-GeoBench, curated problem 1 (hosted rows 2-17), revision `ce1decbe…` | Adds a new geometry workflow: derive generic rational coordinates, satisfy the point-defining identities, and certify a universal incidence relation exactly. |
 | `grounded-premise-proof` | Medium | Theorem retrieval / proof reconstruction | NaturalProofs-Gen train row 524 (source id `[508,0]`), revision `bdf4123…` | Adds premise selection with true distractors and a replayable proof DAG: the verifier checks normality, quotient formation, representative commutation, and equality chaining without trusting the source proof text. |
 | `nondifferentiable-maximum-construction` | Medium | Real analysis / construction | TaoAnalysisBench row 0 (`taobench_000001_textbook`), revision `339937d…` | Adds constructive analysis with a non-unique exact certificate: any rational piecewise-linear peak with strictly positive and negative one-sided slopes is accepted after independent continuity, maximum, and nondifferentiability checks. |
+| `natural-subtraction-proof-repair` | Medium | Formal proof repair / compiler feedback | APRIL `lme_test` row 0 (`Nat.sub_le_of_le_add.lean`), revision `4e30752…` | Adds feedback-grounded repair: independently establish why a rewrite pattern is absent, then certify the corrected natural-arithmetic step as an exact equation combination rather than matching repaired Lean text. |
 | `metric-tsp-proof-repair` | Hard | Proof repair / graph optimization | forge-reason-v1, validation row 11 (`forge-reason-00218`), revision `e582eb0…` | Adds proof repair rather than another verdict-only audit: identify an unjustified equality, weaken the theorem to its valid approximation guarantee, and bind the repair to an exact independently optimized trace. |
 | `modular-cubic-obstruction` | Medium | Number theory / impossibility certificate | Discover-and-Prove `minif2f_hard`, train row 195 (`numbertheory_4x3m7y3neq2003`), revision `ac10444…` | Adds a universal Diophantine nonexistence workflow: discover a modulus, enumerate a complete residue certificate, and have an independent checker test every residue pair. |
 | `divisibility-construction-witness` | Medium | Number theory / construction search | MathOlympiadBench row 57 (`Imo1984P2`), revision `1397f5e…` | Adds existential construction rather than proof of a fixed answer: any bounded pair satisfying both divisibility constraints is accepted after exact independent recomputation. |
@@ -98,6 +99,14 @@ The remaining inventory was not converted wholesale. Major rejection classes:
   because a broad rational piecewise-linear family admits direct checks of
   continuity, strict maximality, and unequal one-sided derivatives; the
   verifier therefore accepts many constructions rather than one encoded path.
+- APRIL's `lme_test` split was screened for repairs whose core mathematical
+  obligation remains independently executable without the source mathlib
+  revision. Most rows were rejected because only a pinned Lean compiler could
+  adjudicate namespace, elaboration, or tactic behavior. Row 0 was retained
+  because the compiler's pattern-mismatch diagnosis is checkable on a frozen
+  AST and the repaired subtraction argument has a complete exact
+  linear-combination certificate. The benchmark does not claim that submitted
+  Lean source compiles.
 
 This is a curation record, not a claim that rejected datasets are intrinsically
 low quality; they were unsuitable for this specific long-lived Harbor suite.
