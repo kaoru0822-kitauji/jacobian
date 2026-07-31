@@ -1,5 +1,85 @@
 # Changelog
 
+## [0.6.0-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.5.0-alpha.0...jacobian-v0.6.0-alpha.0) (2026-07-30)
+
+
+### Features
+
+* add license-aware conjecture ingestion ([1858b49](https://github.com/morluto/jacobian/commit/1858b490f9dc4acac0021c68ec8c0dfc2eacb31d))
+* **benchmarks:** add versioned math source catalog ([5f80489](https://github.com/morluto/jacobian/commit/5f80489eef182c57518aba5d370d0a4b7fd225dd))
+* **benchmarks:** compile deterministic Harbor math tasks ([732c926](https://github.com/morluto/jacobian/commit/732c9268e9673e7eab669c608339824f3ecf04a5))
+* **benchmarks:** replace legacy harness with Harbor regression dataset ([e4e9b67](https://github.com/morluto/jacobian/commit/e4e9b67a893576f0b3cab6cb474eb8aaf0820107))
+* **harbor:** centralize verifier protocol support ([57dedf2](https://github.com/morluto/jacobian/commit/57dedf2217baedc0f229d5d5377beb980e9c4c58))
+* materialize formal dataset rows ([cd7f7e8](https://github.com/morluto/jacobian/commit/cd7f7e8eb05124a2fe7ff0913fbf30ad2b351fbe))
+* **polynomial:** add Keller and inverse obstruction verification ([fdc331c](https://github.com/morluto/jacobian/commit/fdc331c58040ef5aaba809564c604afde0bf802f))
+
+
+### Bug Fixes
+
+* address Lean frontend review findings ([19d5b95](https://github.com/morluto/jacobian/commit/19d5b95252b3af983cae8a09c40871e93f81aacb))
+* **benchmarks:** accept bound verification records ([5913175](https://github.com/morluto/jacobian/commit/5913175cae7fa703843b49390d17ed9bd8311906))
+* **benchmarks:** accept verification metadata in math_contract ([1176c4d](https://github.com/morluto/jacobian/commit/1176c4d9c1ec707756b18640880136f5e6ffdf92))
+* **benchmarks:** add unique LABELs to prevent BuildKit cross-task cache contamination ([ca55f94](https://github.com/morluto/jacobian/commit/ca55f9497fd73538030f648fa43c6f238ebe8229))
+* **benchmarks:** address review comments on assurance, scoring, and guidance ([6cf26b6](https://github.com/morluto/jacobian/commit/6cf26b6a0528b308c694df7499625500ec2fcdff))
+* **benchmarks:** bind generation to source provenance ([dd5a183](https://github.com/morluto/jacobian/commit/dd5a1838ec49bd2f0cc65d25214b2f220be8c176))
+* **benchmarks:** bind remaining evaluation contracts ([a33e353](https://github.com/morluto/jacobian/commit/a33e3534e590926b23dbdc61f1f7e40ab58db450))
+* **benchmarks:** close Harbor observation integrity gaps ([9e419f5](https://github.com/morluto/jacobian/commit/9e419f557aebb8dd091aa276a8127d8d80b6c5dc))
+* **benchmarks:** close provenance and verifier gaps ([361305a](https://github.com/morluto/jacobian/commit/361305ad318d0cb2464cba8ce7af89b27e6006d3))
+* **benchmarks:** close regression verifier gaps ([437bac6](https://github.com/morluto/jacobian/commit/437bac6af00bfb12c334b3f87920b09a13d3940e))
+* **benchmarks:** close remaining Harbor review gaps ([9c84306](https://github.com/morluto/jacobian/commit/9c8430681b2362c07d0fcc90b9fd7c455805b849))
+* **benchmarks:** complete Harbor verification contracts ([#226](https://github.com/morluto/jacobian/issues/226)) ([74173f9](https://github.com/morluto/jacobian/commit/74173f9cb5e406fc64e6d74060d88fe80dbc6bb3))
+* **benchmarks:** fix Docker ENTRYPOINT conflict and job-level env resolution ([3650f23](https://github.com/morluto/jacobian/commit/3650f23fc73ec1abaf0ff428c35c9ccc80aeb44d))
+* **benchmarks:** harden Harbor verifier records ([9b1bff4](https://github.com/morluto/jacobian/commit/9b1bff435bed868bd0cd1345686dfce83f80d99b))
+* **benchmarks:** harden regression-v1 verification ([5dd350a](https://github.com/morluto/jacobian/commit/5dd350ae0b0f244a693d0b17338dc708b1832dc0))
+* **benchmarks:** harden review edge cases ([4b12ea8](https://github.com/morluto/jacobian/commit/4b12ea8ee40121f2cca779c69b052f127cb0a426))
+* **benchmarks:** harden verifier and snapshot provenance ([f7b8c2d](https://github.com/morluto/jacobian/commit/f7b8c2dc341bf9d95048587619e6829f111d5e48))
+* **benchmarks:** keep regression tasks tool-agnostic ([b9ad03d](https://github.com/morluto/jacobian/commit/b9ad03d3e73dfea727f557f75cb165ec5464688d))
+* **benchmarks:** preserve correctness under false certification ([3514b9c](https://github.com/morluto/jacobian/commit/3514b9c073844b1ed46164e93f55861825c987b8))
+* **benchmarks:** preserve provider spike evidence ([a1e7236](https://github.com/morluto/jacobian/commit/a1e7236d5a7413610fe718d197643e9300e1d517))
+* **benchmarks:** separate mathematical correctness from verification binding ([7aa29c5](https://github.com/morluto/jacobian/commit/7aa29c5d05deaceb4f5c778cd81d8d8098524c41))
+* **benchmarks:** set maximum_assurance to VERIFIED where authorized checkers exist ([56b023e](https://github.com/morluto/jacobian/commit/56b023eacafe377bf180425f06bfd3929f92ec4a))
+* bind formal dataset derived provenance ([c89ade3](https://github.com/morluto/jacobian/commit/c89ade3017fd685b1506f323547196c6d3ef9f9a))
+* **capabilities:** bound exact result materialization ([30438fb](https://github.com/morluto/jacobian/commit/30438fb960e4543f8fe2f8a61591e887d0fae349))
+* enforce conjecture ingestion policy invariants ([bdba1a6](https://github.com/morluto/jacobian/commit/bdba1a6fe441f47ef438ef4df34310f26db62548))
+* harden formal dataset materialization ([2354077](https://github.com/morluto/jacobian/commit/2354077def4b20e088084f08a233ddfcd6a190f0))
+* harden Lean executable replay ([b6da5fa](https://github.com/morluto/jacobian/commit/b6da5fa82ec383c672a9ea2034ed0f813d0cfa2b))
+* **ingestion:** canonicalize source provenance and text ([33feba7](https://github.com/morluto/jacobian/commit/33feba7444aeb7813ebd482bdc3e9cb8511b94e6))
+* **lean:** align moved frontend assets and test seams ([b02fdbb](https://github.com/morluto/jacobian/commit/b02fdbbcceca73b86dc48fdbcaffb9ebc7862605))
+* **mcp:** add type: ignore for untyped MCP decorators ([386ddf3](https://github.com/morluto/jacobian/commit/386ddf3f0bbfa8ad8cd039f2480c55ca6f8f1027))
+* **mcp:** add type: ignore for untyped MCP decorators ([ef1727d](https://github.com/morluto/jacobian/commit/ef1727d8780b5827be0e80ec15e1c1196081e3d4))
+* **mcp:** measure discovery responses as rendered ([2dd2f6c](https://github.com/morluto/jacobian/commit/2dd2f6c6cd033af3b9f1f319698c6dcb6b88e551))
+* **mcp:** validate raw workspace writes ([3980f8d](https://github.com/morluto/jacobian/commit/3980f8de01d60e5860b0fb39dd4ecd0f764d7a49))
+* **mcp:** validate the public invocation boundary ([4c11df8](https://github.com/morluto/jacobian/commit/4c11df881b4ae46d7c706b984b8b4d81dd6dad7c))
+* **npm:** refresh stale Python package before MCP startup ([86dd077](https://github.com/morluto/jacobian/commit/86dd07748bfcb641bca0abef5be6693152420fed))
+* **polynomial:** align inverse witness with negative claim ([9b4289a](https://github.com/morluto/jacobian/commit/9b4289ab21c2c676ec799c1e9d1519bd0225efe1))
+* **portfolio:** skip bundles with unavailable dependencies ([5629b10](https://github.com/morluto/jacobian/commit/5629b100c568ca485a73584babcb6ee8896a44b1))
+* preserve fail-closed runtime boundaries ([68a3d20](https://github.com/morluto/jacobian/commit/68a3d20b865c3fabb9792d10f85373357c604a26))
+* preserve formal source semantics ([3351dfb](https://github.com/morluto/jacobian/commit/3351dfbb63b290aa29a27e316984018d277d2d31))
+* protect policy-owned conjecture artifacts ([d505c4f](https://github.com/morluto/jacobian/commit/d505c4f75776ca475a429404927c7c71635a56f5))
+* record redacted conjecture episodes ([ca2751f](https://github.com/morluto/jacobian/commit/ca2751fa98be6b350b596cca4d32c4e582d31dce))
+* revalidate Lean frontend identity ([8d3e123](https://github.com/morluto/jacobian/commit/8d3e123798dab6493adad270d2097480848682e2))
+* ruff fixes and type annotations for recovery helpers ([8cfce62](https://github.com/morluto/jacobian/commit/8cfce62c0711d4ef5ff3b6ed273a8c7514036885))
+* ruff format and update C901 baseline after refactor ([d3c6a5c](https://github.com/morluto/jacobian/commit/d3c6a5c506aa5169ac70372a4c79d883c4da2c54))
+* **sat:** advertise assignment artifact verification ([805bb39](https://github.com/morluto/jacobian/commit/805bb39891096324ae693b283753001e18b63ab3))
+* **search:** serialize starts against shutdown ([1af5565](https://github.com/morluto/jacobian/commit/1af5565ff6a765c589cb40354c0ab747aa374c27))
+* **tests:** repair stale _launch monkeypatch and sorted-parents assertions ([1c19f1c](https://github.com/morluto/jacobian/commit/1c19f1c383f0ac40135f4aa243c4bd4f65b7cd0a))
+* **tooling:** allow pinned Harbor CLI import ([4044a30](https://github.com/morluto/jacobian/commit/4044a306148b9b0be40d0c3ca393eb9513a0b220))
+* **tooling:** pack npm package from its directory ([a507871](https://github.com/morluto/jacobian/commit/a507871668a79a44969886246df43394cd240ea0))
+* update C901 complexity baseline after server.py refactor ([2247aaf](https://github.com/morluto/jacobian/commit/2247aaf097c2bb881b89607e5bffc126bb0cd770))
+
+
+### Documentation
+
+* **benchmarks:** clarify math eval provenance and status ([9aaac8d](https://github.com/morluto/jacobian/commit/9aaac8daca8ebc64ba5e9ae76bd5ed9d191a7e48))
+* **benchmarks:** explain math evaluation workflow ([879101f](https://github.com/morluto/jacobian/commit/879101f34463f6b6a3c10628483e587506733062))
+* **benchmarks:** use guarded Jacobian runner ([a65879b](https://github.com/morluto/jacobian/commit/a65879b2399079540f0d81c7b04eee4be70d5d88))
+* define Harbor workflow observation boundary ([6897390](https://github.com/morluto/jacobian/commit/6897390317b35976b3191be18766e6782c11a97a))
+* explain domain-owned installation boundaries ([da218fb](https://github.com/morluto/jacobian/commit/da218fbed19521b395b0f529873ae0a2cce5f193))
+* **mcp:** document artifact:// resource envelope format in operating guide ([508aa0f](https://github.com/morluto/jacobian/commit/508aa0f27d00434577ab535b135c95b7866ed787))
+* **polynomial:** document why spawn is required for inverse solver ([2ebc5e1](https://github.com/morluto/jacobian/commit/2ebc5e1499a6007a4eb805a88c046ef28bd4c6c4))
+* remove shared capability registries ([8a383e4](https://github.com/morluto/jacobian/commit/8a383e48ae20d19b7379fb26544651ed2bbff647))
+* **skills:** add Jacobian Harbor benchmark workflow ([d0c9b93](https://github.com/morluto/jacobian/commit/d0c9b9322e40051e0c5abd8209bd9abf59d5787f))
+
 ## [0.5.0-alpha.0](https://github.com/morluto/jacobian/compare/jacobian-v0.4.1-alpha.0...jacobian-v0.5.0-alpha.0) (2026-07-29)
 
 
