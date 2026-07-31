@@ -356,6 +356,7 @@ def test_autoformalization_audit_accepts_alternative_exact_witnesses(
         "dot_product": 0,
         "coordinate_products": [6, -6],
     }
+    _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
 
     accepted = _run_verifier(task, app, logs)

@@ -1,4 +1,5 @@
 import json
+import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -34,7 +35,11 @@ def evidence_matches_result(evidence, result):
 
 
 def q(value):
-    if not isinstance(value, str):
+    if (
+        not isinstance(value, str)
+        or re.fullmatch(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]{1,40}|/[1-9][0-9]*)?", value)
+        is None
+    ):
         return None
     try:
         parsed = Fraction(value)
