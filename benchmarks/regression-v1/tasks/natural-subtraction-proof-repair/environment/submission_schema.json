@@ -12,8 +12,8 @@
       "required": ["failed_pattern_occurs", "basis_order", "multipliers", "derived_coefficients", "side_condition_used"],
       "properties": {
         "failed_pattern_occurs": {"type": "boolean"},
-        "basis_order": {"type": "array", "prefixItems": [{"const": "HD"}, {"const": "SUB_RECOVERY"}], "items": false},
-        "multipliers": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}], "items": false},
+        "basis_order": {"type": "array", "minItems": 2, "prefixItems": [{"const": "HD"}, {"const": "SUB_RECOVERY"}], "items": false},
+        "multipliers": {"type": "array", "minItems": 2, "prefixItems": [{"type": "string"}, {"type": "string"}], "items": false},
         "derived_coefficients": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"type": "string"}},
         "side_condition_used": {"const": "b<=a"}
       }

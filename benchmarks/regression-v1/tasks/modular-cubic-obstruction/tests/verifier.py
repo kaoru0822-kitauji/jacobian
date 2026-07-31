@@ -25,7 +25,7 @@ def _complete_obstruction(result):
     cases = result["residue_cases"]
     if (
         type(modulus) is not int
-        or not 2 <= modulus <= 50
+        or modulus != 7
         or type(target) is not int
         or not 0 <= target < modulus
         or not isinstance(cases, list)

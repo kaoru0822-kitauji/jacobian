@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from verifier_support import (
@@ -11,6 +12,26 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
+MAX_EVIDENCE_BYTES = 1_048_576
+NON_COMPILATION_LIMITATION = (
+    "Lean parsing, elaboration, and compilation are not assessed."
+)
+
+
+def _load_frozen_input():
+    try:
+        workspace = W / "input.json"
+        frozen = E / "input.json"
+        if workspace.is_symlink() or frozen.is_symlink():
+            return {}
+        frozen_bytes = frozen.read_bytes()
+        if workspace.read_bytes() != frozen_bytes:
+            return {}
+        value = json.loads(frozen_bytes)
+    except (OSError, ValueError, UnicodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
 
 REQUIRED_DEFECTS = {
     "MISSING_DIMENSION_PREMISE",
@@ -104,14 +125,29 @@ def _evidence_matches_result(evidence, result):
     if target is None:
         return False
     try:
+        if target.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
         text = target.read_text()
         marker = next(
             line.removeprefix("RESULT_JSON:").strip()
             for line in text.splitlines()
             if line.startswith("RESULT_JSON:")
         )
-        return json.loads(marker) == result and all(
-            term in text for term in ("dimension", "dot product", "coordinate")
+        positive_compile_claim = None
+        for match in re.finditer(
+            r"\b(?:both|the|these|either)\s+lean\s+declarations?\s+"
+            r"(?:compile|compiled|compiles)\b",
+            text,
+            re.IGNORECASE,
+        ):
+            prefix = text[max(0, match.start() - 40) : match.start()]
+            if not re.search(r"\b(?:not|never|cannot|can't)\b", prefix, re.I):
+                positive_compile_claim = match
+                break
+        return (
+            json.loads(marker) == result
+            and all(term in text for term in ("dimension", "dot product", "coordinate"))
+            and positive_compile_claim is None
         )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
@@ -119,7 +155,7 @@ def _evidence_matches_result(evidence, result):
 
 def main():
     submission = load_submission()
-    source = json.loads((W / "input.json").read_text())
+    source = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
         submission,
@@ -141,10 +177,15 @@ def main():
         contract
         and submission.get("claimed_assurance") == expected["maximum_assurance"]
     )
+    limitations_correct = bool(
+        contract and NON_COMPILATION_LIMITATION in submission.get("limitations", [])
+    )
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
-    correct = bool(contract and math_correct and not false_certification)
+    correct = bool(
+        contract and math_correct and limitations_correct and not false_certification
+    )
     reward = (
         0
         if not correct

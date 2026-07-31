@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 
 ROOT = Path(__file__).parents[3]
 TASKS = ROOT / "benchmarks" / "regression-v1" / "tasks"
@@ -287,7 +287,7 @@ def test_verifiers_reject_unhashable_assurance(
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
+    assert rejected["scope_accuracy"] == 0.0
     assert rejected["reward"] == 0.0
     assert rejected["false_certification"] is False
 
@@ -380,3 +380,152 @@ def test_autoformalization_audit_rejects_incomplete_defect_set(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "task_name",
+    [
+        "autoformalization-semantic-audit",
+        "divisibility-construction-witness",
+        "metric-tsp-proof-repair",
+        "natural-subtraction-proof-repair",
+    ],
+)
+def test_verifiers_reject_replaced_workspace_inputs(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
+    input_path = app / "input.json"
+    input_data = json.loads(input_path.read_text())
+    input_data["task_id"] = "tampered"
+    _write_json(input_path, input_data)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "task_name",
+    [
+        "autoformalization-semantic-audit",
+        "divisibility-construction-witness",
+        "metric-tsp-proof-repair",
+        "modular-cubic-obstruction",
+        "natural-subtraction-proof-repair",
+    ],
+)
+def test_hardening_targets_accept_reference_solutions(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    result = _run_verifier(*_prepare_case(tmp_path, task_name, "computed"))
+    assert result["correctness"] == 1.0
+    assert result["reward"] == pytest.approx(1.0)
+
+
+def test_metric_tsp_scope_is_part_of_correctness(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(tmp_path, "metric-tsp-proof-repair", "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["scope"] = "wrong scope"
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["scope_accuracy"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_metric_tsp_evidence_requires_calculations(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(tmp_path, "metric-tsp-proof-repair", "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "MST Euler shortcut optimal approximation\nRESULT_JSON: {}\n"
+    )
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_metric_tsp_accepts_factor_two_claim(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(tmp_path, "metric-tsp-proof-repair", "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["corrected_claim"] = "factor-2 approximation"
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+
+
+def test_divisibility_accepts_schema_valid_integral_numbers(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "divisibility-construction-witness", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"] = {
+        key: float(value) for key, value in submission["result"].items()
+    }
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+
+
+def test_modular_obstruction_requires_the_certified_modulus(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(tmp_path, "modular-cubic-obstruction", "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["modulus"] = 14
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_natural_subtraction_schema_requires_both_basis_entries() -> None:
+    task = TASKS / "natural-subtraction-proof-repair"
+    schema = json.loads((task / "environment" / "submission_schema.json").read_text())
+    submission = json.loads((task / "solution" / "submission.json").read_text())
+    submission["result"]["basis_order"] = []
+    with pytest.raises(ValidationError):
+        Draft202012Validator(schema).validate(submission)
+
+    submission = json.loads((task / "solution" / "submission.json").read_text())
+    submission["result"]["multipliers"] = ["1"]
+    with pytest.raises(ValidationError):
+        Draft202012Validator(schema).validate(submission)
+
+
+def test_autoformalization_rejects_positive_lean_compile_claim(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "autoformalization-semantic-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "dimension dot product coordinate\n"
+        "Both Lean declarations compile.\n"
+        "RESULT_JSON: {}\n"
+    )
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.9)
