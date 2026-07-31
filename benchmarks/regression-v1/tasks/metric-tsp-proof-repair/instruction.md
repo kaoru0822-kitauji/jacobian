@@ -10,4 +10,5 @@ the repaired guarantee holds.
 
 Write `submission.json` to the exact agent-visible `submission_schema.json`.
 Put a concise proof repair and weight calculation in `evidence/answer.txt`,
-and bind the file with its SHA-256 digest.
+include a `RESULT_JSON:` line containing the submitted result as JSON, and bind
+the file with its SHA-256 digest.
