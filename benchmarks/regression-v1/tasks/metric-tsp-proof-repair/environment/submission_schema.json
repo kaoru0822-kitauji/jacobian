@@ -13,7 +13,7 @@
       "properties": {
         "flaw_location": {"const": "STEP_4"},
         "invalid_inference": {"const": "SHORTCUTTING_PRESERVES_EXACT_COST"},
-        "corrected_claim": {"const": "TWO_APPROXIMATION"},
+        "corrected_claim": {"type": "string", "minLength": 1},
         "mst_edges": {
           "type": "array",
           "minItems": 5,

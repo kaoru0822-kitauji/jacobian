@@ -36,7 +36,7 @@
           "additionalProperties": false,
           "required": ["dimension", "x", "forced_y"],
           "properties": {
-            "dimension": {"type": "integer", "minimum": 0, "maximum": 8},
+            "dimension": {"const": 1},
             "x": {"type": "array", "maxItems": 8, "items": {"type": "integer"}},
             "forced_y": {"type": "array", "maxItems": 8, "items": {"type": "integer"}}
           }
@@ -46,7 +46,7 @@
           "additionalProperties": false,
           "required": ["dimension", "x", "y", "dot_product", "coordinate_products"],
           "properties": {
-            "dimension": {"type": "integer", "minimum": 0, "maximum": 8},
+            "dimension": {"const": 2},
             "x": {"type": "array", "maxItems": 8, "items": {"type": "integer"}},
             "y": {"type": "array", "maxItems": 8, "items": {"type": "integer"}},
             "dot_product": {"type": "integer"},
