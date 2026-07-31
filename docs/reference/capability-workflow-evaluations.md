@@ -4,7 +4,7 @@
 
 This document defines the boundary between Jacobian capability development and
 agent-evaluation evidence. The current Harbor surface is the committed
-[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: twenty-three
+[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: twenty-four
 self-contained tasks for graph counterexamples, graph artifact composition,
 finite coverage, SAT witnesses, exact rational systems, Hermite normal form,
 polynomial normalization, polynomial-map collisions, matrix and subspace
@@ -14,7 +14,7 @@ proof/evaluator meta-verification, finite
 claim auditing, exact probabilistic auditing, autoformalization semantic
 alignment, grounded premise retrieval with proof-DAG reconstruction, symbolic
 Euclidean geometry, constructive real analysis, compiler-feedback proof repair,
-and optimization-proof repair.
+finite combinatorial construction, and optimization-proof repair.
 
 ## Task and verifier validation
 

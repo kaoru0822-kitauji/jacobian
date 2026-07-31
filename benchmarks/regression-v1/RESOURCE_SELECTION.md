@@ -21,6 +21,7 @@ Review date: 2026-07-30. Source inventory: the `Resources` tab of spreadsheet
 | `metric-tsp-proof-repair` | Hard | Proof repair / graph optimization | forge-reason-v1, validation row 11 (`forge-reason-00218`), revision `e582eb0…` | Adds proof repair rather than another verdict-only audit: identify an unjustified equality, weaken the theorem to its valid approximation guarantee, and bind the repair to an exact independently optimized trace. |
 | `modular-cubic-obstruction` | Medium | Number theory / impossibility certificate | Discover-and-Prove `minif2f_hard`, train row 195 (`numbertheory_4x3m7y3neq2003`), revision `ac10444…` | Adds a universal Diophantine nonexistence workflow: discover a modulus, enumerate a complete residue certificate, and have an independent checker test every residue pair. |
 | `divisibility-construction-witness` | Medium | Number theory / construction search | MathOlympiadBench row 57 (`Imo1984P2`), revision `1397f5e…` | Adds existential construction rather than proof of a fixed answer: any bounded pair satisfying both divisibility constraints is accepted after exact independent recomputation. |
+| `distinct-sum-pairing-optimum` | Hard | Combinatorics / optimal construction | ConstructiveBench row 2 (`IMO2012SLC2`), revision `58ae4c0` | Adds constrained set-packing construction: submit any optimal disjoint pairing, while an independent exhaustive solver establishes the exact optimum for the frozen finite instance. |
 | `log-inequality-meta-audit` | Hard | Conversation proof audit / meta-verification | Nemotron-Math-Proofs-v2 rows 54-55, revision `7665d7f…` | Adds a four-layer audit: distinguish a false universal claim, a mathematically valid disproof, noncompliance with the original “prove” instruction, and whether the evaluator and meta-evaluator scores follow their stated rubrics. |
 
 Difficulty is based on the complete task contract, not only the length of the
@@ -107,6 +108,12 @@ The remaining inventory was not converted wholesale. Major rejection classes:
   AST and the repaired subtraction argument has a complete exact
   linear-combination certificate. The benchmark does not claim that submitted
   Lean source compiles.
+- ConstructiveBench's opening competition rows were screened for constructions
+  with small, complete offline evaluators. Unbounded partitions, continuous
+  motion, routine answer recovery, and rows with suspect formalizations were
+  rejected. `IMO2012SLC2` was retained only as the frozen `n=15` instance:
+  the verifier accepts any optimal pairing and exhaustively proves its finite
+  optimum, while explicitly declining the source's all-parameter conclusion.
 
 This is a curation record, not a claim that rejected datasets are intrinsically
 low quality; they were unsuitable for this specific long-lived Harbor suite.

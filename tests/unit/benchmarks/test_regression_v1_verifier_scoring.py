@@ -28,6 +28,7 @@ RESOURCE_DERIVED_TASKS = (
     "autoformalization-semantic-audit",
     "calendar-good-days-audit",
     "divisibility-construction-witness",
+    "distinct-sum-pairing-optimum",
     "euler-line-symbolic-certificate",
     "grounded-premise-proof",
     "log-exponent-recovery",
@@ -224,6 +225,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
         (
             "divisibility-construction-witness",
             lambda result: result.update(quotient_by_7_pow_7=341),
+        ),
+        (
+            "distinct-sum-pairing-optimum",
+            lambda result: result["pairs"][4].__setitem__(1, 10),
         ),
         (
             "euler-line-symbolic-certificate",
@@ -571,3 +576,23 @@ def test_natural_subtraction_repair_rejects_false_pattern_diagnosis(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_distinct_sum_pairing_accepts_alternative_optimum(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "distinct-sum-pairing-optimum",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"] = {
+        "pair_count": 5,
+        "pairs": [[1, 2], [3, 7], [4, 10], [5, 8], [6, 9]],
+        "sums": [3, 10, 14, 13, 15],
+    }
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
