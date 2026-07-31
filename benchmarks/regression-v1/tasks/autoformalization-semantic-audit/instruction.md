@@ -12,5 +12,6 @@ Supply exact integer-vector certificates for both semantic defects:
 
 Do not claim that either Lean declaration compiles: no Lean runtime is part of
 this task. Write `submission.json` to the exact agent-visible
-`submission_schema.json`. Put a concise audit in `evidence/answer.txt`, and bind
-that file with its SHA-256 digest.
+`submission_schema.json`. Put a concise audit in `evidence/answer.txt`, include a
+`RESULT_JSON:` line containing the submitted result as JSON, and bind that file
+with its SHA-256 digest.

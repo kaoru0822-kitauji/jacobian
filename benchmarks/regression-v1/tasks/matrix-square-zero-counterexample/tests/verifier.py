@@ -21,7 +21,7 @@ def evidence_matches_result(evidence, result, required_terms):
             if line.startswith("RESULT_JSON:")
         )
         return json.loads(marker) == result and all(
-            term in text for term in required_terms
+            any(term in text for term in terms) for terms in required_terms
         )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
@@ -80,7 +80,12 @@ def main():
     ev = bool(
         valid
         and evidence_matches_result(
-            s["evidence"], s["result"], ("A", "square", "transpose")
+            s["evidence"],
+            s["result"],
+            (
+                ("square", "A^2", "A²", "A*A"),
+                ("transpose", "A^T", "Aᵀ", "not symmetric"),
+            ),
         )
     )
     scope = bool(valid and s["scope"] == " ".join(expected["required_scope_terms"]))
