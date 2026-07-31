@@ -1,15 +1,14 @@
-+# Capability workflow evaluations
+# Capability workflow evaluations
 
 [Documentation home](../index.md)
 
 This document defines the boundary between Jacobian capability development and
 agent-evaluation evidence. The current Harbor surface is the committed
-[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: fifteen
-self-contained tasks for graph counterexamples, graph artifact composition,
-finite coverage, SAT witnesses, exact rational systems, Hermite normal form,
-polynomial normalization, polynomial-map collisions, matrix and subspace
-counterexamples, polynomial-tail reasoning, exact logarithmic algebra,
-proof-audit workloads, and symbolic geometry.
+[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: 24
+self-contained tasks spanning finite and graph constructions, exact linear and
+polynomial algebra, combinatorial optimization, matrix and subspace
+counterexamples, symbolic geometry, logarithmic reasoning, and proof or
+semantic audit workloads.
 
 ## Task and verifier validation
 
