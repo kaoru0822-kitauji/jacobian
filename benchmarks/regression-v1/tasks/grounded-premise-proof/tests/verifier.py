@@ -47,6 +47,41 @@ RULES = {
 STEP_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
 
+def _valid_step_shape(step, step_ids):
+    return bool(
+        isinstance(step, dict)
+        and set(step) == {"id", "rule", "inputs", "output"}
+        and type(step["id"]) is str
+        and type(step["rule"]) is str
+        and type(step["output"]) is str
+        and STEP_ID_PATTERN.fullmatch(step["id"]) is not None
+        and step["id"] not in step_ids
+        and step["rule"] in RULES
+    )
+
+
+def _valid_step_inputs(step, facts):
+    inputs = step["inputs"]
+    return bool(
+        isinstance(inputs, list)
+        and all(type(value) is str for value in inputs)
+        and len(inputs) == len(set(inputs))
+        and set(inputs) <= facts
+    )
+
+
+def _apply_rule(step, facts, selected, used_premises):
+    required_inputs, output, premise = RULES[step["rule"]]
+    if set(step["inputs"]) != required_inputs or step["output"] != output:
+        return False
+    if output in facts or (premise is not None and premise not in selected):
+        return False
+    if premise is not None:
+        used_premises.add(premise)
+    facts.add(output)
+    return True
+
+
 def _replay_proof(result, source):
     if not isinstance(result, dict) or set(result) != {
         "selected_premises",
@@ -75,41 +110,13 @@ def _replay_proof(result, source):
     if not isinstance(steps, list):
         return False
     for step in steps:
-        if not isinstance(step, dict) or set(step) != {
-            "id",
-            "rule",
-            "inputs",
-            "output",
-        }:
+        if not _valid_step_shape(step, step_ids):
             return False
-        if (
-            type(step["id"]) is not str
-            or type(step["rule"]) is not str
-            or type(step["output"]) is not str
-            or STEP_ID_PATTERN.fullmatch(step["id"]) is None
-        ):
+        if not _valid_step_inputs(step, facts):
             return False
-        if step["id"] in step_ids or step["rule"] not in RULES:
+        if not _apply_rule(step, facts, selected, used_premises):
             return False
-        inputs = step["inputs"]
-        if (
-            not isinstance(inputs, list)
-            or not all(type(value) is str for value in inputs)
-            or len(inputs) != len(set(inputs))
-            or not set(inputs) <= facts
-        ):
-            return False
-        required_inputs, output, premise = RULES[step["rule"]]
-        if set(inputs) != required_inputs or step["output"] != output:
-            return False
-        if output in facts:
-            return False
-        if premise is not None:
-            if premise not in selected:
-                return False
-            used_premises.add(premise)
         step_ids.add(step["id"])
-        facts.add(output)
 
     target = source.get("target_fact")
     return bool(
