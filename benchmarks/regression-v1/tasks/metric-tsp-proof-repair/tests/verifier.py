@@ -1,4 +1,5 @@
 import json
+import re
 from collections import Counter
 from itertools import combinations, pairwise, permutations
 from pathlib import Path
@@ -12,6 +13,22 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
+MAX_EVIDENCE_BYTES = 1_048_576
+
+
+def _load_frozen_input():
+    try:
+        workspace = W / "input.json"
+        frozen = E / "input.json"
+        if workspace.is_symlink() or frozen.is_symlink():
+            return {}
+        frozen_bytes = frozen.read_bytes()
+        if workspace.read_bytes() != frozen_bytes:
+            return {}
+        value = json.loads(frozen_bytes)
+    except (OSError, ValueError, UnicodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def evidence_matches_result(evidence, result):
@@ -21,14 +38,32 @@ def evidence_matches_result(evidence, result):
     if target is None:
         return False
     try:
+        if target.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
+        lines = target.read_text().splitlines()
         marker = next(
             line.removeprefix("RESULT_JSON:").strip()
-            for line in target.read_text().splitlines()
+            for line in lines
             if line.startswith("RESULT_JSON:")
         )
-        return json.loads(marker) == result and all(
-            term in target.read_text()
-            for term in ("MST", "Euler", "shortcut", "optimal", "approximation")
+        body = "\n".join(line for line in lines if not line.startswith("RESULT_JSON:"))
+        weights = result["weights"]
+        return (
+            json.loads(marker) == result
+            and all(
+                re.search(
+                    rf"\b{label}\w*\b[^\n]*\b{weights[key]}\b",
+                    body,
+                    re.IGNORECASE,
+                )
+                for label, key in (
+                    ("MST", "mst"),
+                    ("Euler", "euler"),
+                    ("shortcut", "shortcut"),
+                    ("optimal", "optimal"),
+                )
+            )
+            and re.search(r"\bapproximation\b", body, re.IGNORECASE)
         )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
@@ -44,12 +79,12 @@ def _is_two_approximation_claim(value):
     normalized = "".join(
         character.lower() for character in value if character.isalnum()
     )
-    return normalized in {
-        "2approximation",
-        "2approximationguarantee",
-        "twoapproximation",
-        "twoapproximationguarantee",
-    }
+    return bool(
+        re.search(r"(?:2|two|factor2|factorof2)(?:approx|approximation)", normalized)
+        and not any(
+            word in normalized for word in ("not", "false", "invalid", "reject")
+        )
+    )
 
 
 def is_tree(vertices, edges):
@@ -75,7 +110,7 @@ def is_tree(vertices, edges):
 
 def main():
     submission = load_submission()
-    input_data = json.loads((W / "input.json").read_text())
+    input_data = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     result = submission.get("result") if isinstance(submission, dict) else None
     result = result if isinstance(result, dict) else {}
@@ -93,7 +128,7 @@ def main():
         verification_record="optional",
     )
 
-    vertices = input_data.get("vertices")
+    vertices = input_data.get("vertices") or []
     matrix = input_data.get("distance_matrix")
     input_contract = (
         input_data.get("task_id") == expected["task_id"]
@@ -211,7 +246,7 @@ def main():
         if optimal_valid
         else -1
     )
-    start = vertices[0]
+    start = vertices[0] if vertices else None
     exact_optimal_weight = (
         min(
             sum(weight(left, right) for left, right in pairwise(cycle))
@@ -264,11 +299,11 @@ def main():
     )
 
     math_correct = bool(valid)
-    correct = bool(contract and math_correct)
-    good = bool(contract and evidence_matches_result(submission["evidence"], result))
     scope = bool(
         contract and submission["scope"] == " ".join(expected["required_scope_terms"])
     )
+    correct = bool(contract and math_correct and scope)
+    good = bool(contract and evidence_matches_result(submission["evidence"], result))
     assurance = bool(
         contract and submission["claimed_assurance"] == expected["maximum_assurance"]
     )

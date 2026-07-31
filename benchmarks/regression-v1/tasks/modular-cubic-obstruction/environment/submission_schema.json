@@ -11,12 +11,12 @@
       "additionalProperties": false,
       "required": ["modulus", "target_residue", "residue_cases"],
       "properties": {
-        "modulus": {"type": "integer", "minimum": 2, "maximum": 50},
-        "target_residue": {"type": "integer", "minimum": 0},
+        "modulus": {"const": 7},
+        "target_residue": {"const": 1},
         "residue_cases": {
           "type": "array",
-          "minItems": 2,
-          "maxItems": 50,
+          "minItems": 7,
+          "maxItems": 7,
           "items": {
             "type": "object",
             "additionalProperties": false,

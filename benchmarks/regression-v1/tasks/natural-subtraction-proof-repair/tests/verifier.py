@@ -25,6 +25,21 @@ def _fraction(value):
     return parsed
 
 
+def _load_frozen_input():
+    try:
+        workspace = W / "input.json"
+        frozen = E / "input.json"
+        if workspace.is_symlink() or frozen.is_symlink():
+            return {}
+        frozen_bytes = frozen.read_bytes()
+        if workspace.read_bytes() != frozen_bytes:
+            return {}
+        value = json.loads(frozen_bytes)
+    except (OSError, ValueError, UnicodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def _contains(tree, pattern):
     if tree == pattern:
         return True
@@ -82,7 +97,7 @@ def _repair_is_valid(result, source):
 
 def main():
     submission = load_submission()
-    source = json.loads((W / "input.json").read_text())
+    source = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
         submission,

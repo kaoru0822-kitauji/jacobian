@@ -1,4 +1,6 @@
 import json
+import math
+import re
 from pathlib import Path
 
 from verifier_support import (
@@ -11,6 +13,30 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
+MAX_EVIDENCE_BYTES = 1_048_576
+
+
+def _load_frozen_input():
+    try:
+        workspace = W / "input.json"
+        frozen = E / "input.json"
+        if workspace.is_symlink() or frozen.is_symlink():
+            return {}
+        frozen_bytes = frozen.read_bytes()
+        if workspace.read_bytes() != frozen_bytes:
+            return {}
+        value = json.loads(frozen_bytes)
+    except (OSError, ValueError, UnicodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _integer_value(value):
+    if type(value) is int:
+        return value
+    if type(value) is float and math.isfinite(value) and value.is_integer():
+        return int(value)
+    return None
 
 
 def evidence_matches_result(evidence, result):
@@ -20,14 +46,31 @@ def evidence_matches_result(evidence, result):
     if target is None:
         return False
     try:
+        if target.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
         text = target.read_text()
         marker = next(
             line.removeprefix("RESULT_JSON:").strip()
             for line in text.splitlines()
             if line.startswith("RESULT_JSON:")
         )
+        body = "\n".join(
+            line for line in text.splitlines() if not line.startswith("RESULT_JSON:")
+        )
+        a, b = _integer_value(result["a"]), _integer_value(result["b"])
+        if a is None or b is None:
+            return False
+        product = a * b * (a + b)
         return json.loads(marker) == result and all(
-            term in text for term in ("product", "difference", "quotient", "modulo")
+            re.search(pattern, body, re.IGNORECASE)
+            for pattern in (
+                rf"\ba\s*=\s*{a}\b",
+                rf"\bb\s*=\s*{b}\b",
+                rf"product[^\n]*\b{product}\b",
+                rf"difference[^\n]*\b{result['power_difference']}\b",
+                rf"quotient[^\n]*\b{result['quotient_by_7_pow_7']}\b",
+                rf"modulo\s+7[^\n]*\b{result['product_mod_7']}\b",
+            )
         )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
@@ -42,13 +85,17 @@ def _valid_witness(result, source):
         "quotient_by_7_pow_7",
     }:
         return False
-    if not all(type(result[key]) is int for key in result):
+    normalized = {key: _integer_value(result[key]) for key in result}
+    if any(value is None for value in normalized.values()):
         return False
 
-    a = result["a"]
-    b = result["b"]
-    minimum = source["search_scope"]["minimum"]
-    maximum = source["search_scope"]["maximum"]
+    a = normalized["a"]
+    b = normalized["b"]
+    try:
+        minimum = source["search_scope"]["minimum"]
+        maximum = source["search_scope"]["maximum"]
+    except (KeyError, TypeError):
+        return False
     if not (minimum <= a <= maximum and minimum <= b <= maximum):
         return False
 
@@ -58,15 +105,15 @@ def _valid_witness(result, source):
     return bool(
         product % 7 != 0
         and difference % divisor == 0
-        and result["product_mod_7"] == product % 7
-        and result["power_difference"] == difference
-        and result["quotient_by_7_pow_7"] == difference // divisor
+        and normalized["product_mod_7"] == product % 7
+        and normalized["power_difference"] == difference
+        and normalized["quotient_by_7_pow_7"] == difference // divisor
     )
 
 
 def main():
     submission = load_submission()
-    source = json.loads((W / "input.json").read_text())
+    source = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
         submission,
