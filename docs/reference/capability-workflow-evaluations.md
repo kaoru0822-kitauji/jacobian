@@ -4,12 +4,12 @@
 
 This document defines the boundary between Jacobian capability development and
 agent-evaluation evidence. The current Harbor surface is the committed
-[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: fourteen
+[`regression-v1`](../../benchmarks/regression-v1/README.md) dataset: fifteen
 self-contained tasks for graph counterexamples, graph artifact composition,
 finite coverage, SAT witnesses, exact rational systems, Hermite normal form,
 polynomial normalization, polynomial-map collisions, matrix and subspace
-counterexamples, polynomial-tail reasoning, exact logarithmic algebra, and
-proof-audit workloads.
+counterexamples, polynomial-tail reasoning, exact logarithmic algebra,
+proof-audit workloads, and symbolic geometry.
 
 ## Task and verifier validation
 
@@ -22,9 +22,12 @@ verification order, or stopping criteria.
 Validate the bundles and then run the Oracle:
 
 ```sh
-harbor sync benchmarks/regression-v1/dataset.toml
-harbor check benchmarks/regression-v1/tasks
-harbor run -c benchmarks/regression-v1/job-oracle.json
+make harbor-check
+make harbor-oracle
+
+# Release PR only, after the task set is frozen:
+make harbor-release-sync
+make harbor-release-oracle
 ```
 
 The verifier scores correctness, evidence validity, scope accuracy, assurance

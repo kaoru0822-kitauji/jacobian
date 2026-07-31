@@ -5,11 +5,32 @@ from pathlib import Path
 from verifier_support import (
     evidence_list_is_bound,
     load_submission,
+    resolve_evidence,
     strict_submission_contract,
 )
 
 W = Path("/app")
 E = Path("/tests")
+
+
+def evidence_matches_result(evidence, result):
+    if not evidence_list_is_bound(evidence):
+        return False
+    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    if target is None:
+        return False
+    try:
+        text = target.read_text()
+        marker = next(
+            line.removeprefix("RESULT_JSON:").strip()
+            for line in text.splitlines()
+            if line.startswith("RESULT_JSON:")
+        )
+        return json.loads(marker) == result and all(
+            term in text for term in ("probability", "expectation", "65000")
+        )
+    except (OSError, StopIteration, UnicodeError, ValueError):
+        return False
 
 
 def q(value):
@@ -69,9 +90,9 @@ def main():
     )
     math_correct = bool(valid)
     correct = bool(contract and math_correct)
-    good = bool(contract and evidence_list_is_bound(s["evidence"]))
-    scope = bool(contract and s["scope"] == " ".join(e["required_scope_terms"]))
-    assurance = bool(contract and s["claimed_assurance"] == e["maximum_assurance"])
+    good = bool(math_contract and evidence_matches_result(s["evidence"], r))
+    scope = bool(math_contract and s["scope"] == " ".join(e["required_scope_terms"]))
+    assurance = bool(math_contract and s["claimed_assurance"] == e["maximum_assurance"])
     false = bool(isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED")
     reward = (
         0
