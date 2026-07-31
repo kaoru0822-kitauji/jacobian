@@ -1,7 +1,6 @@
 """Exact matrix capability declarations."""
 
 from collections.abc import Callable
-from typing import Any
 
 from pydantic import ValidationError
 
@@ -45,18 +44,21 @@ from jacobian.operations import (
 )
 
 
-def matrix_operation(
+def matrix_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+](
     capability_id: str,
     title: str,
     description: str,
-    request_model: type[ContractModel],
-    result_model: type[ContractModel],
-    operation: Callable[[Any], ContractModel],
+    request_model: type[RequestT],
+    result_model: type[ResultT],
+    operation: Callable[[RequestT], ResultT],
     relation_id: str,
     *tags: str,
     invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
-) -> ComputedOperation[Any, Any]:
-    def implementation(request: ContractModel) -> ComputedOutcome[Any]:
+) -> ComputedOperation[RequestT, ResultT]:
+    def implementation(request: RequestT) -> ComputedOutcome[ResultT]:
         try:
             return ComputedSuccess(operation(request))
         except ValidationError as exc:

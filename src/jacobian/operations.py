@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from jacobian.checker_operations import ExactReplayCheckerDeclaration
@@ -108,14 +108,14 @@ class ComputedOperationFactory:
         description: str,
         request_model: type[RequestT],
         result_model: type[ResultT],
-        operation: Callable[[ContractModel], ContractModel],
+        operation: Callable[[RequestT], ResultT],
         *tags: str,
         invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
         relation_id: str | None = None,
     ) -> ComputedOperation[RequestT, ResultT]:
         def implementation(request: RequestT) -> ComputedOutcome[ResultT]:
             try:
-                return ComputedSuccess(cast(ResultT, operation(request)))
+                return ComputedSuccess(operation(request))
             except self.failure.exceptions as exc:
                 return ComputedNotApplicable(self.failure.diagnostic(exc))
 
@@ -195,6 +195,7 @@ type BoundedSearchOutcome[ResultT: ContractModel] = (
 class BoundedSearchOperation[
     RequestT: ContractModel,
     ResultT: ContractModel,
+    ObligationT: ContractModel,
 ]:
     """One budgeted producer with explicit partial-result semantics."""
 
@@ -207,8 +208,8 @@ class BoundedSearchOperation[
     relation_id: str
     scope_parameters: Callable[[RequestT, ResultT], dict[str, Any]]
     is_complete: Callable[[ResultT], bool]
-    obligation_model: type[ContractModel]
-    obligation: Callable[[RequestT, ResultT], ContractModel]
+    obligation_model: type[ObligationT]
+    obligation: Callable[[RequestT, ResultT], ObligationT]
     incomplete_basis: str
     tags: tuple[str, ...] = ()
     invocation_examples: tuple[CapabilityInvocationExample, ...] = ()
@@ -232,7 +233,9 @@ class DomainDiagnostics:
     invalid_request: CapabilityDiagnostic
 
 
-type DomainOperation = ComputedOperation[Any, Any] | BoundedSearchOperation[Any, Any]
+type DomainOperation = (
+    ComputedOperation[Any, Any] | BoundedSearchOperation[Any, Any, Any]
+)
 
 
 class ManagedDomainInstaller(Protocol):

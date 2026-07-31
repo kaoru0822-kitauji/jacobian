@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from jacobian.contracts.finite_sets import (
     FiniteSetBooleanResult,
     FiniteSetCardinalityResult,
     FiniteSetElementListResult,
     FiniteSetPairRequest,
 )
-from jacobian.contracts.results import ContractModel
 
 
-def _pair(request: ContractModel) -> tuple[set[int], set[int]]:
-    pair = cast(FiniteSetPairRequest, request)
+def _pair(request: FiniteSetPairRequest) -> tuple[set[int], set[int]]:
+    pair = request
     return (
         {int(element) for element in pair.left.elements},
         {int(element) for element in pair.right.elements},
@@ -27,51 +24,55 @@ def _element_list(values: set[int]) -> FiniteSetElementListResult:
     )
 
 
-def set_union(request: ContractModel) -> ContractModel:
+def set_union(request: FiniteSetPairRequest) -> FiniteSetElementListResult:
     left, right = _pair(request)
     return _element_list(left | right)
 
 
-def set_intersection(request: ContractModel) -> ContractModel:
+def set_intersection(request: FiniteSetPairRequest) -> FiniteSetElementListResult:
     left, right = _pair(request)
     return _element_list(left & right)
 
 
-def set_difference(request: ContractModel) -> ContractModel:
+def set_difference(request: FiniteSetPairRequest) -> FiniteSetElementListResult:
     left, right = _pair(request)
     return _element_list(left - right)
 
 
-def set_symmetric_difference(request: ContractModel) -> ContractModel:
+def set_symmetric_difference(
+    request: FiniteSetPairRequest,
+) -> FiniteSetElementListResult:
     left, right = _pair(request)
     return _element_list(left ^ right)
 
 
-def decide_subset(request: ContractModel) -> ContractModel:
+def decide_subset(request: FiniteSetPairRequest) -> FiniteSetBooleanResult:
     left, right = _pair(request)
     return FiniteSetBooleanResult(holds=left <= right)
 
 
-def decide_proper_subset(request: ContractModel) -> ContractModel:
+def decide_proper_subset(request: FiniteSetPairRequest) -> FiniteSetBooleanResult:
     left, right = _pair(request)
     return FiniteSetBooleanResult(holds=left < right)
 
 
-def decide_disjoint(request: ContractModel) -> ContractModel:
+def decide_disjoint(request: FiniteSetPairRequest) -> FiniteSetBooleanResult:
     left, right = _pair(request)
     return FiniteSetBooleanResult(holds=left.isdisjoint(right))
 
 
-def left_cardinality(request: ContractModel) -> ContractModel:
+def left_cardinality(request: FiniteSetPairRequest) -> FiniteSetCardinalityResult:
     left, _ = _pair(request)
     return FiniteSetCardinalityResult(cardinality=len(left))
 
 
-def intersection_cardinality(request: ContractModel) -> ContractModel:
+def intersection_cardinality(
+    request: FiniteSetPairRequest,
+) -> FiniteSetCardinalityResult:
     left, right = _pair(request)
     return FiniteSetCardinalityResult(cardinality=len(left & right))
 
 
-def union_cardinality(request: ContractModel) -> ContractModel:
+def union_cardinality(request: FiniteSetPairRequest) -> FiniteSetCardinalityResult:
     left, right = _pair(request)
     return FiniteSetCardinalityResult(cardinality=len(left | right))

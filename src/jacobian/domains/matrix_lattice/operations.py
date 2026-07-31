@@ -21,8 +21,10 @@ from jacobian.contracts.matrix_operations import (
     RationalOutputMatrix,
     RrefResult,
     SmithNormalFormResult,
+    SquareIntegerMatrixRequest,
     SquareRationalMatrixRequest,
 )
+from jacobian.math import matrices as native_matrices
 
 
 def _rational(value: Any) -> OutputRational:
@@ -45,7 +47,7 @@ def _qq_matrix(matrix: RationalMatrix) -> Any:
 
 
 def compute_rref(request: RationalMatrixRequest) -> RrefResult:
-    reduced, pivots = _qq_matrix(request.matrix).rref()
+    reduced, pivots = native_matrices.rref(_qq_matrix(request.matrix))
     columns = reduced.cols
     pivot_columns = tuple(int(column) for column in pivots)
     return RrefResult(
@@ -136,17 +138,13 @@ def compute_smith_normal_form(
     )
 
 
-def compute_inverse(request: IntegerMatrixRequest) -> MatrixInverseResult:
+def compute_inverse(request: SquareIntegerMatrixRequest) -> MatrixInverseResult:
     import sympy
 
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )
-    if source.rows != source.cols:
-        raise ValueError("inverse requires a square matrix")
-    if source.det() == 0:
-        raise ValueError("matrix is singular; inverse does not exist")
-    inverse = source.inv()
+    inverse = native_matrices.inverse(source)
     return MatrixInverseResult(
         inverse=RationalOutputMatrix(
             entries=tuple(
@@ -157,15 +155,13 @@ def compute_inverse(request: IntegerMatrixRequest) -> MatrixInverseResult:
     )
 
 
-def compute_trace(request: IntegerMatrixRequest) -> MatrixTraceResult:
+def compute_trace(request: SquareIntegerMatrixRequest) -> MatrixTraceResult:
     import sympy
 
     source = sympy.Matrix(
         [[int(value) for value in row] for row in request.matrix.entries]
     )
-    if source.rows != source.cols:
-        raise ValueError("trace requires a square matrix")
-    return MatrixTraceResult(trace=str(int(source.trace())))
+    return MatrixTraceResult(trace=str(int(native_matrices.trace(source))))
 
 
 def compute_rational_linear_solve(
@@ -185,7 +181,7 @@ def compute_rational_linear_solve(
     )
 
 
-def compute_adjugate(request: IntegerMatrixRequest) -> MatrixAdjugateResult:
+def compute_adjugate(request: SquareIntegerMatrixRequest) -> MatrixAdjugateResult:
     import sympy
 
     source = sympy.Matrix(

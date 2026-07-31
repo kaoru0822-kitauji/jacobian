@@ -14,7 +14,6 @@ from jacobian.contracts.projective_geometry import (
     ProjectiveLineArrangementResult,
     ProjectiveMultiplicityCount,
 )
-from jacobian.contracts.results import ContractModel
 from jacobian.domains._examples import example
 from jacobian.operations import (
     ComputedOperation,
@@ -64,8 +63,9 @@ def _wire_triple(values: tuple[int, int, int]) -> PrimitiveProjectiveTriple:
     )
 
 
-def materialize_projective_line_flats(request: ContractModel) -> ContractModel:
-    request = cast(ProjectiveLineArrangementRequest, request)
+def materialize_projective_line_flats(
+    request: ProjectiveLineArrangementRequest,
+) -> ProjectiveLineArrangementResult:
     normalized = tuple(
         sorted(
             (

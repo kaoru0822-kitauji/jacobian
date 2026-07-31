@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.capabilities import CapabilityDiagnostic
-from jacobian.contracts.results import ContractModel, ExecutionStatus
+from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.validated_analysis import (
     RationalLinearProgramObligation,
     RationalLinearProgramRequest,
@@ -124,7 +124,7 @@ def _scope(
 def _obligation(
     request: RationalLinearProgramRequest,
     result: RationalLinearProgramResult,
-) -> ContractModel:
+) -> RationalLinearProgramObligation:
     return RationalLinearProgramObligation(
         program=request.program,
         status=result.status,

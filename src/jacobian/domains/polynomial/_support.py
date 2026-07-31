@@ -46,7 +46,7 @@ def polynomial_operation[
     description: str,
     request_model: type[RequestT],
     result_model: type[ResultT],
-    operation: Callable[[ContractModel], ContractModel],
+    operation: Callable[[RequestT], ResultT],
     *tags: str,
     invocation_examples: tuple[CapabilityInvocationExample, ...] = (),
     relation_id: str | None = None,

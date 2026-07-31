@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import cache
-from typing import Any, cast
+from typing import Any
 
 from jacobian.contracts.polynomial_operations import (
     IntegerPolynomial,
@@ -29,7 +29,6 @@ from jacobian.contracts.polynomial_operations import (
     RationalPolynomialIntegralResult,
     RationalPolynomialRequest,
 )
-from jacobian.contracts.results import ContractModel
 from jacobian.domains.polynomial.operations import _poly, _rational, _wire
 
 
@@ -60,8 +59,9 @@ def _integer_wire(polynomial: Any) -> IntegerPolynomial:
     )
 
 
-def integer_polynomial_gcd(request: ContractModel) -> ContractModel:
-    request = cast(IntegerPolynomialPairRequest, request)
+def integer_polynomial_gcd(
+    request: IntegerPolynomialPairRequest,
+) -> IntegerPolynomialGcdResult:
     left = _integer_poly(request.left)
     right = _integer_poly(request.right)
     gcd = left.gcd(right)
@@ -73,15 +73,17 @@ def integer_polynomial_gcd(request: ContractModel) -> ContractModel:
     )
 
 
-def integer_polynomial_content(request: ContractModel) -> ContractModel:
-    request = cast(IntegerPolynomialRequest, request)
+def integer_polynomial_content(
+    request: IntegerPolynomialRequest,
+) -> IntegerPolynomialContentResult:
     return IntegerPolynomialContentResult(
         content=str(int(_integer_poly(request.polynomial).content()))
     )
 
 
-def integer_polynomial_primitive_part(request: ContractModel) -> ContractModel:
-    request = cast(IntegerPolynomialRequest, request)
+def integer_polynomial_primitive_part(
+    request: IntegerPolynomialRequest,
+) -> IntegerPolynomialPrimitivePartResult:
     source = _integer_poly(request.polynomial)
     content, primitive = source.primitive()
     reconstructed = primitive.mul_ground(content)
@@ -92,22 +94,25 @@ def integer_polynomial_primitive_part(request: ContractModel) -> ContractModel:
     )
 
 
-def integer_polynomial_evaluate(request: ContractModel) -> ContractModel:
-    request = cast(IntegerPolynomialEvaluationRequest, request)
+def integer_polynomial_evaluate(
+    request: IntegerPolynomialEvaluationRequest,
+) -> IntegerPolynomialEvaluationResult:
     point = int(request.point)
     value = _integer_poly(request.polynomial).eval(point)
     return IntegerPolynomialEvaluationResult(point=request.point, value=str(int(value)))
 
 
-def integer_polynomial_compose(request: ContractModel) -> ContractModel:
-    request = cast(IntegerPolynomialCompositionRequest, request)
+def integer_polynomial_compose(
+    request: IntegerPolynomialCompositionRequest,
+) -> IntegerPolynomialCompositionResult:
     composition = _integer_poly(request.outer).compose(_integer_poly(request.inner))
     return IntegerPolynomialCompositionResult(composition=_integer_wire(composition))
 
 
-def integer_polynomial_shift(request: ContractModel) -> ContractModel:
+def integer_polynomial_shift(
+    request: IntegerPolynomialShiftRequest,
+) -> IntegerPolynomialShiftResult:
     """Compute ``p(x + a)`` using SymPy's exact dense shift."""
-    request = cast(IntegerPolynomialShiftRequest, request)
     shifted = _integer_poly(request.polynomial).shift(request.shift)
     return IntegerPolynomialShiftResult(
         shift=request.shift,
@@ -115,8 +120,9 @@ def integer_polynomial_shift(request: ContractModel) -> ContractModel:
     )
 
 
-def rational_polynomial_division(request: ContractModel) -> ContractModel:
-    request = cast(RationalPolynomialDivisionRequest, request)
+def rational_polynomial_division(
+    request: RationalPolynomialDivisionRequest,
+) -> RationalPolynomialDivisionResult:
     left = _poly(request.left)
     right = _poly(request.right)
     quotient, remainder = left.div(right)
@@ -129,8 +135,9 @@ def rational_polynomial_division(request: ContractModel) -> ContractModel:
     )
 
 
-def rational_polynomial_evaluate(request: ContractModel) -> ContractModel:
-    request = cast(RationalPolynomialEvaluationRequest, request)
+def rational_polynomial_evaluate(
+    request: RationalPolynomialEvaluationRequest,
+) -> RationalPolynomialEvaluationResult:
     from sympy import Rational
 
     point = request.point.as_fraction()
@@ -141,8 +148,9 @@ def rational_polynomial_evaluate(request: ContractModel) -> ContractModel:
     )
 
 
-def rational_polynomial_derivative(request: ContractModel) -> ContractModel:
-    request = cast(RationalPolynomialRequest, request)
+def rational_polynomial_derivative(
+    request: RationalPolynomialRequest,
+) -> RationalPolynomialDerivativeResult:
     return RationalPolynomialDerivativeResult(
         derivative=_wire(
             _poly(request.polynomial).diff(),
@@ -151,8 +159,9 @@ def rational_polynomial_derivative(request: ContractModel) -> ContractModel:
     )
 
 
-def rational_polynomial_integral(request: ContractModel) -> ContractModel:
-    request = cast(RationalPolynomialRequest, request)
+def rational_polynomial_integral(
+    request: RationalPolynomialRequest,
+) -> RationalPolynomialIntegralResult:
     return RationalPolynomialIntegralResult(
         antiderivative=_wire(
             _poly(request.polynomial).integrate(),
@@ -200,9 +209,8 @@ def _partial_fraction_sort_key(
 
 
 def rational_partial_fraction_decomposition(
-    request: ContractModel,
-) -> ContractModel:
-    request = cast(RationalFunctionRequest, request)
+    request: RationalFunctionRequest,
+) -> RationalPartialFractionResult:
     from sympy import Add, Poly, apart, cancel, fraction, together
 
     variables = request.numerator.variables

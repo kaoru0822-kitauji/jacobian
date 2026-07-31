@@ -32,9 +32,8 @@ from jacobian.contracts.geometry import (
     SimplePolygonDecisionResult,
     SimplePolygonPointRequest,
 )
-from jacobian.contracts.results import ContractModel
 
-Compute = Callable[[ContractModel], ContractModel]
+Compute = Callable[[LinePairRequest], GeometryBooleanResult]
 
 
 def _fraction(value: Any) -> Fraction:
@@ -106,8 +105,8 @@ def _on_segment(point: Any, start: Any, end: Any) -> bool:
     )
 
 
-def _pair_points(request: ContractModel) -> tuple[Any, Any]:
-    pair = cast(PointPairRequest, request)
+def _pair_points(request: PointPairRequest) -> tuple[Any, Any]:
+    pair = request
     return _point(pair.first), _point(pair.second)
 
 
@@ -117,21 +116,23 @@ def _line(value: LineRequest) -> Any:
     return Line2D(_point(value.first), _point(value.second))
 
 
-def squared_distance(request: ContractModel) -> ContractModel:
+def squared_distance(request: PointPairRequest) -> GeometryRationalResult:
     first, second = _pair_points(request)
     return GeometryRationalResult(value=_wire_rational(first.distance(second) ** 2))
 
 
-def midpoint(request: ContractModel) -> ContractModel:
+def midpoint(request: PointPairRequest) -> GeometryPointResult:
     first, second = _pair_points(request)
     return GeometryPointResult(point=_wire_point(first.midpoint(second)))
 
 
-def segment_intersection(request: ContractModel) -> ContractModel:
+def segment_intersection(
+    request: SegmentIntersectionRequest,
+) -> SegmentIntersectionResult:
     import sympy
     from sympy.geometry import Point2D
 
-    pair = cast(SegmentIntersectionRequest, request)
+    pair = request
     first_start, first_end = _closed_segment(pair.first)
     second_start, second_end = _closed_segment(pair.second)
     first_degenerate = first_start == first_end
@@ -206,10 +207,10 @@ def segment_intersection(request: ContractModel) -> ContractModel:
     )
 
 
-def collinear(request: ContractModel) -> ContractModel:
+def collinear(request: PointTripleRequest) -> GeometryBooleanResult:
     from sympy.geometry import Point2D
 
-    triple = cast(PointTripleRequest, request)
+    triple = request
     return GeometryBooleanResult(
         holds=Point2D.is_collinear(
             _point(triple.first),
@@ -219,10 +220,10 @@ def collinear(request: ContractModel) -> ContractModel:
     )
 
 
-def concyclic(request: ContractModel) -> ContractModel:
+def concyclic(request: PointQuadrupleRequest) -> GeometryBooleanResult:
     from sympy.geometry import Point2D
 
-    points = cast(PointQuadrupleRequest, request)
+    points = request
     return GeometryBooleanResult(
         holds=Point2D.is_concyclic(
             _point(points.first),
@@ -236,8 +237,8 @@ def concyclic(request: ContractModel) -> ContractModel:
 def line_predicate(
     predicate: Callable[[Any, Any], bool],
 ) -> Compute:
-    def compute(request: ContractModel) -> ContractModel:
-        pair = cast(LinePairRequest, request)
+    def compute(request: LinePairRequest) -> GeometryBooleanResult:
+        pair = request
         return GeometryBooleanResult(
             holds=predicate(_line(pair.first_line), _line(pair.second_line))
         )
@@ -245,10 +246,10 @@ def line_predicate(
     return compute
 
 
-def line_intersection(request: ContractModel) -> ContractModel:
+def line_intersection(request: LinePairRequest) -> GeometryLineIntersectionResult:
     from sympy.geometry import Point2D
 
-    pair = cast(LinePairRequest, request)
+    pair = request
     first, second = _line(pair.first_line), _line(pair.second_line)
     if first.equals(second):
         return GeometryLineIntersectionResult(status="COINCIDENT")
@@ -261,20 +262,20 @@ def line_intersection(request: ContractModel) -> ContractModel:
     return GeometryLineIntersectionResult(status="POINT", point=_wire_point(point))
 
 
-def projection(request: ContractModel) -> ContractModel:
+def projection(request: PointLineRequest) -> GeometryPointResult:
     from sympy.geometry import Point2D
 
-    value = cast(PointLineRequest, request)
+    value = request
     projected = _line(value.line).projection(_point(value.point))
     if not isinstance(projected, Point2D):
         raise ValueError("line projection did not produce one exact point")
     return GeometryPointResult(point=_wire_point(projected))
 
 
-def orientation(request: ContractModel) -> ContractModel:
+def orientation(request: PointTripleRequest) -> GeometryOrientationResult:
     import sympy
 
-    triple = cast(PointTripleRequest, request)
+    triple = request
     first, second, third = (
         _point(triple.first),
         _point(triple.second),
@@ -288,10 +289,10 @@ def orientation(request: ContractModel) -> ContractModel:
     )
 
 
-def centroid(request: ContractModel) -> ContractModel:
+def centroid(request: PointTripleRequest) -> GeometryPointResult:
     from sympy.geometry import Point2D
 
-    triple = cast(PointTripleRequest, request)
+    triple = request
     points = [_point(triple.first), _point(triple.second), _point(triple.third)]
     return GeometryPointResult(
         point=_wire_point(
@@ -303,10 +304,10 @@ def centroid(request: ContractModel) -> ContractModel:
     )
 
 
-def circumcircle(request: ContractModel) -> ContractModel:
+def circumcircle(request: PointTripleRequest) -> GeometryCircleResult:
     from sympy.geometry import Circle, Point2D
 
-    triple = cast(PointTripleRequest, request)
+    triple = request
     points = [_point(triple.first), _point(triple.second), _point(triple.third)]
     if Point2D.is_collinear(*points):
         raise ValueError("a circumcircle requires three noncollinear points")
@@ -317,35 +318,32 @@ def circumcircle(request: ContractModel) -> ContractModel:
     )
 
 
-def signed_area(request: ContractModel) -> ContractModel:
+def signed_area(request: PolygonRequest) -> GeometryRationalResult:
     from sympy.geometry import Polygon
 
-    polygon = cast(PolygonRequest, request)
+    polygon = request
     value = Polygon(*(_point(point) for point in polygon.points)).area
     return GeometryRationalResult(value=_wire_rational(value))
 
 
-def simple_polygon(request: ContractModel) -> ContractModel:
-    polygon = cast(PolygonRequest, request)
+def simple_polygon(request: PolygonRequest) -> SimplePolygonDecisionResult:
+    polygon = request
     points = polygon.points
     checked = 0
     for first in range(len(points)):
         for second in range(first + 1, len(points)):
             checked += 1
-            intersection = cast(
-                SegmentIntersectionResult,
-                segment_intersection(
-                    SegmentIntersectionRequest(
-                        first=ClosedSegment2D(
-                            start=points[first],
-                            end=points[(first + 1) % len(points)],
-                        ),
-                        second=ClosedSegment2D(
-                            start=points[second],
-                            end=points[(second + 1) % len(points)],
-                        ),
-                    )
-                ),
+            intersection = segment_intersection(
+                SegmentIntersectionRequest(
+                    first=ClosedSegment2D(
+                        start=points[first],
+                        end=points[(first + 1) % len(points)],
+                    ),
+                    second=ClosedSegment2D(
+                        start=points[second],
+                        end=points[(second + 1) % len(points)],
+                    ),
+                )
             )
             adjacent = (first - second) % len(points) in {1, len(points) - 1}
             shared = (
@@ -376,10 +374,12 @@ def simple_polygon(request: ContractModel) -> ContractModel:
     )
 
 
-def classify_polygon_point(request: ContractModel) -> ContractModel:
+def classify_polygon_point(
+    request: SimplePolygonPointRequest,
+) -> PolygonPointClassificationResult:
     from sympy.geometry import Polygon
 
-    value = cast(SimplePolygonPointRequest, request)
+    value = request
     point = _point(value.point)
     points = tuple(_point(item) for item in value.polygon.points)
     for index, start in enumerate(points):
@@ -396,11 +396,11 @@ def classify_polygon_point(request: ContractModel) -> ContractModel:
     )
 
 
-def convex_hull_points(request: ContractModel) -> ContractModel:
+def convex_hull_points(request: PointSetRequest) -> GeometryConvexHullResult:
     from sympy.geometry import Line2D, Point2D, Polygon, Segment2D
     from sympy.geometry.util import convex_hull
 
-    point_set = cast(PointSetRequest, request)
+    point_set = request
     hull = convex_hull(*(_point(point) for point in point_set.points))
     if isinstance(hull, Point2D):
         points = (hull,)

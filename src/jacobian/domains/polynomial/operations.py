@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Any, cast
+from typing import Any
 
 from jacobian.contracts.exact import CanonicalRational
 from jacobian.contracts.polynomial_operations import (
@@ -28,7 +28,6 @@ from jacobian.contracts.polynomials import (
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
-from jacobian.contracts.results import ContractModel
 
 _MAX_OUTPUT_TERMS = 1024
 
@@ -102,8 +101,7 @@ def _invariant_value(
     )
 
 
-def polynomial_gcd(request: ContractModel) -> ContractModel:
-    request = cast(PolynomialGcdRequest, request)
+def polynomial_gcd(request: PolynomialGcdRequest) -> PolynomialGcdResult:
     left = _poly(request.left)
     right = _poly(request.right)
     left_multiplier, right_multiplier, gcd = left.gcdex(right)
@@ -118,9 +116,8 @@ def polynomial_gcd(request: ContractModel) -> ContractModel:
 
 
 def polynomial_resultant(
-    request: ContractModel,
-) -> ContractModel:
-    request = cast(PolynomialResultantRequest, request)
+    request: PolynomialResultantRequest,
+) -> PolynomialResultantResult:
     from sympy import resultant
 
     variables = request.left.variables
@@ -139,9 +136,8 @@ def polynomial_resultant(
 
 
 def polynomial_discriminant(
-    request: ContractModel,
-) -> ContractModel:
-    request = cast(PolynomialDiscriminantRequest, request)
+    request: PolynomialDiscriminantRequest,
+) -> PolynomialDiscriminantResult:
     from sympy import discriminant
 
     variables = request.polynomial.variables
@@ -158,9 +154,8 @@ def polynomial_discriminant(
 
 
 def polynomial_square_free_decomposition(
-    request: ContractModel,
-) -> ContractModel:
-    request = cast(PolynomialSquareFreeRequest, request)
+    request: PolynomialSquareFreeRequest,
+) -> PolynomialSquareFreeDecompositionResult:
     from sympy import QQ, Poly
 
     source = _poly(request.polynomial)

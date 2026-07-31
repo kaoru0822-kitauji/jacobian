@@ -9,7 +9,7 @@ from jacobian.contracts.graph_coloring import (
     GraphChromaticNumberOutput,
     GraphChromaticNumberRequest,
 )
-from jacobian.contracts.results import ContractModel, ExecutionStatus
+from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.graph_optimization.operations import (
     build_simple_graph,
     solve_chromatic_number,
@@ -100,7 +100,7 @@ def _chromatic_number_scope_parameters(
 def _chromatic_number_obligation(
     request: GraphChromaticNumberRequest,
     result: GraphChromaticNumberOutput,
-) -> ContractModel:
+) -> GraphChromaticNumberObligation:
     return GraphChromaticNumberObligation(
         graph=request.graph,
         status=result.status,

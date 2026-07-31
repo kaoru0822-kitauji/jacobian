@@ -9,7 +9,6 @@ from jacobian.contracts.graph_optimization import (
     GraphHamiltonianPathRequest,
     GraphHamiltonianPathResult,
 )
-from jacobian.contracts.results import ContractModel
 from jacobian.domains.graph_optimization.operations import build_simple_graph
 from jacobian.operations import (
     ComputedNotApplicable,
@@ -22,8 +21,9 @@ if TYPE_CHECKING:
     import networkx as nx
 
 
-def decide_hamiltonian_path(request: ContractModel) -> ContractModel:
-    request = cast(GraphHamiltonianPathRequest, request)
+def decide_hamiltonian_path(
+    request: GraphHamiltonianPathRequest,
+) -> GraphHamiltonianPathResult:
     graph = cast("nx.Graph[str]", build_simple_graph(request.graph))
     vertices = tuple(sorted(graph))
     order = len(vertices)
@@ -84,9 +84,7 @@ def _execute(
     import networkx as nx
 
     try:
-        return ComputedSuccess(
-            cast(GraphHamiltonianPathResult, decide_hamiltonian_path(request))
-        )
+        return ComputedSuccess(decide_hamiltonian_path(request))
     except (
         ArithmeticError,
         nx.NetworkXError,
