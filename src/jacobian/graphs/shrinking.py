@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from jacobian.artifacts import ArtifactService
 from jacobian.capabilities import CapabilityInvocationError
@@ -414,6 +414,11 @@ class GraphCounterexampleShrinkAdapter:
             outcome=outcome,
             verification_record_uri=step.verification_record_uri,
             detail=step.detail,
+            candidate_digest=(
+                "sha256:" + step.proposed_uri.removeprefix("artifact://sha256/")
+                if step.proposed_uri is not None
+                else None
+            ),
         )
 
 
@@ -525,6 +530,31 @@ def _local_scope(
         and len(final_attempts) == len(expected_vertices) + len(expected_edges)
         and all_rejected
     )
+    expected_attempt_count = len(expected_vertices) + len(expected_edges)
+    completeness_status: Literal["COMPLETE", "INCOMPLETE", "UNKNOWN"] = (
+        "COMPLETE"
+        if complete
+        else (
+            "INCOMPLETE"
+            if untested_vertices
+            or untested_edges
+            or len(final_attempts) != expected_attempt_count
+            else "UNKNOWN"
+        )
+    )
+    obligations = (
+        "attempt every supported immediate vertex deletion"
+        if untested_vertices
+        else "",
+        "attempt every supported immediate edge deletion" if untested_edges else "",
+        "obtain acceptable rejection evidence for every attempted deletion"
+        if not all_rejected
+        else "",
+        "complete the final property check before claiming local minimality"
+        if not final_property_verified
+        else "",
+    )
+    remaining_obligations: tuple[str, ...] = tuple(item for item in obligations if item)
     return GraphLocalMinimalityScope(
         requested_reducers=reducers,
         tested_vertex_deletions=tested_vertices,
@@ -533,6 +563,10 @@ def _local_scope(
         untested_edge_deletions=untested_edges,
         complete_for_requested_reducers=complete,
         one_step_locally_minimal=complete,
+        expected_attempt_count=expected_attempt_count,
+        completed_attempt_count=len(final_attempts),
+        completeness_status=completeness_status,
+        remaining_obligations=remaining_obligations,
         basis=(
             "every requested single deletion from the final graph was tested "
             "exactly once and mathematically rejected by the registered checker"

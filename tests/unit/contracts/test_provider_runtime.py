@@ -22,8 +22,10 @@ from jacobian.contracts.provider_measurements import (
 )
 from jacobian.provider_runtime import (
     ProviderRuntimeError,
+    ProviderRuntimeErrorCode,
     composite_provider_runtime,
     python_distribution_provider_runtime,
+    require_provider_runtime_ready,
     require_provider_runtime_unchanged,
 )
 from jacobian.providers.flint_runtime import (
@@ -254,6 +256,43 @@ def test_python_distribution_unchanged_check_does_not_import_implementation(
 
     monkeypatch.setattr(provider_runtime.importlib, "import_module", fail_import)
     require_provider_runtime_unchanged(runtime)
+
+
+def test_python_provider_readiness_checks_required_attributes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = python_distribution_provider_runtime(
+        "pydantic",
+        distribution_name="pydantic",
+        import_name="pydantic",
+        required_attributes=("missing_required_attribute",),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT",
+        refresh=True,
+    )
+    assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
+    monkeypatch.setattr(
+        provider_runtime.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(),
+    )
+
+    with pytest.raises(ProviderRuntimeError) as raised:
+        require_provider_runtime_ready(runtime)
+
+    assert raised.value.code is ProviderRuntimeErrorCode.READINESS_FAILED
+
+
+def test_disappeared_executable_is_unavailable(tmp_path: Path) -> None:
+    runtime = _runtime(
+        digest_kind=CapabilityProviderDigestKind.EXECUTABLE,
+        configuration={"executable": str(tmp_path / "gone")},
+    )
+
+    with pytest.raises(ProviderRuntimeError) as raised:
+        require_provider_runtime_unchanged(runtime)
+
+    assert raised.value.code is ProviderRuntimeErrorCode.UNAVAILABLE
 
 
 def test_lean_frontend_runtime_binds_the_pinned_executable(

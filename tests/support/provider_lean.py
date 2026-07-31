@@ -11,9 +11,13 @@ PINNED_LEAN_CORE_RUNTIME_UNAVAILABLE_REASON = (
 def pinned_lean_core_runtime_available() -> bool:
     """Return whether the production pinned Lean CORE frontend probe succeeds."""
 
+    from jacobian.contracts.capabilities import CapabilityProviderAvailability
     from jacobian.providers.lean_runtime import lean_frontend_provider_runtime
 
-    return lean_frontend_provider_runtime().availability.value == "available"
+    return (
+        lean_frontend_provider_runtime().availability
+        is CapabilityProviderAvailability.AVAILABLE
+    )
 
 
 def pinned_mathlib_runtime_available() -> bool:
@@ -23,10 +27,11 @@ def pinned_mathlib_runtime_available() -> bool:
     during collection of unit and component tests.
     """
 
+    from jacobian.contracts.capabilities import CapabilityProviderAvailability
     from jacobian.providers.lean_runtime import lean_provider_runtime
 
     runtime = lean_provider_runtime(
         profiles={"mathlib": {"mathlib_commit": "pinned"}},
         checker_ids=(),
     )
-    return runtime.availability.value == "available"
+    return runtime.availability is CapabilityProviderAvailability.AVAILABLE

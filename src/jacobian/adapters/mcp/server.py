@@ -1,4 +1,4 @@
-"""Thin MCP 2.0.0b2 adapter over the tested Python runtime."""
+"""Thin MCP 2.0.0 adapter over the tested Python runtime."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
 from mcp.server import MCPServer
 from mcp.server.extension import Extension, ResourceBinding, ToolBinding
 from mcp.server.mcpserver.exceptions import ToolError
@@ -64,7 +63,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class JacobianMCPServer(MCPServer[AppState]):
-    """MCP server with strict validation at the public invocation boundary."""
+    """MCP server with SDK-owned static argument validation."""
 
     async def call_tool(
         self,
@@ -72,26 +71,18 @@ class JacobianMCPServer(MCPServer[AppState]):
         arguments: dict[str, Any],
         context: Any | None = None,
     ) -> Any:
-        tool = next(
-            (tool for tool in await self.list_tools() if tool.name == name), None
-        )
-        if tool is not None:
-            schema = {**tool.input_schema, "additionalProperties": False}
-            errors = list(Draft202012Validator(schema).iter_errors(arguments))
-            if errors:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=_public_tool_error(
-                                name,
-                                ValueError("tool arguments failed schema validation"),
-                            ),
-                        )
-                    ],
-                    is_error=True,
-                )
-        return await super().call_tool(name, arguments, context)
+        try:
+            return await super().call_tool(name, arguments, context)
+        except ToolError as exc:
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=_public_tool_error(name, exc),
+                    )
+                ],
+                is_error=True,
+            )
 
 
 class JacobianCoreExtension(Extension):
@@ -235,6 +226,11 @@ class JacobianCoreExtension(Extension):
         arguments = params.arguments or {}
         argument_digest = _argument_digest(arguments)
         try:
+            # MCP 2.0.0 validates declared parameter values through the generated
+            # Pydantic model, but that model intentionally ignores unknown keys.
+            # Keep this narrow adapter check so the public tool boundary remains
+            # closed; domain-selected capability payloads are validated later by
+            # Jacobian's descriptor contract.
             binding = next(
                 binding
                 for binding in self.tools()

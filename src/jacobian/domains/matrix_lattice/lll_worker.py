@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import importlib
-import json
 import re
 import sys
 from typing import Any
 
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.matrix_operations import (
     MAX_OUTPUT_SCALAR_DIGITS,
     MAX_SCALAR_DIGITS,
@@ -38,9 +42,9 @@ def _read() -> list[list[int]]:
     if len(encoded) > INPUT_LIMIT:
         raise WorkerError("FLINT_LLL_INPUT_LIMIT_EXCEEDED")
     try:
-        payload = json.loads(encoded)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise WorkerError("FLINT_LLL_INPUT_INVALID") from exc
+        payload = loads_strict_json(encoded)
+    except CanonicalizationError as exc:
+        raise WorkerError("INVALID_REQUEST") from exc
     if (
         not isinstance(payload, dict)
         or set(payload) != {"protocol", "basis"}
@@ -118,7 +122,7 @@ def main() -> int:
         code = 2
     else:
         code = 0
-    sys.stdout.write(json.dumps(output, sort_keys=True, separators=(",", ":")) + "\n")
+    sys.stdout.buffer.write(canonicalize_json(output) + b"\n")
     return code
 
 

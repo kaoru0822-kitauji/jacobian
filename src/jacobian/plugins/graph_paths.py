@@ -15,8 +15,16 @@ from itertools import pairwise, permutations
 from typing import Any, cast
 
 import networkx as nx
+from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json
+from jacobian.contracts.plugin_inputs import (
+    GraphCanonicalizeRequest,
+    GraphEnumerationRequest,
+    GraphPathCapabilityRequest,
+    GraphPathEvaluationRequest,
+    GraphPathReductionRequest,
+)
 
 # ---------------------------------------------------------------------------
 # Validation helpers
@@ -178,7 +186,9 @@ def _as_digraph(payload: dict[str, Any]) -> nx.DiGraph[str]:
 
 
 def _max_path_length(claim: dict[str, Any], candidate: dict[str, Any]) -> int:
-    value = claim.get("max_path_length", len(candidate.get("vertices", [])))
+    value = claim.get("max_path_length")
+    if value is None:
+        value = len(candidate.get("vertices", []))
     return cast(int, value)
 
 
@@ -281,8 +291,21 @@ def _claim_view(payload: dict[str, Any]) -> dict[str, Any]:
 def evaluate(request: dict[str, Any]) -> dict[str, Any]:
     """Evaluate graph candidates for a claim.  Results are unverified."""
     start = time.monotonic()
-    claim = request.get("claim", {})
-    candidate_list = request.get("candidates", [request.get("candidate")])
+    try:
+        selected = GraphPathEvaluationRequest.model_validate(request)
+    except ValidationError:
+        return _rejected(
+            ["graph evaluation request does not match its contract"], start
+        )
+    claim = selected.claim.model_dump(mode="json", exclude_none=True)
+    candidate_list = (
+        [selected.candidate.model_dump(mode="json", exclude_none=True)]
+        if selected.candidate is not None
+        else [
+            candidate.model_dump(mode="json", exclude_none=True)
+            for candidate in selected.candidates or ()
+        ]
+    )
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -374,13 +397,35 @@ def evaluate(request: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
+def _graph_capability_request(request: dict[str, Any]) -> GraphPathCapabilityRequest:
+    try:
+        return GraphPathCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "graph capability request does not match its contract"
+        ) from exc
+
+
+def _graph_reduction_request(request: dict[str, Any]) -> GraphPathReductionRequest:
+    try:
+        return GraphPathReductionRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError("graph reduction request does not match its contract") from exc
+
+
 def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return one graph evaluation in the generic evaluator contract."""
 
+    try:
+        selected = GraphPathCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "graph evaluation request does not match its contract"
+        ) from exc
     response = evaluate(
         {
-            "claim": _claim_view(request.get("claim", {})),
-            "candidate": request.get("candidate"),
+            "claim": selected.claim.model_dump(mode="json", exclude_none=True),
+            "candidate": selected.candidate.model_dump(mode="json", exclude_none=True),
         }
     )
     if response["input"]["status"] != "ACCEPTED":
@@ -418,9 +463,13 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
 def find_witness(request: dict[str, Any]) -> dict[str, Any]:
     """Search for a graph witness.  Result is unverified."""
     start = time.monotonic()
-    claim = request.get("claim", {})
-    candidate = request.get("candidate", {})
-    role = request.get("witness_role", "DEFEATS_CANDIDATE")
+    try:
+        selected = _graph_capability_request(request)
+    except ValueError as exc:
+        return _rejected([str(exc)], start)
+    claim = selected.claim.model_dump(mode="json", exclude_none=True)
+    candidate = selected.candidate.model_dump(mode="json", exclude_none=True)
+    role = selected.witness_role
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -554,16 +603,7 @@ def find_witness(request: dict[str, Any]) -> dict[str, Any]:
 def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return graph witness search in the generic oracle contract."""
 
-    response = find_witness(
-        {
-            "claim": _claim_view(request.get("claim", {})),
-            "candidate": request.get("candidate", {}),
-            "witness_role": request.get(
-                "witness_role",
-                "DEFEATS_CANDIDATE",
-            ),
-        }
-    )
+    response = find_witness(request)
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
     return {
@@ -586,8 +626,14 @@ def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
 def materialize(request: dict[str, Any]) -> dict[str, Any]:
     """Materialize a complete bounded family for a graph claim."""
     start = time.monotonic()
-    claim = request.get("claim", {})
-    candidate = request.get("candidate", {})
+    try:
+        selected = GraphPathCapabilityRequest.model_validate(request)
+    except ValidationError:
+        return _rejected(
+            ["graph materialization request does not match its contract"], start
+        )
+    claim = selected.claim.model_dump(mode="json", exclude_none=True)
+    candidate = selected.candidate.model_dump(mode="json", exclude_none=True)
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -614,9 +660,10 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
 def reductions(request: dict[str, Any]) -> dict[str, Any]:
     """Propose candidate reductions that preserve the attacked predicate."""
     start = time.monotonic()
-    target_kind = request.get("target_kind", "candidate")
-    target = request.get("target", {})
-    claim = request.get("claim", {})
+    selected = _graph_reduction_request(request)
+    target_kind = selected.target_kind
+    target = selected.target.model_dump(mode="json", exclude_none=True)
+    claim = selected.claim.model_dump(mode="json", exclude_none=True)
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -707,18 +754,19 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
 def reductions_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return complete reduced payloads for the generic shrinker."""
 
-    target = request.get("target", {})
+    selected = _graph_reduction_request(request)
+    target = selected.target.model_dump(mode="json", exclude_none=True)
     response = reductions(
         {
-            "target_kind": request.get("target_kind", "candidate"),
+            "target_kind": selected.target_kind,
             "target": target,
-            "claim": _claim_view(request.get("claim", {})),
+            "claim": selected.claim.model_dump(mode="json", exclude_none=True),
         }
     )
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
-    requested = set(request.get("reducers", ()))
-    objective_names = tuple(request.get("objectives", ()))
+    requested = set(selected.reducers)
+    objective_names = tuple(selected.objectives)
     proposals: list[dict[str, Any]] = []
     for operation in response["reductions"]:
         reducer = operation["reduction_kind"]
@@ -784,9 +832,13 @@ def canonicalize_capability(request: dict[str, Any]) -> dict[str, Any]:
     the same capability contract.
     """
 
-    structure = request.get("structure")
-    if not isinstance(structure, dict):
-        raise ValueError("structure must be an object")
+    try:
+        selected = GraphCanonicalizeRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "graph canonicalization request does not match its contract"
+        ) from exc
+    structure = selected.structure.model_dump(mode="json", exclude_none=True)
     errors = validate_candidate(structure)
     if errors:
         raise ValueError("; ".join(errors))
@@ -867,34 +919,15 @@ def _relabel_graph_payload(
 def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Page through labeled DAGs whose arcs respect the vertex index order."""
 
-    bounds = request.get("bounds")
-    cursor = request.get("cursor")
-    page_size = request.get("page_size")
-    if not isinstance(bounds, dict):
-        raise ValueError("bounds must be an object")
-    if set(bounds) != {"vertices"}:
-        raise ValueError("graph bounds require exactly vertices")
-    vertex_count = bounds["vertices"]
-    if (
-        not isinstance(vertex_count, int)
-        or isinstance(vertex_count, bool)
-        or vertex_count < 1
-        or vertex_count > 8
-    ):
-        raise ValueError("vertices must be an integer from one through eight")
-    if not isinstance(page_size, int) or isinstance(page_size, bool) or page_size < 1:
-        raise ValueError("page_size must be a positive integer")
-    offset = 0
-    if cursor is not None:
-        if (
-            not isinstance(cursor, dict)
-            or set(cursor) != {"offset"}
-            or not isinstance(cursor["offset"], int)
-            or isinstance(cursor["offset"], bool)
-            or cursor["offset"] < 0
-        ):
-            raise ValueError("cursor must contain a nonnegative integer offset")
-        offset = cursor["offset"]
+    try:
+        selected = GraphEnumerationRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "graph enumeration request does not match its contract"
+        ) from exc
+    vertex_count = selected.bounds["vertices"]
+    page_size = selected.page_size
+    offset = selected.cursor.offset if selected.cursor is not None else 0
 
     vertices = [f"v{index}" for index in range(vertex_count)]
     possible_arcs = [

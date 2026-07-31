@@ -220,7 +220,7 @@
     {
       "path": "src/jacobian/plugins/graph_paths.py",
       "symbol": "find_witness",
-      "complexity": 13
+      "complexity": 14
     },
     {
       "path": "src/jacobian/plugins/graph_paths.py",
@@ -261,11 +261,6 @@
       "path": "src/jacobian/portfolio/core_installation.py",
       "symbol": "install",
       "complexity": 13
-    },
-    {
-      "path": "src/jacobian/provider_runtime.py",
-      "symbol": "require_provider_runtime_unchanged",
-      "complexity": 14
     },
     {
       "path": "src/jacobian/sat_smt/cadical.py",
@@ -575,7 +570,7 @@
     {
       "path": "src/jacobian_checkers/sat_lrat.py",
       "symbol": "_replay",
-      "complexity": 26
+      "complexity": 23
     },
     {
       "path": "src/jacobian_checkers/sat_lrat.py",

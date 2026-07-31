@@ -11,7 +11,11 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.checkers import CheckerDecision, EvidenceKind
@@ -193,7 +197,7 @@ class VerificationService:
             raise CheckerExecutionError(_CHECKER_DIAGNOSTICS_TOO_LARGE)
         try:
             response = loads_strict_json(completed.stdout)
-        except ValueError as exc:
+        except CanonicalizationError as exc:
             raise CheckerExecutionError(_CHECKER_UNREADABLE_RESPONSE) from exc
         if completed.returncode != 0:
             _LOGGER.warning(

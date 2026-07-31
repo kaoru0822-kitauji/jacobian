@@ -17,6 +17,17 @@ from copy import deepcopy
 from fractions import Fraction
 from typing import Any, cast
 
+from pydantic import ValidationError
+
+from jacobian.contracts.plugin_inputs import (
+    MatrixCapabilityRequest,
+    MatrixEnumerationRequest,
+    MatrixEvaluationRequest,
+    MatrixMaterializeRequest,
+    MatrixReductionRequest,
+    MatrixTransformRequest,
+)
+
 MAX_SEARCHED_MATRICES = 65_536
 
 # ---------------------------------------------------------------------------
@@ -67,27 +78,18 @@ def _canonical_rational(frac: Fraction) -> dict[str, str]:
 def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Page through a finite rectangular integer-matrix scope."""
 
-    bounds = request.get("bounds")
-    cursor = request.get("cursor")
-    page_size = request.get("page_size")
-    if not isinstance(bounds, dict):
-        raise ValueError("bounds must be an object")
+    try:
+        selected = MatrixEnumerationRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "matrix enumeration request does not match its contract"
+        ) from exc
+    bounds = selected.bounds.model_dump(mode="json")
+    page_size = selected.page_size
+    offset = selected.cursor.offset if selected.cursor is not None else 0
     errors = _validate_scope(bounds)
     if errors:
         raise ValueError("; ".join(errors))
-    if not isinstance(page_size, int) or isinstance(page_size, bool) or page_size < 1:
-        raise ValueError("page_size must be a positive integer")
-    offset = 0
-    if cursor is not None:
-        if (
-            not isinstance(cursor, dict)
-            or set(cursor) != {"offset"}
-            or not isinstance(cursor["offset"], int)
-            or isinstance(cursor["offset"], bool)
-            or cursor["offset"] < 0
-        ):
-            raise ValueError("cursor must contain a nonnegative integer offset")
-        offset = cursor["offset"]
 
     rows = cast(int, bounds["rows"])
     cols = cast(int, bounds["cols"])
@@ -123,9 +125,13 @@ def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
 def transform_row_major_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Propose a row-major representation of one integer matrix."""
 
-    source = request.get("source")
-    if not isinstance(source, dict):
-        raise ValueError("source must be an object")
+    try:
+        selected = MatrixTransformRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "matrix transform request does not match its contract"
+        ) from exc
+    source = selected.source.model_dump(mode="json")
     errors = validate_candidate(source)
     if errors:
         raise ValueError("; ".join(errors))
@@ -419,11 +425,41 @@ def _claim_view(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _matrix_capability_request(request: dict[str, Any]) -> MatrixCapabilityRequest:
+    try:
+        return MatrixCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "matrix capability request does not match its contract"
+        ) from exc
+
+
+def _matrix_reduction_request(request: dict[str, Any]) -> MatrixReductionRequest:
+    try:
+        return MatrixReductionRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "matrix reduction request does not match its contract"
+        ) from exc
+
+
 def evaluate(request: dict[str, Any]) -> dict[str, Any]:
     """Evaluate integer-matrix candidates for a claim.  Results are unverified."""
     start = time.monotonic()
-    claim = request.get("claim", {})
-    candidate_list = request.get("candidates", [request.get("candidate")])
+    try:
+        selected = MatrixEvaluationRequest.model_validate(request)
+    except ValidationError:
+        return _rejected(
+            ["matrix evaluation request does not match its contract"], start
+        )
+    claim = selected.claim.model_dump(mode="json")
+    candidate_list = (
+        [selected.candidate.model_dump(mode="json")]
+        if selected.candidate is not None
+        else [
+            candidate.model_dump(mode="json") for candidate in selected.candidates or ()
+        ]
+    )
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -498,13 +534,18 @@ def evaluate(request: dict[str, Any]) -> dict[str, Any]:
 def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return one matrix evaluation in the generic evaluator contract."""
 
-    claim = _claim_view(request.get("claim", {}))
-    response = evaluate(
-        {
-            "claim": claim,
-            "candidate": request.get("candidate"),
-        }
+    try:
+        selected = MatrixCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "matrix evaluation request does not match its contract"
+        ) from exc
+    claim = selected.claim.model_dump(mode="json")
+    candidate_model = selected.candidate
+    candidate = (
+        candidate_model.model_dump(mode="json") if candidate_model is not None else None
     )
+    response = evaluate({"claim": claim, "candidate": candidate})
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
     result = response["results"][0]
@@ -527,10 +568,14 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
         "method": method,
         "coverage": coverage,
         "objectives": {objective["name"]: objective["value"]},
-        "features": {
-            "rows": str(request["candidate"]["rows"]),
-            "cols": str(request["candidate"]["cols"]),
-        },
+        "features": (
+            {
+                "rows": str(candidate_model.rows),
+                "cols": str(candidate_model.cols),
+            }
+            if candidate_model is not None
+            else {}
+        ),
         "failure_classifications": (
             ["nontrivial_kernel"] if result.get("is_singular") else []
         ),
@@ -541,14 +586,19 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
 def find_witness(request: dict[str, Any]) -> dict[str, Any]:
     """Search for a matrix witness.  Result is unverified."""
     start = time.monotonic()
-    claim = request.get("claim", {})
-    candidate = request.get("candidate")
+    selected = _matrix_capability_request(request)
+    claim = selected.claim.model_dump(mode="json")
+    candidate = (
+        selected.candidate.model_dump(mode="json")
+        if selected.candidate is not None
+        else None
+    )
     claim_errors = validate_claim(claim)
     if claim_errors:
         return _rejected(claim_errors, start)
 
     predicate = claim.get("predicate")
-    requested_role = request.get("witness_role", "DEFEATS_CANDIDATE")
+    requested_role = selected.witness_role
 
     if predicate == "is_nonsingular":
         if requested_role != "DEFEATS_CANDIDATE":
@@ -658,16 +708,7 @@ def find_witness(request: dict[str, Any]) -> dict[str, Any]:
 def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return matrix witness search in the generic oracle contract."""
 
-    domain_request: dict[str, Any] = {
-        "claim": _claim_view(request.get("claim", {})),
-        "witness_role": request.get(
-            "witness_role",
-            "DEFEATS_CANDIDATE",
-        ),
-    }
-    if request.get("candidate") is not None:
-        domain_request["candidate"] = request["candidate"]
-    response = find_witness(domain_request)
+    response = find_witness(request)
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
     return {
@@ -690,7 +731,13 @@ def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
 def materialize(request: dict[str, Any]) -> dict[str, Any]:
     """Materialize a complete bounded family for a matrix claim."""
     start = time.monotonic()
-    claim = request.get("claim", {})
+    try:
+        selected = MatrixMaterializeRequest.model_validate(request)
+    except ValidationError:
+        return _rejected(
+            ["matrix materialization request does not match its contract"], start
+        )
+    claim = selected.claim.model_dump(mode="json")
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -707,6 +754,14 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     scope_errors = _validate_scope(scope)
     if scope_errors:
         return _rejected(scope_errors, start)
+    if _scope_total(scope) > MAX_SEARCHED_MATRICES:
+        return _rejected(
+            [
+                "matrix materialization scope exceeds the bounded search limit "
+                f"of {MAX_SEARCHED_MATRICES} candidates"
+            ],
+            start,
+        )
 
     family: list[dict[str, Any]] = []
     for index, mat in _scope_iterator(scope):
@@ -732,9 +787,10 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
 def reductions(request: dict[str, Any]) -> dict[str, Any]:
     """Propose candidate reductions that preserve the attacked predicate."""
     start = time.monotonic()
-    target_kind = request.get("target_kind", "candidate")
-    target = request.get("target", {})
-    claim = request.get("claim", {})
+    selected = _matrix_reduction_request(request)
+    target_kind = selected.target_kind
+    target = selected.target.model_dump(mode="json")
+    claim = selected.claim.model_dump(mode="json")
 
     claim_errors = validate_claim(claim)
     if claim_errors:
@@ -817,18 +873,19 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
 def reductions_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return complete reduced payloads for the generic shrinker."""
 
-    target = request.get("target", {})
+    selected = _matrix_reduction_request(request)
+    target = selected.target.model_dump(mode="json")
     response = reductions(
         {
-            "target_kind": request.get("target_kind", "candidate"),
+            "target_kind": selected.target_kind,
             "target": target,
-            "claim": _claim_view(request.get("claim", {})),
+            "claim": selected.claim.model_dump(mode="json"),
         }
     )
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
-    requested = set(request.get("reducers", ()))
-    objective_names = tuple(request.get("objectives", ()))
+    requested = set(selected.reducers)
+    objective_names = tuple(selected.objectives)
     proposals: list[dict[str, Any]] = []
     for operation in response["reductions"]:
         reducer = operation["reduction_kind"]

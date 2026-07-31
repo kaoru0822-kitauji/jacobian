@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import importlib
-import json
 import re
 import sys
 from typing import Any
+
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 
 FLINT_HNF_WORKER_PROTOCOL = "jacobian.flint-hnf-worker/v1"
 FLINT_HNF_INPUT_LIMIT = 1_000_000
@@ -22,24 +27,10 @@ class FlintHnfWorkerError(RuntimeError):
 
 
 def _emit(payload: dict[str, object]) -> None:
-    sys.stdout.write(
-        json.dumps(
-            {"protocol": FLINT_HNF_WORKER_PROTOCOL, **payload},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        + "\n"
+    sys.stdout.buffer.write(
+        canonicalize_json({"protocol": FLINT_HNF_WORKER_PROTOCOL, **payload}) + b"\n"
     )
     sys.stdout.flush()
-
-
-def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate JSON key")
-        result[key] = value
-    return result
 
 
 def _read_request() -> dict[str, Any]:
@@ -47,8 +38,8 @@ def _read_request() -> dict[str, Any]:
     if len(encoded) > FLINT_HNF_INPUT_LIMIT:
         raise FlintHnfWorkerError("FLINT_HNF_INPUT_LIMIT_EXCEEDED")
     try:
-        payload = json.loads(encoded, object_pairs_hook=_strict_object)
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        payload = loads_strict_json(encoded)
+    except CanonicalizationError as exc:
         raise FlintHnfWorkerError("FLINT_HNF_INPUT_INVALID") from exc
     if not isinstance(payload, dict):
         raise FlintHnfWorkerError("FLINT_HNF_INPUT_INVALID")

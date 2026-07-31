@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from typing import Any
+
+from pydantic import ValidationError
+
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 
 
 def _point_enclosure(payload: dict[str, Any]) -> dict[str, Any]:
@@ -37,14 +44,15 @@ def _point_enclosure(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> int:
-    payload = json.loads(sys.stdin.read())
-    sys.stdout.write(
-        json.dumps(
-            _point_enclosure(payload),
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    )
+    try:
+        payload = loads_strict_json(sys.stdin.buffer.read())
+        if not isinstance(payload, dict):
+            raise ValueError("analysis worker request must be an object")
+        result = _point_enclosure(payload)
+    except (CanonicalizationError, TypeError, ValueError, ValidationError):
+        sys.stderr.write("validated analysis worker request or execution failed\n")
+        return 2
+    sys.stdout.buffer.write(canonicalize_json(result))
     return 0
 
 

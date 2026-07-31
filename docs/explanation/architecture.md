@@ -549,6 +549,20 @@ surface is deliberately small:
 - Scope and archive artifacts are immutable; the experiment snapshot is a
   durable lifecycle record.
 
+The released MCP Python SDK `2.0.0` owns validation for statically declared
+tool arguments. Jacobian retains descriptor-selected validation for the
+dynamic `capability.invoke` payload, because the selected mathematical schema
+is not known when the MCP tool is registered. User-correctable application
+failures are projected as `CallToolResult(is_error=True)`; protocol-state
+failures remain MCP errors. Successful capability calls keep the canonical
+`CapabilityResult` in `structured_content` and a compact text projection.
+
+When a result has a durable episode URI, the adapter additionally emits an
+MCP `ResourceLink` with the result's JSON media type and known size. The link
+is additive: clients that ignore it still receive the text and structured
+result, and tenant/resource authorization follows the direct resource-read
+path.
+
 The Python SDK advertises these stable tools and static resources through the
 `io.jacobian/core` v1 extension. They remain ordinary MCP tools and resources:
 clients do not need to advertise a matching client extension to invoke them.

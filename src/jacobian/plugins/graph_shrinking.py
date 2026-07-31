@@ -4,15 +4,24 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import ValidationError
+
+from jacobian.contracts.plugin_inputs import GraphShrinkRequest
+
 
 def reduce_simple_graph(request: dict[str, Any]) -> dict[str, Any]:
     """Propose every requested single deletion in canonical order."""
 
-    target = request["target"]
-    vertices = tuple(target["vertices"])
-    edges = tuple(tuple(edge) for edge in target["edges"])
-    requested = tuple(request["reducers"])
-    objectives = tuple(request["objectives"])
+    try:
+        selected = GraphShrinkRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError("graph shrinking request does not match its contract") from exc
+
+    target = selected.target
+    vertices = target.vertices
+    edges = target.edges
+    requested = selected.reducers
+    objectives = selected.objectives
     proposals: list[dict[str, Any]] = []
 
     if "delete_vertex" in requested:

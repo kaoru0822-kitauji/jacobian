@@ -42,7 +42,7 @@ def carcara_runtime(
     installed = create_runtime(
         root, checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED
     )
-    assert installed.carcara_runtime == runtime
+    assert installed.portfolio.carcara_runtime == runtime
     return installed
 
 

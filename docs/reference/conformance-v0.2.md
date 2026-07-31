@@ -181,7 +181,7 @@ implementation.
 
 | ID | Scenario | Required result |
 | --- | --- | --- |
-| `ADP-001` | List MCP tools using SDK `2.0.0b2` | Exactly `capability.describe` and `capability.invoke`; installed mathematical operations are capability IDs, not top-level tools |
+| `ADP-001` | List MCP tools using SDK `2.0.0` | Exactly `capability.describe` and `capability.invoke`; installed mathematical operations are capability IDs, not top-level tools |
 | `ADP-002` | Read `experiment://<id>` | Latest durable snapshot |
 | `ADP-003` | Read experiment accounting, scope, or archive resources | Compact metadata and artifact handles; large pages remain artifact resources |
 | `ADP-004` | Describe and invoke an installed capability through MCP | The descriptor schema is enforced and the result preserves execution, assurance, evidence, artifact, and provenance fields |

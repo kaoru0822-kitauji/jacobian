@@ -45,6 +45,14 @@ invocation to the exact descriptor runtime without repeating all discovery
 metadata in every response. Provider metadata remains separate from execution
 status, conclusion, evidence type, and assurance.
 
+Identity revalidation and first-use readiness are separate checks. The former
+remeasures the declared executable, source tree, distribution RECORD, or every
+component of a composite runtime and fails closed with a stable provider error
+code when identity is incomplete, unavailable, malformed, or changed. The
+latter imports a declared Python module and checks its required attributes (or
+checks executable readiness) immediately before first use. A missing callable
+is `READINESS_FAILED`; it does not change the import-free availability probe.
+
 ## Availability
 
 `CapabilityService.register` rejects descriptors without runtime identity and

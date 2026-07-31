@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import canonicalize_json
 from jacobian.claims import ClaimValidationService
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.discovery import ExperimentHandle, ExperimentState
@@ -39,6 +39,7 @@ from jacobian.evaluation import (
     EvaluationService,
 )
 from jacobian.experiment_identity import new_experiment_uri
+from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
 from jacobian.persistence.recovery import (
     put_internal_artifact,
     quarantine_recovery_snapshot,
@@ -58,7 +59,7 @@ from jacobian.search._helpers import (
     _updated_accounting,
     _updated_snapshot,
 )
-from jacobian.search.errors import SearchError
+from jacobian.search.errors import SearchCorruptionError, SearchError
 from jacobian.store import ArtifactStore, StoreError
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
@@ -218,10 +219,14 @@ class SearchService:
             ).fetchall()
             for row in rows:
                 try:
-                    snapshot = SearchExperimentSnapshot.model_validate(
-                        loads_strict_json(row["snapshot_json"])
+                    snapshot = decode_persisted_model(
+                        SearchExperimentSnapshot,
+                        row["snapshot_json"],
+                        record_kind="search_snapshot",
+                        record_id=str(row["experiment_uri"]),
+                        field="snapshot_json",
                     )
-                except (TypeError, ValidationError, ValueError) as exc:
+                except PersistenceCorruptionError as exc:
                     self._quarantine_recovery_snapshot(connection, row, exc)
                     continue
                 if snapshot.experiment_uri != str(
@@ -669,17 +674,26 @@ class SearchService:
                 )
             rows = connection.execute(
                 """
-                SELECT event_json
+                SELECT sequence, event_json
                 FROM search_events
                 WHERE experiment_uri = ?
                 ORDER BY sequence
                 """,
                 (experiment_uri,),
             ).fetchall()
-        events = tuple(
-            SearchLifecycleEvent.model_validate(loads_strict_json(row["event_json"]))
-            for row in rows
-        )
+        try:
+            events = tuple(
+                decode_persisted_model(
+                    SearchLifecycleEvent,
+                    row["event_json"],
+                    record_kind="search_event",
+                    record_id=f"{experiment_uri}:{row['sequence']}",
+                    field="event_json",
+                )
+                for row in rows
+            )
+        except PersistenceCorruptionError as exc:
+            raise SearchCorruptionError(exc) from exc
         previous: str | None = None
         for event in events:
             if event.previous_event_digest != previous:
@@ -1226,9 +1240,15 @@ class SearchService:
                 "or search.enumerate, or start a new experiment."
             )
         try:
-            return SearchExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
+            return decode_persisted_model(
+                SearchExperimentSnapshot,
+                row["snapshot_json"],
+                record_kind="search_snapshot",
+                record_id=experiment_uri,
+                field="snapshot_json",
             )
+        except PersistenceCorruptionError as exc:
+            raise SearchCorruptionError(exc) from exc
         except (ValidationError, ValueError) as exc:
             raise SearchError("stored search snapshot is invalid") from exc
 

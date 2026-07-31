@@ -7,7 +7,7 @@ from typing import Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, model_validator
 
-from jacobian.contracts.common import ArtifactUri, CheckerUri
+from jacobian.contracts.common import ArtifactUri, CheckerUri, Sha256Digest
 from jacobian.contracts.results import ContractModel, ExecutionStatus
 
 
@@ -53,6 +53,7 @@ class GraphReductionAttempt(ContractModel):
     outcome: GraphReductionOutcome
     verification_record_uri: ArtifactUri | None = None
     detail: str
+    candidate_digest: Sha256Digest | None = None
 
     @model_validator(mode="after")
     def require_one_deletion_target(self) -> Self:
@@ -80,6 +81,10 @@ class GraphLocalMinimalityScope(ContractModel):
     one_step_locally_minimal: StrictBool
     global_minimality_claimed: Literal[False] = False
     basis: str
+    expected_attempt_count: StrictInt = Field(default=0, ge=0)
+    completed_attempt_count: StrictInt = Field(default=0, ge=0)
+    completeness_status: Literal["COMPLETE", "INCOMPLETE", "UNKNOWN"] = "UNKNOWN"
+    remaining_obligations: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def keep_scope_claim_fail_closed(self) -> Self:

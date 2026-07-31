@@ -47,7 +47,10 @@ def lean_provider_runtime(
         license_id="Apache-2.0",
         features=tuple(sorted(profiles)),
         checker_ids=checker_ids,
-        configuration={"profiles": dict(profiles)},
+        configuration={
+            "executable": str(executable),
+            "profiles": dict(profiles),
+        },
     )
 
 

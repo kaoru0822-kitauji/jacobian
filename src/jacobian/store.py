@@ -21,9 +21,11 @@ from jacobian.canonical import (
 )
 from jacobian.contracts.artifacts import ArtifactManifest, ArtifactPutResult
 from jacobian.persistence import (
+    PersistenceCorruptionError,
     PersistenceLock,
     StateDatabase,
     StateDatabaseError,
+    decode_persisted_model,
 )
 from jacobian.persistence.migrations import STATE_MIGRATIONS
 
@@ -45,6 +47,14 @@ _BOOTSTRAP_SEMANTICS_URI: Final = (
 
 class StoreError(RuntimeError):
     """Base class for bounded artifact-store failures."""
+
+
+class StoreCorruptionError(StoreError):
+    """A persisted store record cannot be decoded without repair."""
+
+    def __init__(self, corruption: object) -> None:
+        self.corruption = corruption
+        super().__init__(str(corruption))
 
 
 class ArtifactNotFoundError(StoreError):
@@ -975,11 +985,16 @@ class ArtifactStore:
             raise ArtifactNotFoundError(f"artifact is not committed: {artifact_uri}")
 
         manifest_bytes = self._read_blob(manifest_digest)
-        manifest_data = loads_strict_json(
-            manifest_bytes,
-            limits=self.canonical_limits,
-        )
-        manifest = ArtifactManifest.model_validate(manifest_data)
+        try:
+            manifest = decode_persisted_model(
+                ArtifactManifest,
+                manifest_bytes,
+                record_kind="artifact_manifest",
+                record_id=artifact_uri,
+                field="manifest_json",
+            )
+        except PersistenceCorruptionError as exc:
+            raise StoreCorruptionError(exc) from exc
         database_parents = tuple(parent["parent_uri"] for parent in parent_rows)
         if any(parent["committed_parent_uri"] is None for parent in parent_rows):
             raise ArtifactIntegrityError("manifest parent is not committed")

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import Field, StrictInt, model_validator
+from pydantic import Field, RootModel, StrictInt, StrictStr, model_validator
 
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -16,6 +16,10 @@ from jacobian.contracts.common import ArtifactUri, Sha256Digest
 from jacobian.contracts.results import ContractModel
 
 MemoryFilterValue = Annotated[str, Field(min_length=1, max_length=128)]
+
+
+class PersistedTags(RootModel[tuple[StrictStr, ...]]):
+    """Canonical JSON array stored in the research-memory index."""
 
 
 class ResearchEpisode(ContractModel):

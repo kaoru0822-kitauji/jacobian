@@ -80,7 +80,7 @@ Python runtime
 | CLI | Typer |
 | Tests | pytest, Hypothesis, and `jsonschema` |
 | Performance benchmarks | pyperf |
-| MCP | Official Python MCP SDK `2.0.0b2` |
+| MCP | Official Python MCP SDK `2.0.0` |
 | Local execution | Sequential orchestration with bounded child processes |
 
 Pydantic validates data but does not define canonical cross-language bytes.
@@ -96,15 +96,16 @@ certificates, but it does not authorize their mathematical conclusions. The
 independent checker replays those artifacts with `fractions.Fraction` and does
 not import Z3.
 
-At the user's explicit request, v0.2 pins the current v2 beta exactly:
+The pre-stable control plane pins the released MCP v2 packages exactly:
 
 ```toml
-mcp = "==2.0.0b2"
+mcp = "==2.0.0"
+mcp-types = "==2.0.0"
 ```
 
-The exact prerelease pin prevents an unreviewed beta upgrade. The MCP package
-is isolated under `adapters/mcp` so SDK migration does not affect mathematical
-schemas or verification code.
+The exact pins prevent an unreviewed SDK drift. The MCP adapter is isolated
+under `adapters/mcp` so protocol changes do not affect mathematical schemas or
+verification code.
 
 ## Specialized backends
 

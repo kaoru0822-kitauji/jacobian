@@ -5,6 +5,10 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import Any, TypeGuard
 
+from pydantic import ValidationError
+
+from jacobian.contracts.plugin_inputs import ErdosStrausCapabilityRequest
+
 _MIN_N = 2
 _MAX_N = 10_000
 
@@ -97,8 +101,12 @@ def _decomposition_table(
 def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Evaluate a bounded range without granting verification authority."""
 
-    claim = _claim_view(request.get("claim", {}))
-    candidate = request.get("candidate")
+    try:
+        selected = ErdosStrausCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError("Erdős-Straus request does not match its contract") from exc
+    claim = selected.claim.model_dump(mode="python")
+    candidate = selected.candidate.model_dump(mode="python")
     errors = validate_claim(claim)
     if not isinstance(candidate, dict):
         errors.append("candidate must be an object")
@@ -139,9 +147,13 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
 def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Propose a complete bounded decomposition table as unverified evidence."""
 
-    claim = _claim_view(request.get("claim", {}))
-    candidate = request.get("candidate")
-    role = request.get("witness_role")
+    try:
+        selected = ErdosStrausCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError("Erdős-Straus request does not match its contract") from exc
+    claim = selected.claim.model_dump(mode="python")
+    candidate = selected.candidate.model_dump(mode="python")
+    role = selected.witness_role
     errors = validate_claim(claim)
     if role != "SUPPORTS_CLAIM":
         errors.append("erdos_straus_range supports only SUPPORTS_CLAIM witnesses")

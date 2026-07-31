@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
-import json
 import os
 import shutil
 import subprocess
@@ -13,6 +12,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from jacobian.canonical import CanonicalizationError, loads_strict_json
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.provider_measurements import (
     ProviderMeasurement,
@@ -95,7 +95,7 @@ elapsed = time.perf_counter() - started
 rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 if sys.platform != "darwin":
     rss *= 1024
-print(json.dumps({"seconds": elapsed, "peak_rss_bytes": rss}))
+print(json.dumps({"seconds": format(elapsed, ".17g"), "peak_rss_bytes": rss}))
 """
 _EXTERNAL_PROBE = r"""
 import json
@@ -116,7 +116,7 @@ rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
 if sys.platform != "darwin":
     rss *= 1024
 print(json.dumps({
-    "seconds": elapsed,
+    "seconds": format(elapsed, ".17g"),
     "peak_rss_bytes": rss,
     "output_bytes": len(process.stdout) + len(process.stderr),
 }))
@@ -155,7 +155,9 @@ def _measure_command(command: list[str]) -> ProviderMeasurementSample:
         )
         if len(process.stdout.encode()) > _MAX_DIAGNOSTIC_BYTES:
             raise RuntimeError("provider probe output exceeded 64 KiB")
-        payload = json.loads(process.stdout)
+        payload = loads_strict_json(process.stdout)
+        if not isinstance(payload, dict):
+            raise ValueError("provider measurement returned a non-object")
         return ProviderMeasurementSample(
             status=ProviderMeasurementStatus.COMPLETED,
             seconds=float(payload["seconds"]),
@@ -171,7 +173,7 @@ def _measure_command(command: list[str]) -> ProviderMeasurementSample:
         OSError,
         RuntimeError,
         ValueError,
-        json.JSONDecodeError,
+        CanonicalizationError,
         subprocess.SubprocessError,
     ):
         return ProviderMeasurementSample(

@@ -24,11 +24,12 @@ operator may separately authorize the bundled assignment checker and expose
 DRAT-trim executable with operator-supplied provenance.
 
 `sat.lrat.verify` is deliberately separate from the DRAT operation. Its
-bounded v1 accepts ASCII LRAT additions with ordered positive RUP hints and
-deletions. It binds the exact CNF object, variable map, DIMACS projection,
-proof bytes, limits, checker, and certificate. Negative RAT hints are
-`UNSUPPORTED`; malformed, truncated, timed-out, cancelled, or rejected proofs
-return `UNKNOWN` and never provide evidence that the formula is satisfiable.
+bounded v1 accepts only ASCII LRAT additions with ordered positive RUP hints.
+RAT hints, deletions, and other LRAT dialect extensions are unsupported and
+rejected. It binds the exact CNF object, variable map, DIMACS projection, proof
+bytes, limits, checker, and certificate. Malformed, truncated, timed-out,
+cancelled, or rejected proofs return `UNKNOWN` and never provide evidence that
+the formula is satisfiable.
 
 ## Registered descriptors
 

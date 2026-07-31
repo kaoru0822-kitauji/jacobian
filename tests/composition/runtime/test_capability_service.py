@@ -47,6 +47,20 @@ TEST_RUNTIME = CapabilityProviderRuntime(
     license_id="MIT",
 )
 
+NOT_READY_RUNTIME = CapabilityProviderRuntime(
+    provider="tests-python",
+    availability=CapabilityProviderAvailability.AVAILABLE,
+    version="1",
+    digest="sha256:" + "b" * 64,
+    digest_kind=CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD,
+    platform="any",
+    install_tier=CapabilityInstallTier.T0,
+    license_id="MIT",
+    configuration={"distribution": "tests-fixture"},
+    distribution_import_name="tests.component.plugins._fixture_plugins",
+    distribution_required_attributes=("missing_first_use_attribute",),
+)
+
 
 @dataclass(frozen=True)
 class ComputedAdapter:
@@ -85,6 +99,24 @@ class ComputedAdapter:
                 basis="deterministic integer arithmetic",
             ),
         )
+
+
+@dataclass(frozen=True)
+class NotReadyProviderAdapter:
+    descriptor = CapabilityDescriptor(
+        capability_id="example.not-ready-provider",
+        version="1",
+        title="Provider readiness fixture",
+        description="Fixture for the first-use provider readiness boundary.",
+        provider="tests-python",
+        provider_runtime=NOT_READY_RUNTIME,
+        modes=(CapabilityMode.EXPLORE,),
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    )
+
+    def invoke(self, _request: CapabilityRequest) -> CapabilityResult:
+        raise AssertionError("provider must be rejected before adapter invocation")
 
 
 @dataclass(frozen=True)
@@ -315,6 +347,27 @@ def test_external_adapter_invocation_is_recorded_and_retrievable(
     assert episode.payload["result"]["completeness"]["status"] == "NOT_APPLICABLE"
     hits = core.memory.search(query="double computed").hits
     assert [hit.episode_uri for hit in hits] == [result.episode_uri]
+
+
+def test_provider_required_attributes_are_checked_before_first_use(
+    capability_core_services: DomainTestServices,
+) -> None:
+    core = capability_core_services.core
+    capability_core_services.installation.register_capability(NotReadyProviderAdapter())
+
+    result = core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id="example.not-ready-provider",
+            input={},
+        )
+    )
+
+    assert result.execution.status is ExecutionStatus.ERROR
+    assert result.diagnostics[0].code == "PROVIDER_READINESS_FAILED"
+    assert result.diagnostics[0].stage == "provider_readiness"
+    assert result.diagnostics[0].details == {
+        "provider_failure_code": "READINESS_FAILED"
+    }
 
 
 def test_installed_capability_discovery_is_compact_deterministic_and_transparent(

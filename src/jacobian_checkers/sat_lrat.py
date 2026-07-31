@@ -113,16 +113,7 @@ def _replay(
         if clause_id <= 0:
             raise ValueError(f"line {number}: invalid clause id")
         if len(fields) > 1 and fields[1] == "d":
-            deleted_ids = _integers(fields[2:], number, "deletion")
-            if not deleted_ids or deleted_ids[-1] != 0:
-                raise ValueError(f"line {number}: malformed deletion")
-            for deleted in deleted_ids[:-1]:
-                if deleted not in active:
-                    raise ValueError(
-                        f"line {number}: deletion references inactive clause"
-                    )
-                del active[deleted]
-            continue
+            raise NotImplementedError("unsupported LRAT feature: deletions")
         values = _integers(fields, number)
         if clause_id <= last_id or values.count(0) != 2:
             raise ValueError(f"line {number}: invalid addition framing")
