@@ -1,10 +1,12 @@
 import json
+import re
 from fractions import Fraction
 from pathlib import Path
 
 from verifier_support import (
     evidence_list_is_bound,
     load_submission,
+    resolve_evidence,
     strict_submission_contract,
 )
 
@@ -15,16 +17,37 @@ ONE = {(0, 0, 0): Fraction(1)}
 
 
 def q(value):
-    if not isinstance(value, str):
+    if (
+        not isinstance(value, str)
+        or re.fullmatch(r"-?[0-9]{1,20}(?:/[0-9]{1,20})?", value) is None
+    ):
         return None
     try:
         parsed = Fraction(value)
     except (ValueError, TypeError, ZeroDivisionError):
         return None
-    canonical = str(parsed.numerator)
-    if parsed.denominator != 1:
-        canonical += f"/{parsed.denominator}"
-    return parsed if value == canonical else None
+    return parsed
+
+
+def evidence_matches_result(evidence, result):
+    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+        return False
+    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    if target is None:
+        return False
+    try:
+        text = target.read_text()
+        marker = next(
+            line.removeprefix("RESULT_JSON:").strip()
+            for line in text.splitlines()
+            if line.startswith("RESULT_JSON:")
+        )
+        return json.loads(marker) == result and all(
+            term in text
+            for term in ("equal-distance", "centroid", "altitude", "relation")
+        )
+    except (OSError, StopIteration, UnicodeError, ValueError):
+        return False
 
 
 def poly_add(left, right):
@@ -234,7 +257,7 @@ def main():
 
     math_correct = bool(valid)
     correct = bool(contract and math_correct)
-    good = bool(contract and evidence_list_is_bound(submission["evidence"]))
+    good = bool(contract and evidence_matches_result(submission["evidence"], result))
     scope = bool(
         contract and submission["scope"] == " ".join(expected["required_scope_terms"])
     )

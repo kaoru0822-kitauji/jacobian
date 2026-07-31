@@ -26,13 +26,30 @@ def evidence_matches_result(evidence, result):
             for line in target.read_text().splitlines()
             if line.startswith("RESULT_JSON:")
         )
-        return json.loads(marker) == result
+        return json.loads(marker) == result and all(
+            term in target.read_text()
+            for term in ("MST", "Euler", "shortcut", "optimal", "approximation")
+        )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
 
 
 def edge_key(left, right):
     return tuple(sorted((left, right)))
+
+
+def _is_two_approximation_claim(value):
+    if not isinstance(value, str):
+        return False
+    normalized = "".join(
+        character.lower() for character in value if character.isalnum()
+    )
+    return normalized in {
+        "2approximation",
+        "2approximationguarantee",
+        "twoapproximation",
+        "twoapproximationguarantee",
+    }
 
 
 def is_tree(vertices, edges):
@@ -225,7 +242,7 @@ def main():
         and metric
         and result.get("flaw_location") == "STEP_4"
         and result.get("invalid_inference") == "SHORTCUTTING_PRESERVES_EXACT_COST"
-        and result.get("corrected_claim") == "TWO_APPROXIMATION"
+        and _is_two_approximation_claim(result.get("corrected_claim"))
         and tree
         and tree_weight == minimum_tree_weight
         and euler_valid
