@@ -14,7 +14,7 @@ authors = [
 
 [[tasks]]
 name = "jacobian/regression-v1-calendar-good-days-audit"
-digest = "sha256:97e0593c247549120e7219aab38c5a083c9d866f71d32afd77700c43980213b4"
+digest = "sha256:a59cdbbda14ac708789f1af95f794acf8568efd7ca8c8decfdc5f6939317ec75"
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
