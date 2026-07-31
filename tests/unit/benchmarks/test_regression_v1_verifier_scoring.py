@@ -24,9 +24,11 @@ VERIFICATION_RECORD_TASKS = (
 )
 RATIONAL_TASK = "rational-linear-solution"
 RESOURCE_DERIVED_TASKS = (
+    "calendar-good-days-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "polynomial-tail-counterexample",
+    "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
 )
 VERIFIER_TASKS = tuple(
@@ -207,6 +209,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
     ("task_name", "mutate"),
     [
         (
+            "calendar-good-days-audit",
+            lambda result: result.update(count=15),
+        ),
+        (
             "matrix-square-zero-counterexample",
             lambda result: result.update(matrix=[[1, 0], [0, 0]]),
         ),
@@ -221,6 +227,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
         (
             "log-exponent-recovery",
             lambda result: result.update(value=59),
+        ),
+        (
+            "random-function-expectation-audit",
+            lambda result: result.update(expected_value="2025"),
         ),
     ],
 )
