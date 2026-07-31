@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
@@ -21,6 +22,7 @@ from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiagnostic,
     CapabilityMode,
+    CapabilityProviderAvailability,
     CapabilityProviderRuntime,
     CapabilityRequest,
     CapabilityResult,
@@ -55,6 +57,8 @@ from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 from jacobian.verification import VerificationService
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +131,18 @@ def install_exact_domain_checkers(
     for installed, declaration in _available_declaration_bundles(bundles):
         declarations_by_id[declaration.capability_id] = declaration
         runtime_key = _provider_runtime_key(declaration)
+        provider_runtime = provider_runtimes[runtime_key]
+        if (
+            provider_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            _LOGGER.warning(
+                "%s independent replay is not installed: %s",
+                declaration.capability_id,
+                provider_runtime.diagnostic,
+            )
+            checker_ids[declaration.capability_id] = None
+            continue
         operation = CheckerOperation(
             name=f"{declaration.capability_id} independent {declaration.replay_method}",
             entrypoint=(f"{declaration.entrypoint_module}:{declaration.function}"),
@@ -139,7 +155,7 @@ def install_exact_domain_checkers(
                 installed.result_schema_uris[declaration.capability_id],
             ),
             reason=declaration.reason,
-            provider_runtime=provider_runtimes[runtime_key],
+            provider_runtime=provider_runtime,
         )
         checker_ids[declaration.capability_id] = installer.install(
             operation,
