@@ -14,7 +14,7 @@ category = "mathematics"
 tags = ["theorem-retrieval", "proof-reconstruction", "group-theory", "offline"]
 case_version = "regression-v1"
 contamination_class = "public-dataset-derived-grounded-proof"
-fixture_digest = "sha256:dac97b6a92ff177de4893e7330f9759d3e1218a54871eff53a5e7aea31e7620f"
+fixture_digest = "sha256:50811dadab41c5b04673af202cbd5866b191f5ff64164eb3c2c9fd983ed3e6c2"
 derivation = "Derived from NaturalProofs-Gen train row 524."
 
 [agent]

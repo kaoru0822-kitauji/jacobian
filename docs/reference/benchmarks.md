@@ -14,7 +14,8 @@ The exact component fixtures and their public oracles are specified in the
 
 The committed
 [Harbor regression-v1 dataset](../../benchmarks/regression-v1/README.md)
-contains twenty-four bounded, offline mathematical workflow tasks. Its task digests,
+contains bounded, offline mathematical workflow tasks, including the current
+symbolic-geometry certificate. Its release-frozen task digests,
 clean-room verifiers, and Oracle job are the canonical validation surface.
 
 The full on-disk ownership map lives in

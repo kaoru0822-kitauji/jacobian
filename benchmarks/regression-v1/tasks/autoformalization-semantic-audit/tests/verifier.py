@@ -88,6 +88,7 @@ def _valid_semantic_audit(result, source):
     return bool(
         result["semantic_status"] == "NOT_EQUIVALENT"
         and isinstance(defects, list)
+        and all(type(defect) is str for defect in defects)
         and set(defects) == REQUIRED_DEFECTS
         and len(defects) == len(REQUIRED_DEFECTS)
         and _missing_premise_is_certified(result["missing_premise_certificate"])
