@@ -25,6 +25,7 @@ def contract(s, expected):
         and s["task_id"] == expected["task_id"]
         and s["conclusion"] == expected["conclusion"]
         and isinstance(s["result"], dict)
+        and isinstance(s["claimed_assurance"], str)
         and s["claimed_assurance"] in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
         and s["completeness"] == "COMPLETE"
         and isinstance(s["evidence"], list)
@@ -48,6 +49,11 @@ def evaluate(coefficients, x):
 def witness_ok(result):
     keys = {"p_coefficients", "q_coefficients", "p_roots", "q_roots", "x1", "x2"}
     if not isinstance(result, dict) or set(result) != keys:
+        return False
+    if not all(
+        isinstance(result[key], list)
+        for key in ("p_coefficients", "q_coefficients", "p_roots", "q_roots")
+    ):
         return False
     try:
         p = [parse_fraction(x) for x in result["p_coefficients"]]
