@@ -35,6 +35,7 @@ EXPECTED_TASKS = {
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
+    "symbolic-block-determinant-decomposition",
     "well-total-domination-counterexample",
 }
 REQUIRED_METADATA = {

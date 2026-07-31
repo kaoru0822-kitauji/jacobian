@@ -570,6 +570,59 @@ def test_hardening_targets_accept_reference_solutions(
     assert result["reward"] == pytest.approx(1.0)
 
 
+def test_symbolic_block_decomposition_accepts_alternative_sum_zero_basis(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "symbolic-block-determinant-decomposition", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["basis_change"] = [
+        ["1", "1", "0"],
+        ["1", "-1", "1"],
+        ["1", "0", "-1"],
+    ]
+    submission["result"]["basis_change_inverse"] = [
+        ["1/3", "1/3", "1/3"],
+        ["2/3", "-1/3", "-1/3"],
+        ["1/3", "1/3", "-2/3"],
+    ]
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("basis_change_inverse", [["1", "0", "0"], ["0", "1", "0"], ["0", "0", "1"]]),
+        ("channels", ["A-B", "A+2B", "A-B"]),
+        ("basis_change", [["1", "1", "1"], ["1", "-1", "0"], ["0", "0", "-1"]]),
+    ],
+)
+def test_symbolic_block_decomposition_rejects_corrupted_certificates(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "symbolic-block-determinant-decomposition", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"][field] = replacement
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_metric_tsp_scope_is_part_of_correctness(tmp_path: Path) -> None:
     task, app, logs = _prepare_case(tmp_path, "metric-tsp-proof-repair", "computed")
     submission_path = app / "submission.json"

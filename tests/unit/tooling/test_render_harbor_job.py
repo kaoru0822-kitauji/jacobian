@@ -62,7 +62,7 @@ def test_render_suite_job_expands_nested_tasks_explicitly() -> None:
     rendered = render_suite_job(get_suite("agent-workflow-v1"), role="oracle")
 
     assert "datasets" not in rendered
-    assert len(rendered["tasks"]) == 28
+    assert len(rendered["tasks"]) == 29
     assert all(
         entry["path"].startswith(
             "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/"
