@@ -30,7 +30,7 @@ digest = "sha256:933c2b6edea559a97a8c9e517b129cefd6435f7d38621409888144208a96dc4
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
-digest = "sha256:d8219d7a5d0d0a647ef5085513c05a99c90f181873ae48b03662dc0ea895a73"
+digest = "sha256:d8219d7a5d0d0a647ef5085513c05a99c90f1818739ae48b03662dc0ea895a73"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-normalization"
