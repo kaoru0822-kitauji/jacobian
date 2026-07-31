@@ -7,5 +7,6 @@ generators.
 
 The verifier will check every ordered choice of three distinct indices and
 will independently replay the dependence. Write `submission.json` to the exact
-agent-visible `submission_schema.json` and bind `evidence/answer.txt` by
+agent-visible `submission_schema.json`, include a `RESULT_JSON:` line containing
+the submitted result as JSON in `evidence/answer.txt`, and bind that file by
 SHA-256.

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from verifier_support import (
@@ -43,6 +44,7 @@ RULES = {
         None,
     ),
 }
+STEP_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
 
 def _replay_proof(result, source):
@@ -84,6 +86,7 @@ def _replay_proof(result, source):
             type(step["id"]) is not str
             or type(step["rule"]) is not str
             or type(step["output"]) is not str
+            or STEP_ID_PATTERN.fullmatch(step["id"]) is None
         ):
             return False
         if step["id"] in step_ids or step["rule"] not in RULES:
@@ -121,13 +124,16 @@ def main():
     submission = load_submission()
     source = json.loads((W / "input.json").read_text())
     expected = json.loads((E / "expected.json").read_text())
+    input_contract = source == json.loads((E / "input.json").read_text())
     contract = strict_submission_contract(
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
         verification_record="forbidden",
     )
-    math_correct = bool(contract and _replay_proof(submission.get("result"), source))
+    math_correct = bool(
+        contract and input_contract and _replay_proof(submission.get("result"), source)
+    )
     evidence_valid = bool(
         contract
         and evidence_list_is_bound(

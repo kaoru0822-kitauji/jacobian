@@ -8,19 +8,22 @@ from verifier_support import load_submission as load_strict_submission
 E = Path("/tests")
 
 
-def evidence_matches_result(evidence, result):
+def evidence_matches_result(evidence, result, required_terms):
     if not evidence_list_is_bound(evidence):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
         return False
     try:
+        text = target.read_text()
         marker = next(
             line.removeprefix("RESULT_JSON:").strip()
-            for line in target.read_text().splitlines()
+            for line in text.splitlines()
             if line.startswith("RESULT_JSON:")
         )
-        return json.loads(marker) == result
+        return json.loads(marker) == result and all(
+            term in text for term in required_terms
+        )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
 
@@ -54,7 +57,10 @@ def contract(s, expected):
 def parse_fraction(value):
     if not isinstance(value, str) or len(value) > 80:
         raise ValueError
-    return Fraction(value)
+    parsed = Fraction(value)
+    if str(parsed) != value:
+        raise ValueError
+    return parsed
 
 
 def evaluate(coefficients, x):
@@ -104,7 +110,12 @@ def main():
     expected = json.loads((E / "expected.json").read_text())
     valid = contract(s, expected)
     math_correct = bool(valid and witness_ok(s["result"]))
-    ev = bool(valid and evidence_matches_result(s["evidence"], s["result"]))
+    ev = bool(
+        valid
+        and evidence_matches_result(
+            s["evidence"], s["result"], ("P", "Q", "root", "R(")
+        )
+    )
     scope = bool(valid and s["scope"] == " ".join(expected["required_scope_terms"]))
     assurance = bool(valid and s["claimed_assurance"] == expected["maximum_assurance"])
     false_cert = isinstance(s, dict) and s.get("claimed_assurance") == "VERIFIED"
