@@ -58,7 +58,7 @@ digest = "sha256:02dee74d77931dc8d59267430f4fa5f82532b1529faeebf9631293e344fd9e8
 
 [[tasks]]
 name = "jacobian/regression-v1-log-inequality-meta-audit"
-digest = "sha256:88951261dd902b86d9d105b00243816ce97932aca220fc03a28168186ce55315"
+digest = "sha256:3f147b59eb4a98ae425c90717eac2425fc1a72cb75a2d61c2b3263d58ad5f21f"
 
 [[tasks]]
 name = "jacobian/regression-v1-matrix-square-zero-counterexample"
