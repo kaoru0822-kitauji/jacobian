@@ -194,17 +194,7 @@ def main():
     coefficients = (
         [q(value) for value in relation] if isinstance(relation, list) else []
     )
-    input_contract = (
-        input_data.get("task_id") == expected["task_id"]
-        and input_data.get("normalization", {}).get("variables") == ["u", "v", "w"]
-        and input_data.get("normalization", {}).get("nonzero_assumptions") == ["u", "w"]
-        and input_data.get("normalization", {}).get("points")
-        == {
-            "A": ["0", "0"],
-            "B": ["2*u", "0"],
-            "C": ["2*v", "2*w"],
-        }
-    )
+    input_contract = input_data == json.loads((E / "input.json").read_text())
 
     zero = (rf_constant(0), rf_constant(0))
     a = zero
