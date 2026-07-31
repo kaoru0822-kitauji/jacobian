@@ -35,6 +35,7 @@ RESOURCE_DERIVED_TASKS = (
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
     "modular-cubic-obstruction",
+    "nondifferentiable-maximum-construction",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
@@ -244,6 +245,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
         (
             "modular-cubic-obstruction",
             lambda result: result["residue_cases"][1].update(lhs_residue=1),
+        ),
+        (
+            "nondifferentiable-maximum-construction",
+            lambda result: result.update(right_derivative="0"),
         ),
         (
             "polynomial-tail-counterexample",
@@ -517,3 +522,29 @@ def test_grounded_premise_proof_rejects_forward_reference(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_nondifferentiable_maximum_accepts_alternative_rational_construction(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "nondifferentiable-maximum-construction",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"] = {
+        "peak": "-7/3",
+        "left_slope": "1/4",
+        "right_slope": "-5/2",
+        "left_value_at_join": "-7/3",
+        "right_value_at_join": "-7/3",
+        "left_derivative": "1/4",
+        "right_derivative": "-5/2",
+    }
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)

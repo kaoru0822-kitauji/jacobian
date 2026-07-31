@@ -1,0 +1,14 @@
+{
+  "task_id": "nondifferentiable-maximum-construction",
+  "domain": {"left": "-1", "right": "1", "join": "0"},
+  "family": {
+    "left_branch": "peak + left_slope*x for -1 <= x <= 0",
+    "right_branch": "peak + right_slope*x for 0 <= x <= 1"
+  },
+  "requirements": [
+    "continuous on [-1,1]",
+    "0 is a global maximum",
+    "not differentiable at 0"
+  ],
+  "rational_format": "integer or numerator/denominator in lowest terms"
+}
