@@ -15,8 +15,8 @@ installs, registers, and forwards.
 ## Requirements
 
 - Node.js >= 18
-- Python 3.12 and `uv` on `$PATH` (the launcher installs the kernel on first
-  use via `uvx`/`uv tool`)
+- Python 3.12 and `uv` on `$PATH` (the launcher installs the matching stable
+  kernel from PyPI on first use)
 
 ## Install
 

@@ -49,6 +49,12 @@ jacobian setup
 jacobian doctor
 ```
 
+For the Python distribution, install the stable package directly with:
+
+```sh
+python -m pip install jacobian
+```
+
 The launcher supports Claude, Codex, Cursor, Gemini, and OpenCode. It requires
 Node.js 18 or newer, Python 3.12, and
 [`uv`](https://docs.astral.sh/uv/). Run `jacobian mcp` to start the server
@@ -274,9 +280,9 @@ for the upstream wheel tags.
 
 ## Status
 
-Jacobian is pre-stable. Experimental contracts may change between releases;
-release specifications describe supported snapshots, not the order of ongoing
-capability research.
+Jacobian 0.6.0 is a stable release. Its published package, capability, and
+artifact contracts describe the supported release surface; ongoing capability
+research does not change that release retroactively.
 
 The Python distribution contains the mathematical kernel, CLI, and MCP server.
 The npm package is a thin launcher and MCP client installer for that same

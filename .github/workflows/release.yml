@@ -112,8 +112,65 @@ jobs:
       - name: Publish npm distribution
         run: |
           version="$(node -p "require('./npm/package.json').version")"
+          dist_tag=latest
+          if [[ "$version" == *-* ]]; then
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$ ]]; then
+              echo "unsupported prerelease version for the alpha channel: $version" >&2
+              exit 1
+            fi
+            dist_tag=alpha
+          fi
+          if dist_tags="$(npm view jacobian dist-tags --json 2>&1)"; then
+            :
+          elif [[ "$dist_tags" == *E404* || "$dist_tags" == *"404 Not Found"* ]]; then
+            dist_tags='{}'
+          else
+            echo "$dist_tags" >&2
+            exit 1
+          fi
+          current_tag="$(node - "$dist_tags" "$dist_tag" <<'NODE'
+          const [encoded, tag] = process.argv.slice(2);
+          const tags = JSON.parse(encoded);
+          process.stdout.write(tags[tag] ?? "");
+          NODE
+          )"
+          if [[ -n "$current_tag" ]] && ! node - "$version" "$current_tag" <<'NODE'
+          const [candidate, current] = process.argv.slice(2);
+          const pattern = /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$/;
+          const ranks = { alpha: 0, beta: 1, rc: 2 };
+
+          function parse(version) {
+            const match = pattern.exec(version);
+            if (!match) throw new Error(`unsupported npm version: ${version}`);
+            return {
+              core: match.slice(1, 4).map(Number),
+              prerelease: match[4]
+                ? [ranks[match[4]], Number(match[5])]
+                : null,
+            };
+          }
+
+          function compare(left, right) {
+            for (let index = 0; index < left.core.length; index += 1) {
+              if (left.core[index] !== right.core[index]) {
+                return left.core[index] - right.core[index];
+              }
+            }
+            if (left.prerelease === null) return right.prerelease === null ? 0 : 1;
+            if (right.prerelease === null) return -1;
+            return left.prerelease[0] - right.prerelease[0] ||
+              left.prerelease[1] - right.prerelease[1];
+          }
+
+          process.exit(compare(parse(candidate), parse(current)) >= 0 ? 0 : 1);
+          NODE
+          then
+            echo "refusing to publish $version: $dist_tag already points to newer version $current_tag" >&2
+            exit 1
+          fi
           if npm view "jacobian@$version" version >/dev/null 2>&1; then
             echo "jacobian@$version is already published"
           else
-            npm publish artifacts/npm/*.tgz --access public --tag alpha
+            npm publish artifacts/npm/*.tgz --access public --tag "$dist_tag"
           fi
+          npm dist-tag add "jacobian@$version" "$dist_tag"

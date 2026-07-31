@@ -1,10 +1,10 @@
 # Contributing to Jacobian
 
-Jacobian is pre-stable. It exposes composable mathematical capabilities that
-AI agents use to investigate conjectures and other mathematically specified
-problems. Contributions should preserve mathematically atomic, agent-visible
-outcomes, agent-owned composition, and the boundary between heuristic search
-or evaluation and independently verified evidence.
+Jacobian is stable as of 0.6.0. It exposes composable mathematical
+capabilities that AI agents use to investigate conjectures and other
+mathematically specified problems. Contributions should preserve mathematically
+atomic, agent-visible outcomes, agent-owned composition, and the boundary
+between heuristic search or evaluation and independently verified evidence.
 
 ## Before changing code
 
@@ -12,7 +12,7 @@ Read the [documentation home](docs/index.md), the
 [product goals](docs/explanation/goals.md), the
 [v0.2 frozen specification](docs/reference/specifications/v0.2.md), and the
 [v0.2 conformance specification](docs/reference/conformance-v0.2.md).
-Later pre-stable package versions extend that snapshot; use the installed
+Later package versions extend that snapshot; use the installed
 catalog and current reference documents for present capability membership.
 
 ## Development environment

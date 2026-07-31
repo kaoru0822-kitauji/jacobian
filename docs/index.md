@@ -13,16 +13,15 @@ independent checkers may promote exact evidence to a verified result. The
 [product model](explanation/product-blueprint.md) defines the capability
 contract and ownership boundaries.
 
-The API and artifact formats are pre-stable. Experimental and
-version-breaking adapters may be exposed before held-out evaluations show
-lift. Evaluations guide portfolio behavior and maintenance; they do not grant
-verification authority. Release specifications describe supported snapshots,
-not a required order of development.
+The 0.6.0 package is a stable release. The v0.2 specification remains the
+last frozen conformance snapshot; current reference documents and the installed
+catalog define the supported capabilities and interfaces for this release.
+Evaluations guide portfolio behavior and maintenance; they do not grant
+verification authority.
 
 ## Project control documents
 
-These documents track the design while the public API and artifact formats are
-still pre-stable:
+These documents track the stable product contract and its ongoing evolution:
 
 | Question | Document | Status |
 | --- | --- | --- |
@@ -30,7 +29,7 @@ still pre-stable:
 | What does the system currently look like? | [Architecture](explanation/architecture.md) | Current implementation and trust boundaries |
 | What direction is the project taking? | [Product goals](explanation/goals.md) | Rolling goals pursued in parallel |
 | Why were cross-cutting choices made? | [Architecture decision log](explanation/adr/index.md) | Accepted decisions with release scope |
-| What is the last frozen release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative snapshot for `0.2.0a0`; later pre-stable releases extend it |
+| What is the last frozen release contract? | [v0.2 specification](reference/specifications/v0.2.md) and [conformance gate](reference/conformance-v0.2.md) | Normative historical snapshot for `0.2.0a0`; later releases extend it |
 | What is installed now? | [Tool surface](reference/tools.md) and runtime `capability://catalog` | Current interface rules and installation-specific inventory |
 
 ## Tutorials
