@@ -10,7 +10,7 @@ import threading
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from mcp_types import CallToolResult, TextContent
+from mcp_types import CallToolResult, ContentBlock, ResourceLink, TextContent
 
 from jacobian.adapters.mcp.constants import (
     CAPABILITY_DISCOVERY_RESPONSE_BYTE_LIMIT,
@@ -166,6 +166,21 @@ def _capability_call_tool_result(
     projected, projection = _invocation_text_projection(result, view=view)
     text = _compact_json(canonical if view == "FULL" else projected)
     model_visible_bytes = len(text.encode("utf-8"))
+    content: list[ContentBlock] = [TextContent(type="text", text=text)]
+    if result.episode_uri is not None:
+        content.append(
+            ResourceLink(
+                name="jacobian-capability-result",
+                title="Durable capability result",
+                uri=result.episode_uri,
+                description=(
+                    "Read the durable canonical capability result when the text "
+                    "projection omits output fields."
+                ),
+                mime_type="application/json",
+                size=len(_json_bytes(canonical)),
+            )
+        )
     return CallToolResult(
         _meta={
             "jacobian": {
@@ -177,7 +192,7 @@ def _capability_call_tool_result(
                 "output_complete": projection["output_complete"],
             }
         },
-        content=[TextContent(type="text", text=text)],
+        content=content,
         structured_content=canonical,
         is_error=False,
     )

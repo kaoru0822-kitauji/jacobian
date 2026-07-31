@@ -67,7 +67,7 @@ def _resource_runtime(
 ) -> JacobianRuntime:
     """Route resources through the same auth context as tools.
 
-    MCP 2.0.0b2 does not inject ``Context`` into static resources, but its HTTP
+    MCP 2.0.0 does not inject ``Context`` into static resources, but its HTTP
     authentication middleware still scopes the access token with a contextvar.
     """
 
@@ -92,8 +92,14 @@ def _configured_root(state_dir: str | Path | None) -> Path:
 
 
 def _unwrap_tool_error(exc: Exception) -> Exception:
-    tool_error = exc.__cause__ if isinstance(exc, ToolError) else exc
-    return tool_error if isinstance(tool_error, Exception) else exc
+    current = exc
+    for _ in range(4):
+        if not isinstance(current, ToolError) or not isinstance(
+            current.__cause__, Exception
+        ):
+            return current
+        current = current.__cause__
+    return current
 
 
 def _classify_public_tool_error(

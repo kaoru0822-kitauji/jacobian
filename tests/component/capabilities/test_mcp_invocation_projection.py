@@ -51,6 +51,18 @@ def test_standard_invocation_projection_is_compact_and_recoverable() -> None:
     assert metadata["omitted_output_fields"][0]["byte_count"] > 8_192
     assert metadata["omitted_output_fields"][0]["sha256"].startswith("sha256:")
     assert call_result.structured_content == result.model_dump(mode="json")
+    assert len(call_result.content) == 2
+    link = call_result.content[1]
+    assert link.type == "resource_link"
+    assert link.uri == result.episode_uri
+    assert link.mime_type == "application/json"
+    assert link.size == len(
+        json.dumps(
+            result.model_dump(mode="json"),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    )
     result_meta = call_result.meta["jacobian"]
     assert (
         result_meta["logical_payload_bytes"]
@@ -66,3 +78,4 @@ def test_standard_invocation_does_not_drop_large_undurable_output() -> None:
 
     assert projection["output"] == result.output
     assert projection["mcp_projection"]["output_complete"] is True
+    assert len(call_result.content) == 1
