@@ -38,6 +38,13 @@ RESOURCE_DERIVED_TASKS = (
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
 )
+VERIFIER_TASKS = tuple(
+    sorted(
+        task.name
+        for task in TASKS.iterdir()
+        if (task / "tests" / "verifier.py").is_file()
+    )
+)
 
 
 def _digest(path: Path) -> str:
@@ -470,6 +477,48 @@ def test_autoformalization_audit_rejects_incomplete_defect_set(
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["defects"] = ["MISSING_DIMENSION_PREMISE"]
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+@pytest.mark.parametrize("task_name", VERIFIER_TASKS)
+def test_verifiers_reject_unhashable_assurance(
+    tmp_path: Path,
+    task_name: str,
+) -> None:
+    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = []
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+    assert rejected["false_certification"] is False
+
+
+def test_polynomial_verifier_rejects_non_array_witness_fields(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "polynomial-tail-counterexample",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"] = {
+        "p_coefficients": {"2": None, "8/3": None, "2/3": None, "0": None},
+        "q_coefficients": {"1": None, "199": None, "9900": None},
+        "p_roots": {"-1": None, "-1/3": None, "0": None},
+        "q_roots": {"-100": None, "-99": None},
+        "x1": "0",
+        "x2": "1/100",
+    }
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
