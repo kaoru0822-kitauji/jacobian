@@ -9,7 +9,7 @@ diagnostics only.
 
 | Path | Artifact class | What it proves | Authoritative for |
 | --- | --- | --- | --- |
-| [`regression-v1/`](regression-v1/) | Harbor workflow dataset | Offline Oracle contract + Jacobian observation on fixed digests | Agent workflow observation (v1); task digests in `dataset.toml` |
+| [`regression-v1/`](regression-v1/) | Harbor workflow dataset | Offline Oracle contract + Jacobian observation on a release-frozen task set | Agent workflow observation (v1); `dataset.toml` is refreshed only by release PRs |
 | [`research/`](research/) | Public research challenges + runner | Answer-visible composition diagnostics under no-retrieval policy | Capability discovery handoffs; **not** held-out model scores |
 | [`reproductions/`](reproductions/) | Public reproduction fixtures | Exact public case replay in composition/provider tests | Regression of known public mathematical episodes |
 | [`examples/`](examples/) | Pilot / documentation cases | Illustrative inputs only | Docs and local smoke |
@@ -50,9 +50,13 @@ A famous open problem is never a substitute for layers 1–3.
 ## Commands
 
 ```sh
-# Harbor identity + Oracle contract
+# Harbor task validation + Oracle contract
 make harbor-check
 make harbor-oracle
+
+# Release PR only, after all task changes have landed
+make harbor-release-sync
+make harbor-release-oracle
 
 # Core performance microbenchmark
 make bench-core
