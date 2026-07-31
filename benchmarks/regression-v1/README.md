@@ -1,8 +1,9 @@
 # Jacobian regression-v1
 
-This is the small committed Harbor dataset for observing Jacobian-enabled
+This is the committed 24-task Harbor dataset for observing Jacobian-enabled
 mathematical workflows. The committed `dataset.toml` is a release artifact;
-release PRs refresh its task digests after the task set is frozen.
+release PRs refresh its complete task inventory and digests after the task set
+is frozen.
 
 The tasks are agent-agnostic. Their instructions name no tool, capability, or
 invocation order. Each task has an offline input, schema 1.4 metadata, an
@@ -18,10 +19,10 @@ rational linear task remains capped at `COMPUTED`: direct-witness evidence can
 establish that the submitted values solve the equations, but not that the
 solution is unique.
 
-These are workflow observations, not a causal benchmark. There is no control
-condition, randomized pairing, or performance claim in v1. A future A/B study
-can reuse these exact task digests while keeping its condition and model
-configuration outside the task bundles.
+These 24 public cases are workflow observations, not a causal benchmark. There
+is no control condition, randomized pairing, or performance claim in v1. A
+future A/B study can reuse these exact task digests while keeping its condition
+and model configuration outside the task bundles.
 
 ## Validation
 

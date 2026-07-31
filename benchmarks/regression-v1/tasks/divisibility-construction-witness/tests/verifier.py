@@ -124,6 +124,7 @@ def main():
     math_correct = bool(contract and _valid_witness(submission.get("result"), source))
     evidence_valid = bool(
         contract
+        and math_correct
         and evidence_matches_result(
             submission.get("evidence"), submission.get("result")
         )

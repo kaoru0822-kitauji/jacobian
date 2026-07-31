@@ -303,7 +303,11 @@ def main():
         contract and submission["scope"] == " ".join(expected["required_scope_terms"])
     )
     correct = bool(contract and math_correct and scope)
-    good = bool(contract and evidence_matches_result(submission["evidence"], result))
+    good = bool(
+        contract
+        and math_correct
+        and evidence_matches_result(submission["evidence"], result)
+    )
     assurance = bool(
         contract and submission["claimed_assurance"] == expected["maximum_assurance"]
     )
