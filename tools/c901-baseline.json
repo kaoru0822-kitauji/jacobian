@@ -193,7 +193,7 @@
       "complexity": 22
     },
     {
-      "path": "src/jacobian/graphs/capabilities.py",
+      "path": "src/jacobian/graphs/invariants.py",
       "symbol": "_compute_property",
       "complexity": 22
     },

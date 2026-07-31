@@ -37,7 +37,7 @@ from jacobian.contracts.plugins import (
 )
 from jacobian.contracts.plugins import CapabilityName, PluginManifest
 from jacobian.contracts.results import ExecutionStatus, InputStatus, Verification
-from jacobian.graphs.capabilities import GraphInstallation
+from jacobian.graphs.installation import GraphInstallation
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.references import ReferenceInstaller
