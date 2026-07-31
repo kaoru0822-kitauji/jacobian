@@ -326,6 +326,7 @@ def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["optimal_tour"] = ["A", "D", "C", "F", "E", "B", "A"]
+    _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
 
     accepted = _run_verifier(task, app, logs)
@@ -349,11 +350,11 @@ def test_autoformalization_audit_accepts_alternative_exact_witnesses(
         "forced_y": [0],
     }
     submission["result"]["operator_mismatch_certificate"] = {
-        "dimension": 3,
-        "x": [1, 2, 0],
-        "y": [2, -1, 5],
+        "dimension": 2,
+        "x": [3, -2],
+        "y": [2, 3],
         "dot_product": 0,
-        "coordinate_products": [2, -2, 0],
+        "coordinate_products": [6, -6],
     }
     _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
