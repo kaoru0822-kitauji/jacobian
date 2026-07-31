@@ -20,12 +20,15 @@ def evidence_matches_result(evidence, result):
     if target is None:
         return False
     try:
+        text = target.read_text()
         marker = next(
             line.removeprefix("RESULT_JSON:").strip()
-            for line in target.read_text().splitlines()
+            for line in text.splitlines()
             if line.startswith("RESULT_JSON:")
         )
-        return json.loads(marker) == result
+        return json.loads(marker) == result and all(
+            term in text for term in ("product", "difference", "quotient", "modulo")
+        )
     except (OSError, StopIteration, UnicodeError, ValueError):
         return False
 
