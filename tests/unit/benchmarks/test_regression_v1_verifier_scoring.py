@@ -24,6 +24,7 @@ VERIFICATION_RECORD_TASKS = (
 )
 RATIONAL_TASK = "rational-linear-solution"
 RESOURCE_DERIVED_TASKS = (
+    "autoformalization-semantic-audit",
     "calendar-good-days-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
@@ -223,6 +224,12 @@ def test_resource_derived_oracles_and_assurance_boundary(
     ("task_name", "mutate"),
     [
         (
+            "autoformalization-semantic-audit",
+            lambda result: result["operator_mismatch_certificate"].update(
+                dot_product=1
+            ),
+        ),
+        (
             "calendar-good-days-audit",
             lambda result: result.update(count=15),
         ),
@@ -285,23 +292,6 @@ def test_verifiers_reject_unhashable_assurance(
     assert rejected["false_certification"] is False
 
 
-def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "metric-tsp-proof-repair",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"]["optimal_tour"] = ["A", "D", "C", "F", "E", "B", "A"]
-    _bind_result_evidence(app, submission)
-    _write_json(submission_path, submission)
-
-    accepted = _run_verifier(task, app, logs)
-    assert accepted["correctness"] == 1.0
-    assert accepted["reward"] == pytest.approx(1.0)
-
-
 def test_polynomial_verifier_rejects_non_array_witness_fields(
     tmp_path: Path,
 ) -> None:
@@ -320,6 +310,71 @@ def test_polynomial_verifier_rejects_non_array_witness_fields(
         "x1": "0",
         "x2": "1/100",
     }
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "metric-tsp-proof-repair",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["optimal_tour"] = ["A", "D", "C", "F", "E", "B", "A"]
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_autoformalization_audit_accepts_alternative_exact_witnesses(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "autoformalization-semantic-audit",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["missing_premise_certificate"] = {
+        "dimension": 1,
+        "x": [-7],
+        "forced_y": [0],
+    }
+    submission["result"]["operator_mismatch_certificate"] = {
+        "dimension": 2,
+        "x": [3, -2],
+        "y": [2, 3],
+        "dot_product": 0,
+        "coordinate_products": [6, -6],
+    }
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_autoformalization_audit_rejects_incomplete_defect_set(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "autoformalization-semantic-audit",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["defects"] = ["MISSING_DIMENSION_PREMISE"]
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "autoformalization-semantic-audit"},
+    "conclusion": {
+      "enum": [
+        "PROPOSED_FORMALIZATION_FAITHFUL",
+        "PROPOSED_FORMALIZATION_NOT_FAITHFUL",
+        "INSUFFICIENT_EVIDENCE"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantic_status", "defects", "missing_premise_certificate", "operator_mismatch_certificate"],
+      "properties": {
+        "semantic_status": {
+          "enum": ["EQUIVALENT", "NOT_EQUIVALENT", "NOT_ASSESSED"]
+        },
+        "defects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "MISSING_DIMENSION_PREMISE",
+              "DOT_PRODUCT_REPLACED_BY_COORDINATEWISE_ZERO",
+              "OTHER"
+            ]
+          }
+        },
+        "missing_premise_certificate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dimension", "x", "forced_y"],
+          "properties": {
+            "dimension": {"const": 1},
+            "x": {"type": "array", "maxItems": 8, "items": {"type": "integer"}},
+            "forced_y": {"type": "array", "maxItems": 8, "items": {"type": "integer"}}
+          }
+        },
+        "operator_mismatch_certificate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dimension", "x", "y", "dot_product", "coordinate_products"],
+          "properties": {
+            "dimension": {"const": 2},
+            "x": {"type": "array", "maxItems": 8, "items": {"type": "integer"}},
+            "y": {"type": "array", "maxItems": 8, "items": {"type": "integer"}},
+            "dot_product": {"type": "integer"},
+            "coordinate_products": {"type": "array", "maxItems": 8, "items": {"type": "integer"}}
+          }
+        }
+      }
+    },
+    "claimed_assurance": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
+    "scope": {"type": "string"},
+    "completeness": {"enum": ["COMPLETE", "PARTIAL", "UNKNOWN"]},
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"const": "evidence/answer.txt"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

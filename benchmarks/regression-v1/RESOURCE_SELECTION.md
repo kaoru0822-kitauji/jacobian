@@ -7,6 +7,7 @@ Review date: 2026-07-30. Source inventory: the `Resources` tab of spreadsheet
 
 | Task | Difficulty | Category | Frozen source | Why it remains useful |
 | --- | --- | --- | --- | --- |
+| `autoformalization-semantic-audit` | Hard | Autoformalization / semantic alignment | ProofNetVerif valid row 2 (`Rudin\|exercise_1_18a`), revision `91183e5…` | Adds exact semantic auditing of a proposed formal statement: expose both a dropped premise and an operator substitution using independently checked finite-dimensional witnesses, without treating type checking as semantic equivalence. |
 | `matrix-square-zero-counterexample` | Easy | Linear algebra / counterexample | COUNTERMATH, test row 2, revision `d4e9f8c…` | Minimal exact witness; tests hypothesis discipline without duplicating an existing task. |
 | `polynomial-tail-counterexample` | Medium | Polynomial reasoning / counterexample | DeepTheorem, train row 8 (source id 3172), revision `f593572…` | Requires roots, tail scope, and an exact order witness; verifier accepts any valid witness. |
 | `subspace-direct-sum-counterexample` | Hard | Linear algebra / quantifiers | COUNTERMATH, test row 8, revision `d4e9f8c…` | Tests careful interpretation of distinct indices and exact reconstruction of all local conditions. |
@@ -76,6 +77,13 @@ The remaining inventory was not converted wholesale. Major rejection classes:
   prose were rejected. Rows 54-55 were retained because the mathematical
   counterexample has a compact exact certificate and the disagreement between
   truth, requested direction, evaluator score, and meta-score is explicit.
+- ProofNetVerif valid rows 0–99 were screened for semantic mismatches that
+  remain independently checkable without a pinned Lean runtime. Rows needing
+  topology, extension theorems, or library-specific elaboration were rejected;
+  row 2 was retained because both the omitted dimension premise and the
+  coordinatewise-for-inner-product substitution admit exact integer-vector
+  counterexamples. The dataset's `correct=false` label is provenance only, not
+  verifier evidence.
 
 This is a curation record, not a claim that rejected datasets are intrinsically
 low quality; they were unsuitable for this specific long-lived Harbor suite.
