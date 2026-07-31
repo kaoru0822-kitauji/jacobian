@@ -1,0 +1,28 @@
+{
+  "task_id": "log-inequality-meta-audit",
+  "problem": "For x,y,z>1 with x^2+y^2=z^2=12, the source prompt asks for a proof that log_z(x^2+y^2)+log_x(y^2+z^2)+log_y(z^2+x^2) is at least 9.",
+  "conversation_trace": {
+    "proposed_solution": {
+      "witness": {"x_squared": 6, "y_squared": 6, "z_squared": 12},
+      "reduction": "L = 2 + 4*log_6(18)",
+      "comparison": "18^4 < 6^7",
+      "conclusion": "The universal inequality is false."
+    },
+    "solution_evaluation": {
+      "mathematical_reasoning": "sound",
+      "instruction_compliance": "does not prove the requested inequality",
+      "score": 0
+    },
+    "meta_evaluation": {
+      "verdict": "The score-zero evaluation is reasonable under its supplied rubric.",
+      "rating": 1
+    }
+  },
+  "required_output": {
+    "audit_mathematical_claim": true,
+    "audit_counterexample": true,
+    "audit_evaluator_score": true,
+    "audit_meta_evaluation": true,
+    "separate_truth_from_instruction_compliance": true
+  }
+}

@@ -29,6 +29,7 @@ EXPECTED_TASKS = {
     "polynomial-tail-counterexample",
     "subspace-direct-sum-counterexample",
     "log-exponent-recovery",
+    "log-inequality-meta-audit",
 }
 VERIFICATION_RECORD_TASKS = {
     "finite-partition",
@@ -39,7 +40,7 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_eighteen_task_dataset() -> None:
+def test_regression_v1_is_a_frozen_nineteen_task_dataset() -> None:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/regression-v1"
     assert {
@@ -82,6 +83,7 @@ def test_regression_v1_is_a_frozen_eighteen_task_dataset() -> None:
             "polynomial-tail-counterexample",
             "subspace-direct-sum-counterexample",
             "log-exponent-recovery",
+            "log-inequality-meta-audit",
             "random-function-expectation-audit",
         }:
             assert isinstance(upstream, dict)

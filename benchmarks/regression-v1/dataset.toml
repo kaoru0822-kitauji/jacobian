@@ -1,6 +1,6 @@
 [dataset]
 name = "jacobian/regression-v1"
-description = "Eighteen self-contained mathematical workflow observation tasks for Jacobian."
+description = "Nineteen self-contained mathematical workflow observation tasks for Jacobian."
 keywords = [
     "mathematics",
     "jacobian",
@@ -43,6 +43,10 @@ digest = "sha256:5899d3eb53d12c34336f867088db008d3397d5772db9ffb857f5f6e115f7846
 [[tasks]]
 name = "jacobian/regression-v1-log-exponent-recovery"
 digest = "sha256:2ac493194118377e41e4d91ed1a45dcace984cb65d8abae98c857a23e122dd7b"
+
+[[tasks]]
+name = "jacobian/regression-v1-log-inequality-meta-audit"
+digest = "sha256:72e0ffaf30d81b7db093b212a2eaacc6192c595ee66c48f7796065bb99805d77"
 
 [[tasks]]
 name = "jacobian/regression-v1-matrix-square-zero-counterexample"

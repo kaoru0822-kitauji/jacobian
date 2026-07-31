@@ -29,6 +29,7 @@ RESOURCE_DERIVED_TASKS = (
     "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
     "log-exponent-recovery",
+    "log-inequality-meta-audit",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
     "modular-cubic-obstruction",
@@ -245,6 +246,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result.update(value=59),
         ),
         (
+            "log-inequality-meta-audit",
+            lambda result: result["certificate"].update(comparison_left=104_977),
+        ),
+        (
             "random-function-expectation-audit",
             lambda result: result.update(expected_value="2025"),
         ),
@@ -389,3 +394,30 @@ def test_divisibility_construction_accepts_alternative_witness(
     accepted = _run_verifier(task, app, logs)
     assert accepted["correctness"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("evaluator_rubric_status", "INCONSISTENT"),
+        ("meta_evaluation_status", "UNREASONABLE"),
+    ],
+)
+def test_log_meta_audit_rejects_corrupted_evaluation_layers(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "log-inequality-meta-audit",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"][field] = value
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
