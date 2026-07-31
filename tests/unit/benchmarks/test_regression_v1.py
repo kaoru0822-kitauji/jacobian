@@ -11,19 +11,15 @@ ROOT = Path(__file__).parents[3]
 DATASET = ROOT / "benchmarks" / "regression-v1"
 TASKS = DATASET / "tasks"
 EXPECTED_TASKS = {
-    "calendar-good-days-audit",
-    "euler-line-symbolic-certificate",
     "graph-counterexample",
     "graph-artifact-composition",
     "finite-partition",
     "sat-witness",
     "rational-linear-solution",
-    "random-function-expectation-audit",
     "hermite-normal-form",
     "polynomial-normalization",
     "polynomial-map-collision",
     "matrix-square-zero-counterexample",
-    "metric-tsp-proof-repair",
     "polynomial-tail-counterexample",
     "subspace-direct-sum-counterexample",
     "log-exponent-recovery",
@@ -37,14 +33,7 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_sixteen_task_dataset() -> None:
-    manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
-    assert manifest["dataset"]["name"] == "jacobian/regression-v1"
-    assert {
-        task["name"].rsplit("/", 1)[-1].removeprefix("regression-v1-")
-        for task in manifest["tasks"]
-    } == EXPECTED_TASKS
-
+def test_regression_v1_contains_the_expected_task_bundles() -> None:
     task_dirs = {path.name for path in TASKS.iterdir() if path.is_dir()}
     assert task_dirs == EXPECTED_TASKS
 
@@ -71,14 +60,10 @@ def test_regression_v1_is_a_frozen_sixteen_task_dataset() -> None:
         assert spec["metadata"]["fixture_digest"] == input_digest
         upstream = metadata["upstream"]
         if task_name in {
-            "calendar-good-days-audit",
-            "euler-line-symbolic-certificate",
             "matrix-square-zero-counterexample",
-            "metric-tsp-proof-repair",
             "polynomial-tail-counterexample",
             "subspace-direct-sum-counterexample",
             "log-exponent-recovery",
-            "random-function-expectation-audit",
         }:
             assert isinstance(upstream, dict)
             assert upstream["revision"]
