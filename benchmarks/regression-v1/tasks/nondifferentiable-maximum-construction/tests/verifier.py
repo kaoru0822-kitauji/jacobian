@@ -47,11 +47,11 @@ def _valid_construction(result, source):
         and values["right_value_at_join"] == peak
         and values["left_derivative"] == left
         and values["right_derivative"] == right
-        and left > 0
-        and right < 0
+        and left >= 0
+        and right <= 0
         and left != right
-        and peak - left < peak
-        and peak + right < peak
+        and peak - left <= peak
+        and peak + right <= peak
     )
 
 

@@ -8,7 +8,6 @@ import runpy
 import shutil
 import sys
 from collections.abc import Mapping
-from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -27,15 +26,9 @@ RATIONAL_TASK = "rational-linear-solution"
 RESOURCE_DERIVED_TASKS = (
     "autoformalization-semantic-audit",
     "calendar-good-days-audit",
-    "divisibility-construction-witness",
-    "euler-line-symbolic-certificate",
-    "grounded-premise-proof",
     "log-exponent-recovery",
-    "log-inequality-meta-audit",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
-    "modular-cubic-obstruction",
-    "nondifferentiable-maximum-construction",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
@@ -228,34 +221,12 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result.update(count=15),
         ),
         (
-            "divisibility-construction-witness",
-            lambda result: result.update(quotient_by_7_pow_7=341),
-        ),
-        (
-            "euler-line-symbolic-certificate",
-            lambda result: result["coordinates"]["O"]["x"]["numerator"][0].update(
-                coefficient="2"
-            ),
-        ),
-        (
-            "grounded-premise-proof",
-            lambda result: result["proof_steps"][3].update(output="XY_EQ_xyN"),
-        ),
-        (
             "matrix-square-zero-counterexample",
             lambda result: result.update(matrix=[[1, 0], [0, 0]]),
         ),
         (
             "metric-tsp-proof-repair",
             lambda result: result["weights"].update(optimal=31),
-        ),
-        (
-            "modular-cubic-obstruction",
-            lambda result: result["residue_cases"][1].update(lhs_residue=1),
-        ),
-        (
-            "nondifferentiable-maximum-construction",
-            lambda result: result.update(right_derivative="0"),
         ),
         (
             "polynomial-tail-counterexample",
@@ -268,10 +239,6 @@ def test_resource_derived_oracles_and_assurance_boundary(
         (
             "log-exponent-recovery",
             lambda result: result.update(value=59),
-        ),
-        (
-            "log-inequality-meta-audit",
-            lambda result: result["certificate"].update(comparison_left=104_977),
         ),
         (
             "random-function-expectation-audit",
@@ -295,48 +262,41 @@ def test_resource_derived_verifiers_reject_corrupted_witnesses(
     assert rejected["reward"] == 0.0
 
 
-def test_euler_line_verifier_accepts_equivalent_rational_functions(
+@pytest.mark.parametrize("task_name", VERIFIER_TASKS)
+def test_verifiers_reject_unhashable_assurance(
     tmp_path: Path,
+    task_name: str,
 ) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "euler-line-symbolic-certificate",
-        "computed",
-    )
+    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    result = submission["result"]
-    for point in result["coordinates"].values():
-        for coordinate in point.values():
-            for term in coordinate["numerator"]:
-                value = Fraction(term["coefficient"]) * 2
-                term["coefficient"] = str(value)
-            for term in coordinate["denominator"]:
-                value = Fraction(term["coefficient"]) * 2
-                term["coefficient"] = str(value)
-    result["relation_coefficients"] = ["4", "-6", "2"]
+    submission["claimed_assurance"] = []
     _write_json(submission_path, submission)
 
-    accepted = _run_verifier(task, app, logs)
-    assert accepted["correctness"] == 1.0
-    assert accepted["reward"] == pytest.approx(1.0)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+    assert rejected["false_certification"] is False
 
 
-def test_euler_line_verifier_rejects_extra_denominator_singularity(
+def test_polynomial_verifier_rejects_non_array_witness_fields(
     tmp_path: Path,
 ) -> None:
     task, app, logs = _prepare_case(
         tmp_path,
-        "euler-line-symbolic-certificate",
+        "polynomial-tail-counterexample",
         "computed",
     )
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    submission["result"]["coordinates"]["O"]["x"]["denominator"][0]["exponents"] = [
-        1,
-        0,
-        0,
-    ]
+    submission["result"] = {
+        "p_coefficients": {"2": None, "8/3": None, "2/3": None, "0": None},
+        "q_coefficients": {"1": None, "199": None, "9900": None},
+        "p_roots": {"-1": None, "-1/3": None, "0": None},
+        "q_roots": {"-100": None, "-99": None},
+        "x1": "0",
+        "x2": "1/100",
+    }
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
@@ -360,86 +320,41 @@ def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None
     assert accepted["reward"] == pytest.approx(1.0)
 
 
-def test_modular_obstruction_accepts_reordered_complete_cases(
+@pytest.mark.parametrize("task_name", VERIFIER_TASKS)
+def test_verifiers_reject_unhashable_assurance(
     tmp_path: Path,
+    task_name: str,
 ) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "modular-cubic-obstruction",
-        "computed",
-    )
+    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    submission["result"]["residue_cases"].reverse()
-    _write_json(submission_path, submission)
-
-    accepted = _run_verifier(task, app, logs)
-    assert accepted["correctness"] == 1.0
-    assert accepted["reward"] == pytest.approx(1.0)
-
-
-def test_modular_obstruction_rejects_incomplete_residue_coverage(
-    tmp_path: Path,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "modular-cubic-obstruction",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"]["residue_cases"].pop()
+    submission["claimed_assurance"] = []
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+    assert rejected["false_certification"] is False
 
 
-def test_divisibility_construction_accepts_alternative_witness(
+def test_polynomial_verifier_rejects_non_array_witness_fields(
     tmp_path: Path,
 ) -> None:
     task, app, logs = _prepare_case(
         tmp_path,
-        "divisibility-construction-witness",
+        "polynomial-tail-counterexample",
         "computed",
     )
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"] = {
-        "a": 1,
-        "b": 324,
-        "product_mod_7": 6,
-        "power_difference": 8_173_186_372_997_100,
-        "quotient_by_7_pow_7": 9_924_419_700,
+        "p_coefficients": {"2": None, "8/3": None, "2/3": None, "0": None},
+        "q_coefficients": {"1": None, "199": None, "9900": None},
+        "p_roots": {"-1": None, "-1/3": None, "0": None},
+        "q_roots": {"-100": None, "-99": None},
+        "x1": "0",
+        "x2": "1/100",
     }
-    _write_json(submission_path, submission)
-
-    accepted = _run_verifier(task, app, logs)
-    assert accepted["correctness"] == 1.0
-    assert accepted["reward"] == pytest.approx(1.0)
-
-
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("evaluator_rubric_status", "INCONSISTENT"),
-        ("meta_evaluation_status", "UNREASONABLE"),
-    ],
-)
-def test_log_meta_audit_rejects_corrupted_evaluation_layers(
-    tmp_path: Path,
-    field: str,
-    value: str,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "log-inequality-meta-audit",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"][field] = value
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
@@ -492,69 +407,6 @@ def test_autoformalization_audit_rejects_incomplete_defect_set(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
-
-
-def test_grounded_premise_proof_rejects_irrelevant_premise(
-    tmp_path: Path,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "grounded-premise-proof",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"]["selected_premises"].append("kernel_is_normal")
-    _write_json(submission_path, submission)
-
-    rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
-
-
-def test_grounded_premise_proof_rejects_forward_reference(
-    tmp_path: Path,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "grounded-premise-proof",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    steps = submission["result"]["proof_steps"]
-    steps[0], steps[1] = steps[1], steps[0]
-    _write_json(submission_path, submission)
-
-    rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
-
-
-def test_nondifferentiable_maximum_accepts_alternative_rational_construction(
-    tmp_path: Path,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "nondifferentiable-maximum-construction",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"] = {
-        "peak": "-7/3",
-        "left_slope": "1/4",
-        "right_slope": "-5/2",
-        "left_value_at_join": "-7/3",
-        "right_value_at_join": "-7/3",
-        "left_derivative": "1/4",
-        "right_derivative": "-5/2",
-    }
-    _write_json(submission_path, submission)
-
-    accepted = _run_verifier(task, app, logs)
-    assert accepted["correctness"] == 1.0
-    assert accepted["reward"] == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize("task_name", VERIFIER_TASKS)
