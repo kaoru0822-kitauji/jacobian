@@ -1,6 +1,6 @@
 [dataset]
 name = "jacobian/regression-v1"
-description = "Twenty-two self-contained mathematical workflow observation tasks for Jacobian."
+description = "Twenty-three self-contained mathematical workflow observation tasks for Jacobian."
 keywords = [
     "mathematics",
     "jacobian",
@@ -67,6 +67,10 @@ digest = "sha256:259b05f04033b4adaabffd77a61c4d67f9e3d37dfd7f1cb4f5ee2fea35731eb
 [[tasks]]
 name = "jacobian/regression-v1-modular-cubic-obstruction"
 digest = "sha256:b0114a83bfe3ea0b319d7b6eb6628f0f767e93b7cfa64223e1082a7731e50b3c"
+
+[[tasks]]
+name = "jacobian/regression-v1-natural-subtraction-proof-repair"
+digest = "sha256:5d37a5c2d67549077280eaa6bbacae61d0d8503d6b9a216cc9ee5f03460ef28f"
 
 [[tasks]]
 name = "jacobian/regression-v1-nondifferentiable-maximum-construction"

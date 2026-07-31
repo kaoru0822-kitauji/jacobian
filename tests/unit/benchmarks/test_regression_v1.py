@@ -28,6 +28,7 @@ EXPECTED_TASKS = {
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
     "modular-cubic-obstruction",
+    "natural-subtraction-proof-repair",
     "nondifferentiable-maximum-construction",
     "polynomial-tail-counterexample",
     "subspace-direct-sum-counterexample",
@@ -43,7 +44,7 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_twenty_two_task_dataset() -> None:
+def test_regression_v1_is_a_frozen_twenty_three_task_dataset() -> None:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/regression-v1"
     assert {
@@ -85,6 +86,7 @@ def test_regression_v1_is_a_frozen_twenty_two_task_dataset() -> None:
             "matrix-square-zero-counterexample",
             "metric-tsp-proof-repair",
             "modular-cubic-obstruction",
+            "natural-subtraction-proof-repair",
             "nondifferentiable-maximum-construction",
             "polynomial-tail-counterexample",
             "subspace-direct-sum-counterexample",

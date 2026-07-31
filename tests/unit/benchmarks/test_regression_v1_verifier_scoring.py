@@ -35,6 +35,7 @@ RESOURCE_DERIVED_TASKS = (
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
     "modular-cubic-obstruction",
+    "natural-subtraction-proof-repair",
     "nondifferentiable-maximum-construction",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
@@ -245,6 +246,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
         (
             "modular-cubic-obstruction",
             lambda result: result["residue_cases"][1].update(lhs_residue=1),
+        ),
+        (
+            "natural-subtraction-proof-repair",
+            lambda result: result["multipliers"].__setitem__(1, "0"),
         ),
         (
             "nondifferentiable-maximum-construction",
@@ -548,3 +553,21 @@ def test_nondifferentiable_maximum_accepts_alternative_rational_construction(
     accepted = _run_verifier(task, app, logs)
     assert accepted["correctness"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_natural_subtraction_repair_rejects_false_pattern_diagnosis(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "natural-subtraction-proof-repair",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["failed_pattern_occurs"] = True
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
