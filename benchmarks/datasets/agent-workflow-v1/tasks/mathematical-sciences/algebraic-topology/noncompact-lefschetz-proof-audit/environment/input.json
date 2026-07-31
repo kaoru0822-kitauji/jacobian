@@ -1,0 +1,33 @@
+{
+  "task_id": "jacobian/agent-workflow-v1-noncompact-lefschetz-proof-audit",
+  "source": {
+    "repository": "https://codeberg.org/tgkolda/1stproof",
+    "revision": "edde66e7ee4cce5f29f0328f730f0db8e7929d5b",
+    "review_file": "2026-02-batch/FirstProofSolutionsComments.pdf",
+    "review_file_sha256": "sha256:a46d478359e4038f7f83e83f8e2de423a6d713f3bc8c93859eab6540e0934631",
+    "archive_file": "2026-02-batch/Supplementary Files/FirstProof_AI_logs.zip",
+    "archive_file_sha256": "sha256:53e451e96abfd2830caa2238d9a9b095407d837a395d7256c16f12102c16ffbe",
+    "model_files": [
+      {"path": "FirstProof-GPT5.2Pro-answers/Weinberger-internet.pdf", "sha256": "sha256:7d025894fa531aeb77687baccc05761baa9918c8194861e73ee4125f2308f7e6"},
+      {"path": "FirstProof-GPT5.2Pro-answers/Weinberger-no-internet.pdf", "sha256": "sha256:a33dbf92354e2cc75d1ab15e38e6cd89633b38e9053bc31e2f7eed50f43bf683"}
+    ],
+    "license": "public First Proof research archive; attribution and review provenance retained"
+  },
+  "frozen_claim": {
+    "lemma": "If X is a boundaryless manifold, f:X->X is proper, compact-support cohomology is finite-dimensional, and f has no fixed points, then L_c(f)=0.",
+    "proof_step": "Choose a compactly supported Thom class of the diagonal supported in an arbitrarily small neighborhood of the noncompact diagonal.",
+    "downstream_use": "Deduce that a fixed-point-free deck transformation cannot act on one-dimensional top compact-support cohomology."
+  },
+  "expert_counterexample": {
+    "space": "R",
+    "map_family": "f_q(x)=x+q for any nonzero rational q",
+    "compact_support_cohomology": {"degree_0_dimension": 0, "degree_1_dimension": 1}
+  },
+  "audit_scope": {
+    "exact_rational_translation": true,
+    "fixed_point_equation": true,
+    "compact_support_lefschetz_replay": true,
+    "original_research_question": "NOT_ASSESSED",
+    "general_topology_theorem_verification": false
+  }
+}

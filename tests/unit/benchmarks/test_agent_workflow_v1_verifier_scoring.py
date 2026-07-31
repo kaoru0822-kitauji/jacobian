@@ -31,6 +31,7 @@ RESOURCE_DERIVED_TASKS = (
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
+    "noncompact-lefschetz-proof-audit",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",

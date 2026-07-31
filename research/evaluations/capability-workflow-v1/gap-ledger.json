@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 27,
-    "manifest_sha256": "sha256:50aefb4508c9060a4c1488f8b9656d30aa0c7c86c69a0cd3fa47d2cc50de54a2",
+    "task_count": 28,
+    "manifest_sha256": "sha256:78697c835b37da1ce3328a12427a1cc24f6fa2b469eeca5ae42fe2e92fbd5a24",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -505,6 +505,20 @@
       "candidate_ids": [],
       "disposition": "RUNTIME_FIX",
       "next_action": "Restore Lean availability and retain exact linear arithmetic as a composable operation; do not add proof-repair policy."
+    },
+    {
+      "task_id": "noncompact-lefschetz-proof-audit",
+      "mathematical_moves": [
+        "Refute a noncompact compact-support Lefschetz lemma with a proper fixed-point-free translation of the real line.",
+        "Recompute compact-support cohomology, the induced orientation action, and the exact Lefschetz number.",
+        "Separate failure of the frozen proof from the status of the original lattice/manifold question."
+      ],
+      "current_capabilities": [],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Use as a diagnostic for theorem-hypothesis auditing and noncompactness errors; do not add a topology-specific detector without repeated workflow evidence."
     },
     {
       "task_id": "nondifferentiable-maximum-construction",
