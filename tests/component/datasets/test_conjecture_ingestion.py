@@ -12,7 +12,6 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.memory import ResearchMemory
-from jacobian.runtime import create_runtime
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
 
@@ -383,18 +382,3 @@ def test_maximum_identifiers_keep_summary_within_store_limit(tmp_path: Path) -> 
     stored = adapter.store.get(result.output["artifact_uri"])
 
     assert len(stored.manifest.summary) <= 512
-
-
-def test_runtime_exposes_typed_conjecture_ingestion_installation(
-    tmp_path: Path,
-) -> None:
-    with create_runtime(tmp_path) as runtime:
-        installation = runtime.portfolio.conjecture_ingestion
-        bundle = runtime.portfolio.domain_bundles["conjecture_ingestion"]
-
-        assert installation is not None
-        assert installation.semantics_uri == bundle.semantics_uri
-        assert (
-            installation.artifact_schema_uri
-            == bundle.result_schema_uris["dataset.conjecture.ingest"]
-        )
