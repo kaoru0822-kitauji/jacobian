@@ -22,7 +22,7 @@ digest = "sha256:014f6d62c4f5df7f65fd938db01eb3046bed6a6353fff6fff745f2e5aafbeec
 
 [[tasks]]
 name = "jacobian/regression-v1-distinct-sum-pairing-optimum"
-digest = "sha256:456c8f243fd1825f780288c603a5463cd623c6c344fd296680bf2fd698fd1a67"
+digest = "sha256:c2a8e68b4e3c85b68176ebedf0ceeda41dd00f75472569bf630a69b357116989"
 
 [[tasks]]
 name = "jacobian/regression-v1-divisibility-construction-witness"
