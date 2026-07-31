@@ -1,0 +1,1 @@
+Reduce the equation modulo 7. The term 7*y^3 vanishes and 2003 is congruent to 1. Cubes modulo 7 are 0, 1, or 6, so 4*x^3 is respectively 0, 4, or 3, never 1. Hence no integers x and y satisfy the equation.

@@ -30,6 +30,7 @@ RESOURCE_DERIVED_TASKS = (
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
+    "modular-cubic-obstruction",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
@@ -223,6 +224,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result["weights"].update(optimal=31),
         ),
         (
+            "modular-cubic-obstruction",
+            lambda result: result["residue_cases"][1].update(lhs_residue=1),
+        ),
+        (
             "polynomial-tail-counterexample",
             lambda result: result.update(x2="1"),
         ),
@@ -319,3 +324,39 @@ def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None
     accepted = _run_verifier(task, app, logs)
     assert accepted["correctness"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_modular_obstruction_accepts_reordered_complete_cases(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "modular-cubic-obstruction",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["residue_cases"].reverse()
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_modular_obstruction_rejects_incomplete_residue_coverage(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "modular-cubic-obstruction",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["residue_cases"].pop()
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0

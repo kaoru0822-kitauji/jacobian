@@ -15,6 +15,7 @@ Review date: 2026-07-30. Source inventory: the `Resources` tab of spreadsheet
 | `random-function-expectation-audit` | Hard | Proof audit / probability | BrokenMath, benchmark row 88, revision `5eda8c5…` | Tests dependence-aware expectation reasoning and exact probability bookkeeping, a pattern absent from the pending suite. |
 | `euler-line-symbolic-certificate` | Hard | Euclidean geometry / symbolic theorem verification | IDEF-GeoBench, curated problem 1 (hosted rows 2-17), revision `ce1decbe…` | Adds a new geometry workflow: derive generic rational coordinates, satisfy the point-defining identities, and certify a universal incidence relation exactly. |
 | `metric-tsp-proof-repair` | Hard | Proof repair / graph optimization | forge-reason-v1, validation row 11 (`forge-reason-00218`), revision `e582eb0…` | Adds proof repair rather than another verdict-only audit: identify an unjustified equality, weaken the theorem to its valid approximation guarantee, and bind the repair to an exact independently optimized trace. |
+| `modular-cubic-obstruction` | Medium | Number theory / impossibility certificate | Discover-and-Prove `minif2f_hard`, train row 195 (`numbertheory_4x3m7y3neq2003`), revision `ac10444…` | Adds a universal Diophantine nonexistence workflow: discover a modulus, enumerate a complete residue certificate, and have an independent checker test every residue pair. |
 
 Difficulty is based on the complete task contract, not only the length of the
 answer. The suite deliberately contains no Extreme/Open task: the reviewed
@@ -55,6 +56,11 @@ The remaining inventory was not converted wholesale. Major rejection classes:
   analytic assumptions that the offline verifier could not independently
   adjudicate. The Metric TSP row was retained because every repaired proof
   obligation admits a complete finite checker on a frozen metric instance.
+- Discover-and-Prove rows 100–199 were screened beyond the previously used
+  logarithm example. Routine evaluations, answer-only algebra, and tasks
+  overlapping exact arithmetic were rejected. Row 195 was retained because
+  its source answer is absent, its universal integer scope is unambiguous, and
+  a complete modular obstruction is independently reproducible offline.
 
 This is a curation record, not a claim that rejected datasets are intrinsically
 low quality; they were unsuitable for this specific long-lived Harbor suite.

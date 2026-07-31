@@ -1,6 +1,6 @@
 [dataset]
 name = "jacobian/regression-v1"
-description = "Sixteen self-contained mathematical workflow observation tasks for Jacobian."
+description = "Seventeen self-contained mathematical workflow observation tasks for Jacobian."
 keywords = [
     "mathematics",
     "jacobian",
@@ -47,6 +47,10 @@ digest = "sha256:197ac8160a9852093e5746622b5524c1461620c4d7b9eaaff7c525cea93ef78
 [[tasks]]
 name = "jacobian/regression-v1-metric-tsp-proof-repair"
 digest = "sha256:259b05f04033b4adaabffd77a61c4d67f9e3d37dfd7f1cb4f5ee2fea35731eb9"
+
+[[tasks]]
+name = "jacobian/regression-v1-modular-cubic-obstruction"
+digest = "sha256:b0114a83bfe3ea0b319d7b6eb6628f0f767e93b7cfa64223e1082a7731e50b3c"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
