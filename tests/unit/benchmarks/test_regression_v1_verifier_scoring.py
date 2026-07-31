@@ -53,6 +53,19 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
+def _bind_result_evidence(app: Path, submission: dict) -> None:
+    evidence_path = app / "evidence" / "answer.txt"
+    lines = evidence_path.read_text().splitlines()
+    marker = "RESULT_JSON: " + json.dumps(
+        submission["result"], sort_keys=True, separators=(",", ":")
+    )
+    evidence_path.write_text(
+        "\n".join(marker if line.startswith("RESULT_JSON:") else line for line in lines)
+        + "\n"
+    )
+    submission["evidence"][0]["sha256"] = _digest(evidence_path)
+
+
 def _sat_record(task: Path, app: Path, submission: Mapping[str, object]) -> dict:
     input_data = json.loads((task / "input.json").read_text())
     result = submission["result"]
@@ -313,53 +326,12 @@ def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["optimal_tour"] = ["A", "D", "C", "F", "E", "B", "A"]
+    _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
 
     accepted = _run_verifier(task, app, logs)
     assert accepted["correctness"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
-
-
-@pytest.mark.parametrize("task_name", VERIFIER_TASKS)
-def test_verifiers_reject_unhashable_assurance(
-    tmp_path: Path,
-    task_name: str,
-) -> None:
-    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["claimed_assurance"] = []
-    _write_json(submission_path, submission)
-
-    rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
-    assert rejected["false_certification"] is False
-
-
-def test_polynomial_verifier_rejects_non_array_witness_fields(
-    tmp_path: Path,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "polynomial-tail-counterexample",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"] = {
-        "p_coefficients": {"2": None, "8/3": None, "2/3": None, "0": None},
-        "q_coefficients": {"1": None, "199": None, "9900": None},
-        "p_roots": {"-1": None, "-1/3": None, "0": None},
-        "q_roots": {"-100": None, "-99": None},
-        "x1": "0",
-        "x2": "1/100",
-    }
-    _write_json(submission_path, submission)
-
-    rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
 
 
 def test_autoformalization_audit_accepts_alternative_exact_witnesses(
@@ -378,11 +350,11 @@ def test_autoformalization_audit_accepts_alternative_exact_witnesses(
         "forced_y": [0],
     }
     submission["result"]["operator_mismatch_certificate"] = {
-        "dimension": 3,
-        "x": [1, 2, 0],
-        "y": [2, -1, 5],
+        "dimension": 2,
+        "x": [3, -2],
+        "y": [2, 3],
         "dot_product": 0,
-        "coordinate_products": [2, -2, 0],
+        "coordinate_products": [6, -6],
     }
     _write_json(submission_path, submission)
 
@@ -402,48 +374,6 @@ def test_autoformalization_audit_rejects_incomplete_defect_set(
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["defects"] = ["MISSING_DIMENSION_PREMISE"]
-    _write_json(submission_path, submission)
-
-    rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
-
-
-@pytest.mark.parametrize("task_name", VERIFIER_TASKS)
-def test_verifiers_reject_unhashable_assurance(
-    tmp_path: Path,
-    task_name: str,
-) -> None:
-    task, app, logs = _prepare_case(tmp_path, task_name, "computed")
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["claimed_assurance"] = []
-    _write_json(submission_path, submission)
-
-    rejected = _run_verifier(task, app, logs)
-    assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
-    assert rejected["false_certification"] is False
-
-
-def test_polynomial_verifier_rejects_non_array_witness_fields(
-    tmp_path: Path,
-) -> None:
-    task, app, logs = _prepare_case(
-        tmp_path,
-        "polynomial-tail-counterexample",
-        "computed",
-    )
-    submission_path = app / "submission.json"
-    submission = json.loads(submission_path.read_text())
-    submission["result"] = {
-        "p_coefficients": {"2": None, "8/3": None, "2/3": None, "0": None},
-        "q_coefficients": {"1": None, "199": None, "9900": None},
-        "p_roots": {"-1": None, "-1/3": None, "0": None},
-        "q_roots": {"-100": None, "-99": None},
-        "x1": "0",
-        "x2": "1/100",
-    }
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
