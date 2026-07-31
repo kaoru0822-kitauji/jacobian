@@ -26,7 +26,6 @@ from jacobian.contracts.polynomials import (
     RationalPolynomialTerm,
     SparseRationalPolynomial,
 )
-from jacobian.contracts.results import ContractModel
 from jacobian.domains.polynomial._support import polynomial_operation
 from jacobian.domains.polynomial.operations import _poly, _rational, _symbols, _wire
 
@@ -153,8 +152,9 @@ def _coefficient_matrix(
     return source_basis, target_basis, matrix, entries
 
 
-def compute_graded_jacobian_syzygy(request: ContractModel) -> ContractModel:
-    request = cast(GradedJacobianSyzygyRequest, request)
+def compute_graded_jacobian_syzygy(
+    request: GradedJacobianSyzygyRequest,
+) -> GradedJacobianSyzygyResult:
     if request.polynomial is not None:
         variables = cast(tuple[str, str, str], request.polynomial.variables)
         source = _poly(request.polynomial)

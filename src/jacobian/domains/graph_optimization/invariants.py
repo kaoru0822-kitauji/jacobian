@@ -140,6 +140,8 @@ def _distance_matrix(graph: Any) -> GraphDistanceMatrixResult:
 def _diameter(graph: Any) -> GraphDiameterResult:
     import networkx as nx
 
+    from jacobian.math.graphs import diameter
+
     if not graph or not nx.is_connected(graph):
         return GraphDiameterResult(
             status="NOT_APPLICABLE",
@@ -149,7 +151,7 @@ def _diameter(graph: Any) -> GraphDiameterResult:
         )
     return GraphDiameterResult(
         status="COMPUTED",
-        diameter=int(nx.diameter(graph)),
+        diameter=diameter(graph),
         connected=True,
         exactness="EXACT",
     )
@@ -170,9 +172,9 @@ def _vertex_connectivity(graph: Any) -> GraphVertexConnectivityResult:
 
 
 def _eulerian(graph: Any) -> GraphEulerianResult:
-    import networkx as nx
+    from jacobian.math.graphs import is_eulerian
 
-    return GraphEulerianResult(is_eulerian=bool(nx.is_eulerian(graph)))
+    return GraphEulerianResult(is_eulerian=is_eulerian(graph))
 
 
 def _spanning_tree_count(graph: Any) -> GraphSpanningTreeCountResult:
@@ -255,10 +257,9 @@ def _maximum_matching(graph: Any) -> GraphMaximumMatchingResult:
 
 
 def _triangle_count(graph: Any) -> GraphTriangleCountResult:
-    import networkx as nx
+    from jacobian.math.graphs import triangle_count
 
-    triangle_counts = cast(dict[str, int], nx.triangles(graph))
-    return GraphTriangleCountResult(triangle_count=sum(triangle_counts.values()) // 3)
+    return GraphTriangleCountResult(triangle_count=triangle_count(graph))
 
 
 def _radius(graph: Any) -> GraphRadiusResult:

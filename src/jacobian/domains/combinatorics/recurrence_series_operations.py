@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from jacobian.canonical import format_canonical_integer
 from jacobian.contracts.combinatorics import (
@@ -13,7 +13,6 @@ from jacobian.contracts.combinatorics import (
     RationalGeneratingFunctionCoefficientsResult,
 )
 from jacobian.contracts.exact import CanonicalRational
-from jacobian.contracts.results import ContractModel
 
 
 def _sympy_rational(value: CanonicalRational) -> Any:
@@ -29,10 +28,12 @@ def _wire(value: Any) -> CanonicalRational:
     )
 
 
-def evaluate_linear_recurrence(request: ContractModel) -> ContractModel:
+def evaluate_linear_recurrence(
+    request: LinearRecurrenceEvaluationRequest,
+) -> LinearRecurrenceEvaluationResult:
     """Materialize the complete bounded replay prefix and requested projection."""
 
-    value = cast(LinearRecurrenceEvaluationRequest, request)
+    value = request
     requested_indices = (
         tuple(range(value.term_count))
         if value.scope == "PREFIX" and value.term_count is not None
@@ -67,11 +68,11 @@ def evaluate_linear_recurrence(request: ContractModel) -> ContractModel:
 
 
 def compute_rational_generating_function_coefficients(
-    request: ContractModel,
-) -> ContractModel:
+    request: RationalGeneratingFunctionCoefficientsRequest,
+) -> RationalGeneratingFunctionCoefficientsResult:
     """Expand N(x)/D(x) by exact coefficient recurrence through x^(k-1)."""
 
-    value = cast(RationalGeneratingFunctionCoefficientsRequest, request)
+    value = request
     numerator = tuple(_sympy_rational(item) for item in value.numerator)
     denominator = tuple(_sympy_rational(item) for item in value.denominator)
     zero = denominator[0] * 0

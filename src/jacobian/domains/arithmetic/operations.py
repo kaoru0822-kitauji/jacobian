@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from fractions import Fraction
-from typing import Literal, cast
+from typing import Literal
 
 from jacobian.contracts.arithmetic import (
     IntegerBaseDigitsRequest,
@@ -34,7 +34,7 @@ from jacobian.contracts.rationals import (
     RationalValueRequest,
     RationalValueResult,
 )
-from jacobian.contracts.results import ContractModel
+from jacobian.math import arithmetic as native_arithmetic
 
 
 def _int(value: str) -> int:
@@ -50,14 +50,14 @@ def to_fraction(num: str, den: str) -> Fraction:
     return Fraction(int(num), int(den))
 
 
-def absolute_value(request: ContractModel) -> ContractModel:
-    req = cast(IntegerValueRequest, request)
-    return IntegerValueResult(value=_canonical(abs(_int(req.value))))
+def absolute_value(request: IntegerValueRequest) -> IntegerValueResult:
+    return IntegerValueResult(
+        value=_canonical(native_arithmetic.absolute_value(_int(request.value)))
+    )
 
 
-def sign(request: ContractModel) -> ContractModel:
-    req = cast(IntegerValueRequest, request)
-    value = _int(req.value)
+def sign(request: IntegerValueRequest) -> IntegerSignResult:
+    value = native_arithmetic.sign(_int(request.value))
     if value < 0:
         sign: Literal[-1, 0, 1] = -1
     elif value > 0:
@@ -67,24 +67,21 @@ def sign(request: ContractModel) -> ContractModel:
     return IntegerSignResult(sign=sign)
 
 
-def decimal_digit_sum(request: ContractModel) -> ContractModel:
-    req = cast(IntegerValueRequest, request)
+def decimal_digit_sum(request: IntegerValueRequest) -> IntegerValueResult:
     return IntegerValueResult(
-        value=_canonical(sum(int(digit) for digit in str(abs(_int(req.value)))))
+        value=_canonical(sum(int(digit) for digit in str(abs(_int(request.value)))))
     )
 
 
-def decimal_digit_count(request: ContractModel) -> ContractModel:
-    req = cast(IntegerValueRequest, request)
-    return IntegerValueResult(value=_canonical(len(str(abs(_int(req.value))))))
+def decimal_digit_count(request: IntegerValueRequest) -> IntegerValueResult:
+    return IntegerValueResult(value=_canonical(len(str(abs(_int(request.value))))))
 
 
-def base_digits(request: ContractModel) -> ContractModel:
+def base_digits(request: IntegerBaseDigitsRequest) -> IntegerBaseDigitsResult:
     from sympy.ntheory import digits as sympy_digits
 
-    req = cast(IntegerBaseDigitsRequest, request)
-    value = _int(req.value)
-    signed_base, *expanded = sympy_digits(value, req.base)
+    value = _int(request.value)
+    signed_base, *expanded = sympy_digits(value, request.base)
     sign: Literal[-1, 0, 1]
     if value == 0:
         sign = 0
@@ -99,15 +96,14 @@ def base_digits(request: ContractModel) -> ContractModel:
     )
 
 
-def nth_root(request: ContractModel) -> ContractModel:
+def nth_root(request: IntegerNthRootRequest) -> IntegerNthRootResult:
     from sympy import integer_nthroot
 
-    req = cast(IntegerNthRootRequest, request)
-    if req.value < 0 and req.degree % 2 == 0:
+    if request.value < 0 and request.degree % 2 == 0:
         raise ValueError("even root of a negative integer is not integral-real")
-    root, exact = integer_nthroot(abs(req.value), req.degree)
+    root, exact = integer_nthroot(abs(request.value), request.degree)
     return IntegerNthRootResult(
-        root=_canonical(-root if req.value < 0 else root),
+        root=_canonical(-root if request.value < 0 else root),
         exact=exact,
     )
 
@@ -123,88 +119,94 @@ def _wire(value: Fraction) -> CanonicalRational:
     )
 
 
-def reciprocal(request: ContractModel) -> ContractModel:
-    req = cast(RationalValueRequest, request)
-    value = _fraction(req.value)
-    if value == 0:
-        raise ValueError("zero has no reciprocal")
-    return RationalValueResult(value=_wire(Fraction(1, 1) / value))
+def reciprocal(request: RationalValueRequest) -> RationalValueResult:
+    try:
+        value = native_arithmetic.reciprocal(_fraction(request.value))
+    except ZeroDivisionError as exc:
+        raise ValueError(str(exc)) from exc
+    return RationalValueResult(value=_wire(value))
 
 
-def negation(request: ContractModel) -> ContractModel:
-    req = cast(RationalValueRequest, request)
-    return RationalValueResult(value=_wire(-_fraction(req.value)))
+def negation(request: RationalValueRequest) -> RationalValueResult:
+    return RationalValueResult(value=_wire(-_fraction(request.value)))
 
 
-def rational_absolute_value(request: ContractModel) -> ContractModel:
-    req = cast(RationalValueRequest, request)
-    return RationalValueResult(value=_wire(abs(_fraction(req.value))))
+def rational_absolute_value(request: RationalValueRequest) -> RationalValueResult:
+    return RationalValueResult(value=_wire(abs(_fraction(request.value))))
 
 
-def sum_rationals(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
-    return RationalValueResult(value=_wire(_fraction(req.left) + _fraction(req.right)))
-
-
-def difference(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
-    return RationalValueResult(value=_wire(_fraction(req.left) - _fraction(req.right)))
-
-
-def product(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
-    return RationalValueResult(value=_wire(_fraction(req.left) * _fraction(req.right)))
-
-
-def quotient(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
-    right = _fraction(req.right)
-    if right == 0:
-        raise ValueError("division by zero")
-    return RationalValueResult(value=_wire(_fraction(req.left) / right))
-
-
-def minimum(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
+def sum_rationals(request: RationalPairRequest) -> RationalValueResult:
     return RationalValueResult(
-        value=_wire(min(_fraction(req.left), _fraction(req.right)))
+        value=_wire(
+            native_arithmetic.sum_rationals(
+                _fraction(request.left), _fraction(request.right)
+            )
+        )
     )
 
 
-def maximum(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
+def difference(request: RationalPairRequest) -> RationalValueResult:
     return RationalValueResult(
-        value=_wire(max(_fraction(req.left), _fraction(req.right)))
+        value=_wire(_fraction(request.left) - _fraction(request.right))
     )
 
 
-def floor(request: ContractModel) -> ContractModel:
-    req = cast(RationalValueRequest, request)
-    return RationalIntegerResult(value=str(math.floor(_fraction(req.value))))
+def product(request: RationalPairRequest) -> RationalValueResult:
+    return RationalValueResult(
+        value=_wire(_fraction(request.left) * _fraction(request.right))
+    )
 
 
-def ceiling(request: ContractModel) -> ContractModel:
-    req = cast(RationalValueRequest, request)
-    return RationalIntegerResult(value=str(math.ceil(_fraction(req.value))))
+def quotient(request: RationalPairRequest) -> RationalValueResult:
+    try:
+        value = native_arithmetic.quotient(
+            _fraction(request.left), _fraction(request.right)
+        )
+    except ZeroDivisionError as exc:
+        raise ValueError(str(exc)) from exc
+    return RationalValueResult(value=_wire(value))
 
 
-def continued_fraction(request: ContractModel) -> ContractModel:
+def minimum(request: RationalPairRequest) -> RationalValueResult:
+    return RationalValueResult(
+        value=_wire(min(_fraction(request.left), _fraction(request.right)))
+    )
+
+
+def maximum(request: RationalPairRequest) -> RationalValueResult:
+    return RationalValueResult(
+        value=_wire(max(_fraction(request.left), _fraction(request.right)))
+    )
+
+
+def floor(request: RationalValueRequest) -> RationalIntegerResult:
+    return RationalIntegerResult(value=str(math.floor(_fraction(request.value))))
+
+
+def ceiling(request: RationalValueRequest) -> RationalIntegerResult:
+    return RationalIntegerResult(value=str(math.ceil(_fraction(request.value))))
+
+
+def continued_fraction(
+    request: RationalValueRequest,
+) -> RationalContinuedFractionResult:
     from sympy import Rational as SympyRational
     from sympy import continued_fraction as sympy_continued_fraction
 
-    req = cast(RationalValueRequest, request)
-    value = _fraction(req.value)
+    value = _fraction(request.value)
     terms = sympy_continued_fraction(SympyRational(value.numerator, value.denominator))
     return RationalContinuedFractionResult(
         terms=tuple(str(int(term)) for term in terms)
     )
 
 
-def equal(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
-    return RationalComparisonResult(holds=_fraction(req.left) == _fraction(req.right))
+def equal(request: RationalPairRequest) -> RationalComparisonResult:
+    return RationalComparisonResult(
+        holds=_fraction(request.left) == _fraction(request.right)
+    )
 
 
-def less_than(request: ContractModel) -> ContractModel:
-    req = cast(RationalPairRequest, request)
-    return RationalComparisonResult(holds=_fraction(req.left) < _fraction(req.right))
+def less_than(request: RationalPairRequest) -> RationalComparisonResult:
+    return RationalComparisonResult(
+        holds=_fraction(request.left) < _fraction(request.right)
+    )

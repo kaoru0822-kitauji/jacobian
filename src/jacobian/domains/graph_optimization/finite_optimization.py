@@ -149,7 +149,7 @@ def _scope(
     }
 
 
-def _vertex_obligation(
+def _vertex_obligation[ObligationT: ContractModel](
     request: GraphOptimizationRequest,
     result: (
         GraphDominationMinimumOutput
@@ -157,8 +157,8 @@ def _vertex_obligation(
         | GraphInducedTreeMaximumOutput
         | GraphInducedBipartiteMaximumOutput
     ),
-    model: type[ContractModel],
-) -> ContractModel:
+    model: type[ObligationT],
+) -> ObligationT:
     return model.model_validate(
         {
             "graph": request.graph,
@@ -175,7 +175,7 @@ def _vertex_obligation(
 def _matching_obligation(
     request: GraphOptimizationRequest,
     result: GraphMinimumMaximalMatchingOutput,
-) -> ContractModel:
+) -> GraphMinimumMaximalMatchingObligation:
     return GraphMinimumMaximalMatchingObligation(
         graph=request.graph,
         status=result.status,

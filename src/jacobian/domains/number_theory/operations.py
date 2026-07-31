@@ -54,26 +54,25 @@ from jacobian.contracts.number_theory import (
     QuadraticResiduesResult,
     ValuationRequest,
 )
-from jacobian.contracts.results import ContractModel
 
 
-def compute_gcd(request: ContractModel) -> ContractModel:
+def compute_gcd(request: IntegerPairRequest) -> IntegerValueResult:
     """Compute gcd(a, b) using ``math.gcd``."""
-    pair = cast(IntegerPairRequest, request)
+    pair = request
     return IntegerValueResult(value=str(math.gcd(int(pair.left), int(pair.right))))
 
 
-def compute_lcm(request: ContractModel) -> ContractModel:
+def compute_lcm(request: IntegerPairRequest) -> IntegerValueResult:
     """Compute lcm(a, b) using ``math.lcm``."""
-    pair = cast(IntegerPairRequest, request)
+    pair = request
     return IntegerValueResult(value=str(math.lcm(int(pair.left), int(pair.right))))
 
 
-def compute_jacobi_symbol(request: ContractModel) -> ContractModel:
+def compute_jacobi_symbol(request: JacobiSymbolRequest) -> JacobiSymbolResult:
     """Compute the Jacobi symbol using ``sympy.jacobi_symbol``."""
     from sympy import jacobi_symbol
 
-    value = cast(JacobiSymbolRequest, request)
+    value = request
     symbol = cast(Literal[-1, 0, 1], int(jacobi_symbol(int(value.a), value.n)))
     return JacobiSymbolResult(
         a=value.a,
@@ -82,11 +81,11 @@ def compute_jacobi_symbol(request: ContractModel) -> ContractModel:
     )
 
 
-def compute_extended_gcd(request: ContractModel) -> ContractModel:
+def compute_extended_gcd(request: IntegerPairRequest) -> ExtendedGcdResult:
     """Compute gcd and Bezout coefficients using ``sympy.gcdex``."""
     from sympy import gcdex
 
-    pair = cast(IntegerPairRequest, request)
+    pair = request
     x, y, divisor = gcdex(int(pair.left), int(pair.right))
     return ExtendedGcdResult(
         gcd=str(int(divisor)),
@@ -95,11 +94,11 @@ def compute_extended_gcd(request: ContractModel) -> ContractModel:
     )
 
 
-def enumerate_divisors(request: ContractModel) -> ContractModel:
+def enumerate_divisors(request: FactorizationRequest) -> DivisorListResult:
     """Enumerate all positive divisors using ``sympy.divisors``."""
     from sympy import divisors as sympy_divisors
 
-    value = int(cast(FactorizationRequest, request).value)
+    value = int(request.value)
     if value == 0:
         raise ValueError("zero has infinitely many divisors")
     return DivisorListResult(
@@ -107,11 +106,11 @@ def enumerate_divisors(request: ContractModel) -> ContractModel:
     )
 
 
-def enumerate_proper_divisors(request: ContractModel) -> ContractModel:
+def enumerate_proper_divisors(request: FactorizationRequest) -> DivisorListResult:
     """Enumerate all positive proper divisors using ``sympy.divisors(proper=True)``."""
     from sympy import divisors as sympy_divisors
 
-    value = int(cast(FactorizationRequest, request).value)
+    value = int(request.value)
     if value == 0:
         raise ValueError("zero has infinitely many divisors")
     return DivisorListResult(
@@ -119,11 +118,11 @@ def enumerate_proper_divisors(request: ContractModel) -> ContractModel:
     )
 
 
-def factorize_primes(request: ContractModel) -> ContractModel:
+def factorize_primes(request: FactorizationRequest) -> PrimeFactorizationResult:
     """Compute the complete prime-power factorization using ``sympy.factorint``."""
     from sympy import factorint
 
-    value = int(cast(FactorizationRequest, request).value)
+    value = int(request.value)
     if value == 0:
         raise ValueError("zero has no finite prime factorization")
     factors = tuple(
@@ -133,11 +132,11 @@ def factorize_primes(request: ContractModel) -> ContractModel:
     return PrimeFactorizationResult(factors=factors)
 
 
-def decide_powerful(request: ContractModel) -> ContractModel:
+def decide_powerful(request: PowerfulNumberRequest) -> PowerfulNumberResult:
     """Decide whether every prime exponent is at least two."""
     from sympy import factorint
 
-    value = int(cast(PowerfulNumberRequest, request).value)
+    value = int(request.value)
     factor_items = sorted(factorint(value).items())
     factors = tuple(
         PrimePower(prime=str(prime), power=int(power)) for prime, power in factor_items
@@ -153,156 +152,156 @@ def decide_powerful(request: ContractModel) -> ContractModel:
     )
 
 
-def compute_valuation(request: ContractModel) -> ContractModel:
+def compute_valuation(request: ValuationRequest) -> IntegerValueResult:
     """Compute the p-adic valuation using ``sympy.multiplicity``."""
     from sympy import isprime, multiplicity
 
-    req = cast(ValuationRequest, request)
+    req = request
     value, prime = int(req.value), int(req.prime)
     if value == 0 or abs(prime) < 2 or not isprime(abs(prime)):
         raise ValueError("valuation requires nonzero value and prime absolute base")
     return IntegerValueResult(value=str(multiplicity(abs(prime), abs(value))))
 
 
-def compute_divisor_count(request: ContractModel) -> ContractModel:
+def compute_divisor_count(request: PositiveIntegerRequest) -> IntegerValueResult:
     """Count positive divisors using ``sympy.divisor_count``."""
     from sympy import divisor_count
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(divisor_count(n))))
 
 
-def compute_divisor_sum(request: ContractModel) -> ContractModel:
+def compute_divisor_sum(request: PositiveIntegerRequest) -> IntegerValueResult:
     """Sum positive divisors using ``sympy.divisor_sigma``."""
     from sympy import divisor_sigma
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(divisor_sigma(n))))
 
 
-def compute_aliquot_sum(request: ContractModel) -> ContractModel:
+def compute_aliquot_sum(request: PositiveIntegerRequest) -> IntegerValueResult:
     """Sum positive proper divisors using ``sympy.divisor_sigma(n) - n``."""
     from sympy import divisor_sigma
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(divisor_sigma(n)) - n))
 
 
-def decide_coprime(request: ContractModel) -> ContractModel:
+def decide_coprime(request: IntegerPairRequest) -> BooleanResult:
     """Decide coprimality using ``math.gcd``."""
-    pair = cast(IntegerPairRequest, request)
+    pair = request
     return BooleanResult(holds=math.gcd(int(pair.left), int(pair.right)) == 1)
 
 
-def decide_divides(request: ContractModel) -> ContractModel:
+def decide_divides(request: DivisibilityRequest) -> BooleanResult:
     """Decide divisibility using the remainder operator."""
-    req = cast(DivisibilityRequest, request)
+    req = request
     divisor, dividend = int(req.divisor), int(req.dividend)
     if divisor == 0:
         raise ValueError("divisor must be nonzero")
     return BooleanResult(holds=dividend % divisor == 0)
 
 
-def decide_even(request: ContractModel) -> ContractModel:
+def decide_even(request: IntegerValueRequest) -> BooleanResult:
     """Decide evenness using the remainder operator."""
-    value = int(cast(IntegerValueRequest, request).value)
+    value = int(request.value)
     return BooleanResult(holds=value % 2 == 0)
 
 
-def decide_odd(request: ContractModel) -> ContractModel:
+def decide_odd(request: IntegerValueRequest) -> BooleanResult:
     """Decide oddness using the remainder operator."""
-    value = int(cast(IntegerValueRequest, request).value)
+    value = int(request.value)
     return BooleanResult(holds=value % 2 != 0)
 
 
-def decide_square(request: ContractModel) -> ContractModel:
+def decide_square(request: NonnegativeIntegerRequest) -> BooleanResult:
     """Decide perfect square using ``math.isqrt``."""
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return BooleanResult(holds=math.isqrt(n) ** 2 == n)
 
 
-def decide_squarefree(request: ContractModel) -> ContractModel:
+def decide_squarefree(request: ArithmeticFunctionRequest) -> BooleanResult:
     """Decide squarefreeness using ``sympy.factorint``."""
     from sympy import factorint
 
-    n = cast(ArithmeticFunctionRequest, request).n
+    n = request.n
     if n == 0:
         return BooleanResult(holds=False)
     return BooleanResult(holds=all(power == 1 for power in factorint(n).values()))
 
 
-def decide_perfect(request: ContractModel) -> ContractModel:
+def decide_perfect(request: NonnegativeIntegerRequest) -> BooleanResult:
     """Decide perfect number using ``sympy.divisor_sigma``."""
     from sympy import divisor_sigma
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return BooleanResult(holds=bool(n and int(divisor_sigma(n)) - n == n))
 
 
-def decide_abundant(request: ContractModel) -> ContractModel:
+def decide_abundant(request: NonnegativeIntegerRequest) -> BooleanResult:
     """Decide abundant number using ``sympy.divisor_sigma``."""
     from sympy import divisor_sigma
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return BooleanResult(holds=bool(n and int(divisor_sigma(n)) - n > n))
 
 
-def decide_deficient(request: ContractModel) -> ContractModel:
+def decide_deficient(request: NonnegativeIntegerRequest) -> BooleanResult:
     """Decide deficient number using ``sympy.divisor_sigma``."""
     from sympy import divisor_sigma
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return BooleanResult(holds=bool(n and int(divisor_sigma(n)) - n < n))
 
 
-def decide_prime(request: ContractModel) -> ContractModel:
+def decide_prime(request: IntegerValueRequest) -> BooleanResult:
     """Decide primality using ``sympy.isprime``."""
     from sympy import isprime
 
-    value = int(cast(IntegerValueRequest, request).value)
+    value = int(request.value)
     return BooleanResult(holds=bool(isprime(value)))
 
 
-def compute_next_prime(request: ContractModel) -> ContractModel:
+def compute_next_prime(request: NonnegativeIntegerRequest) -> IntegerValueResult:
     """Compute the next prime using ``sympy.nextprime``."""
     from sympy import nextprime
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(nextprime(n))))
 
 
-def compute_previous_prime(request: ContractModel) -> ContractModel:
+def compute_previous_prime(request: NonnegativeIntegerRequest) -> IntegerValueResult:
     """Compute the previous prime using ``sympy.prevprime``."""
     from sympy import prevprime
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     if n <= 2:
         raise ValueError("previous prime requires n greater than 2")
     return IntegerValueResult(value=str(int(prevprime(n))))
 
 
-def compute_prime_count(request: ContractModel) -> ContractModel:
+def compute_prime_count(request: NonnegativeIntegerRequest) -> IntegerValueResult:
     """Count primes through n using ``sympy.primepi``."""
     from sympy import primepi
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(primepi(n))))
 
 
-def compute_floor_square_root(request: ContractModel) -> ContractModel:
+def compute_floor_square_root(request: FloorSquareRootRequest) -> FloorSquareRootResult:
     """Return the exact floor square-root."""
     from sympy import integer_nthroot
 
-    n = cast(FloorSquareRootRequest, request).n
+    n = request.n
     root, _ = integer_nthroot(n, 2)
     return FloorSquareRootResult(root=int(root))
 
 
-def compute_legendre_symbol(request: ContractModel) -> ContractModel:
+def compute_legendre_symbol(request: LegendreSymbolRequest) -> LegendreSymbolResult:
     """Compute ``(a / p)`` after checking that ``p`` is prime."""
     from sympy import isprime, legendre_symbol
 
-    value = cast(LegendreSymbolRequest, request)
+    value = request
     if not isprime(value.prime):
         raise ValueError("Legendre denominator must be prime")
     return LegendreSymbolResult(
@@ -312,11 +311,13 @@ def compute_legendre_symbol(request: ContractModel) -> ContractModel:
     )
 
 
-def compute_factorial_valuation(request: ContractModel) -> ContractModel:
+def compute_factorial_valuation(
+    request: FactorialValuationRequest,
+) -> FactorialValuationResult:
     """Compute the valuation of ``n!`` at an arbitrary composite base."""
     from sympy.ntheory import multiplicity_in_factorial
 
-    value = cast(FactorialValuationRequest, request)
+    value = request
     return FactorialValuationResult(
         n=value.n,
         base=value.base,
@@ -324,81 +325,81 @@ def compute_factorial_valuation(request: ContractModel) -> ContractModel:
     )
 
 
-def compute_nth_prime(request: ContractModel) -> ContractModel:
+def compute_nth_prime(request: PositiveIntegerRequest) -> IntegerValueResult:
     """Compute the nth prime using ``sympy.prime``."""
     from sympy import prime
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(prime(n))))
 
 
-def compute_primorial(request: ContractModel) -> ContractModel:
+def compute_primorial(request: NonnegativeIntegerRequest) -> IntegerValueResult:
     """Compute the product of the first n primes using ``sympy.primorial``."""
     from sympy import primorial
 
-    n = cast(NonnegativeIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(primorial(n))))
 
 
-def compute_euler_totient(request: ContractModel) -> ContractModel:
+def compute_euler_totient(request: PositiveIntegerRequest) -> IntegerValueResult:
     """Count coprime residues using ``sympy.totient``."""
     from sympy import totient
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(totient(n))))
 
 
-def compute_mobius(request: ContractModel) -> ContractModel:
+def compute_mobius(request: PositiveIntegerRequest) -> IntegerValueResult:
     """Compute the Mobius function using ``sympy.mobius``."""
     from sympy import mobius
 
-    n = cast(PositiveIntegerRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(int(mobius(n))))
 
 
-def compute_radical(request: ContractModel) -> ContractModel:
+def compute_radical(request: ArithmeticFunctionRequest) -> IntegerValueResult:
     """Compute the product of distinct prime divisors using ``sympy.factorint``."""
     from sympy import factorint
 
-    n = cast(ArithmeticFunctionRequest, request).n
+    n = request.n
     return IntegerValueResult(value=str(math.prod(factorint(n))))
 
 
-def compute_modular_inverse(request: ContractModel) -> ContractModel:
+def compute_modular_inverse(request: ModularValueRequest) -> IntegerValueResult:
     """Compute the modular inverse using ``pow(value, -1, modulus)``."""
-    req = cast(ModularValueRequest, request)
+    req = request
     value, modulus = int(req.value), req.modulus
     return IntegerValueResult(value=str(pow(value, -1, modulus)))
 
 
-def compute_multiplicative_order(request: ContractModel) -> ContractModel:
+def compute_multiplicative_order(request: ModularValueRequest) -> IntegerValueResult:
     """Compute the multiplicative order using ``sympy.n_order``."""
     from sympy import n_order
 
-    req = cast(ModularValueRequest, request)
+    req = request
     value, modulus = int(req.value), req.modulus
     if math.gcd(value, modulus) != 1:
         raise ValueError("multiplicative order requires coprime value and modulus")
     return IntegerValueResult(value=str(int(n_order(value, modulus))))
 
 
-def enumerate_quadratic_residues(request: ContractModel) -> ContractModel:
+def enumerate_quadratic_residues(request: ModulusRequest) -> QuadraticResiduesResult:
     """Enumerate all quadratic residues using ``sympy.quadratic_residues``."""
     from sympy.ntheory.residue_ntheory import quadratic_residues
 
-    modulus = cast(ModulusRequest, request).modulus
+    modulus = request.modulus
     return QuadraticResiduesResult(
         residues=tuple(str(int(r)) for r in quadratic_residues(modulus)),
     )
 
 
 def compute_modular_polynomial_residue_image(
-    request: ContractModel,
-) -> ContractModel:
+    request: ModularPolynomialResidueImageRequest,
+) -> ModularPolynomialResidueImageResult:
     """Enumerate one sparse polynomial over its declared finite residue domains."""
     from itertools import product
 
-    polynomial = cast(ModularPolynomialResidueImageRequest, request)
+    polynomial = request
     normalized_terms = tuple(
         NormalizedModularPolynomialTerm(
             coefficient=int(term.coefficient) % polynomial.modulus,
@@ -471,11 +472,11 @@ def _evaluate_modular_polynomial(
     return value
 
 
-def solve_chinese_remainder(request: ContractModel) -> ContractModel:
+def solve_chinese_remainder(request: ChineseRemainderRequest) -> ChineseRemainderResult:
     """Solve a congruence system using ``sympy.solve_congruence``."""
     from sympy.ntheory.modular import solve_congruence
 
-    system = cast(ChineseRemainderRequest, request)
+    system = request
     result = solve_congruence(
         *zip(system.residues, system.moduli, strict=True),
         check=True,

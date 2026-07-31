@@ -59,7 +59,9 @@ Reference documents define exact interfaces, records, gates, and test
 expectations. Start with the [tool surface](reference/tools.md) for the public
 MCP contract and the
 [domain operation library](reference/domain-operation-library.md) for the
-shared built-in operation contract. Use the runtime `capability://catalog` and
+shared built-in operation contract. The
+[native Python API](reference/python-api.md) documents the supported
+native-value modules. Use the runtime `capability://catalog` and
 `capability.describe` for the installed capability inventory and exact
 operation schemas.
 

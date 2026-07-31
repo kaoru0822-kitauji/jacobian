@@ -25,16 +25,29 @@ from jacobian.domains.number_theory.operations import (
 
 PROTOCOL = "jacobian.number-theory.factorization.sympy.v1"
 
-_OPERATIONS: dict[
-    str,
-    tuple[type[ContractModel], Callable[[ContractModel], ContractModel]],
-] = {
-    "divisors": (FactorizationRequest, enumerate_divisors),
-    "proper_divisors": (FactorizationRequest, enumerate_proper_divisors),
-    "prime_factorization": (FactorizationRequest, factorize_primes),
-    "powerful": (PowerfulNumberRequest, decide_powerful),
-    "squarefree": (ArithmeticFunctionRequest, decide_squarefree),
-    "radical": (ArithmeticFunctionRequest, compute_radical),
+
+def _validated_operation[
+    RequestT: ContractModel,
+    ResultT: ContractModel,
+](
+    request_model: type[RequestT],
+    operation: Callable[[RequestT], ResultT],
+) -> Callable[[object], ResultT]:
+    def invoke(payload: object) -> ResultT:
+        return operation(request_model.model_validate(payload))
+
+    return invoke
+
+
+_OPERATIONS: dict[str, Callable[[object], ContractModel]] = {
+    "divisors": _validated_operation(FactorizationRequest, enumerate_divisors),
+    "proper_divisors": _validated_operation(
+        FactorizationRequest, enumerate_proper_divisors
+    ),
+    "prime_factorization": _validated_operation(FactorizationRequest, factorize_primes),
+    "powerful": _validated_operation(PowerfulNumberRequest, decide_powerful),
+    "squarefree": _validated_operation(ArithmeticFunctionRequest, decide_squarefree),
+    "radical": _validated_operation(ArithmeticFunctionRequest, compute_radical),
 }
 
 
@@ -49,9 +62,8 @@ def main() -> int:
             raise ValueError("unexpected worker request fields")
         if payload["protocol"] != PROTOCOL:
             raise ValueError("unsupported worker protocol")
-        request_model, operation = _OPERATIONS[payload["operation"]]
-        request = request_model.model_validate(payload["request"])
-        result = operation(request)
+        operation = _OPERATIONS[payload["operation"]]
+        result = operation(payload["request"])
         sys.stdout.buffer.write(
             canonicalize_json(
                 {

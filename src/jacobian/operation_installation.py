@@ -302,7 +302,7 @@ class BoundedSearchOperationAdapter:
 
     def __init__(
         self,
-        operation: BoundedSearchOperation[Any, Any],
+        operation: BoundedSearchOperation[Any, Any, Any],
         bundle: DomainBundle,
         resources: _OperationResources,
     ) -> None:
