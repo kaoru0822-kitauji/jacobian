@@ -49,6 +49,24 @@ MCP tools.
 Prefer thin adapters to maintained mathematical systems. Pin versions when
 reproducibility, certificates, or verification depend on them.
 
+The supported native Python API lives only under `jacobian.math`. Keep its
+public modules deliberately small, declare their supported symbols with
+explicit `__all__` values, and cover namespace and import isolation in the
+public-API tests. Do not re-export domain APIs from the root `jacobian`
+namespace. Native functions accept and return Python or maintained
+backend-native values and call typed mathematical kernels directly; they must
+not invoke `capability.invoke`, construct a capability runtime, or expose MCP,
+artifact, provider-loading, or installation objects.
+
+Keep Pydantic models authoritative at capability, persistence, artifact, and
+wire boundaries. Domain implementations and operation factories must preserve
+their concrete request, result, and obligation types: do not accept
+`Callable[[ContractModel], ContractModel]`, cast a validated request back to a
+domain model, or erase bounded-search obligation types. When a native API and a
+capability expose the same outcome, share one typed mathematical kernel and use
+explicit domain-owned conversions rather than duplicating the mathematics or
+introducing a generic conversion framework.
+
 Built-in mathematical producers belong in explicit domain bundles. Do not add
 global operation registries, recursive package discovery, import-time
 registration, or mechanical wrappers for backend functions. Producers remain

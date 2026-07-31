@@ -63,6 +63,47 @@ materializes input and result artifacts, records their lineage and relation,
 and returns `COMPLETE · COMPUTED`. Neither exact arithmetic nor deterministic
 execution grants `VERIFIED`.
 
+### Static type contract
+
+The generic operation layer preserves each domain contract through
+construction and installation:
+
+```python
+ComputedOperation[RequestT, ResultT]
+ComputedOperationFactory(
+    operation: Callable[[RequestT], ResultT],
+) -> ComputedOperation[RequestT, ResultT]
+BoundedSearchOperation[RequestT, ResultT, ObligationT]
+```
+
+Domain implementations accept their concrete validated request model and
+return their concrete result model. Bounded searches likewise return their
+declared obligation model from the obligation builder. A broad
+`Callable[[ContractModel], ContractModel]` boundary, or a cast from
+`ContractModel` to the declared request type inside an implementation, defeats
+this contract and is not supported.
+
+This static precision does not replace runtime validation. The installer still
+validates untrusted input with the declared Pydantic request model before it
+calls domain code, then validates returned result and obligation values before
+materializing artifacts.
+
+## Native Python relationship
+
+The supported native-value interface is the deliberately small
+[`jacobian.math`](python-api.md) namespace. Its functions accept Python,
+SymPy, or NetworkX values as documented and call typed mathematical kernels
+directly. They do not construct the capability runtime or route through
+`capability.invoke`.
+
+When a native function corresponds to a capability, both paths share the same
+domain-owned mathematical kernel. Explicit adapters translate between native
+values and the existing Pydantic request and result contracts. This keeps one
+mathematical implementation while preserving capability schemas, artifact
+lineage, completeness, provenance, and verification behavior. Generic
+reflection, automatic model generation, and universal value conversion are
+outside this library's contract.
+
 ## Bounded searches
 
 A `BoundedSearchOperation` adds a completion predicate, a typed scope
@@ -165,13 +206,17 @@ record.
 Keep additions domain-owned and follow the nearby bundle:
 
 1. define bounded Pydantic request, result, and, for search, obligation models;
-2. implement one mathematical outcome without store or envelope dependencies;
+2. implement one mathematical outcome with concrete request, result, and
+   obligation types and without store or envelope dependencies;
 3. declare a computed or bounded-search operation in a subject module;
 4. include it explicitly in the domain bundle and declare the maintained
    provider runtime and backend version;
 5. test request validation, artifacts and lineage, assurance, failure
    semantics, and catalog projection; and
-6. add an independent checker only when the exact relation has a separate,
+6. if the outcome belongs in the supported native Python API, share the typed
+   kernel, add explicit domain-owned conversions, and update the public symbol
+   manifest and import-isolation tests; and
+7. add an independent checker only when the exact relation has a separate,
    operator-authorized replay path.
 
 Do not add a mechanical wrapper for every backend function, hide a research
