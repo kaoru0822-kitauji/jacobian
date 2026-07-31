@@ -44,42 +44,51 @@ def _square_map() -> dict[str, object]:
 def test_public_jacobian_counterexample_fixture_replays_both_claim_bindings(
     authorized_complete_runtime,
 ) -> None:
-    fixture_path = (
+    task_root = (
         Path(__file__).resolve().parents[5]
         / "benchmarks"
-        / "reproductions"
-        / "jacobian_counterexample_public.json"
+        / "datasets"
+        / "public-reproductions-v1"
+        / "tasks"
+        / "mathematical-sciences"
+        / "algebra"
     )
-    fixture = json.loads(fixture_path.read_text())
+    keller = json.loads(
+        (task_root / "jacobian-keller" / "environment" / "input.json").read_text()
+    )
+    obstruction = json.loads(
+        (
+            task_root / "jacobian-inverse-obstruction" / "environment" / "input.json"
+        ).read_text()
+    )
     runtime = authorized_complete_runtime
 
-    keller = runtime.core.capabilities.invoke(
+    keller_result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.keller_condition.verify",
             mode=CapabilityMode.VERIFY,
-            input={"map": fixture["map"]},
+            input={"map": keller["map"]},
         )
     )
-    obstruction_case = fixture["cases"][1]["input"]
-    obstruction = runtime.core.capabilities.invoke(
+    obstruction_result = runtime.core.capabilities.invoke(
         CapabilityRequest(
             capability_id="polynomial.map.inverse.refute_by_collision",
             mode=CapabilityMode.VERIFY,
             input={
-                "map": fixture[obstruction_case["map_ref"]],
-                "first_point": obstruction_case["first_point"],
-                "second_point": obstruction_case["second_point"],
-                "claimed_image": obstruction_case["claimed_image"],
+                "map": obstruction["map"],
+                "first_point": obstruction["first_point"],
+                "second_point": obstruction["second_point"],
+                "claimed_image": obstruction["claimed_image"],
             },
         )
     )
 
-    assert keller.output["keller_condition_verified"] is True
-    assert keller.output["determinant"]["terms"] == [
+    assert keller_result.output["keller_condition_verified"] is True
+    assert keller_result.output["determinant"]["terms"] == [
         {"coefficient": {"num": "-2", "den": "1"}, "exponents": [0, 0, 0]}
     ]
-    assert obstruction.output["noninvertibility_verified"] is True
-    assert obstruction.output["conclusion"] == "TRUE"
+    assert obstruction_result.output["noninvertibility_verified"] is True
+    assert obstruction_result.output["conclusion"] == "TRUE"
 
 
 def test_keller_condition_verifies_the_published_style_exact_map(

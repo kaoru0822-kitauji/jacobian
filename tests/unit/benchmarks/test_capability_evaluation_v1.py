@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).parents[3]
 EVALUATION = ROOT / "benchmarks" / "capability-evaluations" / "v1"
-REGRESSION = ROOT / "benchmarks" / "regression-v1"
+WORKFLOW = ROOT / "benchmarks" / "datasets" / "agent-workflow-v1"
 
 
 def _load(name: str) -> dict[str, object]:
@@ -32,12 +32,12 @@ def test_gap_ledger_covers_the_frozen_public_suite() -> None:
     assert isinstance(tasks, list)
     ledger_task_ids = [entry["task_id"] for entry in tasks]
     task_dirs = sorted(
-        path.name for path in (REGRESSION / "tasks").iterdir() if path.is_dir()
+        path.parent.name for path in (WORKFLOW / "tasks").rglob("task.toml")
     )
 
     assert ledger_task_ids == task_dirs
     assert len(ledger_task_ids) == len(set(ledger_task_ids)) == 24
-    manifest_bytes = (REGRESSION / "dataset.toml").read_bytes()
+    manifest_bytes = (WORKFLOW / "dataset.toml").read_bytes()
     manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
     assert ledger["source_suite"]["manifest_sha256"] == manifest_digest
 
@@ -52,6 +52,17 @@ def test_gap_ledger_handoffs_are_closed_over_task_candidates() -> None:
     task_candidates = {
         candidate_id for task in tasks for candidate_id in task["candidate_ids"]
     }
+
+    workflow_task_refs = {
+        path.parent.relative_to(ROOT).as_posix()
+        for path in (WORKFLOW / "tasks").rglob("task.toml")
+    }
+    for handoff in handoffs:
+        for evidence in handoff.get("evidence_refs", []):
+            ref = evidence["ref"]
+            if ref.startswith("benchmarks/datasets/agent-workflow-v1/"):
+                assert ref in workflow_task_refs
+                assert (ROOT / ref / "task.toml").is_file()
 
     assert task_candidates == set(handoff_by_id)
     for candidate_id, handoff in handoff_by_id.items():
@@ -104,9 +115,7 @@ def test_public_c1_and_c2_jobs_differ_only_by_condition_identity() -> None:
 
     assert c1["agents"][0]["model_name"] == "${JACOBIAN_MODEL}"
     assert c2["agents"][0]["model_name"] == "${JACOBIAN_MODEL}"
-    assert (
-        c1["datasets"] == c2["datasets"] == [{"path": "benchmarks/regression-v1/tasks"}]
-    )
+    assert c1["tasks"] == c2["tasks"] and len(c1["tasks"]) == 24
 
     normalized_c1 = deepcopy(c1)
     normalized_c2 = deepcopy(c2)

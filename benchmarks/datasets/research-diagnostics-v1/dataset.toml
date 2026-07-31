@@ -1,0 +1,85 @@
+[dataset]
+name = "jacobian/research-diagnostics-v1"
+description = "Answer-visible research challenges for case-level diagnostic runs, never held-out performance claims."
+keywords = [
+    "mathematics",
+    "jacobian",
+    "research-diagnostics",
+    "answer-visible",
+    "offline",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-001"
+digest = "sha256:5cc650ebe039ee32f210aa12401ed26a9c5cef79b93f601966781803f9f3125e"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-002"
+digest = "sha256:a45f771682e494ca052520dc41837d37638e3a93f320aa3f4f8698924ebe6e82"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-003"
+digest = "sha256:0c2163d0bd7f096601ea9018e57400c9e317b0c621e2469c4ad384dadab1e49c"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-004"
+digest = "sha256:a33940819773dd439283247aa913e8aa81f4358bea19c5f87b0114b29357664f"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-005"
+digest = "sha256:41ed05d6a1b1b44667e44c0c201b3a7e50016c32e98816e45eca9b9ce267dc8b"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-006"
+digest = "sha256:59a508742ad6b67105cc2c2d36210e67035d1086ebf5832162a68fda696326ad"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-007"
+digest = "sha256:912216552640c6cf06b9abf3a0808aff98351df070a106f156456634be98eb25"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-008"
+digest = "sha256:141a5b5ae09b941e89cf769fb7ab9e45887b7f6c79e4e21159858416d19588a0"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-009"
+digest = "sha256:4d237de40a60af39e950fbf18fe74d3c4a1d9dfd41f2dddf12bf8f58cedb414b"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-010"
+digest = "sha256:7acb1817a65386aeac0fe67e15f8089697d3f680266f58a2efb0f9f0aa65e1f8"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-011"
+digest = "sha256:fc4ce1df7f2780185b333173b010553a4e66260cbc72417338ffc0e80f17d2fe"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-012"
+digest = "sha256:dfcebb6b901c67386f4e091840640f9466cee528cd440ee42d8a69b5808d746e"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-013"
+digest = "sha256:255772a18b8ba9c694a19b84e383977ca43d232071c1cf06785d96fce0ca246a"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-014"
+digest = "sha256:35f3375e6e919b0f697cf830ee42b67c9e310a78ebed8470b1117ced36cc20d5"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-015"
+digest = "sha256:32191c737d2ea83b8d63bbff20de70cc552328ea8d86a1d8dab4ff222e3bae6c"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-016"
+digest = "sha256:195255ba43c4f9876d4475b0cc0d1e2b5ba909bddc2efd32bd1ecb53083b7bc4"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-017"
+digest = "sha256:23da6b310b6a43aa550cbfcd77862d8144bf432f645fcde183d80ddecf4927e0"
+
+[[tasks]]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-018"
+digest = "sha256:f3f67197f75868760283492730fc199904c9cdcc43f6504f1d2481e67378ec73"

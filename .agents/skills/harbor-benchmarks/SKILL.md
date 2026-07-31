@@ -1,6 +1,6 @@
 ---
 name: harbor-benchmarks
-description: Build, validate, and run Jacobian evaluations packaged as Harbor datasets. Use when authoring or changing Harbor tasks, independent verifiers, Oracle jobs, regression-v1 fixtures, Jacobian observation jobs, task digests, or evaluation handoffs; keep generic Harbor CLI mechanics in the shared Harbor skills.
+description: Build, validate, and run Jacobian evaluations packaged as Harbor datasets. Use when authoring or changing Harbor tasks, independent verifiers, Oracle jobs, workflow fixtures, Jacobian observation jobs, task digests, or evaluation handoffs; keep generic Harbor CLI mechanics in the shared Harbor skills.
 ---
 
 # Harbor Benchmarks
@@ -17,8 +17,8 @@ Classify the work before editing a task:
 
 - **Task/verifier validation:** parse the bundles, run the Oracle, and attack
   deliberate failure cases. This is harness evidence.
-- **Jacobian workflow observation:** use the fixed tasks with
-  `job-jacobian.json`, the authenticated MCP sidecar, and Harbor ATIF plus
+- **Jacobian workflow observation:** use a dataset with an observation profile,
+  its rendered observation job, the authenticated MCP sidecar, and Harbor ATIF plus
   Jacobian telemetry. This is workflow evidence, not comparative performance.
 - **Future causal comparison:** put control/treatment conditions in Harbor job
   configuration, outside task bundles, with identical task digests, prompts,
@@ -28,12 +28,15 @@ Classify the work before editing a task:
 ## Author or change a task
 
 Read `AGENTS.md`, `CONTRIBUTING.md`, and
-`docs/reference/capability-workflow-evaluations.md`. For the current suite,
-work under `benchmarks/regression-v1/` and keep each task self-contained.
+`docs/reference/capability-workflow-evaluations.md`. Work under
+`benchmarks/datasets/<dataset>/tasks/<domain>/<field>/<task>/` and keep each
+task self-contained. Add its nested path to the dataset's `suite.toml`;
+`dataset.toml` is generated and must not be edited by hand.
 
-Every task should have frozen offline input, schema 1.4 metadata, concise
-provenance, an agent-visible `environment/submission_schema.json`, hidden
-Oracle solution material, and a separate clean-room verifier. Instructions must
+Every task has a maintainer `README.md`, frozen offline input, schema 1.4
+metadata, concise provenance, an agent-visible
+`environment/submission_schema.json`, hidden Oracle solution material, and a
+separate clean-room verifier. Instructions must
 be agent-agnostic: describe the mathematical outcome and evidence, never
 capability IDs, tool sequences, preferred decompositions, or Jacobian details.
 
@@ -65,8 +68,9 @@ contract change:
 
 1. Recompute each task content digest with Harbor's task model and update the
    corresponding `dataset.toml` entry; do not invent a custom digest.
-2. Parse/check the task bundles with Harbor.
-3. Run every task through `job-oracle.json` and require full applicable reward.
+2. Parse/check every nested task declared by its suite.
+3. Run every task through the dataset's Oracle job and require full applicable
+   reward.
 4. Exercise deliberate failures: empty or malformed output, wrong answers,
    forged or escaped evidence, incomplete scope, mismatched claims, timeouts,
    and false assurance.
@@ -86,7 +90,7 @@ export JACOBIAN_IMAGE='registry.example/jacobian@sha256:<64-lowercase-hex-digits
 export JACOBIAN_MCP_TOKEN='replace-with-at-least-32-character-token'
 export JACOBIAN_AUTH_TOKENS_JSON='{"tokens":[{"tenant_id":"observation","token":"replace-with-at-least-32-character-token","scopes":["jacobian:use"]}]}'
 export JACOBIAN_MODEL='your-model'
-make agent-eval EVAL_EXECUTE=1
+make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
 ```
 
 Inspect Harbor ATIF together with Jacobian telemetry for capability discovery

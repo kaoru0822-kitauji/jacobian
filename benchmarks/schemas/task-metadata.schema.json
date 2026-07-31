@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Harbor task metadata",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["evaluation_kind", "domain", "field", "assurance_ceiling", "answer_visibility", "provenance_class", "fixture_digest", "required_provider"],
+  "properties": {
+    "evaluation_kind": {"type": "string", "minLength": 1},
+    "domain": {"enum": ["mathematical-sciences", "software-systems"]},
+    "field": {"type": "string", "minLength": 1},
+    "assurance_ceiling": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
+    "answer_visibility": {"type": "string", "minLength": 1},
+    "provenance_class": {"type": "string", "minLength": 1},
+    "fixture_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "required_provider": {"type": "string", "minLength": 1}
+  }
+}

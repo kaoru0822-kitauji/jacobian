@@ -193,47 +193,25 @@ pass/fail research benchmarks, not performance contests. Track:
 
 Runtime and resource use may be reported secondarily. Correctness is the gate.
 
-The initial executable harness covers canonical rational encoding,
-deduplicated artifact insertion, and verified artifact reads:
+The Harbor
+[`performance-v1`](../../benchmarks/datasets/performance-v1/README.md) dataset
+contains four independently runnable tasks:
 
 ```sh
-uv run python benchmarks/performance/benchmark_core.py
+make performance-eval
 ```
 
-The capability harness adds bounded graph canonicalization and finite rational
-membership/separation:
+The tasks cover core operations, complete populated-runtime startup, individual
+startup phases, and the v0.2 compatibility/performance surface. Each pinned
+environment writes raw pyperf JSON and controlled-environment metadata. Reward
+checks that the expected measurement set was produced and that its evidence is
+digest-bound; it does not depend on measured duration.
 
-```sh
-uv run python benchmarks/performance/benchmark_v02.py
-```
-
-Use pyperf's ordinary CLI flags to select a faster development run or write raw
-JSON. These measurements are baselines only; no timing threshold is a v0.2
-release gate.
-
-Architecture work that changes runtime construction uses the startup phase
-harness and compares the base and head revisions on the same host:
-
-```sh
-uv run python benchmarks/performance/benchmark_startup_phases.py -o /tmp/startup-base.json
-uv run python benchmarks/performance/benchmark_startup_phases.py -o /tmp/startup-head.json
-uv run python benchmarks/performance/compare_startup.py \
-  --baseline /tmp/startup-base.json \
-  --current /tmp/startup-head.json
-```
-
-Run the first command from the intended base tree and the second from the head
-tree with the same dependency lock and pyperf options. The comparison keeps
-fresh materialization, core service assembly, populated attachment, and
-authorized hydration separate and reports the cleanup program's phase-specific
-improvement gates. Raw pyperf JSON remains the evidence; the Markdown table is
-only its projection.
-
-The scheduled core benchmark job downloads the previous successful `main` run
-when available and publishes a report-only comparison using a ±20% change
-threshold. A reported regression is a prompt to investigate, not a CI failure;
-benchmark runs share hosted-worker noise and the comparison is intentionally
-separate from correctness validation.
+Scheduled jobs retain the raw Harbor artifacts. Compare base and candidate runs
+only on the same controlled runner with matching task, environment, dependency,
+and corpus digests. Thresholds remain report-only until repeated controlled
+baselines establish natural variance and the project explicitly promotes a
+metric to a gate.
 
 ## Bounded-discovery benchmarks
 

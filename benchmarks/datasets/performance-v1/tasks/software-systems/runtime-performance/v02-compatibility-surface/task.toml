@@ -1,0 +1,41 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+
+[task]
+name = "jacobian/performance-v1-v02-compatibility-surface"
+version = "1.0.0"
+description = "Record pyperf measurements for Jacobian v0.2 compatibility surface."
+keywords = ["performance", "pyperf", "runtime", "jacobian"]
+
+[metadata]
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "software-systems"
+tags = ["performance", "oracle-only", "report-only"]
+evaluation_kind = "performance"
+domain = "software-systems"
+field = "runtime-performance"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "not-applicable"
+provenance_class = "repository-benchmark-entry-point"
+fixture_digest = "sha256:2a4740dee7a72d42a7382643de1fa440842fdcc26f6e8558c3cfaf61571f2125"
+required_provider = "core"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+
+[environment]
+network_mode = "no-network"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192
+
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

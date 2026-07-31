@@ -1,0 +1,1 @@
+The color-preserving reflection swaps a,c and fixes b; vertex orbits {a,c},{b} and one edge orbit.

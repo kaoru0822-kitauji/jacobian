@@ -15,8 +15,14 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-REPRODUCTIONS = (
-    PROJECT_ROOT / "benchmarks" / "reproductions" / "sat_public_reproductions.json"
+TASK_ROOT = (
+    PROJECT_ROOT
+    / "benchmarks"
+    / "datasets"
+    / "public-reproductions-v1"
+    / "tasks"
+    / "mathematical-sciences"
+    / "logic"
 )
 
 pytestmark = [
@@ -28,16 +34,30 @@ pytestmark = [
 
 
 def _load_cases() -> list[dict[str, Any]]:
-    suite = json.loads(REPRODUCTIONS.read_text(encoding="utf-8"))
-    assert suite["scored"] is False
-    assert suite["purpose"].endswith("never hidden evaluation")
-    assert len(suite["attack_coverage"]) >= 4
-    agent_case = suite["agent_regressions"][0]
-    assert agent_case["case_id"] == "ERDOS-SCHUR-F4-AGENT-001"
-    assert agent_case["expected_answer"] == 45
-    assert agent_case["route_is_not_prescribed"] is True
-    cases = suite["cases"]
-    assert isinstance(cases, list)
+    cases = []
+    for slug in ("sat-bool-mus", "sat-pigeonhole", "sat-small"):
+        task = TASK_ROOT / slug
+        request = json.loads((task / "environment" / "input.json").read_text())
+        expected = json.loads((task / "tests" / "expected.json").read_text())
+        cases.append(
+            {
+                "variable_names": request["variables"],
+                "clauses": request["clauses"],
+                "expected_status": expected["expected_status"],
+                "required_capabilities": [
+                    (
+                        "sat.model.find"
+                        if expected["expected_status"] == "SATISFIABLE"
+                        else "sat.unsat_proof.find"
+                    ),
+                    (
+                        "sat.model.verify"
+                        if expected["expected_status"] == "SATISFIABLE"
+                        else "sat.unsat_proof.verify"
+                    ),
+                ],
+            }
+        )
     return cases
 
 

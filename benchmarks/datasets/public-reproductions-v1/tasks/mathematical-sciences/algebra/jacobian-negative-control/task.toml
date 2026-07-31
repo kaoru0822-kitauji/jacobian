@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/public-reproductions-v1-jacobian-negative-control"
+version = "1.0.0"
+description = "Negative control: a mutated collision image must remain an UNKNOWN non-conclusion."
+keywords = ["jacobian-conjecture", "polynomial-map", "negative-control", "fail-closed"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "algebra"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["polynomial-map", "negative-control", "fail-closed", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:321b50efad411db9a7e38c3ad4ad22c7c0c4f5a4df91d1f9280d72f548c931d3"
+derivation = "Mutated collision image; fail-closed UNKNOWN non-conclusion replay."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

@@ -56,13 +56,9 @@ def test_core_extension_exposes_exactly_the_stable_five_tools() -> None:
 
 
 def test_harbor_verifier_support_copies_are_identical() -> None:
-    source = (
-        ROOT / "benchmarks" / "regression-v1" / "verifier_support.py"
-    ).read_bytes()
+    source = (ROOT / "benchmarks" / "tooling" / "verifier_support.py").read_bytes()
     targets = sorted(
-        (ROOT / "benchmarks" / "regression-v1" / "tasks").glob(
-            "*/tests/verifier_support.py"
-        )
+        (ROOT / "benchmarks" / "datasets").glob("*/tasks/**/tests/verifier_support.py")
     )
-    assert len(targets) == 24
+    assert len(targets) == 79
     assert all(target.read_bytes() == source for target in targets)

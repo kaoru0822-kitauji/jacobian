@@ -1,0 +1,27 @@
+[dataset]
+name = "jacobian/performance-v1"
+description = "Controlled operational measurements reported separately from reward and agent latency."
+keywords = [
+    "mathematics",
+    "jacobian",
+    "performance",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
+
+[[tasks]]
+name = "jacobian/performance-v1-complete-runtime-startup"
+digest = "sha256:256a54519527ecf32ae9b3006804fc8cbdc6d1b105afe5d3e4549b25bc44b242"
+
+[[tasks]]
+name = "jacobian/performance-v1-core-operations"
+digest = "sha256:76677f7cac0925f82acc1f9c4fff6862f42790806887304f9efcb2cc9f394012"
+
+[[tasks]]
+name = "jacobian/performance-v1-startup-phases"
+digest = "sha256:8a095d80282f4800f1d9003a942050cb7ba353078411a057725780b29509e416"
+
+[[tasks]]
+name = "jacobian/performance-v1-v02-compatibility-surface"
+digest = "sha256:0a0862dada386aebe3cebc3f37036f508953448ed9298c0d8d5a17aa57f3e89b"

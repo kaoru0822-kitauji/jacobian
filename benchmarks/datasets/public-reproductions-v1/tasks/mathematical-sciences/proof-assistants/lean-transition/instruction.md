@@ -1,0 +1,3 @@
+# Lean proof-state tactic application
+
+Apply the declared tactic to the Lean proof state in `input.json` and report the resulting goal count and whether the proof is completed. Write `submission.json` to the exact agent-visible `submission_schema.json`, record the calculation in `evidence/answer.txt`, and include that file's SHA-256 digest in the evidence list. Claim `COMPUTED` assurance; do not claim `VERIFIED`.

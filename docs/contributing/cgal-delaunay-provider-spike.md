@@ -30,19 +30,22 @@ The [official 6.2 release](https://www.cgal.org/2026/06/11/cgal62/),
 [package license inventory](https://doc.cgal.org/6.2/Manual/packages.html)
 define the upstream boundary. The frozen source, adapter, commands, and outputs
 are in
-[`benchmarks/provider_spikes/cgal_delaunay_pin.json`](../../benchmarks/provider_spikes/cgal_delaunay_pin.json).
+[`benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cgal/environment/cgal_delaunay_pin.json`](../../benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cgal/environment/cgal_delaunay_pin.json).
 
 ## Reproduce
+
+The canonical repository entry point is
+`make provider-eval PROVIDER=cgal`; it builds and runs the pinned Harbor task.
 
 Compile the checked-in fixed transport against the official library archive:
 
 ```sh
 g++ -std=c++17 -O2 \
   -I/path/to/CGAL-6.2/include \
-  benchmarks/provider_spikes/cgal_delaunay_spike.cpp \
+  benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cgal/environment/cgal_delaunay_spike.cpp \
   -lgmp -lmpfr -o /tmp/cgal-delaunay-spike
 
-uv run python benchmarks/provider_spikes/cgal_delaunay_spike.py \
+uv run python benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cgal/environment/spike.py \
   --source-archive /path/to/CGAL-6.2-library.tar.xz \
   --executable /tmp/cgal-delaunay-spike \
   --output /tmp/cgal-delaunay-provider-spike.json

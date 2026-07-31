@@ -1,0 +1,107 @@
+[dataset]
+name = "jacobian/agent-workflow-v1"
+description = "Fixed Jacobian-enabled mathematical workflows for Oracle validation and agent observation."
+keywords = [
+    "mathematics",
+    "jacobian",
+    "agent-workflow",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-autoformalization-semantic-audit"
+digest = "sha256:43745548ce276e0512c52fe5091b331b09bc25acec1e5e3dd37ff40bcf51ad99"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-calendar-good-days-audit"
+digest = "sha256:9b5f8b6551fe13ddfa9c9e05b99de374ebb6bd1097c1a297c80253053d26fcca"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"
+digest = "sha256:330ddb770b56e8a1e313a876f0fb24b3b9d7adaf70452f45fa5729db8a141918"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-divisibility-construction-witness"
+digest = "sha256:47033cba7eed0e8547eb81e01867b42daca0cd3e880b34343ea39a955b217648"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"
+digest = "sha256:833c3accf03f72a2836b7bfb144c5ebffef20b0ba242de682b6bde9d987567a8"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-finite-partition"
+digest = "sha256:8066dd253f3d05e024ffd47f87091e26113c7a2d69455554bd01ce925e583ac5"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-graph-artifact-composition"
+digest = "sha256:1a1a488e045b737e915e5d8ce0306fbdfc19f528a6b649d9a0f229f61fb2639a"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-graph-counterexample"
+digest = "sha256:94f03b9e3fd2e9d4252da06264712964e7a9140810f7c16c8552855449239d34"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-grounded-premise-proof"
+digest = "sha256:5d364abd11c1d04561311bdb434846644758edfbcaac34bbbd9433281a22ecea"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-hermite-normal-form"
+digest = "sha256:46e9171b30f73a249c1189d0b3105557259d5ce4991992b5428ee2597a6ef0e3"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-log-exponent-recovery"
+digest = "sha256:4be28b1e17ea670a55d3f2be1cde8ca93458367e1ebd24d83da932541eb5c96f"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-log-inequality-meta-audit"
+digest = "sha256:9233675d1a4513ab5eeb6f36714943ac690a8cc233f56a6839793d10545798ba"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-matrix-square-zero-counterexample"
+digest = "sha256:a7dbe24b055e6324e094b4af081696995290991496b9b5c3ac3ce9db42246e7a"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-metric-tsp-proof-repair"
+digest = "sha256:0f11825a7ecff4680cef355a895d3dcd3854d26cefa19ce286c1dcb740a04f6d"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-modular-cubic-obstruction"
+digest = "sha256:35df96f3fca26f2da1c4ad57a1f9db87f0d7f7aa3704fbdd50fee93d2023a7ad"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-natural-subtraction-proof-repair"
+digest = "sha256:364f8769e407fdf462833f93730d5be7e4c0b26ebd32e8db9d041bbbd3d67c76"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-nondifferentiable-maximum-construction"
+digest = "sha256:2ad0f13c862698b2aa22248dd5999924254db600ffe7ce0a8f56940308671f4d"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-polynomial-map-collision"
+digest = "sha256:6e82e0db295d3f92732f09bf95ce9b9bc6073304084b73f7d9212e11eb7b8d7c"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-polynomial-normalization"
+digest = "sha256:0c07bd7c1baeec0d548a08e806274c6bdb9ac0c7778965e8430e44f619f3f00f"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-polynomial-tail-counterexample"
+digest = "sha256:d14e68a6071b50c00e4fa5708760868e966d201843899502df20247f4affb03a"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-random-function-expectation-audit"
+digest = "sha256:d0b51ae1e25e1a0b8f99cbc9e1eac73c5b4867fadbf9f285c46e70fb454b1c72"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-rational-linear-solution"
+digest = "sha256:9dc8322a5b78b4875450b461290abb6f56100e5d852c784a3f5371322b890f99"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-sat-witness"
+digest = "sha256:18787277b8793c660245e20624762dc92cddbf54876b21119664f0a6e129cdfa"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-subspace-direct-sum-counterexample"
+digest = "sha256:80956ff91c69b0ba25f28b55b1ae6e0317c57b8e7f9f4ae4eb289c302b651781"

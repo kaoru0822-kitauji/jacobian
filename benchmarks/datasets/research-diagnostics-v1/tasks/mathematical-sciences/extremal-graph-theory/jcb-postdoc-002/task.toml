@@ -1,0 +1,43 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-002"
+version = "1.0.0"
+description = "Research diagnostic: Written on the Wall II Conjecture 200: a 14-vertex exact counterexample"
+keywords = ["research", "diagnostic", "mathematical-sciences", "extremal graph theory", "Hamiltonian paths", "exact finite optimization"]
+[metadata]
+evaluation_kind = "research-diagnostic"
+domain = "mathematical-sciences"
+field = "extremal-graph-theory"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-answer-visible-diagnostic"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["research", "diagnostic", "answer-visible", "offline", "extremal-graph-theory", "hamiltonian-paths", "exact-finite-optimization"]
+case_version = "research-diagnostics-v1"
+contamination_class = "public-answer-visible-diagnostic"
+fixture_digest = "sha256:7a70b36e43e03fdf55e966f8bfec9863e47ce312d086c103957c1c3463f3e905"
+derivation = "This small graph has a short structural proof and independent finite certificates. It probes whether an agent can combine graph construction, neighborhood invariants, exact maximum induced-tree computation, and a Hamiltonian obstruction."
+historical_fit = "DIRECT"
+current_status = "COVERED"
+evaluation_status = "RUNNABLE_PUBLIC_REPRODUCTION"
+next_action = "Add the exact 14-vertex public object as a stable regression only if its redistribution and fixture size remain appropriate."
+
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

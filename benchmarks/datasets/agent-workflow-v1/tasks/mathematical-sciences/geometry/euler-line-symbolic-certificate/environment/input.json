@@ -1,0 +1,31 @@
+{
+  "task_id":"jacobian/agent-workflow-v1-euler-line-symbolic-certificate",
+  "problem": "For a nondegenerate triangle, derive exact symbolic coordinates for its circumcenter O, centroid G, and orthocenter H, then certify that O, G, and H are collinear.",
+  "normalization": {
+    "variables": ["u", "v", "w"],
+    "nonzero_assumptions": ["u", "w"],
+    "points": {
+      "A": ["0", "0"],
+      "B": ["2*u", "0"],
+      "C": ["2*v", "2*w"]
+    }
+  },
+  "point_definitions": {
+    "O": ["distance(O,A)=distance(O,B)", "distance(O,B)=distance(O,C)"],
+    "G": ["3*G=A+B+C"],
+    "H": ["BC perpendicular AH", "AC perpendicular BH"]
+  },
+  "rational_function_format": {
+    "term": {
+      "coefficient": "canonical rational string",
+      "exponents": ["u exponent", "v exponent", "w exponent"]
+    },
+    "expression": ["numerator term list", "denominator term list"],
+    "denominator_restriction": "a nonzero rational multiple of a power of w"
+  },
+  "required_output": {
+    "coordinates": ["O.x", "O.y", "G.x", "G.y", "H.x", "H.y"],
+    "nonzero_relation_coefficients_in_order": ["O", "G", "H"],
+    "exact_symbolic_certificate": true
+  }
+}

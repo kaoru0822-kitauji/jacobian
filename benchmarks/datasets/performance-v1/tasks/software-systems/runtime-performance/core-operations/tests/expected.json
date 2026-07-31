@@ -1,0 +1,10 @@
+{
+  "task_id": "jacobian/performance-v1-core-operations",
+  "suite": "jacobian-v0.2-core",
+  "benchmarks": [
+    "canonicalize-64-rationals",
+    "artifact-read-256-integers",
+    "artifact-deduplicated-put-256-integers",
+    "artifact-store-clean-open-populated"
+  ]
+}

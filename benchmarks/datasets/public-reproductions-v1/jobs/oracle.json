@@ -1,0 +1,103 @@
+{
+  "jobs_dir": "benchmarks/results/public-reproductions-v1-oracle",
+  "n_attempts": 1,
+  "timeout_multiplier": 1.0,
+  "orchestrator": {
+    "type": "local",
+    "n_concurrent_trials": 1,
+    "quiet": false
+  },
+  "environment": {
+    "type": "docker",
+    "force_build": true,
+    "delete": true
+  },
+  "agents": [
+    {
+      "name": "oracle"
+    }
+  ],
+  "tasks": [
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/algebra/jacobian-inverse-obstruction"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/algebra/jacobian-keller"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/algebra/jacobian-negative-control"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/algebraic-topology/integral-circle"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/algebraic-topology/integral-projective-plane"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/algebraic-topology/reduced-point"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/combinatorics/recurrence-fibonacci"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/combinatorics/recurrence-linear-eval"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/combinatorics/recurrence-lucas"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/combinatorics/recurrence-rational-series"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/reliability-series-path"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/reliability-single-edge"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/reliability-triangle-fair"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/symmetry-colored-reflection"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/symmetry-cycle-rotation"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/symmetry-identity-subgroup"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/linear-algebra/smith-rank-deficient"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/linear-algebra/smith-rectangular"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/logic/sat-bool-mus"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/logic/sat-erdos-schur-f4"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/logic/sat-pigeonhole"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/logic/sat-small"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/probability/gaussian-complex-cancellation"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/probability/gaussian-sixth-moment"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/probability/gaussian-two-sum-fourth-moment"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/proof-assistants/lean-retrieval"
+    },
+    {
+      "path": "benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/proof-assistants/lean-transition"
+    }
+  ]
+}

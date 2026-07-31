@@ -1,0 +1,35 @@
+[dataset]
+name = "jacobian/provider-feasibility-v1"
+description = "Pinned optional-backend feasibility checks with provider-specific expected outcomes."
+keywords = [
+    "mathematics",
+    "jacobian",
+    "provider-feasibility",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
+
+[[tasks]]
+name = "jacobian/provider-feasibility-v1-cddlib"
+digest = "sha256:836b769a0399716946bd5eb7b37b3280e20f92d309089230ff52ad1434f219df"
+
+[[tasks]]
+name = "jacobian/provider-feasibility-v1-cgal"
+digest = "sha256:3f63c93c17437caaf4ffbe72733fc5f7710ce3aca77b711472295e67630a56b6"
+
+[[tasks]]
+name = "jacobian/provider-feasibility-v1-gudhi"
+digest = "sha256:cdb3807c04653d9a5b1554e17cd8185fc2e7d36861e24feabe0aba4a2e3a39cd"
+
+[[tasks]]
+name = "jacobian/provider-feasibility-v1-lean-repl"
+digest = "sha256:158bd65748530b7b9fe8111c3896b9f301bca7febc5d4e35b91c03fc97bfd348"
+
+[[tasks]]
+name = "jacobian/provider-feasibility-v1-nauty"
+digest = "sha256:92a0f1d053617d8d377cac26d9c53007cf0556ff92c68692f3d5e20cb32fc750"
+
+[[tasks]]
+name = "jacobian/provider-feasibility-v1-regina"
+digest = "sha256:bec675c9dd89612a24aaf379de045d76a619ed141ba8d59a5704448884f1935a"

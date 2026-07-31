@@ -1,0 +1,8 @@
+{
+  "task_id": "jacobian/performance-v1-v02-compatibility-surface",
+  "suite": "jacobian-v0.2",
+  "benchmarks": [
+    "canonicalize-five-vertex-digraph",
+    "separate-triangle-stable-set-point"
+  ]
+}

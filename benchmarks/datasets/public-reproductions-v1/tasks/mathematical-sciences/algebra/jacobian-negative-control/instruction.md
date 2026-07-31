@@ -1,0 +1,3 @@
+# Negative control for a polynomial-map collision
+
+The `claimed_image` in `input.json` has been mutated away from the true common image. Determine whether the two points still share that claimed image. If they do not, return `UNKNOWN` with no verification record and a short boundary note. Write `submission.json` to the exact agent-visible `submission_schema.json`, record the calculation in `evidence/answer.txt`, and include that file's SHA-256 digest in the evidence list. Claim `COMPUTED` assurance; do not claim `VERIFIED`.

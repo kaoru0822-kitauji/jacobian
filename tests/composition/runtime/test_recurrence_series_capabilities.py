@@ -14,14 +14,33 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.combinatorics import build_combinatorics_bundle
 
 _RECURRENCE_CONVENTION = "A_N_EQUALS_SUM_C_J_TIMES_A_N_MINUS_J_FOR_J_FROM_1"
-_OVERLAP_CASES = json.loads(
-    (
-        Path(__file__).resolve().parents[3]
-        / "benchmarks"
-        / "reproductions"
-        / "recurrence_series_overlap_regression.json"
-    ).read_text()
-)["discovery_cases"]
+_PUBLIC_TASKS = (
+    Path(__file__).resolve().parents[3]
+    / "benchmarks"
+    / "datasets"
+    / "public-reproductions-v1"
+    / "tasks"
+    / "mathematical-sciences"
+    / "combinatorics"
+)
+_OVERLAP_CASES = []
+for _slug in (
+    "recurrence-fibonacci",
+    "recurrence-linear-eval",
+    "recurrence-lucas",
+    "recurrence-rational-series",
+):
+    _task = _PUBLIC_TASKS / _slug
+    _OVERLAP_CASES.append(
+        {
+            "query": json.loads((_task / "environment" / "input.json").read_text())[
+                "query"
+            ],
+            "expected_first": json.loads(
+                (_task / "tests" / "expected.json").read_text()
+            )["expected_first"],
+        }
+    )
 
 
 def _q(numerator: int, denominator: int = 1) -> dict[str, str]:

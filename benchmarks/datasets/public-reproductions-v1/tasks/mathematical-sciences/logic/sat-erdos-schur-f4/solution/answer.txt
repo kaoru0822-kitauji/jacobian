@@ -1,0 +1,1 @@
+f(4)=45: there is a 4-coloring of {1,...,44} with no monochromatic a+b=c, and no such coloring exists for {1,...,45}.

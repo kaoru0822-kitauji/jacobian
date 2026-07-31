@@ -1,0 +1,43 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-012"
+version = "1.0.0"
+description = "Research diagnostic: A counterexample to Anderson's quasi-completeness conjecture"
+keywords = ["research", "diagnostic", "mathematical-sciences", "commutative algebra", "Noetherian local rings", "formal proof"]
+[metadata]
+evaluation_kind = "research-diagnostic"
+domain = "mathematical-sciences"
+field = "commutative-algebra"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-answer-visible-diagnostic"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "hard"
+category = "mathematics"
+tags = ["research", "diagnostic", "answer-visible", "offline", "commutative-algebra", "noetherian-local-rings", "formal-proof"]
+case_version = "research-diagnostics-v1"
+contamination_class = "public-answer-visible-diagnostic"
+fixture_digest = "sha256:cd1e934ea4074ee12d670db8256f7050fb783f0695085a01c9857e5ff4947811"
+derivation = "The public resolution requires a long formal construction in local algebra. It is a deliberate theorem-scale probe for semantic algebraic artifacts, theorem retrieval, and proof-state support rather than generic symbolic computation."
+historical_fit = "MISSING"
+current_status = "OPEN_GAP"
+evaluation_status = "BLOCKED_ON_INTERVENTION"
+next_action = "Route this case to commutative-algebra discovery rather than treating it as evidence for a generic topology capability."
+
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

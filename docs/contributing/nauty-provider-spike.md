@@ -23,17 +23,20 @@ production capabilities remain deferred.
 
 The version, source digest, license text, command profiles, and exact expected
 outputs are frozen in
-[`benchmarks/provider_spikes/nauty_provider_pin.json`](../../benchmarks/provider_spikes/nauty_provider_pin.json).
+[`benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty/environment/nauty_provider_pin.json`](../../benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty/environment/nauty_provider_pin.json).
 The source and command semantics were checked against the
 [official nauty/Traces page](https://users.cecs.anu.edu.au/~bdm/nauty/) and the
 [2.9.3 user's guide](https://users.cecs.anu.edu.au/~bdm/nauty/nug29.pdf).
 
 ## Bounded reproduction
 
+The canonical repository entry point is
+`make provider-eval PROVIDER=nauty`; it builds and runs the pinned Harbor task.
+
 Build the official source archive outside the repository, then run:
 
 ```sh
-uv run python benchmarks/provider_spikes/nauty_provider_spike.py \
+uv run python benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty/environment/spike.py \
   --source-archive /path/to/nauty2_9_3.tar.gz \
   --geng /path/to/nauty2_9_3/geng \
   --labelg /path/to/nauty2_9_3/labelg \

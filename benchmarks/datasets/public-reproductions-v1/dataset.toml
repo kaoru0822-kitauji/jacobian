@@ -1,0 +1,121 @@
+[dataset]
+name = "jacobian/public-reproductions-v1"
+description = "Replay known public mathematical cases with deterministic, independently checked outcomes."
+keywords = [
+    "mathematics",
+    "jacobian",
+    "public-reproductions",
+    "verification",
+    "offline",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-gaussian-complex-cancellation"
+digest = "sha256:f6b2ffff4f429b774ff7c5aa5cca06525a447818da1a4382745019c57f12dac9"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-gaussian-sixth-moment"
+digest = "sha256:a967b0dba8c2ba6bb448bedc1f73ebf744249540d9a10e2f7d9d0b6bdb906c16"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-gaussian-two-sum-fourth-moment"
+digest = "sha256:5a4de8f2846cfb5153ea0079891514c2e1acf3d35a11d15e44ac8ffffdab1b8f"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-integral-circle"
+digest = "sha256:c1e0cb99979d001947250185696b2720bc30ed22cac3f5de4c6a90e54a8dc98e"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-integral-projective-plane"
+digest = "sha256:722751818283dc4bcd08947a7b2a04afb3476fcc1a934fceb7be2aa99667bb00"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-jacobian-inverse-obstruction"
+digest = "sha256:53b5cc66602e9b6278e7202ef297b8293d7a65cb21c59be15ea543f4d93b7b7f"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-jacobian-keller"
+digest = "sha256:9d9e04c1116c8a829125ccf6d361f209e23417133d814211e8962f9f3a3950ac"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-jacobian-negative-control"
+digest = "sha256:3ebc94735d11b6e2346dff2dd545ae32e421d195896ad59fcd8dc06c25ca8fee"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-lean-retrieval"
+digest = "sha256:a3fc1cc939252a52d96421ed8c3611496550111f5f970598f0fb074e0bcf1dec"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-lean-transition"
+digest = "sha256:7391be361bddad2b163b2bbe5bca406c83622869df568936710960e0ddd60f2d"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-recurrence-fibonacci"
+digest = "sha256:dc714eb50bce08e6320870b773add3a18860fafc2bfee9523f04357a32273fbe"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-recurrence-linear-eval"
+digest = "sha256:d7f934c2700a8ef7bed4e035671a657e7549b19f6445235f57e5a20ca9617eba"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-recurrence-lucas"
+digest = "sha256:752975c5316f9330f1e23a7dd78b327fa3211685b838f005db88414ed82c37f9"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-recurrence-rational-series"
+digest = "sha256:13b7e950fcdab22d61c5f7be64175a4c12df4f53ce724812887080b545897f56"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-reduced-point"
+digest = "sha256:5871ebb7ba0077674b14e2541f2824355835cf97b743f2871beb2ed90ef85b9e"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-reliability-series-path"
+digest = "sha256:12fe83ecf8000a4b08954dffb6a3d0adfa6e709fdd6f3a047b67fd863fa6a1e8"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-reliability-single-edge"
+digest = "sha256:67c115905667499453c04926ae75f6892d5f5acf8d8d66e9364d133f5bbd58cd"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-reliability-triangle-fair"
+digest = "sha256:589f0abe0ac048b08a8ebbca85a8a8efea6dbc20b6f19e4f16f1542296ae5dcd"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-sat-bool-mus"
+digest = "sha256:9c6dab788593f0446b2a9c75665f7a2a12bfa19ff2afb01c089ae713371f41d4"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-sat-erdos-schur-f4"
+digest = "sha256:0005210ac504de613e1655f13eee9fdafbf31835426542f9076047a3023a4749"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-sat-pigeonhole"
+digest = "sha256:3c78dedfd14377351b3cf6acc86a2c403183b623a947be8c7206ef7ac9b5458d"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-sat-small"
+digest = "sha256:35d49c1d3d7cd08d5d8b63c800c0a67a9080ca50af06171a0b9281ffc5838a19"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-smith-rank-deficient"
+digest = "sha256:75a0aa756bd7c05d782120821ed83feda9db250c694df827a669f1ae479c4329"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-smith-rectangular"
+digest = "sha256:7eaf0f7979106487fbc2873c225f6946122570cb97bcef61d34a514dff16b93c"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-symmetry-colored-reflection"
+digest = "sha256:28cd8125e1841253ddd075fece310c4de80dcc72671044487688302257d45a11"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-symmetry-cycle-rotation"
+digest = "sha256:09b5d2e7e6404896ddd801786e20deb2ac0a5b9c13b6565136d21319db46a2b7"
+
+[[tasks]]
+name = "jacobian/public-reproductions-v1-symmetry-identity-subgroup"
+digest = "sha256:3a173b19908fb793b1b77ce68afedbdb987a3304bae834bb9090ab450ce24cb8"

@@ -64,7 +64,7 @@ not as an invitation to fill the gap with evaluation fixtures.
 Read `AGENTS.md` and inspect:
 
 - `docs/reference/capability-workflow-evaluations.md`
-- `benchmarks/regression-v1/`
+- `benchmarks/datasets/agent-workflow-v1/`
 - `src/jacobian/eval_telemetry.py`
 - the Harbor task and verifier validation checks
 - the relevant capability descriptors, checkers, and contracts.

@@ -1,0 +1,41 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+
+[task]
+name = "jacobian/provider-feasibility-v1-nauty"
+version = "1.0.0"
+description = "Reproduce the pinned cddlib H/V feasibility contract."
+keywords = ["provider", "cddlib", "polyhedra", "feasibility"]
+
+[metadata]
+author_name = "Jacobian contributors"
+difficulty = "hard"
+category = "software-systems"
+tags = ["provider", "oracle-only", "pinned"]
+evaluation_kind = "provider-feasibility"
+domain = "software-systems"
+field = "provider-integration"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "pinned-provider-spike"
+fixture_digest = "sha256:c2f070eb0e1a6fc3bf9af3a3360bc8f6ddf65611c9e7c51755a24cbc4dd08070"
+required_provider = "nauty"
+
+[agent]
+timeout_sec = 3600.0
+
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+
+[environment]
+network_mode = "no-network"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192
+
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

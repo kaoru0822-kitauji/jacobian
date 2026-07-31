@@ -1,7 +1,7 @@
 # Capability evaluation v1
 
 This directory freezes the discovery handoff and comparison design derived
-from the public 24-task Harbor `regression-v1` suite. It does not contain a
+from the public 24-task Harbor `agent-workflow-v1` suite. It does not contain a
 model result or a held-out score.
 
 The artifacts have three distinct roles:
@@ -26,4 +26,3 @@ No held-out fixtures or Oracle answers are committed here. Until those
 external identities are filled and a hard model-run budget is authorized,
 `comparison-plan.json` remains `SCAFFOLD_ONLY` and no model execution is
 allowed.
-

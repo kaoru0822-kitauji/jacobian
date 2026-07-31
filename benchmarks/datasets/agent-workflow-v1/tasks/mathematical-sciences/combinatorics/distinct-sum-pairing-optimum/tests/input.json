@@ -1,0 +1,1 @@
+{"task_id":"jacobian/agent-workflow-v1-distinct-sum-pairing-optimum","n":15,"ground_set":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],"constraints":["each pair has two distinct ground-set elements","pairs are pairwise disjoint","pair sums are pairwise distinct","every pair sum is at most n"],"objective":"maximize the number of pairs"}

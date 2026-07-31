@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "conclusion",
+    "result",
+    "claimed_assurance",
+    "scope",
+    "completeness",
+    "evidence",
+    "limitations"
+  ],
+  "properties": {
+    "task_id": {
+      "const": "jacobian/public-reproductions-v1-jacobian-keller"
+    },
+    "conclusion": {
+      "const": "TRUE"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keller_condition_verified",
+        "determinant"
+      ],
+      "properties": {
+        "keller_condition_verified": {
+          "type": "boolean"
+        },
+        "determinant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "terms"
+          ],
+          "properties": {
+            "terms": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "coefficient",
+                  "exponents"
+                ],
+                "properties": {
+                  "coefficient": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "num",
+                      "den"
+                    ],
+                    "properties": {
+                      "num": {
+                        "type": "string"
+                      },
+                      "den": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "exponents": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claimed_assurance": {
+      "enum": [
+        "UNVERIFIED",
+        "COMPUTED",
+        "CHECKED"
+      ]
+    },
+    "scope": {
+      "const": "jacobian/public-reproductions-v1-jacobian-keller complete finite input"
+    },
+    "completeness": {
+      "const": "COMPLETE"
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "const": "evidence/answer.txt"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -30,7 +30,7 @@ inventory][licensing], [3.13.0 source tag][source-tag], and [PyPI 3.13.0
 files][pypi] define the upstream boundary. The frozen source and wheel digests,
 module-header digests, exact filtered complex, and expected mathematical output
 are in
-[`benchmarks/provider_spikes/gudhi_persistence_pin.json`](../../benchmarks/provider_spikes/gudhi_persistence_pin.json).
+[`benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi/environment/pin.json`](../../benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi/environment/pin.json).
 
 [simplex-tree]: https://gudhi.inria.fr/python/3.13.0/simplex_tree_ref.html
 [licensing]: https://gudhi.inria.fr/licensing/
@@ -38,6 +38,9 @@ are in
 [pypi]: https://pypi.org/project/gudhi/3.13.0/
 
 ## Reproduce
+
+The canonical repository entry point is
+`make provider-eval PROVIDER=gudhi`; it builds and runs the pinned Harbor task.
 
 Create an isolated Python 3.12 environment and install the pinned wheel plus a
 compatible NumPy:
@@ -48,7 +51,7 @@ uv pip install --python /tmp/jcb-gudhi-venv/bin/python \
   /path/to/gudhi-3.13.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
   numpy
 
-uv run python benchmarks/provider_spikes/gudhi_persistence_spike.py \
+uv run python benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi/environment/spike.py \
   --python-executable /tmp/jcb-gudhi-venv/bin/python \
   --wheel /path/to/gudhi-3.13.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
   --source-archive /path/to/gudhi-3.13.0-source.tar.gz \
@@ -111,13 +114,13 @@ unrelated catalog available.
   spike registers no capability or checker.
 - Provider/runtime state: the observation targeted the digest-pinned GUDHI
   3.13.0 CPython 3.12 wheel and exact source archive recorded in
-  `benchmarks/provider_spikes/gudhi_persistence_pin.json`; absence and import failure remain
+  `benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi/environment/pin.json`; absence and import failure remain
   typed non-conclusions.
 - Model and prompt settings: not applicable; the reproduction is a deterministic
   subprocess probe with no model call.
 - Raw trace: no separate raw transcript was retained. The frozen input,
   expected provider output, source and wheel identities, and replay digest are
-  in `benchmarks/provider_spikes/gudhi_persistence_pin.json`; the missing raw transcript is an
+  in `benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi/environment/pin.json`; the missing raw transcript is an
   explicit evidence limitation.
 - Validation recorded by the original handoff: not retained. The maintained
   regression entry point is

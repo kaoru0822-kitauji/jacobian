@@ -1,0 +1,120 @@
+schema_version = "1"
+
+[dataset]
+id = "jacobian/research-diagnostics-v1"
+version = "1.0.0"
+title = "Jacobian research diagnostics"
+purpose = "Answer-visible research challenges for case-level diagnostic runs, never held-out performance claims."
+claim_class = "diagnostic"
+answer_visibility = "public"
+default_execution_profile = "oracle-only"
+keywords = ["mathematics","jacobian","research-diagnostics","answer-visible","offline"]
+authors = [{ name = "Jacobian contributors", email = "maintainers@jacobian.invalid" }]
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-015"
+path = "tasks/mathematical-sciences/additive-combinatorics/jcb-postdoc-015"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-014"
+path = "tasks/mathematical-sciences/algebraic-geometry/jcb-postdoc-014"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-008"
+path = "tasks/mathematical-sciences/analytic-number-theory/jcb-postdoc-008"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-001"
+path = "tasks/mathematical-sciences/commutative-algebra/jcb-postdoc-001"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-012"
+path = "tasks/mathematical-sciences/commutative-algebra/jcb-postdoc-012"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-016"
+path = "tasks/mathematical-sciences/computational-number-theory/jcb-postdoc-016"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-013"
+path = "tasks/mathematical-sciences/enumerative-combinatorics/jcb-postdoc-013"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-002"
+path = "tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-002"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-004"
+path = "tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-004"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-006"
+path = "tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-006"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-018"
+path = "tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-018"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-009"
+path = "tasks/mathematical-sciences/lattice-theory/jcb-postdoc-009"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-010"
+path = "tasks/mathematical-sciences/matrix-analysis/jcb-postdoc-010"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-011"
+path = "tasks/mathematical-sciences/percolation-theory/jcb-postdoc-011"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-005"
+path = "tasks/mathematical-sciences/probability-theory/jcb-postdoc-005"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-017"
+path = "tasks/mathematical-sciences/submodular-optimization/jcb-postdoc-017"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-003"
+path = "tasks/mathematical-sciences/universal-algebra/jcb-postdoc-003"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/research-diagnostics-v1-jcb-postdoc-007"
+path = "tasks/mathematical-sciences/universal-algebra/jcb-postdoc-007"
+maximum_assurance = "COMPUTED"
+required_provider = "core"

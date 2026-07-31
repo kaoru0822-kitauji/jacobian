@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Jacobian Harbor dataset registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "datasets"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "datasets": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "directory", "evaluation_kind", "scored", "publication_status", "required_provider", "runtime_profile", "jobs"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^jacobian/[a-z0-9][a-z0-9-]*$"},
+          "directory": {"type": "string", "pattern": "^benchmarks/datasets/[a-z0-9][a-z0-9-]*$"},
+          "evaluation_kind": {"type": "string", "minLength": 1},
+          "scored": {"type": "boolean"},
+          "publication_status": {"type": "string", "minLength": 1},
+          "required_provider": {"type": "string", "minLength": 1},
+          "runtime_profile": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "purpose": {"type": "string", "minLength": 1},
+          "claim_class": {"type": "string", "minLength": 1},
+          "answer_visibility": {"type": "string", "minLength": 1},
+          "default_execution_profile": {"type": "string", "minLength": 1},
+          "oracle_jobs_dir": {"type": "string", "minLength": 1},
+          "observation_jobs_dir": {"type": "string", "minLength": 1},
+          "compose_file": {"type": "string", "minLength": 1},
+          "jobs": {
+            "type": "object",
+            "required": ["oracle"],
+            "properties": {
+              "oracle": {"type": "string", "minLength": 1},
+              "observation": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  }
+}

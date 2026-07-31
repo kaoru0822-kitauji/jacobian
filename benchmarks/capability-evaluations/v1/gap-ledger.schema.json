@@ -19,7 +19,7 @@
       "const": "1"
     },
     "ledger_id": {
-      "const": "jacobian.regression-v1.capability-gap-ledger"
+      "const": "jacobian.agent-workflow-v1.capability-gap-ledger"
     },
     "captured_at": {
       "type": "string",
@@ -36,7 +36,7 @@
       ],
       "properties": {
         "path": {
-          "const": "benchmarks/regression-v1/dataset.toml"
+          "const": "benchmarks/datasets/agent-workflow-v1/dataset.toml"
         },
         "task_count": {
           "const": 24

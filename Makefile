@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-sync harbor-release-sync harbor-release-check harbor-oracle harbor-release-oracle agent-eval bench-core clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-sync harbor-oracle harbor-oracle-all agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -159,28 +159,33 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
-harbor-check: ## Validate local Harbor task bundles without checking the release manifest.
+harbor-check: ## Verify committed Harbor task digests against local task contents.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
-	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --tasks-only
-
-harbor-sync: ## Update vendored verifier support without changing the release manifest.
-	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
-
-harbor-release-sync: ## Refresh the committed Harbor dataset manifest for a release PR.
-	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
-
-harbor-release-check: harbor-check ## Validate task bundles and the release manifest.
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 
-harbor-oracle: harbor-check ## Run the Harbor Oracle contract gate.
-	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-oracle.json $(EVAL_ARGS)
+harbor-sync: ## Update vendored verifier support and deterministic task digests.
+	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
 
-harbor-release-oracle: harbor-release-check ## Run the Oracle gate against a synchronized release tree.
-	$(HARBOR_RUNNER) run -c benchmarks/regression-v1/job-oracle.json $(EVAL_ARGS)
+harbor-oracle: harbor-check ## Run one dataset's Harbor Oracle contract gate (DATASET=...).
+	@test -n "$(DATASET)" || { echo "DATASET is required (for example, DATASET=agent-workflow-v1)" >&2; exit 2; }
+	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
+	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-harbor-oracle.XXXXXX.json") && \
+	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
+	$(UV_RUN) python tools/render_harbor_job.py \
+		--dataset "$(DATASET)" \
+		--role oracle \
+		--output "$$resolved_job" && \
+	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
-agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
+harbor-oracle-all: harbor-check ## Explicitly run every registered dataset's Oracle job.
+	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 performance-v1 provider-feasibility-v1 examples-v1; do \
+		$(MAKE) --no-print-directory harbor-oracle DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
+	done
+
+agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 EVAL_EXECUTE=1).
 	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \
-		echo "Model execution is opt-in. Review the job, then run: make agent-eval EVAL_EXECUTE=1"; \
+		echo "Model execution is opt-in. Review the job, then run: make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1"; \
 		exit 0; \
 	fi; \
 	image=$${JACOBIAN_IMAGE:-}; \
@@ -196,13 +201,27 @@ agent-eval: ## Run the Harbor-native Jacobian workflow observation job.
 	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-job.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
 	$(UV_RUN) python tools/render_harbor_job.py \
-		--input benchmarks/regression-v1/job-jacobian.json \
+		--dataset "$(or $(DATASET),agent-workflow-v1)" \
+		--role observation \
 		--output "$$resolved_job" \
 		--model "$${JACOBIAN_MODEL}" && \
 	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
-bench-core: ## Run the core performance benchmark script.
-	$(UV_RUN) python benchmarks/performance/benchmark_core.py
+performance-eval: ## Run the report-only performance dataset through its Oracle job.
+	$(MAKE) harbor-oracle DATASET=performance-v1
+
+provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gudhi|lean-repl|nauty|regina).
+	@test -n "$(PROVIDER)" || { echo "PROVIDER is required" >&2; exit 2; }
+	@case "$(PROVIDER)" in cddlib|cgal|gudhi|lean-repl|nauty|regina) ;; *) echo "unknown provider: $(PROVIDER)" >&2; exit 2;; esac
+	@$(MAKE) harbor-check && \
+	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-provider-eval.XXXXXX.json") && \
+	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
+	$(UV_RUN) python tools/render_harbor_job.py \
+		--dataset provider-feasibility-v1 \
+		--role oracle \
+		--provider "$(PROVIDER)" \
+		--output "$$resolved_job" && \
+	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
 clean: ## Remove local caches, build outputs, and coverage artifacts.
 	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build htmlcov

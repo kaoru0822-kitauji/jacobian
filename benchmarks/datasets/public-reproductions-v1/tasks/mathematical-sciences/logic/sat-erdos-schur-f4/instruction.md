@@ -1,0 +1,3 @@
+# Erdos-Schur f(4) determination
+
+Let f(k) be the least N such that every k-coloring of {1,...,N} contains a monochromatic solution to a+b=c. Determine f(4) and justify both bounds exactly: a k-coloring of {1,...,N-1} with no monochromatic a+b=c (lower bound) and evidence that no such coloring exists for N (upper bound). Write `submission.json` to the exact agent-visible `submission_schema.json`, record the justification in `evidence/answer.txt`, and include that file's SHA-256 digest in the evidence list. Claim `COMPUTED` assurance; do not claim `VERIFIED`.
