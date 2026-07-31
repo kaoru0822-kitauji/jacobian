@@ -17,6 +17,7 @@ stable public contract.
 | [0006](0006-semantic-test-topology.md) | Isolate tests by semantic depth and resource ownership | Accepted, pre-stable |
 | [0007](0007-benchmark-and-package-layout.md) | Organize benchmarks by artifact class; package domain adapters without shims | Accepted, pre-stable |
 | [0008](0008-harbor-native-benchmark-datasets.md) | Package every executable benchmark case in claim-specific Harbor datasets | Accepted, pre-stable |
+| [0009](0009-bounded-lrat-authority.md) | Keep LRAT replay experimental and addition-only until an independent backend passes the authority gate | Accepted, pre-stable |
 
 Add an ADR when a decision changes a trust boundary, durable data model,
 cross-component contract, dependency strategy, or other choice that would be

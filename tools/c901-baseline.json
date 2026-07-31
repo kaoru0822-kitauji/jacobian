@@ -263,11 +263,6 @@
       "complexity": 13
     },
     {
-      "path": "src/jacobian/provider_runtime.py",
-      "symbol": "require_provider_runtime_unchanged",
-      "complexity": 14
-    },
-    {
       "path": "src/jacobian/sat_smt/cadical.py",
       "symbol": "_parse_solver_output",
       "complexity": 11
@@ -575,7 +570,7 @@
     {
       "path": "src/jacobian_checkers/sat_lrat.py",
       "symbol": "_replay",
-      "complexity": 26
+      "complexity": 23
     },
     {
       "path": "src/jacobian_checkers/sat_lrat.py",
