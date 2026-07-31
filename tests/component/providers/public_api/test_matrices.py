@@ -24,3 +24,6 @@ def test_matrix_input_errors_are_stable() -> None:
         matrices.inverse(sympy.zeros(2))
     with pytest.raises(ValueError, match="exact"):
         matrices.trace(sympy.Matrix([[1.5]]))
+    nested_float = sympy.Add(sympy.Float("0.1"), sympy.Rational(1, 3), evaluate=False)
+    with pytest.raises(ValueError, match="exact"):
+        matrices.trace(sympy.Matrix([[nested_float]]))

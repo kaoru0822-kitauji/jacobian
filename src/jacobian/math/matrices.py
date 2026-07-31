@@ -15,7 +15,7 @@ def _matrix(value: MatrixBase) -> MatrixBase:
         raise ValueError("matrix dimensions must be between 1 and 32")
     if any(not entry.is_number or entry.is_finite is not True for entry in value):
         raise ValueError("matrix entries must be finite exact numbers")
-    if any(entry.is_Float for entry in value):
+    if any(entry.has(sympy.Float) for entry in value):
         raise ValueError("matrix entries must be exact; SymPy Float is not supported")
     return value
 
