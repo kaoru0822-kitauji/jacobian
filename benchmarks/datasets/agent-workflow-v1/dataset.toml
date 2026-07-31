@@ -39,6 +39,10 @@ name = "jacobian/agent-workflow-v1-finite-partition"
 digest = "sha256:8066dd253f3d05e024ffd47f87091e26113c7a2d69455554bd01ce925e583ac5"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-generated-lemma-vacuity-audit"
+digest = "sha256:765b097afb48e1f4cff9166e1735aa99edd997f89abfea35efe11511f24cb58b"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-graph-artifact-composition"
 digest = "sha256:1a1a488e045b737e915e5d8ce0306fbdfc19f528a6b649d9a0f229f61fb2639a"
 

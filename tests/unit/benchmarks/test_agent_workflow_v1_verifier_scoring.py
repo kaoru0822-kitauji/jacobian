@@ -27,6 +27,7 @@ RESOURCE_DERIVED_TASKS = (
     "autoformalization-semantic-audit",
     "calendar-good-days-audit",
     "finite-magma-countermodel",
+    "generated-lemma-vacuity-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",

@@ -14,6 +14,7 @@ EXPECTED_TASKS = {
     "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
     "finite-magma-countermodel",
+    "generated-lemma-vacuity-audit",
     "grounded-premise-proof",
     "graph-counterexample",
     "graph-artifact-composition",
