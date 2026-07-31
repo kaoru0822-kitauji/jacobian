@@ -19,7 +19,7 @@ category = "mathematics"
 tags = ["graph", "distance", "composition", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:4cfbc62b50f44f15a3a5e973619f3fc49263dccf088d258904a182f431191510"
+fixture_digest = "sha256:4fb641fa7ebbad8b497f422242b90de883fb574226bbc60c16571b41225a923c"
 derivation = "Fixed connected six-vertex graph with a non-singleton distance calculation."
 [agent]
 timeout_sec = 600.0

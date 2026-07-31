@@ -457,7 +457,11 @@ def render_job_config(config: dict[str, Any], *, model: str) -> dict[str, Any]:
 
 
 def render_suite_job(
-    suite: Suite, *, role: str, model: str | None = None
+    suite: Suite,
+    *,
+    role: str,
+    model: str | None = None,
+    provider: str | None = None,
 ) -> dict[str, Any]:
     template = suite.job_oracle if role == "oracle" else suite.job_observation
     if template is None:
@@ -465,8 +469,15 @@ def render_suite_job(
     config = json.loads(template.read_text(encoding="utf-8"))
     config.pop("datasets", None)
     config.pop("tasks", None)
+    task_refs = suite.tasks
+    if provider is not None:
+        task_refs = tuple(ref for ref in task_refs if ref.required_provider == provider)
+        if not task_refs:
+            raise HarborSuiteError(
+                f"dataset {suite.id} has no task requiring provider {provider!r}"
+            )
     config["tasks"] = [
-        {"path": ref.path.relative_to(ROOT).as_posix()} for ref in suite.tasks
+        {"path": ref.path.relative_to(ROOT).as_posix()} for ref in task_refs
     ]
     config["jobs_dir"] = (
         suite.oracle_jobs_dir if role == "oracle" else suite.observation_jobs_dir
@@ -480,6 +491,20 @@ def render_suite_job(
             else config
         )
     return config
+
+
+def _workflow_fixture_digest_failures(
+    task_dir: Path, rel: str, metadata: dict[str, Any]
+) -> list[str]:
+    if metadata.get("evaluation_kind") != "workflow":
+        return []
+    fixture = task_dir / "environment" / "input.json"
+    if not fixture.is_file():
+        return []
+    expected = DIGEST_PREFIX + hashlib.sha256(fixture.read_bytes()).hexdigest()
+    if metadata["fixture_digest"] == expected:
+        return []
+    return [f"{rel}/task.toml: fixture_digest does not match environment/input.json"]
 
 
 def _iter_files(root: Path) -> Iterator[Path]:
@@ -527,6 +552,9 @@ def validate_task_topology(suite: Suite, task_dir: Path) -> list[str]:
                     )
                 if ref and metadata["required_provider"] != ref.required_provider:
                     failures.append(f"{rel}/task.toml: provider disagrees with suite")
+                failures.extend(
+                    _workflow_fixture_digest_failures(task_dir, rel, metadata)
+                )
         except HarborSuiteError as exc:
             failures.append(str(exc))
     env = task_dir / "environment"

@@ -170,7 +170,13 @@ harbor-sync: ## Update vendored verifier support and deterministic task digests.
 harbor-oracle: harbor-check ## Run one dataset's Harbor Oracle contract gate (DATASET=...).
 	@test -n "$(DATASET)" || { echo "DATASET is required (for example, DATASET=agent-workflow-v1)" >&2; exit 2; }
 	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
-	$(HARBOR_RUNNER) run -c "benchmarks/datasets/$(DATASET)/jobs/oracle.json" $(EVAL_ARGS)
+	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-harbor-oracle.XXXXXX.json") && \
+	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
+	$(UV_RUN) python tools/render_harbor_job.py \
+		--dataset "$(DATASET)" \
+		--role oracle \
+		--output "$$resolved_job" && \
+	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
 harbor-oracle-all: harbor-check ## Explicitly run every registered dataset's Oracle job.
 	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 performance-v1 provider-feasibility-v1 examples-v1; do \
@@ -207,7 +213,15 @@ performance-eval: ## Run the report-only performance dataset through its Oracle 
 provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gudhi|lean-repl|nauty|regina).
 	@test -n "$(PROVIDER)" || { echo "PROVIDER is required" >&2; exit 2; }
 	@case "$(PROVIDER)" in cddlib|cgal|gudhi|lean-repl|nauty|regina) ;; *) echo "unknown provider: $(PROVIDER)" >&2; exit 2;; esac
-	$(MAKE) harbor-oracle DATASET=provider-feasibility-v1
+	@$(MAKE) harbor-check && \
+	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-provider-eval.XXXXXX.json") && \
+	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
+	$(UV_RUN) python tools/render_harbor_job.py \
+		--dataset provider-feasibility-v1 \
+		--role oracle \
+		--provider "$(PROVIDER)" \
+		--output "$$resolved_job" && \
+	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
 clean: ## Remove local caches, build outputs, and coverage artifacts.
 	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build htmlcov

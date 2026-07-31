@@ -10,7 +10,7 @@ algebra
 
 - case_version: agent-workflow-v1
 - contamination_class: hand-designed-structural-variant
-- fixture_digest: sha256:9206bd2581f20ceabd16a483ffe98eff97cfcd402f84f7866fdc257c704aa8d3
+- fixture_digest: sha256:2d7d0b1eb38f450bd83eec51664a83185b4a3de77431608113a07d8e8f93aede
 - derivation: Fixed symmetric map and two distinct integer points with equal images.
 - derivation_note: Hand-designed symmetric polynomial map; no external source is loaded at runtime.
 

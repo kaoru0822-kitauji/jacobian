@@ -19,7 +19,7 @@ category = "mathematics"
 tags = ["linear", "rational", "exact", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:0961884dee6ac4889d07da3c82a1bc6e9a5aa52f12c69229f09c3bcfd17ef493"
+fixture_digest = "sha256:7ca7f46fa89c2b4f7260fd01698dfe5c2a7414116f45c0b00541666270f5816e"
 derivation = "Fixed two-variable system with a non-integral unique solution."
 [agent]
 timeout_sec = 600.0

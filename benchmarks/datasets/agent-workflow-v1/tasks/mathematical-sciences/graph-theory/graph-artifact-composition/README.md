@@ -10,7 +10,7 @@ graph-theory
 
 - case_version: agent-workflow-v1
 - contamination_class: hand-designed-structural-variant
-- fixture_digest: sha256:afc9c57132594b60e9d309377efd0866109303fc5639d93b8f0ad6b081313e65
+- fixture_digest: sha256:4fb641fa7ebbad8b497f422242b90de883fb574226bbc60c16571b41225a923c
 - derivation: Fixed connected six-vertex graph with a non-singleton distance calculation.
 - derivation_note: Hand-designed finite graph; no external source is loaded at runtime.
 

@@ -120,7 +120,7 @@ def _make_minimal_task(root: Path, *, task_id: str = "jacobian/test-v1-a") -> Pa
             assurance_ceiling = "COMPUTED"
             answer_visibility = "hidden"
             provenance_class = "hand-designed"
-            fixture_digest = "sha256:{"0" * 64}"
+            fixture_digest = "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
             required_provider = "core"
             [agent]
             timeout_sec = 60.0
@@ -514,6 +514,23 @@ def test_validate_task_topology_reports_missing_metadata_field(
     (task / "task.toml").write_text(task_toml)
     failures = validate_task_topology(suite, task)
     assert any("metadata" in f.lower() for f in failures)
+
+
+def test_validate_task_topology_reports_workflow_fixture_digest_drift(
+    tmp_path: Path, patched_root: Path
+) -> None:
+    suite, task = _make_suite_with_task(tmp_path)
+    task_toml = (
+        (task / "task.toml")
+        .read_text()
+        .replace(
+            "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "sha256:" + "0" * 64,
+        )
+    )
+    (task / "task.toml").write_text(task_toml)
+    failures = validate_task_topology(suite, task)
+    assert any("fixture_digest" in f for f in failures)
 
 
 def test_validate_task_topology_reports_env_dockerfile_copies_solution(

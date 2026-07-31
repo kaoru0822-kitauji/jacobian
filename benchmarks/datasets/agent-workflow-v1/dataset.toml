@@ -36,11 +36,11 @@ digest = "sha256:8066dd253f3d05e024ffd47f87091e26113c7a2d69455554bd01ce925e583ac
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-graph-artifact-composition"
-digest = "sha256:9b78b9992ef06fc84ef3939ba5ec780b5ba1baf7b1e1bf4213296ac4b551aa35"
+digest = "sha256:1a1a488e045b737e915e5d8ce0306fbdfc19f528a6b649d9a0f229f61fb2639a"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-graph-counterexample"
-digest = "sha256:57c695fd92c1c0c20bdf6ebab4281dba080e5bc9b2c96727f518ba412bb8b05c"
+digest = "sha256:94f03b9e3fd2e9d4252da06264712964e7a9140810f7c16c8552855449239d34"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-grounded-premise-proof"
@@ -48,7 +48,7 @@ digest = "sha256:5d364abd11c1d04561311bdb434846644758edfbcaac34bbbd9433281a22ece
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-hermite-normal-form"
-digest = "sha256:c2829f5c0e6a3ff1959aa5ab14024bf3a1eb3e529367a462cd8973b42e19f1e2"
+digest = "sha256:46e9171b30f73a249c1189d0b3105557259d5ce4991992b5428ee2597a6ef0e3"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-log-exponent-recovery"
@@ -80,11 +80,11 @@ digest = "sha256:2ad0f13c862698b2aa22248dd5999924254db600ffe7ce0a8f56940308671f4
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-polynomial-map-collision"
-digest = "sha256:d042f0d33fcf7f348c1474c0c7766bd61183ca9db13621e889b49eeba8933c04"
+digest = "sha256:6e82e0db295d3f92732f09bf95ce9b9bc6073304084b73f7d9212e11eb7b8d7c"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-polynomial-normalization"
-digest = "sha256:3b505e6f63c516e36073fde03a4854bc3796a4d6f31f37adb3996f22102cde4d"
+digest = "sha256:0c07bd7c1baeec0d548a08e806274c6bdb9ac0c7778965e8430e44f619f3f00f"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-polynomial-tail-counterexample"
@@ -96,7 +96,7 @@ digest = "sha256:d0b51ae1e25e1a0b8f99cbc9e1eac73c5b4867fadbf9f285c46e70fb454b1c7
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-rational-linear-solution"
-digest = "sha256:9434d3b8be561b7a71fe20730b471787daaa0fff2278b397877d13c62e6996e0"
+digest = "sha256:9dc8322a5b78b4875450b461290abb6f56100e5d852c784a3f5371322b890f99"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-sat-witness"

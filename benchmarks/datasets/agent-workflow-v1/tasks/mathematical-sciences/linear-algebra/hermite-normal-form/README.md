@@ -10,7 +10,7 @@ linear-algebra
 
 - case_version: agent-workflow-v1
 - contamination_class: hand-designed-structural-variant
-- fixture_digest: sha256:bb764b3ee766e258f0dd5f89bb37e87974264f423db30d5e94a98fdfeec58693
+- fixture_digest: sha256:c8b594b227372622fb69167b5182f136eab90a5550fc25cd77eac711a72ef798
 - derivation: Fixed full-rank integer matrix with a unimodular row reduction certificate.
 - derivation_note: Hand-designed full-rank matrix with exact unimodular certificate.
 

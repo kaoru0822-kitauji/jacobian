@@ -53,6 +53,17 @@ def test_gap_ledger_handoffs_are_closed_over_task_candidates() -> None:
         candidate_id for task in tasks for candidate_id in task["candidate_ids"]
     }
 
+    workflow_task_refs = {
+        path.parent.relative_to(ROOT).as_posix()
+        for path in (WORKFLOW / "tasks").rglob("task.toml")
+    }
+    for handoff in handoffs:
+        for evidence in handoff.get("evidence_refs", []):
+            ref = evidence["ref"]
+            if ref.startswith("benchmarks/datasets/agent-workflow-v1/"):
+                assert ref in workflow_task_refs
+                assert (ROOT / ref / "task.toml").is_file()
+
     assert task_candidates == set(handoff_by_id)
     for candidate_id, handoff in handoff_by_id.items():
         if handoff["status"] == "accepted":

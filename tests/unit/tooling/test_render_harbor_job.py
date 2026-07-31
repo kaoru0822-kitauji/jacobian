@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 
 import pytest
-from benchmarks.tooling.harbor_suite import get_suite, render_suite_job
+from benchmarks.tooling.harbor_suite import (
+    HarborSuiteError,
+    get_suite,
+    render_suite_job,
+)
 
 ROOT = Path(__file__).parents[3]
 RENDERER = ROOT / "tools" / "render_harbor_job.py"
@@ -65,3 +69,21 @@ def test_render_suite_job_expands_nested_tasks_explicitly() -> None:
         )
         for entry in rendered["tasks"]
     )
+
+
+def test_render_suite_job_filters_provider_tasks() -> None:
+    rendered = render_suite_job(
+        get_suite("provider-feasibility-v1"), role="oracle", provider="cgal"
+    )
+
+    assert len(rendered["tasks"]) == 1
+    assert rendered["tasks"][0]["path"].endswith("/provider-integration/cgal")
+
+
+def test_render_suite_job_rejects_unknown_provider() -> None:
+    with pytest.raises(HarborSuiteError, match="no task requiring provider"):
+        render_suite_job(
+            get_suite("provider-feasibility-v1"),
+            role="oracle",
+            provider="missing-provider",
+        )

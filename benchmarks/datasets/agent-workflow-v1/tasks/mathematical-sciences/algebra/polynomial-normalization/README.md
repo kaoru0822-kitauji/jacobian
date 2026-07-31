@@ -10,7 +10,7 @@ algebra
 
 - case_version: agent-workflow-v1
 - contamination_class: hand-designed-structural-variant
-- fixture_digest: sha256:60acd1fbcd0dc163843512d3e0fd5ad535fe21534115bf63c2e705aaa3b7df27
+- fixture_digest: sha256:c66643ff9b22fcfd7f23f2164e1ee33f285541bccb6d4cc31ca36f211eed1ad3
 - derivation: Fixed sparse bivariate expression with cancellation and reordered terms.
 - derivation_note: Hand-designed sparse exact expression; no symbolic backend is required at runtime.
 

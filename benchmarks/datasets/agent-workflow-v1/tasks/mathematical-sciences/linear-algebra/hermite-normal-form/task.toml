@@ -19,7 +19,7 @@ category = "mathematics"
 tags = ["matrix", "hermite", "certificate", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "hand-designed-structural-variant"
-fixture_digest = "sha256:08b9e36333260c2281650f8449a40195d64ce2ada4d1c215dcbfde97d955def0"
+fixture_digest = "sha256:c8b594b227372622fb69167b5182f136eab90a5550fc25cd77eac711a72ef798"
 derivation = "Fixed full-rank integer matrix with a unimodular row reduction certificate."
 [agent]
 timeout_sec = 600.0

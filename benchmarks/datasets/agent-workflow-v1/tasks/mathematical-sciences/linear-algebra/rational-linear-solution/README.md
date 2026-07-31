@@ -10,7 +10,7 @@ linear-algebra
 
 - case_version: agent-workflow-v1
 - contamination_class: hand-designed-structural-variant
-- fixture_digest: sha256:a24aaad769323b66fa1a0f91d757fc84f6cedeff3dd10ba37c8b15b9d975a3ba
+- fixture_digest: sha256:7ca7f46fa89c2b4f7260fd01698dfe5c2a7414116f45c0b00541666270f5816e
 - derivation: Fixed two-variable system with a non-integral unique solution.
 - derivation_note: Hand-designed exact system; no floating-point arithmetic is needed.
 

@@ -10,7 +10,7 @@ graph-theory
 
 - case_version: agent-workflow-v1
 - contamination_class: hand-designed-structural-variant
-- fixture_digest: sha256:5e334b8b22312e495bcf8fd9f94bc288d8d39e84a9e1384eecd74a7ecb3ed0ac
+- fixture_digest: sha256:428415ec9a3dac6eba8f2cb966954d1608731c6aab09dd76ab04ca8b926cb14b
 - derivation: A fixed six-vertex triangle-free graph with an odd cycle and minimum degree two.
 - derivation_note: Hand-designed finite graph; no external source is loaded at runtime.
 

@@ -36,14 +36,23 @@ def main() -> int:
     parser.add_argument(
         "--role", choices=("oracle", "observation"), default="observation"
     )
+    parser.add_argument(
+        "--provider",
+        help="restrict a suite job to tasks requiring this provider",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", default=MODEL_PLACEHOLDER)
     args = parser.parse_args()
     if args.dataset:
         rendered = render_suite_job(
-            get_suite(args.dataset), role=args.role, model=args.model
+            get_suite(args.dataset),
+            role=args.role,
+            model=args.model,
+            provider=args.provider,
         )
     else:
+        if args.provider:
+            parser.error("--provider requires --dataset")
         if args.input is None:
             parser.error("--input or --dataset is required")
         config = json.loads(args.input.read_text(encoding="utf-8"))
