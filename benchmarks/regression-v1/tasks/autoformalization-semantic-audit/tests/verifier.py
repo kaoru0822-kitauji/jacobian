@@ -58,7 +58,7 @@ def _operator_mismatch_is_certified(certificate):
     }:
         return False
     dimension = certificate["dimension"]
-    if type(dimension) is not int or dimension != 2:
+    if type(dimension) is not int or not 2 <= dimension <= 100:
         return False
     x = certificate["x"]
     y = certificate["y"]
