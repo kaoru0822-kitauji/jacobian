@@ -6,4 +6,5 @@ date in calendar order, including each concatenated integer.
 
 Write `submission.json` to the exact agent-visible `submission_schema.json`.
 Put a concise description of the exhaustive check in `evidence/answer.txt`,
-and bind the file with its SHA-256 digest.
+include a `RESULT_JSON:` line containing the submitted result as JSON, and bind
+the file with its SHA-256 digest.
