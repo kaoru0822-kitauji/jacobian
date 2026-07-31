@@ -5,11 +5,12 @@
   "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
   "properties": {
     "task_id": {"const": "calendar-good-days-audit"},
-    "conclusion": {"const": "FALSE"},
+    "conclusion": {"enum": ["TRUE", "FALSE"]},
     "result": {
       "type": "object",
       "additionalProperties": false,
       "required": ["count", "good_dates"],
+      "additionalProperties": false,
       "properties": {
         "count": {"type": "integer", "minimum": 0},
         "good_dates": {

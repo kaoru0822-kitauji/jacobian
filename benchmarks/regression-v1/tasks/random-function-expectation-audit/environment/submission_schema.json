@@ -5,11 +5,12 @@
   "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
   "properties": {
     "task_id": {"const": "random-function-expectation-audit"},
-    "conclusion": {"const": "FALSE"},
+    "conclusion": {"enum": ["TRUE", "FALSE"]},
     "result": {
       "type": "object",
       "additionalProperties": false,
       "required": ["self_hit_probability", "other_hit_probability", "ordered_squared_difference_sum", "expected_value"],
+      "additionalProperties": false,
       "properties": {
         "self_hit_probability": {"type": "string"},
         "other_hit_probability": {"type": "string"},

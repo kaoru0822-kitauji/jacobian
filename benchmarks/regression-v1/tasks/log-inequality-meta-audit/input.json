@@ -24,5 +24,15 @@
     "audit_evaluator_score": true,
     "audit_meta_evaluation": true,
     "separate_truth_from_instruction_compliance": true
+  },
+  "evaluation_rubric": {
+    "mathematical_reasoning_label": "sound",
+    "compliant_instruction_label": "PROVES_REQUESTED_CLAIM",
+    "noncompliant_instruction_label": "DOES_NOT_PROVE_REQUESTED_CLAIM",
+    "score_if_compliant": 1,
+    "score_if_noncompliant": 0,
+    "consistent_status": "CONSISTENT",
+    "reasonable_meta_status": "REASONABLE",
+    "reasonable_meta_rating": 1
   }
 }
