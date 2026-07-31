@@ -11,12 +11,12 @@
       "additionalProperties": false,
       "required": ["claim_status", "counterexample_status", "instruction_compliance", "evaluator_score", "evaluator_rubric_status", "meta_evaluation_status", "certificate"],
       "properties": {
-        "claim_status": {"const": "FALSE"},
-        "counterexample_status": {"const": "VALID"},
-        "instruction_compliance": {"const": "DOES_NOT_PROVE_REQUESTED_CLAIM"},
-        "evaluator_score": {"const": 0},
-        "evaluator_rubric_status": {"const": "CONSISTENT"},
-        "meta_evaluation_status": {"const": "REASONABLE"},
+        "claim_status": {"type": "string", "minLength": 1},
+        "counterexample_status": {"type": "string", "minLength": 1},
+        "instruction_compliance": {"type": "string", "minLength": 1},
+        "evaluator_score": {"type": "integer", "minimum": 0},
+        "evaluator_rubric_status": {"type": "string", "minLength": 1},
+        "meta_evaluation_status": {"type": "string", "minLength": 1},
         "certificate": {
           "type": "object",
           "additionalProperties": false,

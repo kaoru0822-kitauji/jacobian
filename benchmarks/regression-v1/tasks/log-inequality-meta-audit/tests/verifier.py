@@ -72,21 +72,36 @@ def _valid_layered_audit(result, source):
         and certificate["comparison"] == "LESS_THAN"
         and left < right
     )
-    rubric = source["conversation_trace"]["solution_evaluation"]
+    rubric = source["evaluation_rubric"]
+    observed_evaluation = source["conversation_trace"]["solution_evaluation"]
     meta = source["conversation_trace"]["meta_evaluation"]
+    expected_score = (
+        rubric["score_if_noncompliant"]
+        if result["instruction_compliance"] == rubric["noncompliant_instruction_label"]
+        else rubric["score_if_compliant"]
+    )
+    evaluator_consistent = (
+        type(result["evaluator_score"]) is int
+        and result["evaluator_score"] == expected_score
+        and observed_evaluation["score"] == expected_score
+        and result["evaluator_rubric_status"] == rubric["consistent_status"]
+        and observed_evaluation["mathematical_reasoning"]
+        == rubric["mathematical_reasoning_label"]
+    )
     return bool(
         domain_valid
         and exact_disproof
         and result["claim_status"] == "FALSE"
         and result["counterexample_status"] == "VALID"
         and result["instruction_compliance"] == "DOES_NOT_PROVE_REQUESTED_CLAIM"
-        and result["evaluator_score"] == rubric["score"] == 0
-        and result["evaluator_rubric_status"] == "CONSISTENT"
-        and rubric["mathematical_reasoning"] == "sound"
-        and rubric["instruction_compliance"]
-        == "does not prove the requested inequality"
-        and result["meta_evaluation_status"] == "REASONABLE"
-        and meta["rating"] == 1
+        and result["instruction_compliance"]
+        in {
+            rubric["compliant_instruction_label"],
+            rubric["noncompliant_instruction_label"],
+        }
+        and evaluator_consistent
+        and result["meta_evaluation_status"] == rubric["reasonable_meta_status"]
+        and meta["rating"] == rubric["reasonable_meta_rating"]
     )
 
 
