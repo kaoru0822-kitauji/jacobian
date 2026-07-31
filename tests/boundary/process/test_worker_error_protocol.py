@@ -90,3 +90,25 @@ def test_worker_code_cannot_self_report_a_source_change(
 
     assert completed.returncode == 1
     assert response["error_code"] == "EXECUTION_FAILED"
+
+
+def test_checker_worker_classifies_malformed_provider_runtime() -> None:
+    entrypoint = "tests.component.checkers._fixture_checkers:check_fixture_value"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "jacobian.checker_worker",
+            entrypoint,
+            package_source_digest(entrypoint),
+            "{malformed",
+        ],
+        input=b"{}",
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    response = loads_strict_json(completed.stdout)
+
+    assert completed.returncode == 1
+    assert response == {"error_code": "MALFORMED_RUNTIME"}

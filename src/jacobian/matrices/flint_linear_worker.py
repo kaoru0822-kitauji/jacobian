@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import importlib
-import json
 import re
 import sys
 from fractions import Fraction
 from typing import Any
+
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 
 FLINT_LINEAR_WORKER_PROTOCOL = "jacobian.flint-linear-worker/v1"
 FLINT_LINEAR_INCONSISTENCY_WORKER_PROTOCOL = (
@@ -34,23 +39,9 @@ def _emit(
     protocol: str = FLINT_LINEAR_WORKER_PROTOCOL,
 ) -> None:
     sys.stdout.write(
-        json.dumps(
-            {"protocol": protocol, **payload},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        + "\n"
+        canonicalize_json({"protocol": protocol, **payload}).decode("utf-8") + "\n"
     )
     sys.stdout.flush()
-
-
-def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("duplicate JSON key")
-        result[key] = value
-    return result
 
 
 def _read_request() -> dict[str, Any]:
@@ -58,8 +49,8 @@ def _read_request() -> dict[str, Any]:
     if len(encoded) > FLINT_LINEAR_INPUT_LIMIT:
         raise FlintLinearWorkerError("FLINT_LINEAR_INPUT_LIMIT_EXCEEDED")
     try:
-        payload = json.loads(encoded, object_pairs_hook=_strict_object)
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        payload = loads_strict_json(encoded)
+    except CanonicalizationError as exc:
         raise FlintLinearWorkerError("FLINT_LINEAR_INPUT_INVALID") from exc
     if not isinstance(payload, dict):
         raise FlintLinearWorkerError("FLINT_LINEAR_INPUT_INVALID")

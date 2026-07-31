@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from typing import Any
@@ -10,7 +9,11 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.bounded_process import ProcessResourceLimits, run_bounded_process
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.contracts.validated_analysis import (
@@ -123,7 +126,7 @@ def _point_enclosure(
             status=ExecutionStatus.TIMEOUT,
             diagnostic=_diagnostic("ARB_POINT_ENCLOSURE_TIMEOUT", detail),
         )
-    except (OSError, RuntimeError, json.JSONDecodeError, ValidationError):
+    except (OSError, RuntimeError, CanonicalizationError, ValidationError):
         detail = (
             "The Arb worker failed or returned malformed output; "
             "no enclosure conclusion is available."

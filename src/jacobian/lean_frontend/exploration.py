@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import queue
 import re
@@ -24,7 +23,11 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.capabilities import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
@@ -239,7 +242,7 @@ class PersistentLeanRepl:
         if process is None or process.stdin is None:
             raise RuntimeError("Lean REPL is unavailable")
         try:
-            process.stdin.write(json.dumps(request, sort_keys=True) + "\n\n")
+            process.stdin.write(canonicalize_json(request).decode("utf-8") + "\n\n")
             process.stdin.flush()
         except (BrokenPipeError, OSError) as exc:
             self._stop_process()
@@ -284,7 +287,7 @@ class PersistentLeanRepl:
                     continue
                 if not block:
                     continue
-                value = json.loads("".join(block))
+                value = loads_strict_json("".join(block))
                 if not isinstance(value, dict):
                     raise RuntimeError("Lean REPL returned a non-object response")
                 responses.put(value)
@@ -292,7 +295,7 @@ class PersistentLeanRepl:
             if block:
                 raise RuntimeError("Lean REPL returned an unterminated response")
             responses.put(RuntimeError("Lean REPL exited"))
-        except (json.JSONDecodeError, OSError, RuntimeError) as exc:
+        except (CanonicalizationError, OSError, RuntimeError) as exc:
             responses.put(exc)
 
     def _stop_process(self) -> None:
@@ -532,7 +535,7 @@ def install_lean_exploration_capabilities(
         version="2",
         schema=LeanPremiseRetrievalArtifact.model_json_schema(),
     )
-    runtime = Path(__file__).resolve().parents[2] / "lean"
+    runtime = Path(__file__).resolve().parents[3] / "lean"
     repl = LeanExplorationReplRuntime(runtime, installations)
     resources = _Resources(
         store=store,
@@ -1333,11 +1336,17 @@ def _extract_typed_goals(
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError("Lean typed proof-state extraction failed") from exc
     marker = "JACOBIAN_PROOF_STATE_RESULT "
-    lines = completed.stdout.decode("utf-8", errors="strict").splitlines()
+    try:
+        lines = completed.stdout.decode("utf-8", errors="strict").splitlines()
+    except UnicodeDecodeError as exc:
+        raise RuntimeError("Lean typed proof-state extraction failed") from exc
     responses = [line for line in lines if line.startswith(marker)]
     if completed.returncode != 0 or len(responses) != 1:
         raise RuntimeError("Lean typed proof-state extraction failed")
-    envelope = loads_strict_json(responses[0].removeprefix(marker))
+    try:
+        envelope = loads_strict_json(responses[0].removeprefix(marker))
+    except CanonicalizationError as exc:
+        raise RuntimeError("Lean typed proof-state extraction failed") from exc
     if (
         not isinstance(envelope, dict)
         or envelope.get("request_id") != request_id

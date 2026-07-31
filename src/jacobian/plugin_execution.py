@@ -6,10 +6,15 @@ import logging
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any
+from enum import StrEnum
+from typing import Any, cast
 
 from jacobian.bounded_process import run_bounded_process
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.results import ExecutionStatus
 from jacobian.implementation import package_source_digest
 from jacobian.worker_environment import worker_environment
@@ -41,6 +46,44 @@ _PLUGIN_STOPPED = (
 )
 
 
+class _PluginWorkerFailureCode(StrEnum):
+    """Bounded operational failures emitted by the plugin worker."""
+
+    INVALID_REQUEST = "INVALID_REQUEST"
+    SOURCE_CHANGED = "SOURCE_CHANGED"
+    RESPONSE_INVALID = "RESPONSE_INVALID"
+    EXECUTION_FAILED = "EXECUTION_FAILED"
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+
+
+class PluginInputError(ValueError):
+    """A plugin request cannot be parsed into its domain contract."""
+
+    def __init__(
+        self,
+        *,
+        path: str,
+        expected: str,
+        actual_type: str,
+    ) -> None:
+        self.path = path
+        self.expected = expected
+        self.actual_type = actual_type
+        super().__init__(
+            f"invalid plugin input at {path or '/'}: expected {expected} "
+            f"(received {actual_type})"
+        )
+
+
+class PluginResponseError(ValueError):
+    """A plugin worker response is not a safe typed response envelope."""
+
+    def __init__(self, *, failure_code: _PluginWorkerFailureCode, message: str) -> None:
+        self.failure_code = failure_code
+        self.safe_message = message
+        super().__init__(message)
+
+
 @dataclass(frozen=True, slots=True)
 class PluginExecutionResult:
     """Operational result from one local plugin worker invocation."""
@@ -50,6 +93,10 @@ class PluginExecutionResult:
     diagnostics: str
     detail: str | None
     runtime_ms: int
+    failure_code: _PluginWorkerFailureCode | None = None
+    path: str | None = None
+    expected: str | None = None
+    actual_type: str | None = None
 
 
 class PluginExecutor:
@@ -107,6 +154,7 @@ class PluginExecutor:
                 diagnostics=diagnostics,
                 detail=_PLUGIN_TIMEOUT,
                 runtime_ms=_elapsed_ms(started),
+                failure_code=_PluginWorkerFailureCode.EXECUTION_FAILED,
             )
 
         if completed.stdout_exceeded:
@@ -116,6 +164,7 @@ class PluginExecutor:
                 diagnostics=diagnostics,
                 detail=_PLUGIN_OUTPUT_TOO_LARGE,
                 runtime_ms=_elapsed_ms(started),
+                failure_code=_PluginWorkerFailureCode.RESPONSE_INVALID,
             )
         if completed.stderr_exceeded:
             return PluginExecutionResult(
@@ -124,16 +173,18 @@ class PluginExecutor:
                 diagnostics=diagnostics,
                 detail=_PLUGIN_DIAGNOSTICS_TOO_LARGE,
                 runtime_ms=_elapsed_ms(started),
+                failure_code=_PluginWorkerFailureCode.RESPONSE_INVALID,
             )
         try:
             output = loads_strict_json(completed.stdout)
-        except ValueError:
+        except CanonicalizationError:
             return PluginExecutionResult(
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
                 detail=_PLUGIN_UNREADABLE_RESPONSE,
                 runtime_ms=_elapsed_ms(started),
+                failure_code=_PluginWorkerFailureCode.RESPONSE_INVALID,
             )
         if completed.returncode != 0:
             _LOGGER.warning(
@@ -141,12 +192,17 @@ class PluginExecutor:
                 output,
                 diagnostics,
             )
+            code = _failure_code(output)
             return PluginExecutionResult(
                 status=ExecutionStatus.ERROR,
                 output=None,
                 diagnostics=diagnostics,
                 detail=_plugin_failure_detail(output),
                 runtime_ms=_elapsed_ms(started),
+                failure_code=code,
+                path=_optional_string(output, "path"),
+                expected=_optional_string(output, "expected"),
+                actual_type=_optional_string(output, "actual_type"),
             )
         if not isinstance(output, dict):
             return PluginExecutionResult(
@@ -155,6 +211,7 @@ class PluginExecutor:
                 diagnostics=diagnostics,
                 detail=_PLUGIN_UNREADABLE_RESPONSE,
                 runtime_ms=_elapsed_ms(started),
+                failure_code=_PluginWorkerFailureCode.RESPONSE_INVALID,
             )
         if output.get("measured_implementation_digest") != expected_digest:
             _LOGGER.warning(
@@ -167,6 +224,7 @@ class PluginExecutor:
                 diagnostics=diagnostics,
                 detail=_PLUGIN_CHANGED,
                 runtime_ms=_elapsed_ms(started),
+                failure_code=_PluginWorkerFailureCode.SOURCE_CHANGED,
             )
         response = output.get("response")
         if not isinstance(response, dict):
@@ -191,9 +249,32 @@ def _elapsed_ms(started: float) -> int:
 
 
 def _plugin_failure_detail(output: Any) -> str:
-    if isinstance(output, dict) and output.get("error_code") == "SOURCE_CHANGED":
+    code = _failure_code(output)
+    if code is _PluginWorkerFailureCode.SOURCE_CHANGED:
         return _PLUGIN_CHANGED
+    if code is _PluginWorkerFailureCode.INVALID_REQUEST:
+        return "The plugin rejected its request. Check the capability input contract and retry."
+    if code is _PluginWorkerFailureCode.PROVIDER_UNAVAILABLE:
+        return "The plugin provider is unavailable. Install or repair the declared provider, then retry."
     return _PLUGIN_STOPPED
+
+
+def _failure_code(value: Any) -> _PluginWorkerFailureCode:
+    if isinstance(value, dict):
+        raw_code = value.get("error_code")
+        if not isinstance(raw_code, str):
+            return _PluginWorkerFailureCode.EXECUTION_FAILED
+        try:
+            return _PluginWorkerFailureCode(raw_code)
+        except ValueError:
+            pass
+    return _PluginWorkerFailureCode.EXECUTION_FAILED
+
+
+def _optional_string(value: Any, key: str) -> str | None:
+    if isinstance(value, dict) and isinstance(value.get(key), str):
+        return cast(str, value[key])
+    return None
 
 
 def _bounded_text(value: bytes | str | None, *, limit: int) -> str:

@@ -15,7 +15,11 @@ from typing import Any, Protocol
 
 from pydantic import ValidationError
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.capabilities import CapabilityProviderRuntime
 from jacobian.contracts.lean import (
     LeanDeclarationInspectOutput,
@@ -697,7 +701,7 @@ def _parse_session_response(
         raise _protocol_error()
     try:
         envelope = loads_strict_json(serialized)
-    except ValueError as exc:
+    except CanonicalizationError as exc:
         raise _protocol_error() from exc
     if not isinstance(envelope, dict) or envelope.get("request_id") != (
         expected_request_id

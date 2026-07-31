@@ -341,7 +341,7 @@ def _require_current_runtime(
 
     try:
         require_provider_runtime_unchanged(provider_runtime)
-    except (OSError, ProviderRuntimeError) as exc:
+    except (OSError, ProviderRuntimeError, ValidationError) as exc:
         raise _LeanUnavailableError(
             "The pinned Lean executable identity changed or became unavailable."
         ) from exc

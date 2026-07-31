@@ -10,7 +10,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from pydantic import ValidationError
+
+from jacobian.canonical import (
+    CanonicalizationError,
+    canonicalize_json,
+    loads_strict_json,
+)
 from jacobian.contracts.capabilities import (
     CapabilityProviderDigestKind,
     CapabilityProviderRuntime,
@@ -21,8 +27,17 @@ from jacobian.implementation import (
 )
 from jacobian.provider_runtime import (
     ProviderRuntimeError,
+    ProviderRuntimeErrorCode,
     require_provider_runtime_unchanged,
 )
+
+
+class _CheckerWorkerFailureError(ValueError):
+    """A bounded failure classification for checker-owned runtime parsing."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
 
 
 def _resolve(entrypoint: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
@@ -43,13 +58,20 @@ def _measure_runtime(
     os.environ.pop("JACOBIAN_CHECKER_RUNTIME_DIGEST", None)
     if encoded is None:
         return None, None
-    runtime = CapabilityProviderRuntime.model_validate(loads_strict_json(encoded))
     try:
+        runtime = CapabilityProviderRuntime.model_validate(loads_strict_json(encoded))
         require_provider_runtime_unchanged(runtime)
-    except (OSError, ProviderRuntimeError, ValueError) as exc:
-        raise ValueError(
-            "checker runtime differs from its authorized identity"
-        ) from exc
+    except (CanonicalizationError, ValidationError) as exc:
+        raise _CheckerWorkerFailureError("MALFORMED_RUNTIME") from exc
+    except ProviderRuntimeError as exc:
+        code = (
+            "MALFORMED_RUNTIME"
+            if exc.code is ProviderRuntimeErrorCode.MALFORMED_RUNTIME
+            else "EXECUTION_FAILED"
+        )
+        raise _CheckerWorkerFailureError(code) from exc
+    except (OSError, ValueError) as exc:
+        raise _CheckerWorkerFailureError("MALFORMED_RUNTIME") from exc
     if runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE:
         executable = runtime.configuration.get("executable")
         if not isinstance(executable, str):
@@ -72,8 +94,13 @@ def main() -> int:
         )
         return 2
     error_code = "EXECUTION_FAILED"
+    request_decoded = False
     try:
         request = loads_strict_json(sys.stdin.buffer.read())
+        request_decoded = True
+        if not isinstance(request, dict):
+            error_code = "INVALID_REQUEST"
+            raise _CheckerWorkerFailureError(error_code)
         measured_before = package_source_digest(sys.argv[1])
         if measured_before != sys.argv[2]:
             error_code = "SOURCE_CHANGED"
@@ -108,12 +135,20 @@ def main() -> int:
         )
         sys.stdout.buffer.write(b"\n")
         return 0
-    except Exception as exc:  # checker isolation turns all failures into ERROR
+    except _CheckerWorkerFailureError as exc:
+        error = {"error_code": exc.code}
+        sys.stdout.buffer.write(canonicalize_json(error))
+        sys.stdout.buffer.write(b"\n")
+        return 1
+    except CanonicalizationError:
         error = {
-            "error": type(exc).__name__,
-            "error_code": error_code,
-            "detail": str(exc),
+            "error_code": "RESPONSE_INVALID" if request_decoded else "INVALID_REQUEST"
         }
+        sys.stdout.buffer.write(canonicalize_json(error))
+        sys.stdout.buffer.write(b"\n")
+        return 1
+    except Exception:  # checker isolation turns all failures into ERROR
+        error = {"error_code": error_code}
         sys.stdout.buffer.write(canonicalize_json(error))
         sys.stdout.buffer.write(b"\n")
         return 1
