@@ -29,6 +29,7 @@ RESOURCE_DERIVED_TASKS = (
     "euler-line-symbolic-certificate",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
+    "metric-tsp-proof-repair",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
@@ -218,6 +219,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result.update(matrix=[[1, 0], [0, 0]]),
         ),
         (
+            "metric-tsp-proof-repair",
+            lambda result: result["weights"].update(optimal=31),
+        ),
+        (
             "polynomial-tail-counterexample",
             lambda result: result.update(x2="1"),
         ),
@@ -298,3 +303,19 @@ def test_euler_line_verifier_rejects_extra_denominator_singularity(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_metric_tsp_repair_accepts_reversed_optimal_tour(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "metric-tsp-proof-repair",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["optimal_tour"] = ["A", "D", "C", "F", "E", "B", "A"]
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)

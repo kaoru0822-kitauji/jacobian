@@ -14,6 +14,7 @@ Review date: 2026-07-30. Source inventory: the `Resources` tab of spreadsheet
 | `calendar-good-days-audit` | Medium | Proof audit / bounded verification | BrokenMath, benchmark row 84, revision `5eda8c5…` | Requires a complete finite audit rather than trusting a false target; the verifier reconstructs all qualifying dates. |
 | `random-function-expectation-audit` | Hard | Proof audit / probability | BrokenMath, benchmark row 88, revision `5eda8c5…` | Tests dependence-aware expectation reasoning and exact probability bookkeeping, a pattern absent from the pending suite. |
 | `euler-line-symbolic-certificate` | Hard | Euclidean geometry / symbolic theorem verification | IDEF-GeoBench, curated problem 1 (hosted rows 2-17), revision `ce1decbe…` | Adds a new geometry workflow: derive generic rational coordinates, satisfy the point-defining identities, and certify a universal incidence relation exactly. |
+| `metric-tsp-proof-repair` | Hard | Proof repair / graph optimization | forge-reason-v1, validation row 11 (`forge-reason-00218`), revision `e582eb0…` | Adds proof repair rather than another verdict-only audit: identify an unjustified equality, weaken the theorem to its valid approximation guarantee, and bind the repair to an exact independently optimized trace. |
 
 Difficulty is based on the complete task contract, not only the length of the
 answer. The suite deliberately contains no Extreme/Open task: the reviewed
@@ -49,6 +50,11 @@ The remaining inventory was not converted wholesale. Major rejection classes:
   were also skipped: several rely on implicit nondegeneracy, are substantially
   simpler length/incidence consequences, or would repeat the same coordinate
   identity workflow without increasing coverage.
+- Nearby forge-reason-v1 rows were rejected when the repair was only a missing
+  base case, merely relabeled an open problem, or depended on cryptographic or
+  analytic assumptions that the offline verifier could not independently
+  adjudicate. The Metric TSP row was retained because every repaired proof
+  obligation admits a complete finite checker on a frozen metric instance.
 
 This is a curation record, not a claim that rejected datasets are intrinsically
 low quality; they were unsuitable for this specific long-lived Harbor suite.
