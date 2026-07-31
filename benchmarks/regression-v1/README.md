@@ -1,8 +1,8 @@
 # Jacobian regression-v1
 
 This is the small committed Harbor dataset for observing Jacobian-enabled
-mathematical workflows. It contains twelve self-contained, answerable tasks;
-the task digests in `dataset.toml` are the task identities.
+mathematical workflows. The committed `dataset.toml` is a release artifact;
+release PRs refresh its task digests after the task set is frozen.
 
 The tasks are agent-agnostic. Their instructions name no tool, capability, or
 invocation order. Each task has an offline input, schema 1.4 metadata, an
@@ -28,8 +28,12 @@ configuration outside the task bundles.
 From the repository root:
 
 ```sh
-harbor check benchmarks/regression-v1/tasks/*
+make harbor-check
 make harbor-oracle
+
+# Release PR only, after all task changes have landed:
+make harbor-release-sync
+make harbor-release-oracle
 ```
 
 The Oracle job is the contract gate. Run it again after changing a task,
