@@ -137,9 +137,9 @@ test("normalizes release-please Python prerelease versions for npm", () => {
 });
 
 test("launcher pins and refreshes stale default Python packages", () => {
-  assert.equal(pythonVersionFromNpmVersion("0.5.0-alpha.0"), "0.5.0a0");
-  assert.equal(PYTHON_PACKAGE_VERSION, "0.5.0a0");
-  assert.equal(PACKAGE_SPEC, "jacobian==0.5.0a0");
+  const expectedPythonVersion = pythonVersionFromNpmVersion(packageMetadata.version);
+  assert.equal(PYTHON_PACKAGE_VERSION, expectedPythonVersion);
+  assert.equal(PACKAGE_SPEC, `${packageMetadata.name}==${expectedPythonVersion}`);
   assert.equal(packageNeedsRefresh("0.4.0"), true);
   assert.equal(packageNeedsRefresh(null), true);
   assert.equal(packageNeedsRefresh(PYTHON_PACKAGE_VERSION), false);
