@@ -117,8 +117,7 @@ def main():
                 not isinstance(edge, list)
                 or len(edge) != 2
                 or any(
-                    type(vertex) is not str or vertex not in vertices
-                    for vertex in edge
+                    type(vertex) is not str or vertex not in vertices for vertex in edge
                 )
             ):
                 edge_shape = False
