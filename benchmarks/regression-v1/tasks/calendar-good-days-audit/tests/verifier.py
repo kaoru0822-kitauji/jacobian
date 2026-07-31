@@ -53,8 +53,7 @@ def main():
             isinstance(date, dict)
             and set(date) == {"month", "day", "concatenated"}
             and all(
-                type(date[field]) is int
-                for field in ("month", "day", "concatenated")
+                type(date[field]) is int for field in ("month", "day", "concatenated")
             )
             for date in r["good_dates"]
         )
