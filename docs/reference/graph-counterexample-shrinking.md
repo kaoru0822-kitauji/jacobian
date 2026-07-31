@@ -19,7 +19,9 @@ and `graph.property.non_bipartite.preservation` format.
 
 The result records every attempted reduction in execution order. Each attempt
 identifies the source graph, proposed graph, exact deleted vertex or edge,
-outcome, and—only for accepted steps—the independent verification record.
+candidate digest, outcome, and—only for accepted steps—the independent
+verification record. The local-minimality scope also records the expected and
+completed attempt counts, completeness status, and remaining obligations.
 Possible outcomes distinguish verified acceptance, mathematical property
 rejection, checker failure, and invalid reduction.
 
@@ -37,6 +39,10 @@ graph. It sets `one_step_locally_minimal` only when:
 3. every such deletion was mathematically rejected by the checker; and
 4. execution completed without a timeout, checker error, invalid proposal, or
    budget omission.
+
+An incomplete enumeration, cancellation, unavailable checker, or worker error
+leaves minimality unknown. This evidence is local to the declared reducer
+family; it does not imply global minimality.
 
 The result separately lists tested and untested deletions. It never claims
 global minimality. Restricting the reducer set restricts the meaning of the

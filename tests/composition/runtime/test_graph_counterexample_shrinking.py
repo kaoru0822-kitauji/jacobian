@@ -54,6 +54,15 @@ def test_graph_counterexample_shrink_records_verified_steps_and_exact_local_scop
     assert scope["complete_for_requested_reducers"] is True
     assert scope["one_step_locally_minimal"] is True
     assert scope["global_minimality_claimed"] is False
+    assert scope["expected_attempt_count"] == 6
+    assert scope["completed_attempt_count"] == 6
+    assert scope["completeness_status"] == "COMPLETE"
+    assert scope["remaining_obligations"] == []
+    assert all(
+        attempt["candidate_digest"] is not None
+        for attempt in result.output["attempts"]
+        if attempt["proposed_graph_uri"] is not None
+    )
     trace = runtime.core.store.get(result.output["trace_uri"])
     assert trace.payload["attempts"] == result.output["attempts"]
     assert trace.payload["local_minimality_scope"] == scope

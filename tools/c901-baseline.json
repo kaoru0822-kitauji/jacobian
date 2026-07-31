@@ -220,7 +220,7 @@
     {
       "path": "src/jacobian/plugins/graph_paths.py",
       "symbol": "find_witness",
-      "complexity": 13
+      "complexity": 14
     },
     {
       "path": "src/jacobian/plugins/graph_paths.py",
