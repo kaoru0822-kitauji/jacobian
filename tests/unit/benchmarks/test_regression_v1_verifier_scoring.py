@@ -25,6 +25,7 @@ VERIFICATION_RECORD_TASKS = (
 )
 RATIONAL_TASK = "rational-linear-solution"
 RESOURCE_DERIVED_TASKS = (
+    "autoformalization-semantic-audit",
     "calendar-good-days-audit",
     "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
@@ -207,6 +208,12 @@ def test_resource_derived_oracles_and_assurance_boundary(
 @pytest.mark.parametrize(
     ("task_name", "mutate"),
     [
+        (
+            "autoformalization-semantic-audit",
+            lambda result: result["operator_mismatch_certificate"].update(
+                dot_product=1
+            ),
+        ),
         (
             "calendar-good-days-audit",
             lambda result: result.update(count=15),
@@ -416,6 +423,53 @@ def test_log_meta_audit_rejects_corrupted_evaluation_layers(
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"][field] = value
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_autoformalization_audit_accepts_alternative_exact_witnesses(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "autoformalization-semantic-audit",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["missing_premise_certificate"] = {
+        "dimension": 1,
+        "x": [-7],
+        "forced_y": [0],
+    }
+    submission["result"]["operator_mismatch_certificate"] = {
+        "dimension": 3,
+        "x": [1, 2, 0],
+        "y": [2, -1, 5],
+        "dot_product": 0,
+        "coordinate_products": [2, -2, 0],
+    }
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_autoformalization_audit_rejects_incomplete_defect_set(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "autoformalization-semantic-audit",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["defects"] = ["MISSING_DIMENSION_PREMISE"]
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)

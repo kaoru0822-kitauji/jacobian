@@ -1,0 +1,150 @@
+import json
+from pathlib import Path
+
+from verifier_support import (
+    evidence_list_is_bound,
+    false_verified_claim,
+    load_submission,
+    strict_submission_contract,
+)
+
+W = Path("/app")
+E = Path("/tests")
+
+REQUIRED_DEFECTS = {
+    "MISSING_DIMENSION_PREMISE",
+    "DOT_PRODUCT_REPLACED_BY_COORDINATEWISE_ZERO",
+}
+
+
+def _integer_vector(value, dimension):
+    return bool(
+        isinstance(value, list)
+        and len(value) == dimension
+        and all(type(entry) is int for entry in value)
+    )
+
+
+def _missing_premise_is_certified(certificate):
+    if not isinstance(certificate, dict) or set(certificate) != {
+        "dimension",
+        "x",
+        "forced_y",
+    }:
+        return False
+    dimension = certificate["dimension"]
+    if type(dimension) is not int or dimension != 1:
+        return False
+    x = certificate["x"]
+    forced_y = certificate["forced_y"]
+    return bool(
+        _integer_vector(x, dimension)
+        and _integer_vector(forced_y, dimension)
+        and x[0] != 0
+        and forced_y == [0]
+        and x[0] * forced_y[0] == 0
+        and not any(forced_y)
+    )
+
+
+def _operator_mismatch_is_certified(certificate):
+    if not isinstance(certificate, dict) or set(certificate) != {
+        "dimension",
+        "x",
+        "y",
+        "dot_product",
+        "coordinate_products",
+    }:
+        return False
+    dimension = certificate["dimension"]
+    if type(dimension) is not int or dimension < 2:
+        return False
+    x = certificate["x"]
+    y = certificate["y"]
+    products = certificate["coordinate_products"]
+    if not all(_integer_vector(vector, dimension) for vector in (x, y, products)):
+        return False
+    actual_products = [left * right for left, right in zip(x, y, strict=True)]
+    actual_dot_product = sum(actual_products)
+    return bool(
+        any(y)
+        and products == actual_products
+        and certificate["dot_product"] == actual_dot_product == 0
+        and any(product != 0 for product in actual_products)
+    )
+
+
+def _valid_semantic_audit(result, source):
+    if not isinstance(result, dict) or set(result) != {
+        "semantic_status",
+        "defects",
+        "missing_premise_certificate",
+        "operator_mismatch_certificate",
+    }:
+        return False
+    if source.get("audit_scope", {}).get("lean_compilation") is not False:
+        return False
+    defects = result["defects"]
+    return bool(
+        result["semantic_status"] == "NOT_EQUIVALENT"
+        and isinstance(defects, list)
+        and set(defects) == REQUIRED_DEFECTS
+        and len(defects) == len(REQUIRED_DEFECTS)
+        and _missing_premise_is_certified(result["missing_premise_certificate"])
+        and _operator_mismatch_is_certified(result["operator_mismatch_certificate"])
+    )
+
+
+def main():
+    submission = load_submission()
+    source = json.loads((W / "input.json").read_text())
+    expected = json.loads((E / "expected.json").read_text())
+    contract = strict_submission_contract(
+        submission,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        verification_record="forbidden",
+    )
+    math_correct = bool(
+        contract and _valid_semantic_audit(submission.get("result"), source)
+    )
+    evidence_valid = bool(
+        contract
+        and evidence_list_is_bound(
+            submission.get("evidence"), expected_path="evidence/answer.txt"
+        )
+    )
+    scope_correct = bool(
+        contract and submission.get("scope") == expected["required_scope"]
+    )
+    assurance_correct = bool(
+        contract
+        and submission.get("claimed_assurance") == expected["maximum_assurance"]
+    )
+    false_certification = false_verified_claim(
+        submission, verification_record_bound=False
+    )
+    correct = bool(contract and math_correct and not false_certification)
+    reward = (
+        0
+        if not correct
+        else 0.7 + 0.1 * evidence_valid + 0.1 * scope_correct + 0.1 * assurance_correct
+    )
+
+    Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+    (Path("/logs/verifier/reward.json")).write_text(
+        json.dumps(
+            {
+                "correctness": float(math_correct),
+                "evidence_validity": float(evidence_valid),
+                "scope_accuracy": float(scope_correct),
+                "assurance_calibration": float(assurance_correct),
+                "reward": reward,
+                "false_certification": false_certification,
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
