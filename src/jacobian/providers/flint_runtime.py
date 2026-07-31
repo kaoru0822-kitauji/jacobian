@@ -202,6 +202,28 @@ def python_flint_probability_provider_runtime(
     return runtime
 
 
+def exact_domain_checker_source_provider_runtime() -> CapabilityProviderRuntime:
+    """Identify the bundled source used by exact-domain replay checkers."""
+
+    try:
+        version, _, _ = _jacobian_identity()
+    except ProviderRuntimeError:
+        return _unavailable_runtime(
+            provider="jacobian.exact-domain-checker-source",
+            install_tier=CapabilityInstallTier.T1,
+            license_id="MIT",
+            diagnostic="The exact-domain checker source could not be identified.",
+        )
+    return source_provider_runtime(
+        "jacobian.exact-domain-checker-source",
+        version=version,
+        entrypoint=("jacobian_checkers.exact_domain_operations:check_polynomial_gcd"),
+        install_tier=CapabilityInstallTier.T1,
+        license_id="MIT",
+        features=("clean-process-replay",),
+    )
+
+
 def exact_domain_checker_provider_runtime(
     *,
     checker_ids: tuple[str, ...] = (),
@@ -209,30 +231,10 @@ def exact_domain_checker_provider_runtime(
 ) -> CapabilityProviderRuntime:
     """Bind independent checker source and its pinned FLINT replay backend."""
 
-    try:
-        version, _, _ = _jacobian_identity()
-    except ProviderRuntimeError:
-        source = _unavailable_runtime(
-            provider="jacobian.exact-domain-checker-source",
-            install_tier=CapabilityInstallTier.T1,
-            license_id="MIT",
-            diagnostic="The exact-domain checker source could not be identified.",
-        )
-    else:
-        source = source_provider_runtime(
-            "jacobian.exact-domain-checker-source",
-            version=version,
-            entrypoint=(
-                "jacobian_checkers.exact_domain_operations:check_polynomial_gcd"
-            ),
-            install_tier=CapabilityInstallTier.T1,
-            license_id="MIT",
-            features=("clean-process-replay",),
-        )
     return composite_provider_runtime(
         "jacobian.exact-domain-checkers",
         components=(
-            source,
+            exact_domain_checker_source_provider_runtime(),
             python_flint_exact_checker_provider_runtime(refresh=refresh),
         ),
         features=("clean-process-replay", "python-flint"),
