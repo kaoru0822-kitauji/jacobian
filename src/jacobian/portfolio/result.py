@@ -26,9 +26,9 @@ from jacobian.exact_domain_checkers import ExactDomainCheckerInstallation
 from jacobian.finite_coverage import FiniteCoverageInstallation
 from jacobian.finite_partition import FinitePartitionInstallation
 from jacobian.geometry_verification import GeometryCheckerInstallation
-from jacobian.graphs.capabilities import GraphInstallation
 from jacobian.graphs.coloring import GraphColoringInstallation
 from jacobian.graphs.composition import GraphCompositionInstallation
+from jacobian.graphs.installation import GraphInstallation
 from jacobian.graphs.isomorphism import GraphIsomorphismInstallation
 from jacobian.graphs.shrinking import GraphShrinkingInstallation
 from jacobian.lean_frontend.declarations import LeanDeclarationService

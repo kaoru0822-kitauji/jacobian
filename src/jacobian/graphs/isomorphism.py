@@ -39,7 +39,7 @@ from jacobian.contracts.graph_isomorphism import (
     SimpleUndirectedGraph,
 )
 from jacobian.contracts.results import ExecutionStatus
-from jacobian.graphs.capabilities import GraphInstallation
+from jacobian.graphs.installation import GraphInstallation
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema

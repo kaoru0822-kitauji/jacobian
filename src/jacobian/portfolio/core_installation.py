@@ -11,8 +11,8 @@ from jacobian.exact_domain_checkers import install_exact_domain_verification
 from jacobian.finite_coverage import install_finite_coverage
 from jacobian.finite_partition import install_finite_partition
 from jacobian.geometry_verification import install_geometry_checker
-from jacobian.graphs.capabilities import install_graph_capabilities
 from jacobian.graphs.coloring import install_graph_coloring_capabilities
+from jacobian.graphs.installation import install_graph_capabilities
 from jacobian.graphs.isomorphism import install_graph_isomorphism
 from jacobian.graphs.shrinking import install_graph_shrinking
 from jacobian.installation.context import InstallationContext

@@ -51,39 +51,20 @@ from jacobian.contracts.graph_composition import (
 )
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
+from jacobian.graphs.artifacts import (
+    ARTIFACT_URI_PATTERN,
+    GRAPH_PAYLOAD_SCHEMA,
+    GraphArtifactResources,
+    graph_payload,
+    load_graph,
+)
 from jacobian.graphs.atlas import graph_atlas_order, networkx_loader
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.store import ArtifactStore
 
 if TYPE_CHECKING:
     import networkx as nx
-
-_ARTIFACT_URI_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
-
-_GRAPH_PAYLOAD_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "graph_schema_version": {"const": "1"},
-        "vertices": {
-            "type": "array",
-            "items": {"type": "string"},
-            "uniqueItems": True,
-        },
-        "edges": {
-            "type": "array",
-            "items": {
-                "type": "array",
-                "items": {"type": "string"},
-                "minItems": 2,
-                "maxItems": 2,
-            },
-            "uniqueItems": True,
-        },
-    },
-    "required": ["graph_schema_version", "vertices", "edges"],
-    "additionalProperties": False,
-}
 
 #: Explicit backend boundary statement for the enumeration scope.
 _ENUMERATION_BACKEND_BOUNDARY = (
@@ -132,7 +113,7 @@ def install_graph_composition_capabilities(
     """Register composition and enumeration schemas and return adapters.
 
     This installer reuses the ``jacobian.simple-undirected-graph`` semantics
-    and graph payload schema already registered by ``graph_capabilities``.
+    and graph payload schema already registered by the graph installation.
     The caller must pass the existing ``semantics_uri`` and
     ``graph_schema_uri`` from ``GraphInstallation``.
     """
@@ -213,12 +194,12 @@ class GraphComposeAdapter:
                     },
                     "result_graph_uri": {
                         "type": "string",
-                        "pattern": _ARTIFACT_URI_PATTERN,
+                        "pattern": ARTIFACT_URI_PATTERN,
                     },
-                    "result_graph": _GRAPH_PAYLOAD_SCHEMA,
+                    "result_graph": GRAPH_PAYLOAD_SCHEMA,
                     "composition_artifact_uri": {
                         "type": "string",
-                        "pattern": _ARTIFACT_URI_PATTERN,
+                        "pattern": ARTIFACT_URI_PATTERN,
                     },
                     "backend": {"type": "string"},
                     "backend_version": {"type": "string"},
@@ -258,15 +239,19 @@ class GraphComposeAdapter:
                 )
             ) from exc
 
-        left_graph = _load_graph(self.resources, validated.left_graph_uri)
+        left_graph = load_graph(
+            _artifact_resources(self.resources), validated.left_graph_uri
+        )
         right_graph: nx.Graph[Any] | None = None
         if validated.right_graph_uri is not None:
-            right_graph = _load_graph(self.resources, validated.right_graph_uri)
+            right_graph = load_graph(
+                _artifact_resources(self.resources), validated.right_graph_uri
+            )
 
         operation = validated.operation
         backend = f"networkx.{_backend_suffix(operation)}"
         result_graph = _apply_composition(operation, left_graph, right_graph)
-        result_payload = _graph_payload(result_graph)
+        result_payload = graph_payload(result_graph)
 
         result_artifact = self.resources.artifacts.put(
             schema_uri=self.resources.graph_schema_uri,
@@ -388,9 +373,9 @@ class GraphEnumerateNonisomorphicAdapter:
                             "properties": {
                                 "graph_uri": {
                                     "type": "string",
-                                    "pattern": _ARTIFACT_URI_PATTERN,
+                                    "pattern": ARTIFACT_URI_PATTERN,
                                 },
-                                "graph": _GRAPH_PAYLOAD_SCHEMA,
+                                "graph": GRAPH_PAYLOAD_SCHEMA,
                                 "order": {"type": "integer", "minimum": 0},
                                 "size": {"type": "integer", "minimum": 0},
                             },
@@ -408,7 +393,7 @@ class GraphEnumerateNonisomorphicAdapter:
                     "truncated": {"type": "boolean"},
                     "scope_uri": {
                         "type": "string",
-                        "pattern": _ARTIFACT_URI_PATTERN,
+                        "pattern": ARTIFACT_URI_PATTERN,
                     },
                     "backend": {"const": "networkx.graph_atlas_g"},
                     "backend_version": {"type": "string"},
@@ -485,7 +470,7 @@ class GraphEnumerateNonisomorphicAdapter:
         graphs: list[dict[str, Any]] = []
         graph_uris: list[str] = []
         for graph in window:
-            payload = _graph_payload(graph)
+            payload = graph_payload(graph)
             graph_artifact = self.resources.artifacts.put(
                 schema_uri=self.resources.graph_schema_uri,
                 semantics_uri=self.resources.semantics_uri,
@@ -630,121 +615,15 @@ def _composition_parents(
     return (validated.left_graph_uri,)
 
 
-def _graph_payload(graph: nx.Graph[Any]) -> dict[str, Any]:
-    """Convert a NetworkX graph to the simple-undirected-graph payload schema.
-
-    Nodes are relabeled to ``v0, v1, ...`` in sorted order.  Edges are
-    emitted as two-element arrays in ascending label order.
-    """
-    sorted_nodes = sorted(graph.nodes)
-    labels = {node: f"v{index}" for index, node in enumerate(sorted_nodes)}
-    edges = sorted(
-        [labels[source], labels[target]]
-        if labels[source] < labels[target]
-        else [labels[target], labels[source]]
-        for source, target in graph.edges
-    )
-    return {
-        "graph_schema_version": "1",
-        "vertices": [labels[node] for node in sorted_nodes],
-        "edges": edges,
-    }
-
-
-def _load_graph(
+def _artifact_resources(
     resources: GraphCompositionResources,
-    graph_uri: str,
-) -> nx.Graph[str]:
-    """Load and validate a simple-undirected-graph artifact.
-
-    Mirrors the validation in ``graph_capabilities._load_graph`` but is
-    self-contained so this module does not depend on private helpers from
-    another adapter module.
-    """
-    try:
-        artifact = resources.store.get(graph_uri)
-    except StoreError as exc:
-        raise CapabilityInvocationError(
-            CapabilityDiagnostic(
-                code="GRAPH_ARTIFACT_NOT_FOUND",
-                stage="graph_resolution",
-                message="The requested graph artifact is unavailable.",
-                path="graph_uri",
-                hint="Use a graph URI returned by a graph capability.",
-            )
-        ) from exc
-    if (
-        artifact.manifest.schema_uri != resources.graph_schema_uri
-        or artifact.manifest.semantics_uri != resources.semantics_uri
-        or not isinstance(artifact.payload, dict)
-    ):
-        raise CapabilityInvocationError(
-            CapabilityDiagnostic(
-                code="INCOMPATIBLE_GRAPH_ARTIFACT",
-                stage="graph_validation",
-                message=("The artifact is not a compatible simple undirected graph."),
-                path="graph_uri",
-                schema_uri=resources.graph_schema_uri,
-                hint="Use a graph URI returned by a graph capability.",
-            )
-        )
-    payload = artifact.payload
-    vertices = payload.get("vertices")
-    edges = payload.get("edges")
-    if (
-        payload.get("graph_schema_version") != "1"
-        or not isinstance(vertices, list)
-        or not all(isinstance(vertex, str) for vertex in vertices)
-        or len(set(vertices)) != len(vertices)
-        or not isinstance(edges, list)
-    ):
-        raise CapabilityInvocationError(
-            CapabilityDiagnostic(
-                code="INCOMPATIBLE_GRAPH_ARTIFACT",
-                stage="graph_validation",
-                message="The graph artifact payload is malformed.",
-                path="graph_uri",
-                schema_uri=resources.graph_schema_uri,
-                hint="Recreate the graph through its owning capability.",
-            )
-        )
-    vertex_set = set(vertices)
-    normalized_edges: list[tuple[str, str]] = []
-    for edge in edges:
-        if (
-            not isinstance(edge, list)
-            or len(edge) != 2
-            or not all(isinstance(endpoint, str) for endpoint in edge)
-            or edge[0] not in vertex_set
-            or edge[1] not in vertex_set
-            or edge[0] >= edge[1]
-        ):
-            raise CapabilityInvocationError(
-                CapabilityDiagnostic(
-                    code="INCOMPATIBLE_GRAPH_ARTIFACT",
-                    stage="graph_validation",
-                    message="The graph artifact violates simple-graph semantics.",
-                    path="graph_uri",
-                    schema_uri=resources.graph_schema_uri,
-                    hint="Recreate the graph through its owning capability.",
-                )
-            )
-        normalized_edges.append((edge[0], edge[1]))
-    if len(set(normalized_edges)) != len(normalized_edges):
-        raise CapabilityInvocationError(
-            CapabilityDiagnostic(
-                code="INCOMPATIBLE_GRAPH_ARTIFACT",
-                stage="graph_validation",
-                message="The graph artifact contains duplicate edges.",
-                path="graph_uri",
-                schema_uri=resources.graph_schema_uri,
-                hint="Recreate the graph through its owning capability.",
-            )
-        )
-    graph: nx.Graph[str] = networkx_loader.get().Graph()
-    graph.add_nodes_from(vertices)
-    graph.add_edges_from(normalized_edges)
-    return graph
+) -> GraphArtifactResources:
+    return GraphArtifactResources(
+        store=resources.store,
+        artifacts=resources.artifacts,
+        semantics_uri=resources.semantics_uri,
+        graph_schema_uri=resources.graph_schema_uri,
+    )
 
 
 def _runtime_ms(started: float) -> int:
