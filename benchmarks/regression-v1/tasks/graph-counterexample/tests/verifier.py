@@ -34,6 +34,7 @@ def contract(s, expected):
         and s["conclusion"] == expected["conclusion"]
         and isinstance(s["result"], dict)
         and isinstance(s["claimed_assurance"], str)
+        and isinstance(s["claimed_assurance"], str)
         and s["claimed_assurance"] in {"UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"}
         and isinstance(s["scope"], str)
         and s["completeness"] == "COMPLETE"
