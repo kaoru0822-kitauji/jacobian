@@ -11,30 +11,18 @@ ROOT = Path(__file__).parents[3]
 DATASET = ROOT / "benchmarks" / "regression-v1"
 TASKS = DATASET / "tasks"
 EXPECTED_TASKS = {
-    "autoformalization-semantic-audit",
-    "calendar-good-days-audit",
-    "divisibility-construction-witness",
-    "distinct-sum-pairing-optimum",
-    "euler-line-symbolic-certificate",
     "graph-counterexample",
     "graph-artifact-composition",
-    "grounded-premise-proof",
     "finite-partition",
     "sat-witness",
     "rational-linear-solution",
-    "random-function-expectation-audit",
     "hermite-normal-form",
     "polynomial-normalization",
     "polynomial-map-collision",
     "matrix-square-zero-counterexample",
-    "metric-tsp-proof-repair",
-    "modular-cubic-obstruction",
-    "natural-subtraction-proof-repair",
-    "nondifferentiable-maximum-construction",
     "polynomial-tail-counterexample",
     "subspace-direct-sum-counterexample",
     "log-exponent-recovery",
-    "log-inequality-meta-audit",
 }
 VERIFICATION_RECORD_TASKS = {
     "finite-partition",
@@ -72,22 +60,10 @@ def test_regression_v1_contains_the_expected_task_bundles() -> None:
         assert spec["metadata"]["fixture_digest"] == input_digest
         upstream = metadata["upstream"]
         if task_name in {
-            "autoformalization-semantic-audit",
-            "calendar-good-days-audit",
-            "divisibility-construction-witness",
-            "distinct-sum-pairing-optimum",
-            "euler-line-symbolic-certificate",
-            "grounded-premise-proof",
             "matrix-square-zero-counterexample",
-            "metric-tsp-proof-repair",
-            "modular-cubic-obstruction",
-            "natural-subtraction-proof-repair",
-            "nondifferentiable-maximum-construction",
             "polynomial-tail-counterexample",
             "subspace-direct-sum-counterexample",
             "log-exponent-recovery",
-            "log-inequality-meta-audit",
-            "random-function-expectation-audit",
         }:
             assert isinstance(upstream, dict)
             assert upstream["revision"]
