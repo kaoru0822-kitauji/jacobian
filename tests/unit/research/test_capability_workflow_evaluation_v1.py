@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from copy import deepcopy
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).parents[3]
-EVALUATION = ROOT / "benchmarks" / "capability-evaluations" / "v1"
+EVALUATION = ROOT / "research" / "evaluations" / "capability-workflow-v1"
 WORKFLOW = ROOT / "benchmarks" / "datasets" / "agent-workflow-v1"
 
 
@@ -94,6 +93,10 @@ def test_comparison_plan_is_fail_closed_until_treatment_and_held_out_freeze() ->
     ]
     assert conditions[1]["role"] == "PRIMARY_CONTROL"
     assert conditions[2]["role"] == "PRIMARY_TREATMENT"
+    assert all(condition["public_job_config"] is None for condition in conditions)
+    assert all(
+        condition["image_environment_variable"] is None for condition in conditions
+    )
     assert conditions[2]["catalog_digest"] is None
     assert plan["held_out_boundary"]["status"] == "NOT_MATERIALIZED"
     assert plan["execution_gate"]["model_execution_allowed"] is False
@@ -109,29 +112,11 @@ def test_comparison_plan_is_fail_closed_until_treatment_and_held_out_freeze() ->
     )
 
 
-def test_public_c1_and_c2_jobs_differ_only_by_condition_identity() -> None:
-    c1 = _load("job-public-c1-current.json")
-    c2 = _load("job-public-c2-treatment.json")
-
-    assert c1["agents"][0]["model_name"] == "${JACOBIAN_MODEL}"
-    assert c2["agents"][0]["model_name"] == "${JACOBIAN_MODEL}"
-    assert c1["tasks"] == c2["tasks"] and len(c1["tasks"]) == 24
-
-    normalized_c1 = deepcopy(c1)
-    normalized_c2 = deepcopy(c2)
-    normalized_c1["jobs_dir"] = normalized_c2["jobs_dir"] = "<condition-results>"
-    normalized_c1["environment"]["extra_docker_compose"] = ["<condition-compose>"]
-    normalized_c2["environment"]["extra_docker_compose"] = ["<condition-compose>"]
-    assert normalized_c1 == normalized_c2
-
-
-def test_public_condition_compose_files_differ_only_by_image_selection() -> None:
-    c1 = (EVALUATION / "public-c1-current.compose.yaml").read_text(encoding="utf-8")
-    c2 = (EVALUATION / "public-c2-treatment.compose.yaml").read_text(encoding="utf-8")
-
-    assert "JACOBIAN_C1_IMAGE must be digest-pinned" in c1
-    assert "JACOBIAN_C2_IMAGE must be digest-pinned" in c2
-    assert c1.replace("JACOBIAN_C1_IMAGE", "JACOBIAN_CONDITION_IMAGE") == c2.replace(
-        "JACOBIAN_C2_IMAGE", "JACOBIAN_CONDITION_IMAGE"
-    )
-    assert not (EVALUATION / "held-out").exists()
+def test_research_scaffold_has_no_executable_harbor_inputs() -> None:
+    assert sorted(path.name for path in EVALUATION.iterdir()) == [
+        "README.md",
+        "comparison-plan.json",
+        "comparison-plan.schema.json",
+        "gap-ledger.json",
+        "gap-ledger.schema.json",
+    ]

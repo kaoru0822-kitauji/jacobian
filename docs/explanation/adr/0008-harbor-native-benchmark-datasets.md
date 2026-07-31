@@ -7,10 +7,11 @@ Status: Accepted, pre-stable
 ADR 0007 organized `benchmarks/` by artifact class. That made the distinction
 between workflow observations, public reproductions, research diagnostics,
 performance measurements, provider spikes, and examples visible, but only one
-class was executable as Harbor tasks. The remaining classes used unrelated
-JSON ledgers and Python entry points. The frozen `regression-v1` name also
+class was executable as Harbor tasks. The frozen `regression-v1` name also
 suggested a product regression gate even though its model runs observe fixed
-agent workflows and do not establish causal performance.
+agent workflows and do not establish causal performance. Non-runnable research
+plans and discovery handoffs need a separate home from executable benchmark
+cases.
 
 Harbor local dataset loading inspects only immediate child task directories.
 The mathematical subject taxonomy we want is nested by domain and field, so a
@@ -24,6 +25,15 @@ layout follows the Terminal-Bench Science review pattern: agent-visible
 instructions and environment, Oracle-only solution material, verifier-only
 tests, and a maintainer README. Jacobian retains its stricter provenance,
 assurance, artifact-integrity, and fail-closed verification rules.
+
+The repository has three explicit ownership boundaries. `benchmarks/datasets/`
+contains executable Harbor cases and their dataset manifests.
+`benchmarks/tooling/` contains reusable Harbor infrastructure and does not own
+a second task list. `research/evaluations/` contains non-runnable evaluation
+plans, discovery handoffs, and reports. Research records may reference
+canonical dataset paths, but they are not Harbor datasets, are not injected
+into agent containers, and must not be treated as performance evidence without
+a separately frozen held-out evaluation.
 
 Six datasets keep different claims separate:
 

@@ -45,18 +45,18 @@
     {
       "condition_id": "C1",
       "role": "PRIMARY_CONTROL",
-      "portfolio": "Frozen current Jacobian catalog.",
-      "public_job_config": "benchmarks/capability-evaluations/v1/job-public-c1-current.json",
-      "image_environment_variable": "JACOBIAN_C1_IMAGE",
+      "portfolio": "Frozen current Jacobian catalog; no Harbor job is committed in this scaffold.",
+      "public_job_config": null,
+      "image_environment_variable": null,
       "catalog_digest": "sha256:c9fd0f0e062312f1b466c08207b5fd1d2994bd6aee12b6a8c2f6d7bd876706bc",
       "status": "FROZEN"
     },
     {
       "condition_id": "C2",
       "role": "PRIMARY_TREATMENT",
-      "portfolio": "The C1 catalog plus exactly one accepted candidate delta.",
-      "public_job_config": "benchmarks/capability-evaluations/v1/job-public-c2-treatment.json",
-      "image_environment_variable": "JACOBIAN_C2_IMAGE",
+      "portfolio": "The C1 catalog plus exactly one accepted candidate delta; no Harbor job is committed in this scaffold.",
+      "public_job_config": null,
+      "image_environment_variable": null,
       "catalog_digest": null,
       "status": "BLOCKED_PENDING_SINGLE_DELTA"
     }
