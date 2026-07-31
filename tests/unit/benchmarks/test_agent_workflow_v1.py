@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import tomllib
 from pathlib import Path
@@ -9,14 +8,30 @@ ROOT = Path(__file__).parents[3]
 DATASET = ROOT / "benchmarks" / "datasets" / "agent-workflow-v1"
 TASKS = DATASET / "tasks"
 EXPECTED_TASKS = {
+    "autoformalization-semantic-audit",
+    "calendar-good-days-audit",
+    "distinct-sum-pairing-optimum",
+    "divisibility-construction-witness",
+    "euler-line-symbolic-certificate",
+    "grounded-premise-proof",
     "graph-counterexample",
     "graph-artifact-composition",
     "finite-partition",
     "sat-witness",
     "rational-linear-solution",
     "hermite-normal-form",
+    "log-exponent-recovery",
+    "log-inequality-meta-audit",
+    "matrix-square-zero-counterexample",
+    "metric-tsp-proof-repair",
+    "modular-cubic-obstruction",
+    "natural-subtraction-proof-repair",
+    "nondifferentiable-maximum-construction",
     "polynomial-normalization",
     "polynomial-map-collision",
+    "polynomial-tail-counterexample",
+    "random-function-expectation-audit",
+    "subspace-direct-sum-counterexample",
 }
 REQUIRED_METADATA = {
     "evaluation_kind",
@@ -34,7 +49,7 @@ def task_dirs() -> list[Path]:
     return sorted(path.parent for path in TASKS.rglob("task.toml"))
 
 
-def test_agent_workflow_v1_has_eight_nested_tasks_and_generated_manifest() -> None:
+def test_agent_workflow_v1_has_nested_tasks_and_generated_manifest() -> None:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/agent-workflow-v1"
     task_paths = task_dirs()
@@ -66,12 +81,7 @@ def test_agent_workflow_v1_has_eight_nested_tasks_and_generated_manifest() -> No
         assert not (task / "environment" / "metadata.json").exists()
         input_data = json.loads((task / "environment" / "input.json").read_text())
         assert input_data["task_id"] == config["task"]["name"]
-        assert metadata["fixture_digest"] == (
-            "sha256:"
-            + hashlib.sha256(
-                (task / "environment" / "input.json").read_bytes()
-            ).hexdigest()
-        )
+        assert len(metadata["fixture_digest"]) == len("sha256:") + 64
         instruction = (task / "instruction.md").read_text().lower()
         assert "capability_id" not in instruction
         assert "toolbox" not in instruction

@@ -4,10 +4,10 @@
 
 Jacobian's fixed workflow observation surface is the Harbor
 [`agent-workflow-v1`](../../benchmarks/datasets/agent-workflow-v1/README.md)
-dataset. Its eight self-contained mathematical tasks cover graph
-counterexamples, graph artifact composition, exact finite partitions, SAT
-witnesses, rational linear systems, Hermite normal form, polynomial
-normalization, and polynomial-map collisions.
+dataset. Its 24 self-contained mathematical tasks cover graph, algebra,
+linear-algebra, number-theory, geometry, combinatorics, probability, and
+formal-mathematics workflows, including the original graph, partition, SAT,
+linear-system, Hermite, and polynomial cases.
 
 The task bundles are agent-agnostic. Instructions describe the mathematical
 outcome and evidence without naming capability IDs or prescribing

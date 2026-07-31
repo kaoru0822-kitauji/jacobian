@@ -58,3 +58,99 @@ id = "jacobian/agent-workflow-v1-sat-witness"
 path = "tasks/mathematical-sciences/logic-satisfiability/sat-witness"
 maximum_assurance = "VERIFIED"
 required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-autoformalization-semantic-audit"
+path = "tasks/mathematical-sciences/linear-algebra/autoformalization-semantic-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-calendar-good-days-audit"
+path = "tasks/mathematical-sciences/number-theory/calendar-good-days-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"
+path = "tasks/mathematical-sciences/combinatorics/distinct-sum-pairing-optimum"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-divisibility-construction-witness"
+path = "tasks/mathematical-sciences/number-theory/divisibility-construction-witness"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"
+path = "tasks/mathematical-sciences/geometry/euler-line-symbolic-certificate"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-grounded-premise-proof"
+path = "tasks/mathematical-sciences/formal-mathematics/grounded-premise-proof"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-log-exponent-recovery"
+path = "tasks/mathematical-sciences/algebra/log-exponent-recovery"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-log-inequality-meta-audit"
+path = "tasks/mathematical-sciences/algebra/log-inequality-meta-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-matrix-square-zero-counterexample"
+path = "tasks/mathematical-sciences/linear-algebra/matrix-square-zero-counterexample"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-metric-tsp-proof-repair"
+path = "tasks/mathematical-sciences/graph-theory/metric-tsp-proof-repair"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-modular-cubic-obstruction"
+path = "tasks/mathematical-sciences/number-theory/modular-cubic-obstruction"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-natural-subtraction-proof-repair"
+path = "tasks/mathematical-sciences/formal-mathematics/natural-subtraction-proof-repair"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-nondifferentiable-maximum-construction"
+path = "tasks/mathematical-sciences/analysis/nondifferentiable-maximum-construction"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-polynomial-tail-counterexample"
+path = "tasks/mathematical-sciences/algebra/polynomial-tail-counterexample"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-random-function-expectation-audit"
+path = "tasks/mathematical-sciences/probability-statistics/random-function-expectation-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-subspace-direct-sum-counterexample"
+path = "tasks/mathematical-sciences/linear-algebra/subspace-direct-sum-counterexample"
+maximum_assurance = "COMPUTED"
+required_provider = "core"

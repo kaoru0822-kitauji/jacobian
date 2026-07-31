@@ -12,24 +12,24 @@ authors = [
 
 [[tasks]]
 name = "jacobian/provider-feasibility-v1-cddlib"
-digest = "sha256:e8153975a3790e8a82a09db9cedad2e23fa30da32fe2705ddadb7aba1c354123"
+digest = "sha256:836b769a0399716946bd5eb7b37b3280e20f92d309089230ff52ad1434f219df"
 
 [[tasks]]
 name = "jacobian/provider-feasibility-v1-cgal"
-digest = "sha256:c6b3276b0504e5018af8e9f94006863abbe932f74f41b8299b28cbd5329ac931"
+digest = "sha256:3f63c93c17437caaf4ffbe72733fc5f7710ce3aca77b711472295e67630a56b6"
 
 [[tasks]]
 name = "jacobian/provider-feasibility-v1-gudhi"
-digest = "sha256:140e64e6b2ae506ee49b53928423969c65f5cb5b053d3965915fc0000db191ad"
+digest = "sha256:cdb3807c04653d9a5b1554e17cd8185fc2e7d36861e24feabe0aba4a2e3a39cd"
 
 [[tasks]]
 name = "jacobian/provider-feasibility-v1-lean-repl"
-digest = "sha256:bfd4843b3ca4863369c0605790c4ee07285540e673c5afa0ddefdd2d7f64fa38"
+digest = "sha256:158bd65748530b7b9fe8111c3896b9f301bca7febc5d4e35b91c03fc97bfd348"
 
 [[tasks]]
 name = "jacobian/provider-feasibility-v1-nauty"
-digest = "sha256:43ca4ecc78206060f3fffb4d4cd0e90a3ed8184d160924378ed7eb06c92419e0"
+digest = "sha256:92a0f1d053617d8d377cac26d9c53007cf0556ff92c68692f3d5e20cb32fc750"
 
 [[tasks]]
 name = "jacobian/provider-feasibility-v1-regina"
-digest = "sha256:b71b4c7d1518534f40f8b1806e5fb8a573a081de8e83b56ae197e4f0fdd99ee3"
+digest = "sha256:bec675c9dd89612a24aaf379de045d76a619ed141ba8d59a5704448884f1935a"

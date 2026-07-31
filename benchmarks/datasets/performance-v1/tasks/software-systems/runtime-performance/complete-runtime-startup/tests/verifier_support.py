@@ -80,7 +80,9 @@ def strict_submission_contract(
         and isinstance(submission.get("result"), dict)
         and isinstance(submission.get("scope"), str)
         and isinstance(submission.get("limitations"), list)
+        and all(type(item) is str for item in submission.get("limitations", []))
         and isinstance(submission.get("evidence"), list)
+        and isinstance(submission.get("claimed_assurance"), str)
         and submission.get("claimed_assurance") in allowed_assurances
     )
 

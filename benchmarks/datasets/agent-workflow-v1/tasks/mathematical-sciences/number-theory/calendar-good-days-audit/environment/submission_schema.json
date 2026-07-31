@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "calendar-good-days-audit"},
+    "conclusion": {"enum": ["TRUE", "FALSE"]},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "good_dates"],
+      "additionalProperties": false,
+      "properties": {
+        "count": {"type": "integer", "minimum": 0},
+        "good_dates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["month", "day", "concatenated"],
+            "properties": {
+              "month": {"type": "integer"},
+              "day": {"type": "integer"},
+              "concatenated": {"type": "integer"}
+            }
+          }
+        }
+      }
+    },
+    "claimed_assurance": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED"]},
+    "scope": {"const": "calendar-good-days-audit exhaustive declared-date enumeration"},
+    "completeness": {"const": "COMPLETE"},
+    "evidence": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/answer.txt"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}
