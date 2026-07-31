@@ -42,6 +42,14 @@ VERIFIER_TASKS = tuple(
 )
 
 
+def _task_tree_snapshot() -> dict[str, str]:
+    return {
+        path.relative_to(TASKS).as_posix(): _digest(path)
+        for path in sorted(TASKS.rglob("*"))
+        if path.is_file()
+    }
+
+
 def _digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -96,6 +104,7 @@ def _bound_record(task_name: str, task: Path, app: Path, submission: dict) -> di
 def _run_verifier(task: Path, app: Path, logs: Path) -> dict:
     concrete_path = type(pathlib.Path())
     original_path = pathlib.Path
+    original_dont_write_bytecode = sys.dont_write_bytecode
     mounts = {
         "/app": app,
         "/tests": task / "tests",
@@ -113,11 +122,13 @@ def _run_verifier(task: Path, app: Path, logs: Path) -> dict:
 
     try:
         pathlib.Path = mapped_path  # type: ignore[assignment]
+        sys.dont_write_bytecode = True
         sys.path.insert(0, str(task / "tests"))
         runpy.run_path(str(task / "tests" / "verifier.py"), run_name="__main__")
     finally:
         sys.path.remove(str(task / "tests"))
         sys.modules.pop("verifier_support", None)
+        sys.dont_write_bytecode = original_dont_write_bytecode
         pathlib.Path = original_path
     return json.loads((logs / "reward.json").read_text())
 
@@ -161,6 +172,15 @@ def _prepare_case(
         }
     _write_json(app / "submission.json", submission)
     return task, app, logs
+
+
+def test_verifier_execution_does_not_mutate_task_bundles(tmp_path: Path) -> None:
+    before = _task_tree_snapshot()
+
+    result = _run_verifier(*_prepare_case(tmp_path, RATIONAL_TASK, "computed"))
+
+    assert result["correctness"] == 1.0
+    assert _task_tree_snapshot() == before
 
 
 @pytest.mark.parametrize("task_name", VERIFICATION_RECORD_TASKS)
