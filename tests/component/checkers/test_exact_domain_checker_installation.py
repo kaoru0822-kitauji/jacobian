@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from tests.unit.contracts.artifacts import artifact_uri as _uri
 
+import jacobian.exact_domain_checkers as exact_domain_checkers
 from jacobian.contracts.capabilities import CapabilityProviderAvailability
 from jacobian.contracts.graph_invariant_operations import GraphInvariantRequest
 from jacobian.contracts.graph_optimization import (
@@ -35,8 +36,11 @@ from jacobian.exact_domain_checkers import (
 )
 from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.portfolio import build_builtin_portfolio
-from jacobian.providers.flint_runtime import exact_domain_checker_provider_runtime
-from jacobian.registry import CheckerRegistry
+from jacobian.providers.flint_runtime import (
+    exact_domain_checker_provider_runtime,
+    exact_domain_checker_source_provider_runtime,
+)
+from jacobian.registry import CheckerExecutableChangedError, CheckerRegistry
 from jacobian.store import ArtifactStore
 
 
@@ -374,3 +378,67 @@ def test_installer_omits_exact_replay_when_its_provider_is_unavailable(
 
     assert set(installation.checker_ids) == set(matrix_ids)
     assert all(installation.checker_ids[name] is None for name in matrix_ids)
+    assert {
+        diagnostic.details["capability_id"] for diagnostic in installation.diagnostics
+    } == set(matrix_ids)
+    assert all(
+        diagnostic.code == "EXACT_REPLAY_PROVIDER_UNAVAILABLE"
+        for diagnostic in installation.diagnostics
+    )
+
+
+def test_installer_does_not_omit_replay_when_bundled_source_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unavailable_source = exact_domain_checker_source_provider_runtime().model_copy(
+        update={
+            "availability": CapabilityProviderAvailability.UNAVAILABLE,
+            "version": None,
+            "digest": None,
+            "digest_kind": None,
+            "diagnostic": "The exact-domain checker source could not be identified.",
+        }
+    )
+    unavailable_provider = exact_domain_checker_provider_runtime().model_copy(
+        update={
+            "availability": CapabilityProviderAvailability.UNAVAILABLE,
+            "version": None,
+            "digest": None,
+            "digest_kind": None,
+            "diagnostic": (
+                "Required composite provider components are unavailable: "
+                "jacobian.exact-domain-checker-source."
+            ),
+        }
+    )
+    monkeypatch.setattr(
+        exact_domain_checkers,
+        "exact_domain_checker_source_provider_runtime",
+        lambda: unavailable_source,
+    )
+    monkeypatch.setattr(
+        exact_domain_checkers,
+        "exact_domain_checker_provider_runtime",
+        lambda **_: unavailable_provider,
+    )
+
+    with pytest.raises(CheckerExecutableChangedError):
+        install_exact_domain_checkers(
+            CheckerRegistry(ArtifactStore(tmp_path / "store")),
+            matrix=_installed(
+                (
+                    RationalMatrixRequest,
+                    SquareRationalMatrixRequest,
+                    IntegerMatrixRequest,
+                ),
+                (
+                    "matrix.normal_form.rref.compute",
+                    "matrix.nullspace.compute",
+                    "matrix.characteristic_polynomial.compute",
+                    "matrix.normal_form.smith.compute",
+                ),
+                character="f",
+            ),
+            authorize=True,
+        )

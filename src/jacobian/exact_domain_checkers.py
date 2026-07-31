@@ -46,6 +46,7 @@ from jacobian.providers.flint_runtime import (
     certified_snf_checker_provider_runtime,
     combinatorics_exact_checker_provider_runtime,
     exact_domain_checker_provider_runtime,
+    exact_domain_checker_source_provider_runtime,
     graded_syzygy_checker_provider_runtime,
     graph_exact_checker_provider_runtime,
     poset_exact_checker_provider_runtime,
@@ -59,15 +60,17 @@ from jacobian.store import ArtifactStore, StoredArtifact, StoreError
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
+_OPTIONAL_EXACT_REPLAY_PROVIDER_KEYS = frozenset({"python-flint"})
 
 
 @dataclass(frozen=True, slots=True)
 class ExactDomainCheckerInstallation:
-    """Authorized checker identities keyed by producer capability ID."""
+    """Exact replay identities and non-conclusive installation diagnostics."""
 
     checker_ids: dict[str, str | None]
     provider_runtimes: dict[str, CapabilityProviderRuntime]
     witness_schema_uri: str | None = None
+    diagnostics: tuple[CapabilityDiagnostic, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,21 +131,15 @@ def install_exact_domain_checkers(
     }
     checker_ids: dict[str, str | None] = {}
     declarations_by_id: dict[str, ExactReplayCheckerDeclaration] = {}
+    diagnostics: list[CapabilityDiagnostic] = []
+    exact_checker_source_available = (
+        exact_domain_checker_source_provider_runtime().availability
+        is CapabilityProviderAvailability.AVAILABLE
+    )
     for installed, declaration in _available_declaration_bundles(bundles):
         declarations_by_id[declaration.capability_id] = declaration
         runtime_key = _provider_runtime_key(declaration)
         provider_runtime = provider_runtimes[runtime_key]
-        if (
-            provider_runtime.availability
-            is not CapabilityProviderAvailability.AVAILABLE
-        ):
-            _LOGGER.warning(
-                "%s independent replay is not installed: %s",
-                declaration.capability_id,
-                provider_runtime.diagnostic,
-            )
-            checker_ids[declaration.capability_id] = None
-            continue
         operation = CheckerOperation(
             name=f"{declaration.capability_id} independent {declaration.replay_method}",
             entrypoint=(f"{declaration.entrypoint_module}:{declaration.function}"),
@@ -157,6 +154,41 @@ def install_exact_domain_checkers(
             reason=declaration.reason,
             provider_runtime=provider_runtime,
         )
+        if (
+            provider_runtime.availability
+            is not CapabilityProviderAvailability.AVAILABLE
+        ):
+            can_omit = (
+                runtime_key in _OPTIONAL_EXACT_REPLAY_PROVIDER_KEYS
+                and exact_checker_source_available
+            )
+            if not can_omit:
+                checker_ids[declaration.capability_id] = installer.install(
+                    operation,
+                    authorize=authorize,
+                ).checker_id
+                continue
+            diagnostic = CapabilityDiagnostic(
+                code="EXACT_REPLAY_PROVIDER_UNAVAILABLE",
+                stage="provider_availability",
+                message=(
+                    f"Independent replay for {declaration.capability_id!r} is "
+                    "not installed: "
+                    f"{provider_runtime.diagnostic or 'the provider is unavailable.'}"
+                ),
+                hint=(
+                    "Install or repair the optional python-flint backend, then retry."
+                ),
+                details={
+                    "capability_id": declaration.capability_id,
+                    "provider": provider_runtime.provider,
+                    "checker_authorization_affected": True,
+                },
+            )
+            diagnostics.append(diagnostic)
+            _LOGGER.warning("%s", diagnostic.message)
+            checker_ids[declaration.capability_id] = None
+            continue
         checker_ids[declaration.capability_id] = installer.install(
             operation,
             authorize=authorize,
@@ -172,6 +204,7 @@ def install_exact_domain_checkers(
     }
     return ExactDomainCheckerInstallation(
         checker_ids=checker_ids,
+        diagnostics=tuple(diagnostics),
         provider_runtimes={
             "python-flint": exact_domain_checker_provider_runtime(
                 checker_ids=authorized_ids["python-flint"]
@@ -231,6 +264,7 @@ def install_exact_domain_verification(
     installation = ExactDomainCheckerInstallation(
         checker_ids=installed.checker_ids,
         witness_schema_uri=witness_schema_uri,
+        diagnostics=installed.diagnostics,
         provider_runtimes=installed.provider_runtimes,
     )
     if not any(
