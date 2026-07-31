@@ -29,6 +29,7 @@ RESOURCE_DERIVED_TASKS = (
     "calendar-good-days-audit",
     "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
+    "grounded-premise-proof",
     "log-exponent-recovery",
     "log-inequality-meta-audit",
     "matrix-square-zero-counterexample",
@@ -227,6 +228,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result["coordinates"]["O"]["x"]["numerator"][0].update(
                 coefficient="2"
             ),
+        ),
+        (
+            "grounded-premise-proof",
+            lambda result: result["proof_steps"][3].update(output="XY_EQ_xyN"),
         ),
         (
             "matrix-square-zero-counterexample",
@@ -470,6 +475,43 @@ def test_autoformalization_audit_rejects_incomplete_defect_set(
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
     submission["result"]["defects"] = ["MISSING_DIMENSION_PREMISE"]
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_grounded_premise_proof_rejects_irrelevant_premise(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "grounded-premise-proof",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["selected_premises"].append("kernel_is_normal")
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_grounded_premise_proof_rejects_forward_reference(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "grounded-premise-proof",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    steps = submission["result"]["proof_steps"]
+    steps[0], steps[1] = steps[1], steps[0]
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)

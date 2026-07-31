@@ -1,0 +1,32 @@
+{
+  "task_id": "grounded-premise-proof",
+  "claim": "If G is abelian and N is a subgroup of G, then the quotient group G/N is abelian.",
+  "initial_facts": ["G_ABELIAN", "N_SUBGROUP", "X_EQ_xN", "Y_EQ_yN"],
+  "candidate_premises": [
+    {
+      "id": "subgroup_of_abelian_is_normal",
+      "statement": "Every subgroup of an abelian group is normal."
+    },
+    {
+      "id": "coset_product_definition",
+      "statement": "For normal N, (aN)(bN)=(ab)N."
+    },
+    {
+      "id": "kernel_is_normal",
+      "statement": "The kernel of a group homomorphism is normal."
+    },
+    {
+      "id": "center_is_subgroup",
+      "statement": "The center of a group is a subgroup."
+    }
+  ],
+  "registered_rules": [
+    "APPLY_NORMALITY_PREMISE",
+    "FORM_QUOTIENT",
+    "EXPAND_XY_COSET_PRODUCT",
+    "COMMUTE_REPRESENTATIVES",
+    "COLLAPSE_YX_COSET_PRODUCT",
+    "CHAIN_EQUALITIES"
+  ],
+  "target_fact": "XY_EQ_YX"
+}

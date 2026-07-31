@@ -17,6 +17,7 @@ EXPECTED_TASKS = {
     "euler-line-symbolic-certificate",
     "graph-counterexample",
     "graph-artifact-composition",
+    "grounded-premise-proof",
     "finite-partition",
     "sat-witness",
     "rational-linear-solution",
@@ -41,7 +42,7 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_twenty_task_dataset() -> None:
+def test_regression_v1_is_a_frozen_twenty_one_task_dataset() -> None:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/regression-v1"
     assert {
@@ -79,6 +80,7 @@ def test_regression_v1_is_a_frozen_twenty_task_dataset() -> None:
             "calendar-good-days-audit",
             "divisibility-construction-witness",
             "euler-line-symbolic-certificate",
+            "grounded-premise-proof",
             "matrix-square-zero-counterexample",
             "metric-tsp-proof-repair",
             "modular-cubic-obstruction",

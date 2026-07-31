@@ -1,6 +1,6 @@
 [dataset]
 name = "jacobian/regression-v1"
-description = "Twenty self-contained mathematical workflow observation tasks for Jacobian."
+description = "Twenty-one self-contained mathematical workflow observation tasks for Jacobian."
 keywords = [
     "mathematics",
     "jacobian",
@@ -39,6 +39,10 @@ digest = "sha256:9900627b7b97055186e2b3b6f3a3c1ea2a2af30bbc96973f2c57b92f2af9325
 [[tasks]]
 name = "jacobian/regression-v1-graph-counterexample"
 digest = "sha256:81902e9411f31e0358cd823e3cf496d609251f56f5757d239a44d5220ab7cfaf"
+
+[[tasks]]
+name = "jacobian/regression-v1-grounded-premise-proof"
+digest = "sha256:7a4b9564ecf2858440ac5fcd05b8d78f4442434f4224047f32d5a90e3b7384a5"
 
 [[tasks]]
 name = "jacobian/regression-v1-hermite-normal-form"
