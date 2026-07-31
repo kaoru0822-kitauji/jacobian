@@ -5,6 +5,7 @@ from verifier_support import (
     evidence_list_is_bound,
     false_verified_claim,
     load_submission,
+    resolve_evidence,
     strict_submission_contract,
 )
 
@@ -57,7 +58,7 @@ def _operator_mismatch_is_certified(certificate):
     }:
         return False
     dimension = certificate["dimension"]
-    if type(dimension) is not int or dimension != 2:
+    if type(dimension) is not int or not 2 <= dimension <= 100:
         return False
     x = certificate["x"]
     y = certificate["y"]
@@ -96,6 +97,26 @@ def _valid_semantic_audit(result, source):
     )
 
 
+def _evidence_matches_result(evidence, result):
+    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+        return False
+    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    if target is None:
+        return False
+    try:
+        text = target.read_text()
+        marker = next(
+            line.removeprefix("RESULT_JSON:").strip()
+            for line in text.splitlines()
+            if line.startswith("RESULT_JSON:")
+        )
+        return json.loads(marker) == result and all(
+            term in text for term in ("dimension", "dot product", "coordinate")
+        )
+    except (OSError, StopIteration, UnicodeError, ValueError):
+        return False
+
+
 def main():
     submission = load_submission()
     source = json.loads((W / "input.json").read_text())
@@ -111,9 +132,7 @@ def main():
     )
     evidence_valid = bool(
         contract
-        and evidence_list_is_bound(
-            submission.get("evidence"), expected_path="evidence/answer.txt"
-        )
+        and _evidence_matches_result(submission["evidence"], submission["result"])
     )
     scope_correct = bool(
         contract and submission.get("scope") == expected["required_scope"]
