@@ -14,7 +14,7 @@ authors = [
 
 [[tasks]]
 name = "jacobian/regression-v1-calendar-good-days-audit"
-digest = "sha256:c04e162ff1bc3b7fff786ccf763f465f039f2997dde29a0a82efb78558ea7953"
+digest = "sha256:97e0593c247549120e7219aab38c5a083c9d866f71d32afd77700c43980213b4"
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
@@ -34,11 +34,11 @@ digest = "sha256:4d832d5d8cb86a186d748931e10a99dbcb6ca3871ae3c29e8f3266e545197b9
 
 [[tasks]]
 name = "jacobian/regression-v1-log-exponent-recovery"
-digest = "sha256:c319362249a31dd1a3f26d489cbe8013529638784182184a436b5e5c582c900b"
+digest = "sha256:96a588c403fd45ac66f02ec8e363dc5c3910282ae20a07ab449db2dfcda408b3"
 
 [[tasks]]
 name = "jacobian/regression-v1-matrix-square-zero-counterexample"
-digest = "sha256:18de2e3f9b6bd86b45d13097cc284e7a0a4f679f4c9e6286fd605eea28b613f5"
+digest = "sha256:264dbd8654541886d850ebc28bd80c1b0532fa0a71b5e712ba4f52818a055e2b"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
@@ -50,11 +50,11 @@ digest = "sha256:f2c6623798de911bd116747a5bb74f60dc5bb6c0f2bbf900ad8c857b38397cd
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-tail-counterexample"
-digest = "sha256:13ee1576b25b3dc2258afe1db6b2092615948ee84100b2f1de86d1bd45268b24"
+digest = "sha256:4bcdc01127577842817fa3616b71eef9f074c6a93ab40b1ea926f06c15f043e6"
 
 [[tasks]]
 name = "jacobian/regression-v1-random-function-expectation-audit"
-digest = "sha256:585afb9673d20b1c0062464481160e52c612f8263e65a948432a306280a2f7df"
+digest = "sha256:b05da1da317740c48993298d01e6418d470a2f30a6411abc9f39b39db778627b"
 
 [[tasks]]
 name = "jacobian/regression-v1-rational-linear-solution"
@@ -66,4 +66,4 @@ digest = "sha256:f2f163ad705ddcbe78df1122218c5c60a952308b28a029995688fab18ac3146
 
 [[tasks]]
 name = "jacobian/regression-v1-subspace-direct-sum-counterexample"
-digest = "sha256:4ede989552fc171303786868f4da91bd89c819c8869991fb88d9f8ba93fbcd0a"
+digest = "sha256:3d25f08ee3c61995eeae74e610c48617420a4e9b018023e81f98a658d82f19ad"

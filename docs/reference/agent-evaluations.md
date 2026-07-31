@@ -4,11 +4,11 @@
 
 Jacobian’s current mathematical observation suite is the committed Harbor
 [`regression-v1`](../../benchmarks/regression-v1/README.md) dataset. It contains
-twelve self-contained tasks covering graph counterexamples, graph artifact
+fourteen self-contained tasks covering graph counterexamples, graph artifact
 composition, exact finite partitions, SAT witnesses, rational linear systems,
 Hermite normal form, polynomial normalization, polynomial-map collisions,
 matrix and subspace counterexamples, polynomial-tail reasoning, and exact
-logarithmic algebra.
+logarithmic algebra, and proof-audit workloads.
 
 The task bundles are agent-agnostic. A prompt says only that a mathematical
 toolbox may be available; it does not prescribe capability IDs, decomposition,
