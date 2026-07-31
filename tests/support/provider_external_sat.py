@@ -8,13 +8,14 @@ def external_sat_toolchain_available() -> bool:
     probes also validate version, provenance, and the checker health command.
     """
 
+    from jacobian.contracts.capabilities import CapabilityProviderAvailability
     from jacobian.providers.external_solver_runtime import (
         cadical_provider_runtime,
         drat_trim_provider_runtime,
     )
 
     return all(
-        runtime.availability.value == "available"
+        runtime.availability is CapabilityProviderAvailability.AVAILABLE
         for runtime in (
             cadical_provider_runtime(),
             drat_trim_provider_runtime(),
@@ -25,14 +26,22 @@ def external_sat_toolchain_available() -> bool:
 def cadical_runtime_available() -> bool:
     """Return whether the pinned CaDiCaL executable passes readiness."""
 
+    from jacobian.contracts.capabilities import CapabilityProviderAvailability
     from jacobian.providers.external_solver_runtime import cadical_provider_runtime
 
-    return cadical_provider_runtime().availability.value == "available"
+    return (
+        cadical_provider_runtime().availability
+        is CapabilityProviderAvailability.AVAILABLE
+    )
 
 
 def drat_trim_runtime_available() -> bool:
     """Return whether the pinned DRAT-trim checker passes readiness."""
 
+    from jacobian.contracts.capabilities import CapabilityProviderAvailability
     from jacobian.providers.external_solver_runtime import drat_trim_provider_runtime
 
-    return drat_trim_provider_runtime().availability.value == "available"
+    return (
+        drat_trim_provider_runtime().availability
+        is CapabilityProviderAvailability.AVAILABLE
+    )

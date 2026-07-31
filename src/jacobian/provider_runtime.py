@@ -7,9 +7,12 @@ import importlib
 import importlib.metadata
 import sysconfig
 from collections.abc import Mapping
+from enum import StrEnum
 from functools import cache
 from pathlib import Path
 from typing import Any
+
+from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
@@ -41,8 +44,38 @@ SYMPY_POLYNOMIAL_WORKER_PROTOCOL = "jacobian.sympy-polynomial-normalization/v1"
 Z3_SOLVER_VERSION = "5.0.0.0"
 
 
+class ProviderRuntimeErrorCode(StrEnum):
+    """Stable classifications for provider identity and readiness failures."""
+
+    IDENTITY_INCOMPLETE = "IDENTITY_INCOMPLETE"
+    MALFORMED_RUNTIME = "MALFORMED_RUNTIME"
+    UNAVAILABLE = "UNAVAILABLE"
+    IDENTITY_CHANGED = "IDENTITY_CHANGED"
+    READINESS_FAILED = "READINESS_FAILED"
+
+
 class ProviderRuntimeError(RuntimeError):
     """Raised when a required provider identity cannot be inspected safely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: ProviderRuntimeErrorCode | None = None,
+    ) -> None:
+        self.code = code or _infer_provider_error_code(message)
+        super().__init__(message[:512])
+
+
+def _infer_provider_error_code(message: str) -> ProviderRuntimeErrorCode:
+    lowered = message.casefold()
+    if "incomplete" in lowered:
+        return ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE
+    if "malformed" in lowered or "invalid" in lowered:
+        return ProviderRuntimeErrorCode.MALFORMED_RUNTIME
+    if "changed" in lowered:
+        return ProviderRuntimeErrorCode.IDENTITY_CHANGED
+    return ProviderRuntimeErrorCode.UNAVAILABLE
 
 
 @cache
@@ -74,7 +107,8 @@ def _distribution_record_digest(
         rows.append(f"{package_path}\0{hash_value}\0{size}\n")
     if not rows or not hashed:
         raise ProviderRuntimeError(
-            "the installed Python distribution has no hashed RECORD manifest"
+            "the installed Python distribution has no hashed RECORD manifest",
+            code=ProviderRuntimeErrorCode.MALFORMED_RUNTIME,
         )
     digest = hashlib.sha256("".join(rows).encode()).hexdigest()
     return f"sha256:{digest}"
@@ -99,7 +133,8 @@ def _jacobian_identity() -> tuple[str, str, tuple[str, ...]]:
         digest = package_source_digest("jacobian.capabilities:CapabilityService")
     except (importlib.metadata.PackageNotFoundError, ImplementationError) as exc:
         raise ProviderRuntimeError(
-            "the Jacobian source runtime could not be identified"
+            "the Jacobian source runtime could not be identified",
+            code=ProviderRuntimeErrorCode.UNAVAILABLE,
         ) from exc
     return distribution.version, digest, _license_files(distribution)
 
@@ -121,7 +156,8 @@ def _inspect_python_distribution_identity(
     try:
         if importlib.util.find_spec(import_name) is None:
             raise ProviderRuntimeError(
-                f"the {distribution_name} import target is unavailable"
+                f"the {distribution_name} import target is unavailable",
+                code=ProviderRuntimeErrorCode.UNAVAILABLE,
             )
         distribution = importlib.metadata.distribution(distribution_name)
         digest = _distribution_record_digest(distribution)
@@ -131,7 +167,8 @@ def _inspect_python_distribution_identity(
         ProviderRuntimeError,
     ) as exc:
         raise ProviderRuntimeError(
-            f"the {distribution_name} distribution identity is unavailable"
+            f"the {distribution_name} distribution identity is unavailable",
+            code=ProviderRuntimeErrorCode.UNAVAILABLE,
         ) from exc
     return distribution.version, digest, _license_files(distribution)
 
@@ -354,59 +391,109 @@ def python_distribution_provider_runtime(
     )
 
 
-def require_provider_runtime_unchanged(
+def _validated_provider_runtime(
     runtime: CapabilityProviderRuntime,
-) -> None:
-    """Remeasure every immutable component of an authorized provider runtime."""
+) -> CapabilityProviderRuntime:
+    try:
+        return CapabilityProviderRuntime.model_validate(runtime.model_dump(mode="json"))
+    except (AttributeError, TypeError, ValidationError) as exc:
+        raise ProviderRuntimeError(
+            "provider runtime is malformed",
+            code=ProviderRuntimeErrorCode.MALFORMED_RUNTIME,
+        ) from exc
 
-    if (
-        runtime.availability is not CapabilityProviderAvailability.AVAILABLE
-        or runtime.digest is None
-        or runtime.digest_kind is None
-    ):
-        raise ProviderRuntimeError("provider runtime identity is incomplete")
 
-    if runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE:
-        executable = runtime.configuration.get("executable")
-        if (
-            not isinstance(executable, str)
-            or _sha256_file(Path(executable)) != runtime.digest
-        ):
-            raise ProviderRuntimeError("provider executable identity changed")
-        return
+def _require_executable_identity(runtime: CapabilityProviderRuntime) -> None:
+    executable = runtime.configuration.get("executable")
+    if not isinstance(executable, str):
+        raise ProviderRuntimeError(
+            "provider executable identity is incomplete",
+            code=ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE,
+        )
+    try:
+        measured = _sha256_file(Path(executable))
+    except OSError as exc:
+        raise ProviderRuntimeError(
+            "provider executable is unavailable",
+            code=ProviderRuntimeErrorCode.UNAVAILABLE,
+        ) from exc
+    if measured != runtime.digest:
+        raise ProviderRuntimeError(
+            "provider executable identity changed",
+            code=ProviderRuntimeErrorCode.IDENTITY_CHANGED,
+        )
 
-    if runtime.digest_kind is CapabilityProviderDigestKind.SOURCE_TREE:
-        entrypoint = runtime.configuration.get("entrypoint")
-        if not isinstance(entrypoint, str):
-            raise ProviderRuntimeError("provider source identity is incomplete")
-        try:
-            measured_source = package_source_digest(entrypoint)
-        except ImplementationError as exc:
-            raise ProviderRuntimeError("provider source is unavailable") from exc
-        if measured_source != runtime.digest:
-            raise ProviderRuntimeError("provider source identity changed")
-        return
 
-    if runtime.digest_kind is CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD:
-        distribution = runtime.configuration.get("distribution")
-        import_name = runtime.distribution_import_name
-        if not isinstance(distribution, str) or import_name is None:
-            raise ProviderRuntimeError("Python distribution identity is incomplete")
+def _require_source_identity(runtime: CapabilityProviderRuntime) -> None:
+    entrypoint = runtime.configuration.get("entrypoint")
+    if not isinstance(entrypoint, str):
+        raise ProviderRuntimeError(
+            "provider source identity is incomplete",
+            code=ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE,
+        )
+    try:
+        measured_source = package_source_digest(entrypoint)
+    except ImplementationError as exc:
+        raise ProviderRuntimeError(
+            "provider source is unavailable",
+            code=ProviderRuntimeErrorCode.UNAVAILABLE,
+        ) from exc
+    if measured_source != runtime.digest:
+        raise ProviderRuntimeError(
+            "provider source identity changed",
+            code=ProviderRuntimeErrorCode.IDENTITY_CHANGED,
+        )
+
+
+def _require_python_identity(runtime: CapabilityProviderRuntime) -> None:
+    distribution = runtime.configuration.get("distribution")
+    import_name = runtime.distribution_import_name
+    if not isinstance(distribution, str) or import_name is None:
+        raise ProviderRuntimeError(
+            "Python distribution identity is incomplete",
+            code=ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE,
+        )
+    try:
         version, digest, _license_files = _inspect_python_distribution_identity(
             distribution,
             import_name,
             runtime.distribution_required_attributes,
         )
-        if version != runtime.version or digest != runtime.digest:
-            raise ProviderRuntimeError("Python distribution identity changed")
-        return
+    except ProviderRuntimeError as exc:
+        raise ProviderRuntimeError(
+            "Python distribution identity is unavailable",
+            code=ProviderRuntimeErrorCode.UNAVAILABLE,
+        ) from exc
+    if version != runtime.version or digest != runtime.digest:
+        raise ProviderRuntimeError(
+            "Python distribution identity changed",
+            code=ProviderRuntimeErrorCode.IDENTITY_CHANGED,
+        )
 
+
+def _component_runtimes(
+    runtime: CapabilityProviderRuntime,
+) -> tuple[CapabilityProviderRuntime, ...]:
     components = runtime.configuration.get("components")
     if not isinstance(components, list) or not components:
-        raise ProviderRuntimeError("composite provider identity is incomplete")
-    component_runtimes = tuple(
-        CapabilityProviderRuntime.model_validate(component) for component in components
-    )
+        raise ProviderRuntimeError(
+            "composite provider identity is incomplete",
+            code=ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE,
+        )
+    try:
+        return tuple(
+            CapabilityProviderRuntime.model_validate(component)
+            for component in components
+        )
+    except ValidationError as exc:
+        raise ProviderRuntimeError(
+            "composite provider runtime is malformed",
+            code=ProviderRuntimeErrorCode.MALFORMED_RUNTIME,
+        ) from exc
+
+
+def _require_composite_identity(runtime: CapabilityProviderRuntime) -> None:
+    component_runtimes = _component_runtimes(runtime)
     for component in component_runtimes:
         require_provider_runtime_unchanged(component)
     measured = composite_provider_runtime(
@@ -421,7 +508,89 @@ def require_provider_runtime_unchanged(
         },
     )
     if measured.digest != runtime.digest:
-        raise ProviderRuntimeError("composite provider identity changed")
+        raise ProviderRuntimeError(
+            "composite provider identity changed",
+            code=ProviderRuntimeErrorCode.IDENTITY_CHANGED,
+        )
+
+
+def require_provider_runtime_unchanged(
+    runtime: CapabilityProviderRuntime,
+) -> None:
+    """Remeasure every immutable component of an authorized provider runtime."""
+
+    runtime = _validated_provider_runtime(runtime)
+
+    if (
+        runtime.availability is not CapabilityProviderAvailability.AVAILABLE
+        or runtime.digest is None
+        or runtime.digest_kind is None
+    ):
+        raise ProviderRuntimeError(
+            "provider runtime identity is incomplete",
+            code=ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE,
+        )
+
+    if runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE:
+        _require_executable_identity(runtime)
+        return
+
+    if runtime.digest_kind is CapabilityProviderDigestKind.SOURCE_TREE:
+        _require_source_identity(runtime)
+        return
+
+    if runtime.digest_kind is CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD:
+        _require_python_identity(runtime)
+        return
+
+    _require_composite_identity(runtime)
+
+
+def require_provider_runtime_ready(runtime: CapabilityProviderRuntime) -> None:
+    """Check first-use callable availability without changing identity policy."""
+
+    runtime = _validated_provider_runtime(runtime)
+    if runtime.availability is not CapabilityProviderAvailability.AVAILABLE:
+        raise ProviderRuntimeError(
+            "provider runtime is unavailable",
+            code=ProviderRuntimeErrorCode.UNAVAILABLE,
+        )
+    if runtime.digest_kind is CapabilityProviderDigestKind.PYTHON_DISTRIBUTION_RECORD:
+        _require_python_ready(runtime)
+        return
+    if runtime.digest_kind is CapabilityProviderDigestKind.EXECUTABLE:
+        _require_executable_ready(runtime)
+        return
+    if runtime.digest_kind is CapabilityProviderDigestKind.COMPOSITE:
+        for component in _component_runtimes(runtime):
+            require_provider_runtime_ready(component)
+
+
+def _require_python_ready(runtime: CapabilityProviderRuntime) -> None:
+    import_name = runtime.distribution_import_name
+    if import_name is None:
+        raise ProviderRuntimeError(
+            "Python provider readiness identity is incomplete",
+            code=ProviderRuntimeErrorCode.IDENTITY_INCOMPLETE,
+        )
+    try:
+        module = importlib.import_module(import_name)
+        for attribute in runtime.distribution_required_attributes:
+            getattr(module, attribute)
+    except (AttributeError, ImportError, OSError, RuntimeError) as exc:
+        raise ProviderRuntimeError(
+            "Python provider required attributes are not ready",
+            code=ProviderRuntimeErrorCode.READINESS_FAILED,
+        ) from exc
+
+
+def _require_executable_ready(runtime: CapabilityProviderRuntime) -> None:
+    executable = runtime.configuration.get("executable")
+    if not isinstance(executable, str) or not Path(executable).is_file():
+        raise ProviderRuntimeError(
+            "provider executable is not ready",
+            code=ProviderRuntimeErrorCode.READINESS_FAILED,
+        )
 
 
 def known_provider_runtime(

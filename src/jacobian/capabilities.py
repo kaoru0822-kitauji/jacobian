@@ -43,6 +43,10 @@ from jacobian.contracts.memory import ResearchEpisode
 from jacobian.contracts.results import Coverage, Execution, ExecutionStatus
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.memory import ResearchMemory
+from jacobian.provider_runtime import (
+    ProviderRuntimeError,
+    require_provider_runtime_ready,
+)
 from jacobian.schema_validation import check_draft202012_schema
 from jacobian.store import ArtifactStore, StoreError
 
@@ -553,7 +557,11 @@ class CapabilityService:
             return result
         normalized_request = request.model_copy(update={"input": normalized_input})
         try:
-            result = CapabilityResult.model_validate(adapter.invoke(normalized_request))
+            result = _invoke_ready_adapter(
+                adapter=adapter,
+                descriptor=descriptor,
+                request=normalized_request,
+            )
         except CapabilityInvocationError as exc:
             result = _failed_result(
                 descriptor=descriptor,
@@ -1077,6 +1085,37 @@ def _failed_result(
         provider=provenance["provider"],
         provider_digest=provenance["provider_digest"],
     )
+
+
+def _invoke_ready_adapter(
+    *,
+    adapter: CapabilityAdapter,
+    descriptor: CapabilityDescriptor,
+    request: CapabilityRequest,
+) -> CapabilityResult:
+    runtime = descriptor.provider_runtime
+    if runtime is None:
+        raise CapabilityError(
+            f"capability {descriptor.capability_id} has no provider runtime identity"
+        )
+    try:
+        require_provider_runtime_ready(runtime)
+    except ProviderRuntimeError as exc:
+        return _failed_result(
+            descriptor=descriptor,
+            request=request,
+            diagnostic=CapabilityDiagnostic(
+                code="PROVIDER_READINESS_FAILED",
+                stage="provider_readiness",
+                message="The declared capability provider is not ready for first use.",
+                hint=(
+                    "Repair or reinstall the declared provider, then retry the "
+                    "capability invocation."
+                ),
+                details={"provider_failure_code": exc.code.value},
+            ),
+        )
+    return CapabilityResult.model_validate(adapter.invoke(request))
 
 
 def _provider_provenance(
