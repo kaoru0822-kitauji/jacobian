@@ -8,6 +8,7 @@ Then use the declared equation basis to derive the goal: submit one rational
 multiplier per basis equation and the resulting coefficient vector in the
 declared variable order. The subtraction-recovery equation is justified only
 by the recorded `b<=a` side condition.
+Use scope exactly: `the frozen natural-subtraction branch and declared equation basis`.
 
 The verifier independently traverses the expression tree and recomputes the
 linear combination over exact rationals. It does not run Lean or accept a
