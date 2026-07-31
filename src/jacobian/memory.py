@@ -12,9 +12,47 @@ from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
 )
-from jacobian.contracts.memory import MemoryHit, MemorySearchResult, ResearchEpisode
+from jacobian.contracts.memory import (
+    MemoryHit,
+    MemorySearchResult,
+    PersistedTags,
+    ResearchEpisode,
+)
+from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.store import ArtifactStore, StoreCorruptionError
+
+
+def _decode_memory_hits(
+    rows: list[Any],
+    *,
+    terms: tuple[str, ...],
+    matched_filters: tuple[str, ...],
+) -> tuple[MemoryHit, ...]:
+    try:
+        return tuple(
+            MemoryHit(
+                episode_uri=row["episode_uri"],
+                capability_id=row["capability_id"],
+                mode=CapabilityMode(row["mode"]),
+                assurance_level=CapabilityAssuranceLevel(row["assurance_level"]),
+                summary=row["summary"],
+                tags=decode_persisted_model(
+                    PersistedTags,
+                    row["tags_json"],
+                    record_kind="research_episode",
+                    record_id=row["episode_uri"],
+                    field="tags_json",
+                ).root,
+                created_at=datetime.fromisoformat(row["created_at"]),
+                score=(1000 if terms else 500),
+                matched_query_terms=terms,
+                matched_filters=matched_filters,
+            )
+            for row in rows
+        )
+    except PersistenceCorruptionError as exc:
+        raise StoreCorruptionError(exc) from exc
 
 
 class ResearchMemory:
@@ -55,7 +93,17 @@ class ResearchMemory:
                 """
             ).fetchall()
             for row in existing:
-                for tag in json.loads(row["tags_json"]):
+                try:
+                    tags = decode_persisted_model(
+                        PersistedTags,
+                        row["tags_json"],
+                        record_kind="research_episode",
+                        record_id=row["episode_uri"],
+                        field="tags_json",
+                    ).root
+                except PersistenceCorruptionError as exc:
+                    raise StoreCorruptionError(exc) from exc
+                for tag in tags:
                     connection.execute(
                         """
                         INSERT OR IGNORE INTO research_episode_tags(episode_uri, tag)
@@ -136,7 +184,7 @@ class ResearchMemory:
                     episode.mode.value,
                     episode.assurance_level.value,
                     episode.summary,
-                    json.dumps(list(episode.tags), sort_keys=True),
+                    canonicalize_json(list(episode.tags)).decode("utf-8"),
                     search_text,
                 ),
             )
@@ -310,20 +358,10 @@ class ResearchMemory:
             assurance_level=assurance_level,
             cutoff=cutoff,
         )
-        hits = tuple(
-            MemoryHit(
-                episode_uri=row["episode_uri"],
-                capability_id=row["capability_id"],
-                mode=CapabilityMode(row["mode"]),
-                assurance_level=CapabilityAssuranceLevel(row["assurance_level"]),
-                summary=row["summary"],
-                tags=tuple(json.loads(row["tags_json"])),
-                created_at=datetime.fromisoformat(row["created_at"]),
-                score=(1000 if terms else 500),
-                matched_query_terms=tuple(terms),
-                matched_filters=matched_filters,
-            )
-            for row in rows
+        hits = _decode_memory_hits(
+            rows,
+            terms=tuple(terms),
+            matched_filters=matched_filters,
         )
         return MemorySearchResult(
             query=query,

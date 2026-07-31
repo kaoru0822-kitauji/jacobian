@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import canonicalize_json
 from jacobian.contracts.results import ContractModel
 from jacobian.contracts.workspaces import (
     WorkspaceAttempt,
@@ -20,7 +20,12 @@ from jacobian.contracts.workspaces import (
     WorkspaceScratchEntry,
     WorkspaceScratchSummary,
 )
-from jacobian.workspaces.errors import WorkspaceError, WorkspaceReferenceError
+from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
+from jacobian.workspaces.errors import (
+    WorkspaceCorruptionError,
+    WorkspaceError,
+    WorkspaceReferenceError,
+)
 
 
 def _dependency_postorder(
@@ -160,8 +165,21 @@ def _now() -> datetime:
 def _model_from_json[ModelT: ContractModel](
     model_type: type[ModelT],
     payload: bytes,
+    *,
+    record_kind: str | None = None,
+    record_id: str = "workspace",
+    field: str = "payload_json",
 ) -> ModelT:
-    return model_type.model_validate(loads_strict_json(payload))
+    try:
+        return decode_persisted_model(
+            model_type,
+            payload,
+            record_kind=record_kind or model_type.__name__,
+            record_id=record_id,
+            field=field,
+        )
+    except PersistenceCorruptionError as exc:
+        raise WorkspaceCorruptionError(exc) from exc
 
 
 def _finding_summary(

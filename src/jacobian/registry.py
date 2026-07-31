@@ -9,7 +9,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import canonicalize_json
 from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
@@ -20,7 +20,11 @@ from jacobian.contracts.checkers import (
     EvidenceKind,
 )
 from jacobian.implementation import ImplementationError, package_source_digest
-from jacobian.persistence import PersistenceLock
+from jacobian.persistence import (
+    PersistenceCorruptionError,
+    PersistenceLock,
+    decode_persisted_model,
+)
 from jacobian.provider_runtime import (
     ProviderRuntimeError,
     require_provider_runtime_unchanged,
@@ -340,10 +344,14 @@ class CheckerRegistry:
                 "an authorized checker_id, and retry."
             )
         try:
-            data = loads_strict_json(bytes(row["registration_json"]))
-            data["authorized"] = bool(row["authorized"])
-            registration = CheckerRegistration.model_validate(data)
-        except (TypeError, ValueError) as exc:
+            registration = decode_persisted_model(
+                CheckerRegistration,
+                bytes(row["registration_json"]),
+                record_kind="checker_registration",
+                record_id=checker_id,
+                field="registration_json",
+            ).model_copy(update={"authorized": bool(row["authorized"])})
+        except PersistenceCorruptionError as exc:
             raise CheckerRegistryError(
                 "Checker registry data is invalid. Restore the Jacobian state "
                 "directory from a trusted copy before retrying."

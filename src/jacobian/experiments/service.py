@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.canonical import canonicalize_json, loads_strict_json
+from jacobian.canonical import canonicalize_json
 from jacobian.claims import ClaimValidationService
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.contracts.discovery import (
@@ -45,7 +45,12 @@ from jacobian.experiments._helpers import (
     _now,
     _updated,
 )
-from jacobian.experiments.errors import ExperimentError, ExperimentNotFoundError
+from jacobian.experiments.errors import (
+    ExperimentCorruptionError,
+    ExperimentError,
+    ExperimentNotFoundError,
+)
+from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
@@ -64,6 +69,22 @@ _EXPERIMENT_NOT_FOUND = (
     "The experiment was not found. Check the URI returned by search.run or "
     "search.enumerate, or start a new experiment."
 )
+
+
+def _decode_experiment_snapshot(
+    encoded: str | bytes | bytearray,
+    experiment_uri: str,
+) -> ExperimentSnapshot:
+    try:
+        return decode_persisted_model(
+            ExperimentSnapshot,
+            encoded,
+            record_kind="experiment_snapshot",
+            record_id=experiment_uri,
+            field="snapshot_json",
+        )
+    except PersistenceCorruptionError as exc:
+        raise ExperimentCorruptionError(exc) from exc
 
 
 class ExperimentService:
@@ -159,10 +180,15 @@ class ExperimentService:
             ).fetchall()
             for row in rows:
                 try:
-                    snapshot = ExperimentSnapshot.model_validate(
-                        loads_strict_json(row["snapshot_json"])
+                    snapshot = _decode_experiment_snapshot(
+                        row["snapshot_json"], str(row["experiment_uri"])
                     )
-                except (TypeError, ValidationError, ValueError) as exc:
+                except (
+                    TypeError,
+                    ValidationError,
+                    ValueError,
+                    ExperimentCorruptionError,
+                ) as exc:
                     self._quarantine_recovery_snapshot(connection, row, exc)
                     continue
                 if snapshot.experiment_uri != str(
@@ -323,10 +349,8 @@ class ExperimentService:
             _LOGGER.warning("experiment not found: %s", experiment_uri)
             raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
         try:
-            return ExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
-            )
-        except (ValidationError, ValueError) as exc:
+            return _decode_experiment_snapshot(row["snapshot_json"], experiment_uri)
+        except (ValidationError, ValueError, ExperimentCorruptionError) as exc:
             raise ExperimentError("stored experiment snapshot is invalid") from exc
 
     def contains(self, experiment_uri: str) -> bool:
@@ -388,9 +412,7 @@ class ExperimentService:
                     experiment_uri,
                 )
                 raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
-            snapshot = ExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
-            )
+            snapshot = _decode_experiment_snapshot(row["snapshot_json"], experiment_uri)
             if snapshot.state in _TERMINAL_STATES:
                 return ExperimentCancelResult(
                     experiment_uri=experiment_uri,
@@ -935,9 +957,7 @@ class ExperimentService:
                     experiment_uri,
                 )
                 raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
-            current = ExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
-            )
+            current = _decode_experiment_snapshot(row["snapshot_json"], experiment_uri)
             if current.state in _TERMINAL_STATES:
                 return
             terminal = _updated(
@@ -995,9 +1015,7 @@ class ExperimentService:
             if row is None:
                 _LOGGER.warning("experiment not found: %s", experiment_uri)
                 raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
-            snapshot = ExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
-            )
+            snapshot = _decode_experiment_snapshot(row["snapshot_json"], experiment_uri)
             if snapshot.state == ExperimentState.CANCEL_REQUESTED:
                 return False
             if snapshot.state != ExperimentState.PENDING:
@@ -1060,8 +1078,8 @@ class ExperimentService:
                     snapshot.experiment_uri,
                 )
                 raise ExperimentNotFoundError(_EXPERIMENT_NOT_FOUND)
-            current = ExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
+            current = _decode_experiment_snapshot(
+                row["snapshot_json"], snapshot.experiment_uri
             )
             if current.state == ExperimentState.CANCEL_REQUESTED:
                 return False
@@ -1099,8 +1117,8 @@ class ExperimentService:
             if row is None:
                 _LOGGER.warning("experiment not found: %s", snapshot.experiment_uri)
                 raise ExperimentError(_EXPERIMENT_NOT_FOUND)
-            current = ExperimentSnapshot.model_validate(
-                loads_strict_json(row["snapshot_json"])
+            current = _decode_experiment_snapshot(
+                row["snapshot_json"], snapshot.experiment_uri
             )
             terminal = snapshot
             if current.state == ExperimentState.CANCEL_REQUESTED:

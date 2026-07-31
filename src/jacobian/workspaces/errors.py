@@ -7,6 +7,14 @@ class WorkspaceError(RuntimeError):
     """Base error for invalid or unavailable workspace operations."""
 
 
+class WorkspaceCorruptionError(WorkspaceError):
+    """A persisted workspace payload cannot be reconstructed safely."""
+
+    def __init__(self, corruption: object) -> None:
+        self.corruption = corruption
+        super().__init__(str(corruption))
+
+
 class WorkspaceNotFoundError(WorkspaceError):
     """The requested workspace, branch, revision, or item does not exist."""
 
