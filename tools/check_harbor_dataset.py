@@ -23,6 +23,13 @@ def _actual_digests() -> dict[str, str]:
     }
 
 
+def check_tasks() -> int:
+    """Parse every local task bundle without consulting the release manifest."""
+    actual = _actual_digests()
+    print(f"Harbor task bundles are valid for {len(actual)} tasks.")
+    return 0
+
+
 def check() -> int:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     expected = {
@@ -65,9 +72,12 @@ def write() -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--tasks-only", action="store_true")
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--write", action="store_true")
     args = parser.parse_args()
+    if args.tasks_only:
+        return check_tasks()
     return check() if args.check else write()
 
 

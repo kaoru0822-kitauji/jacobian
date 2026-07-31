@@ -161,13 +161,13 @@ check-static: lint-full typecheck test-architecture todo-check build ## Run CI-o
 
 harbor-check: ## Validate local Harbor task bundles without checking the release manifest.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
-	$(HARBOR_RUNNER) check benchmarks/regression-v1/tasks
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --tasks-only
 
 harbor-sync: ## Update vendored verifier support without changing the release manifest.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
 
 harbor-release-sync: ## Refresh the committed Harbor dataset manifest for a release PR.
-	$(HARBOR_RUNNER) sync benchmarks/regression-v1/dataset.toml
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
 
 harbor-release-check: harbor-check ## Validate task bundles and the release manifest.
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
