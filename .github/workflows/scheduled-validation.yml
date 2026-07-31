@@ -57,83 +57,18 @@ jobs:
       - run: make test-provider
 
   performance:
-    name: Core performance benchmark
+    name: Harbor performance measurements
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      actions: read
-      contents: read
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
-      - run: >-
-          uv run --locked python benchmarks/performance/benchmark_core.py
-          --fast
-          --output benchmark.json
-      - name: Find previous successful benchmark
-        id: baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p .ci/performance-baseline
-          runs="$(gh run list \
-            --workflow scheduled-validation.yml \
-            --branch main \
-            --event schedule \
-            --status success \
-            --limit 10 \
-            --json databaseId \
-            --jq '.[].databaseId')" || runs=""
-          baseline_run=""
-          while read -r run_id; do
-            if [ -n "$run_id" ] && gh run download "$run_id" \
-              --name core-performance \
-              --dir .ci/performance-baseline >/dev/null 2>&1; then
-              baseline_run="$run_id"
-              break
-            fi
-          done <<< "$runs"
-          if [ -n "$baseline_run" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "run=$baseline_run" >> "$GITHUB_OUTPUT"
-            echo "Using benchmark artifact from scheduled run $baseline_run."
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No previous successful scheduled benchmark was available."
-          fi
-      - name: Compare with previous benchmark
-        if: steps.baseline.outputs.found == 'true'
-        run: |
-          baseline_path="$(find .ci/performance-baseline -type f -name benchmark.json -print -quit)"
-          if [ -z "$baseline_path" ]; then
-            echo "No benchmark.json was found in the downloaded artifact." \
-              | tee benchmark-comparison.md
-            exit 1
-          fi
-          if ! uv run --locked python benchmarks/performance/compare_core.py \
-            --baseline "$baseline_path" \
-            --current benchmark.json \
-            --threshold-percent 25 \
-            --output benchmark-comparison.md; then
-            echo "Benchmark comparison could not be produced." \
-              | tee benchmark-comparison.md
-            exit 1
-          fi
-          cat benchmark-comparison.md >> "$GITHUB_STEP_SUMMARY"
-          if grep -q '| REGRESSION |' benchmark-comparison.md; then
-            echo "Core benchmark regression exceeded the 25% noise allowance." >&2
-            exit 1
-          fi
-      - name: Record missing benchmark baseline
-        if: steps.baseline.outputs.found != 'true'
-        run: echo "No previous successful scheduled benchmark was available; this run establishes the artifact baseline." >> "$GITHUB_STEP_SUMMARY"
+      - run: make performance-eval
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: core-performance
-          path: |
-            benchmark.json
-            benchmark-comparison.md
+          name: harbor-performance-v1
+          path: benchmarks/results/performance-v1-oracle
           if-no-files-found: warn
           retention-days: 90

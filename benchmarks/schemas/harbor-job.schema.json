@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jacobian.invalid/benchmarks/schemas/harbor-job.schema.json",
+  "title": "Harbor job configuration",
+  "description": "Reference contract for the Harbor job JSON files committed under each suite and for the rendered configs produced by tools/render_harbor_job.py. The only runtime placeholder permitted in a source template is ${JACOBIAN_MODEL} inside agents[].model_name; the renderer resolves it before Harbor starts and rejects any remaining ${...} placeholder so Harbor's Docker compose mode never receives unresolved job-level env templating.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["jobs_dir", "n_attempts", "timeout_multiplier", "orchestrator", "environment", "agents", "tasks"],
+  "properties": {
+    "jobs_dir": {"type": "string", "minLength": 1},
+    "n_attempts": {"type": "integer", "minimum": 1},
+    "timeout_multiplier": {"type": "number", "exclusiveMinimum": 0},
+    "orchestrator": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "n_concurrent_trials": {"type": "integer", "minimum": 1},
+        "quiet": {"type": "boolean"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "force_build": {"type": "boolean"},
+        "delete": {"type": "boolean"},
+        "extra_docker_compose": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "model_name": {"type": "string", "minLength": 1},
+          "mcp_servers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "transport", "url"],
+              "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "transport": {"type": "string", "minLength": 1},
+                "url": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {"path": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

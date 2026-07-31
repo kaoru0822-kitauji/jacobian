@@ -51,6 +51,7 @@ complete a specific task.
 
 - [Discover, invoke, and verify domain capabilities](how-to/invoke-domain-capabilities.md)
 - [Deploy the remote MCP server](how-to/deploy-remote-mcp.md)
+- [Author a Harbor benchmark task](how-to/author-harbor-benchmark-task.md)
 
 ## Reference
 

@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from benchmarks.performance.compare_core import compare
-from benchmarks.performance.compare_startup import compare as compare_startup
+from benchmarks.tooling.performance_compare import compare, compare_startup
 
 
 def _write_suite(

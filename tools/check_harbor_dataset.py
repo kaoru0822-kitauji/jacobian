@@ -1,74 +1,62 @@
-"""Check or deterministically write the local Harbor dataset manifest."""
+"""Check or deterministically write Harbor dataset manifests.
+
+Iterates every dataset registered in ``benchmarks/registry.toml``. For each
+dataset, verifies that the committed ``dataset.toml`` matches the suite header
+plus Harbor-native task digests and that task topology is sound
+(``--check``) or regenerates the manifest (``--write``). Dataset manifests are
+generated artifacts; do not hand-edit the ``[[tasks]]`` list.
+"""
 
 from __future__ import annotations
 
 import argparse
 import sys
-import tomllib
 from pathlib import Path
 
-import tomli_w
-from harbor.models.task.task import Task
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-ROOT = Path(__file__).parents[1]
-DATASET = ROOT / "benchmarks" / "regression-v1"
-TASKS = DATASET / "tasks"
-
-
-def _actual_digests() -> dict[str, str]:
-    return {
-        path.name: Task(path, disable_verification=True).checksum
-        for path in sorted(TASKS.iterdir())
-        if path.is_dir()
-    }
+from benchmarks.tooling.harbor_suite import (  # noqa: E402
+    HarborSuiteError,
+    check_suite,
+    load_registry,
+    report_failures,
+    report_ok,
+    write_dataset_manifest,
+)
 
 
 def check() -> int:
-    manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
-    expected = {
-        entry["name"].rsplit("/", 1)[-1].removeprefix("regression-v1-"): entry[
-            "digest"
-        ].removeprefix("sha256:")
-        for entry in manifest["tasks"]
-    }
-    actual = _actual_digests()
-    failures = []
-    for name in sorted(expected.keys() | actual.keys()):
-        if expected.get(name) != actual.get(name):
-            failures.append(
-                f"{name}: manifest={expected.get(name)!r} actual={actual.get(name)!r}"
-            )
-    if failures:
-        print("Harbor task digest mismatch:", file=sys.stderr)
-        print("\n".join(failures), file=sys.stderr)
+    failures: list[str] = []
+    checked = 0
+    for suite in load_registry():
+        checked += 1
+        failures.extend(check_suite(suite))
+    if report_failures(failures, header="Harbor dataset manifest drift"):
         return 1
-    print(f"Harbor task digests match for {len(actual)} tasks.")
+    report_ok(f"Harbor datasets match for {checked} dataset(s).")
     return 0
 
 
 def write() -> int:
-    path = DATASET / "dataset.toml"
-    manifest = tomllib.loads(path.read_text())
-    digests = _actual_digests()
-    manifest["tasks"] = [
-        {
-            "name": f"jacobian/regression-v1-{name}",
-            "digest": f"sha256:{digest}",
-        }
-        for name, digest in digests.items()
-    ]
-    path.write_text(tomli_w.dumps(manifest))
-    print(f"Updated Harbor task digests for {len(digests)} tasks.")
+    for suite in load_registry():
+        write_dataset_manifest(suite)
+        print(f"Updated Harbor dataset manifest for {suite.id}.")
     return 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true")
-    mode.add_argument("--write", action="store_true")
+    mode.add_argument("--check", action="store_true", help="verify committed manifests")
+    mode.add_argument("--write", action="store_true", help="regenerate manifests")
     args = parser.parse_args()
-    return check() if args.check else write()
+    try:
+        return check() if args.check else write()
+    except HarborSuiteError as exc:
+        print(f"harbor dataset check error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

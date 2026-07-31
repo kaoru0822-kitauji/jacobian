@@ -1,0 +1,60 @@
+schema_version = "1"
+
+[dataset]
+id = "jacobian/agent-workflow-v1"
+version = "1.0.0"
+title = "Jacobian agent workflow observations"
+purpose = "Fixed Jacobian-enabled mathematical workflows for Oracle validation and agent observation."
+claim_class = "workflow-observation"
+answer_visibility = "hidden-at-runtime"
+default_execution_profile = "oracle-and-observation"
+keywords = ["mathematics", "jacobian", "agent-workflow"]
+authors = [{ name = "Jacobian contributors", email = "maintainers@jacobian.invalid" }]
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-finite-partition"
+path = "tasks/mathematical-sciences/number-theory/finite-partition"
+maximum_assurance = "VERIFIED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-graph-artifact-composition"
+path = "tasks/mathematical-sciences/graph-theory/graph-artifact-composition"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-graph-counterexample"
+path = "tasks/mathematical-sciences/graph-theory/graph-counterexample"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-hermite-normal-form"
+path = "tasks/mathematical-sciences/linear-algebra/hermite-normal-form"
+maximum_assurance = "VERIFIED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-polynomial-map-collision"
+path = "tasks/mathematical-sciences/algebra/polynomial-map-collision"
+maximum_assurance = "VERIFIED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-polynomial-normalization"
+path = "tasks/mathematical-sciences/algebra/polynomial-normalization"
+maximum_assurance = "VERIFIED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-rational-linear-solution"
+path = "tasks/mathematical-sciences/linear-algebra/rational-linear-solution"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/agent-workflow-v1-sat-witness"
+path = "tasks/mathematical-sciences/logic-satisfiability/sat-witness"
+maximum_assurance = "VERIFIED"
+required_provider = "core"

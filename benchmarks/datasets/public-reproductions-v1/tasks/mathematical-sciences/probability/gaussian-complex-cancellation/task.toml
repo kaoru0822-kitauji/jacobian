@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/public-reproductions-v1-gaussian-complex-cancellation"
+version = "1.0.0"
+description = "Compute the exact order-2 complex Gaussian moment of a polynomial."
+keywords = ["gaussian-moment", "complex-gaussian", "exact-rational", "verification"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "probability"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["gaussian", "moment", "exact-rational", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:c4479f2a152004c1ff1c5b480b6ed46200c405e10d4c0a8cc62cb5ae05559e17"
+derivation = "Complex cancellation second moment; exact rational replay."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

@@ -1,0 +1,1 @@
+{"graph":{"vertices":["a","b","c"],"edges":[["a","b"],["b","c"]]},"edge_probabilities":[{"edge":["a","b"],"open_probability":{"num":"1","den":"2"}},{"edge":["b","c"],"open_probability":{"num":"2","den":"3"}}],"terminals":["a","c"],"task_id":"jacobian/public-reproductions-v1-reliability-series-path"}

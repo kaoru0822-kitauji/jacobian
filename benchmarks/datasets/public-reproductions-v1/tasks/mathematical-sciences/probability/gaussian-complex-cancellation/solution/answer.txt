@@ -1,0 +1,1 @@
+The second moment of 1+iZ under the standard complex Gaussian is 0 (real), 0 (imaginary) by cancellation.

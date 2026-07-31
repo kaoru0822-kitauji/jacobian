@@ -1,0 +1,36 @@
+schema_version = "1"
+
+[dataset]
+id = "jacobian/performance-v1"
+version = "1.0.0"
+title = "Jacobian performance measurements"
+purpose = "Controlled operational measurements reported separately from reward and agent latency."
+claim_class = "operational-measurement"
+answer_visibility = "not-applicable"
+default_execution_profile = "oracle-only"
+keywords = ["mathematics", "jacobian", "performance"]
+authors = [{ name = "Jacobian contributors", email = "maintainers@jacobian.invalid" }]
+
+[[tasks]]
+id = "jacobian/performance-v1-complete-runtime-startup"
+path = "tasks/software-systems/runtime-performance/complete-runtime-startup"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/performance-v1-core-operations"
+path = "tasks/software-systems/runtime-performance/core-operations"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/performance-v1-startup-phases"
+path = "tasks/software-systems/runtime-performance/startup-phases"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/performance-v1-v02-compatibility-surface"
+path = "tasks/software-systems/runtime-performance/v02-compatibility-surface"
+maximum_assurance = "COMPUTED"
+required_provider = "core"

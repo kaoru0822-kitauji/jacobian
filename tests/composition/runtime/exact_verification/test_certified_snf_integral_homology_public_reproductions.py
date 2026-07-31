@@ -12,19 +12,44 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-REPRODUCTIONS = (
+TASK_ROOT = (
     PROJECT_ROOT
     / "benchmarks"
-    / "reproductions"
-    / "certified_snf_integral_homology_public.json"
+    / "datasets"
+    / "public-reproductions-v1"
+    / "tasks"
+    / "mathematical-sciences"
 )
 
 
-def _suite() -> dict[str, Any]:
-    suite = json.loads(REPRODUCTIONS.read_text(encoding="utf-8"))
-    assert suite["scored"] is False
-    assert suite["held_out_evaluation"]["status"] == "READY_NOT_RUN"
-    return suite
+def _suite() -> dict[str, list[dict[str, Any]]]:
+    smith = []
+    for slug in ("smith-rank-deficient", "smith-rectangular"):
+        task = TASK_ROOT / "linear-algebra" / slug
+        expected = json.loads((task / "tests" / "expected.json").read_text())
+        smith.append(
+            {
+                "matrix": json.loads((task / "environment" / "input.json").read_text())[
+                    "matrix"
+                ],
+                "expected_rank": expected["expected_rank"],
+                "expected_invariant_factors": expected["expected_invariant_factors"],
+            }
+        )
+    homology = []
+    for slug in ("integral-circle", "integral-projective-plane", "reduced-point"):
+        task = TASK_ROOT / "algebraic-topology" / slug
+        request = json.loads((task / "environment" / "input.json").read_text())
+        expected = json.loads((task / "tests" / "expected.json").read_text())
+        homology.append(
+            {
+                "presentation": request["presentation"],
+                "convention": request["convention"],
+                "expected_free_ranks": expected["expected_free_ranks"],
+                "expected_torsion": expected["expected_torsion"],
+            }
+        )
+    return {"smith_cases": smith, "homology_cases": homology}
 
 
 def test_public_certified_smith_cases_reach_checker_bound_results(

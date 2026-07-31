@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/public-reproductions-v1-jacobian-keller"
+version = "1.0.0"
+description = "Verify the Keller condition and Jacobian determinant of a three-variable polynomial map over Q."
+keywords = ["jacobian-conjecture", "polynomial-map", "keller-condition", "determinant"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "algebra"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["polynomial-map", "jacobian", "keller", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:580784458d5dbda3c9f8ac7f0b7bc7daa512e992980a74716a37157e93b30fcc"
+derivation = "Three-variable Keller-map polynomial; exact Jacobian determinant replay."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

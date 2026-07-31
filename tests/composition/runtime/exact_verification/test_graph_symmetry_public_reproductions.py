@@ -12,22 +12,40 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-REPRODUCTIONS = (
-    PROJECT_ROOT / "benchmarks" / "reproductions" / "graph_symmetry_orbits_public.json"
+TASK_ROOT = (
+    PROJECT_ROOT
+    / "benchmarks"
+    / "datasets"
+    / "public-reproductions-v1"
+    / "tasks"
+    / "mathematical-sciences"
+    / "graph-theory"
 )
 
 
-def _suite() -> dict[str, Any]:
-    suite = json.loads(REPRODUCTIONS.read_text(encoding="utf-8"))
-    assert suite["scored"] is False
-    assert suite["held_out_evaluation"]["status"] == "READY_NOT_RUN"
-    return suite
+def _suite() -> list[dict[str, Any]]:
+    cases = []
+    for slug in (
+        "symmetry-colored-reflection",
+        "symmetry-cycle-rotation",
+        "symmetry-identity-subgroup",
+    ):
+        task = TASK_ROOT / slug
+        request = json.loads((task / "environment" / "input.json").read_text())
+        request.pop("task_id", None)
+        cases.append(
+            {
+                "request": request,
+                **json.loads((task / "tests" / "expected.json").read_text()),
+            }
+        )
+    return cases
 
 
 def test_public_declared_graph_symmetry_cases_reach_checker_bound_results(
     authorized_complete_runtime,
 ) -> None:
-    for case in _suite()["cases"]:
+    for case in _suite():
         computed = authorized_complete_runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="graph.symmetry.generator_orbits.compute",

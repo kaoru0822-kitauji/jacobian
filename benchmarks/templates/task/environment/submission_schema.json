@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "jacobian/<dataset>-<task-slug>"},
+    "conclusion": {"type": "string"},
+    "result": {"type": "object"},
+    "claimed_assurance": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
+    "scope": {"type": "string"},
+    "completeness": {"type": "string"},
+    "evidence": {"type": "array"},
+    "limitations": {"type": "array"}
+  }
+}

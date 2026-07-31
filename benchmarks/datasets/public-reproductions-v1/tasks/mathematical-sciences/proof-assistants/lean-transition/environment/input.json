@@ -1,0 +1,1 @@
+{"environment":"CORE","statement":"(P Q : Prop) \u2192 P \u2192 Q \u2192 P \u2227 Q","proof_prefix":["intro P Q hP hQ"],"tactic":"constructor","task_id":"jacobian/public-reproductions-v1-lean-transition"}

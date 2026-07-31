@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/public-reproductions-v1-sat-erdos-schur-f4"
+version = "1.0.0"
+description = "Determine the Erdos-Schur number f(4) and justify both bounds."
+keywords = ["ramsey-theory", "schur", "coloring", "bounded-search"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "logic"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "hard"
+category = "mathematics"
+tags = ["erdos-schur", "ramsey", "coloring", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:07fcfc8737ac90932553976a9d490205d1095f7f7cd922118e9b97ea9d79b188"
+derivation = "Erdos-Schur f(4)=45 agent regression; answer-visible diagnostic."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

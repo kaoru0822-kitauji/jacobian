@@ -16,6 +16,7 @@ stable public contract.
 | [0005](0005-direct-epistemic-workspaces.md) | Keep epistemic workspaces separate from capability assurance | Accepted, pre-stable |
 | [0006](0006-semantic-test-topology.md) | Isolate tests by semantic depth and resource ownership | Accepted, pre-stable |
 | [0007](0007-benchmark-and-package-layout.md) | Organize benchmarks by artifact class; package domain adapters without shims | Accepted, pre-stable |
+| [0008](0008-harbor-native-benchmark-datasets.md) | Package every executable benchmark case in claim-specific Harbor datasets | Accepted, pre-stable |
 
 Add an ADR when a decision changes a trust boundary, durable data model,
 cross-component contract, dependency strategy, or other choice that would be

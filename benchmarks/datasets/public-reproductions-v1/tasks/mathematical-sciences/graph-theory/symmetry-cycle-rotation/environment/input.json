@@ -1,0 +1,1 @@
+{"graph":{"vertices":["a","b","c","d"],"edges":[["a","b"],["a","d"],["b","c"],["c","d"]]},"generators":[{"generator_id":"quarter_turn","mapping":{"a":"b","b":"c","c":"d","d":"a"}}],"task_id":"jacobian/public-reproductions-v1-symmetry-cycle-rotation"}

@@ -4,7 +4,7 @@ This reference freezes the discovery-to-implementation boundary for the
 probability, discrete-mathematics, computational-geometry, and topology
 foundations accepted on 2026-07-29. The machine-readable source of the catalog
 snapshot, move ledger, case status, and discovery handoffs is
-[`public_postdoc_status_v2.json`](../../benchmarks/research/challenges/public_postdoc_status_v2.json).
+the answer-visible tasks in [`research-diagnostics-v1`](../../benchmarks/datasets/research-diagnostics-v1/).
 
 The source suite remains immutable and answer-visible. These records support
 contract design and public regression; they are not a held-out model

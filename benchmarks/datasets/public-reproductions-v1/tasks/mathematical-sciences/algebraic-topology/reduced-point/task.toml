@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/public-reproductions-v1-reduced-point"
+version = "1.0.0"
+description = "Compute reduced integral homology of a one-point simplicial complex."
+keywords = ["simplicial-homology", "reduced-homology", "boundary"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "algebraic-topology"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "easy"
+category = "mathematics"
+tags = ["homology", "simplicial", "reduced", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:536bcaaf096e412463cc5d18050e5743d4ea7d29b1ba67beb0a492443834706e"
+derivation = "One-point complex; reduced integral homology boundary replay."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

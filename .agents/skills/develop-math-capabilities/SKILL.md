@@ -63,28 +63,21 @@ Fix discovery, examples, defaults, errors, or reusable agent guidance when
 those are the actual gap. Require recurring move evidence or a justified
 fundamental-primitive exception before adding a capability.
 
-Add public diagnostic cases to the versioned corpus under
-`benchmarks/research/challenges/`. Preserve immutable input suites and create a
-new status overlay when live portfolio coverage changes. Keep `scored=false`
-when the answer is public.
+Add public diagnostic cases to the versioned Harbor corpus under
+`benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/`.
+Preserve immutable task inputs and fold status into task metadata or generated
+reports. Keep `scored=false` when the answer is public.
 
 Plan a no-retrieval public run before spending model budget:
 
 ```console
-uv run python benchmarks/research/runner.py \
-  --challenge CHALLENGE_ID
+make harbor-oracle DATASET=research-diagnostics-v1
 ```
 
 Execute only with explicit model-work authorization and a hard process budget:
 
 ```console
-uv run python benchmarks/research/runner.py \
-  --challenge CHALLENGE_ID \
-  --model MODEL \
-  --reasoning-effort xhigh \
-  --timeout-seconds 900 \
-  --execute \
-  --max-model-runs 1
+make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
 ```
 
 Treat the resulting trace as workflow evidence, not proof that Jacobian caused

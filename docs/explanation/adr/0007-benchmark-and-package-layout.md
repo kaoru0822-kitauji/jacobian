@@ -2,7 +2,8 @@
 
 [Documentation home](../../index.md) · [Decision log](index.md)
 
-- Status: Accepted for the pre-stable architecture
+- Status: Accepted for the pre-stable architecture; benchmark layout
+  superseded by [ADR 0008](0008-harbor-native-benchmark-datasets.md)
 - Date: 2026-07-31
 
 ## Decision

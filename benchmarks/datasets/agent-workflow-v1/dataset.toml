@@ -1,0 +1,43 @@
+[dataset]
+name = "jacobian/agent-workflow-v1"
+description = "Fixed Jacobian-enabled mathematical workflows for Oracle validation and agent observation."
+keywords = [
+    "mathematics",
+    "jacobian",
+    "agent-workflow",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-finite-partition"
+digest = "sha256:ec9f0e3e7f7b0981d63b41996c371c6a346fc8e941f126a76c4ad0f1d6db15a9"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-graph-artifact-composition"
+digest = "sha256:1ceeb9528b895b385afee242a79a65227fd714925c52c197695bbba0d55a349f"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-graph-counterexample"
+digest = "sha256:de1c59034821016fa0acc918c97c009b94adb495634b671d1ef9deb65ba108ea"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-hermite-normal-form"
+digest = "sha256:a3d7c45bffe764279632fb03f1e7dcd33dae7efa2daacba4649af6533963a040"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-polynomial-map-collision"
+digest = "sha256:387cab26f3a07a0bba87362686be28a83b8f5096114ed3afcf2fcdaaff51b07b"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-polynomial-normalization"
+digest = "sha256:453a456402c0443e405fd5af807700ace46c9e813c572e89c23cdb40940840b7"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-rational-linear-solution"
+digest = "sha256:ee06c997ae450fe67b6ef5eba42ad57599a69c32788db02cf13dd147fcf9b862"
+
+[[tasks]]
+name = "jacobian/agent-workflow-v1-sat-witness"
+digest = "sha256:821454b21c7f332d9e47b771af6733c3c337b7840adbe31f6df0c5ab723a3725"

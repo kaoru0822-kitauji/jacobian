@@ -1,0 +1,34 @@
+{
+  "jobs_dir": "benchmarks/results/performance-v1-oracle",
+  "n_attempts": 1,
+  "timeout_multiplier": 1,
+  "orchestrator": {
+    "type": "local",
+    "n_concurrent_trials": 1,
+    "quiet": false
+  },
+  "environment": {
+    "type": "docker",
+    "force_build": true,
+    "delete": true
+  },
+  "agents": [
+    {
+      "name": "oracle"
+    }
+  ],
+  "tasks": [
+    {
+      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/complete-runtime-startup"
+    },
+    {
+      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/core-operations"
+    },
+    {
+      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/startup-phases"
+    },
+    {
+      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/v02-compatibility-surface"
+    }
+  ]
+}

@@ -40,7 +40,7 @@ and the
 
 ## Pinned provider identity
 
-[`benchmarks/provider_spikes/regina_outcomes_pin.json`](../../benchmarks/provider_spikes/regina_outcomes_pin.json)
+[`benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/regina/environment/pin.json`](../../benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/regina/environment/pin.json)
 binds:
 
 - the 7.4.1 upstream source archive and the upstream signed-checksum location;
@@ -59,6 +59,9 @@ silently treating either as the other.
 
 ## Reproduction
 
+The canonical repository entry point is
+`make provider-eval PROVIDER=regina`; it builds and runs the pinned Harbor task.
+
 Create a separate Python 3.12 environment and install only the pinned wheel:
 
 ```sh
@@ -71,7 +74,7 @@ uv pip install \
 Run the controller from the locked Jacobian environment:
 
 ```sh
-uv run python benchmarks/provider_spikes/regina_outcomes_spike.py \
+uv run python benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/regina/environment/spike.py \
   --python-executable /tmp/jcb-regina-venv/bin/python \
   --wheel /path/to/regina-7.4.1-cp312-cp312-manylinux_2_28_x86_64.whl \
   --source-archive /path/to/regina-7.4.1.tar.gz \

@@ -1,0 +1,43 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/research-diagnostics-v1-jcb-postdoc-003"
+version = "1.0.0"
+description = "Research diagnostic: Equational implication 4155 to 4658: finite countermodel discovery"
+keywords = ["research", "diagnostic", "mathematical-sciences", "universal algebra", "finite model search", "equational logic"]
+[metadata]
+evaluation_kind = "research-diagnostic"
+domain = "mathematical-sciences"
+field = "universal-algebra"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-answer-visible-diagnostic"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["research", "diagnostic", "answer-visible", "offline", "universal-algebra", "finite-model-search", "equational-logic"]
+case_version = "research-diagnostics-v1"
+contamination_class = "public-answer-visible-diagnostic"
+fixture_digest = "sha256:975d1718e2799d05d9817d9772a14dfe3fa12486df44327a5dbd4515f349a027"
+derivation = "A small countermodel tests Jacobian's domain-owned universal-algebra search and law evaluator without requiring the model to know the public operation in advance."
+historical_fit = "DIRECT"
+current_status = "COVERED"
+evaluation_status = "REGRESSION_COVERED"
+next_action = "Keep the order-two oracle and bounded no-witness behavior as separate regression obligations."
+
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

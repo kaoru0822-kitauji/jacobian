@@ -12,27 +12,42 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-REPRODUCTIONS = (
+TASK_ROOT = (
     PROJECT_ROOT
     / "benchmarks"
-    / "reproductions"
-    / "gaussian_polynomial_moment_public.json"
+    / "datasets"
+    / "public-reproductions-v1"
+    / "tasks"
+    / "mathematical-sciences"
+    / "probability"
 )
 
 
-def _load_suite() -> dict[str, Any]:
-    suite = json.loads(REPRODUCTIONS.read_text(encoding="utf-8"))
-    assert suite["scored"] is False
-    assert suite["purpose"].endswith("never evidence for an all-order identity")
-    assert suite["held_out_evaluation"]["status"] == "READY_NOT_RUN"
-    assert len(suite["attack_coverage"]) >= 3
-    return suite
+def _load_suite() -> list[dict[str, Any]]:
+    cases = []
+    for slug in (
+        "gaussian-complex-cancellation",
+        "gaussian-sixth-moment",
+        "gaussian-two-sum-fourth-moment",
+    ):
+        task = TASK_ROOT / slug
+        request = json.loads((task / "environment" / "input.json").read_text())
+        request.pop("task_id", None)
+        cases.append(
+            {
+                "request": request,
+                "expected_moment": json.loads(
+                    (task / "tests" / "expected.json").read_text()
+                )["expected_moment"],
+            }
+        )
+    return cases
 
 
 def test_public_gaussian_moment_reproductions_reach_checker_bound_results(
     authorized_complete_runtime,
 ) -> None:
-    for case in _load_suite()["cases"]:
+    for case in _load_suite():
         computed = authorized_complete_runtime.core.capabilities.invoke(
             CapabilityRequest(
                 capability_id="probability.gaussian_polynomial.moment.compute",

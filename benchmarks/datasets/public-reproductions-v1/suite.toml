@@ -1,0 +1,174 @@
+schema_version = "1"
+
+[dataset]
+id = "jacobian/public-reproductions-v1"
+version = "1.0.0"
+title = "Jacobian public mathematical reproductions"
+purpose = "Replay known public mathematical cases with deterministic, independently checked outcomes."
+claim_class = "public-case-correctness"
+answer_visibility = "public"
+default_execution_profile = "oracle-only"
+keywords = ["mathematics","jacobian","public-reproductions","verification","offline"]
+authors = [{ name = "Jacobian contributors", email = "maintainers@jacobian.invalid" }]
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-jacobian-inverse-obstruction"
+path = "tasks/mathematical-sciences/algebra/jacobian-inverse-obstruction"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-jacobian-keller"
+path = "tasks/mathematical-sciences/algebra/jacobian-keller"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-jacobian-negative-control"
+path = "tasks/mathematical-sciences/algebra/jacobian-negative-control"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-integral-circle"
+path = "tasks/mathematical-sciences/algebraic-topology/integral-circle"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-integral-projective-plane"
+path = "tasks/mathematical-sciences/algebraic-topology/integral-projective-plane"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-reduced-point"
+path = "tasks/mathematical-sciences/algebraic-topology/reduced-point"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-recurrence-fibonacci"
+path = "tasks/mathematical-sciences/combinatorics/recurrence-fibonacci"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-recurrence-linear-eval"
+path = "tasks/mathematical-sciences/combinatorics/recurrence-linear-eval"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-recurrence-lucas"
+path = "tasks/mathematical-sciences/combinatorics/recurrence-lucas"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-recurrence-rational-series"
+path = "tasks/mathematical-sciences/combinatorics/recurrence-rational-series"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-reliability-series-path"
+path = "tasks/mathematical-sciences/graph-theory/reliability-series-path"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-reliability-single-edge"
+path = "tasks/mathematical-sciences/graph-theory/reliability-single-edge"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-reliability-triangle-fair"
+path = "tasks/mathematical-sciences/graph-theory/reliability-triangle-fair"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-symmetry-colored-reflection"
+path = "tasks/mathematical-sciences/graph-theory/symmetry-colored-reflection"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-symmetry-cycle-rotation"
+path = "tasks/mathematical-sciences/graph-theory/symmetry-cycle-rotation"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-symmetry-identity-subgroup"
+path = "tasks/mathematical-sciences/graph-theory/symmetry-identity-subgroup"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-smith-rank-deficient"
+path = "tasks/mathematical-sciences/linear-algebra/smith-rank-deficient"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-smith-rectangular"
+path = "tasks/mathematical-sciences/linear-algebra/smith-rectangular"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-sat-bool-mus"
+path = "tasks/mathematical-sciences/logic/sat-bool-mus"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-sat-erdos-schur-f4"
+path = "tasks/mathematical-sciences/logic/sat-erdos-schur-f4"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-sat-pigeonhole"
+path = "tasks/mathematical-sciences/logic/sat-pigeonhole"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-sat-small"
+path = "tasks/mathematical-sciences/logic/sat-small"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-gaussian-complex-cancellation"
+path = "tasks/mathematical-sciences/probability/gaussian-complex-cancellation"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-gaussian-sixth-moment"
+path = "tasks/mathematical-sciences/probability/gaussian-sixth-moment"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-gaussian-two-sum-fourth-moment"
+path = "tasks/mathematical-sciences/probability/gaussian-two-sum-fourth-moment"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-lean-retrieval"
+path = "tasks/mathematical-sciences/proof-assistants/lean-retrieval"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
+id = "jacobian/public-reproductions-v1-lean-transition"
+path = "tasks/mathematical-sciences/proof-assistants/lean-transition"
+maximum_assurance = "COMPUTED"
+required_provider = "core"

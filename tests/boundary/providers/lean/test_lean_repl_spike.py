@@ -6,7 +6,18 @@ from typing import Any, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SPIKE = runpy.run_path(
-    str(PROJECT_ROOT / "benchmarks" / "provider_spikes" / "lean_repl_spike.py")
+    str(
+        PROJECT_ROOT
+        / "benchmarks"
+        / "datasets"
+        / "provider-feasibility-v1"
+        / "tasks"
+        / "software-systems"
+        / "provider-integration"
+        / "lean-repl"
+        / "environment"
+        / "spike.py"
+    )
 )
 
 

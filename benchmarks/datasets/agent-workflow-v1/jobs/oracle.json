@@ -1,0 +1,46 @@
+{
+  "jobs_dir": "benchmarks/results/agent-workflow-v1-oracle",
+  "n_attempts": 1,
+  "timeout_multiplier": 1,
+  "orchestrator": {
+    "type": "local",
+    "n_concurrent_trials": 1,
+    "quiet": false
+  },
+  "environment": {
+    "type": "docker",
+    "force_build": true,
+    "delete": true
+  },
+  "agents": [
+    {
+      "name": "oracle"
+    }
+  ],
+  "tasks": [
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/algebra/polynomial-map-collision"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/algebra/polynomial-normalization"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/graph-theory/graph-artifact-composition"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/graph-theory/graph-counterexample"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/hermite-normal-form"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/rational-linear-solution"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/logic-satisfiability/sat-witness"
+    },
+    {
+      "path": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/number-theory/finite-partition"
+    }
+  ]
+}

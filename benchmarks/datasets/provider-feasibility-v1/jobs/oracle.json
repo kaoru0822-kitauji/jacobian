@@ -1,0 +1,40 @@
+{
+  "jobs_dir": "benchmarks/results/provider-feasibility-v1-oracle",
+  "n_attempts": 1,
+  "timeout_multiplier": 1,
+  "orchestrator": {
+    "type": "local",
+    "n_concurrent_trials": 1,
+    "quiet": false
+  },
+  "environment": {
+    "type": "docker",
+    "force_build": true,
+    "delete": true
+  },
+  "agents": [
+    {
+      "name": "oracle"
+    }
+  ],
+  "tasks": [
+    {
+      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cddlib"
+    },
+    {
+      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cgal"
+    },
+    {
+      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi"
+    },
+    {
+      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/lean-repl"
+    },
+    {
+      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty"
+    },
+    {
+      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/regina"
+    }
+  ]
+}

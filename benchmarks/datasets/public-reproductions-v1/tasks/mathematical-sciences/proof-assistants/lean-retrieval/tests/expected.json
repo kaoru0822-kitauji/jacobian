@@ -1,0 +1,1 @@
+{"task_id":"jacobian/public-reproductions-v1-lean-retrieval","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/public-reproductions-v1-lean-retrieval","complete finite input"],"expected_candidate_tactic":"exact Nat.gcd_zero_right n","expected_exhaustive":false}

@@ -1,0 +1,1 @@
+{"presentation":{"vertices":["0","1","2","3","4","5"],"facets":[["0","1","2"],["0","1","3"],["0","2","4"],["0","3","5"],["0","4","5"],["1","2","5"],["1","3","4"],["1","4","5"],["2","3","4"],["2","3","5"]]},"convention":"UNREDUCED","task_id":"jacobian/public-reproductions-v1-integral-projective-plane"}
