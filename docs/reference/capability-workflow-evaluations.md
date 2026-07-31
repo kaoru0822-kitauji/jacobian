@@ -22,9 +22,12 @@ verification order, or stopping criteria.
 Validate the bundles and then run the Oracle:
 
 ```sh
-harbor sync benchmarks/regression-v1/dataset.toml
-harbor check benchmarks/regression-v1/tasks
-harbor run -c benchmarks/regression-v1/job-oracle.json
+make harbor-check
+make harbor-oracle
+
+# Release PR only, after the task set is frozen:
+make harbor-release-sync
+make harbor-release-oracle
 ```
 
 The verifier scores correctness, evidence validity, scope accuracy, assurance
