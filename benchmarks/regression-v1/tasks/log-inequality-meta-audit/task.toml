@@ -14,7 +14,7 @@ category = "mathematics"
 tags = ["conversation", "proof-audit", "meta-verification", "offline"]
 case_version = "regression-v1"
 contamination_class = "public-conversation-derived-meta-verification"
-fixture_digest = "sha256:634da6885cbb0e9a644ed0243a719ff1a186cba54835bfdfd54e11aaee16f46a"
+fixture_digest = "sha256:f3e176e2e999c9e4589b35b9ddb6ef55a7dc225132fe4af29429b2332d5321c3"
 derivation = "Derived from Nemotron-Math-Proofs-v2 rows 54-55."
 
 [agent]
