@@ -19,10 +19,7 @@ def q(value):
         parsed = Fraction(value)
     except (ValueError, TypeError, ZeroDivisionError):
         return None
-    canonical = str(parsed.numerator)
-    if parsed.denominator != 1:
-        canonical += f"/{parsed.denominator}"
-    return parsed if value == canonical else None
+    return parsed
 
 
 def main():
@@ -56,6 +53,14 @@ def main():
     expectation = other_hit * squared_sum
     valid = (
         math_contract
+        and set(r)
+        == {
+            "self_hit_probability",
+            "other_hit_probability",
+            "ordered_squared_difference_sum",
+            "expected_value",
+        }
+        and type(r.get("ordered_squared_difference_sum")) is int
         and q(r.get("self_hit_probability")) == self_hit
         and q(r.get("other_hit_probability")) == other_hit
         and r.get("ordered_squared_difference_sum") == squared_sum

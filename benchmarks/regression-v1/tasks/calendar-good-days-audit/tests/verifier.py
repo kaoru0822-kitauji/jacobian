@@ -46,6 +46,18 @@ def main():
                 )
     valid = (
         math_contract
+        and set(r) == {"count", "good_dates"}
+        and type(r.get("count")) is int
+        and isinstance(r.get("good_dates"), list)
+        and all(
+            isinstance(date, dict)
+            and set(date) == {"month", "day", "concatenated"}
+            and all(
+                type(date[field]) is int
+                for field in ("month", "day", "concatenated")
+            )
+            for date in r["good_dates"]
+        )
         and r.get("count") == len(expected_dates)
         and r.get("good_dates") == expected_dates
         and len(expected_dates) != 15
