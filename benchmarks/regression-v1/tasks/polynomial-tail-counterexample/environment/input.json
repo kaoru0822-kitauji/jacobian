@@ -1,0 +1,11 @@
+{
+  "task_id": "polynomial-tail-counterexample",
+  "claim": "If P and Q have positive leading coefficients, degree(P) > degree(Q) > 1, and all roots are real and distinct, then P-Q is strictly increasing for every x at least the largest root of P or Q.",
+  "coefficient_domain": "rationals",
+  "required_witness": {
+    "provide_P_coefficients_descending": true,
+    "provide_Q_coefficients_descending": true,
+    "provide_rational_x1_x2_with_0_le_x1_lt_x2": true,
+    "show_P_minus_Q_not_increasing_on_witness_pair": true
+  }
+}

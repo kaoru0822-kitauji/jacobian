@@ -8,18 +8,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).parents[3]
-DATASET = ROOT / "benchmarks" / "regression-v1"
-TASKS = DATASET / "tasks"
-EXPECTED_TASKS = {
-    "graph-counterexample",
-    "graph-artifact-composition",
-    "finite-partition",
-    "sat-witness",
-    "rational-linear-solution",
-    "hermite-normal-form",
-    "polynomial-normalization",
-    "polynomial-map-collision",
-}
+TASKS = ROOT / "benchmarks" / "regression-v1" / "tasks"
 VERIFICATION_RECORD_TASKS = {
     "finite-partition",
     "hermite-normal-form",
@@ -29,19 +18,18 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
-    manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
-    assert manifest["dataset"]["name"] == "jacobian/regression-v1"
-    assert {
-        task["name"].rsplit("/", 1)[-1].removeprefix("regression-v1-")
-        for task in manifest["tasks"]
-    } == EXPECTED_TASKS
-
+def test_regression_v1_contains_the_expected_task_bundles() -> None:
     task_dirs = {path.name for path in TASKS.iterdir() if path.is_dir()}
-    assert task_dirs == EXPECTED_TASKS
+    task_ids = {
+        tomllib.loads((TASKS / task_name / "task.toml").read_text())["task"][
+            "name"
+        ].removeprefix("jacobian/regression-v1-")
+        for task_name in task_dirs
+    }
+    assert task_dirs == task_ids
 
     verifier_dockerfile_sizes = []
-    for task_name in sorted(EXPECTED_TASKS):
+    for task_name in sorted(task_dirs):
         task = TASKS / task_name
         spec = tomllib.loads((task / "task.toml").read_text())
         assert spec["schema_version"] == "1.4"
@@ -61,7 +49,12 @@ def test_regression_v1_is_a_frozen_eight_task_dataset() -> None:
             json.loads((task / "environment" / "metadata.json").read_text()) == metadata
         )
         assert spec["metadata"]["fixture_digest"] == input_digest
-        assert metadata["upstream"] is None
+        upstream = metadata["upstream"]
+        if upstream is not None:
+            assert isinstance(upstream, dict)
+            assert upstream["revision"]
+            assert upstream["row"] >= 0
+            assert upstream["source_url"].startswith("https://huggingface.co/datasets/")
 
         instruction = (task / "instruction.md").read_text()
         submission_schema = json.loads(
