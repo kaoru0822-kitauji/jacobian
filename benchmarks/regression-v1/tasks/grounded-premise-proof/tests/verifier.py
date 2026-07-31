@@ -55,6 +55,7 @@ def _replay_proof(result, source):
     selected = result["selected_premises"]
     if (
         not isinstance(selected, list)
+        or not all(type(premise) is str for premise in selected)
         or len(selected) != len(REQUIRED_PREMISES)
         or set(selected) != REQUIRED_PREMISES
     ):
@@ -79,11 +80,18 @@ def _replay_proof(result, source):
             "output",
         }:
             return False
+        if (
+            type(step["id"]) is not str
+            or type(step["rule"]) is not str
+            or type(step["output"]) is not str
+        ):
+            return False
         if step["id"] in step_ids or step["rule"] not in RULES:
             return False
         inputs = step["inputs"]
         if (
             not isinstance(inputs, list)
+            or not all(type(value) is str for value in inputs)
             or len(inputs) != len(set(inputs))
             or not set(inputs) <= facts
         ):
@@ -102,7 +110,8 @@ def _replay_proof(result, source):
 
     target = source.get("target_fact")
     return bool(
-        result["target_fact"] == target
+        type(result["target_fact"]) is str
+        and result["target_fact"] == target
         and target in facts
         and used_premises == REQUIRED_PREMISES
     )

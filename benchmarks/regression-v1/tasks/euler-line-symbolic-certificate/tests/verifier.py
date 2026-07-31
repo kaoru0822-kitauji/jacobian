@@ -213,6 +213,11 @@ def main():
     valid = bool(
         input_contract
         and math_contract
+        and set(result) == {"coordinates", "relation_coefficients"}
+        and isinstance(coordinate_data, dict)
+        and set(coordinate_data) == {"O", "G", "H"}
+        and isinstance(relation, list)
+        and len(relation) == 3
         and all(point is not None for point in points.values())
         and len(coefficients) == 3
         and all(coefficient is not None for coefficient in coefficients)

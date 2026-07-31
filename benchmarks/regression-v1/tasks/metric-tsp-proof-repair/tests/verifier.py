@@ -6,11 +6,29 @@ from pathlib import Path
 from verifier_support import (
     evidence_list_is_bound,
     load_submission,
+    resolve_evidence,
     strict_submission_contract,
 )
 
 W = Path("/app")
 E = Path("/tests")
+
+
+def evidence_matches_result(evidence, result):
+    if not evidence_list_is_bound(evidence):
+        return False
+    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    if target is None:
+        return False
+    try:
+        marker = next(
+            line.removeprefix("RESULT_JSON:").strip()
+            for line in target.read_text().splitlines()
+            if line.startswith("RESULT_JSON:")
+        )
+        return json.loads(marker) == result
+    except (OSError, StopIteration, UnicodeError, ValueError):
+        return False
 
 
 def edge_key(left, right):
@@ -95,7 +113,14 @@ def main():
     edge_shape = isinstance(raw_edges, list)
     if edge_shape:
         for edge in raw_edges:
-            if not isinstance(edge, list) or len(edge) != 2:
+            if (
+                not isinstance(edge, list)
+                or len(edge) != 2
+                or any(
+                    type(vertex) is not str or vertex not in vertices
+                    for vertex in edge
+                )
+            ):
                 edge_shape = False
                 break
             edges.append(edge_key(edge[0], edge[1]))
@@ -116,15 +141,19 @@ def main():
 
     euler = result.get("euler_walk")
     expected_counts = Counter(dict.fromkeys(edges, 2))
+    euler_shape = (
+        isinstance(euler, list)
+        and len(euler) == 11
+        and all(type(vertex) is str and vertex in vertices for vertex in euler)
+    )
     actual_counts = (
         Counter(edge_key(left, right) for left, right in pairwise(euler))
-        if isinstance(euler, list) and len(euler) == 11
+        if euler_shape
         else Counter()
     )
     euler_valid = bool(
         tree
-        and isinstance(euler, list)
-        and len(euler) == 11
+        and euler_shape
         and euler[0] == euler[-1]
         and actual_counts == expected_counts
     )
@@ -156,6 +185,7 @@ def main():
     optimal_valid = bool(
         isinstance(optimal_tour, list)
         and len(optimal_tour) == len(vertices) + 1
+        and all(type(vertex) is str and vertex in vertices for vertex in optimal_tour)
         and optimal_tour[0] == optimal_tour[-1]
         and len(set(optimal_tour[:-1])) == len(vertices)
         and set(optimal_tour[:-1]) == set(vertices)
@@ -179,6 +209,20 @@ def main():
     reported = result.get("weights")
     valid = bool(
         math_contract
+        and set(result)
+        == {
+            "flaw_location",
+            "invalid_inference",
+            "corrected_claim",
+            "mst_edges",
+            "euler_walk",
+            "shortcut_tour",
+            "optimal_tour",
+            "weights",
+        }
+        and isinstance(reported, dict)
+        and set(reported) == {"mst", "euler", "shortcut", "optimal"}
+        and all(type(value) is int for value in reported.values())
         and metric
         and result.get("flaw_location") == "STEP_4"
         and result.get("invalid_inference") == "SHORTCUTTING_PRESERVES_EXACT_COST"
@@ -205,7 +249,7 @@ def main():
 
     math_correct = bool(valid)
     correct = bool(contract and math_correct)
-    good = bool(contract and evidence_list_is_bound(submission["evidence"]))
+    good = bool(contract and evidence_matches_result(submission["evidence"], result))
     scope = bool(
         contract and submission["scope"] == " ".join(expected["required_scope_terms"])
     )
