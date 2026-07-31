@@ -46,7 +46,7 @@ digest = "sha256:969402f041c5e02a1f31b387d4dd41a5f7261469176298248aae3b12bca2968
 
 [[tasks]]
 name = "jacobian/regression-v1-metric-tsp-proof-repair"
-digest = "sha256:80cb920060010604760122807e09d4d3fc19614c5cb683d44eee3a6a0269c16b"
+digest = "sha256:24b2eaadbacf4e2e40ce78268aa9cd6c8a52becaeca30adf91b23c6976a33f6c"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
