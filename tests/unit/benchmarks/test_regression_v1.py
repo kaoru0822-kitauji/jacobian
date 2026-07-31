@@ -12,6 +12,7 @@ DATASET = ROOT / "benchmarks" / "regression-v1"
 TASKS = DATASET / "tasks"
 EXPECTED_TASKS = {
     "calendar-good-days-audit",
+    "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
     "graph-counterexample",
     "graph-artifact-composition",
@@ -38,7 +39,7 @@ VERIFICATION_RECORD_TASKS = {
 }
 
 
-def test_regression_v1_is_a_frozen_seventeen_task_dataset() -> None:
+def test_regression_v1_is_a_frozen_eighteen_task_dataset() -> None:
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/regression-v1"
     assert {
@@ -73,6 +74,7 @@ def test_regression_v1_is_a_frozen_seventeen_task_dataset() -> None:
         upstream = metadata["upstream"]
         if task_name in {
             "calendar-good-days-audit",
+            "divisibility-construction-witness",
             "euler-line-symbolic-certificate",
             "matrix-square-zero-counterexample",
             "metric-tsp-proof-repair",

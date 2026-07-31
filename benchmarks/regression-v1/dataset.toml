@@ -1,6 +1,6 @@
 [dataset]
 name = "jacobian/regression-v1"
-description = "Seventeen self-contained mathematical workflow observation tasks for Jacobian."
+description = "Eighteen self-contained mathematical workflow observation tasks for Jacobian."
 keywords = [
     "mathematics",
     "jacobian",
@@ -15,6 +15,10 @@ authors = [
 [[tasks]]
 name = "jacobian/regression-v1-calendar-good-days-audit"
 digest = "sha256:014f6d62c4f5df7f65fd938db01eb3046bed6a6353fff6fff745f2e5aafbeecf"
+
+[[tasks]]
+name = "jacobian/regression-v1-divisibility-construction-witness"
+digest = "sha256:65ef0266fcf0884fb527ddb8b01f650f2842aeae37c18460be100de4b1822713"
 
 [[tasks]]
 name = "jacobian/regression-v1-euler-line-symbolic-certificate"

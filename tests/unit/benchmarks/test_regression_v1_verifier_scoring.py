@@ -26,6 +26,7 @@ VERIFICATION_RECORD_TASKS = (
 RATIONAL_TASK = "rational-linear-solution"
 RESOURCE_DERIVED_TASKS = (
     "calendar-good-days-audit",
+    "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
@@ -210,6 +211,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result.update(count=15),
         ),
         (
+            "divisibility-construction-witness",
+            lambda result: result.update(quotient_by_7_pow_7=341),
+        ),
+        (
             "euler-line-symbolic-certificate",
             lambda result: result["coordinates"]["O"]["x"]["numerator"][0].update(
                 coefficient="2"
@@ -360,3 +365,27 @@ def test_modular_obstruction_rejects_incomplete_residue_coverage(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_divisibility_construction_accepts_alternative_witness(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path,
+        "divisibility-construction-witness",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"] = {
+        "a": 1,
+        "b": 324,
+        "product_mod_7": 6,
+        "power_difference": 8_173_186_372_997_100,
+        "quotient_by_7_pow_7": 9_924_419_700,
+    }
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)

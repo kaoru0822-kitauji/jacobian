@@ -1,0 +1,37 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+
+[task]
+name = "jacobian/regression-v1-divisibility-construction-witness"
+version = "1.0.0"
+description = "Construct and certify an integer witness satisfying coupled divisibility constraints."
+keywords = ["number-theory", "construction", "divisibility", "witness"]
+
+[metadata]
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["number-theory", "construction-search", "exact-arithmetic", "offline"]
+case_version = "regression-v1"
+contamination_class = "public-dataset-derived-construction"
+fixture_digest = "sha256:553495b1965c9ea4874aba8827ce831aa4ab51178f3f485775e23deeef8df024"
+derivation = "Derived from MathOlympiadBench row 57 (IMO 1984 Problem 2)."
+
+[agent]
+timeout_sec = 600.0
+
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
