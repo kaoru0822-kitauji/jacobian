@@ -26,27 +26,27 @@ digest = "sha256:b67b3e554eade1461e0615bddbc454cf78ea918701c7e3928b585bc60d7e2fd
 
 [[tasks]]
 name = "jacobian/regression-v1-finite-partition"
-digest = "sha256:610800913d093b85229a4ad7d82e2406d242595608363174a86ae33612357395"
+digest = "sha256:30e7dad22422721c6e3ac2829f26ec1d4f57476196756483791bb8e8fc3cc0b1"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-artifact-composition"
-digest = "sha256:9900627b7b97055186e2b3b6f3a3c1ea2a2af30bbc96973f2c57b92f2af93253"
+digest = "sha256:f26265a2398155fa8baa46cdce87fed95dcc10d3f0b4bfa78d0bcf3f10887a3b"
 
 [[tasks]]
 name = "jacobian/regression-v1-graph-counterexample"
-digest = "sha256:81902e9411f31e0358cd823e3cf496d609251f56f5757d239a44d5220ab7cfaf"
+digest = "sha256:4a48f3eae65380b1e96fd0f629b7c84f7f55e36642ba5ad128d5177af9438dc4"
 
 [[tasks]]
 name = "jacobian/regression-v1-hermite-normal-form"
-digest = "sha256:5899d3eb53d12c34336f867088db008d3397d5772db9ffb857f5f6e115f7846c"
+digest = "sha256:896e7c88db7ed823696fbde08487e7731ec04e707917d0cdbc2fbfe2f4df29fe"
 
 [[tasks]]
 name = "jacobian/regression-v1-log-exponent-recovery"
-digest = "sha256:2ac493194118377e41e4d91ed1a45dcace984cb65d8abae98c857a23e122dd7b"
+digest = "sha256:3b6018f9e2f095627ca25b67c3d6d70bf5a53766bf2d20673daa71af7bb9d84a"
 
 [[tasks]]
 name = "jacobian/regression-v1-matrix-square-zero-counterexample"
-digest = "sha256:197ac8160a9852093e5746622b5524c1461620c4d7b9eaaff7c525cea93ef78a"
+digest = "sha256:9d8a5a59b3e126198f2050bd8e95054154de0dc66518013978cdec66b8cec05f"
 
 [[tasks]]
 name = "jacobian/regression-v1-metric-tsp-proof-repair"
@@ -58,15 +58,15 @@ digest = "sha256:b0114a83bfe3ea0b319d7b6eb6628f0f767e93b7cfa64223e1082a7731e50b3
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-map-collision"
-digest = "sha256:af901caf232172fa1d54b6a0c19b6ef5978287e36c75a9e88424144af1575bcd"
+digest = "sha256:03e64e8c3f4deb540fc2a4ff78e8f777a1bc989747f78f9b63f9dd4fb0c514f4"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-normalization"
-digest = "sha256:1aa2fc7f6945a0e79ba97d88dbe2283ab27ac735535e0aeb90ca433bb225e039"
+digest = "sha256:5ac7575c900f410e8a6717dd90270f47a12e4755f7d723f5086c83e47ea2b893"
 
 [[tasks]]
 name = "jacobian/regression-v1-polynomial-tail-counterexample"
-digest = "sha256:fa8283b70fa4f92c843dfaefd39cf08afa4defcaa9db139011c8808b6953cde0"
+digest = "sha256:bc8e7cfe3529e1dde00afd141da8d1953934c6a69097dcf77010e3b09a9d741a"
 
 [[tasks]]
 name = "jacobian/regression-v1-random-function-expectation-audit"
@@ -74,12 +74,12 @@ digest = "sha256:13ff86febc2fa6a623f3a6e5109e288f2dfe0350ffdc050977dbd8a1d819d3b
 
 [[tasks]]
 name = "jacobian/regression-v1-rational-linear-solution"
-digest = "sha256:6096534b439eb5cc096faf9dad4cfb980e49548ce1b3caa4ebbc8642b1c66aca"
+digest = "sha256:20486d678610c13d0b0c59ade9d7cc8fac9c7a8a7bbcf0e728b4a8f9b757a460"
 
 [[tasks]]
 name = "jacobian/regression-v1-sat-witness"
-digest = "sha256:eaef68473845c6005be2767906f1fa4933b9bc79b02bd00b0b0def384863d8e0"
+digest = "sha256:01d531c357bf1e115bcae5b129e4e53c7188754a0ac96de7426e92d7bad5c0e6"
 
 [[tasks]]
 name = "jacobian/regression-v1-subspace-direct-sum-counterexample"
-digest = "sha256:f954a07e75a37d2c3d0afe50a8ffe38246fbbaa8a67d06a83970bede0c16497f"
+digest = "sha256:af5d656c32f54c92bf5846044833ebe385af92c298f9fac7c9442ba2e9d3a493"
