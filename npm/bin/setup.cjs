@@ -2,6 +2,7 @@
 
 const {
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   renameSync,
@@ -161,6 +162,8 @@ function buildLauncher() {
  * @param {string} [uvBin]
  * @param {string} [profile]
  * @param {string} [providerPath]
+ * @param {string} [projectEnvironment]
+ * @param {string} [elanHome]
  * @returns {{ command: string, args: string[], version: string, package: null, source: string, stateDir: string, profile: string, env: object }}
  */
 function buildSourceLauncher(
@@ -169,6 +172,8 @@ function buildSourceLauncher(
   uvBin = "uv",
   profile = "core",
   providerPath = process.env.PATH || "",
+  projectEnvironment = process.env.UV_PROJECT_ENVIRONMENT || "",
+  elanHome = process.env.ELAN_HOME || "",
 ) {
   const profiles = new Set(["core", "full-python", "lean", "external-proof"]);
   if (!profiles.has(profile)) {
@@ -181,6 +186,12 @@ function buildSourceLauncher(
       `${sourcePath} is not a Jacobian source checkout: pyproject.toml and uv.lock are required.`,
     );
   }
+  const environment = {};
+  if (providerPath) environment.PATH = providerPath;
+  if (projectEnvironment) {
+    environment.UV_PROJECT_ENVIRONMENT = projectEnvironment;
+  }
+  if (profile === "lean" && elanHome) environment.ELAN_HOME = elanHome;
   return {
     command: uvBin,
     args: [
@@ -198,7 +209,7 @@ function buildSourceLauncher(
     source: sourcePath,
     stateDir: statePath,
     profile,
-    env: providerPath ? { PATH: providerPath } : {},
+    env: environment,
   };
 }
 
@@ -243,6 +254,21 @@ function readOptional(path) {
   }
 }
 
+/** Refuse to replace a symlink instead of the config file it names. */
+function rejectSymlink(path) {
+  try {
+    if (lstatSync(path).isSymbolicLink()) {
+      throw new Error(
+        `${path} is a symbolic link. Jacobian will not replace linked client ` +
+          "configs; update the link target directly or use a regular config file",
+      );
+    }
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+}
+
 /**
  * Write a file only if its content would change.
  *
@@ -252,6 +278,7 @@ function readOptional(path) {
 function writeIfChanged(path, content) {
   const existing = readOptional(path);
   if (existing === content) return;
+  rejectSymlink(path);
   mkdirSync(dirname(path), { recursive: true });
   const mode = existsSync(path) ? statSync(path).mode & 0o777 : 0o600;
   const temporary = join(
@@ -585,6 +612,8 @@ async function interactiveConfirm() {
  * @param {string} [options.uvBin] uv executable used by source launches.
  * @param {string} [options.profile] Source dependency profile metadata.
  * @param {string} [options.providerPath] PATH audited by the source doctor.
+ * @param {string} [options.projectEnvironment] uv environment used for sync and launch.
+ * @param {string} [options.elanHome] ELAN_HOME audited by the Lean source profile.
  * @returns {Promise<object>} Setup report.
  */
 async function run(options) {
@@ -605,6 +634,8 @@ async function run(options) {
         options.uvBin || "uv",
         options.profile || "core",
         options.providerPath || process.env.PATH || "",
+        options.projectEnvironment || process.env.UV_PROJECT_ENVIRONMENT || "",
+        options.elanHome || process.env.ELAN_HOME || "",
       )
     : buildLauncher();
   const detectedIds = defs.filter((d) => isClientDetected(home, d.id)).map((d) => d.id);

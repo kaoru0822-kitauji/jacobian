@@ -8,13 +8,23 @@ import json
 import re
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 
 _DIGEST_IMAGE = re.compile(r"^.+@sha256:[0-9a-f]{64}$")
 REVISION_LABEL = "org.opencontainers.image.revision"
 VERSION_LABEL = "org.opencontainers.image.version"
+
+
+def _repository_version(repo: Path) -> str:
+    """Return the same normalized version used by the image build."""
+
+    return subprocess.run(
+        ["uv", "version", "--project", str(repo), "--short"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 
 def inspect_image(
@@ -92,8 +102,7 @@ def main() -> int:
             ).stdout.strip()
         )
         if args.expected_version is None:
-            with (repo / "pyproject.toml").open("rb") as stream:
-                version = tomllib.load(stream)["project"]["version"]
+            version = _repository_version(repo)
         else:
             version = args.expected_version
         report = inspect_image(

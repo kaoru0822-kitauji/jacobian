@@ -91,6 +91,14 @@ function main() {
         options.providerPath = rest[++i];
       } else if (arg.startsWith("--provider-path=")) {
         options.providerPath = arg.slice(16);
+      } else if (arg === "--project-environment") {
+        options.projectEnvironment = rest[++i];
+      } else if (arg.startsWith("--project-environment=")) {
+        options.projectEnvironment = arg.slice(22);
+      } else if (arg === "--elan-home") {
+        options.elanHome = rest[++i];
+      } else if (arg.startsWith("--elan-home=")) {
+        options.elanHome = arg.slice(12);
       } else if (arg === "--client" || arg === "-c") {
         i++;
         if (rest[i]) {

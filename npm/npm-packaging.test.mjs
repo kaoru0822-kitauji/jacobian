@@ -3,10 +3,12 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtemp,
   mkdir,
+  lstat,
   readFile,
   readdir,
   rm,
   stat,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -147,6 +149,7 @@ test("buildSourceLauncher binds the exact checkout and state directory", () => {
     "/opt/uv",
     "full-python",
     "/providers/bin:/usr/bin",
+    "/environments/jacobian",
   );
   assert.equal(launcher.command, "/opt/uv");
   assert.deepEqual(launcher.args, [
@@ -161,7 +164,27 @@ test("buildSourceLauncher binds the exact checkout and state directory", () => {
   ]);
   assert.equal(launcher.profile, "full-python");
   assert.equal(launcher.package, null);
-  assert.deepEqual(launcher.env, { PATH: "/providers/bin:/usr/bin" });
+  assert.deepEqual(launcher.env, {
+    PATH: "/providers/bin:/usr/bin",
+    UV_PROJECT_ENVIRONMENT: "/environments/jacobian",
+  });
+});
+
+test("buildSourceLauncher preserves a nondefault Lean toolchain home", () => {
+  const source = join(npmRoot, "..");
+  const launcher = buildSourceLauncher(
+    source,
+    join(source, ".jacobian-source-test"),
+    "/opt/uv",
+    "lean",
+    "/providers/bin:/usr/bin",
+    "",
+    "/toolchains/elan",
+  );
+  assert.deepEqual(launcher.env, {
+    PATH: "/providers/bin:/usr/bin",
+    ELAN_HOME: "/toolchains/elan",
+  });
 });
 
 test("normalizes release-please Python prerelease versions for npm", () => {
@@ -419,6 +442,32 @@ test("config creation uses a private atomic replacement", async () => {
     assert.equal(await readFile(configPath, "utf8"), "{}\n");
     assert.equal((await stat(configPath)).mode & 0o777, 0o600);
     assert.deepEqual(await readdir(join(base, "nested")), ["config.json"]);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("config writes reject symbolic links without detaching them", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-symlink-config-"));
+  try {
+    const targetPath = join(base, "dotfiles-config.json");
+    const configPath = join(base, "client-config.json");
+    await writeFile(targetPath, "before\n");
+    await symlink(targetPath, configPath);
+    assert.throws(
+      () =>
+        applyEdits([
+          {
+            path: configPath,
+            original: "before\n",
+            updated: "after\n",
+            action: "update",
+          },
+        ]),
+      /symbolic link/,
+    );
+    assert.equal((await lstat(configPath)).isSymbolicLink(), true);
+    assert.equal(await readFile(targetPath, "utf8"), "before\n");
   } finally {
     await rm(base, { recursive: true, force: true });
   }

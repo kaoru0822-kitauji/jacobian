@@ -61,6 +61,17 @@ def _git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
+def _repository_version(repo: Path) -> str:
+    """Return uv's normalized version for the selected project."""
+
+    return subprocess.run(
+        ["uv", "version", "--project", str(repo), "--short"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
 def _provider_report(runtime: Any) -> dict[str, dict[str, Any]]:
     portfolio = runtime.portfolio
     fields = {
@@ -121,6 +132,8 @@ def inspect_installation(
     profile: str,
     expected_revision: str,
     launcher_provider_path: str,
+    launcher_project_environment: str,
+    launcher_elan_home: str,
 ) -> dict[str, Any]:
     """Return a source, catalog, and provider identity report."""
 
@@ -132,7 +145,8 @@ def inspect_installation(
     expected_source = (repo / "src" / "jacobian").resolve()
     source_matches = package_source.is_relative_to(expected_source)
     with (repo / "pyproject.toml").open("rb") as stream:
-        expected_version = tomllib.load(stream)["project"]["version"]
+        declared_version = tomllib.load(stream)["project"]["version"]
+    expected_version = _repository_version(repo)
 
     state_dir.mkdir(parents=True, exist_ok=True)
     with create_runtime(
@@ -159,6 +173,8 @@ def inspect_installation(
         != CapabilityProviderAvailability.AVAILABLE.value
     ]
     effective_provider_path = os.environ.get("PATH", "")
+    effective_project_environment = os.environ.get("UV_PROJECT_ENVIRONMENT", "")
+    effective_elan_home = os.environ.get("ELAN_HOME", "")
     checks = {
         "git_clean": not dirty,
         "revision_matches": revision == expected_revision,
@@ -167,6 +183,12 @@ def inspect_installation(
         "profile_providers_available": not missing,
         "provider_path_preserved": effective_provider_path == launcher_provider_path
         or effective_provider_path.endswith(os.pathsep + launcher_provider_path),
+        "project_environment_preserved": (
+            effective_project_environment == launcher_project_environment
+        ),
+        "elan_home_preserved": (
+            profile != "lean" or effective_elan_home == launcher_elan_home
+        ),
     }
     return {
         "status": "ok" if all(checks.values()) else "error",
@@ -178,9 +200,14 @@ def inspect_installation(
         "git_dirty": dirty,
         "package_version": jacobian.__version__,
         "expected_package_version": expected_version,
+        "declared_package_version": declared_version,
         "package_source": str(package_source),
         "provider_path": effective_provider_path,
         "launcher_provider_path": launcher_provider_path,
+        "project_environment": effective_project_environment,
+        "launcher_project_environment": launcher_project_environment,
+        "elan_home": effective_elan_home,
+        "launcher_elan_home": launcher_elan_home,
         "catalog_digest": digest,
         "catalog_size": len(catalog.capabilities),
         "policy_profile": catalog.policy_profile,
@@ -199,6 +226,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", choices=PROFILES, required=True)
     parser.add_argument("--expected-revision", required=True)
     parser.add_argument("--provider-path", required=True)
+    parser.add_argument("--project-environment", default="")
+    parser.add_argument("--elan-home", default="")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--json", action="store_true")
     return parser
@@ -213,6 +242,8 @@ def main() -> int:
             profile=args.profile,
             expected_revision=args.expected_revision,
             launcher_provider_path=args.provider_path,
+            launcher_project_environment=args.project_environment,
+            launcher_elan_home=args.elan_home,
         )
     except (
         OSError,

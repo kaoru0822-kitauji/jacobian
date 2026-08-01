@@ -26,7 +26,10 @@ writes any client configuration. The audit is saved as
 The generated launcher preserves the provider-bearing base `PATH` used by
 doctor. uv prepends the project virtual environment to that same base path for
 both doctor and MCP, so GUI clients resolve the same Lean and external-proof
-executables that were audited in the terminal.
+executables that were audited in the terminal. If the bootstrap inherits a
+custom `UV_PROJECT_ENVIRONMENT`, it resolves that path absolutely and records
+it in the launcher. The `lean` profile likewise records a nondefault
+`ELAN_HOME`, so a GUI restart uses the toolchain home that doctor audited.
 
 ## Profiles
 
@@ -50,7 +53,9 @@ Add `--dev` when the clone also needs the locked development group. Use
 without changing the environment, state directory, or client files. Repeating
 the same command is idempotent. Client edits are one transaction: if any write
 fails, all earlier files from that run are restored. `jacobian remove` removes
-only the Jacobian entry and preserves unrelated client settings.
+only the Jacobian entry and preserves unrelated client settings. Client config
+symlinks are rejected rather than replaced; update the link target directly or
+temporarily use a regular config file.
 
 After pulling a new commit, rerun the bootstrap. The client already points at
 the same source path, while the locked sync and doctor refresh its environment
