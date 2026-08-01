@@ -32,6 +32,7 @@ RESOURCE_DERIVED_TASKS = (
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
     "noncompact-lefschetz-proof-audit",
+    "parameterized-sharp-bound-audit",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
@@ -594,6 +595,77 @@ def test_symbolic_block_decomposition_accepts_alternative_sum_zero_basis(
     accepted = _run_verifier(task, app, logs)
     assert accepted["correctness"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_parameterized_sharp_bound_accepts_permuted_certificates(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "parameterized-sharp-bound-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["certificate"]["tangent_variables"] = ["c", "a", "b"]
+    result["certificate"]["schur_ordering"] = ["b", "c", "a"]
+    result["boundary_family"] = {
+        "vanishing_variable": "a",
+        "other_variables": ["c", "b"],
+        "parameter": "t->0+",
+        "limit": "1/4",
+        "attained_for_positive_parameter": False,
+    }
+    result["audit"]["defects"].reverse()
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("transition", {"numerator": 4, "denominator": 1}),
+        (
+            "high_regime",
+            {
+                "condition": "d>=15/4",
+                "bound": "1/4",
+                "remainder_coefficient": "d-15/4",
+                "attainment": "ATTAINED_FOR_ALL_D",
+            },
+        ),
+        (
+            "boundary_family",
+            {
+                "vanishing_variable": "c",
+                "other_variables": ["a", "b"],
+                "parameter": "t->0+",
+                "limit": "1/4",
+                "attained_for_positive_parameter": True,
+            },
+        ),
+    ],
+)
+def test_parameterized_sharp_bound_rejects_corrupted_sharpness(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "parameterized-sharp-bound-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"][field] = replacement
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
 
 
 @pytest.mark.parametrize(

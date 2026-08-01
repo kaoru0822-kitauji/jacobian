@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "jacobian/agent-workflow-v1-parameterized-sharp-bound-audit"},
+    "conclusion": {"enum": ["PIECEWISE_BOUND_REPAIRED", "FROZEN_EXPLANATION_VALID", "INSUFFICIENT_EVIDENCE"]},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transition", "low_regime", "high_regime", "threshold_case", "certificate", "symmetric_witness", "boundary_family", "audit"],
+      "properties": {
+        "transition": {"$ref": "#/$defs/rational"},
+        "low_regime": {
+          "type": "object", "additionalProperties": false,
+          "required": ["condition", "bound", "interpolation"],
+          "properties": {
+            "condition": {"const": "0<d<=15/4"},
+            "bound": {"const": "1/9+d/27"},
+            "interpolation": {
+              "type": "object", "additionalProperties": false,
+              "required": ["tangent_weight", "schur_weight"],
+              "properties": {
+                "tangent_weight": {"const": "1-4*d/15"},
+                "schur_weight": {"const": "4*d/15"}
+              }
+            }
+          }
+        },
+        "high_regime": {
+          "type": "object", "additionalProperties": false,
+          "required": ["condition", "bound", "remainder_coefficient", "attainment"],
+          "properties": {
+            "condition": {"const": "d>=15/4"},
+            "bound": {"const": "1/4"},
+            "remainder_coefficient": {"const": "d-15/4"},
+            "attainment": {"const": "ATTAINED_ONLY_AT_THRESHOLD; INFIMUM_ONLY_ABOVE_THRESHOLD"}
+          }
+        },
+        "threshold_case": {"const": "BOTH_FORMULAS_AGREE_AND_SYMMETRIC_EQUALITY_IS_ATTAINED"},
+        "certificate": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tangent_variables", "schur_ordering", "identity_scope"],
+          "properties": {
+            "tangent_variables": {"type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": {"enum": ["a", "b", "c"]}},
+            "schur_ordering": {"type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": {"enum": ["a", "b", "c"]}},
+            "identity_scope": {"const": "a+b+c=1; a,b,c>0"}
+          }
+        },
+        "symmetric_witness": {
+          "type": "object", "additionalProperties": false,
+          "required": ["a", "b", "c"],
+          "properties": {"a": {"$ref": "#/$defs/rational"}, "b": {"$ref": "#/$defs/rational"}, "c": {"$ref": "#/$defs/rational"}}
+        },
+        "boundary_family": {
+          "type": "object", "additionalProperties": false,
+          "required": ["vanishing_variable", "other_variables", "parameter", "limit", "attained_for_positive_parameter"],
+          "properties": {
+            "vanishing_variable": {"enum": ["a", "b", "c"]},
+            "other_variables": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"enum": ["a", "b", "c"]}},
+            "parameter": {"const": "t->0+"},
+            "limit": {"const": "1/4"},
+            "attained_for_positive_parameter": {"const": false}
+          }
+        },
+        "audit": {
+          "type": "object", "additionalProperties": false,
+          "required": ["frozen_explanation_status", "defects"],
+          "properties": {
+            "frozen_explanation_status": {"const": "PARTIALLY_CORRECT_BUT_SHARPNESS_JUSTIFICATION_DEFECTIVE"},
+            "defects": {
+              "type": "array", "minItems": 2, "maxItems": 3, "uniqueItems": true,
+              "items": {"enum": ["SYMMETRIC_EQUALITY_OVERCLAIMED_FOR_ALL_D", "BOUNDARY_INFIMUM_MISLABELED_AS_MINIMUM", "TRANSITION_CASE_NOT_SEPARATED"]}
+            }
+          }
+        }
+      }
+    },
+    "claimed_assurance": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
+    "scope": {"type": "string"},
+    "completeness": {"enum": ["COMPLETE", "PARTIAL", "UNKNOWN"]},
+    "evidence": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/answer.txt"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "rational": {
+      "type": "object", "additionalProperties": false,
+      "required": ["numerator", "denominator"],
+      "properties": {"numerator": {"type": "integer", "minimum": -1000000, "maximum": 1000000}, "denominator": {"type": "integer", "minimum": 1, "maximum": 1000000}}
+    }
+  }
+}

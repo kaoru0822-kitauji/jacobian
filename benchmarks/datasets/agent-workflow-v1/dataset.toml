@@ -91,6 +91,10 @@ name = "jacobian/agent-workflow-v1-nondifferentiable-maximum-construction"
 digest = "sha256:38ac5dd84d79a174394c91020d05c2aad1b9e55e3a53464d24e3b54d6be1fe60"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-parameterized-sharp-bound-audit"
+digest = "sha256:99ea15dc461d9b090f476f9663d6d30137a7a4a139b0e7f94d371ea8f9061f35"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-polynomial-map-collision"
 digest = "sha256:6e82e0db295d3f92732f09bf95ce9b9bc6073304084b73f7d9212e11eb7b8d7c"
 

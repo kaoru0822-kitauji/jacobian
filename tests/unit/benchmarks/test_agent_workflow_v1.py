@@ -30,6 +30,7 @@ EXPECTED_TASKS = {
     "natural-subtraction-proof-repair",
     "nondifferentiable-maximum-construction",
     "noncompact-lefschetz-proof-audit",
+    "parameterized-sharp-bound-audit",
     "polynomial-normalization",
     "polynomial-map-collision",
     "polynomial-tail-counterexample",
