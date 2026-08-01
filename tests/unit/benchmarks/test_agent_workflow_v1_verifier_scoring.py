@@ -905,3 +905,22 @@ def test_symbolic_block_certificate_enforces_common_channel_first(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_parameterized_bound_evidence_binds_boundary_family(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "parameterized-sharp-bound-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["boundary_family"]["vanishing_variable"] = "a"
+    submission["result"]["boundary_family"]["other_variables"] = ["b", "c"]
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == 0.0

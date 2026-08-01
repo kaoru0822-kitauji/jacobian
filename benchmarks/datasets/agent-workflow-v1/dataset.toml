@@ -92,7 +92,7 @@ digest = "sha256:38ac5dd84d79a174394c91020d05c2aad1b9e55e3a53464d24e3b54d6be1fe6
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-parameterized-sharp-bound-audit"
-digest = "sha256:99ea15dc461d9b090f476f9663d6d30137a7a4a139b0e7f94d371ea8f9061f35"
+digest = "sha256:7e567a6da2136e5525d74f457c19109a8da7328ca6ca27c48544e25157234f45"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-polynomial-map-collision"
