@@ -69,6 +69,19 @@ def test_render_suite_job_expands_canonical_tasks_explicitly() -> None:
     )
 
 
+def test_render_suite_job_limits_observation_to_configured_tasks() -> None:
+    rendered = render_suite_job(get_suite("agent-workflow-v1"), role="observation")
+
+    assert rendered["tasks"] == [{"path": "benchmarks/tasks/graph-counterexample"}]
+
+    with pytest.raises(HarborSuiteError, match="unknown task"):
+        render_suite_job(
+            get_suite("agent-workflow-v1"),
+            role="observation",
+            tasks=("finite-partition",),
+        )
+
+
 def test_render_suite_job_filters_provider_tasks() -> None:
     rendered = render_suite_job(
         get_suite("provider-feasibility-v1"), role="oracle", provider="cgal"

@@ -492,6 +492,45 @@ def render_job_config(config: dict[str, Any], *, model: str) -> dict[str, Any]:
     return result
 
 
+def _observation_task_path(entry: Any, *, dataset_id: str) -> Path:
+    if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+        raise HarborSuiteError(
+            f"dataset {dataset_id} observation job has an invalid task entry"
+        )
+    return _resolve(entry["path"], ROOT)
+
+
+def _configured_observation_tasks(
+    suite: Suite, configured_tasks: Any
+) -> tuple[TaskRef, ...]:
+    if not isinstance(configured_tasks, list):
+        raise HarborSuiteError(
+            f"dataset {suite.id} observation job tasks must be a list"
+        )
+    refs_by_path = {ref.path: ref for ref in suite.tasks}
+    configured_refs: list[TaskRef] = []
+    configured_paths: set[Path] = set()
+    for entry in configured_tasks:
+        task_path = _observation_task_path(entry, dataset_id=suite.id)
+        ref = refs_by_path.get(task_path)
+        if ref is None:
+            raise HarborSuiteError(
+                f"dataset {suite.id} observation job selects a task outside "
+                f"the suite: {entry['path']}"
+            )
+        if task_path in configured_paths:
+            raise HarborSuiteError(
+                f"dataset {suite.id} observation job repeats task: {task_path.name}"
+            )
+        configured_paths.add(task_path)
+        configured_refs.append(ref)
+    if not configured_refs:
+        raise HarborSuiteError(
+            f"dataset {suite.id} observation job has no configured tasks"
+        )
+    return tuple(configured_refs)
+
+
 def render_suite_job(
     suite: Suite,
     *,
@@ -505,8 +544,10 @@ def render_suite_job(
         raise HarborSuiteError(f"dataset {suite.id} has no {role} job")
     config = json.loads(template.read_text(encoding="utf-8"))
     config.pop("datasets", None)
-    config.pop("tasks", None)
+    configured_tasks = config.pop("tasks", None)
     task_refs = suite.tasks
+    if role == "observation" and configured_tasks is not None:
+        task_refs = _configured_observation_tasks(suite, configured_tasks)
     if tasks is not None:
         requested = set(tasks)
         known = {ref.path.name for ref in task_refs}

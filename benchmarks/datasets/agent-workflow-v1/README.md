@@ -18,6 +18,10 @@ The observation job uses the Jacobian MCP sidecar and is selected with:
 make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
 ```
 
+The observation job currently supports `graph-counterexample` only. Other
+dataset tasks remain Oracle-valid but do not yet have Codex-ready agent images;
+selecting one of them is rejected before Harbor starts.
+
 Five tasks have an operator-authorized verification record and may accept
 `VERIFIED`; the remaining tasks are capped at `COMPUTED`. A wrong result or an
 unsupported certification claim forces reward to zero. These are workflow

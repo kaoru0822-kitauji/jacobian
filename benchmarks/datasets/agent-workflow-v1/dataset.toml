@@ -64,7 +64,7 @@ digest = "sha256:1544f699a13f4ec41b2226a5cca1ee8e9d26fd5d1e24be9f203cbc87bff5663
 
 [[tasks]]
 name = "jacobian/graph-counterexample"
-digest = "sha256:66499169c33acda6dacb8da7de69b159322670b5de072384938e96eefc730ef8"
+digest = "sha256:5a39ce1ae05565f5b7d3f113171614344614da5ec48b11defd30f76c0a5b2e06"
 
 [[tasks]]
 name = "jacobian/grounded-premise-proof"

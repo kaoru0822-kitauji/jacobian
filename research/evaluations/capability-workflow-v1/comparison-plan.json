@@ -11,7 +11,7 @@
   "public_reproduction": {
     "path": "benchmarks/tasks",
     "task_count": 38,
-    "manifest_digest": "sha256:a84f819fdd825b24660df3a4bf715b541cea4d1a705ada606be6bcf4b0490497",
+    "manifest_digest": "sha256:492b86f47471a4389b2d59f6f422203c1a16ad8dae9c893c2c9b09646003567a",
     "contamination": "PUBLIC_ANSWER_VISIBLE",
     "causal_claims_allowed": false
   },

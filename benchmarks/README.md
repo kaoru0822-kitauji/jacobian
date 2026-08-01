@@ -46,7 +46,7 @@ make harbor-sync
 make harbor-check
 make harbor-oracle DATASET=agent-workflow-v1 TASKS="task-id"
 make harbor-oracle-all
-make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
+make agent-eval DATASET=agent-workflow-v1 TASKS=graph-counterexample EVAL_EXECUTE=1
 make performance-eval
 make provider-eval PROVIDER=cgal
 ```
