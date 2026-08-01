@@ -19,6 +19,7 @@ from jacobian.contracts.memory import (
     ResearchEpisode,
 )
 from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
+from jacobian.persistence.research_index import failure_metadata
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreCorruptionError
 
@@ -77,61 +78,6 @@ class ResearchMemory:
                 )
             },
         )
-        self._upgrade_legacy_index()
-
-    def _upgrade_legacy_index(self) -> None:
-        with self.store.connection() as connection:
-            existing = connection.execute(
-                """
-                SELECT episode_uri, tags_json
-                FROM research_episodes
-                WHERE episode_uri NOT IN (
-                    SELECT episode_uri
-                    FROM research_episode_index_versions
-                    WHERE index_version = '2'
-                )
-                """
-            ).fetchall()
-            for row in existing:
-                try:
-                    tags = decode_persisted_model(
-                        PersistedTags,
-                        row["tags_json"],
-                        record_kind="research_episode",
-                        record_id=row["episode_uri"],
-                        field="tags_json",
-                    ).root
-                except PersistenceCorruptionError as exc:
-                    raise StoreCorruptionError(exc) from exc
-                for tag in tags:
-                    connection.execute(
-                        """
-                        INSERT OR IGNORE INTO research_episode_tags(episode_uri, tag)
-                        VALUES (?, ?)
-                        """,
-                        (row["episode_uri"], tag),
-                    )
-                stored = self.store.get(row["episode_uri"])
-                episode = ResearchEpisode.model_validate(stored.payload)
-                connection.executemany(
-                    """
-                    INSERT OR IGNORE INTO research_episode_failures(
-                        episode_uri, stage, classification
-                    ) VALUES (?, ?, ?)
-                    """,
-                    (
-                        (row["episode_uri"], stage, classification)
-                        for stage, classification in _failure_metadata(episode.result)
-                    ),
-                )
-                connection.execute(
-                    """
-                    INSERT OR REPLACE INTO research_episode_index_versions(
-                        episode_uri, index_version
-                    ) VALUES (?, '2')
-                    """,
-                    (row["episode_uri"],),
-                )
 
     def record(self, episode: ResearchEpisode) -> str:
         normalized = self.schemas.validate(
@@ -195,7 +141,7 @@ class ResearchMemory:
                 """,
                 ((stored.artifact_uri, tag) for tag in episode.tags),
             )
-            failure_metadata = _failure_metadata(episode.result)
+            failure_rows = failure_metadata(episode.result)
             connection.executemany(
                 """
                 INSERT OR IGNORE INTO research_episode_failures(
@@ -204,7 +150,7 @@ class ResearchMemory:
                 """,
                 (
                     (stored.artifact_uri, stage, classification)
-                    for stage, classification in failure_metadata
+                    for stage, classification in failure_rows
                 ),
             )
             connection.execute(
@@ -389,27 +335,6 @@ def _validate_filter_values(label: str, values: tuple[str, ...]) -> None:
         raise ValueError(
             f"memory search {label} filters must contain 1 to 128 characters"
         )
-
-
-def _failure_metadata(result: dict[str, Any]) -> tuple[tuple[str, str], ...]:
-    metadata: set[tuple[str, str]] = set()
-    diagnostics = result.get("diagnostics", ())
-    if isinstance(diagnostics, (list, tuple)):
-        for diagnostic in diagnostics:
-            if not isinstance(diagnostic, dict):
-                continue
-            stage = diagnostic.get("stage")
-            classification = diagnostic.get("code")
-            if isinstance(stage, str) and isinstance(classification, str):
-                metadata.add((stage, classification))
-    output = result.get("output")
-    if isinstance(output, dict):
-        classifications = output.get("failure_classifications", ())
-        if isinstance(classifications, (list, tuple)):
-            for classification in classifications:
-                if isinstance(classification, str):
-                    metadata.add(("mathematical_evaluation", classification))
-    return tuple(sorted(metadata))
 
 
 def _matched_filter_labels(

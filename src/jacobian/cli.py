@@ -1,4 +1,4 @@
-"""Typer command-line adapter for the v0.2 runtime."""
+"""Typer command-line adapter for the current Jacobian runtime."""
 
 from __future__ import annotations
 
@@ -45,6 +45,35 @@ app = typer.Typer(
     help="Verifier-centric workbench for bounded executable mathematics.",
     no_args_is_help=True,
 )
+
+
+def _storage_error_payload(exc: Exception) -> tuple[dict[str, str], int]:
+    from jacobian.store import UnsupportedStateVersionError
+
+    if isinstance(exc, UnsupportedStateVersionError):
+        return (
+            {
+                "code": exc.code,
+                "message": (
+                    "Jacobian cannot open this state directory because its persisted "
+                    f"revision {exc.detected_revision} is outside the supported "
+                    f"floor {exc.minimum_revision}."
+                ),
+                "hint": (
+                    "Export the data with a compatible release or start a fresh "
+                    "state directory; do not overwrite the existing state."
+                ),
+            },
+            1,
+        )
+    return (
+        {
+            "code": "STORAGE_ERROR",
+            "message": "Jacobian could not read or update its local state.",
+            "hint": "Check the state directory and available disk space, then retry.",
+        },
+        1,
+    )
 
 
 def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
@@ -194,14 +223,7 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
             1,
         )
     if isinstance(exc, StoreError):
-        return (
-            {
-                "code": "STORAGE_ERROR",
-                "message": "Jacobian could not read or update its local state.",
-                "hint": "Check the state directory and available disk space, then retry.",
-            },
-            1,
-        )
+        return _storage_error_payload(exc)
     if isinstance(
         exc,
         (CheckerExecutionError, ConjectureError, ExperimentError, SearchError),

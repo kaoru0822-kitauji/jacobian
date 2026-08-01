@@ -27,7 +27,11 @@ from jacobian.persistence import (
     StateDatabaseError,
     decode_persisted_model,
 )
-from jacobian.persistence.migrations import STATE_MIGRATIONS
+from jacobian.persistence.migrations import (
+    CURRENT_STATE_FORMAT_REVISION,
+    STATE_MIGRATIONS,
+    SUPPORTED_STATE_FLOOR,
+)
 
 _OBJECT_FORMAT_VERSION: Final = b"jacobian.object.v1"
 _CANONICALIZER_NAME: Final = b"jacobian.rfc8785+nfc+exact-rational.v1"
@@ -55,6 +59,25 @@ class StoreCorruptionError(StoreError):
     def __init__(self, corruption: object) -> None:
         self.corruption = corruption
         super().__init__(str(corruption))
+
+
+class UnsupportedStateVersionError(StoreError):
+    """The persisted state is outside the supported migration floor."""
+
+    code = "UNSUPPORTED_STATE_VERSION"
+
+    def __init__(self, detected_revision: int, *, minimum_revision: int) -> None:
+        self.detected_revision = detected_revision
+        self.minimum_revision = minimum_revision
+        direction = (
+            "future" if detected_revision > CURRENT_STATE_FORMAT_REVISION else "legacy"
+        )
+        super().__init__(
+            f"{self.code}: {direction} state revision {detected_revision} is not "
+            f"supported; minimum supported revision is {minimum_revision}. "
+            "Export the data with a compatible release or start a fresh state "
+            "directory."
+        )
 
 
 class ArtifactNotFoundError(StoreError):
@@ -181,12 +204,100 @@ class ArtifactStore:
         self.blob_root.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
         try:
+            self._reject_unsupported_state_revision()
             self.database.migrate(STATE_MIGRATIONS)
+            self._run_state_data_upgrades()
+        except UnsupportedStateVersionError:
+            with suppress(StateDatabaseError):
+                self.database.close(checkpoint=False)
+            raise
+        except StoreCorruptionError:
+            with suppress(StateDatabaseError):
+                self.database.close(checkpoint=False)
+            raise
         except Exception as exc:
             with suppress(StateDatabaseError):
                 self.database.close(checkpoint=False)
             raise StoreError("artifact store schema migration failed") from exc
         self._reconcile_blob_quota()
+
+    def _reject_unsupported_state_revision(self) -> None:
+        """Reject old and future ledgers before the migration runner can act."""
+
+        revision = self._read_migration_revision()
+        if revision is None:
+            return
+        if revision < SUPPORTED_STATE_FLOOR or revision > CURRENT_STATE_FORMAT_REVISION:
+            raise UnsupportedStateVersionError(
+                revision,
+                minimum_revision=SUPPORTED_STATE_FLOOR,
+            )
+        self._validate_state_format_metadata(revision)
+
+    def _read_migration_revision(self) -> int | None:
+        if not self.db_path.exists() or self.db_path.is_dir():
+            return None
+        try:
+            with sqlite3.connect(self.db_path) as connection:
+                table = connection.execute(
+                    """
+                    SELECT 1 FROM sqlite_master
+                    WHERE type = 'table' AND name = 'jacobian_schema_migrations'
+                    """
+                ).fetchone()
+                if table is None:
+                    return None
+                row = connection.execute(
+                    "SELECT MAX(revision) FROM jacobian_schema_migrations"
+                ).fetchone()
+        except sqlite3.DatabaseError:
+            return None
+        return None if row is None or row[0] is None else int(row[0])
+
+    def _validate_state_format_metadata(self, revision: int) -> None:
+        try:
+            with sqlite3.connect(self.db_path) as connection:
+                format_table = connection.execute(
+                    """
+                    SELECT 1 FROM sqlite_master
+                    WHERE type = 'table' AND name = 'jacobian_state_format'
+                    """
+                ).fetchone()
+                if format_table is None:
+                    return
+                format_row = connection.execute(
+                    """
+                    SELECT format_revision
+                    FROM jacobian_state_format
+                    WHERE id = 0
+                    """
+                ).fetchone()
+        except sqlite3.DatabaseError:
+            return
+        if format_row is None:
+            if revision >= CURRENT_STATE_FORMAT_REVISION:
+                raise StoreCorruptionError("state-format metadata record is missing")
+            return
+        format_revision = int(format_row[0])
+        if format_revision > CURRENT_STATE_FORMAT_REVISION:
+            raise UnsupportedStateVersionError(
+                format_revision,
+                minimum_revision=SUPPORTED_STATE_FLOOR,
+            )
+        if (
+            revision >= CURRENT_STATE_FORMAT_REVISION
+            and format_revision != CURRENT_STATE_FORMAT_REVISION
+        ):
+            raise StoreCorruptionError(
+                "state-format metadata does not match the migration head"
+            )
+
+    def _run_state_data_upgrades(self) -> None:
+        """Run durable data-format upgrades after the artifact store is ready."""
+
+        from jacobian.persistence.state_upgrade import upgrade_state_data
+
+        upgrade_state_data(self)
 
     def close(self) -> None:
         """Checkpoint SQLite and end this store's owned lifetime."""

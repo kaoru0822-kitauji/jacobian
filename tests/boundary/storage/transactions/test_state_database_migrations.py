@@ -148,8 +148,10 @@ def test_newer_revision_fails_closed(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="schema migration failed"):
+    with pytest.raises(StoreError, match="UNSUPPORTED_STATE_VERSION") as exc_info:
         ArtifactStore(tmp_path)
+    assert exc_info.value.detected_revision == 99
+    assert exc_info.value.minimum_revision == 3
 
 
 def test_missing_tail_revision_is_reapplied(tmp_path: Path) -> None:

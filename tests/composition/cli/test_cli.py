@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from jacobian.cli import _public_error, app
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
-from jacobian.store import StoreLimitError
+from jacobian.store import StoreLimitError, UnsupportedStateVersionError
 
 
 def test_cli_init_reports_reference_domains_and_polytope_formats(
@@ -216,6 +216,18 @@ def test_cli_storage_limit_has_a_capacity_recovery_action() -> None:
         ),
     }
     assert "fixture" not in str(error)
+
+
+def test_cli_unsupported_state_version_is_typed_and_preserves_state() -> None:
+    error, exit_code = _public_error(
+        UnsupportedStateVersionError(2, minimum_revision=3)
+    )
+
+    assert exit_code == 1
+    assert error["code"] == "UNSUPPORTED_STATE_VERSION"
+    assert "revision 2" in error["message"]
+    assert "floor 3" in error["message"]
+    assert "fresh state directory" in error["hint"]
 
 
 @pytest.mark.usefixtures("authorized_complete_runtime")
