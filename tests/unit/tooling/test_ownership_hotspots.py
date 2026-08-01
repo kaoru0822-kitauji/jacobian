@@ -60,5 +60,5 @@ def test_harbor_verifier_support_copies_are_identical() -> None:
     targets = sorted(
         (ROOT / "benchmarks" / "datasets").glob("*/tasks/**/tests/verifier_support.py")
     )
-    assert len(targets) == 86
+    assert len(targets) == 87
     assert all(target.read_bytes() == source for target in targets)

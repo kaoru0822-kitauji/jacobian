@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 31,
-    "manifest_sha256": "sha256:177e6f03dc53b29252bc6d113a34ecad878e00738fc2797f2d1a16c1f6bff47f",
+    "task_count": 32,
+    "manifest_sha256": "sha256:ed18eae603463b8b94872d2e083d9b746a2f72c0fbab81fdea339a5a9c302ac7",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -106,6 +106,27 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep the finite enumeration in agent-owned composition; do not add a calendar-task solver."
+    },
+    {
+      "task_id": "complex-power-sum-elimination",
+      "mathematical_moves": [
+        "Derive exact Newton power-sum recurrences and eliminate the symmetric product.",
+        "Audit every quotient denominator and reconstruct both quadratic-field target branches."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay declared polynomial identities, but does not synthesize the recurrence elimination or prove both quadratic-field branches are complete and achievable."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
     },
     {
       "task_id": "distinct-sum-pairing-optimum",

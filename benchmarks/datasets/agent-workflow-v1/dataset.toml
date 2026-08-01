@@ -19,6 +19,10 @@ name = "jacobian/agent-workflow-v1-calendar-good-days-audit"
 digest = "sha256:9b5f8b6551fe13ddfa9c9e05b99de374ebb6bd1097c1a297c80253053d26fcca"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-complex-power-sum-elimination"
+digest = "sha256:521412c77dc5bbc30d56f6465fca773a524852729a1cbf04c58bc584d1e7c6f0"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"
 digest = "sha256:05e4f1a4cfc6ef1c6aa97d0c3c01c462e27a22c04c50e0c9121c5d985f7b5308"
 
@@ -96,7 +100,7 @@ digest = "sha256:38ac5dd84d79a174394c91020d05c2aad1b9e55e3a53464d24e3b54d6be1fe6
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-parameterized-sharp-bound-audit"
-digest = "sha256:99ea15dc461d9b090f476f9663d6d30137a7a4a139b0e7f94d371ea8f9061f35"
+digest = "sha256:d9b37eea797d7af060e500b71d0ba1cd42f04b8090c08f2556d608a61a34a830"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-polynomial-map-collision"
@@ -128,7 +132,7 @@ digest = "sha256:6a1d30e49d29b7b086194b09fc3df259c28e5d44fd70f71f2a8fe863967cc52
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-symbolic-block-determinant-decomposition"
-digest = "sha256:08e7463ab962184d9907d9adb67cfdd6202465fd2e6fa6e84a50345f34635344"
+digest = "sha256:881b2d03e0ee8d466c766ebe4ec26eb7033d5c1e43344602d7fa78868453fb21"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-well-total-domination-counterexample"

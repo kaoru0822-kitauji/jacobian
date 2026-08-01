@@ -529,6 +529,7 @@ def test_autoformalization_audit_rejects_incomplete_defect_set(
     "task_name",
     [
         "autoformalization-semantic-audit",
+        "complex-power-sum-elimination",
         "divisibility-construction-witness",
         "finite-magma-countermodel",
         "metric-tsp-proof-repair",
@@ -555,6 +556,7 @@ def test_verifiers_reject_replaced_workspace_inputs(
     "task_name",
     [
         "autoformalization-semantic-audit",
+        "complex-power-sum-elimination",
         "divisibility-construction-witness",
         "finite-magma-countermodel",
         "metric-tsp-proof-repair",
@@ -777,6 +779,58 @@ def test_natural_subtraction_schema_requires_both_basis_entries() -> None:
     submission["result"]["multipliers"] = ["1"]
     with pytest.raises(ValidationError):
         Draft202012Validator(schema).validate(submission)
+
+
+def test_complex_power_sum_accepts_reversed_branch_order(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "complex-power-sum-elimination", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["branches"].reverse()
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        (
+            ("recurrence", "power_sums", "5", 3),
+            {"numerator": 19, "denominator": 1},
+        ),
+        (
+            ("branches", 0, "target", "sqrt17"),
+            {"numerator": 3, "denominator": 1},
+        ),
+        (("branches", 0, "denominator_norms", "s_minus_12"), 31),
+        (("branches",), []),
+    ],
+)
+def test_complex_power_sum_rejects_corrupted_certificates(
+    tmp_path: Path,
+    path: tuple[object, ...],
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "complex-power-sum-elimination", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    target = submission["result"]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = replacement
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
 
 
 def test_autoformalization_rejects_positive_lean_compile_claim(
