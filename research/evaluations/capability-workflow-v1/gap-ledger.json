@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 26,
-    "manifest_sha256": "sha256:9ebc6068e2bd3008fba828b29b26fb2295456358511658e9c5b0c771f529a47e",
+    "task_count": 27,
+    "manifest_sha256": "sha256:2b618bf56e22a3c04d142f43a529ae471d39c8fe12d7b063c2524f0a3b33e70d",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -220,6 +220,21 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Use trace evidence to diagnose discovery or payload failures; do not add a duplicate producer."
+    },
+    {
+      "task_id": "generated-lemma-vacuity-audit",
+      "mathematical_moves": [
+        "Distinguish a satisfiable existential implication from a non-vacuous square-witness bound.",
+        "Demonstrate that a generated common-divisor lemma is premise-independent because d=1 always satisfies its conclusion."
+      ],
+      "current_capabilities": [],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Use as a diagnostic for lemma-generation quality; do not add a task-shaped vacuity detector without repeated trace evidence."
     },
     {
       "task_id": "graph-artifact-composition",
