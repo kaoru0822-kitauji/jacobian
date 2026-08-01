@@ -68,7 +68,7 @@ digest = "sha256:59adf9386e1857293498a90b60c12cca275200626f51b8012146f55ba94cba5
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-lcm-highly-abundant-scope-audit"
-digest = "sha256:8665f3d04877adfe00a34c750488b395a026dc19a88ad4eda9653d5b36de84e9"
+digest = "sha256:710330e56557df33d758dac76ff04d7a8705a314dfffe0b26abf4298b6fd87de"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-log-exponent-recovery"

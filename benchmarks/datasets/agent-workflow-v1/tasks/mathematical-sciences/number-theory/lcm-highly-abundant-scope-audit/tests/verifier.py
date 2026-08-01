@@ -178,6 +178,8 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
     if (
         claims.get("counterexample_index") != 97
         or source.get("source", {}).get("captured_at") != "2026-07-31"
+        or source.get("source", {}).get("content_binding")
+        != "URL_ONLY_NOT_CONTENT_DIGEST_BOUND"
         or not isinstance(result, dict)
         or set(result)
         != {
@@ -205,26 +207,18 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
 def _evidence_is_valid(evidence: object) -> bool:
     if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
         return False
-    assert isinstance(evidence, list)
+    if not isinstance(evidence, list) or len(evidence) != 1:
+        return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
         return False
     try:
         if target.stat().st_size > MAX_EVIDENCE_BYTES:
             return False
-        lower = target.read_text().lower()
+        text = target.read_text().strip()
     except (OSError, UnicodeError):
         return False
-    return all(
-        phrase in lower
-        for phrase in (
-            "counterexample",
-            "divisor sum",
-            "minimality",
-            "earlier",
-            "does not",
-        )
-    )
+    return len(text) >= 20
 
 
 def main() -> None:

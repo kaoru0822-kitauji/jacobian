@@ -21,7 +21,7 @@ category = "mathematics"
 tags = ["conversation-audit", "exact-divisor-sum", "minimality-overclaim", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "public-conversation-derived-scope-audit"
-fixture_digest = "sha256:d044df773743f5c9425ae9fda60e2d96dc5d372c9f23c25791dca229ebcf3d2c"
+fixture_digest = "sha256:15335dd2df4d38fc7ed3f1ed675842356c2335958398f93d24e2051cb3af51e9"
 derivation = "Derived from a public ChatGPT trace and its MathOverflow community audit captured 2026-07-31."
 
 [agent]
