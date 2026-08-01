@@ -15,6 +15,8 @@ lower bound of `a^3+b^3+c^3+abc*d`.
 
 Write `submission.json` to the exact schema. Put a concise repair in
 `evidence/answer.txt`, include one `RESULT_JSON:` line containing the exact
-submitted result as compact JSON, and bind that file with its SHA-256 digest.
+submitted result as compact JSON, plus one `BOUNDARY_FAMILY_JSON:` line
+containing the exact submitted `boundary_family` object as compact JSON, and
+bind that file with its SHA-256 digest.
 Use `COMPUTED`, not `VERIFIED`: the checker replays this bounded symbolic
 certificate but is not an external proof assistant.
