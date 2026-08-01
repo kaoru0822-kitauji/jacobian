@@ -9,6 +9,7 @@ const { stderr } = require("node:process");
  *
  * Subcommands handled in Node:
  *   jacobian setup    — MCP client configuration wizard
+ *   jacobian upgrade  — Refresh the launcher-managed Python package
  *   jacobian doctor   — MCP handshake and tool catalog verification
  *   jacobian remove   — Remove Jacobian MCP from client configs
  *   jacobian mcp      — Run the MCP server over stdio
@@ -21,6 +22,8 @@ const HELP = `Jacobian — composable mathematical capabilities for AI agents
 Usage:
   jacobian setup [--client <id>...] [--all] [--yes] [--dry-run] [--json]
     Configure MCP clients to use Jacobian.
+  jacobian upgrade
+    Refresh the launcher-managed Python package.
   jacobian doctor [--json]
     Verify the MCP handshake and tool catalog.
   jacobian remove [--client <id>...] [--all] [--yes] [--json]
@@ -86,6 +89,21 @@ function main() {
       );
       process.exitCode = 1;
     });
+    return;
+  }
+
+  if (command === "upgrade") {
+    const { PACKAGE_SPEC, upgrade } = require("./launcher.cjs");
+    try {
+      upgrade();
+      console.log(`Jacobian Python package upgraded to ${PACKAGE_SPEC}.`);
+    } catch (error) {
+      stderr.write(
+        `Jacobian upgrade did not finish: ${error.message}\n` +
+          "Check the local Python runtime and package index, then retry `npx jacobian upgrade`.\n",
+      );
+      process.exitCode = 1;
+    }
     return;
   }
 
