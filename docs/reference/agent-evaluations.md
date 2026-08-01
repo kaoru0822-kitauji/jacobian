@@ -40,6 +40,14 @@ export JACOBIAN_MODEL='your-model'
 make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
 ```
 
+Build repository images with `make container-image IMAGE=jacobian:local`, then
+publish and digest-pin them. The target records the exact Git revision and
+package version as OCI labels and refuses a dirty source tree. Before Harbor
+starts, `make agent-eval` pulls the pinned digest and rejects an image whose
+labels do not match the selected checkout. A digest alone identifies image
+bytes; it does not establish which Jacobian source revision those bytes
+contain.
+
 Inspect Harbor ATIF together with Jacobian telemetry for discovery,
 descriptions, invocation and parameter errors, artifact and verification-record
 flow, repeated calls, shell activity, tokens, time, and completion. This is

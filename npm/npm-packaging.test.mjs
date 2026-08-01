@@ -48,6 +48,8 @@ import {
   clientDefinitions,
   isClientDetected,
   buildLauncher,
+  buildSourceLauncher,
+  applyEdits,
   resolveClientEdit,
   SERVER_NAME,
 } from "./bin/setup.cjs";
@@ -126,6 +128,25 @@ test("buildLauncher returns a version-matching launcher with mcp subcommand", ()
   assert.ok(launcher.args.length > 0);
   // The last arg should be "mcp" (the subcommand).
   assert.equal(launcher.args[launcher.args.length - 1], "mcp");
+});
+
+test("buildSourceLauncher binds the exact checkout and state directory", () => {
+  const source = join(npmRoot, "..");
+  const state = join(source, ".jacobian-source-test");
+  const launcher = buildSourceLauncher(source, state, "/opt/uv", "full-python");
+  assert.equal(launcher.command, "/opt/uv");
+  assert.deepEqual(launcher.args, [
+    "run",
+    "--project",
+    source,
+    "--locked",
+    "--no-sync",
+    "jacobian-mcp",
+    "--state-dir",
+    state,
+  ]);
+  assert.equal(launcher.profile, "full-python");
+  assert.equal(launcher.package, null);
 });
 
 test("normalizes release-please Python prerelease versions for npm", () => {
@@ -248,8 +269,15 @@ test("setup writes a TOML config for Codex", async () => {
     assert.equal(edit2.action, "already_current");
 
     // Remove should work.
+    await writeFile(
+      codex.configPath,
+      edit2.original === null
+        ? `${edit.updated}jacobian_theme = "preserve"\n`
+        : `${edit2.original}jacobian_theme = "preserve"\n`,
+    );
     const edit3 = resolveClientEdit("remove", codex, launcher);
     assert.equal(edit3.action, "remove");
+    assert.match(edit3.updated, /jacobian_theme = "preserve"/);
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -298,6 +326,62 @@ test("setup updates an existing JSON config without losing other servers", async
     assert.ok(config.mcpServers["other-server"]);
     assert.ok(config.mcpServers[SERVER_NAME]);
     assert.equal(config.someOtherSetting, true);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("remove preserves unrelated JSON settings and MCP servers", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-remove-preserve-"));
+  try {
+    const home = await fakeHome(base, ["claude"]);
+    const claude = clientDefinitions(home).find((d) => d.id === "claude");
+    const original = {
+      mcpServers: {
+        jacobian: { command: "old", args: [] },
+        other: { command: "other", args: ["--safe"] },
+      },
+      theme: "dark",
+    };
+    await writeFile(claude.configPath, JSON.stringify(original, null, 2) + "\n");
+    const launcher = buildLauncher();
+    const edit = resolveClientEdit("remove", claude, launcher);
+    applyEdits([edit]);
+    const updated = JSON.parse(await readFile(claude.configPath, "utf8"));
+    assert.equal(updated.mcpServers.jacobian, undefined);
+    assert.deepEqual(updated.mcpServers.other, original.mcpServers.other);
+    assert.equal(updated.theme, "dark");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("multi-client config writes roll back as one transaction", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-rollback-"));
+  try {
+    const firstPath = join(base, "first.json");
+    const blockedParent = join(base, "blocked");
+    await writeFile(firstPath, "before\n");
+    await writeFile(blockedParent, "not a directory\n");
+    assert.throws(
+      () =>
+        applyEdits([
+          {
+            path: firstPath,
+            original: "before\n",
+            updated: "after\n",
+            action: "update",
+          },
+          {
+            path: join(blockedParent, "config.json"),
+            original: null,
+            updated: "{}\n",
+            action: "create",
+          },
+        ]),
+      /Earlier config writes were rolled back/,
+    );
+    assert.equal(await readFile(firstPath, "utf8"), "before\n");
   } finally {
     await rm(base, { recursive: true, force: true });
   }

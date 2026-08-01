@@ -338,7 +338,7 @@ MATHLIB profile.
 Build the repository image:
 
 ```sh
-docker build -t jacobian:local .
+make container-image IMAGE=jacobian:local
 ```
 
 Run it with a persistent state volume and read-only secret mount:

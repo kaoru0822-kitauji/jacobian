@@ -17,13 +17,31 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-sync harbor-oracle harbor-oracle-all agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
+.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-sync harbor-oracle harbor-oracle-all agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-setup: ## Install the locked development environment.
+uv-version-check: ## Require the repository-pinned uv release.
+	@test "$$(uv --version | awk '{print $$2}')" = "$$(tr -d '[:space:]' < .uv-version)" || { \
+		echo "install uv $$(tr -d '[:space:]' < .uv-version) before using this checkout" >&2; \
+		exit 2; \
+	}
+
+setup: uv-version-check ## Install the locked development environment.
 	uv sync --locked --dev
+
+setup-agent: ## Configure an agent against this source checkout (ARGS="--client codex --profile full-python").
+	./scripts/setup-agent $(ARGS)
+
+container-image: ## Build a revision-labelled local image (IMAGE=jacobian:local).
+	@test -z "$$(git status --porcelain)" || { echo "container-image requires a clean worktree" >&2; exit 2; }
+	@revision=$$(git rev-parse HEAD); \
+	version=$$(uv version --short); \
+	docker build \
+		--build-arg JACOBIAN_REVISION="$$revision" \
+		--build-arg JACOBIAN_VERSION="$$version" \
+		-t "$(or $(IMAGE),jacobian:local)" .
 
 deploy-check: ## Validate the clone-to-systemd deployment entrypoint.
 	bash -n deploy/install.sh
@@ -197,6 +215,7 @@ agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 
 		echo "JACOBIAN_MCP_TOKEN, JACOBIAN_AUTH_TOKENS_JSON, and JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
+	$(UV_RUN) python tools/check_jacobian_image.py --image "$$image" --pull && \
 	$(MAKE) harbor-check && \
 	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-job.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \

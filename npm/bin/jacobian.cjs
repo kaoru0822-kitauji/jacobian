@@ -21,6 +21,7 @@ const HELP = `Jacobian — composable mathematical capabilities for AI agents
 
 Usage:
   jacobian setup [--client <id>...] [--all] [--yes] [--dry-run] [--json]
+                 [--source <checkout> --state-dir <path> --profile <name>]
     Configure MCP clients to use Jacobian.
   jacobian upgrade
     Refresh the launcher-managed Python package.
@@ -70,6 +71,22 @@ function main() {
         options.dryRun = true;
       } else if (arg === "--json") {
         options.json = true;
+      } else if (arg === "--source") {
+        options.source = rest[++i];
+      } else if (arg.startsWith("--source=")) {
+        options.source = arg.slice(9);
+      } else if (arg === "--state-dir") {
+        options.stateDir = rest[++i];
+      } else if (arg.startsWith("--state-dir=")) {
+        options.stateDir = arg.slice(12);
+      } else if (arg === "--uv-bin") {
+        options.uvBin = rest[++i];
+      } else if (arg.startsWith("--uv-bin=")) {
+        options.uvBin = arg.slice(9);
+      } else if (arg === "--profile") {
+        options.profile = rest[++i];
+      } else if (arg.startsWith("--profile=")) {
+        options.profile = arg.slice(10);
       } else if (arg === "--client" || arg === "-c") {
         i++;
         if (rest[i]) {

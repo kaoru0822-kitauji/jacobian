@@ -1,0 +1,108 @@
+"""Contracts for source bootstrap identity and frozen benchmark baselines."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import tomllib
+from pathlib import Path
+from types import ModuleType
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_tool(name: str) -> ModuleType:
+    path = ROOT / "tools" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_image_preflight_binds_revision_and_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checker = _load_tool("check_jacobian_image")
+    image = "registry.invalid/jacobian@sha256:" + "a" * 64
+
+    def fake_run(command: list[str], **_kwargs: object) -> object:
+        assert command == ["docker", "image", "inspect", image]
+        inspected = [
+            {
+                "Config": {
+                    "Labels": {
+                        checker.REVISION_LABEL: "abc123",
+                        checker.VERSION_LABEL: "0.6.0",
+                    }
+                }
+            }
+        ]
+        return type("Completed", (), {"stdout": json.dumps(inspected)})()
+
+    monkeypatch.setattr(checker.subprocess, "run", fake_run)
+    report = checker.inspect_image(
+        image,
+        expected_revision="abc123",
+        expected_version="0.6.0",
+        pull=False,
+    )
+    assert report["status"] == "ok"
+    assert report["checks"] == {
+        "revision_matches": True,
+        "version_matches": True,
+    }
+
+
+def test_image_preflight_rejects_a_mislabeled_image(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checker = _load_tool("check_jacobian_image")
+    image = "registry.invalid/jacobian@sha256:" + "b" * 64
+    inspected = [{"Config": {"Labels": {checker.REVISION_LABEL: "old"}}}]
+    completed = type("Completed", (), {"stdout": json.dumps(inspected)})()
+    monkeypatch.setattr(checker.subprocess, "run", lambda *_args, **_kwargs: completed)
+    report = checker.inspect_image(
+        image,
+        expected_revision="new",
+        expected_version="0.6.0",
+        pull=False,
+    )
+    assert report["status"] == "error"
+    assert report["checks"]["revision_matches"] is False
+    assert report["checks"]["version_matches"] is False
+
+
+def test_performance_v1_is_one_explicit_historical_baseline() -> None:
+    dataset = ROOT / "benchmarks" / "datasets" / "performance-v1"
+    with (dataset / "baseline.toml").open("rb") as stream:
+        baseline = tomllib.load(stream)
+    assert baseline["classification"] == "historical-baseline"
+    revision = baseline["repository_revision"]
+    uv_version = baseline["uv_version"]
+    task_dirs = sorted((dataset / "tasks").glob("*/*/*"))
+    assert len(task_dirs) == 4
+    for task_dir in task_dirs:
+        environment = task_dir / "environment"
+        task_input = json.loads((environment / "input.json").read_text())
+        dockerfile = (environment / "Dockerfile").read_text()
+        assert task_input["repository_revision"] == revision
+        assert f"fetch --depth 1 origin {revision}" in dockerfile
+        assert f"ghcr.io/astral-sh/uv:{uv_version}-" in dockerfile
+
+
+def test_active_uv_surfaces_share_the_repository_pin() -> None:
+    pinned = (ROOT / ".uv-version").read_text().strip()
+    assert f"ghcr.io/astral-sh/uv:{pinned}-" in (ROOT / "Dockerfile").read_text()
+    setup_files = [
+        ROOT / ".github" / "actions" / "setup-python-tests" / "action.yml",
+        ROOT / ".github" / "actions" / "setup-lean" / "action.yml",
+        ROOT / ".github" / "workflows" / "ci.yml",
+        ROOT / ".github" / "workflows" / "release.yml",
+        ROOT / ".github" / "workflows" / "release-please.yml",
+    ]
+    for path in setup_files:
+        text = path.read_text()
+        assert text.count("astral-sh/setup-uv@") == text.count(f'version: "{pinned}"')
