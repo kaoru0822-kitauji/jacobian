@@ -174,6 +174,20 @@ def test_autoformalization_rejects_positive_lean_compile_claim(
     assert rejected["reward"] == pytest.approx(0.9)
 
 
+def test_research_status_audit_accepts_equivalent_case_order(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"].reverse()
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
 def test_inverse_distance_audit_accepts_alternative_rational_direction(
     tmp_path: Path,
 ) -> None:

@@ -134,6 +134,12 @@ def test_resource_derived_oracles_and_assurance_boundary(
             "random-function-expectation-audit",
             lambda result: result.update(expected_value="2025"),
         ),
+        (
+            "research-status-evidence-audit",
+            lambda result: result["cases"][0].update(
+                classification="RESOLVED_BY_CITED_WORK"
+            ),
+        ),
     ],
 )
 def test_resource_derived_verifiers_reject_corrupted_witnesses(
