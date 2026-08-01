@@ -5,7 +5,7 @@
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
     "task_count": 33,
-    "manifest_sha256": "sha256:c06546b5426a33a5c0ae22087d839dd9f77c95fe5be8d34f03a18c1962d74c15",
+    "manifest_sha256": "sha256:941678f0caadbe2ccf67c11d0080ddbf3fed64a8b6acf32d7267f2bd62bc233c",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {

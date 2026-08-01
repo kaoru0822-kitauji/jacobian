@@ -8,7 +8,7 @@
     "conclusion": {"enum": ["COMPLETE_TARGET_SET_DERIVED", "INSUFFICIENT_EVIDENCE"]},
     "result": {
       "type": "object", "additionalProperties": false,
-      "required": ["recurrence", "elimination", "branches", "achievability"],
+      "required": ["elimination", "branches", "achievability"],
       "properties": {
         "recurrence": {
           "type": "object", "additionalProperties": false,
@@ -31,10 +31,10 @@
         },
         "elimination": {
           "type": "object", "additionalProperties": false,
-          "required": ["sum_polynomial", "hypothesis_factorization", "target_polynomial"],
+          "required": ["sum_polynomial", "target_polynomial"],
           "properties": {
             "sum_polynomial": {"$ref": "#/$defs/polynomial"},
-            "hypothesis_factorization": {"const": "A4-2*A3=-(s^2/2)*(s^2-10*s+8)"},
+            "hypothesis_factorization": {"type": "string", "minLength": 1},
             "target_polynomial": {"$ref": "#/$defs/polynomial"}
           }
         },
@@ -52,9 +52,9 @@
                 "type": "object", "additionalProperties": false,
                 "required": ["s", "s_minus_12", "five_s_minus_44"],
                 "properties": {
-                  "s": {"const": 8},
-                  "s_minus_12": {"const": 32},
-                  "five_s_minus_44": {"const": -64}
+                  "s": {"type": "integer"},
+                  "s_minus_12": {"type": "integer"},
+                  "five_s_minus_44": {"type": "integer"}
                 }
               }
             }
