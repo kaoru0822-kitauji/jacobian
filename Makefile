@@ -194,11 +194,10 @@ harbor-oracle: harbor-check harbor-oracle-run ## Check contracts, then run a dat
 
 harbor-oracle-run: ## Run a dataset Oracle after an already-successful contract gate.
 	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
-	@test -n "$(JACOBIAN_MODEL)" || { echo "JACOBIAN_MODEL is required" >&2; exit 2; }
 	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
 	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-harbor-oracle.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
-	$(UV_RUN) python tools/render_harbor_job.py --dataset "$(DATASET)" --role oracle --output "$$resolved_job" --model "$(JACOBIAN_MODEL)" --tasks $(TASKS) && \
+	$(UV_RUN) python tools/render_harbor_job.py --dataset "$(DATASET)" --role oracle --output "$$resolved_job" --model "$${JACOBIAN_MODEL:-oracle}" --tasks $(TASKS) && \
 	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS) && \
 	$(HARBOR_PYTHON) benchmarks/tooling/validate_harbor_results.py \
 		--dataset "$(DATASET)" \
