@@ -76,7 +76,7 @@ digest = "sha256:710330e56557df33d758dac76ff04d7a8705a314dfffe0b26abf4298b6fd87d
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-lean-transitive-axiom-audit"
-digest = "sha256:2fe32f171535bc693aace4a18882a537920cbeb55d496a3588c07275774888d7"
+digest = "sha256:4b7e8869f461811c5b776b3a7832f6d683f0749b45d8d45311cdd55edd9aac18"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-log-exponent-recovery"
