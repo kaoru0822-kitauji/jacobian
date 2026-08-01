@@ -251,12 +251,11 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
         "boundary_family",
         "audit",
     }
-    if not isinstance(result, dict) or set(result) != required:
-        return False
-    if source.get("problem", {}).get("frozen_answer") != "min(1/4, 1/9+d/27)":
-        return False
     if (
-        source.get("source", {}).get("row_sha256")
+        not isinstance(result, dict)
+        or set(result) != required
+        or source.get("problem", {}).get("frozen_answer") != "min(1/4, 1/9+d/27)"
+        or source.get("source", {}).get("row_sha256")
         != "sha256:811d71c04f1be8345f05f1b0076af9189e8851eb2d98d5b4f557492eca0699fb"
     ):
         return False

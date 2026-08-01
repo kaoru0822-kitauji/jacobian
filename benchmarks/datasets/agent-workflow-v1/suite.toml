@@ -156,6 +156,12 @@ maximum_assurance = "COMPUTED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-complex-power-sum-elimination"
+path = "tasks/mathematical-sciences/algebra/complex-power-sum-elimination"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-inverse-distance-remainder-audit"
 path = "tasks/mathematical-sciences/analysis/inverse-distance-remainder-audit"
 maximum_assurance = "COMPUTED"

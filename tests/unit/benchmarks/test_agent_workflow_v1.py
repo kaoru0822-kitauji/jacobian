@@ -10,6 +10,7 @@ TASKS = DATASET / "tasks"
 EXPECTED_TASKS = {
     "autoformalization-semantic-audit",
     "calendar-good-days-audit",
+    "complex-power-sum-elimination",
     "distinct-sum-pairing-optimum",
     "divisibility-construction-witness",
     "euler-line-symbolic-certificate",
