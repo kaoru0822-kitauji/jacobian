@@ -29,6 +29,7 @@ EXPECTED_TASKS = {
     "modular-cubic-obstruction",
     "natural-subtraction-proof-repair",
     "nondifferentiable-maximum-construction",
+    "noncompact-lefschetz-proof-audit",
     "polynomial-normalization",
     "polynomial-map-collision",
     "polynomial-tail-counterexample",
