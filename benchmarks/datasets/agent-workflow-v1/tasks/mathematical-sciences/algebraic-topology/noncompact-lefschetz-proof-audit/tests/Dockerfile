@@ -1,5 +1,5 @@
 FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
-LABEL jacobian.checksum="d81d039046d231f78ed09b243b013f3d09b5edf8b41c6683835931c371be9d09"
+LABEL jacobian.checksum="9afe74f7f1704b526838479d4b18d0d3d535565ff8b131c6f15cb37762b359b6"
 LABEL jacobian.task="jacobian/agent-workflow-v1-noncompact-lefschetz-proof-audit"
 COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
 COPY input.json /app/input.json
