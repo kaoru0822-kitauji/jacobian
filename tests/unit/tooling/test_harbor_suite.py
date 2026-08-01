@@ -362,6 +362,37 @@ def test_suite_rejects_noncanonical_task_id(tmp_path: Path, patched_root: Path) 
         load_registry(reg)
 
 
+def test_registry_rejects_nested_canonical_task_bundle(
+    tmp_path: Path, patched_root: Path
+) -> None:
+    ds_path = tmp_path / "test-v1"
+    (ds_path / "jobs").mkdir(parents=True)
+    (ds_path / "jobs" / "oracle.json").write_text("{}")
+    _write_suite_toml(ds_path / "suite.toml")
+    _make_minimal_task(
+        tmp_path / "benchmarks" / "tasks" / "algebra" / "nested-task",
+        task_id="jacobian/nested-task",
+    )
+    reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
+
+    with pytest.raises(HarborSuiteError, match=r"missing task\.toml"):
+        load_registry(reg)
+
+
+def test_registry_rejects_incomplete_canonical_task_directory(
+    tmp_path: Path, patched_root: Path
+) -> None:
+    ds_path = tmp_path / "test-v1"
+    (ds_path / "jobs").mkdir(parents=True)
+    (ds_path / "jobs" / "oracle.json").write_text("{}")
+    _write_suite_toml(ds_path / "suite.toml")
+    (tmp_path / "benchmarks" / "tasks" / "incomplete-task").mkdir(parents=True)
+    reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
+
+    with pytest.raises(HarborSuiteError, match=r"missing task\.toml"):
+        load_registry(reg)
+
+
 # ---------------------------------------------------------------------------
 # Dataset manifest generation
 # ---------------------------------------------------------------------------

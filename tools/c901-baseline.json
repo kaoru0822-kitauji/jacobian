@@ -40,7 +40,7 @@
     {
       "path": "benchmarks/tooling/harbor_suite.py",
       "symbol": "load_registry",
-      "complexity": 13
+      "complexity": 12
     },
     {
       "path": "benchmarks/tooling/harbor_suite.py",

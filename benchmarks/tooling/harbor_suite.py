@@ -112,6 +112,37 @@ class TaskDigest:
     digest: str
 
 
+def _canonical_task_directories(root: Path) -> set[Path]:
+    """Return the flat canonical task inventory, rejecting hidden bundles."""
+
+    if not root.exists():
+        return set()
+    if root.is_symlink() or not root.is_dir():
+        raise HarborSuiteError(f"canonical task root must be a directory: {root}")
+
+    tasks: set[Path] = set()
+    for entry in sorted(root.iterdir()):
+        if entry.is_symlink() or not entry.is_dir():
+            raise HarborSuiteError(
+                f"canonical task root contains a non-task entry: {entry}"
+            )
+        manifest = entry / "task.toml"
+        if manifest.is_symlink() or not manifest.is_file():
+            raise HarborSuiteError(
+                f"canonical task directory is missing task.toml: {entry}"
+            )
+        nested = sorted(
+            candidate for candidate in entry.rglob("task.toml") if candidate != manifest
+        )
+        if nested:
+            raise HarborSuiteError(
+                "canonical task bundles must be one directory deep: "
+                + ", ".join(str(path) for path in nested)
+            )
+        tasks.add(entry.resolve())
+    return tasks
+
+
 def _resolve(value: str, base: Path) -> Path:
     path = Path(value)
     candidate = path if path.is_absolute() else (base / path).absolute()
@@ -321,17 +352,13 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
         declared_task_paths.update(ref.path for ref in tasks)
         object.__setattr__(suite, "tasks", tasks)
         suites.append(suite)
-    canonical_root = ROOT / "benchmarks" / "tasks"
-    if canonical_root.is_dir():
-        discovered = {
-            path.parent.resolve() for path in canonical_root.glob("*/task.toml")
-        }
-        missing = sorted(discovered - {path.resolve() for path in declared_task_paths})
-        if missing:
-            raise HarborSuiteError(
-                "canonical task is not assigned to a dataset: "
-                + ", ".join(path.name for path in missing)
-            )
+    discovered = _canonical_task_directories(ROOT / "benchmarks" / "tasks")
+    missing = sorted(discovered - {path.resolve() for path in declared_task_paths})
+    if missing:
+        raise HarborSuiteError(
+            "canonical task is not assigned to a dataset: "
+            + ", ".join(path.name for path in missing)
+        )
     return tuple(suites)
 
 

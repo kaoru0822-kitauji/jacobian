@@ -22,6 +22,24 @@ if str(ROOT) not in sys.path:
 CANONICAL_PREFIX = "benchmarks/tasks/"
 EVENTS = ("pull_request", "merge_group", "push", "schedule", "workflow_dispatch")
 MAX_PULL_REQUEST_ORACLE_TASKS = 8
+BENCHMARK_CONTROL_PATHS = frozenset(
+    {
+        ".github/scripts/plan-benchmarks",
+        ".github/scripts/validate-benchmark-plan",
+        ".github/workflows/benchmarks.yml",
+        "Makefile",
+        "tools/check_harbor_dataset.py",
+        "tools/render_harbor_job.py",
+        "tools/sync_harbor_verifier_support.py",
+    }
+)
+BENCHMARK_EXECUTION_CONTROL_PATHS = frozenset(
+    {
+        "tools/check_harbor_dataset.py",
+        "tools/render_harbor_job.py",
+        "tools/sync_harbor_verifier_support.py",
+    }
+)
 
 
 def _json(value: object) -> str:
@@ -76,7 +94,11 @@ def plan(
         return _full_plan(reason)
 
     benchmark_paths = [
-        path for path in paths if path == "benchmarks" or path.startswith("benchmarks/")
+        path
+        for path in paths
+        if path == "benchmarks"
+        or path.startswith("benchmarks/")
+        or path in BENCHMARK_CONTROL_PATHS
     ]
     if not benchmark_paths:
         return {
@@ -111,6 +133,17 @@ def plan(
     integration = event == "merge_group"
 
     for path in benchmark_paths:
+        if path in BENCHMARK_CONTROL_PATHS:
+            if path in BENCHMARK_EXECUTION_CONTROL_PATHS and integration:
+                scope = "all"
+                run_oracle = True
+                reasons.append("benchmark execution control-plane change")
+            elif path in BENCHMARK_EXECUTION_CONTROL_PATHS:
+                reasons.append("control-plane Oracle deferred to merge queue")
+            else:
+                reasons.append("benchmark planning or workflow contract change")
+            continue
+
         if path.startswith(CANONICAL_PREFIX):
             remainder = path.removeprefix(CANONICAL_PREFIX)
             task_id, _, relative = remainder.partition("/")

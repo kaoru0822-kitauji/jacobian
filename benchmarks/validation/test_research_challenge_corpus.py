@@ -9,6 +9,7 @@ from benchmarks.tooling.harbor_suite import get_suite
 REPO_ROOT = Path(__file__).parents[2]
 DATASET = REPO_ROOT / "benchmarks" / "datasets" / "research-diagnostics-v1"
 TASKS = REPO_ROOT / "benchmarks" / "tasks"
+EXPECTED_RESEARCH_TASKS = {f"jcb-postdoc-{index:03d}" for index in range(1, 19)}
 
 
 def _task_dirs() -> list[Path]:
@@ -17,9 +18,7 @@ def _task_dirs() -> list[Path]:
 
 def test_research_diagnostics_are_one_public_answer_visible_task_each() -> None:
     tasks = _task_dirs()
-    assert {path.name for path in tasks} == {
-        ref.path.name for ref in get_suite("research-diagnostics-v1").tasks
-    }
+    assert {path.name for path in tasks} == EXPECTED_RESEARCH_TASKS
     manifest = tomllib.loads((DATASET / "dataset.toml").read_text())
     assert manifest["dataset"]["name"] == "jacobian/research-diagnostics-v1"
     assert len(manifest["tasks"]) == len(tasks)

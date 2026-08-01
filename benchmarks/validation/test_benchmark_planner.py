@@ -44,6 +44,37 @@ def test_product_only_changes_skip_benchmark_work() -> None:
     assert _matrix(result) == []
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".github/scripts/plan-benchmarks",
+        ".github/scripts/validate-benchmark-plan",
+        ".github/workflows/benchmarks.yml",
+        "Makefile",
+    ],
+)
+def test_benchmark_control_plane_changes_run_contract_checks(path: str) -> None:
+    result = planner.plan([path], event="pull_request")
+
+    assert result["run-benchmark-check"] == "true"
+    assert result["run-benchmark-oracle"] == "false"
+    assert result["benchmark-oracle-scope"] == "none"
+    assert _matrix(result) == []
+
+
+def test_executable_control_plane_change_defers_oracle_to_merge_queue() -> None:
+    path = "tools/render_harbor_job.py"
+
+    pull_request = planner.plan([path], event="pull_request")
+    merge_group = planner.plan([path], event="merge_group")
+
+    assert pull_request["run-benchmark-check"] == "true"
+    assert pull_request["run-benchmark-oracle"] == "false"
+    assert merge_group["run-benchmark-oracle"] == "true"
+    assert merge_group["benchmark-oracle-scope"] == "all"
+    assert _matrix(merge_group)
+
+
 def test_task_readme_change_runs_contract_checks_without_oracle() -> None:
     result = planner.plan(
         ["benchmarks/tasks/parameterized-sharp-bound-audit/README.md"],
