@@ -40,7 +40,7 @@ digest = "sha256:8066dd253f3d05e024ffd47f87091e26113c7a2d69455554bd01ce925e583ac
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-generated-lemma-vacuity-audit"
-digest = "sha256:765b097afb48e1f4cff9166e1735aa99edd997f89abfea35efe11511f24cb58b"
+digest = "sha256:9fdc468cfbc18d305e9eafe4bca1e841159d5b8a46466d42a59dad87de7f8015"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-graph-artifact-composition"

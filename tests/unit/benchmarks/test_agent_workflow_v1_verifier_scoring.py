@@ -674,3 +674,28 @@ def test_autoformalization_rejects_positive_lean_compile_claim(
     assert rejected["correctness"] == 1.0
     assert rejected["evidence_validity"] == 0.0
     assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_generated_lemma_audit_enforces_visible_divisor_witness_bounds(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "generated-lemma-vacuity-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    audit = submission["result"]["common_divisor_audit"]
+    audit["a"] = 1_000_001
+    audit["b"] = 1_000_002
+    audit["dividends"] = [
+        4 * audit["a"] * audit["b"] - 1,
+        2 * audit["a"] - 1,
+        2 * audit["a"] + 1,
+    ]
+    audit["original_premise_holds"] = False
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
