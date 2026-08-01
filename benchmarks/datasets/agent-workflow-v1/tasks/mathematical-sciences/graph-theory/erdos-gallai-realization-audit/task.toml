@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/agent-workflow-v1-erdos-gallai-realization-audit"
+version = "1.0.0"
+description = "Audit graphicality using a realization and a complete Erdős–Gallai obstruction."
+keywords = ["graphical-sequence", "erdos-gallai", "realization", "obstruction"]
+[metadata]
+evaluation_kind = "workflow"
+domain = "mathematical-sciences"
+field = "graph-theory"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "hidden-at-runtime"
+provenance_class = "expert-discussion-derived-graph-audit"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "hard"
+category = "mathematics"
+tags = ["graph-realization", "inequality-audit", "constructive-witness", "offline"]
+case_version = "agent-workflow-v1"
+contamination_class = "public-discussion-derived"
+fixture_digest = "sha256:b0219a14529cc35bba2bd1ea945ba9f5c4d0317a63251a7f43c25873a639664d"
+derivation = "Derived from MathOverflow question 37665, captured 2026-07-31."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 36,
-    "manifest_sha256": "sha256:6e78181d843b2601923608550762cc1fe274f39bcfe1c4186c9e865ff39d2051",
+    "task_count": 37,
+    "manifest_sha256": "sha256:d1889061ec1c9c20bd7e5ad5789c9f97b6f27290a1a475559e61227a770f3530",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -193,6 +193,16 @@
       ],
       "disposition": "ACCEPT_CANDIDATE",
       "next_action": "Use this as the second structurally distinct public episode for a complete polynomial residue-image producer."
+    },
+    {
+      "task_id": "erdos-gallai-realization-audit",
+      "mathematical_moves": ["Construct a simple graph realizing one degree sequence.","Compute every Erdős–Gallai obstruction for a nongraphical sequence."],
+      "current_capabilities": [{"capability_id":"graph.compute.properties","availability":"AVAILABLE","boundary":"Computes properties of a supplied graph but does not realize or obstruct degree sequences."}],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep realization construction and theorem-based obstruction as agent-owned composition."
     },
     {
       "task_id": "euler-line-symbolic-certificate",
