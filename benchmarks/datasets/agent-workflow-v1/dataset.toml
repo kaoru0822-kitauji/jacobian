@@ -23,6 +23,10 @@ name = "jacobian/agent-workflow-v1-complex-power-sum-elimination"
 digest = "sha256:4293ae14599dcd9ba61130f0747ad673d616617d657286733b4df933e340145a"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-dead-end-local-density-audit"
+digest = "sha256:02b4353210a62aaeaab9d523ca3630e4f3f8f8d3e92ed38b51441e4be6aaab3f"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"
 digest = "sha256:05e4f1a4cfc6ef1c6aa97d0c3c01c462e27a22c04c50e0c9121c5d985f7b5308"
 

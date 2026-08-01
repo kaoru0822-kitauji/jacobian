@@ -1173,3 +1173,59 @@ def test_lcm_scope_audit_rejects_corrupted_or_overclaimed_certificates(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_local_density_rejects_boolean_integer_fields(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"][1]["density_numerator"] = True
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+
+
+def test_local_density_rejects_duplicate_evidence_descriptors(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"].append(dict(submission["evidence"][0]))
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+
+
+def test_dead_end_local_density_audit_accepts_case_reordering(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"].reverse()
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_dead_end_local_density_audit_rejects_duplicate_case_id(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"][1]["case_id"] = submission["result"]["cases"][0][
+        "case_id"
+    ]
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
