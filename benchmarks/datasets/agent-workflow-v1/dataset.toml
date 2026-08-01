@@ -120,7 +120,7 @@ digest = "sha256:6a1d30e49d29b7b086194b09fc3df259c28e5d44fd70f71f2a8fe863967cc52
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-symbolic-block-determinant-decomposition"
-digest = "sha256:c7be5651cc0520ef53910c11de9422c01f409f724e2609b136097c508ed8768d"
+digest = "sha256:10b33ac59d65d86986064a7b586612412ad759117c7b85fef320626539e0b7e5"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-well-total-domination-counterexample"
