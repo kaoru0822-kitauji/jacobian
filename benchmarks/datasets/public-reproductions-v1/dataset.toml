@@ -34,7 +34,7 @@ digest = "sha256:e68b5c30af7ba660f12feaf1a9faf4ee473b746244a5399644739def26c6c0c
 
 [[tasks]]
 name = "jacobian/jacobian-inverse-obstruction"
-digest = "sha256:b8c5a8721d66b151d01f85c30bc8660232b125391050785ac257b03ebf4761fa"
+digest = "sha256:ea73b34cbae01a61ee0e3691a8a3175950444896a3198ef62f26944bece63f96"
 
 [[tasks]]
 name = "jacobian/jacobian-keller"
@@ -90,7 +90,7 @@ digest = "sha256:109d1bfcebd61514485ed04ed25eb79e303dd47deee3f998607f00dfd588488
 
 [[tasks]]
 name = "jacobian/sat-erdos-schur-f4"
-digest = "sha256:8c0c0ea9da090721d607a517717c93e4e3b6cb725f82a94a230b6f1f46c90370"
+digest = "sha256:68f287632cf3086d596de258d688257d88962f09ed0f9f2ea6510875342bc038"
 
 [[tasks]]
 name = "jacobian/sat-pigeonhole"

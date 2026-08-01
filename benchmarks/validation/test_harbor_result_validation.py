@@ -120,3 +120,18 @@ def test_duplicate_task_trials_fail_closed() -> None:
     )
 
     assert any("exactly one trial" in failure for failure in failures)
+
+
+def test_task_defined_reward_dimensions_are_validated() -> None:
+    trial = _trial()
+    trial["verifier_result"]["rewards"]["measurements_valid"] = True
+    trial["verifier_result"]["rewards"]["task_specific"] = 0.5
+
+    failures = _validate_payload(
+        _payload(),
+        trial_results=[trial],
+        expected_tasks={"example-task"},
+        expected_digests={"example-task": "sha256:digest"},
+    )
+
+    assert any("task_specific must be full reward" in failure for failure in failures)

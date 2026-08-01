@@ -76,14 +76,21 @@ def edge_key(left, right):
 def _is_two_approximation_claim(value):
     if not isinstance(value, str):
         return False
-    normalized = "".join(
-        character.lower() for character in value if character.isalnum()
+    normalized = re.sub(r"[_-]+", " ", " ".join(value.casefold().split()))
+    match = re.search(
+        r"\b(?:factor\s*(?:of\s*)?2|two|2)\s+approximation\b",
+        normalized,
     )
-    return bool(
-        re.search(r"(?:2|two|factor2|factorof2)(?:approx|approximation)", normalized)
-        and not any(
-            word in normalized for word in ("not", "false", "invalid", "reject")
+    if match is None:
+        return False
+    surrounding = normalized[max(0, match.start() - 80) : match.end() + 80]
+    return (
+        re.search(
+            r"\b(?:not|never|cannot|can\s+not|false|invalid|reject|unsupported|"
+            r"unproven|does\s+not|doesn\'t|isn\'t)\b",
+            surrounding,
         )
+        is None
     )
 
 

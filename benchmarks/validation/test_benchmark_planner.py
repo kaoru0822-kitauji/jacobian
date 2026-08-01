@@ -162,6 +162,18 @@ def test_large_task_set_is_deferred_from_pull_request_to_merge_queue() -> None:
     assert len(_matrix(merge_group)) == 9
 
 
+def test_documentation_changes_do_not_consume_the_oracle_task_cap() -> None:
+    task_ids = sorted(planner._membership()[0])[:9]
+    paths = [f"benchmarks/tasks/{task_id}/README.md" for task_id in task_ids]
+    paths.append(f"benchmarks/tasks/{task_ids[0]}/tests/verifier.py")
+
+    result = planner.plan(paths, event="pull_request")
+
+    assert result["run-benchmark-oracle"] == "true"
+    assert result["benchmark-oracle-scope"] == "changed-tasks"
+    assert {item["task"] for item in _matrix(result)} == {task_ids[0]}
+
+
 def test_main_push_does_not_repeat_merge_queue_oracles() -> None:
     result = planner.plan(["benchmarks/tooling/verifier_support.py"], event="push")
 

@@ -46,7 +46,11 @@ def main() -> int:
         help="restrict a suite job to these canonical task IDs",
     )
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--model", default=MODEL_PLACEHOLDER)
+    parser.add_argument(
+        "--model",
+        required=True,
+        help="model identifier to substitute for ${JACOBIAN_MODEL}",
+    )
     args = parser.parse_args()
     if args.dataset:
         rendered = render_suite_job(

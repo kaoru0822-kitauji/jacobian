@@ -126,12 +126,16 @@ def _validate_trial(
     if not isinstance(rewards, dict) or not rewards:
         return task_id, [*failures, f"trial result {index}: incomplete verifier reward"]
     dimensions = (
-        "correctness",
-        "evidence_validity",
-        "scope_accuracy",
-        "assurance_calibration",
         "reward",
-        "false_certification",
+        *sorted(
+            dimension
+            for dimension, value in rewards.items()
+            if dimension != "reward"
+            and (
+                dimension == "false_certification"
+                or (isinstance(value, (int, float)) and not isinstance(value, bool))
+            )
+        ),
     )
     for dimension in dimensions:
         failures.extend(

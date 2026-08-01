@@ -125,6 +125,7 @@ def plan(
 
     by_task, suites_by_id = _membership()
     changed_tasks: set[str] = set()
+    oracle_tasks: set[str] = set()
     affected_datasets: set[str] = set()
     reasons: list[str] = []
     run_oracle = False
@@ -154,6 +155,7 @@ def plan(
             changed_tasks.add(task_id)
             affected_datasets.update(dataset for dataset, _ in by_task[task_id])
             if relative != "README.md":
+                oracle_tasks.add(task_id)
                 run_oracle = True
                 reasons.append(f"executable task change: {task_id}")
             else:
@@ -223,10 +225,10 @@ def plan(
     if (
         event == "pull_request"
         and scope == "none"
-        and len(changed_tasks) > MAX_PULL_REQUEST_ORACLE_TASKS
+        and len(oracle_tasks) > MAX_PULL_REQUEST_ORACLE_TASKS
     ):
         run_oracle = False
-        changed_tasks.clear()
+        oracle_tasks.clear()
         reasons.append(
             "large changed-task Oracle set deferred to merge queue "
             f"(limit {MAX_PULL_REQUEST_ORACLE_TASKS})"
@@ -249,7 +251,7 @@ def plan(
     else:
         matrix = [
             {"dataset": dataset, "task": task_id, "digest": _digest(path)}
-            for task_id in sorted(changed_tasks)
+            for task_id in sorted(oracle_tasks)
             for dataset, path in by_task[task_id]
         ]
 
