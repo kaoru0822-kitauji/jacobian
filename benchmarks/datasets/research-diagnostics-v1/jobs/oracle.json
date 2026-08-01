@@ -17,60 +17,9 @@
       "name": "oracle"
     }
   ],
-  "tasks": [
+  "datasets": [
     {
-      "path": "benchmarks/tasks/jcb-postdoc-015"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-014"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-008"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-001"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-012"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-016"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-013"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-002"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-004"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-006"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-018"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-009"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-010"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-011"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-005"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-017"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-003"
-    },
-    {
-      "path": "benchmarks/tasks/jcb-postdoc-007"
+      "path": "benchmarks/datasets/research-diagnostics-v1"
     }
   ]
 }

@@ -266,7 +266,7 @@
       ],
       "properties": {
         "path": {
-          "const": "benchmarks/tasks"
+          "const": "benchmarks/datasets/agent-workflow-v1"
         },
         "task_count": {
           "const": 38

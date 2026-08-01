@@ -271,25 +271,11 @@ def validate(
                     {
                         "task": task_id,
                         "digest": expected_digests[task_id],
-                        "verifier": (
-                            ROOT
-                            / "benchmarks"
-                            / "tasks"
-                            / task_id
-                            / "tests"
-                            / "verifier.py"
-                        )
+                        "verifier": (known[task_id].path / "tests" / "verifier.py")
                         .relative_to(ROOT)
                         .as_posix(),
                         "verifier_sha256": hashlib.sha256(
-                            (
-                                ROOT
-                                / "benchmarks"
-                                / "tasks"
-                                / task_id
-                                / "tests"
-                                / "verifier.py"
-                            ).read_bytes()
+                            (known[task_id].path / "tests" / "verifier.py").read_bytes()
                         ).hexdigest(),
                     }
                     for task_id in sorted(requested)

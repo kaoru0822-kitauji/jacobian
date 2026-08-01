@@ -40,7 +40,7 @@ and the
 
 ## Pinned provider identity
 
-[`benchmarks/tasks/regina/environment/pin.json`](../../benchmarks/tasks/regina/environment/pin.json)
+[`benchmarks/datasets/provider-feasibility-v1/regina/environment/pin.json`](../../benchmarks/datasets/provider-feasibility-v1/regina/environment/pin.json)
 binds:
 
 - the 7.4.1 upstream source archive and the upstream signed-checksum location;
@@ -74,7 +74,7 @@ uv pip install \
 Run the controller from the locked Jacobian environment:
 
 ```sh
-uv run python benchmarks/tasks/regina/environment/spike.py \
+uv run python benchmarks/datasets/provider-feasibility-v1/regina/environment/spike.py \
   --python-executable /tmp/jcb-regina-venv/bin/python \
   --wheel /path/to/regina-7.4.1-cp312-cp312-manylinux_2_28_x86_64.whl \
   --source-archive /path/to/regina-7.4.1.tar.gz \

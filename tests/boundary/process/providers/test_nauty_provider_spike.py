@@ -17,13 +17,22 @@ from jacobian.bounded_process import BoundedProcessResult
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SPIKE = runpy.run_path(
-    str(PROJECT_ROOT / "benchmarks" / "tasks" / "nauty" / "environment" / "spike.py")
+    str(
+        PROJECT_ROOT
+        / "benchmarks"
+        / "datasets"
+        / "provider-feasibility-v1"
+        / "nauty"
+        / "environment"
+        / "spike.py"
+    )
 )
 PIN = json.loads(
     (
         PROJECT_ROOT
         / "benchmarks"
-        / "tasks"
+        / "datasets"
+        / "provider-feasibility-v1"
         / "nauty"
         / "environment"
         / "nauty_provider_pin.json"

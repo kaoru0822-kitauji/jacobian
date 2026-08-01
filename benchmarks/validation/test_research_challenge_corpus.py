@@ -8,7 +8,7 @@ from benchmarks.tooling.harbor_suite import get_suite
 
 REPO_ROOT = Path(__file__).parents[2]
 DATASET = REPO_ROOT / "benchmarks" / "datasets" / "research-diagnostics-v1"
-TASKS = REPO_ROOT / "benchmarks" / "tasks"
+TASKS = REPO_ROOT / "benchmarks" / "datasets" / "research-diagnostics-v1"
 EXPECTED_RESEARCH_TASKS = {f"jcb-postdoc-{index:03d}" for index in range(1, 19)}
 
 

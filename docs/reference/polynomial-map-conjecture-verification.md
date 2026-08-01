@@ -46,7 +46,7 @@ the checker uses a separate exact sparse-rational implementation in
 `jacobian_checkers.polynomial_maps` and runs in the bounded checker worker.
 
 The public reference fixture
-`benchmarks/tasks/jacobian-inverse-obstruction/` binds the
+`benchmarks/datasets/public-reproductions-v1/jacobian-inverse-obstruction/` binds the
 published three-variable map, its determinant `-2`, a rational collision, and
 a wrong-image negative control. It is scored false and is intended for
 reproduction and contract regression, not for a hidden model-evaluation claim.

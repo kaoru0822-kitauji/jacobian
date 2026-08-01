@@ -56,7 +56,7 @@ def test_gap_ledger_handoffs_are_closed_over_task_candidates() -> None:
     for handoff in handoffs:
         for evidence in handoff.get("evidence_refs", []):
             ref = evidence["ref"]
-            if ref.startswith("benchmarks/tasks/"):
+            if ref.startswith("benchmarks/datasets/agent-workflow-v1/"):
                 assert Path(ref).name in workflow_task_ids
 
     assert task_candidates == set(handoff_by_id)

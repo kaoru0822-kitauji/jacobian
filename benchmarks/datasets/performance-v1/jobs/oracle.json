@@ -17,18 +17,9 @@
       "name": "oracle"
     }
   ],
-  "tasks": [
+  "datasets": [
     {
-      "path": "benchmarks/tasks/complete-runtime-startup"
-    },
-    {
-      "path": "benchmarks/tasks/core-operations"
-    },
-    {
-      "path": "benchmarks/tasks/startup-phases"
-    },
-    {
-      "path": "benchmarks/tasks/v02-compatibility-surface"
+      "path": "benchmarks/datasets/performance-v1"
     }
   ]
 }

@@ -18,19 +18,21 @@
   "agents": [
     {
       "name": "codex",
-      "model_name": "${JACOBIAN_MODEL}",
       "mcp_servers": [
         {
           "name": "jacobian",
           "transport": "streamable-http",
-          "url": "http://jacobian-auth-proxy:8080/mcp"
+          "url": "http://jacobian:8000/mcp"
         }
       ]
     }
   ],
-  "tasks": [
+  "datasets": [
     {
-      "path": "benchmarks/tasks/graph-counterexample"
+      "path": "benchmarks/datasets/agent-workflow-v1",
+      "task_names": [
+        "graph-counterexample"
+      ]
     }
   ]
 }

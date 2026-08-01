@@ -63,7 +63,7 @@ def test_benchmark_control_plane_changes_run_contract_checks(path: str) -> None:
 
 
 def test_executable_control_plane_change_defers_oracle_to_merge_queue() -> None:
-    path = "tools/render_harbor_job.py"
+    path = "benchmarks/tooling/harbor_suite.py"
 
     pull_request = planner.plan([path], event="pull_request")
     merge_group = planner.plan([path], event="merge_group")
@@ -77,7 +77,10 @@ def test_executable_control_plane_change_defers_oracle_to_merge_queue() -> None:
 
 def test_task_readme_change_runs_contract_checks_without_oracle() -> None:
     result = planner.plan(
-        ["benchmarks/tasks/parameterized-sharp-bound-audit/README.md"],
+        [
+            "benchmarks/datasets/agent-workflow-v1/"
+            "parameterized-sharp-bound-audit/README.md"
+        ],
         event="pull_request",
     )
 
@@ -89,7 +92,10 @@ def test_task_readme_change_runs_contract_checks_without_oracle() -> None:
 
 def test_executable_task_change_selects_exact_task_and_all_memberships() -> None:
     result = planner.plan(
-        ["benchmarks/tasks/parameterized-sharp-bound-audit/tests/verifier.py"],
+        [
+            "benchmarks/datasets/agent-workflow-v1/"
+            "parameterized-sharp-bound-audit/tests/verifier.py"
+        ],
         event="pull_request",
     )
 
@@ -149,8 +155,13 @@ def test_shared_tooling_change_runs_full_portfolio_in_merge_queue() -> None:
 
 
 def test_large_task_set_is_deferred_from_pull_request_to_merge_queue() -> None:
-    task_ids = sorted(planner._membership()[0])[:9]
-    paths = [f"benchmarks/tasks/{task_id}/tests/verifier.py" for task_id in task_ids]
+    by_task, _suites = planner._membership()
+    task_ids = sorted(by_task)[:9]
+    paths = [
+        f"benchmarks/datasets/{dataset}/{task_id}/tests/verifier.py"
+        for task_id in task_ids
+        for dataset, _path in by_task[task_id]
+    ]
 
     pull_request = planner.plan(paths, event="pull_request")
     merge_group = planner.plan(paths, event="merge_group")
@@ -163,9 +174,17 @@ def test_large_task_set_is_deferred_from_pull_request_to_merge_queue() -> None:
 
 
 def test_documentation_changes_do_not_consume_the_oracle_task_cap() -> None:
-    task_ids = sorted(planner._membership()[0])[:9]
-    paths = [f"benchmarks/tasks/{task_id}/README.md" for task_id in task_ids]
-    paths.append(f"benchmarks/tasks/{task_ids[0]}/tests/verifier.py")
+    by_task, _suites = planner._membership()
+    task_ids = sorted(by_task)[:9]
+    paths = [
+        f"benchmarks/datasets/{dataset}/{task_id}/README.md"
+        for task_id in task_ids
+        for dataset, _path in by_task[task_id]
+    ]
+    paths.append(
+        "benchmarks/datasets/"
+        f"{by_task[task_ids[0]][0][0]}/{task_ids[0]}/tests/verifier.py"
+    )
 
     result = planner.plan(paths, event="pull_request")
 
@@ -209,9 +228,8 @@ def test_force_full_includes_each_dataset_task_pair() -> None:
     assert _matrix(result)
 
 
-def test_canonical_task_ids_have_no_dataset_local_bundle_copies() -> None:
-    local_bundles = list(
-        (ROOT / "benchmarks" / "datasets").glob("*/tasks/**/task.toml")
-    )
-
-    assert local_bundles == []
+def test_task_bundles_live_directly_in_their_harbor_dataset() -> None:
+    suites = planner._harbor_suite().load_registry()
+    assert suites
+    for suite in suites:
+        assert all(task.path.parent == suite.path for task in suite.tasks)

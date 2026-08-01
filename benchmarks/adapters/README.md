@@ -1,7 +1,8 @@
 # Harbor source adapters
 
 This directory is reserved for reproducible conversions from pinned external
-benchmark sources into canonical `benchmarks/tasks/<task-id>/` bundles. An
+benchmark sources into task bundles under the owning
+`benchmarks/datasets/<dataset>/` Harbor dataset root. An
 adapter must record the immutable source revision and content digest, license
 and redistribution status, included and excluded rows, deterministic conversion
 command, pinned dependencies, Oracle evidence, and parity evidence when it

@@ -12,15 +12,16 @@ observe fixed agent workflows and do not establish causal performance.
 Non-runnable research plans and discovery handoffs need a separate home from
 executable benchmark cases.
 
-Harbor local dataset loading expects standalone task directories. The
-mathematical subject taxonomy is useful metadata, but it must not become a
-second identity or force a task to be copied for another dataset.
+Harbor local dataset loading expects standalone task directories directly under
+the dataset path. The mathematical subject taxonomy is useful metadata, but it
+must not become a second identity or force Harbor to resolve a task from a
+separate Jacobian inventory.
 
 ## Decision
 
-Every executable benchmark case is one self-contained Harbor task under
-`benchmarks/tasks/<task-id>/`. Dataset member fragments select canonical tasks
-without copying them. The task layout follows the Terminal-Bench Science review pattern: agent-visible
+Every executable benchmark case is one self-contained Harbor task directly
+under its dataset path at `benchmarks/datasets/<dataset>/<task-id>/`. Dataset
+member fragments record Jacobian policy for those same local bundles. The task layout follows the Terminal-Bench Science review pattern: agent-visible
 instructions and environment, Oracle-only solution material, verifier-only
 tests, and a maintainer README. Jacobian retains its stricter provenance,
 assurance, artifact-integrity, and fail-closed verification rules.
@@ -48,11 +49,11 @@ declares its claim class, answer visibility, execution profile, and assurance
 ceiling.
 
 `registry.toml` discovers datasets but does not duplicate task membership.
-Each dataset's `members/*.toml` fragments are the source of truth for dataset
-membership and policy. `dataset.toml` is generated from the validated members and
-Harbor's task checksum implementation; manual digest edits are drift. Job
-templates are rendered into temporary Harbor configs containing one explicit
-`tasks: [{"path": ...}]` entry per selected canonical task.
+Each dataset's `members/*.toml` fragments are the source of truth for Jacobian
+membership and policy. `dataset.toml` is generated from the validated members
+and Harbor's task checksum implementation; manual digest edits are drift.
+Jobs point at the dataset path and let Harbor discover and filter its direct
+task children.
 
 The canonical verifier protocol support lives in repository-owned Harbor
 tooling. Each task receives a byte-identical ordinary file because task and
@@ -78,7 +79,7 @@ checker identity. Knowing an Oracle answer does not raise the ceiling above
 
 ## Consequences
 
-Benchmark discovery, manifest generation, job rendering, verifier-support
+Benchmark discovery, manifest generation, Harbor job configuration, verifier-support
 synchronization, and integrity checks share one repository-owned suite
 boundary. Nested mathematical taxonomy no longer depends on Harbor's local
 directory recursion.

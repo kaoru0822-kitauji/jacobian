@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Jacobian Harbor dataset header",
-  "description": "Dataset metadata. Membership is declared by one member fragment per canonical task under members/.",
+  "description": "Dataset metadata. Membership is declared by one member fragment per direct Harbor task bundle under the dataset root.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "dataset"],

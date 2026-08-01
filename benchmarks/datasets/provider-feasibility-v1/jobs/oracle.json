@@ -17,24 +17,9 @@
       "name": "oracle"
     }
   ],
-  "tasks": [
+  "datasets": [
     {
-      "path": "benchmarks/tasks/cddlib"
-    },
-    {
-      "path": "benchmarks/tasks/cgal"
-    },
-    {
-      "path": "benchmarks/tasks/gudhi"
-    },
-    {
-      "path": "benchmarks/tasks/lean-repl"
-    },
-    {
-      "path": "benchmarks/tasks/nauty"
-    },
-    {
-      "path": "benchmarks/tasks/regina"
+      "path": "benchmarks/datasets/provider-feasibility-v1"
     }
   ]
 }

@@ -5,7 +5,7 @@
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
     "task_count": 38,
-    "manifest_sha256": "sha256:492b86f47471a4389b2d59f6f422203c1a16ad8dae9c893c2c9b09646003567a",
+    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -932,10 +932,10 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/modular-cubic-obstruction"
+          "ref": "benchmarks/datasets/agent-workflow-v1/modular-cubic-obstruction"
         },
         {
-          "ref": "benchmarks/tasks/divisibility-construction-witness"
+          "ref": "benchmarks/datasets/agent-workflow-v1/divisibility-construction-witness"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: ONLY_WEAK_LEXICAL_MATCHES for a complete sparse polynomial residue image"
@@ -988,13 +988,13 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/subspace-direct-sum-counterexample"
+          "ref": "benchmarks/datasets/agent-workflow-v1/subspace-direct-sum-counterexample"
         },
         {
-          "ref": "benchmarks/tasks/autoformalization-semantic-audit"
+          "ref": "benchmarks/datasets/agent-workflow-v1/autoformalization-semantic-audit"
         },
         {
-          "ref": "benchmarks/tasks/euler-line-symbolic-certificate"
+          "ref": "benchmarks/datasets/agent-workflow-v1/euler-line-symbolic-certificate"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: only Ax=b solution and inconsistency outcomes matched"
@@ -1052,7 +1052,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/matrix-square-zero-counterexample"
+          "ref": "benchmarks/datasets/agent-workflow-v1/matrix-square-zero-counterexample"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: determinant, rank, inverse, adjugate, trace, and normal forms matched but no matrix product"
@@ -1105,7 +1105,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/metric-tsp-proof-repair"
+          "ref": "benchmarks/datasets/agent-workflow-v1/metric-tsp-proof-repair"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: spanning-tree count present, weighted minimum spanning tree absent"
@@ -1155,7 +1155,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/metric-tsp-proof-repair"
+          "ref": "benchmarks/datasets/agent-workflow-v1/metric-tsp-proof-repair"
         }
       ],
       "contract_ref": null,
@@ -1200,7 +1200,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/random-function-expectation-audit"
+          "ref": "benchmarks/datasets/agent-workflow-v1/random-function-expectation-audit"
         }
       ],
       "contract_ref": null,
@@ -1244,7 +1244,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/tasks/nondifferentiable-maximum-construction"
+          "ref": "benchmarks/datasets/agent-workflow-v1/nondifferentiable-maximum-construction"
         }
       ],
       "contract_ref": null,

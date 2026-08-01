@@ -1,9 +1,8 @@
 # Jacobian agent-workflow-v1
 
 This Harbor dataset contains fixed Jacobian-enabled mathematical workflows for
-Oracle validation and agent observation. Tasks are organized as
-`benchmarks/tasks/<task-id>/` and retain separate agent,
-Oracle, and verifier containers.
+Oracle validation and agent observation. Each task bundle is a direct child of
+this directory and retains separate agent, Oracle, and verifier containers.
 
 `suite.toml` owns membership and contract metadata. `dataset.toml` is generated
 from Harbor-computed task digests. The Oracle contract gate is:
@@ -18,9 +17,9 @@ The observation job uses the Jacobian MCP sidecar and is selected with:
 make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
 ```
 
-The observation job currently supports `graph-counterexample` only. Other
-dataset tasks remain Oracle-valid but do not yet have Codex-ready agent images;
-selecting one of them is rejected before Harbor starts.
+Use `TASKS=graph-counterexample` for a small run. Harbor loads the task bundles
+from this dataset directory and applies the task-name filter; Jacobian does not
+render or rewrite a Harbor task selection.
 
 Five tasks have an operator-authorized verification record and may accept
 `VERIFIED`; the remaining tasks are capped at `COMPUTED`. A wrong result or an

@@ -15,11 +15,25 @@ from jacobian.bounded_process import BoundedProcessResult
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SPIKE = runpy.run_path(
-    str(PROJECT_ROOT / "benchmarks" / "tasks" / "regina" / "environment" / "spike.py")
+    str(
+        PROJECT_ROOT
+        / "benchmarks"
+        / "datasets"
+        / "provider-feasibility-v1"
+        / "regina"
+        / "environment"
+        / "spike.py"
+    )
 )
 BASE_PIN = json.loads(
     (
-        PROJECT_ROOT / "benchmarks" / "tasks" / "regina" / "environment" / "pin.json"
+        PROJECT_ROOT
+        / "benchmarks"
+        / "datasets"
+        / "provider-feasibility-v1"
+        / "regina"
+        / "environment"
+        / "pin.json"
     ).read_text(encoding="utf-8")
 )
 RunSpike = Callable[..., dict[str, Any]]

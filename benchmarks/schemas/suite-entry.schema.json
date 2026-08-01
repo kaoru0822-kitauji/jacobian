@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jacobian.invalid/benchmarks/schemas/suite-entry.schema.json",
   "title": "Harbor dataset member fragment",
-  "description": "Reference contract for one dataset members/<task-id>.toml fragment. The task_id selects a globally flat canonical bundle under benchmarks/tasks; assurance_ceiling caps the claimed_assurance the verifier will accept, and required_provider names the optional backend the task depends on.",
+  "description": "Reference contract for one dataset members/<task-id>.toml fragment. The task_id selects the direct Harbor task bundle with the same name under that dataset root; assurance_ceiling caps the claimed_assurance the verifier will accept, and required_provider names the optional backend the task depends on.",
   "type": "object",
   "additionalProperties": false,
   "required": ["task_id", "assurance_ceiling", "required_provider"],

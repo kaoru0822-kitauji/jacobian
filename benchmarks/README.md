@@ -5,9 +5,10 @@ dataset identities below keep workflow observations, public reproductions,
 research diagnostics, operational measurements, provider feasibility, and
 examples from making incompatible claims look comparable.
 
-`benchmarks/tasks/` is the sole home for canonical executable Harbor bundles.
-`benchmarks/datasets/<dataset>/members/` selects those bundles without copying
-them; `suite.toml` contains dataset metadata and `dataset.toml` is generated.
+`benchmarks/datasets/<dataset>/` is the Harbor dataset root and contains the
+dataset's executable task bundles directly. `members/` retains Jacobian's
+assurance and provider metadata; `suite.toml` contains dataset metadata and
+`dataset.toml` is generated from Harbor task digests.
 Reusable Harbor infrastructure belongs under `benchmarks/tooling/`, adapters
 under `benchmarks/adapters/`, and non-runnable evaluation plans and research
 handoffs under `research/evaluations/`.
@@ -24,7 +25,8 @@ handoffs under `research/evaluations/`.
 `registry.toml` is the discovery index. Each dataset's member fragments own
 membership and assurance ceilings. `dataset.toml` is generated from those
 fragments and Harbor-computed task digests; hand-editing digests is a
-validation error. Harbor jobs are rendered with explicit flat task paths.
+validation error. Harbor jobs point at the dataset root and use Harbor's
+native task-name filtering.
 
 The repository `.uv-version` pins active development, CI, release, and product
 image builds. Harbor task images remain bound to the uv version and digest in
