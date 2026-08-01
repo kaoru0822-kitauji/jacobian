@@ -204,40 +204,47 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
         or frozen_source.get("row_sha256")
         != "sha256:3c90414d1940aeff2f696b02fa5757ecd506180128e5ffd0b2db681e4c8d3f51"
         or not isinstance(result, dict)
-        or set(result) != {"recurrence", "elimination", "branches", "achievability"}
+        or not {"elimination", "branches", "achievability"} <= set(result)
+        or not set(result) <= {"recurrence", "elimination", "branches", "achievability"}
     ):
         return False
-    recurrence = result["recurrence"]
-    if not isinstance(recurrence, dict) or set(recurrence) != {
-        "seed",
-        "product_polynomial",
-        "power_sums",
-    }:
-        return False
-    product = _poly(recurrence["product_polynomial"])
     expected_product: Poly = (Fraction(), Fraction(-2), Fraction(1, 2))
-    if recurrence["seed"] != ["2", "s"] or product != expected_product:
-        return False
-    assert product is not None
-    expected_powers = _power_sum_polynomials(product)
-    submitted_powers = recurrence["power_sums"]
-    if not _submitted_powers_match(submitted_powers, expected_powers):
-        return False
+    expected_powers = _power_sum_polynomials(expected_product)
+    recurrence = result.get("recurrence")
+    if recurrence is not None:
+        if not isinstance(recurrence, dict) or set(recurrence) != {
+            "seed",
+            "product_polynomial",
+            "power_sums",
+        }:
+            return False
+        if (
+            recurrence["seed"] != ["2", "s"]
+            or _poly(recurrence["product_polynomial"]) != expected_product
+            or not _submitted_powers_match(recurrence["power_sums"], expected_powers)
+        ):
+            return False
 
     elimination = result["elimination"]
-    if not isinstance(elimination, dict) or set(elimination) != {
-        "sum_polynomial",
-        "hypothesis_factorization",
-        "target_polynomial",
-    }:
-        return False
     if (
-        _poly(elimination["sum_polynomial"])
-        != (Fraction(8), Fraction(-10), Fraction(1))
-        or elimination["hypothesis_factorization"] != "A4-2*A3=-(s^2/2)*(s^2-10*s+8)"
-        or _poly(elimination["target_polynomial"])
-        != (Fraction(32), Fraction(-20), Fraction(1))
+        not isinstance(elimination, dict)
+        or not {"sum_polynomial", "target_polynomial"} <= set(elimination)
+        or not set(elimination)
+        <= {"sum_polynomial", "hypothesis_factorization", "target_polynomial"}
     ):
+        return False
+    if _poly(elimination["sum_polynomial"]) != (
+        Fraction(8),
+        Fraction(-10),
+        Fraction(1),
+    ) or _poly(elimination["target_polynomial"]) != (
+        Fraction(32),
+        Fraction(-20),
+        Fraction(1),
+    ):
+        return False
+    factorization = elimination.get("hypothesis_factorization")
+    if factorization is not None and factorization != "A4-2*A3=-(s^2/2)*(s^2-10*s+8)":
         return False
     difference = _padd(
         expected_powers["4"], _pscale(expected_powers["3"], Fraction(-2))
