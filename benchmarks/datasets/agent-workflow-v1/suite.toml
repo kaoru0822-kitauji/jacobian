@@ -24,6 +24,12 @@ maximum_assurance = "VERIFIED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-lean-transitive-axiom-audit"
+path = "tasks/mathematical-sciences/formal-mathematics/lean-transitive-axiom-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-lcm-highly-abundant-scope-audit"
 path = "tasks/mathematical-sciences/number-theory/lcm-highly-abundant-scope-audit"
 maximum_assurance = "COMPUTED"

@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 35,
-    "manifest_sha256": "sha256:05395433ce5bfec5d4f99779d6b594bf2e11e600c3efed8d34b7513392d56a45",
+    "task_count": 36,
+    "manifest_sha256": "sha256:c7fbc7d62bab921e8417384ad73f027725046c11d1f3322465349e126d01ef16",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -424,6 +424,19 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep counterexample construction and minimality-scope auditing as agent-owned composition; do not add a problem-specific highly-abundant solver."
+    },
+    {
+      "task_id": "lean-transitive-axiom-audit",
+      "mathematical_moves": [
+        "Compute transitive declaration dependencies from frozen roots.",
+        "Separate shallow axiom reports from complete trust closure."
+      ],
+      "current_capabilities": [{"capability_id":"lean.proof.axioms.inspect","availability":"UNAVAILABLE","boundary":"The capability is catalogued, but the frozen runtime snapshot does not have the pinned Lean provider installed; it also does not replay this historical collector defect."}],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep historical trust-report comparison as an agent-owned audit."
     },
     {
       "task_id": "log-exponent-recovery",

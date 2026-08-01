@@ -30,6 +30,7 @@ RESOURCE_DERIVED_TASKS = (
     "generated-lemma-vacuity-audit",
     "inverse-distance-remainder-audit",
     "lcm-highly-abundant-scope-audit",
+    "lean-transitive-axiom-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
@@ -1197,6 +1198,16 @@ def test_local_density_rejects_duplicate_evidence_descriptors(tmp_path: Path) ->
     _write_json(submission_path, submission)
     rejected = _run_verifier(task, app, logs)
     assert rejected["evidence_validity"] == 0.0
+
+
+def test_lean_axiom_fixture_requires_genuine_transitive_closure() -> None:
+    task = _task("lean-transitive-axiom-audit")
+    source = json.loads((task / "environment" / "input.json").read_text())
+    case = next(
+        item for item in source["cases"] if item["case_id"] == "axiom-type-closure"
+    )
+    assert "A0" not in case["dependencies"]["A2"]
+    assert case["dependencies"]["A1"] == ["A0"]
 
 
 def test_dead_end_local_density_audit_accepts_case_reordering(tmp_path: Path) -> None:
