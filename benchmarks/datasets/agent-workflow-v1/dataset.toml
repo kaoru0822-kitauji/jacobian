@@ -39,6 +39,10 @@ name = "jacobian/agent-workflow-v1-erdos-gallai-realization-audit"
 digest = "sha256:bc0d854140e934ed035c62950885c51dab15e7c1335f4ee85675dc2ac6600399"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-euler-fourth-power-scope-audit"
+digest = "sha256:290b752484772c10bae0c41e30114b1d95f9f84d7c21f020e4155ca6832cb755"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"
 digest = "sha256:aafcb0a6b87229c4cabcfb7719a3b7eb96d3c3c088cce1f831b433b9d3756d9f"
 
