@@ -29,6 +29,8 @@ npm install -g jacobian
 ```sh
 jacobian setup [--client <id>...] [--all] [--yes] [--dry-run] [--json]
   Configure MCP clients to use Jacobian.
+jacobian upgrade
+  Refresh the launcher-managed Python package.
 jacobian doctor [--json]
   Verify the MCP handshake and tool catalog.
 jacobian remove [--client <id>...] [--all] [--yes] [--json]

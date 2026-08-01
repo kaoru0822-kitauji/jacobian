@@ -120,13 +120,35 @@ function packageNeedsRefresh(installedVersion) {
 }
 
 /**
+ * Install or upgrade the configured Python package in the shared environment.
+ *
+ * @param {{ kind: "uv" | "python", path: string }} runtime
+ * @param {string} python
+ */
+function installPackage(runtime, python) {
+  const args =
+    runtime.kind === "uv"
+      ? ["pip", "install", "--upgrade", "--python", python, PACKAGE_SPEC]
+      : ["-m", "pip", "install", "--upgrade", PACKAGE_SPEC];
+  const result = run(runtime.path, args);
+  if (result.error || result.status !== 0) {
+    process.exitCode = 1;
+    throw new Error(
+      "Jacobian could not install its Python package. Check network and package " +
+        "index access, then retry `npx jacobian doctor`.",
+    );
+  }
+}
+
+/**
  * Ensure the shared virtual environment exists and the Jacobian package is
  * installed.  Returns the path to the venv Python executable.
  *
  * @param {{ kind: "uv" | "python", path: string }} runtime
+ * @param {{ forceUpgrade?: boolean }} [options]
  * @returns {string}
  */
-function ensureEnvironment(runtime) {
+function ensureEnvironment(runtime, options = {}) {
   const root = venvRoot();
   const python = venvPython();
 
@@ -156,29 +178,39 @@ function ensureEnvironment(runtime) {
   // Check if the package is already installed.
   const check = run(python, ["-c", `import jacobian; print(jacobian.__version__)`], { silent: true });
   const installedVersion = check.status === 0 ? check.stdout.trim() : null;
-  if (packageNeedsRefresh(installedVersion)) {
-    if (runtime.kind === "uv") {
-      const result = run(runtime.path, ["pip", "install", "--upgrade", "--python", python, PACKAGE_SPEC]);
-      if (result.error || result.status !== 0) {
-        process.exitCode = 1;
-        throw new Error(
-          "Jacobian could not install its Python package. Check network and package " +
-            "index access, then retry `npx jacobian doctor`.",
-        );
-      }
-    } else {
-      const result = run(python, ["-m", "pip", "install", "--upgrade", PACKAGE_SPEC]);
-      if (result.error || result.status !== 0) {
-        process.exitCode = 1;
-        throw new Error(
-          "Jacobian could not install its Python package. Check network and package " +
-            "index access, then retry `npx jacobian doctor`.",
-        );
-      }
-    }
+  if (options.forceUpgrade || packageNeedsRefresh(installedVersion)) {
+    installPackage(runtime, python);
   }
 
   return python;
+}
+
+/**
+ * Refresh the configured Python package in the launcher-managed environment.
+ *
+ * @returns {{ package: string, python: string }}
+ */
+function upgrade() {
+  const runtime = requireRuntime();
+  const python = ensureEnvironment(runtime, { forceUpgrade: true });
+  return { package: PACKAGE_SPEC, python };
+}
+
+/**
+ * Resolve a usable Python runtime or raise the standard launcher error.
+ *
+ * @returns {{ kind: "uv" | "python", path: string }}
+ */
+function requireRuntime() {
+  const runtime = detectRuntime();
+  if (!runtime) {
+    process.exitCode = 1;
+    throw new Error(
+      "Jacobian requires Python 3.12 or uv on PATH. Install one, then retry " +
+        "`npx jacobian doctor`.",
+    );
+  }
+  return runtime;
 }
 
 /**
@@ -189,15 +221,7 @@ function ensureEnvironment(runtime) {
  * @returns {string}
  */
 function resolvePython() {
-  const runtime = detectRuntime();
-  if (!runtime) {
-    process.exitCode = 1;
-    throw new Error(
-      "Jacobian requires Python 3.12 or uv on PATH. Install one, then retry " +
-        "`npx jacobian doctor`.",
-    );
-  }
-  return ensureEnvironment(runtime);
+  return ensureEnvironment(requireRuntime());
 }
 
 /**
@@ -262,6 +286,7 @@ module.exports = {
   PACKAGE_SPEC,
   VENV_NAME,
   packageNeedsRefresh,
+  upgrade,
   pythonVersionFromNpmVersion,
   venvRoot,
   venvPython,

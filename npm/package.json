@@ -15,7 +15,7 @@
     "jacobian": "bin/jacobian.cjs"
   },
   "scripts": {
-    "test": "node --test npm-packaging.test.mjs"
+    "test": "node --test npm-packaging.test.mjs cli-e2e.test.mjs"
   },
   "files": [
     "bin",

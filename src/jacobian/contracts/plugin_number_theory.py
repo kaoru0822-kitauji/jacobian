@@ -6,20 +6,9 @@ from typing import Literal, Self
 
 from pydantic import Field, StrictInt, model_validator
 
-from jacobian.contracts.claims import ClaimSpec
+from jacobian.contracts.claims import flatten_claim_spec
 from jacobian.contracts.plugin_protocol import PluginRequestContext
 from jacobian.contracts.results import ContractModel
-
-
-def _flatten_claim(value: object) -> object:
-    if not isinstance(value, dict) or not isinstance(value.get("predicate"), dict):
-        return value
-    claim = ClaimSpec.model_validate(value)
-    return {
-        "predicate": claim.predicate.name,
-        **claim.predicate.parameters,
-        **claim.bounds,
-    }
 
 
 class ErdosStrausClaim(ContractModel):
@@ -30,7 +19,7 @@ class ErdosStrausClaim(ContractModel):
     @model_validator(mode="before")
     @classmethod
     def flatten_generic_claim(cls, value: object) -> object:
-        return _flatten_claim(value)
+        return flatten_claim_spec(value)
 
     @model_validator(mode="after")
     def require_ordered_range(self) -> Self:
@@ -54,6 +43,15 @@ class ErdosStrausCapabilityRequest(PluginRequestContext):
     claim: ErdosStrausClaim
     candidate: ErdosStrausCandidate
     witness_role: Literal["DEFEATS_CANDIDATE", "SUPPORTS_CLAIM"] = "SUPPORTS_CLAIM"
+
+    @model_validator(mode="after")
+    def require_matching_range(self) -> Self:
+        if (
+            self.candidate.lower_bound != self.claim.lower_bound
+            or self.candidate.upper_bound != self.claim.upper_bound
+        ):
+            raise ValueError("candidate range must exactly match the claim range")
+        return self
 
 
 __all__ = [

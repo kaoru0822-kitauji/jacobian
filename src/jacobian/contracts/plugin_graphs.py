@@ -7,20 +7,9 @@ from typing import Any, Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, model_validator
 
-from jacobian.contracts.claims import ClaimSpec
+from jacobian.contracts.claims import flatten_claim_spec
 from jacobian.contracts.plugin_protocol import PluginRequestContext
 from jacobian.contracts.results import ContractModel
-
-
-def _flatten_claim(value: object) -> object:
-    if not isinstance(value, dict) or not isinstance(value.get("predicate"), dict):
-        return value
-    claim = ClaimSpec.model_validate(value)
-    return {
-        "predicate": claim.predicate.name,
-        **claim.predicate.parameters,
-        **claim.bounds,
-    }
 
 
 class GraphPathClaim(ContractModel):
@@ -31,7 +20,7 @@ class GraphPathClaim(ContractModel):
     @model_validator(mode="before")
     @classmethod
     def flatten_generic_claim(cls, value: object) -> object:
-        return _flatten_claim(value)
+        return flatten_claim_spec(value)
 
     @model_validator(mode="after")
     def validate_predicate_fields(self) -> Self:
@@ -84,31 +73,6 @@ class GraphPathCandidate(ContractModel):
                 raise ValueError(
                     "intended_paths must contain legal source-terminal paths"
                 )
-        return self
-
-
-class GraphPathEvaluationRequest(PluginRequestContext):
-    claim: GraphPathClaim
-    candidate: GraphPathCandidate | None = None
-    candidates: tuple[GraphPathCandidate, ...] | None = None
-
-    @model_validator(mode="after")
-    def require_candidates(self) -> Self:
-        if self.candidate is not None and self.candidates is not None:
-            raise ValueError("candidate and candidates cannot be combined")
-        if self.candidate is None and not self.candidates:
-            raise ValueError("at least one candidate is required")
-        candidates = (
-            (self.candidate,) if self.candidate is not None else self.candidates or ()
-        )
-        if self.claim.predicate == "intended_paths_complete":
-            for candidate in candidates:
-                if candidate.source is None or not candidate.terminals:
-                    raise ValueError(
-                        "intended_paths_complete requires source and terminals"
-                    )
-                if candidate.source in candidate.terminals:
-                    raise ValueError("source cannot also be a terminal")
         return self
 
 
@@ -211,7 +175,6 @@ __all__ = [
     "GraphPathCandidate",
     "GraphPathCapabilityRequest",
     "GraphPathClaim",
-    "GraphPathEvaluationRequest",
     "GraphPathReductionRequest",
     "GraphShrinkRequest",
     "GraphShrinkTarget",
