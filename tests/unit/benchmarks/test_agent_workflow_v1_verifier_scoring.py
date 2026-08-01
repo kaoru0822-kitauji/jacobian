@@ -29,6 +29,7 @@ RESOURCE_DERIVED_TASKS = (
     "finite-magma-countermodel",
     "generated-lemma-vacuity-audit",
     "inverse-distance-remainder-audit",
+    "lcm-highly-abundant-scope-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
@@ -936,6 +937,61 @@ def test_putnam_2adic_audit_rejects_corrupted_induction_certificates(
 ) -> None:
     task, app, logs = _prepare_case(
         tmp_path, "putnam-2adic-induction-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    target = submission["result"]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = replacement
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_lcm_scope_audit_accepts_alternative_earlier_index(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "lcm-highly-abundant-scope-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    earlier = submission["result"]["witnesses"][1]
+    earlier.update(
+        {
+            "n": 73,
+            "lcm_factorization": earlier["lcm_factorization"]
+            + [{"prime": 73, "exponent": 1}],
+            "lcm_value": 410555180440430163438262940577600,
+            "competitor": 409087987237258561004281340832000,
+            "sigma_lcm": 3068535475037360330537152020480000,
+            "sigma_competitor": 3071037991057009848454773473280000,
+        }
+    )
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        (("witnesses", 0, "sigma_competitor"), 1),
+        (("witnesses", 1, "n"), 97),
+        (("witnesses", 1, "exponent_deltas", 0, "prime"), 4),
+        (("minimality_claim",), "CONFIRMED"),
+    ],
+)
+def test_lcm_scope_audit_rejects_corrupted_or_overclaimed_certificates(
+    tmp_path: Path,
+    path: tuple[object, ...],
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "lcm-highly-abundant-scope-audit", "computed"
     )
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())

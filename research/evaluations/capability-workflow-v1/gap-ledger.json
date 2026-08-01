@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 33,
-    "manifest_sha256": "sha256:c06546b5426a33a5c0ae22087d839dd9f77c95fe5be8d34f03a18c1962d74c15",
+    "task_count": 34,
+    "manifest_sha256": "sha256:fd801bd82b393b910a15c1b0dc1f11dc92502109fa489b095ae57e05d04b8b5c",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -380,6 +380,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Use as an asymptotic proof-audit diagnostic; do not add a general series-remainder capability from one directional certificate family."
+    },
+    {
+      "task_id": "lcm-highly-abundant-scope-audit",
+      "mathematical_moves": [
+        "Reconstruct exact LCM factorizations and divisor sums from a public model trace.",
+        "Preserve a valid counterexample while independently refuting an unsupported minimality claim.",
+        "Produce an earlier prime-exponent competitor with strict size and divisor-sum inequalities."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "integer.compute.prime_factorization",
+          "availability": "AVAILABLE",
+          "boundary": "Can factor supplied integers but does not search exponent-delta competitors or audit claim scope."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep counterexample construction and minimality-scope auditing as agent-owned composition; do not add a problem-specific highly-abundant solver."
     },
     {
       "task_id": "log-exponent-recovery",
