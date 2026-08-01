@@ -94,6 +94,19 @@ class ClaimSpec(ContractModel):
         return self
 
 
+def flatten_claim_spec(value: object) -> object:
+    """Project a generic claim artifact into a plugin request claim shape."""
+
+    if not isinstance(value, dict) or not isinstance(value.get("predicate"), dict):
+        return value
+    claim = ClaimSpec.model_validate(value)
+    return {
+        "predicate": claim.predicate.name,
+        **claim.predicate.parameters,
+        **claim.bounds,
+    }
+
+
 class ClaimValidationResult(ContractModel):
     schema_version: Literal["1"] = "1"
     execution: Execution

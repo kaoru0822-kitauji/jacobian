@@ -10,21 +10,22 @@ All outputs are unverified search results; checkers replay evidence separately.
 from __future__ import annotations
 
 import itertools
-import re
 import time
 from collections.abc import Iterator
 from copy import deepcopy
 from fractions import Fraction
-from typing import Any, cast
+from typing import Any
 
 from pydantic import ValidationError
 
 from jacobian.contracts.plugin_matrices import (
+    MatrixCandidate,
     MatrixCapabilityRequest,
+    MatrixClaim,
     MatrixEnumerationRequest,
-    MatrixEvaluationRequest,
     MatrixMaterializeRequest,
     MatrixReductionRequest,
+    MatrixScope,
     MatrixTransformRequest,
 )
 
@@ -35,65 +36,38 @@ MAX_SEARCHED_MATRICES = 65_536
 # ---------------------------------------------------------------------------
 
 
-_INTEGER_RE = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
-
-
-def _is_exact_integer(value: Any) -> bool:
-    if isinstance(value, bool):
-        return False
-    if isinstance(value, int):
-        return True
-    if isinstance(value, str):
-        return bool(_INTEGER_RE.match(value))
-    return False
-
-
 def _to_int(value: Any) -> int:
-    if isinstance(value, bool):
-        raise ValueError("boolean is not an exact integer")
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        if not _INTEGER_RE.match(value):
-            raise ValueError(f"not an exact integer: {value!r}")
-        return int(value)
-    raise ValueError(f"not an exact integer: {value!r}")
+    return int(value)
 
 
 def _to_int_matrix(entries: Any) -> list[list[int]]:
-    if not isinstance(entries, list):
+    if not isinstance(entries, (list, tuple)):
         raise ValueError("entries must be a list of rows")
     matrix: list[list[int]] = []
     for row in entries:
-        if not isinstance(row, list):
+        if not isinstance(row, (list, tuple)):
             raise ValueError("each row must be a list")
         matrix.append([_to_int(x) for x in row])
     return matrix
+
+
+def _candidate_matrix(candidate: MatrixCandidate) -> list[list[int]]:
+    return _to_int_matrix(candidate.entries)
 
 
 def _canonical_rational(frac: Fraction) -> dict[str, str]:
     return {"num": str(frac.numerator), "den": str(frac.denominator)}
 
 
-def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
-    """Page through a finite rectangular integer-matrix scope."""
-
-    try:
-        selected = MatrixEnumerationRequest.model_validate(request)
-    except ValidationError as exc:
-        raise ValueError(
-            "matrix enumeration request does not match its contract"
-        ) from exc
-    bounds = selected.bounds.model_dump(mode="json")
-    page_size = selected.page_size
-    offset = selected.cursor.offset if selected.cursor is not None else 0
-    errors = _validate_scope(bounds)
-    if errors:
-        raise ValueError("; ".join(errors))
-
-    rows = cast(int, bounds["rows"])
-    cols = cast(int, bounds["cols"])
-    values = [_to_int(value) for value in cast(list[Any], bounds["entries"])]
+def _enumerate_typed(
+    bounds: MatrixScope,
+    *,
+    page_size: int,
+    offset: int,
+) -> dict[str, Any]:
+    rows = bounds.rows
+    cols = bounds.cols
+    values = _scope_values(bounds)
     total = len(values) ** (rows * cols)
     stop = min(offset + page_size, total)
     candidates: list[dict[str, Any]] = []
@@ -122,6 +96,22 @@ def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def enumerate_candidates_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Page through a finite rectangular integer-matrix scope."""
+
+    try:
+        selected = MatrixEnumerationRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError(
+            "matrix enumeration request does not match its contract"
+        ) from exc
+    return _enumerate_typed(
+        selected.bounds,
+        page_size=selected.page_size,
+        offset=selected.cursor.offset if selected.cursor is not None else 0,
+    )
+
+
 def transform_row_major_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Propose a row-major representation of one integer matrix."""
 
@@ -131,17 +121,9 @@ def transform_row_major_capability(request: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(
             "matrix transform request does not match its contract"
         ) from exc
-    source = selected.source.model_dump(mode="json")
-    errors = validate_candidate(source)
-    if errors:
-        raise ValueError("; ".join(errors))
-    rows = cast(int, source["rows"])
-    cols = cast(int, source["cols"])
-    values = [
-        str(_to_int(value))
-        for row in cast(list[list[Any]], source["entries"])
-        for value in row
-    ]
+    rows = selected.source.rows
+    cols = selected.source.cols
+    values = [str(value) for row in _candidate_matrix(selected.source) for value in row]
     return {
         "response_version": "1",
         "transform_format": "matrix.row_major",
@@ -249,135 +231,28 @@ def _is_singular(matrix: list[list[int]]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _validate_scope(scope: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    rows = scope.get("rows")
-    cols = scope.get("cols")
-    entries = scope.get("entries")
-    if not isinstance(rows, int) or isinstance(rows, bool) or rows <= 0:
-        errors.append("scope.rows must be a positive integer")
-    if not isinstance(cols, int) or isinstance(cols, bool) or cols <= 0:
-        errors.append("scope.cols must be a positive integer")
-    if not isinstance(entries, list) or not entries:
-        errors.append("scope.entries must be a non-empty list of allowed integers")
-    else:
-        for e in entries:
-            if not _is_exact_integer(e):
-                errors.append(f"scope entry {e!r} is not an exact integer")
-                break
-    return errors
+def _scope_values(scope: MatrixScope) -> list[int]:
+    return [_to_int(value) for value in scope.entries]
 
 
-def _scope_iterator(
-    scope: dict[str, Any],
-) -> Iterator[tuple[int, list[list[int]]]]:
-    rows = cast(int, scope["rows"])
-    cols = cast(int, scope["cols"])
-    values = [_to_int(e) for e in scope["entries"]]
+def _scope_iterator(scope: MatrixScope) -> Iterator[tuple[int, list[list[int]]]]:
+    rows = scope.rows
+    cols = scope.cols
+    values = _scope_values(scope)
     positions = rows * cols
     for index, combo in enumerate(itertools.product(values, repeat=positions)):
         mat = [list(combo[i * cols : (i + 1) * cols]) for i in range(rows)]
         yield index, mat
 
 
-def _scope_total(scope: dict[str, Any]) -> int:
-    values = [_to_int(e) for e in scope["entries"]]
-    rows = cast(int, scope["rows"])
-    cols = cast(int, scope["cols"])
-    return cast(int, len(values) ** (rows * cols))
+def _scope_total(scope: MatrixScope) -> int:
+    values = _scope_values(scope)
+    return int(len(values) ** (int(scope.rows) * int(scope.cols)))
 
 
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
-
-
-def validate_candidate(payload: dict[str, Any]) -> list[str]:
-    """Return a list of validation errors for a matrix candidate payload."""
-    errors: list[str] = []
-    rows = payload.get("rows")
-    cols = payload.get("cols")
-    entries = payload.get("entries")
-
-    if not isinstance(rows, int) or isinstance(rows, bool) or rows <= 0:
-        errors.append("rows must be a positive integer")
-    if not isinstance(cols, int) or isinstance(cols, bool) or cols <= 0:
-        errors.append("cols must be a positive integer")
-    if not isinstance(entries, list):
-        errors.append("entries must be a list of rows")
-        return errors
-
-    if rows is not None and len(entries) != rows:
-        errors.append(f"entries has {len(entries)} rows, expected {rows}")
-
-    for i, row in enumerate(entries):
-        if not isinstance(row, list):
-            errors.append(f"row {i} is not a list")
-            continue
-        if cols is not None and len(row) != cols:
-            errors.append(f"row {i} has {len(row)} columns, expected {cols}")
-        for j, val in enumerate(row):
-            if not _is_exact_integer(val):
-                errors.append(f"entry ({i},{j}) is not an exact integer")
-
-    if not errors:
-        try:
-            _to_int_matrix(entries)
-        except ValueError as exc:
-            errors.append(str(exc))
-
-    return errors
-
-
-def validate_claim(payload: dict[str, Any]) -> list[str]:
-    """Return a list of validation errors for a matrix claim payload."""
-    errors: list[str] = []
-    predicate = payload.get("predicate")
-    if predicate == "is_nonsingular":
-        pass
-    elif predicate == "maximize_absolute_determinant":
-        scope = payload.get("scope")
-        if not isinstance(scope, dict):
-            errors.append("maximize_absolute_determinant requires a scope")
-        else:
-            errors.extend(_validate_scope(scope))
-            if (
-                isinstance(scope.get("rows"), int)
-                and isinstance(scope.get("cols"), int)
-                and scope["rows"] != scope["cols"]
-            ):
-                errors.append("determinant scope must be square")
-    else:
-        errors.append(f"unsupported matrix claim predicate: {predicate}")
-    return errors
-
-
-def _validate_candidate_for_claim(
-    claim: dict[str, Any], candidate: dict[str, Any]
-) -> list[str]:
-    errors = validate_candidate(candidate)
-    if (
-        not errors
-        and claim.get("predicate")
-        in {"is_nonsingular", "maximize_absolute_determinant"}
-        and candidate.get("rows") != candidate.get("cols")
-    ):
-        errors.append("determinant predicates require a square matrix")
-    if not errors and claim.get("predicate") == "maximize_absolute_determinant":
-        scope = claim.get("scope")
-        if not isinstance(scope, dict):
-            errors.append("maximize_absolute_determinant requires a scope")
-        else:
-            if candidate.get("rows") != scope.get("rows") or candidate.get(
-                "cols"
-            ) != scope.get("cols"):
-                errors.append("candidate dimensions do not match claim scope")
-            else:
-                allowed = {_to_int(value) for value in scope["entries"]}
-                matrix = _to_int_matrix(candidate["entries"])
-                if any(entry not in allowed for row in matrix for entry in row):
-                    errors.append("candidate entry is outside claim scope")
-    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -410,21 +285,6 @@ def _rejected(errors: list[str], start: float) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _claim_view(payload: dict[str, Any]) -> dict[str, Any]:
-    """Project a generic ClaimSpec into this plugin's compact domain view."""
-
-    predicate = payload.get("predicate")
-    if not isinstance(predicate, dict):
-        return payload
-    parameters = predicate.get("parameters", {})
-    bounds = payload.get("bounds", {})
-    return {
-        "predicate": predicate.get("name"),
-        **(parameters if isinstance(parameters, dict) else {}),
-        **(bounds if isinstance(bounds, dict) else {}),
-    }
-
-
 def _matrix_capability_request(request: dict[str, Any]) -> MatrixCapabilityRequest:
     try:
         return MatrixCapabilityRequest.model_validate(request)
@@ -443,92 +303,50 @@ def _matrix_reduction_request(request: dict[str, Any]) -> MatrixReductionRequest
         ) from exc
 
 
-def evaluate(request: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate integer-matrix candidates for a claim.  Results are unverified."""
-    start = time.monotonic()
-    try:
-        selected = MatrixEvaluationRequest.model_validate(request)
-    except ValidationError:
-        return _rejected(
-            ["matrix evaluation request does not match its contract"], start
-        )
-    claim = selected.claim.model_dump(mode="json")
-    candidate_list = (
-        [selected.candidate.model_dump(mode="json")]
-        if selected.candidate is not None
-        else [
-            candidate.model_dump(mode="json") for candidate in selected.candidates or ()
-        ]
-    )
-
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
-
-    predicate = claim.get("predicate")
-    results: list[dict[str, Any]] = []
-
-    for idx, candidate in enumerate(candidate_list):
-        if candidate is None:
-            results.append({"candidate_index": idx, "error": "missing candidate"})
-            continue
-        cand_errors = _validate_candidate_for_claim(claim, candidate)
-        if cand_errors:
-            return _rejected(cand_errors, start)
-
-        matrix = _to_int_matrix(candidate["entries"])
-        det = _det_fraction(matrix)
-
-        if predicate == "is_nonsingular":
-            result: dict[str, Any] = {
-                "candidate_index": idx,
-                "objective": {
-                    "name": "determinant",
-                    "value": _canonical_rational(det),
-                },
-                "is_singular": det == 0,
-                "proposed_witness": None,
-                "coverage": "EXHAUSTIVE",
-                "arithmetic": "EXACT_RATIONAL",
-                "detail": "exact rational determinant",
-            }
-            if det == 0:
-                vec = _kernel_vector(matrix)
-                if vec is not None:
-                    result["proposed_witness"] = {
-                        "witness_format": "matrix.kernel_vector",
-                        "format_version": "1",
-                        "role": "DEFEATS_CANDIDATE",
-                        "payload": {"vector": [_canonical_rational(v) for v in vec]},
-                    }
-                    result["detail"] = (
-                        "matrix is singular with a non-zero kernel vector"
-                    )
-            results.append(result)
-
-        elif predicate == "maximize_absolute_determinant":
-            abs_det = abs(det)
-            results.append(
-                {
-                    "candidate_index": idx,
-                    "objective": {
-                        "name": "abs_determinant",
-                        "value": _canonical_rational(abs_det),
-                    },
-                    "is_singular": det == 0,
-                    "proposed_witness": None,
-                    "coverage": "EXHAUSTIVE",
-                    "arithmetic": "EXACT_RATIONAL",
-                    "detail": "exact rational absolute determinant",
+def _evaluate_typed(
+    claim: MatrixClaim,
+    candidate: MatrixCandidate,
+) -> dict[str, Any]:
+    matrix = _candidate_matrix(candidate)
+    det = _det_fraction(matrix)
+    if claim.predicate == "is_nonsingular":
+        result: dict[str, Any] = {
+            "objective": {
+                "name": "determinant",
+                "value": _canonical_rational(det),
+            },
+            "is_singular": det == 0,
+            "proposed_witness": None,
+            "coverage": "EXHAUSTIVE",
+            "arithmetic": "EXACT_RATIONAL",
+            "detail": "exact rational determinant",
+        }
+        if det == 0:
+            vec = _kernel_vector(matrix)
+            if vec is not None:
+                result["proposed_witness"] = {
+                    "witness_format": "matrix.kernel_vector",
+                    "format_version": "1",
+                    "role": "DEFEATS_CANDIDATE",
+                    "payload": {"vector": [_canonical_rational(v) for v in vec]},
                 }
-            )
+                result["detail"] = "matrix is singular with a non-zero kernel vector"
+        return result
 
-    response = _ok(start)
-    response["results"] = results
-    response["coverage"] = "EXHAUSTIVE"
-    response["arithmetic"] = "EXACT_RATIONAL"
-    response["detail"] = "matrix search-side evaluation"
-    return response
+    if claim.predicate == "maximize_absolute_determinant":
+        return {
+            "objective": {
+                "name": "abs_determinant",
+                "value": _canonical_rational(abs(det)),
+            },
+            "is_singular": det == 0,
+            "proposed_witness": None,
+            "coverage": "EXHAUSTIVE",
+            "arithmetic": "EXACT_RATIONAL",
+            "detail": "exact rational absolute determinant",
+        }
+
+    raise ValueError("unsupported matrix claim predicate")
 
 
 def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
@@ -540,19 +358,12 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(
             "matrix evaluation request does not match its contract"
         ) from exc
-    claim = selected.claim.model_dump(mode="json")
     candidate_model = selected.candidate
-    candidate = (
-        candidate_model.model_dump(mode="json") if candidate_model is not None else None
-    )
-    response = evaluate({"claim": claim, "candidate": candidate})
-    if response["input"]["status"] != "ACCEPTED":
-        raise ValueError("; ".join(response["input"]["errors"]))
-    result = response["results"][0]
-    if "error" in result:
-        raise ValueError(result["error"])
+    if candidate_model is None:
+        raise ValueError("matrix evaluation request requires a candidate")
+    result = _evaluate_typed(selected.claim, candidate_model)
     objective = result["objective"]
-    predicate = claim.get("predicate")
+    predicate = selected.claim.predicate
     if predicate == "is_nonsingular":
         conclusion = "FALSE" if result["is_singular"] else "TRUE"
         method = "EXHAUSTIVE_FINITE"
@@ -583,149 +394,104 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def find_witness(request: dict[str, Any]) -> dict[str, Any]:
-    """Search for a matrix witness.  Result is unverified."""
-    start = time.monotonic()
-    selected = _matrix_capability_request(request)
-    claim = selected.claim.model_dump(mode="json")
-    candidate = (
-        selected.candidate.model_dump(mode="json")
-        if selected.candidate is not None
-        else None
-    )
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
+def _find_kernel_witness_typed(
+    candidate: MatrixCandidate | None,
+) -> dict[str, Any]:
+    if candidate is None:
+        raise ValueError("is_nonsingular witness requires a candidate")
+    matrix = _candidate_matrix(candidate)
+    vec = _kernel_vector(matrix)
+    if vec is None:
+        return {
+            "status": "SEARCH_EXHAUSTED",
+            "witness": None,
+            "coverage": "EXHAUSTIVE",
+            "arithmetic": "EXACT_RATIONAL",
+            "detail": "matrix has trivial kernel only",
+        }
+    return {
+        "status": "FOUND",
+        "witness": {"vector": [_canonical_rational(v) for v in vec]},
+        "witness_format": "matrix.kernel_vector",
+        "format_version": "1",
+        "role": "DEFEATS_CANDIDATE",
+        "coverage": "EXHAUSTIVE",
+        "arithmetic": "EXACT_RATIONAL",
+        "detail": "non-zero kernel vector found",
+    }
 
-    predicate = claim.get("predicate")
-    requested_role = selected.witness_role
 
-    if predicate == "is_nonsingular":
+def _find_maxdet_witness_typed(
+    claim: MatrixClaim,
+) -> dict[str, Any]:
+    scope = claim.scope
+    if scope is None:
+        raise ValueError("maximize_absolute_determinant witness requires a scope")
+    if _scope_total(scope) > MAX_SEARCHED_MATRICES:
+        raise ValueError(
+            f"scope exceeds witness search limit of {MAX_SEARCHED_MATRICES} candidates"
+        )
+
+    best_value = Fraction(-1)
+    best_index = -1
+    best_matrix: list[list[int]] = []
+    for index, mat in _scope_iterator(scope):
+        det = abs(_det_fraction(mat))
+        if det > best_value:
+            best_value = det
+            best_index = index
+            best_matrix = mat
+
+    if best_index < 0:
+        raise ValueError("scope contains no candidates")
+
+    return {
+        "status": "FOUND",
+        "witness": {
+            "matrix": {
+                "rows": scope.rows,
+                "cols": scope.cols,
+                "entries": best_matrix,
+            },
+            "objective_value": _canonical_rational(best_value),
+            "index": best_index,
+        },
+        "witness_format": "matrix.maximizer",
+        "format_version": "1",
+        "role": "SUPPORTS_CLAIM",
+        "coverage": "EXHAUSTIVE",
+        "arithmetic": "EXACT_RATIONAL",
+        "detail": f"maximizer with |det| = {best_value}",
+    }
+
+
+def _find_witness_typed(
+    claim: MatrixClaim,
+    candidate: MatrixCandidate | None,
+    requested_role: str,
+) -> dict[str, Any]:
+    if claim.predicate == "is_nonsingular":
         if requested_role != "DEFEATS_CANDIDATE":
-            return _rejected(
-                ["is_nonsingular supports only DEFEATS_CANDIDATE witnesses"],
-                start,
-            )
-        if candidate is None:
-            return _rejected(["is_nonsingular witness requires a candidate"], start)
-        cand_errors = _validate_candidate_for_claim(claim, candidate)
-        if cand_errors:
-            return _rejected(cand_errors, start)
-        matrix = _to_int_matrix(candidate["entries"])
-        vec = _kernel_vector(matrix)
-        if vec is None:
-            response = _ok(start)
-            response.update(
-                {
-                    "status": "SEARCH_EXHAUSTED",
-                    "witness": None,
-                    "coverage": "EXHAUSTIVE",
-                    "arithmetic": "EXACT_RATIONAL",
-                    "detail": "matrix has trivial kernel only",
-                }
-            )
-            return response
-        response = _ok(start)
-        response.update(
-            {
-                "status": "FOUND",
-                "witness": {"vector": [_canonical_rational(v) for v in vec]},
-                "witness_format": "matrix.kernel_vector",
-                "format_version": "1",
-                "role": "DEFEATS_CANDIDATE",
-                "coverage": "EXHAUSTIVE",
-                "arithmetic": "EXACT_RATIONAL",
-                "detail": "non-zero kernel vector found",
-            }
-        )
-        return response
-
-    if predicate == "maximize_absolute_determinant":
+            raise ValueError("is_nonsingular supports only DEFEATS_CANDIDATE witnesses")
+        return _find_kernel_witness_typed(candidate)
+    if claim.predicate == "maximize_absolute_determinant":
         if requested_role != "SUPPORTS_CLAIM":
-            return _rejected(
-                [
-                    "maximize_absolute_determinant supports only "
-                    "SUPPORTS_CLAIM witnesses"
-                ],
-                start,
+            raise ValueError(
+                "maximize_absolute_determinant supports only SUPPORTS_CLAIM witnesses"
             )
-        scope = claim.get("scope")
-        if scope is None:
-            return _rejected(
-                ["maximize_absolute_determinant witness requires a scope"], start
-            )
-        scope_errors = _validate_scope(scope)
-        if scope_errors:
-            return _rejected(scope_errors, start)
-        if _scope_total(scope) > MAX_SEARCHED_MATRICES:
-            return _rejected(
-                [
-                    "scope exceeds witness search limit of "
-                    f"{MAX_SEARCHED_MATRICES} candidates"
-                ],
-                start,
-            )
-
-        best_value = Fraction(-1)
-        best_index = -1
-        best_matrix: list[list[int]] = []
-        for index, mat in _scope_iterator(scope):
-            det = abs(_det_fraction(mat))
-            if det > best_value:
-                best_value = det
-                best_index = index
-                best_matrix = mat
-
-        if best_index < 0:
-            return _rejected(["scope contains no candidates"], start)
-
-        response = _ok(start)
-        response.update(
-            {
-                "status": "FOUND",
-                "witness": {
-                    "matrix": {
-                        "rows": scope["rows"],
-                        "cols": scope["cols"],
-                        "entries": best_matrix,
-                    },
-                    "objective_value": _canonical_rational(best_value),
-                    "index": best_index,
-                },
-                "witness_format": "matrix.maximizer",
-                "format_version": "1",
-                "role": "SUPPORTS_CLAIM",
-                "coverage": "EXHAUSTIVE",
-                "arithmetic": "EXACT_RATIONAL",
-                "detail": f"maximizer with |det| = {best_value}",
-            }
-        )
-        return response
-
-    return _rejected(["unsupported matrix claim predicate for witness search"], start)
+        return _find_maxdet_witness_typed(claim)
+    raise ValueError("unsupported matrix claim predicate for witness search")
 
 
 def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return matrix witness search in the generic oracle contract."""
 
-    response = find_witness(request)
-    if response["input"]["status"] != "ACCEPTED":
-        raise ValueError("; ".join(response["input"]["errors"]))
-    return {
-        key: value
-        for key, value in response.items()
-        if key
-        in {
-            "status",
-            "witness",
-            "witness_format",
-            "format_version",
-            "role",
-            "arithmetic",
-            "coverage",
-            "detail",
-        }
-    }
+    selected = _matrix_capability_request(request)
+    return _find_witness_typed(
+        selected.claim,
+        selected.candidate,
+        selected.witness_role,
+    )
 
 
 def materialize(request: dict[str, Any]) -> dict[str, Any]:
@@ -737,23 +503,14 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         return _rejected(
             ["matrix materialization request does not match its contract"], start
         )
-    claim = selected.claim.model_dump(mode="json")
-
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
-
-    if claim.get("predicate") != "maximize_absolute_determinant":
+    if selected.claim.predicate != "maximize_absolute_determinant":
         return _rejected(
             ["matrix materialize supports maximize_absolute_determinant only"], start
         )
 
-    scope = claim.get("scope")
+    scope = selected.claim.scope
     if scope is None:
         return _rejected(["missing scope"], start)
-    scope_errors = _validate_scope(scope)
-    if scope_errors:
-        return _rejected(scope_errors, start)
     if _scope_total(scope) > MAX_SEARCHED_MATRICES:
         return _rejected(
             [
@@ -769,8 +526,8 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
             {
                 "index": index,
                 "candidate": {
-                    "rows": scope["rows"],
-                    "cols": scope["cols"],
+                    "rows": scope.rows,
+                    "cols": scope.cols,
                     "entries": mat,
                 },
             }
@@ -784,83 +541,67 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
-def reductions(request: dict[str, Any]) -> dict[str, Any]:
-    """Propose candidate reductions that preserve the attacked predicate."""
-    start = time.monotonic()
-    selected = _matrix_reduction_request(request)
-    target_kind = selected.target_kind
-    target = selected.target.model_dump(mode="json")
-    claim = selected.claim.model_dump(mode="json")
+def _singular_reduction_proposals(matrix: list[list[int]]) -> list[dict[str, Any]]:
+    n = len(matrix)
+    proposed: list[dict[str, Any]] = []
 
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
+    for i in range(n):
+        reduced = [
+            [matrix[r][c] for c in range(n) if c != i] for r in range(n) if r != i
+        ]
+        if reduced and _is_singular(reduced) and _kernel_vector(reduced) is not None:
+            proposed.append(
+                {
+                    "reduction_kind": "delete_row_column",
+                    "index": i,
+                    "objectives": {
+                        "elements": (n - 1) * (n - 1),
+                        "max_abs_entry": max(abs(x) for row in reduced for x in row),
+                    },
+                }
+            )
 
-    if target_kind != "candidate":
+    for i in range(n):
+        for j in range(n):
+            reduced = [row[:] for row in matrix]
+            reduced[i][j] = 0
+            if _is_singular(reduced) and _kernel_vector(reduced) is not None:
+                proposed.append(
+                    {
+                        "reduction_kind": "zero_entry",
+                        "row": i,
+                        "col": j,
+                        "objectives": {
+                            "elements": n * n,
+                            "max_abs_entry": max(
+                                abs(x) for row in reduced for x in row
+                            ),
+                        },
+                    }
+                )
+
+    proposed.sort(
+        key=lambda r: (r["objectives"]["elements"], r["objectives"]["max_abs_entry"])
+    )
+    return proposed
+
+
+def _reductions_typed(
+    selected: MatrixReductionRequest,
+    *,
+    start: float,
+) -> dict[str, Any]:
+    if selected.target_kind != "candidate":
         response = _ok(start)
         response["reductions"] = []
         response["detail"] = "matrix plugin only supports candidate reduction"
         return response
 
-    cand_errors = _validate_candidate_for_claim(claim, target)
-    if cand_errors:
-        return _rejected(cand_errors, start)
-
-    predicate = claim.get("predicate")
-    matrix = _to_int_matrix(target["entries"])
-    n = len(matrix)
-
-    proposed: list[dict[str, Any]] = []
-
-    if predicate == "is_nonsingular" and _is_singular(matrix):
-        # Try deleting matching row and column.
-        for i in range(n):
-            reduced = [
-                [matrix[r][c] for c in range(n) if c != i] for r in range(n) if r != i
-            ]
-            if reduced and _is_singular(reduced):
-                vec = _kernel_vector(reduced)
-                if vec is not None:
-                    proposed.append(
-                        {
-                            "reduction_kind": "delete_row_column",
-                            "index": i,
-                            "objectives": {
-                                "elements": (n - 1) * (n - 1),
-                                "max_abs_entry": max(
-                                    abs(x) for row in reduced for x in row
-                                ),
-                            },
-                        }
-                    )
-
-        # Try zeroing a single entry.
-        for i in range(n):
-            for j in range(n):
-                reduced = [row[:] for row in matrix]
-                reduced[i][j] = 0
-                if _is_singular(reduced):
-                    vec = _kernel_vector(reduced)
-                    if vec is not None:
-                        proposed.append(
-                            {
-                                "reduction_kind": "zero_entry",
-                                "row": i,
-                                "col": j,
-                                "objectives": {
-                                    "elements": n * n,
-                                    "max_abs_entry": max(
-                                        abs(x) for row in reduced for x in row
-                                    ),
-                                },
-                            }
-                        )
-
-    # maximize_absolute_determinant has no candidate reductions in the
-    # maintained reference profile.
-
-    proposed.sort(
-        key=lambda r: (r["objectives"]["elements"], r["objectives"]["max_abs_entry"])
+    matrix = _candidate_matrix(selected.target)
+    proposed = (
+        _singular_reduction_proposals(matrix)
+        if selected.claim.predicate == "is_nonsingular" and _is_singular(matrix)
+        else []
     )
 
     response = _ok(start)
@@ -876,13 +617,7 @@ def reductions_capability(request: dict[str, Any]) -> dict[str, Any]:
 
     selected = _matrix_reduction_request(request)
     target = selected.target.model_dump(mode="json")
-    response = reductions(
-        {
-            "target_kind": selected.target_kind,
-            "target": target,
-            "claim": selected.claim.model_dump(mode="json"),
-        }
-    )
+    response = _reductions_typed(selected, start=time.monotonic())
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
     requested = set(selected.reducers)

@@ -6,35 +6,16 @@ from typing import Literal, Self
 
 from pydantic import Field, StrictInt, StrictStr, model_validator
 
-from jacobian.contracts.claims import ClaimSpec
+from jacobian.contracts.claims import flatten_claim_spec
+from jacobian.contracts.exact import CanonicalInteger
 from jacobian.contracts.plugin_protocol import PluginRequestContext
 from jacobian.contracts.results import ContractModel
-
-
-def _flatten_claim(value: object) -> object:
-    if not isinstance(value, dict) or not isinstance(value.get("predicate"), dict):
-        return value
-    claim = ClaimSpec.model_validate(value)
-    return {
-        "predicate": claim.predicate.name,
-        **claim.predicate.parameters,
-        **claim.bounds,
-    }
 
 
 class MatrixScope(ContractModel):
     rows: StrictInt = Field(ge=1, le=32)
     cols: StrictInt = Field(ge=1, le=32)
-    entries: tuple[StrictInt | StrictStr, ...] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validate_entries(self) -> Self:
-        for value in self.entries:
-            if isinstance(value, str) and (
-                not value or not value.lstrip("-").isdigit()
-            ):
-                raise ValueError("scope entries must be exact integers")
-        return self
+    entries: tuple[StrictInt | CanonicalInteger, ...] = Field(min_length=1)
 
 
 class MatrixClaim(ContractModel):
@@ -44,7 +25,7 @@ class MatrixClaim(ContractModel):
     @model_validator(mode="before")
     @classmethod
     def flatten_generic_claim(cls, value: object) -> object:
-        return _flatten_claim(value)
+        return flatten_claim_spec(value)
 
     @model_validator(mode="after")
     def validate_scope_for_predicate(self) -> Self:
@@ -59,7 +40,7 @@ class MatrixClaim(ContractModel):
 class MatrixCandidate(ContractModel):
     rows: StrictInt = Field(ge=1, le=32)
     cols: StrictInt = Field(ge=1, le=32)
-    entries: tuple[tuple[StrictInt | StrictStr, ...], ...]
+    entries: tuple[tuple[StrictInt | CanonicalInteger, ...], ...]
 
     @model_validator(mode="after")
     def validate_matrix_shape(self) -> Self:
@@ -67,37 +48,35 @@ class MatrixCandidate(ContractModel):
             len(row) != self.cols for row in self.entries
         ):
             raise ValueError("matrix entries must match rows and cols")
-        for value in (item for row in self.entries for item in row):
-            if (
-                isinstance(value, bool)
-                or (
-                    isinstance(value, str)
-                    and (not value or not value.lstrip("-").isdigit())
-                )
-                or not isinstance(value, (int, str))
-            ):
-                raise ValueError("matrix entries must be exact integers")
         return self
 
-
-class MatrixEvaluationRequest(PluginRequestContext):
-    claim: MatrixClaim
-    candidate: MatrixCandidate | None = None
-    candidates: tuple[MatrixCandidate, ...] | None = None
-
-    @model_validator(mode="after")
-    def require_candidates(self) -> Self:
-        if self.candidate is not None and self.candidates is not None:
-            raise ValueError("candidate and candidates cannot be combined")
-        if self.candidate is None and not self.candidates:
-            raise ValueError("at least one candidate is required")
-        return self
+    def validate_for_claim(self, claim: MatrixClaim) -> None:
+        if (
+            claim.predicate in {"is_nonsingular", "maximize_absolute_determinant"}
+            and self.rows != self.cols
+        ):
+            raise ValueError("determinant predicates require a square matrix")
+        if claim.predicate == "maximize_absolute_determinant":
+            assert claim.scope is not None
+            if self.rows != claim.scope.rows or self.cols != claim.scope.cols:
+                raise ValueError("candidate dimensions do not match claim scope")
+            allowed = {int(value) for value in claim.scope.entries}
+            if any(int(entry) not in allowed for row in self.entries for entry in row):
+                raise ValueError("candidate entry is outside claim scope")
 
 
 class MatrixCapabilityRequest(PluginRequestContext):
     claim: MatrixClaim
     candidate: MatrixCandidate | None = None
     witness_role: Literal["DEFEATS_CANDIDATE", "SUPPORTS_CLAIM"] = "DEFEATS_CANDIDATE"
+
+    @model_validator(mode="after")
+    def validate_candidate_for_claim(self) -> Self:
+        if self.claim.predicate == "is_nonsingular" and self.candidate is None:
+            raise ValueError("is_nonsingular capability requires a candidate")
+        if self.candidate is not None:
+            self.candidate.validate_for_claim(self.claim)
+        return self
 
 
 class MatrixReductionRequest(PluginRequestContext):
@@ -106,6 +85,11 @@ class MatrixReductionRequest(PluginRequestContext):
     claim: MatrixClaim
     reducers: tuple[Literal["delete_row_column", "zero_entry"], ...] = ()
     objectives: tuple[Literal["elements", "max_abs_entry"], ...] = ()
+
+    @model_validator(mode="after")
+    def validate_target_for_claim(self) -> Self:
+        self.target.validate_for_claim(self.claim)
+        return self
 
 
 class MatrixCursor(ContractModel):
@@ -137,7 +121,6 @@ __all__ = [
     "MatrixClaim",
     "MatrixCursor",
     "MatrixEnumerationRequest",
-    "MatrixEvaluationRequest",
     "MatrixMaterializeRequest",
     "MatrixReductionRequest",
     "MatrixScope",

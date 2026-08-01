@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 from itertools import pairwise, permutations
-from typing import Any, cast
+from typing import Any
 
 import networkx as nx
 from pydantic import ValidationError
@@ -21,153 +21,17 @@ from jacobian.canonical import canonicalize_json
 from jacobian.contracts.plugin_graphs import (
     GraphCanonicalizeRequest,
     GraphEnumerationRequest,
+    GraphPathCandidate,
     GraphPathCapabilityRequest,
-    GraphPathEvaluationRequest,
+    GraphPathClaim,
     GraphPathReductionRequest,
 )
 
-# ---------------------------------------------------------------------------
-# Validation helpers
-# ---------------------------------------------------------------------------
 
-
-def _is_positive_int(value: Any) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool) and value > 0
-
-
-def _is_valid_path(
-    path: Any,
-    *,
-    vertex_set: set[str],
-    arc_set: set[tuple[str, str]],
-    source: str,
-    terminals: set[str],
-) -> bool:
-    if (
-        not isinstance(path, list)
-        or len(path) < 2
-        or not all(isinstance(v, str) for v in path)
-        or path[0] != source
-        or path[-1] not in terminals
-        or len(path) != len(set(path))
-        or any(v not in vertex_set for v in path)
-    ):
-        return False
-    return all((left, right) in arc_set for left, right in pairwise(path))
-
-
-def validate_candidate(payload: dict[str, Any]) -> list[str]:
-    """Return a list of validation errors for a graph candidate payload."""
-    errors: list[str] = []
-    vertices = payload.get("vertices")
-    arcs = payload.get("arcs")
-    source = payload.get("source")
-    terminals = payload.get("terminals")
-    intended_paths = payload.get("intended_paths")
-
-    if not isinstance(vertices, list) or not vertices:
-        errors.append("vertices must be a non-empty list")
-        return errors
-    if len(vertices) != len(set(vertices)) or not all(
-        isinstance(v, str) for v in vertices
-    ):
-        errors.append("vertices must be unique strings")
-        return errors
-
-    vertex_set = set(vertices)
-
-    if source is not None and source not in vertex_set:
-        errors.append("source is not a graph vertex")
-
-    if terminals is not None:
-        if not isinstance(terminals, list):
-            errors.append("terminals must be a list")
-        elif not terminals or any(t not in vertex_set for t in terminals):
-            errors.append("terminals are invalid")
-
-    if arcs is not None:
-        if not isinstance(arcs, list):
-            errors.append("arcs must be a list")
-        else:
-            seen: set[tuple[str, str]] = set()
-            for arc in arcs:
-                if (
-                    not isinstance(arc, list)
-                    or len(arc) != 2
-                    or arc[0] not in vertex_set
-                    or arc[1] not in vertex_set
-                ):
-                    errors.append(f"arc {arc} is malformed or out of domain")
-                    break
-                pair = (arc[0], arc[1])
-                if pair in seen:
-                    errors.append(f"duplicate arc {arc}")
-                    break
-                seen.add(pair)
-
-    if intended_paths is not None and not errors:
-        if not isinstance(intended_paths, list):
-            errors.append("intended_paths must be a list")
-        else:
-            arc_set = {tuple(a) for a in arcs} if isinstance(arcs, list) else set()
-            term_set = set(terminals) if isinstance(terminals, list) else set()
-            default_source = source if isinstance(source, str) else vertices[0]
-            for path in intended_paths:
-                if not _is_valid_path(
-                    path,
-                    vertex_set=vertex_set,
-                    arc_set=arc_set,
-                    source=default_source,
-                    terminals=term_set,
-                ):
-                    errors.append(f"intended path {path} is invalid")
-                    break
-
-    return errors
-
-
-def validate_claim(payload: dict[str, Any]) -> list[str]:
-    """Return a list of validation errors for a graph claim payload."""
-    errors: list[str] = []
-    predicate = payload.get("predicate")
-    if predicate == "intended_paths_complete":
-        if payload.get("simple") is not True:
-            errors.append("intended_paths_complete requires simple=True")
-        max_len = payload.get("max_path_length")
-        if max_len is not None and not _is_positive_int(max_len):
-            errors.append("max_path_length must be a positive integer")
-    elif predicate == "is_bipartite":
-        pass
-    else:
-        errors.append(f"unsupported graph claim predicate: {predicate}")
-    return errors
-
-
-def _validate_candidate_for_claim(
-    claim: dict[str, Any], candidate: dict[str, Any]
-) -> list[str]:
-    errors = validate_candidate(candidate)
-    if errors or claim.get("predicate") != "intended_paths_complete":
-        return errors
-
-    source = candidate.get("source")
-    terminals = candidate.get("terminals")
-    intended_paths = candidate.get("intended_paths")
-    if not isinstance(source, str):
-        errors.append("intended_paths_complete requires a source vertex")
-    if not isinstance(terminals, list) or not terminals:
-        errors.append("intended_paths_complete requires non-empty terminals")
-    elif isinstance(source, str) and source in terminals:
-        errors.append("source cannot also be a terminal")
-    if not isinstance(intended_paths, list):
-        errors.append("intended_paths_complete requires intended_paths")
-    return errors
-
-
-def _path_coverage(claim: dict[str, Any], candidate: dict[str, Any]) -> str:
+def _path_coverage(claim: GraphPathClaim, candidate: GraphPathCandidate) -> str:
     return (
         "EXHAUSTIVE"
-        if _max_path_length(claim, candidate) >= len(candidate["vertices"])
+        if _max_path_length(claim, candidate) >= len(candidate.vertices)
         else "BOUNDED"
     )
 
@@ -177,48 +41,47 @@ def _path_coverage(claim: dict[str, Any], candidate: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _as_digraph(payload: dict[str, Any]) -> nx.DiGraph[str]:
+def _as_digraph(candidate: GraphPathCandidate) -> nx.DiGraph[str]:
     g: nx.DiGraph[str] = nx.DiGraph()
-    g.add_nodes_from(payload.get("vertices", []))
-    for arc in payload.get("arcs", []):
-        g.add_edge(arc[0], arc[1])
+    g.add_nodes_from(candidate.vertices)
+    g.add_edges_from(candidate.arcs)
     return g
 
 
-def _max_path_length(claim: dict[str, Any], candidate: dict[str, Any]) -> int:
-    value = claim.get("max_path_length")
+def _max_path_length(claim: GraphPathClaim, candidate: GraphPathCandidate) -> int:
+    value = claim.max_path_length
     if value is None:
-        value = len(candidate.get("vertices", []))
-    return cast(int, value)
+        return len(candidate.vertices)
+    return value
 
 
 def _enumerate_simple_paths(
-    candidate: dict[str, Any], max_length: int
+    candidate: GraphPathCandidate, max_length: int
 ) -> set[tuple[str, ...]]:
     """Enumerate all simple source-terminal paths with at most max_length vertices."""
     g = _as_digraph(candidate)
-    source = candidate.get("source")
-    terminals = candidate.get("terminals") or []
-    if source is None or not terminals:
+    if candidate.source is None or not candidate.terminals:
         return set()
     cutoff = max(1, max_length - 1)
     paths: set[tuple[str, ...]] = set()
-    for target in terminals:
-        for path in nx.all_simple_paths(g, source, target, cutoff=cutoff):
-            paths.add(tuple(cast(list[str], path)))
+    for target in candidate.terminals:
+        for path in nx.all_simple_paths(g, candidate.source, target, cutoff=cutoff):
+            paths.add(tuple(path))
     return paths
 
 
-def _find_omitted_path(candidate: dict[str, Any], max_length: int) -> list[str] | None:
+def _find_omitted_path(
+    candidate: GraphPathCandidate, max_length: int
+) -> list[str] | None:
     actual = _enumerate_simple_paths(candidate, max_length)
-    intended = {tuple(p) for p in candidate.get("intended_paths", [])}
+    intended = set(candidate.intended_paths or ())
     for path in sorted(actual):
         if path not in intended:
             return list(path)
     return None
 
 
-def _find_odd_cycle(candidate: dict[str, Any]) -> list[str] | None:
+def _find_odd_cycle(candidate: GraphPathCandidate) -> list[str] | None:
     """Return an odd cycle in the underlying graph, or None if none exists."""
     g = _as_digraph(candidate)
     ug = g.to_undirected()
@@ -230,7 +93,7 @@ def _find_odd_cycle(candidate: dict[str, Any]) -> list[str] | None:
     return None
 
 
-def _two_coloring(candidate: dict[str, Any]) -> dict[str, int] | None:
+def _two_coloring(candidate: GraphPathCandidate) -> dict[str, int] | None:
     ug = _as_digraph(candidate).to_undirected()
     if not nx.is_bipartite(ug):
         return None
@@ -273,128 +136,70 @@ def _rejected(errors: list[str], start: float) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _claim_view(payload: dict[str, Any]) -> dict[str, Any]:
-    """Project a generic ClaimSpec into this plugin's compact domain view."""
-
-    predicate = payload.get("predicate")
-    if not isinstance(predicate, dict):
-        return payload
-    parameters = predicate.get("parameters", {})
-    bounds = payload.get("bounds", {})
-    return {
-        "predicate": predicate.get("name"),
-        **(parameters if isinstance(parameters, dict) else {}),
-        **(bounds if isinstance(bounds, dict) else {}),
-    }
-
-
-def evaluate(request: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate graph candidates for a claim.  Results are unverified."""
-    start = time.monotonic()
-    try:
-        selected = GraphPathEvaluationRequest.model_validate(request)
-    except ValidationError:
-        return _rejected(
-            ["graph evaluation request does not match its contract"], start
-        )
-    claim = selected.claim.model_dump(mode="json", exclude_none=True)
-    candidate_list = (
-        [selected.candidate.model_dump(mode="json", exclude_none=True)]
-        if selected.candidate is not None
-        else [
-            candidate.model_dump(mode="json", exclude_none=True)
-            for candidate in selected.candidates or ()
-        ]
-    )
-
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
-
-    results: list[dict[str, Any]] = []
-    for idx, candidate in enumerate(candidate_list):
-        if candidate is None:
-            results.append({"candidate_index": idx, "error": "missing candidate"})
-            continue
-        cand_errors = _validate_candidate_for_claim(claim, candidate)
-        if cand_errors:
-            return _rejected(cand_errors, start)
-
-        predicate = claim.get("predicate")
-        max_len = _max_path_length(claim, candidate)
-
-        if predicate == "intended_paths_complete":
-            actual = _enumerate_simple_paths(candidate, max_len)
-            intended = {tuple(p) for p in candidate.get("intended_paths", [])}
-            omitted = [list(p) for p in sorted(actual) if p not in intended]
-            result: dict[str, Any] = {
-                "candidate_index": idx,
-                "objective": {
-                    "name": "path_family_complete",
-                    "value": len(omitted) == 0,
-                    "num_actual": len(actual),
-                    "num_intended": len(intended),
-                },
-                "proposed_witness": None,
-                "coverage": _path_coverage(claim, candidate),
-                "arithmetic": "EXACT_INTEGER",
-                "detail": (
-                    "intended family complete"
-                    if not omitted
-                    else f"{len(omitted)} omitted path(s)"
-                ),
+def _evaluate_typed(
+    claim: GraphPathClaim,
+    candidate: GraphPathCandidate,
+) -> dict[str, Any]:
+    max_len = _max_path_length(claim, candidate)
+    if claim.predicate == "intended_paths_complete":
+        actual = _enumerate_simple_paths(candidate, max_len)
+        intended = set(candidate.intended_paths or ())
+        omitted = [list(path) for path in sorted(actual) if path not in intended]
+        result: dict[str, Any] = {
+            "objective": {
+                "name": "path_family_complete",
+                "value": not omitted,
+                "num_actual": len(actual),
+                "num_intended": len(intended),
+            },
+            "proposed_witness": None,
+            "coverage": _path_coverage(claim, candidate),
+            "arithmetic": "EXACT_INTEGER",
+            "detail": (
+                "intended family complete"
+                if not omitted
+                else f"{len(omitted)} omitted path(s)"
+            ),
+        }
+        if omitted:
+            result["proposed_witness"] = {
+                "witness_format": "graph.omitted_path",
+                "format_version": "1",
+                "role": "DEFEATS_CANDIDATE",
+                "payload": {"path": omitted[0]},
             }
-            if omitted:
-                result["proposed_witness"] = {
-                    "witness_format": "graph.omitted_path",
+        return result
+
+    if claim.predicate == "is_bipartite":
+        odd_cycle = _find_odd_cycle(candidate)
+        if odd_cycle:
+            return {
+                "objective": {"name": "is_bipartite", "value": False},
+                "proposed_witness": {
+                    "witness_format": "graph.odd_cycle",
                     "format_version": "1",
                     "role": "DEFEATS_CANDIDATE",
-                    "payload": {"path": omitted[0]},
-                }
-            results.append(result)
+                    "payload": {"cycle": odd_cycle},
+                },
+                "coverage": "EXHAUSTIVE",
+                "arithmetic": "EXACT_INTEGER",
+                "detail": f"odd cycle of length {len(odd_cycle)}",
+            }
+        coloring = _two_coloring(candidate)
+        return {
+            "objective": {"name": "is_bipartite", "value": True},
+            "proposed_witness": {
+                "witness_format": "graph.2coloring",
+                "format_version": "1",
+                "role": "SUPPORTS_CLAIM",
+                "payload": {"coloring": coloring},
+            },
+            "coverage": "EXHAUSTIVE",
+            "arithmetic": "EXACT_INTEGER",
+            "detail": "graph is bipartite",
+        }
 
-        elif predicate == "is_bipartite":
-            odd_cycle = _find_odd_cycle(candidate)
-            if odd_cycle:
-                results.append(
-                    {
-                        "candidate_index": idx,
-                        "objective": {"name": "is_bipartite", "value": False},
-                        "proposed_witness": {
-                            "witness_format": "graph.odd_cycle",
-                            "format_version": "1",
-                            "role": "DEFEATS_CANDIDATE",
-                            "payload": {"cycle": odd_cycle},
-                        },
-                        "coverage": "EXHAUSTIVE",
-                        "arithmetic": "EXACT_INTEGER",
-                        "detail": f"odd cycle of length {len(odd_cycle)}",
-                    }
-                )
-            else:
-                coloring = _two_coloring(candidate)
-                results.append(
-                    {
-                        "candidate_index": idx,
-                        "objective": {"name": "is_bipartite", "value": True},
-                        "proposed_witness": {
-                            "witness_format": "graph.2coloring",
-                            "format_version": "1",
-                            "role": "SUPPORTS_CLAIM",
-                            "payload": {"coloring": coloring},
-                        },
-                        "coverage": "EXHAUSTIVE",
-                        "arithmetic": "EXACT_INTEGER",
-                        "detail": "graph is bipartite",
-                    }
-                )
-
-    response = _ok(start)
-    response["results"] = results
-    response["coverage"] = "EXHAUSTIVE"
-    response["arithmetic"] = "EXACT_INTEGER"
-    response["detail"] = "graph search-side evaluation"
-    return response
+    raise ValueError("unsupported graph claim predicate")
 
 
 def _graph_capability_request(request: dict[str, Any]) -> GraphPathCapabilityRequest:
@@ -422,17 +227,7 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(
             "graph evaluation request does not match its contract"
         ) from exc
-    response = evaluate(
-        {
-            "claim": selected.claim.model_dump(mode="json", exclude_none=True),
-            "candidate": selected.candidate.model_dump(mode="json", exclude_none=True),
-        }
-    )
-    if response["input"]["status"] != "ACCEPTED":
-        raise ValueError("; ".join(response["input"]["errors"]))
-    result = response["results"][0]
-    if "error" in result:
-        raise ValueError(result["error"])
+    result = _evaluate_typed(selected.claim, selected.candidate)
     objective = result["objective"]
     coverage = result["coverage"]
     proposed = result.get("proposed_witness")
@@ -460,167 +255,122 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def find_witness(request: dict[str, Any]) -> dict[str, Any]:
-    """Search for a graph witness.  Result is unverified."""
-    start = time.monotonic()
-    try:
-        selected = _graph_capability_request(request)
-    except ValueError as exc:
-        return _rejected([str(exc)], start)
-    claim = selected.claim.model_dump(mode="json", exclude_none=True)
-    candidate = selected.candidate.model_dump(mode="json", exclude_none=True)
-    role = selected.witness_role
-
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
-    cand_errors = _validate_candidate_for_claim(claim, candidate)
-    if cand_errors:
-        return _rejected(cand_errors, start)
-
-    predicate = claim.get("predicate")
+def _find_path_witness_typed(
+    claim: GraphPathClaim,
+    candidate: GraphPathCandidate,
+    role: str,
+) -> dict[str, Any]:
     max_len = _max_path_length(claim, candidate)
 
-    if predicate == "intended_paths_complete":
-        if role == "DEFEATS_CANDIDATE":
-            omitted = _find_omitted_path(candidate, max_len)
-            if omitted:
-                response = _ok(start)
-                response.update(
-                    {
-                        "status": "FOUND",
-                        "witness": {"path": omitted},
-                        "witness_format": "graph.omitted_path",
-                        "format_version": "1",
-                        "role": "DEFEATS_CANDIDATE",
-                        "coverage": "NOT_APPLICABLE",
-                        "arithmetic": "EXACT_INTEGER",
-                        "detail": "legal source-terminal path omitted from intended family",
-                    }
-                )
-                return response
-            response = _ok(start)
-            response.update(
-                {
-                    "status": "SEARCH_EXHAUSTED",
-                    "witness": None,
-                    "coverage": _path_coverage(claim, candidate),
-                    "arithmetic": "EXACT_INTEGER",
-                    "detail": "no omitted path found within bounded scope",
-                }
-            )
-            return response
+    if role == "DEFEATS_CANDIDATE":
+        omitted = _find_omitted_path(candidate, max_len)
+        if omitted:
+            return {
+                "status": "FOUND",
+                "witness": {"path": omitted},
+                "witness_format": "graph.omitted_path",
+                "format_version": "1",
+                "role": "DEFEATS_CANDIDATE",
+                "coverage": "NOT_APPLICABLE",
+                "arithmetic": "EXACT_INTEGER",
+                "detail": "legal source-terminal path omitted from intended family",
+            }
+        return {
+            "status": "SEARCH_EXHAUSTED",
+            "witness": None,
+            "coverage": _path_coverage(claim, candidate),
+            "arithmetic": "EXACT_INTEGER",
+            "detail": "no omitted path found within bounded scope",
+        }
 
-        if role == "SUPPORTS_CLAIM":
-            actual = _enumerate_simple_paths(candidate, max_len)
-            intended = {tuple(p) for p in candidate.get("intended_paths", [])}
-            if actual == intended:
-                response = _ok(start)
-                response.update(
-                    {
-                        "status": "SEARCH_EXHAUSTED",
-                        "witness": None,
-                        "coverage": _path_coverage(claim, candidate),
-                        "arithmetic": "EXACT_INTEGER",
-                        "detail": "intended family matches actual family",
-                    }
-                )
-                return response
-            response = _ok(start)
-            response.update(
-                {
-                    "status": "NOT_FOUND_WITHIN_SCOPE",
-                    "witness": None,
-                    "coverage": _path_coverage(claim, candidate),
-                    "arithmetic": "EXACT_INTEGER",
-                    "detail": "intended family does not match actual family",
-                }
-            )
-            return response
+    if role == "SUPPORTS_CLAIM":
+        actual = _enumerate_simple_paths(candidate, max_len)
+        intended = set(candidate.intended_paths or ())
+        return {
+            "status": "SEARCH_EXHAUSTED"
+            if actual == intended
+            else "NOT_FOUND_WITHIN_SCOPE",
+            "witness": None,
+            "coverage": _path_coverage(claim, candidate),
+            "arithmetic": "EXACT_INTEGER",
+            "detail": (
+                "intended family matches actual family"
+                if actual == intended
+                else "intended family does not match actual family"
+            ),
+        }
 
-    if predicate == "is_bipartite":
-        if role == "DEFEATS_CANDIDATE":
-            odd_cycle = _find_odd_cycle(candidate)
-            if odd_cycle:
-                response = _ok(start)
-                response.update(
-                    {
-                        "status": "FOUND",
-                        "witness": {"cycle": odd_cycle},
-                        "witness_format": "graph.odd_cycle",
-                        "format_version": "1",
-                        "role": "DEFEATS_CANDIDATE",
-                        "coverage": "EXHAUSTIVE",
-                        "arithmetic": "EXACT_INTEGER",
-                        "detail": f"odd cycle of length {len(odd_cycle)}",
-                    }
-                )
-                return response
-            response = _ok(start)
-            response.update(
-                {
-                    "status": "SEARCH_EXHAUSTED",
-                    "witness": None,
-                    "coverage": "EXHAUSTIVE",
-                    "arithmetic": "EXACT_INTEGER",
-                    "detail": "no odd cycle found",
-                }
-            )
-            return response
+    raise ValueError("unsupported witness role")
 
-        if role == "SUPPORTS_CLAIM":
-            coloring = _two_coloring(candidate)
-            if coloring:
-                response = _ok(start)
-                response.update(
-                    {
-                        "status": "FOUND",
-                        "witness": {"coloring": coloring},
-                        "witness_format": "graph.2coloring",
-                        "format_version": "1",
-                        "role": "SUPPORTS_CLAIM",
-                        "coverage": "EXHAUSTIVE",
-                        "arithmetic": "EXACT_INTEGER",
-                        "detail": "2-coloring witness",
-                    }
-                )
-                return response
-            response = _ok(start)
-            response.update(
-                {
-                    "status": "SEARCH_EXHAUSTED",
-                    "witness": None,
-                    "coverage": "EXHAUSTIVE",
-                    "arithmetic": "EXACT_INTEGER",
-                    "detail": "graph is not bipartite",
-                }
-            )
-            return response
 
-    return _rejected(["unsupported witness role or claim predicate"], start)
+def _find_bipartite_witness_typed(
+    candidate: GraphPathCandidate,
+    role: str,
+) -> dict[str, Any]:
+    if role == "DEFEATS_CANDIDATE":
+        odd_cycle = _find_odd_cycle(candidate)
+        if odd_cycle:
+            return {
+                "status": "FOUND",
+                "witness": {"cycle": odd_cycle},
+                "witness_format": "graph.odd_cycle",
+                "format_version": "1",
+                "role": "DEFEATS_CANDIDATE",
+                "coverage": "EXHAUSTIVE",
+                "arithmetic": "EXACT_INTEGER",
+                "detail": f"odd cycle of length {len(odd_cycle)}",
+            }
+        return {
+            "status": "SEARCH_EXHAUSTED",
+            "witness": None,
+            "coverage": "EXHAUSTIVE",
+            "arithmetic": "EXACT_INTEGER",
+            "detail": "no odd cycle found",
+        }
+
+    if role == "SUPPORTS_CLAIM":
+        coloring = _two_coloring(candidate)
+        return {
+            "status": "FOUND" if coloring else "SEARCH_EXHAUSTED",
+            "witness": {"coloring": coloring} if coloring else None,
+            **(
+                {
+                    "witness_format": "graph.2coloring",
+                    "format_version": "1",
+                    "role": "SUPPORTS_CLAIM",
+                }
+                if coloring
+                else {}
+            ),
+            "coverage": "EXHAUSTIVE",
+            "arithmetic": "EXACT_INTEGER",
+            "detail": "2-coloring witness" if coloring else "graph is not bipartite",
+        }
+
+    raise ValueError("unsupported witness role")
+
+
+def _find_witness_typed(
+    claim: GraphPathClaim,
+    candidate: GraphPathCandidate,
+    role: str,
+) -> dict[str, Any]:
+    if claim.predicate == "intended_paths_complete":
+        return _find_path_witness_typed(claim, candidate, role)
+    if claim.predicate == "is_bipartite":
+        return _find_bipartite_witness_typed(candidate, role)
+    raise ValueError("unsupported graph claim predicate")
 
 
 def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
     """Return graph witness search in the generic oracle contract."""
 
-    response = find_witness(request)
-    if response["input"]["status"] != "ACCEPTED":
-        raise ValueError("; ".join(response["input"]["errors"]))
-    return {
-        key: value
-        for key, value in response.items()
-        if key
-        in {
-            "status",
-            "witness",
-            "witness_format",
-            "format_version",
-            "role",
-            "arithmetic",
-            "coverage",
-            "detail",
-        }
-    }
+    selected = _graph_capability_request(request)
+    return _find_witness_typed(
+        selected.claim,
+        selected.candidate,
+        selected.witness_role,
+    )
 
 
 def materialize(request: dict[str, Any]) -> dict[str, Any]:
@@ -632,58 +382,34 @@ def materialize(request: dict[str, Any]) -> dict[str, Any]:
         return _rejected(
             ["graph materialization request does not match its contract"], start
         )
-    claim = selected.claim.model_dump(mode="json", exclude_none=True)
-    candidate = selected.candidate.model_dump(mode="json", exclude_none=True)
-
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
-    cand_errors = _validate_candidate_for_claim(claim, candidate)
-    if cand_errors:
-        return _rejected(cand_errors, start)
-
-    predicate = claim.get("predicate")
+    predicate = selected.claim.predicate
     if predicate != "intended_paths_complete":
         return _rejected(["materialize supports intended_paths_complete only"], start)
 
-    max_len = _max_path_length(claim, candidate)
-    paths = sorted(_enumerate_simple_paths(candidate, max_len))
+    max_len = _max_path_length(selected.claim, selected.candidate)
+    paths = sorted(_enumerate_simple_paths(selected.candidate, max_len))
 
     response = _ok(start)
     response["family"] = [list(p) for p in paths]
-    response["coverage"] = _path_coverage(claim, candidate)
+    response["coverage"] = _path_coverage(selected.claim, selected.candidate)
     response["arithmetic"] = "EXACT_INTEGER"
     response["detail"] = "all simple source-terminal paths within bound"
     return response
 
 
-def reductions(request: dict[str, Any]) -> dict[str, Any]:
-    """Propose candidate reductions that preserve the attacked predicate."""
-    start = time.monotonic()
-    selected = _graph_reduction_request(request)
-    target_kind = selected.target_kind
-    target = selected.target.model_dump(mode="json", exclude_none=True)
-    claim = selected.claim.model_dump(mode="json", exclude_none=True)
-
-    claim_errors = validate_claim(claim)
-    if claim_errors:
-        return _rejected(claim_errors, start)
-    cand_errors = (
-        _validate_candidate_for_claim(claim, target)
-        if target_kind == "candidate"
-        else []
-    )
-    if cand_errors:
-        return _rejected(cand_errors, start)
-
-    predicate = claim.get("predicate")
-    max_len = _max_path_length(claim, target)
+def _reductions_typed(
+    selected: GraphPathReductionRequest,
+    *,
+    start: float,
+) -> dict[str, Any]:
+    predicate = selected.claim.predicate
+    max_len = _max_path_length(selected.claim, selected.target)
 
     protected_vertices: set[str] = set()
     protected_arcs: set[tuple[str, str]] = set()
 
     if predicate == "intended_paths_complete":
-        omitted = _find_omitted_path(target, max_len)
+        omitted = _find_omitted_path(selected.target, max_len)
         if omitted is None:
             response = _ok(start)
             response["reductions"] = []
@@ -692,7 +418,7 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
         protected_vertices = set(omitted)
         protected_arcs = set(pairwise(omitted))
     elif predicate == "is_bipartite":
-        cycle = _find_odd_cycle(target)
+        cycle = _find_odd_cycle(selected.target)
         if cycle is None:
             response = _ok(start)
             response["reductions"] = []
@@ -707,8 +433,8 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
     else:
         return _rejected(["unsupported predicate for reductions"], start)
 
-    vertices = target.get("vertices", [])
-    arcs = target.get("arcs", [])
+    vertices = selected.target.vertices
+    arcs = selected.target.arcs
     current_vertices = len(vertices)
     current_edges = len(arcs)
 
@@ -756,13 +482,7 @@ def reductions_capability(request: dict[str, Any]) -> dict[str, Any]:
 
     selected = _graph_reduction_request(request)
     target = selected.target.model_dump(mode="json", exclude_none=True)
-    response = reductions(
-        {
-            "target_kind": selected.target_kind,
-            "target": target,
-            "claim": selected.claim.model_dump(mode="json", exclude_none=True),
-        }
-    )
+    response = _reductions_typed(selected, start=time.monotonic())
     if response["input"]["status"] != "ACCEPTED":
         raise ValueError("; ".join(response["input"]["errors"]))
     requested = set(selected.reducers)
@@ -839,9 +559,6 @@ def canonicalize_capability(request: dict[str, Any]) -> dict[str, Any]:
             "graph canonicalization request does not match its contract"
         ) from exc
     structure = selected.structure.model_dump(mode="json", exclude_none=True)
-    errors = validate_candidate(structure)
-    if errors:
-        raise ValueError("; ".join(errors))
     vertices = structure["vertices"]
     if len(vertices) > 9:
         raise ValueError("reference canonicalizer is limited to nine vertices")

@@ -3,68 +3,15 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Any, TypeGuard
+from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.contracts.plugin_number_theory import ErdosStrausCapabilityRequest
-
-_MIN_N = 2
-_MAX_N = 10_000
-
-
-def _is_int(value: object) -> TypeGuard[int]:
-    return isinstance(value, int) and not isinstance(value, bool)
-
-
-def _claim_view(payload: dict[str, Any]) -> dict[str, Any]:
-    predicate = payload.get("predicate")
-    if not isinstance(predicate, dict):
-        return payload
-    parameters = predicate.get("parameters", {})
-    return {
-        "predicate": predicate.get("name"),
-        **(parameters if isinstance(parameters, dict) else {}),
-    }
-
-
-def _validate_range(payload: dict[str, Any]) -> list[str]:
-    lower = payload.get("lower_bound")
-    upper = payload.get("upper_bound")
-    if not _is_int(lower) or not _is_int(upper):
-        return ["lower_bound and upper_bound must be integers"]
-    if lower < _MIN_N:
-        return [f"lower_bound must be at least {_MIN_N}"]
-    if upper < lower:
-        return ["upper_bound must be at least lower_bound"]
-    if upper > _MAX_N:
-        return [f"upper_bound exceeds the reference limit of {_MAX_N}"]
-    return []
-
-
-def validate_claim(payload: dict[str, Any]) -> list[str]:
-    if payload.get("predicate") != "erdos_straus_range":
-        return ["unsupported Erdős-Straus claim predicate"]
-    return _validate_range(payload)
-
-
-def validate_candidate(payload: dict[str, Any]) -> list[str]:
-    return _validate_range(payload)
-
-
-def _validate_candidate_for_claim(
-    claim: dict[str, Any],
-    candidate: dict[str, Any],
-) -> list[str]:
-    errors = validate_candidate(candidate)
-    if errors:
-        return errors
-    if (
-        candidate["lower_bound"] != claim["lower_bound"]
-        or candidate["upper_bound"] != claim["upper_bound"]
-    ):
-        return ["candidate range must exactly match the claim range"]
-    return []
+from jacobian.contracts.plugin_number_theory import (
+    ErdosStrausCandidate,
+    ErdosStrausCapabilityRequest,
+    ErdosStrausClaim,
+)
 
 
 def _decompose(n: int) -> tuple[int, int, int] | None:
@@ -98,27 +45,12 @@ def _decomposition_table(
     return table, None
 
 
-def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate a bounded range without granting verification authority."""
-
-    try:
-        selected = ErdosStrausCapabilityRequest.model_validate(request)
-    except ValidationError as exc:
-        raise ValueError("Erdős-Straus request does not match its contract") from exc
-    claim = selected.claim.model_dump(mode="python")
-    candidate = selected.candidate.model_dump(mode="python")
-    errors = validate_claim(claim)
-    if not isinstance(candidate, dict):
-        errors.append("candidate must be an object")
-    elif not errors:
-        errors.extend(_validate_candidate_for_claim(claim, candidate))
-    if errors:
-        raise ValueError("; ".join(errors))
-    if not isinstance(candidate, dict):
-        raise ValueError("candidate must be an object")
-
-    lower = candidate["lower_bound"]
-    upper = candidate["upper_bound"]
+def _evaluate_typed(
+    claim: ErdosStrausClaim,
+    candidate: ErdosStrausCandidate,
+) -> dict[str, Any]:
+    lower = candidate.lower_bound
+    upper = candidate.upper_bound
     table, missing = _decomposition_table(lower, upper)
     complete = missing is None
     return {
@@ -144,30 +76,26 @@ def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
-    """Propose a complete bounded decomposition table as unverified evidence."""
+def evaluate_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Evaluate a bounded range without granting verification authority."""
 
     try:
         selected = ErdosStrausCapabilityRequest.model_validate(request)
     except ValidationError as exc:
         raise ValueError("Erdős-Straus request does not match its contract") from exc
-    claim = selected.claim.model_dump(mode="python")
-    candidate = selected.candidate.model_dump(mode="python")
-    role = selected.witness_role
-    errors = validate_claim(claim)
-    if role != "SUPPORTS_CLAIM":
-        errors.append("erdos_straus_range supports only SUPPORTS_CLAIM witnesses")
-    if not isinstance(candidate, dict):
-        errors.append("candidate must be an object")
-    elif not errors:
-        errors.extend(_validate_candidate_for_claim(claim, candidate))
-    if errors:
-        raise ValueError("; ".join(errors))
-    if not isinstance(candidate, dict):
-        raise ValueError("candidate must be an object")
+    return _evaluate_typed(selected.claim, selected.candidate)
 
-    lower = candidate["lower_bound"]
-    upper = candidate["upper_bound"]
+
+def _find_witness_typed(
+    claim: ErdosStrausClaim,
+    candidate: ErdosStrausCandidate,
+    role: str,
+) -> dict[str, Any]:
+    if role != "SUPPORTS_CLAIM":
+        raise ValueError("erdos_straus_range supports only SUPPORTS_CLAIM witnesses")
+
+    lower = candidate.lower_bound
+    upper = candidate.upper_bound
     table, missing = _decomposition_table(lower, upper)
     if missing is not None:
         return {
@@ -191,3 +119,17 @@ def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
         "coverage": "EXHAUSTIVE",
         "detail": f"complete proposed decomposition table for [{lower}, {upper}]",
     }
+
+
+def find_witness_capability(request: dict[str, Any]) -> dict[str, Any]:
+    """Propose a complete bounded decomposition table as unverified evidence."""
+
+    try:
+        selected = ErdosStrausCapabilityRequest.model_validate(request)
+    except ValidationError as exc:
+        raise ValueError("Erdős-Straus request does not match its contract") from exc
+    return _find_witness_typed(
+        selected.claim,
+        selected.candidate,
+        selected.witness_role,
+    )
