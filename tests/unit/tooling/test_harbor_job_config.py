@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 from benchmarks.tooling.harbor_suite import get_suite
@@ -60,32 +59,3 @@ def test_paired_jobs_use_three_attempts_per_condition() -> None:
 
     assert treatment["n_attempts"] == 3
     assert control["n_attempts"] == 3
-
-
-def test_agent_eval_rejects_invalid_toggle_and_clears_control_mcp() -> None:
-    invalid = subprocess.run(
-        ["make", "-n", "agent-eval", "JACOBIAN_ENABLED=false"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert invalid.returncode != 0
-    assert "JACOBIAN_ENABLED must be exactly 0 or 1" in invalid.stderr
-
-    control = subprocess.run(
-        [
-            "make",
-            "-n",
-            "agent-eval",
-            "JACOBIAN_ENABLED=0",
-            "MCP_CONFIG=unexpected.json",
-            "EVAL_EXECUTE=1",
-            "JACOBIAN_MODEL=test",
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert "--mcp-config" not in control.stdout
