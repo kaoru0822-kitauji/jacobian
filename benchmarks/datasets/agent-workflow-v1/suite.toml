@@ -42,6 +42,12 @@ maximum_assurance = "COMPUTED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-erdos-gallai-realization-audit"
+path = "tasks/mathematical-sciences/graph-theory/erdos-gallai-realization-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-graph-counterexample"
 path = "tasks/mathematical-sciences/graph-theory/graph-counterexample"
 maximum_assurance = "COMPUTED"

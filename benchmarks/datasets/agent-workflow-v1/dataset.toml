@@ -35,6 +35,10 @@ name = "jacobian/agent-workflow-v1-divisibility-construction-witness"
 digest = "sha256:997a76faef7340ca7c78227dd251d793924a5b23bb94c84697c53010ba170f4c"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-erdos-gallai-realization-audit"
+digest = "sha256:7562b43b10f387e90c80564bd6eb8a5e3587f3760c3f5f675aba0915b057590f"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"
 digest = "sha256:aafcb0a6b87229c4cabcfb7719a3b7eb96d3c3c088cce1f831b433b9d3756d9f"
 

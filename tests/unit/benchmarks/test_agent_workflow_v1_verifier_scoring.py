@@ -1210,6 +1210,29 @@ def test_lean_axiom_fixture_requires_genuine_transitive_closure() -> None:
     assert case["dependencies"]["A1"] == ["A0"]
 
 
+def test_degree_sequence_accepts_reversed_one_based_edges(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "erdos-gallai-realization-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    case = next(
+        item for item in submission["result"]["cases"] if item["status"] == "GRAPHICAL"
+    )
+    case["edges"] = [[v + 1, u + 1] for u, v in case["edges"]]
+    _write_json(submission_path, submission)
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_degree_sequence_reference_solution_is_schema_valid() -> None:
+    task = _task("erdos-gallai-realization-audit")
+    schema = json.loads((task / "environment" / "submission_schema.json").read_text())
+    submission = json.loads((task / "solution" / "submission.json").read_text())
+    Draft202012Validator(schema).validate(submission)
+
+
 def test_dead_end_local_density_audit_accepts_case_reordering(tmp_path: Path) -> None:
     task, app, logs = _prepare_case(
         tmp_path, "dead-end-local-density-audit", "computed"

@@ -14,6 +14,7 @@ EXPECTED_TASKS = {
     "dead-end-local-density-audit",
     "distinct-sum-pairing-optimum",
     "divisibility-construction-witness",
+    "erdos-gallai-realization-audit",
     "euler-line-symbolic-certificate",
     "finite-magma-countermodel",
     "generated-lemma-vacuity-audit",
