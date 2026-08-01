@@ -116,15 +116,15 @@ def _difference_identity_is_valid(value: object) -> bool:
 def _induction_is_valid(value: object) -> bool:
     if not isinstance(value, dict) or set(value) != {
         "hypotheses",
-        "sub_one_terms",
+        "sub_one_term_lower_bounds",
         "add_one_reason",
-        "u_terms",
+        "u_term_lower_bounds",
         "successor",
     }:
         return False
     hypotheses = _affines(value["hypotheses"], 3)
-    sub_terms = _affines(value["sub_one_terms"], 2)
-    u_terms = _affines(value["u_terms"], 2)
+    sub_terms = _affines(value["sub_one_term_lower_bounds"], 2)
+    u_terms = _affines(value["u_term_lower_bounds"], 2)
     successor = _affines(value["successor"], 3)
     if None in (hypotheses, sub_terms, u_terms, successor):
         return False
@@ -150,7 +150,7 @@ def _induction_is_valid(value: object) -> bool:
 
 def _target_is_valid(value: object) -> bool:
     if not isinstance(value, dict) or set(value) != {
-        "u_difference_terms",
+        "u_difference_term_lower_bounds",
         "u_difference",
         "scale_v2",
         "b_difference",
@@ -158,7 +158,7 @@ def _target_is_valid(value: object) -> bool:
         "not_divides_exponent",
     }:
         return False
-    terms = _affines(value["u_difference_terms"], 2)
+    terms = _affines(value["u_difference_term_lower_bounds"], 2)
     u_difference = _affine(value["u_difference"])
     b_difference = _affine(value["b_difference"])
     divides = _affine(value["divides_exponent"])

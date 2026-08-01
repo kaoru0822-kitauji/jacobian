@@ -116,7 +116,7 @@ digest = "sha256:35267a292d95eedbacd71faacafb052db248fb9b89710bdd4d809d616a3d53f
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-putnam-2adic-induction-audit"
-digest = "sha256:81f451240952e86206a0eb57c78b27d1c3c168f2eb6fcb334223a3c66c7136e9"
+digest = "sha256:e8c73cab20025bfcfa4d0416eb5acd8a0b39af16c53bc8b8278f7b7e58d7ff65"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-random-function-expectation-audit"

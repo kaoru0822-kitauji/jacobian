@@ -924,7 +924,7 @@ def test_inverse_distance_audit_rejects_corrupted_certificates(
 @pytest.mark.parametrize(
     ("path", "replacement"),
     [
-        (("valuation_induction", "sub_one_terms", 1), [1, 2]),
+        (("valuation_induction", "sub_one_term_lower_bounds", 1), [1, 2]),
         (("target_transfer", "b_difference"), [2, 3]),
         (("finite_testing_role",), "FINITE_CASES_PROVE_ALL_K"),
     ],
@@ -948,6 +948,8 @@ def test_putnam_2adic_audit_rejects_corrupted_induction_certificates(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
 def test_generated_lemma_audit_enforces_visible_divisor_witness_bounds(
     tmp_path: Path,
 ) -> None:
