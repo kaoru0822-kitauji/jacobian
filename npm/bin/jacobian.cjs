@@ -87,6 +87,10 @@ function main() {
         options.profile = rest[++i];
       } else if (arg.startsWith("--profile=")) {
         options.profile = arg.slice(10);
+      } else if (arg === "--provider-path") {
+        options.providerPath = rest[++i];
+      } else if (arg.startsWith("--provider-path=")) {
+        options.providerPath = arg.slice(16);
       } else if (arg === "--client" || arg === "-c") {
         i++;
         if (rest[i]) {

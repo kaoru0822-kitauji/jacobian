@@ -106,3 +106,17 @@ def test_active_uv_surfaces_share_the_repository_pin() -> None:
     for path in setup_files:
         text = path.read_text()
         assert text.count("astral-sh/setup-uv@") == text.count(f'version: "{pinned}"')
+
+
+def test_every_bootstrap_profile_audits_z3_and_networkx() -> None:
+    doctor = _load_tool("source_agent_doctor")
+    for providers in doctor._PROFILE_PROVIDERS.values():
+        assert "z3" in providers
+        assert "networkx" in providers
+
+
+def test_bootstrap_dry_run_and_client_preflight_fail_closed() -> None:
+    script = (ROOT / "scripts" / "setup-agent").read_text()
+    assert "uv python find --no-python-downloads" in script
+    assert "unknown MCP client" in script
+    assert '--provider-path "$PATH"' in script

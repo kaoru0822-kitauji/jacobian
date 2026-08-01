@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -133,7 +141,13 @@ test("buildLauncher returns a version-matching launcher with mcp subcommand", ()
 test("buildSourceLauncher binds the exact checkout and state directory", () => {
   const source = join(npmRoot, "..");
   const state = join(source, ".jacobian-source-test");
-  const launcher = buildSourceLauncher(source, state, "/opt/uv", "full-python");
+  const launcher = buildSourceLauncher(
+    source,
+    state,
+    "/opt/uv",
+    "full-python",
+    "/providers/bin:/usr/bin",
+  );
   assert.equal(launcher.command, "/opt/uv");
   assert.deepEqual(launcher.args, [
     "run",
@@ -147,6 +161,7 @@ test("buildSourceLauncher binds the exact checkout and state directory", () => {
   ]);
   assert.equal(launcher.profile, "full-python");
   assert.equal(launcher.package, null);
+  assert.deepEqual(launcher.env, { PATH: "/providers/bin:/usr/bin" });
 });
 
 test("normalizes release-please Python prerelease versions for npm", () => {
@@ -220,7 +235,7 @@ test("setup writes a JSON config for Claude Code", async () => {
     const home = await fakeHome(base, ["claude"]);
     const defs = clientDefinitions(home);
     const claude = defs.find((d) => d.id === "claude");
-    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null };
+    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null, env: { PATH: "/providers/bin" } };
 
     const edit = resolveClientEdit("setup", claude, launcher);
     assert.equal(edit.action, "create");
@@ -237,6 +252,7 @@ test("setup writes a JSON config for Claude Code", async () => {
     assert.ok(config.mcpServers[SERVER_NAME]);
     assert.equal(config.mcpServers[SERVER_NAME].command, "/usr/bin/node");
     assert.deepEqual(config.mcpServers[SERVER_NAME].args, ["/path/to/jacobian", "mcp"]);
+    assert.deepEqual(config.mcpServers[SERVER_NAME].env, { PATH: "/providers/bin" });
 
     // Re-resolving should report already_current.
     const edit2 = resolveClientEdit("setup", claude, launcher);
@@ -252,13 +268,14 @@ test("setup writes a TOML config for Codex", async () => {
     const home = await fakeHome(base, ["codex"]);
     const defs = clientDefinitions(home);
     const codex = defs.find((d) => d.id === "codex");
-    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null };
+    const launcher = { command: "/usr/bin/node", args: ["/path/to/jacobian", "mcp"], version: packageMetadata.version, package: null, env: { PATH: "/providers/bin" } };
 
     const edit = resolveClientEdit("setup", codex, launcher);
     assert.equal(edit.action, "create");
     assert.ok(edit.updated !== null);
     assert.ok(edit.updated.includes("[mcp_servers]"));
     assert.ok(edit.updated.includes("jacobian"));
+    assert.ok(edit.updated.includes('env = { PATH = "/providers/bin" }'));
 
     // Apply and re-read.
     mkdirSync(join(home, ".codex"), { recursive: true });
@@ -387,6 +404,26 @@ test("multi-client config writes roll back as one transaction", async () => {
   }
 });
 
+test("config creation uses a private atomic replacement", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-atomic-config-"));
+  try {
+    const configPath = join(base, "nested", "config.json");
+    applyEdits([
+      {
+        path: configPath,
+        original: null,
+        updated: "{}\n",
+        action: "create",
+      },
+    ]);
+    assert.equal(await readFile(configPath, "utf8"), "{}\n");
+    assert.equal((await stat(configPath)).mode & 0o777, 0o600);
+    assert.deepEqual(await readdir(join(base, "nested")), ["config.json"]);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
 test("invalid JSON explains that setup made no changes", async () => {
   const base = await mkdtemp(join(tmpdir(), "jacobian-invalid-json-"));
   try {
@@ -435,6 +472,32 @@ test("top-level setup failure gives a retry action without a stack trace", async
     assert.match(result.stderr, /retry `npx jacobian setup`/);
     assert.doesNotMatch(result.stderr, /\n\s+at /);
     assert.equal(await readFile(configPath, "utf8"), "{ invalid");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("source setup rejects an unsupported client before writing config", async () => {
+  const home = await mkdtemp(join(tmpdir(), "jacobian-cli-unknown-client-"));
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(npmRoot, "bin", "jacobian.cjs"),
+        "setup",
+        "--source",
+        join(npmRoot, ".."),
+        "--profile",
+        "full-python",
+        "--client",
+        "codxe",
+        "--yes",
+      ],
+      { encoding: "utf8", env: { ...process.env, HOME: home } },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Unknown MCP client: codxe/);
+    assert.equal(existsSync(join(home, ".codex", "config.toml")), false);
   } finally {
     await rm(home, { recursive: true, force: true });
   }

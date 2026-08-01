@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tomllib
@@ -14,26 +15,33 @@ from typing import Any
 import jacobian
 from jacobian.adapters.mcp.projections import _catalog_digest
 from jacobian.contracts.capabilities import CapabilityProviderAvailability
+from jacobian.provider_runtime import known_provider_runtime
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 
 PROFILES = ("core", "full-python", "lean", "external-proof")
 _PROFILE_PROVIDERS = {
-    "core": ("sympy",),
+    "core": ("networkx", "sympy", "z3"),
     "full-python": (
+        "networkx",
         "sympy",
+        "z3",
         "python-flint",
         "python-flint-hnf",
         "cvc5",
     ),
     "lean": (
+        "networkx",
         "sympy",
+        "z3",
         "python-flint",
         "python-flint-hnf",
         "cvc5",
         "lean",
     ),
     "external-proof": (
+        "networkx",
         "sympy",
+        "z3",
         "python-flint",
         "python-flint-hnf",
         "cvc5",
@@ -89,11 +97,30 @@ def _provider_report(runtime: Any) -> dict[str, dict[str, Any]]:
             ),
             "diagnostic": provider_runtime.diagnostic,
         }
+    for name, provider in (("networkx", "jacobian.networkx"), ("z3", "jacobian.z3")):
+        provider_runtime = known_provider_runtime(provider)
+        report[name] = {
+            "availability": provider_runtime.availability.value,
+            "provider": provider_runtime.provider,
+            "version": provider_runtime.version,
+            "digest": provider_runtime.digest,
+            "digest_kind": (
+                provider_runtime.digest_kind.value
+                if provider_runtime.digest_kind is not None
+                else None
+            ),
+            "diagnostic": provider_runtime.diagnostic,
+        }
     return dict(sorted(report.items()))
 
 
 def inspect_installation(
-    *, repo: Path, state_dir: Path, profile: str, expected_revision: str
+    *,
+    repo: Path,
+    state_dir: Path,
+    profile: str,
+    expected_revision: str,
+    launcher_provider_path: str,
 ) -> dict[str, Any]:
     """Return a source, catalog, and provider identity report."""
 
@@ -131,12 +158,15 @@ def inspect_installation(
         if providers.get(provider, {}).get("availability")
         != CapabilityProviderAvailability.AVAILABLE.value
     ]
+    effective_provider_path = os.environ.get("PATH", "")
     checks = {
         "git_clean": not dirty,
         "revision_matches": revision == expected_revision,
         "package_version_matches": jacobian.__version__ == expected_version,
         "source_checkout_matches": source_matches,
         "profile_providers_available": not missing,
+        "provider_path_preserved": effective_provider_path == launcher_provider_path
+        or effective_provider_path.endswith(os.pathsep + launcher_provider_path),
     }
     return {
         "status": "ok" if all(checks.values()) else "error",
@@ -149,6 +179,8 @@ def inspect_installation(
         "package_version": jacobian.__version__,
         "expected_package_version": expected_version,
         "package_source": str(package_source),
+        "provider_path": effective_provider_path,
+        "launcher_provider_path": launcher_provider_path,
         "catalog_digest": digest,
         "catalog_size": len(catalog.capabilities),
         "policy_profile": catalog.policy_profile,
@@ -166,6 +198,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--profile", choices=PROFILES, required=True)
     parser.add_argument("--expected-revision", required=True)
+    parser.add_argument("--provider-path", required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--json", action="store_true")
     return parser
@@ -179,6 +212,7 @@ def main() -> int:
             state_dir=args.state_dir,
             profile=args.profile,
             expected_revision=args.expected_revision,
+            launcher_provider_path=args.provider_path,
         )
     except (
         OSError,

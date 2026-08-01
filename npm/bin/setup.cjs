@@ -4,11 +4,14 @@ const {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
   rmSync,
+  statSync,
 } = require("node:fs");
+const { randomUUID } = require("node:crypto");
 const { homedir } = require("node:os");
-const { dirname, join, resolve } = require("node:path");
+const { basename, dirname, join, resolve } = require("node:path");
 const readline = require("node:readline/promises");
 const { stdin, stdout, stderr } = require("node:process");
 
@@ -157,9 +160,16 @@ function buildLauncher() {
  * @param {string} stateDir
  * @param {string} [uvBin]
  * @param {string} [profile]
- * @returns {{ command: string, args: string[], version: string, package: null, source: string, stateDir: string, profile: string }}
+ * @param {string} [providerPath]
+ * @returns {{ command: string, args: string[], version: string, package: null, source: string, stateDir: string, profile: string, env: object }}
  */
-function buildSourceLauncher(source, stateDir, uvBin = "uv", profile = "core") {
+function buildSourceLauncher(
+  source,
+  stateDir,
+  uvBin = "uv",
+  profile = "core",
+  providerPath = process.env.PATH || "",
+) {
   const profiles = new Set(["core", "full-python", "lean", "external-proof"]);
   if (!profiles.has(profile)) {
     throw new Error(`Unknown Jacobian source profile: ${profile}.`);
@@ -188,6 +198,7 @@ function buildSourceLauncher(source, stateDir, uvBin = "uv", profile = "core") {
     source: sourcePath,
     stateDir: statePath,
     profile,
+    env: providerPath ? { PATH: providerPath } : {},
   };
 }
 
@@ -205,11 +216,15 @@ function jsonEntry(def, launcher) {
       command: [launcher.command, ...launcher.args].join(" "),
       cwd: ".",
       enabled: true,
+      ...(Object.keys(launcher.env || {}).length > 0
+        ? { environment: launcher.env }
+        : {}),
     };
   }
   return {
     command: launcher.command,
     args: launcher.args,
+    ...(Object.keys(launcher.env || {}).length > 0 ? { env: launcher.env } : {}),
   };
 }
 
@@ -238,7 +253,23 @@ function writeIfChanged(path, content) {
   const existing = readOptional(path);
   if (existing === content) return;
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content, { encoding: "utf8" });
+  const mode = existsSync(path) ? statSync(path).mode & 0o777 : 0o600;
+  const temporary = join(
+    dirname(path),
+    `.${basename(path)}.jacobian-${randomUUID()}.tmp`,
+  );
+  try {
+    writeFileSync(temporary, content, {
+      encoding: "utf8",
+      flag: "wx",
+      mode,
+    });
+    renameSync(temporary, path);
+  } finally {
+    if (existsSync(temporary)) {
+      rmSync(temporary, { force: true });
+    }
+  }
 }
 
 /**
@@ -360,7 +391,12 @@ function resolveTomlEdit(operation, def, launcher) {
   }
 
   // Setup: build the entry.
-  const expectedEntry = `jacobian = { command = ${JSON.stringify(launcher.command)}, args = [${launcher.args.map((argument) => JSON.stringify(argument)).join(", ")}], startup_timeout_sec = 30 }`;
+  const environment = Object.entries(launcher.env || {});
+  const environmentEntry =
+    environment.length > 0
+      ? `, env = { ${environment.map(([key, value]) => `${key} = ${JSON.stringify(value)}`).join(", ")} }`
+      : "";
+  const expectedEntry = `jacobian = { command = ${JSON.stringify(launcher.command)}, args = [${launcher.args.map((argument) => JSON.stringify(argument)).join(", ")}], startup_timeout_sec = 30${environmentEntry} }`;
   const entryLines = [`[mcp_servers]`, expectedEntry];
 
   if (sectionStart === -1) {
@@ -548,18 +584,27 @@ async function interactiveConfirm() {
  * @param {string} [options.stateDir] Fixed state directory for source launches.
  * @param {string} [options.uvBin] uv executable used by source launches.
  * @param {string} [options.profile] Source dependency profile metadata.
+ * @param {string} [options.providerPath] PATH audited by the source doctor.
  * @returns {Promise<object>} Setup report.
  */
 async function run(options) {
   const operation = options.operation;
   const home = homedir();
   const defs = clientDefinitions(home);
+  const supportedIds = new Set(defs.map((definition) => definition.id));
+  const invalidClients = (options.clients || []).filter(
+    (client) => !supportedIds.has(client),
+  );
+  if (invalidClients.length > 0) {
+    throw new Error(`Unknown MCP client: ${invalidClients.join(", ")}.`);
+  }
   const launcher = options.source
     ? buildSourceLauncher(
         options.source,
         options.stateDir || join(resolve(options.source), ".jacobian"),
         options.uvBin || "uv",
         options.profile || "core",
+        options.providerPath || process.env.PATH || "",
       )
     : buildLauncher();
   const detectedIds = defs.filter((d) => isClientDetected(home, d.id)).map((d) => d.id);
