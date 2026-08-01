@@ -20,7 +20,7 @@ digest = "sha256:9b5f8b6551fe13ddfa9c9e05b99de374ebb6bd1097c1a297c80253053d26fcc
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-complex-power-sum-elimination"
-digest = "sha256:9c117e931e4c306188256c1baab3be11bbda681a964c89ac83f3e3a277e2d209"
+digest = "sha256:4293ae14599dcd9ba61130f0747ad673d616617d657286733b4df933e340145a"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-dead-end-local-density-audit"
@@ -100,7 +100,7 @@ digest = "sha256:31dd23d70b61ae9e2afc48c7e9b7d0954ae62fda7ebc550b6a26daeeaec4728
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-noncompact-lefschetz-proof-audit"
-digest = "sha256:f75fab21bed8d6b7913c85968a4814f3e46e9bf6c0f4e0bd88b67ed2713466a4"
+digest = "sha256:0803e65d7d51e58e58b6411427d840bccf4d710065b1e8400db3cef9ee356cc2"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-nondifferentiable-maximum-construction"
