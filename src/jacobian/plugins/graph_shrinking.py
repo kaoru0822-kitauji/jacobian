@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from jacobian.contracts.plugin_inputs import GraphShrinkRequest
+from jacobian.contracts.plugin_graphs import GraphShrinkRequest
 
 
 def reduce_simple_graph(request: dict[str, Any]) -> dict[str, Any]:

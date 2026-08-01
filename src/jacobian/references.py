@@ -1,4 +1,4 @@
-"""Operator bootstrap for the bundled v0.2 reference domains."""
+"""Operator bootstrap for the bundled reference domains."""
 
 from __future__ import annotations
 

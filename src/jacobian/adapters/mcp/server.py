@@ -38,6 +38,7 @@ from jacobian.adapters.mcp.projections import (
     WORKSPACE_OPEN_DESCRIPTION,
     WORKSPACE_QUERY_DESCRIPTION,
     WORKSPACE_WRITE_DESCRIPTION,
+    CapabilityProjectionStrategy,
 )
 from jacobian.adapters.mcp.remote import TenantRuntimeRouter
 from jacobian.adapters.mcp.resources import _register_resources_and_prompts
@@ -332,11 +333,16 @@ async def _runtime_lifespan(
     *,
     runtime: JacobianRuntime | None,
     tenant_router: TenantRuntimeRouter | None,
+    projection_strategy: CapabilityProjectionStrategy,
 ) -> AsyncIterator[AppState]:
     if runtime is not None:
         _start_lean_warmup(runtime)
     try:
-        yield AppState(runtime=runtime, tenant_router=tenant_router)
+        yield AppState(
+            runtime=runtime,
+            tenant_router=tenant_router,
+            projection_strategy=projection_strategy,
+        )
     finally:
         if runtime is not None:
             runtime.close()
@@ -357,11 +363,20 @@ def create_server(
     capability_exclusions: frozenset[str] = frozenset(),
     capability_policy: CapabilityPolicy | None = None,
     max_tenant_runtimes: int | None = None,
+    _projection_strategy: CapabilityProjectionStrategy = (
+        "COMPACT_URI_TEXT_RESOURCE_LINK"
+    ),
 ) -> MCPServer[AppState]:
     """Create a local or tenant-routed adapter over a Jacobian runtime."""
 
     if tenant_isolation and capability_exclusions:
         raise ValueError("capability exclusions are supported only by local evaluation")
+    if _projection_strategy not in {
+        "FULL_INLINE",
+        "COMPACT_URI_TEXT",
+        "COMPACT_URI_TEXT_RESOURCE_LINK",
+    }:
+        raise ValueError("unsupported internal MCP projection strategy")
 
     # Keep ``--help`` and ``--version`` independent of the MCP runtime's
     # heavier imports and shutdown hooks.
@@ -417,6 +432,7 @@ def create_server(
             server,
             runtime=runtime,
             tenant_router=tenant_router,
+            projection_strategy=_projection_strategy,
         ) as state:
             yield state
 

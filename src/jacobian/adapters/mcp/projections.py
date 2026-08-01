@@ -33,6 +33,11 @@ from jacobian.contracts.capabilities import (
 _LOGGER = logging.getLogger(__name__)
 CapabilityDescriptionView = Literal["SUMMARY", "CONTRACT", "FULL"]
 CapabilityInvocationView = Literal["SUMMARY", "STANDARD", "FULL"]
+CapabilityProjectionStrategy = Literal[
+    "FULL_INLINE",
+    "COMPACT_URI_TEXT",
+    "COMPACT_URI_TEXT_RESOURCE_LINK",
+]
 
 if TYPE_CHECKING:
     from jacobian.runtime.model import JacobianRuntime
@@ -161,13 +166,21 @@ def _capability_call_tool_result(
     result: CapabilityResult,
     *,
     view: CapabilityInvocationView,
+    projection_strategy: CapabilityProjectionStrategy = (
+        "COMPACT_URI_TEXT_RESOURCE_LINK"
+    ),
 ) -> CallToolResult:
+    if projection_strategy == "FULL_INLINE":
+        view = "FULL"
     canonical = result.model_dump(mode="json")
     projected, projection = _invocation_text_projection(result, view=view)
     text = _compact_json(canonical if view == "FULL" else projected)
     model_visible_bytes = len(text.encode("utf-8"))
     content: list[ContentBlock] = [TextContent(type="text", text=text)]
-    if result.episode_uri is not None:
+    if (
+        projection_strategy == "COMPACT_URI_TEXT_RESOURCE_LINK"
+        and result.episode_uri is not None
+    ):
         content.append(
             ResourceLink(
                 name="jacobian-capability-result",

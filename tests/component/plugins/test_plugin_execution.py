@@ -25,7 +25,7 @@ def _wait_until_process_exits(
             current_start_time = (
                 stat_path.read_text(encoding="utf-8").rsplit(")", 1)[1].split()[19]
             )
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
             return
         if current_start_time != expected_start_time:
             return

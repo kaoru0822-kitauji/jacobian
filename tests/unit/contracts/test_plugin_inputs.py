@@ -3,15 +3,17 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from jacobian.contracts.plugin_inputs import (
-    ErdosStrausCapabilityRequest,
+from jacobian.contracts.plugin_graphs import (
     GraphPathCapabilityRequest,
     GraphPathReductionRequest,
     GraphShrinkRequest,
+)
+from jacobian.contracts.plugin_matrices import (
     MatrixCapabilityRequest,
     MatrixReductionRequest,
     MatrixTransformRequest,
 )
+from jacobian.contracts.plugin_number_theory import ErdosStrausCapabilityRequest
 
 
 def _matrix_candidate() -> dict[str, object]:

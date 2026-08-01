@@ -347,6 +347,35 @@ _RUNTIME_SCHEMA_STATEMENTS = (
 )
 _RUNTIME_SCHEMA = "\n-- statement boundary --\n".join(_RUNTIME_SCHEMA_STATEMENTS)
 
+_STATE_FORMAT_SCHEMA_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS jacobian_state_format (
+        id INTEGER PRIMARY KEY CHECK (id = 0),
+        format_revision INTEGER NOT NULL,
+        recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS jacobian_data_upgrades (
+        upgrade_id TEXT PRIMARY KEY,
+        completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    INSERT INTO jacobian_state_format(id, format_revision)
+    VALUES (0, 4)
+    ON CONFLICT(id) DO UPDATE SET format_revision = excluded.format_revision
+    """,
+    """
+    INSERT OR IGNORE INTO jacobian_data_upgrades(upgrade_id)
+    SELECT 'research-episode-index-v2'
+    WHERE NOT EXISTS (SELECT 1 FROM research_episodes)
+    """,
+)
+_STATE_FORMAT_SCHEMA = "\n-- statement boundary --\n".join(
+    _STATE_FORMAT_SCHEMA_STATEMENTS
+)
+
 
 def _install_artifact_schema(connection: sqlite3.Connection) -> None:
     for statement in _ARTIFACT_SCHEMA_STATEMENTS:
@@ -381,6 +410,11 @@ def _install_runtime_schema(connection: sqlite3.Connection) -> None:
         )
 
 
+def _install_state_format_schema(connection: sqlite3.Connection) -> None:
+    for statement in _STATE_FORMAT_SCHEMA_STATEMENTS:
+        connection.execute(statement)
+
+
 STATE_MIGRATIONS = (
     Migration(
         revision=1,
@@ -400,4 +434,14 @@ STATE_MIGRATIONS = (
         definition=_RUNTIME_SCHEMA,
         apply=_install_runtime_schema,
     ),
+    Migration(
+        revision=4,
+        name="state-format-boundary-v1",
+        definition=_STATE_FORMAT_SCHEMA,
+        apply=_install_state_format_schema,
+    ),
 )
+
+SUPPORTED_STATE_FLOOR = 3
+CURRENT_STATE_FORMAT_REVISION = 4
+RESEARCH_INDEX_UPGRADE_ID = "research-episode-index-v2"

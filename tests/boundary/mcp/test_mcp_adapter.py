@@ -5,6 +5,7 @@ import json
 from importlib.metadata import version
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
 
 from jacobian.adapters.mcp.guidance import OPERATING_GUIDE
@@ -215,6 +216,53 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
             reference_result = await client.read_resource("reference://catalog")
             references = json.loads(reference_result.contents[0].text)
             assert references["matrices"]["plugin_id"].startswith("artifact://sha256/")
+
+    asyncio.run(scenario())
+
+
+def test_internal_projection_strategies_are_composable_not_model_parameters(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+
+        for strategy in (
+            "FULL_INLINE",
+            "COMPACT_URI_TEXT",
+            "COMPACT_URI_TEXT_RESOURCE_LINK",
+        ):
+            server = create_server(
+                tmp_path / strategy,
+                _projection_strategy=strategy,
+            )
+            async with Client(server, raise_exceptions=True) as client:
+                listed = await client.list_tools()
+                invoke_schema = next(
+                    tool.input_schema
+                    for tool in listed.tools
+                    if tool.name == "capability.invoke"
+                )
+                assert "projection_strategy" not in json.dumps(invoke_schema)
+                result = await client.call_tool(
+                    "capability.invoke",
+                    {
+                        "capability_id": "integer.compute.gcd",
+                        "mode": "EXPLORE",
+                        "payload": {"left": "84", "right": "30"},
+                    },
+                )
+                assert isinstance(result.structured_content, dict)
+                links = [
+                    block for block in result.content if block.type == "resource_link"
+                ]
+                if strategy == "FULL_INLINE":
+                    assert len(links) == 0
+                    assert json.loads(result.content[0].text)["output"]
+                elif strategy == "COMPACT_URI_TEXT":
+                    assert len(links) == 0
+                else:
+                    assert len(links) == 1
+                assert result.structured_content["output"]
 
     asyncio.run(scenario())
 
@@ -499,6 +547,24 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
                     "payload": {"query": "counterexample", "limit": 5},
                 },
             )
+            durable_result = await client.call_tool(
+                "capability.invoke",
+                {
+                    "capability_id": "integer.compute.gcd",
+                    "mode": "EXPLORE",
+                    "payload": {"left": "84", "right": "30"},
+                },
+            )
+            result_link = next(
+                block
+                for block in durable_result.content
+                if block.type == "resource_link"
+            )
+            durable = await client.read_resource(result_link.uri)
+            durable_payload = json.loads(durable.contents[0].text)
+            assert durable_payload["artifact_uri"] == result_link.uri
+            assert durable_payload["manifest"]["object_digest"].startswith("sha256:")
+            assert durable_payload["payload"]["capability_id"] == "integer.compute.gcd"
             response = json.loads(result.content[0].text)
             assert response["execution"]["status"] == "COMPLETED"
             assert response["assurance"]["level"] == "COMPUTED"
@@ -563,6 +629,51 @@ def test_mcp_describes_and_invokes_capabilities(tmp_path: Path) -> None:
             assert summary_result.structured_content["output"]["result"]["value"] == (
                 "6"
             )
+
+    asyncio.run(scenario())
+
+
+def test_mcp_resource_links_read_exact_artifacts_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        from mcp import Client
+        from mcp.shared.exceptions import MCPError
+
+        async with Client(create_server(tmp_path), raise_exceptions=True) as client:
+            result = await client.call_tool(
+                "capability.invoke",
+                {
+                    "capability_id": "integer.compute.gcd",
+                    "mode": "EXPLORE",
+                    "payload": {"left": "84", "right": "30"},
+                },
+            )
+            link = next(
+                block for block in result.content if block.type == "resource_link"
+            )
+            resource = await client.read_resource(link.uri)
+            payload = json.loads(resource.contents[0].text)
+            assert payload["artifact_uri"] == link.uri
+            assert payload["manifest"]["object_digest"].startswith("sha256:")
+
+            payload_digest = payload["manifest"]["payload_digest"]
+            payload_hex = payload_digest.removeprefix("sha256:")
+            payload_blob = (
+                tmp_path / "blobs" / "sha256" / payload_hex[:2] / payload_hex[2:]
+            )
+            payload_blob.write_bytes(b'{"tampered":true}')
+            with pytest.raises(MCPError):
+                await client.read_resource(link.uri)
+
+            missing_uri = "artifact://sha256/" + ("f" * 64)
+            with pytest.raises(MCPError):
+                await client.read_resource(missing_uri)
+
+            tampered_digest = "0" if link.uri[-1] != "0" else "1"
+            tampered_uri = link.uri[:-1] + tampered_digest
+            with pytest.raises(MCPError):
+                await client.read_resource(tampered_uri)
 
     asyncio.run(scenario())
 

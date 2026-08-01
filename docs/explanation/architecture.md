@@ -3,7 +3,7 @@
 [Documentation home](../index.md)
 
 - Status: Current architecture
-- Normative sources:
+- Historical normative context:
   [v0.2 specification](../reference/specifications/v0.2.md) and
   [conformance gate](../reference/conformance-v0.2.md)
 

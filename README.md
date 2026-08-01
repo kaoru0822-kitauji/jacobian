@@ -280,9 +280,9 @@ for the upstream wheel tags.
 
 ## Status
 
-Jacobian 0.6.0 is a stable release. Its published package, capability, and
-artifact contracts describe the supported release surface; ongoing capability
-research does not change that release retroactively.
+Jacobian 0.6.0 is a pre-stable release. Its published package, capability, and
+artifact contracts describe the current supported surface; ongoing capability
+research may change experimental contracts between releases.
 
 The Python distribution contains the mathematical kernel, CLI, and MCP server.
 The npm package is a thin launcher and MCP client installer for that same

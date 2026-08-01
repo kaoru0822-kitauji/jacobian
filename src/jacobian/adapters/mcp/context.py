@@ -12,6 +12,7 @@ from typing import Any
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 
+from jacobian.adapters.mcp.projections import CapabilityProjectionStrategy
 from jacobian.adapters.mcp.remote import TenantRuntimeRouter
 from jacobian.adapters.mcp.tooling import AgentRecoveryError
 from jacobian.runtime.model import JacobianRuntime
@@ -23,6 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 class AppState:
     runtime: JacobianRuntime | None
     tenant_router: TenantRuntimeRouter | None = None
+    projection_strategy: CapabilityProjectionStrategy = "COMPACT_URI_TEXT_RESOURCE_LINK"
 
 
 def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
@@ -51,6 +53,23 @@ def _runtime(ctx: Context[AppState, Any] | None) -> JacobianRuntime:
             "again, inspect the local Jacobian log."
         )
     return state.runtime
+
+
+def _projection_strategy(
+    ctx: Context[AppState, Any] | None,
+) -> CapabilityProjectionStrategy:
+    if ctx is None:
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this request. Retry once; if it fails "
+            "again, inspect the local Jacobian log."
+        )
+    state = ctx.request_context.lifespan_context
+    if not isinstance(state, AppState):
+        raise AgentRecoveryError(
+            "Jacobian is unavailable for this request. Retry once; if it fails "
+            "again, inspect the local Jacobian log."
+        )
+    return state.projection_strategy
 
 
 def _start_lean_warmup(runtime: JacobianRuntime) -> None:

@@ -1,4 +1,4 @@
-"""Lean frontend services: declarations, exploration, proof edit, statements."""
+"""Lean frontend services: declarations, exploration, proof inspection, statements."""
 
 from jacobian.lean_frontend.declarations import (
     LeanDeclarationService,
@@ -7,6 +7,10 @@ from jacobian.lean_frontend.declarations import (
 from jacobian.lean_frontend.exploration import (
     LeanExplorationInstallation,
     install_lean_exploration_capabilities,
+)
+from jacobian.lean_frontend.proof_axioms import (
+    LeanProofAxiomsInstallation,
+    install_lean_proof_axioms_capability,
 )
 from jacobian.lean_frontend.proof_edit import (
     LeanProofEditInstallation,
@@ -21,10 +25,12 @@ from jacobian.lean_frontend.statement import (
 __all__ = [
     "LeanDeclarationService",
     "LeanExplorationInstallation",
+    "LeanProofAxiomsInstallation",
     "LeanProofEditInstallation",
     "LeanService",
     "LeanStatementInstallation",
     "install_lean_exploration_capabilities",
+    "install_lean_proof_axioms_capability",
     "install_lean_proof_edit_capability",
     "install_lean_statement_capabilities",
     "installed_lean_declaration_service",

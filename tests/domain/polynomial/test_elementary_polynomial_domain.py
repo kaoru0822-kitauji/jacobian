@@ -82,9 +82,8 @@ def test_integer_polynomial_operations_preserve_ring_semantics(
         == "6"
     )
 
-    # The legacy adapter flipped the primitive part's sign without also
-    # flipping its content, so its two reported values did not reconstruct a
-    # negative-leading source. The domain result retains an exact reconstruction.
+    # Content, primitive part, and normalization must retain an exact
+    # reconstruction even when the source has a negative leading coefficient.
     primitive = _invoke(
         domain_services,
         "polynomial.integer.compute.primitive_part",

@@ -379,10 +379,11 @@ async def _remote_tenant_scenario(port: int) -> None:
     import httpx2
     from mcp import Client
     from mcp.client.streamable_http import streamable_http_client
+    from mcp.shared.exceptions import MCPError
 
     url = f"http://127.0.0.1:{port}/mcp"
 
-    async def invoke(token: str, *, create: bool) -> int:
+    async def invoke(token: str, *, create: bool) -> tuple[int, str | None]:
         async with (
             httpx2.AsyncClient(
                 headers={"Authorization": f"Bearer {token}"},
@@ -398,6 +399,7 @@ async def _remote_tenant_scenario(port: int) -> None:
         ):
             catalog = await client.read_resource("capability://catalog")
             assert "fixture.increment" in catalog.contents[0].text
+            created_artifact_uri = None
             if create:
                 await client.call_tool(
                     "capability.invoke",
@@ -406,6 +408,19 @@ async def _remote_tenant_scenario(port: int) -> None:
                         "mode": "EXPLORE",
                         "payload": {"value": 4},
                     },
+                )
+                created = await client.call_tool(
+                    "capability.invoke",
+                    {
+                        "capability_id": "integer.compute.gcd",
+                        "mode": "EXPLORE",
+                        "payload": {"left": "84", "right": "30"},
+                    },
+                )
+                created_artifact_uri = next(
+                    block.uri
+                    for block in created.content
+                    if block.type == "resource_link"
                 )
             searched = await client.call_tool(
                 "capability.invoke",
@@ -418,10 +433,27 @@ async def _remote_tenant_scenario(port: int) -> None:
             payload = json.loads(searched.content[0].text)
             assert payload["execution"]["status"] == "COMPLETED", payload["execution"]
             assert "hits" in payload["output"], payload
-            return len(payload["output"]["hits"])
+            return len(payload["output"]["hits"]), created_artifact_uri
 
-    assert await invoke("a" * 32, create=True) == 1
-    assert await invoke("b" * 32, create=False) == 0
+    alpha_hits, alpha_artifact_uri = await invoke("a" * 32, create=True)
+    beta_hits, _ = await invoke("b" * 32, create=False)
+    assert alpha_hits == 1
+    assert beta_hits == 0
+    assert alpha_artifact_uri is not None
+
+    async with (
+        httpx2.AsyncClient(
+            headers={"Authorization": f"Bearer {'b' * 32}"},
+            trust_env=False,
+            timeout=60,
+        ) as http,
+        Client(
+            streamable_http_client(url, http_client=http),
+            raise_exceptions=True,
+        ) as beta_client,
+    ):
+        with pytest.raises(MCPError):
+            await beta_client.read_resource(alpha_artifact_uri)
 
 
 def _wait_for_server(

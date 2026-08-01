@@ -1,6 +1,6 @@
 # Contributing to Jacobian
 
-Jacobian is stable as of 0.6.0. It exposes composable mathematical
+Jacobian is a pre-stable 0.6.0 capability workbench. It exposes composable mathematical
 capabilities that AI agents use to investigate conjectures and other
 mathematically specified problems. Contributions should preserve mathematically
 atomic, agent-visible outcomes, agent-owned composition, and the boundary
