@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 34,
-    "manifest_sha256": "sha256:fd801bd82b393b910a15c1b0dc1f11dc92502109fa489b095ae57e05d04b8b5c",
+    "task_count": 35,
+    "manifest_sha256": "sha256:29e82bad3dd66a06851daf82a524bcee06a8bb0aa9438bfdd09507a1d42b14ca",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -127,6 +127,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
+    },
+    {
+      "task_id": "dead-end-local-density-audit",
+      "mathematical_moves": [
+        "Separate local congruence analysis by the p-adic valuation of the base.",
+        "Detect collisions and vacuous digit constraints in forbidden residue classes.",
+        "Reconstruct exact reduced local-density factors from complete finite residue audits."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "modular.enumerate.quadratic_residues",
+          "availability": "AVAILABLE",
+          "boundary": "Enumerates quadratic residues, not affine divisibility obstructions across valuation branches."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep branch selection, collision analysis, and local-factor reconstruction as agent-owned composition; do not add a problem-specific square-free-density solver."
     },
     {
       "task_id": "distinct-sum-pairing-optimum",
