@@ -38,20 +38,20 @@
         },
         "valuation_induction": {
           "type": "object", "additionalProperties": false,
-          "required": ["hypotheses", "sub_one_terms", "add_one_reason", "u_terms", "successor"],
+          "required": ["hypotheses", "sub_one_term_lower_bounds", "add_one_reason", "u_term_lower_bounds", "successor"],
           "properties": {
             "hypotheses": {"$ref": "#/$defs/triple"},
-            "sub_one_terms": {"$ref": "#/$defs/pair"},
+            "sub_one_term_lower_bounds": {"$ref": "#/$defs/pair"},
             "add_one_reason": {"type": "string", "minLength": 1},
-            "u_terms": {"$ref": "#/$defs/pair"},
+            "u_term_lower_bounds": {"$ref": "#/$defs/pair"},
             "successor": {"$ref": "#/$defs/triple"}
           }
         },
         "target_transfer": {
           "type": "object", "additionalProperties": false,
-          "required": ["u_difference_terms", "u_difference", "scale_v2", "b_difference", "divides_exponent", "not_divides_exponent"],
+          "required": ["u_difference_term_lower_bounds", "u_difference", "scale_v2", "b_difference", "divides_exponent", "not_divides_exponent"],
           "properties": {
-            "u_difference_terms": {"$ref": "#/$defs/pair"},
+            "u_difference_term_lower_bounds": {"$ref": "#/$defs/pair"},
             "u_difference": {"$ref": "#/$defs/affine"},
             "scale_v2": {"type": "integer", "minimum": 0},
             "b_difference": {"$ref": "#/$defs/affine"},

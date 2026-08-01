@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 34,
-    "manifest_sha256": "sha256:fd801bd82b393b910a15c1b0dc1f11dc92502109fa489b095ae57e05d04b8b5c",
+    "task_count": 33,
+    "manifest_sha256": "sha256:1d195bb1db943b9922b96d240284590d61364ce95766e9e47e9f6f539ebfbb25",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
