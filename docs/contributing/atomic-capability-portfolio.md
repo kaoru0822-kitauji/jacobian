@@ -177,7 +177,7 @@ system can move earlier when a concrete workflow repeatedly needs its outcome.
 | ---: | --- | --- | --- | --- | --- |
 | 0 | Existing Z3 | Internal bounded search and differential checking | T0, already locked | Never treat Z3's own status as independent verification | Retain as a provider; do not add a Z3-branded self-verifying capability |
 | 1 | Lean 4, Mathlib, and a thin maintained interaction layer | Declaration search and inspection; completed source still goes to `lean.check` | T3/XL, but already pinned for references | Existing independent Lean replay for completed source; retrieval itself is unverified | Contract spike and paired evaluation, not a default expansion yet |
-| 2 | CaDiCaL plus DRAT-trim, with CakeLPR as a candidate hardening target | Find a SAT assignment; emit an UNSAT proof; check each independently | T2/S-to-M native build | Direct assignment replay for SAT; separate proof checker for UNSAT | First new formal vertical slice |
+| 2 | CaDiCaL plus DRAT-trim, with the pinned Lean checker as the authority candidate | Find a SAT assignment; emit an UNSAT proof; check each independently | T2/S-to-M native build | Direct assignment replay for SAT; separate proof checker for UNSAT | First new formal vertical slice |
 | 3 | cvc5 plus Carcara | Produce and check Alethe UNSAT proofs in explicitly supported theories | T1/S plus T2 Rust checker | Carcara or later proof reconstruction, bound to exact SMT-LIB and theory profile | Implement after SAT; unsupported proof rules remain unverified |
 | 4 | Python-FLINT and Arb | Exact rational linear algebra, integer matrices, polynomials, and rigorous ball enclosures | T1/S | Small independent exact checkers where available; Arb output remains computed until independently replayed | First shared exact-mathematics provider |
 | 5 | SymPy | Typed expression normalization and symbolic transformations | T1/S | Verify only a separately checkable relation; never trust simplifier success alone | Add after FLINT with a non-string typed AST |
@@ -214,13 +214,13 @@ backend ideas.
 | Evidence | Mathematical move | Current support or gap | Proposed change | Backend | Verification boundary | Public reproduction | Decision |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Lean workflow and pinned REPL pilot | Find a relevant declaration, inspect its type, then construct source | `lean.check` replays completed source; discovery and proof-state handoff are missing, and the REPL cannot yet return replayable source | `lean.declaration.search` and `lean.declaration.inspect` experiment | Lean environment; spike maintained Lean REPL or Pantograph only where needed | Search is unverified; final source uses existing `lean.check` | Search and inspect known Mathlib declarations, then replay a small proof | Ready for contract spike and ablation, not default exposure |
-| `BOOL-MUS-001`, finite quantified cases, and repeated solver-backed construction | Find a Boolean model or produce evidence of UNSAT | No shared SAT artifact and certificate lane | Split model finding/checking from UNSAT proof production/checking | CaDiCaL and DRAT-trim; later CakeLPR | Direct model evaluator and separate proof checker | Small satisfiable CNF, pigeonhole UNSAT, corrupted assignment, truncated and misbound proof | Ready for implementation |
+| `BOOL-MUS-001`, finite quantified cases, and repeated solver-backed construction | Find a Boolean model or produce evidence of UNSAT | No shared SAT artifact and certificate lane | Split model finding/checking from UNSAT proof production/checking | CaDiCaL and DRAT-trim, with pinned Lean authority evaluation | Direct model evaluator and separate proof checker | Small satisfiable CNF, pigeonhole UNSAT, corrupted assignment, truncated and misbound proof | Ready for implementation |
 | Existing Z3 use and cross-domain SMT demand | Establish UNSAT in EUF or linear arithmetic | Z3 is a search dependency, not an independent verifier | Theory-bounded Alethe proof capabilities | cvc5 and Carcara | Separate checker; reject unsupported rules and theories without conclusion | Official cvc5 Alethe examples plus mutated premises and theory-profile mismatch | Ready after SAT |
 | Matrix, polytope, and exact-algebra scenarios | Construct an exact rational solution and expose replayable algebra | Current exact work is scenario-specific | Exact rational solution first; Hermite form and factorization later | Python-FLINT | Independent rational arithmetic and relation checks | Rational systems with a valid solution, malformed denominator, wrong transform, and inconsistent-system non-conclusion | Ready after proof lanes |
 | Symbolic reasoning in general workflows | Normalize or transform a declared expression | No shared typed expression schema; arbitrary parsing would be unsafe | Typed AST and narrowly named transformations | SymPy, with FLINT for polynomial canonical forms | Verify only canonical coefficients or another explicit relation | Polynomial normalization and deliberate assumption or branch-cut traps | Contract research, then implementation |
 | Graph Atlas pilot and larger graph workflows | Canonicalize, test isomorphism, or enumerate beyond order seven | Atlas is bounded and small; no observed held-out need yet | Canonical label and isomorphism witness before enumeration | nauty/Traces | Replay the permutation; bind any completeness claim to exact order and generator | Reproduce Atlas canonical classes and mutated permutation | Research queue |
 | `POLY-SEP-001` and future lattice-point cases | Compute cone or integer-semigroup data | Exact separation exists; Hilbert bases and Ehrhart data do not | Add one Normaliz outcome when a scenario needs it | Normaliz/PyNormaliz | Separate membership from minimality and completeness obligations | Tiny cones with independently enumerated bounded sections | Research queue |
-| Tiny optimization scenario | Find an LP/MIP candidate and bound | Solver results cannot currently be promoted safely | Candidate solution first, exact certificate checking second | HiGHS and an exact checker such as CakeVIPR where formats align | Exact primal/dual/Farkas or integer proof replay | Tiny rational LP with perturbed objective, infeasible claim, and timeout | Research queue |
+| Tiny optimization scenario | Find an LP/MIP candidate and bound | Solver results cannot currently be promoted safely | Candidate solution first, exact certificate checking second | HiGHS and a maintained exact checker where formats align | Exact primal/dual/Farkas or integer proof replay | Tiny rational LP with perturbed objective, infeasible claim, and timeout | Research queue |
 
 The PARI, GAP, Singular, fplll, Rocq, Agda, Isabelle, SageMath, and Macaulay2
 rows in the ranked portfolio are backend hypotheses. They need at least one
@@ -402,8 +402,8 @@ fail closed as `UNKNOWN`. See
 
 CaDiCaL has a small source build and a command line that accepts DIMACS plus a
 proof path. DRAT-trim independently validates a DRAT proof against the input
-formula. Later, evaluate whether a compatible emission or conversion path to
-a verified checker such as CakeLPR actually exists. Do not assume format
+formula. Later, evaluate whether a compatible emission or conversion path to a
+maintained verified checker actually exists. Do not assume format
 compatibility or block the first independent proof-checker slice on that
 hardening.
 
@@ -662,8 +662,7 @@ Formal systems and proof-producing solvers:
 
 - [Lean installation][lean-install], [Elan toolchains][lean-elan],
   [Lean REPL][lean-repl], and [Pantograph][pantograph]
-- [CaDiCaL][cadical], [DRAT-trim][drat-trim], and
-  [CakeML verified checkers][cakeml-checkers]
+- [CaDiCaL][cadical] and [DRAT-trim][drat-trim]
 - [cvc5 proof production][cvc5-proofs], [cvc5 Alethe output][cvc5-alethe],
   and [Carcara][carcara]
 - [Z3 guide][z3-guide] and [Z3 tactic proof-support summary][z3-tactics]
@@ -688,7 +687,6 @@ Exact mathematics and domain systems:
 
 [agda-install]: https://agda.readthedocs.io/en/latest/getting-started/installation.html
 [cadical]: https://github.com/arminbiere/cadical
-[cakeml-checkers]: https://cakeml.org/checkers.html
 [carcara]: https://github.com/ufmg-smite/carcara
 [cvc5-alethe]: https://cvc5.github.io/docs/latest/proofs/output_alethe.html
 [cvc5-proofs]: https://cvc5.github.io/docs/latest/proofs/proofs.html

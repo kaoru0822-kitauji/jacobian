@@ -23,10 +23,13 @@ is selected through a recorded comparison of independent implementation,
 supported dialect, deterministic replay, invalid-proof rejection, bounded
 resources, reproducible release and artifact identity, license, and operation
 without Jacobian's SAT producer. The candidates to evaluate are the current
-bounded checker, CakeLPR, and an available pinned Lean LRAT checker. Until one
-candidate passes every gate, no broader LRAT authority is implied.
+bounded checker and the pinned Lean LRAT checker. CakeLPR/CakeML are excluded
+from the current authority path because they would add a second generated-
+checker build and provenance boundary. Until Lean passes every gate, no
+broader LRAT authority is implied.
 
 The required corpus includes valid proofs, malformed and truncated proofs,
 wrong-CNF bindings, altered hints, unsupported steps, and resource-limit
 failures. Rejection or an unavailable backend remains `UNKNOWN` and creates no
-verification record.
+verification record. The current feasibility record is
+[LRAT authority feasibility](../../reference/lrat-authority-evaluation.md).

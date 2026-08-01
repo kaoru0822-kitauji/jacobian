@@ -116,6 +116,10 @@ executable digest. Such a sidecar records the operator's authorization basis;
 it is not mathematical evidence or upstream attestation. A missing, malformed,
 or digest-mismatched sidecar leaves the checker capability unavailable.
 
+The pinned Lean runtime is measured under this rule when it is selected for an
+independent checker. Its source/build identity and executable/runtime digest
+are recorded with the checker authorization and remeasured around replay.
+
 ## Repeatable measurement
 
 Measure the provider selected for one installed capability:
