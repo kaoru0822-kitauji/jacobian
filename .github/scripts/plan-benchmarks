@@ -19,7 +19,6 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-CANONICAL_PREFIX = "benchmarks/tasks/"
 EVENTS = ("pull_request", "merge_group", "push", "schedule", "workflow_dispatch")
 MAX_PULL_REQUEST_ORACLE_TASKS = 8
 BENCHMARK_CONTROL_PATHS = frozenset(
@@ -29,14 +28,12 @@ BENCHMARK_CONTROL_PATHS = frozenset(
         ".github/workflows/benchmarks.yml",
         "Makefile",
         "tools/check_harbor_dataset.py",
-        "tools/render_harbor_job.py",
         "tools/sync_harbor_verifier_support.py",
     }
 )
 BENCHMARK_EXECUTION_CONTROL_PATHS = frozenset(
     {
         "tools/check_harbor_dataset.py",
-        "tools/render_harbor_job.py",
         "tools/sync_harbor_verifier_support.py",
     }
 )
@@ -124,7 +121,6 @@ def plan(
         }
 
     by_task, suites_by_id = _membership()
-    changed_tasks: set[str] = set()
     oracle_tasks: set[str] = set()
     affected_datasets: set[str] = set()
     reasons: list[str] = []
@@ -145,23 +141,6 @@ def plan(
                 reasons.append("benchmark planning or workflow contract change")
             continue
 
-        if path.startswith(CANONICAL_PREFIX):
-            remainder = path.removeprefix(CANONICAL_PREFIX)
-            task_id, _, relative = remainder.partition("/")
-            if not task_id or task_id not in by_task:
-                unknown = True
-                reasons.append(f"unknown canonical task path: {path}")
-                continue
-            changed_tasks.add(task_id)
-            affected_datasets.update(dataset for dataset, _ in by_task[task_id])
-            if relative != "README.md":
-                oracle_tasks.add(task_id)
-                run_oracle = True
-                reasons.append(f"executable task change: {task_id}")
-            else:
-                reasons.append(f"task documentation change: {task_id}")
-            continue
-
         parts = Path(path).parts
         if len(parts) >= 3 and parts[:2] == ("benchmarks", "datasets"):
             dataset_id = parts[2]
@@ -170,6 +149,19 @@ def plan(
                 reasons.append(f"unknown dataset path: {path}")
                 continue
             relative = parts[3:]
+            task_id = relative[0] if len(relative) >= 2 else None
+            suite = suites_by_id[dataset_id]
+            suite_task_ids = {ref.path.name for ref in suite.tasks}
+            if task_id in suite_task_ids:
+                affected_datasets.add(dataset_id)
+                task_relative = relative[1:]
+                if task_relative != ("README.md",):
+                    oracle_tasks.add(task_id)
+                    run_oracle = True
+                    reasons.append(f"executable task change: {task_id}")
+                else:
+                    reasons.append(f"task documentation change: {task_id}")
+                continue
             if relative[:1] in {("README.md",), ("dataset.toml",)}:
                 reasons.append(
                     f"dataset documentation or generated manifest: {dataset_id}"

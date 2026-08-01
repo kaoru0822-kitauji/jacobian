@@ -17,87 +17,9 @@
       "name": "oracle"
     }
   ],
-  "tasks": [
+  "datasets": [
     {
-      "path": "benchmarks/tasks/jacobian-inverse-obstruction"
-    },
-    {
-      "path": "benchmarks/tasks/jacobian-keller"
-    },
-    {
-      "path": "benchmarks/tasks/jacobian-negative-control"
-    },
-    {
-      "path": "benchmarks/tasks/integral-circle"
-    },
-    {
-      "path": "benchmarks/tasks/integral-projective-plane"
-    },
-    {
-      "path": "benchmarks/tasks/reduced-point"
-    },
-    {
-      "path": "benchmarks/tasks/recurrence-fibonacci"
-    },
-    {
-      "path": "benchmarks/tasks/recurrence-linear-eval"
-    },
-    {
-      "path": "benchmarks/tasks/recurrence-lucas"
-    },
-    {
-      "path": "benchmarks/tasks/recurrence-rational-series"
-    },
-    {
-      "path": "benchmarks/tasks/reliability-series-path"
-    },
-    {
-      "path": "benchmarks/tasks/reliability-single-edge"
-    },
-    {
-      "path": "benchmarks/tasks/reliability-triangle-fair"
-    },
-    {
-      "path": "benchmarks/tasks/symmetry-colored-reflection"
-    },
-    {
-      "path": "benchmarks/tasks/symmetry-cycle-rotation"
-    },
-    {
-      "path": "benchmarks/tasks/symmetry-identity-subgroup"
-    },
-    {
-      "path": "benchmarks/tasks/smith-rank-deficient"
-    },
-    {
-      "path": "benchmarks/tasks/smith-rectangular"
-    },
-    {
-      "path": "benchmarks/tasks/sat-bool-mus"
-    },
-    {
-      "path": "benchmarks/tasks/sat-erdos-schur-f4"
-    },
-    {
-      "path": "benchmarks/tasks/sat-pigeonhole"
-    },
-    {
-      "path": "benchmarks/tasks/sat-small"
-    },
-    {
-      "path": "benchmarks/tasks/gaussian-complex-cancellation"
-    },
-    {
-      "path": "benchmarks/tasks/gaussian-sixth-moment"
-    },
-    {
-      "path": "benchmarks/tasks/gaussian-two-sum-fourth-moment"
-    },
-    {
-      "path": "benchmarks/tasks/lean-retrieval"
-    },
-    {
-      "path": "benchmarks/tasks/lean-transition"
+      "path": "benchmarks/datasets/public-reproductions-v1"
     }
   ]
 }

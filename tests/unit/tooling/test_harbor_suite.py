@@ -10,7 +10,6 @@ import pytest
 import tomli_w
 from benchmarks.tooling.harbor_suite import (
     DIGEST_PREFIX,
-    MODEL_PLACEHOLDER,
     TASK_SCHEMA_VERSION,
     HarborSuiteError,
     Suite,
@@ -19,7 +18,6 @@ from benchmarks.tooling.harbor_suite import (
     expected_dataset_manifest,
     get_suite,
     load_registry,
-    render_job_config,
     validate_task_topology,
     validate_task_visibility,
 )
@@ -164,7 +162,7 @@ def _make_minimal_task(root: Path, *, task_id: str = "jacobian/test-v1-a") -> Pa
 def _make_canonical_task(tmp_path: Path, *, task_id: str = "test-v1-a") -> Path:
     (tmp_path / "test-v1").mkdir(parents=True, exist_ok=True)
     return _make_minimal_task(
-        tmp_path / "benchmarks" / "tasks" / task_id,
+        tmp_path / "test-v1" / task_id,
         task_id=f"jacobian/{task_id}",
     )
 
@@ -317,7 +315,7 @@ def test_suite_rejects_task_path_outside_tasks_root(
         ],
     )
     reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
-    with pytest.raises(HarborSuiteError, match="canonical task is missing"):
+    with pytest.raises(HarborSuiteError, match="Harbor task is missing"):
         load_registry(reg)
 
 
@@ -370,12 +368,12 @@ def test_registry_rejects_nested_canonical_task_bundle(
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(ds_path / "suite.toml")
     _make_minimal_task(
-        tmp_path / "benchmarks" / "tasks" / "algebra" / "nested-task",
+        ds_path / "algebra" / "nested-task",
         task_id="jacobian/nested-task",
     )
     reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
 
-    with pytest.raises(HarborSuiteError, match=r"missing task\.toml"):
+    with pytest.raises(HarborSuiteError, match=r"direct children"):
         load_registry(reg)
 
 
@@ -386,10 +384,10 @@ def test_registry_rejects_incomplete_canonical_task_directory(
     (ds_path / "jobs").mkdir(parents=True)
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(ds_path / "suite.toml")
-    (tmp_path / "benchmarks" / "tasks" / "incomplete-task").mkdir(parents=True)
+    (ds_path / "incomplete-task").mkdir(parents=True)
     reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
 
-    with pytest.raises(HarborSuiteError, match=r"missing task\.toml"):
+    with pytest.raises(HarborSuiteError, match=r"non-task directory"):
         load_registry(reg)
 
 
@@ -446,41 +444,6 @@ def test_check_dataset_manifest_reports_missing_manifest(
     failures = check_dataset_manifest(suite)
     assert len(failures) == 1
     assert "missing" in failures[0].lower() or "stale" in failures[0].lower()
-
-
-# ---------------------------------------------------------------------------
-# Job rendering
-# ---------------------------------------------------------------------------
-
-
-def test_render_job_config_resolves_model() -> None:
-    config = {
-        "agents": [{"name": "codex", "model_name": MODEL_PLACEHOLDER}],
-        "tasks": [{"path": "some/path"}],
-    }
-    rendered = render_job_config(config, model="gpt-5")
-    assert rendered["agents"][0]["model_name"] == "gpt-5"
-
-
-def test_render_job_config_rejects_unresolved_placeholders() -> None:
-    config = {
-        "agents": [{"name": "codex", "model_name": MODEL_PLACEHOLDER}],
-        "tasks": [{"path": "${OTHER_VAR}"}],
-    }
-    with pytest.raises(ValueError, match="unresolved"):
-        render_job_config(config, model="gpt-5")
-
-
-def test_render_job_config_rejects_missing_agents() -> None:
-    config = {"tasks": [{"path": "x"}]}
-    with pytest.raises(ValueError, match="agents"):
-        render_job_config(config, model="gpt-5")
-
-
-def test_render_job_config_rejects_no_placeholder() -> None:
-    config = {"agents": [{"name": "codex", "model_name": "already-set"}]}
-    with pytest.raises(ValueError, match="does not contain"):
-        render_job_config(config, model="gpt-5")
 
 
 # ---------------------------------------------------------------------------
@@ -676,9 +639,10 @@ def test_committed_examples_suite_allows_empty_tasks() -> None:
     assert suite.tasks == ()
 
 
-def test_committed_agent_workflow_suite_has_canonical_tasks() -> None:
+def test_committed_agent_workflow_suite_has_dataset_local_tasks() -> None:
     suite = get_suite("jacobian/agent-workflow-v1")
     assert suite.tasks
     assert all(
-        task.path.parent == ROOT / "benchmarks" / "tasks" for task in suite.tasks
+        task.path.parent == ROOT / "benchmarks" / "datasets" / "agent-workflow-v1"
+        for task in suite.tasks
     )

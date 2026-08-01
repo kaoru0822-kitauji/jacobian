@@ -169,6 +169,35 @@ test("buildLauncher does not pass npx-cli.js an extra exec subcommand", () => {
   }
 });
 
+test("buildLauncher uses npm exec when npx exposes npm-cli.js", () => {
+  const original = {
+    npm_lifecycle_event: process.env.npm_lifecycle_event,
+    npm_node_execpath: process.env.npm_node_execpath,
+    npm_execpath: process.env.npm_execpath,
+  };
+  process.env.npm_lifecycle_event = "npx";
+  process.env.npm_node_execpath = "/usr/bin/node";
+  process.env.npm_execpath = "/usr/share/nodejs/npm/bin/npm-cli.js";
+
+  try {
+    const launcher = buildLauncher();
+    assert.deepEqual(launcher.args, [
+      "/usr/share/nodejs/npm/bin/npm-cli.js",
+      "exec",
+      "--yes",
+      `--package=jacobian@${packageMetadata.version}`,
+      "--",
+      "jacobian",
+      "mcp",
+    ]);
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("buildSourceLauncher binds the exact checkout and state directory", () => {
   const source = join(npmRoot, "..");
   const state = join(source, ".jacobian-source-test");

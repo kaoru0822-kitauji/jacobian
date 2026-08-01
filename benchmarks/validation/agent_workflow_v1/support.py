@@ -14,7 +14,7 @@ from benchmarks.tooling.harbor_suite import get_suite
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).parents[3]
-TASKS = ROOT / "benchmarks" / "tasks"
+TASKS = ROOT / "benchmarks" / "datasets" / "agent-workflow-v1"
 AGENT_TASKS = get_suite("agent-workflow-v1").tasks
 VERIFICATION_RECORD_TASKS = (
     "finite-partition",

@@ -44,7 +44,12 @@ def _square_map() -> dict[str, object]:
 def test_public_jacobian_counterexample_fixture_replays_both_claim_bindings(
     authorized_complete_runtime,
 ) -> None:
-    task_root = Path(__file__).resolve().parents[5] / "benchmarks" / "tasks"
+    task_root = (
+        Path(__file__).resolve().parents[5]
+        / "benchmarks"
+        / "datasets"
+        / "public-reproductions-v1"
+    )
     keller = json.loads(
         (task_root / "jacobian-keller" / "environment" / "input.json").read_text()
     )

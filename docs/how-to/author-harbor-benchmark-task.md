@@ -2,21 +2,22 @@
 
 [Documentation home](../index.md)
 
-Executable benchmark cases live once under `benchmarks/tasks/<task-id>/`.
-Choose a globally unique flat task ID; keep domain, field, provenance, and
-evaluation classification in `task.toml` metadata. Add one member fragment at
-`benchmarks/datasets/<dataset>/members/<task-id>.toml` for every dataset that
-owns the case. Start from `benchmarks/templates/task/`, then choose the
-dataset whose claim matches the case.
+Executable benchmark cases live directly under their Harbor dataset root as
+`benchmarks/datasets/<dataset>/<task-id>/`. Choose a globally unique flat task
+ID; keep domain, field, provenance, and evaluation classification in
+`task.toml` metadata. Add one member fragment at
+`benchmarks/datasets/<dataset>/members/<task-id>.toml`. Start from
+`benchmarks/templates/task/`, then choose the dataset whose claim matches the
+case.
 
 Freeze agent-visible input and the strict submission schema under
 `environment/`. Keep expected answers and solution material under `solution/`,
 and the clean-room verifier plus fixtures under `tests/`. The member fragment
-declares only the canonical task ID, assurance ceiling, and provider
-requirement; `dataset.toml` is generated.
+declares only the task ID, assurance ceiling, and provider requirement;
+`dataset.toml` is generated.
 
 Run `make harbor-plan BASE=origin/main`, then `make harbor-sync`, inspect
-the generated `dataset.toml` and rendered job paths, and run
+the generated `dataset.toml` and Harbor dataset path, and run
 `make harbor-check` followed by
 `make harbor-oracle DATASET=<dataset-id> TASKS="<task-id>"`.
 

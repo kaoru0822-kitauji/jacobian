@@ -1,16 +1,15 @@
 """Repository-owned control plane for Jacobian's Harbor datasets.
 
-Datasets own membership policy; canonical Harbor bundles live once under
-``benchmarks/tasks/<task-id>``.  A dataset's ``members/*.toml`` files select
-those bundles without copying them.  ``dataset.toml`` is generated from the
-resolved membership and remains the Harbor-native digest boundary.
+Each dataset is a Harbor-local dataset directory: its executable task bundles
+live directly under ``benchmarks/datasets/<dataset>/`` beside the generated
+``dataset.toml``.  The ``members/*.toml`` files retain Jacobian's metadata and
+assurance policy, while Harbor owns task discovery, filtering, and execution.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import hashlib
-import json
 import re
 import sys
 import tomllib
@@ -25,7 +24,6 @@ BENCHMARKS = ROOT / "benchmarks"
 REGISTRY_PATH = BENCHMARKS / "registry.toml"
 DATASET_PREFIX = "jacobian/"
 DIGEST_PREFIX = "sha256:"
-MODEL_PLACEHOLDER = "${JACOBIAN_MODEL}"
 TASK_SCHEMA_VERSION = "1.4"
 REQUIRED_METADATA = {
     "evaluation_kind",
@@ -39,6 +37,7 @@ REQUIRED_METADATA = {
 }
 REQUIRED_ENVIRONMENT = ("Dockerfile", "input.json", "submission_schema.json")
 REQUIRED_TESTS = ("Dockerfile", "test.sh", "verifier.py", "verifier_support.py")
+DATASET_SUPPORT_DIRS = frozenset({"jobs", "members"})
 FORBIDDEN_VISIBLE_NAMES = frozenset(
     {
         "answer.txt",
@@ -112,31 +111,41 @@ class TaskDigest:
     digest: str
 
 
-def _canonical_task_directories(root: Path) -> set[Path]:
-    """Return the flat canonical task inventory, rejecting hidden bundles."""
+def _dataset_task_directories(root: Path) -> set[Path]:
+    """Return Harbor task bundles directly contained by one dataset."""
 
     if not root.exists():
         return set()
     if root.is_symlink() or not root.is_dir():
-        raise HarborSuiteError(f"canonical task root must be a directory: {root}")
+        raise HarborSuiteError(f"dataset task root must be a directory: {root}")
 
     tasks: set[Path] = set()
     for entry in sorted(root.iterdir()):
-        if entry.is_symlink() or not entry.is_dir():
-            raise HarborSuiteError(
-                f"canonical task root contains a non-task entry: {entry}"
-            )
+        if entry.is_symlink():
+            raise HarborSuiteError(f"dataset contains a symlink: {entry}")
+        if not entry.is_dir():
+            continue
         manifest = entry / "task.toml"
+        if not manifest.exists():
+            nested = sorted(entry.rglob("task.toml"))
+            if nested:
+                raise HarborSuiteError(
+                    "Harbor task bundles must be direct children of the dataset: "
+                    + ", ".join(str(path) for path in nested)
+                )
+            if entry.name not in DATASET_SUPPORT_DIRS:
+                raise HarborSuiteError(
+                    f"dataset contains a non-task directory: {entry}"
+                )
+            continue
         if manifest.is_symlink() or not manifest.is_file():
-            raise HarborSuiteError(
-                f"canonical task directory is missing task.toml: {entry}"
-            )
+            raise HarborSuiteError(f"task manifest is invalid: {manifest}")
         nested = sorted(
             candidate for candidate in entry.rglob("task.toml") if candidate != manifest
         )
         if nested:
             raise HarborSuiteError(
-                "canonical task bundles must be one directory deep: "
+                "Harbor task bundles must be one directory deep: "
                 + ", ".join(str(path) for path in nested)
             )
         tasks.add(entry.resolve())
@@ -186,14 +195,15 @@ def _task_ref(
     task_path: Path,
     assurance: Any,
     provider: Any,
+    task_root: Path,
     label: str,
 ) -> TaskRef:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", task_id):
         raise HarborSuiteError(f"{label}: invalid canonical task id {task_id!r}")
-    if task_path.name != task_id or task_path.parent != (ROOT / "benchmarks" / "tasks"):
-        raise HarborSuiteError(f"{label}: task path must be a direct canonical task")
+    if task_path.name != task_id or task_path.parent != task_root:
+        raise HarborSuiteError(f"{label}: task path must be a direct Harbor task")
     if not task_path.is_dir() or not (task_path / "task.toml").is_file():
-        raise HarborSuiteError(f"{label}: canonical task is missing: {task_id}")
+        raise HarborSuiteError(f"{label}: Harbor task is missing: {task_id}")
     return TaskRef(
         name=f"jacobian/{task_id}",
         path=task_path,
@@ -237,9 +247,10 @@ def _parse_suite_manifest(
         task_id = _require_string(member.get("task_id"), f"{member_file.name} task_id")
         ref = _task_ref(
             task_id=task_id,
-            task_path=_resolve(task_id, ROOT / "benchmarks" / "tasks"),
+            task_path=_resolve(task_id, suite.path),
             assurance=member.get("assurance_ceiling"),
             provider=member.get("required_provider", "core"),
+            task_root=suite.path,
             label=str(member_file.relative_to(ROOT)),
         )
         if ref.name in names:
@@ -258,7 +269,6 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
         raise HarborSuiteError("registry must contain [[datasets]] entries")
     suites: list[Suite] = []
     ids: set[str] = set()
-    declared_task_paths: set[Path] = set()
     for entry in entries:
         if not isinstance(entry, dict):
             raise HarborSuiteError("registry dataset entries must be tables")
@@ -282,7 +292,7 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
         dataset_manifest = _resolve(
             str(entry.get("dataset_manifest", "dataset.toml")), suite_path
         )
-        tasks_dir = ROOT / "benchmarks" / "tasks"
+        tasks_dir = suite_path
         jobs = entry.get("jobs")
         if not isinstance(jobs, dict):
             raise HarborSuiteError(f"{short_id}: jobs table is required")
@@ -349,16 +359,15 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
             raise HarborSuiteError(
                 f"{short_id}: suite metadata disagrees with registry"
             )
-        declared_task_paths.update(ref.path for ref in tasks)
         object.__setattr__(suite, "tasks", tasks)
         suites.append(suite)
-    discovered = _canonical_task_directories(ROOT / "benchmarks" / "tasks")
-    missing = sorted(discovered - {path.resolve() for path in declared_task_paths})
-    if missing:
-        raise HarborSuiteError(
-            "canonical task is not assigned to a dataset: "
-            + ", ".join(path.name for path in missing)
-        )
+        discovered = _dataset_task_directories(suite.path)
+        missing = sorted(discovered - {ref.path.resolve() for ref in tasks})
+        if missing:
+            raise HarborSuiteError(
+                f"{short_id}: Harbor task is not assigned in members/*.toml: "
+                + ", ".join(path.name for path in missing)
+            )
     return tuple(suites)
 
 
@@ -450,95 +459,6 @@ def write_dataset_manifest(suite: Suite) -> int:
         expected_dataset_manifest(suite).rstrip() + "\n", encoding="utf-8"
     )
     return 0
-
-
-def _find_placeholders(value: Any) -> set[str]:
-    if isinstance(value, str):
-        return set(re.findall(r"\$\{[^}]+\}", value))
-    if isinstance(value, list):
-        return (
-            set().union(*(_find_placeholders(item) for item in value))
-            if value
-            else set()
-        )
-    if isinstance(value, dict):
-        return (
-            set().union(*(_find_placeholders(item) for item in value.values()))
-            if value
-            else set()
-        )
-    return set()
-
-
-def render_job_config(config: dict[str, Any], *, model: str) -> dict[str, Any]:
-    if not model.strip():
-        raise ValueError("model must be non-empty")
-    if not isinstance(config, dict):
-        raise ValueError("job config must be a JSON object")
-    result = json.loads(json.dumps(config))
-    agents = result.get("agents")
-    if not isinstance(agents, list):
-        raise ValueError("job config must contain an agents list")
-    replacements = 0
-    for agent in agents:
-        if isinstance(agent, dict) and agent.get("model_name") == MODEL_PLACEHOLDER:
-            agent["model_name"] = model.strip()
-            replacements += 1
-    if replacements == 0:
-        raise ValueError(f"job config does not contain {MODEL_PLACEHOLDER}")
-    leftovers = _find_placeholders(result)
-    if leftovers:
-        raise ValueError(f"unresolved job placeholders remain: {sorted(leftovers)}")
-    return result
-
-
-def render_suite_job(
-    suite: Suite,
-    *,
-    role: str,
-    model: str | None = None,
-    provider: str | None = None,
-    tasks: tuple[str, ...] | None = None,
-) -> dict[str, Any]:
-    template = suite.job_oracle if role == "oracle" else suite.job_observation
-    if template is None:
-        raise HarborSuiteError(f"dataset {suite.id} has no {role} job")
-    config = json.loads(template.read_text(encoding="utf-8"))
-    config.pop("datasets", None)
-    config.pop("tasks", None)
-    task_refs = suite.tasks
-    if tasks is not None:
-        requested = set(tasks)
-        known = {ref.path.name for ref in task_refs}
-        unknown = sorted(requested - known)
-        if unknown:
-            raise HarborSuiteError(
-                f"dataset {suite.id} has unknown task(s): {', '.join(unknown)}"
-            )
-        task_refs = tuple(ref for ref in task_refs if ref.path.name in requested)
-        if not task_refs:
-            raise HarborSuiteError(f"dataset {suite.id} has no selected tasks")
-    if provider is not None:
-        task_refs = tuple(ref for ref in task_refs if ref.required_provider == provider)
-        if not task_refs:
-            raise HarborSuiteError(
-                f"dataset {suite.id} has no task requiring provider {provider!r}"
-            )
-    config["tasks"] = [
-        {"path": ref.path.relative_to(ROOT).as_posix()} for ref in task_refs
-    ]
-    config["jobs_dir"] = (
-        suite.oracle_jobs_dir if role == "oracle" else suite.observation_jobs_dir
-    )
-    if role == "observation":
-        if model is None:
-            model = "${JACOBIAN_MODEL}"
-        config = (
-            render_job_config(config, model=model)
-            if "${JACOBIAN_MODEL}" not in model
-            else config
-        )
-    return config
 
 
 def _workflow_fixture_digest_failures(
@@ -787,7 +707,6 @@ def report_ok(message: str) -> None:
 
 
 __all__ = [
-    "MODEL_PLACEHOLDER",
     "HarborSuiteError",
     "Suite",
     "TaskRef",
@@ -799,8 +718,6 @@ __all__ = [
     "get_suite",
     "iter_task_dirs",
     "load_registry",
-    "render_job_config",
-    "render_suite_job",
     "report_failures",
     "report_ok",
     "suite_digests",

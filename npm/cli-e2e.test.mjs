@@ -91,7 +91,13 @@ test("npx jacobian setup writes and reapplies a client configuration", async () 
     const config = JSON.parse(await readFile(configPath, "utf8"));
     const server = config.mcpServers.jacobian;
     assert.equal(server.command, process.execPath);
-    assert.ok(server.args[0].endsWith("npx-cli.js"));
+    const npmLauncher = server.args[0];
+    assert.ok(
+      npmLauncher.endsWith("npx-cli.js") || npmLauncher.endsWith("npm-cli.js"),
+    );
+    if (npmLauncher.endsWith("npm-cli.js")) {
+      assert.equal(server.args[1], "exec");
+    }
     assert.ok(server.args.includes(`--package=jacobian@${packageMetadata.version}`));
     assert.ok(server.args.includes("--"));
     assert.ok(server.args.includes("jacobian"));

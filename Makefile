@@ -194,12 +194,12 @@ harbor-oracle: harbor-check harbor-oracle-run ## Check contracts, then run a dat
 
 harbor-oracle-run: ## Run a dataset Oracle after an already-successful contract gate.
 	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
-	@test -n "$(JACOBIAN_MODEL)" || { echo "JACOBIAN_MODEL is required" >&2; exit 2; }
 	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
-	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-harbor-oracle.XXXXXX.json") && \
-	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
-	$(UV_RUN) python tools/render_harbor_job.py --dataset "$(DATASET)" --role oracle --output "$$resolved_job" --model "$(JACOBIAN_MODEL)" --tasks $(TASKS) && \
-	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS) && \
+	$(HARBOR_RUNNER) run \
+		-c "benchmarks/datasets/$(DATASET)/jobs/oracle.json" \
+		-p "benchmarks/datasets/$(DATASET)" \
+		$(foreach task,$(TASKS),--include-task-name "$(task)") \
+		$(EVAL_ARGS) && \
 	$(HARBOR_PYTHON) benchmarks/tooling/validate_harbor_results.py \
 		--dataset "$(DATASET)" \
 		--jobs-dir "benchmarks/results/$(DATASET)-oracle" \
@@ -220,30 +220,15 @@ agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 
 		echo "Model execution is opt-in. Review the job, then run: make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1"; \
 		exit 0; \
 	fi; \
-	image=$${JACOBIAN_IMAGE:-}; \
-	identity=$${JACOBIAN_IMAGE_IDENTITY_FILE:-}; \
-	if ! printf '%s\n' "$$image" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then \
-		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
+	if [ -z "$${JACOBIAN_MODEL:-}" ]; then \
+		echo "JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
-	if [ -z "$$identity" ] || [ ! -f "$$identity" ]; then \
-		echo "JACOBIAN_IMAGE_IDENTITY_FILE must name a trusted image identity JSON file" >&2; \
-		exit 2; \
-	fi; \
-	if [ -z "$${JACOBIAN_MCP_TOKEN:-}" ] || [ -z "$${JACOBIAN_AUTH_TOKENS_JSON:-}" ] || [ -z "$${JACOBIAN_MODEL:-}" ]; then \
-		echo "JACOBIAN_MCP_TOKEN, JACOBIAN_AUTH_TOKENS_JSON, and JACOBIAN_MODEL must be exported" >&2; \
-		exit 2; \
-	fi; \
-	$(UV_RUN) python tools/check_jacobian_image.py --image "$$image" --identity-lock "$$identity" --pull && \
-	$(MAKE) harbor-check && \
-	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-job.XXXXXX.json") && \
-	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
-	$(UV_RUN) python tools/render_harbor_job.py \
-		--dataset "$(or $(DATASET),agent-workflow-v1)" \
-		--role observation \
-		--output "$$resolved_job" \
-		--model "$${JACOBIAN_MODEL}" && \
-	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
+	$(HARBOR_RUNNER) run \
+		-c "benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)/jobs/jacobian-observation.json" \
+		-m "$${JACOBIAN_MODEL}" \
+		$(if $(TASKS),-p "benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)" $(foreach task,$(TASKS),--include-task-name "$(task)"),) \
+		$(EVAL_ARGS)
 
 performance-eval: ## Run the report-only performance dataset through its Oracle job.
 	$(MAKE) harbor-oracle DATASET=performance-v1
@@ -252,14 +237,11 @@ provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gud
 	@test -n "$(PROVIDER)" || { echo "PROVIDER is required" >&2; exit 2; }
 	@case "$(PROVIDER)" in cddlib|cgal|gudhi|lean-repl|nauty|regina) ;; *) echo "unknown provider: $(PROVIDER)" >&2; exit 2;; esac
 	@$(MAKE) harbor-check && \
-	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-provider-eval.XXXXXX.json") && \
-	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
-	$(UV_RUN) python tools/render_harbor_job.py \
-		--dataset provider-feasibility-v1 \
-		--role oracle \
-		--provider "$(PROVIDER)" \
-		--output "$$resolved_job" && \
-	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
+	$(HARBOR_RUNNER) run \
+		-c benchmarks/datasets/provider-feasibility-v1/jobs/oracle.json \
+		-p benchmarks/datasets/provider-feasibility-v1 \
+		--include-task-name "$(PROVIDER)" \
+		$(EVAL_ARGS)
 
 clean: ## Remove local caches, build outputs, and coverage artifacts.
 	rm -rf .pytest_cache .mypy_cache .ruff_cache dist build htmlcov

@@ -63,9 +63,9 @@ Fix discovery, examples, defaults, errors, or reusable agent guidance when
 those are the actual gap. Require recurring move evidence or a justified
 fundamental-primitive exception before adding a capability.
 
-Add public diagnostic cases to the versioned Harbor corpus under
-`benchmarks/tasks/`, then add a member fragment under
-`benchmarks/datasets/research-diagnostics-v1/members/`.
+Add public diagnostic cases as direct task bundles under
+`benchmarks/datasets/research-diagnostics-v1/<task-id>/`, then add a member
+fragment under `benchmarks/datasets/research-diagnostics-v1/members/`.
 Preserve immutable task inputs and fold status into task metadata or generated
 reports. Keep `scored=false` when the answer is public.
 

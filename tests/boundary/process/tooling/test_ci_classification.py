@@ -305,7 +305,9 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ),
         ),
         (
-            ("benchmarks/tasks/core-operations/environment/benchmark.py",),
+            (
+                "benchmarks/datasets/performance-v1/core-operations/environment/benchmark.py",
+            ),
             _expected_plan("none"),
         ),
     ],

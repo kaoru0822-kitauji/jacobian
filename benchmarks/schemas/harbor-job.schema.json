@@ -2,10 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jacobian.invalid/benchmarks/schemas/harbor-job.schema.json",
   "title": "Harbor job configuration",
-  "description": "Reference contract for the Harbor job JSON files committed under each suite and for the rendered configs produced by tools/render_harbor_job.py. The only runtime placeholder permitted in a source template is ${JACOBIAN_MODEL} inside agents[].model_name; the renderer resolves it before Harbor starts and rejects any remaining ${...} placeholder so Harbor's Docker compose mode never receives unresolved job-level env templating.",
+  "description": "Reference contract for Harbor job JSON files committed under each dataset. Jobs select Harbor task bundles directly or use Harbor dataset paths and task-name filters.",
   "type": "object",
   "additionalProperties": true,
-  "required": ["jobs_dir", "n_attempts", "timeout_multiplier", "orchestrator", "environment", "agents", "tasks"],
+  "required": ["jobs_dir", "n_attempts", "timeout_multiplier", "orchestrator", "environment", "agents"],
+  "anyOf": [{"required": ["tasks"]}, {"required": ["datasets"]}],
   "properties": {
     "jobs_dir": {"type": "string", "minLength": 1},
     "n_attempts": {"type": "integer", "minimum": 1},
@@ -52,6 +53,20 @@
                 "url": {"type": "string", "minLength": 1}
               }
             }
+          }
+        }
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "task_names": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
           }
         }
       }

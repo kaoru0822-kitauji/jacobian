@@ -2,8 +2,8 @@
 
 [Documentation home](../index.md)
 
-All executable benchmark cases are Harbor tasks under
-[`benchmarks/tasks/`](../../benchmarks/README.md). The six datasets retain
+All executable benchmark cases are Harbor tasks under their dataset roots
+([`benchmarks/datasets/`](../../benchmarks/README.md)). The six datasets retain
 separate claims:
 
 - `agent-workflow-v1` checks fixed workflows and evidence handling;
@@ -19,7 +19,7 @@ Its `dataset.toml` is generated from the suite and Harbor task checksums.
 
 ## Task contract
 
-Tasks use `benchmarks/tasks/<task-id>/` with a maintainer README,
+Tasks use `benchmarks/datasets/<dataset>/<task-id>/` with a maintainer README,
 agent-visible instruction and environment, Oracle-only solution, and
 verifier-only tests. Mathematical tasks use `mathematical-sciences`; runtime,
 provider, and product-surface tasks use `software-systems`.

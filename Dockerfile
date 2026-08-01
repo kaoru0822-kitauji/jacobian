@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.11.28-python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:0.11.28-python3.12-trixie-slim
 
 ARG JACOBIAN_REVISION=unknown
 ARG JACOBIAN_VERSION=0+unknown

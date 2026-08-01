@@ -17,9 +17,9 @@ Classify the work before editing a task:
 
 - **Task/verifier validation:** parse the bundles, run the Oracle, and attack
   deliberate failure cases. This is harness evidence.
-- **Jacobian workflow observation:** use a dataset with an observation profile,
-  its rendered observation job, the authenticated MCP sidecar, and Harbor ATIF plus
-  Jacobian telemetry. This is workflow evidence, not comparative performance.
+- **Jacobian workflow observation:** use the committed Harbor observation job,
+  its direct local MCP service, and Harbor ATIF plus Jacobian telemetry. This is
+  workflow evidence, not comparative performance.
 - **Future causal comparison:** put control/treatment conditions in Harbor job
   configuration, outside task bundles, with identical task digests, prompts,
   models, budgets, environments, and seeds. Do not add an A/B condition merely
@@ -28,13 +28,15 @@ Classify the work before editing a task:
 ## Author or change a task
 
 Read `AGENTS.md`, `CONTRIBUTING.md`, and
-`docs/reference/capability-workflow-evaluations.md`. Canonical task bundles live
-once under `benchmarks/tasks/<task-id>/`, using a globally unique, flat
-directory name. Keep domain, field, provenance, and evaluation classification
-in typed `task.toml` metadata rather than directory hierarchy. A dataset selects
-canonical tasks through one `benchmarks/datasets/<dataset>/members/<task-id>.toml`
-fragment per member; `suite.toml` contains only the dataset header and
-`dataset.toml` is generated. Never copy a task into another dataset.
+`docs/reference/capability-workflow-evaluations.md`. Each Harbor dataset owns
+its task bundles directly under
+`benchmarks/datasets/<dataset>/<task-id>/`; a bundle is a direct child of its
+dataset, not a symlink or nested task directory. Keep domain, field, provenance,
+and evaluation classification in typed `task.toml` metadata rather than
+directory hierarchy. A dataset selects its bundles through one
+`benchmarks/datasets/<dataset>/members/<task-id>.toml` fragment per member, and
+the generated `dataset.toml` is the Harbor digest boundary. Do not maintain a
+second shared task root or copy a bundle outside its owning dataset.
 
 Before adding a task, run the benchmark planner and check for a global ID
 collision. Manually authored or substantially transformed cases remain authored
@@ -111,14 +113,14 @@ verifier logs, source SHA, task digest, and Harbor version.
 
 ## Run Jacobian observation
 
-Use the guarded entry point so the image reference is digest-pinned before
-Harbor starts:
+Review the committed observation job and run the local Harbor composition. The
+Jacobian service is intentionally anonymous for this local evaluation path;
+Harbor connects directly to `http://jacobian:8000/mcp`. Set `JACOBIAN_IMAGE`
+only when overriding the default local image:
 
 ```sh
-export JACOBIAN_IMAGE='registry.example/jacobian@sha256:<64-lowercase-hex-digits>'
-export JACOBIAN_MCP_TOKEN='replace-with-at-least-32-character-token'
-export JACOBIAN_AUTH_TOKENS_JSON='{"tokens":[{"tenant_id":"observation","token":"replace-with-at-least-32-character-token","scopes":["jacobian:use"]}]}'
 export JACOBIAN_MODEL='your-model'
+export JACOBIAN_IMAGE='jacobian:local'
 make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
 ```
 

@@ -60,7 +60,9 @@ def test_core_extension_exposes_exactly_the_stable_five_tools() -> None:
 def test_harbor_verifier_support_copies_are_identical() -> None:
     source = (ROOT / "benchmarks" / "tooling" / "verifier_support.py").read_bytes()
     targets = sorted(
-        (ROOT / "benchmarks" / "tasks").glob("*/tests/verifier_support.py")
+        path
+        for suite in load_registry()
+        for path in suite.path.glob("*/tests/verifier_support.py")
     )
     expected = {
         ref.path / "tests" / "verifier_support.py"
