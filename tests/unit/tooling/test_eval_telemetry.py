@@ -207,10 +207,12 @@ def test_agent_telemetry_tracks_resource_link_follow_through_and_identity(
     tmp_path: Path,
 ) -> None:
     def read_event(seed: str) -> tuple[str, dict[str, object]]:
+        payload = {"seed": seed}
         manifest = {
             "manifest_version": "1",
             "object_digest": "sha256:" + seed * 64,
-            "payload_digest": "sha256:" + (seed.upper() * 64),
+            "payload_digest": "sha256:"
+            + hashlib.sha256(canonicalize_json(payload)).hexdigest(),
             "schema_uri": "artifact://sha256/" + ("c" * 64),
             "semantics_uri": "artifact://sha256/" + ("d" * 64),
             "canonicalizer_digest": "sha256:" + ("e" * 64),
@@ -224,18 +226,24 @@ def test_agent_telemetry_tracks_resource_link_follow_through_and_identity(
         return uri, _tool_event(
             "resources/read",
             {"uri": uri},
-            {"artifact_uri": uri, "manifest": manifest},
+            {"artifact_uri": uri, "manifest": manifest, "payload": payload},
         )
 
     uri, first_read = read_event("a")
+    first_result = first_read["item"]["result"]
+    first_result["contents"] = first_result.pop("content")
     unnecessary_uri, second_read = read_event("b")
     malformed_uri = "artifact://sha256/" + ("f" * 64)
 
-    def link_event(link_uri: str, *, output_complete: bool) -> dict[str, object]:
-        projection = {
-            "capability_id": "graph.search.atlas",
-            "mcp_projection": {"output_complete": output_complete},
-        }
+    def link_event(link_uri: str, *, output_complete: bool | None) -> dict[str, object]:
+        content = []
+        if output_complete is not None:
+            projection = {
+                "capability_id": "graph.search.atlas",
+                "mcp_projection": {"output_complete": output_complete},
+            }
+            content.append({"type": "text", "text": json.dumps(projection)})
+        content.append({"type": "resource_link", "uri": link_uri})
         return {
             "type": "item.completed",
             "item": {
@@ -245,10 +253,7 @@ def test_agent_telemetry_tracks_resource_link_follow_through_and_identity(
                 "status": "completed",
                 "result": {
                     "isError": False,
-                    "content": [
-                        {"type": "text", "text": json.dumps(projection)},
-                        {"type": "resource_link", "uri": link_uri},
-                    ],
+                    "content": content,
                 },
             },
         }

@@ -79,3 +79,13 @@ def test_proof_hole_inspection_ignores_strings_and_identifiers(
 
     assert result.output["sorry_count"] == 0
     assert result.output["admit_count"] == 0
+
+
+def test_proof_holes_are_counted_but_not_rejected_as_commands() -> None:
+    proof_axioms._validate_source("True", "by sorry")
+    assert proof_axioms._proof_hole_counts("by sorry admit") == (1, 1)
+
+
+def test_proof_hole_count_is_bounded_before_artifact_validation() -> None:
+    with pytest.raises(ValueError, match="more than 64"):
+        proof_axioms._validate_source("True", "by " + " ".join(["sorry"] * 65))

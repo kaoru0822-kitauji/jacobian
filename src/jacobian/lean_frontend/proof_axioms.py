@@ -68,6 +68,8 @@ _FORBIDDEN_SOURCE_TOKENS = frozenset(
         "unsafe",
     }
 )
+_FORBIDDEN_PROOF_SOURCE_TOKENS = _FORBIDDEN_SOURCE_TOKENS - {"admit", "sorry"}
+_MAX_PROOF_HOLES = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,8 +296,13 @@ def _validate_source(statement: str, proof: str) -> None:
             raise ValueError(f"{field_name} comments are outside the source boundary")
     if _contains_forbidden_source_token(statement):
         raise ValueError("statement contains an unsupported Lean command")
-    if _contains_forbidden_source_token(proof):
+    if _contains_forbidden_source_token(
+        proof, forbidden_tokens=_FORBIDDEN_PROOF_SOURCE_TOKENS
+    ):
         raise ValueError("proof contains an unsupported Lean command")
+    sorry_count, admit_count = _proof_hole_counts(proof)
+    if sorry_count + admit_count > _MAX_PROOF_HOLES:
+        raise ValueError("proof contains more than 64 proof holes")
 
 
 def _lean_source_tokens(source: str) -> tuple[str, ...]:
@@ -382,9 +389,13 @@ def _is_identifier_character(character: str) -> bool:
     return character == "_" or character == "'" or character.isalnum()
 
 
-def _contains_forbidden_source_token(source: str) -> bool:
+def _contains_forbidden_source_token(
+    source: str,
+    *,
+    forbidden_tokens: frozenset[str] = _FORBIDDEN_SOURCE_TOKENS,
+) -> bool:
     return any(
-        token == "#" or token.casefold() in _FORBIDDEN_SOURCE_TOKENS
+        token == "#" or token.casefold() in forbidden_tokens
         for token in _lean_source_tokens(source)
     )
 

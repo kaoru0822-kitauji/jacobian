@@ -312,6 +312,11 @@ class ArtifactStore:
                 raise StoreCorruptionError("state-format metadata record is missing")
             return
         format_revision = int(format_row[0])
+        if format_revision < SUPPORTED_STATE_FLOOR:
+            raise UnsupportedStateVersionError(
+                format_revision,
+                minimum_revision=SUPPORTED_STATE_FLOOR,
+            )
         if format_revision > CURRENT_STATE_FORMAT_REVISION:
             raise UnsupportedStateVersionError(
                 format_revision,

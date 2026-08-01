@@ -882,12 +882,12 @@ def _matrix_scope_schema() -> dict[str, Any]:
     return {
         "type": "object",
         "properties": {
-            "rows": {"type": "integer", "minimum": 1, "maximum": 64},
-            "cols": {"type": "integer", "minimum": 1, "maximum": 64},
+            "rows": {"type": "integer", "minimum": 1, "maximum": 32},
+            "cols": {"type": "integer", "minimum": 1, "maximum": 32},
             "entries": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": 64,
+                "maxItems": 32,
                 "uniqueItems": True,
                 "items": exact_integer,
             },
@@ -969,16 +969,16 @@ def _matrix_candidate_schema() -> dict[str, Any]:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-            "rows": {"type": "integer", "minimum": 1, "maximum": 64},
-            "cols": {"type": "integer", "minimum": 1, "maximum": 64},
+            "rows": {"type": "integer", "minimum": 1, "maximum": 32},
+            "cols": {"type": "integer", "minimum": 1, "maximum": 32},
             "entries": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": 64,
+                "maxItems": 32,
                 "items": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 64,
+                    "maxItems": 32,
                     "items": exact_integer,
                 },
             },

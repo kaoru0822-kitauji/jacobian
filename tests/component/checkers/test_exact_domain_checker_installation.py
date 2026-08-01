@@ -33,11 +33,23 @@ from jacobian.contracts.polynomial_operations import (
 )
 from jacobian.contracts.projective_geometry import ProjectiveLineArrangementRequest
 from jacobian.contracts.results import ContractModel
+from jacobian.domains.graph_optimization.bundle import (
+    build_graph_optimization_bundle,
+)
+from jacobian.domains.graph_optimization.invariant_bundle import (
+    build_graph_invariant_bundle,
+)
+from jacobian.domains.graph_symmetry.bundle import build_graph_symmetry_bundle
+from jacobian.domains.matrix_lattice.bundle import build_matrix_bundle
+from jacobian.domains.number_theory.bundle import build_number_theory_bundle
+from jacobian.domains.polynomial.bundle import build_polynomial_bundle
+from jacobian.domains.projective_geometry.bundle import (
+    build_projective_geometry_bundle,
+)
 from jacobian.exact_domain_checkers import (
     install_exact_domain_checkers as _install_exact_domain_checkers,
 )
 from jacobian.operation_installation import InstalledDomainBundle
-from jacobian.portfolio import build_builtin_portfolio
 from jacobian.providers.flint_runtime import (
     exact_domain_checker_provider_runtime,
     exact_domain_checker_source_provider_runtime,
@@ -77,12 +89,19 @@ def install_exact_domain_checkers(
         "graph_invariants": "graph_invariants",
         "graph_symmetry": "graph_symmetry",
     }
-    plan = build_builtin_portfolio()
+    bundle_builders = {
+        "graph_optimization": build_graph_optimization_bundle,
+        "graph_invariants": build_graph_invariant_bundle,
+        "graph_symmetry": build_graph_symmetry_bundle,
+        "matrix": build_matrix_bundle,
+        "number_theory": build_number_theory_bundle,
+        "polynomial": build_polynomial_bundle,
+        "projective_geometry": build_projective_geometry_bundle,
+    }
     bundles = {}
     for name, installation in installed.items():
         domain_id = domain_ids.get(name, name)
-        bundle = plan.bundle_for(domain_id)
-        assert bundle is not None
+        bundle = bundle_builders[domain_id]()
         bundles[domain_id] = (bundle, installation)
     return _install_exact_domain_checkers(
         registry,

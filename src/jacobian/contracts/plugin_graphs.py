@@ -88,6 +88,10 @@ class GraphPathCapabilityRequest(PluginRequestContext):
                 raise ValueError(
                     "intended_paths_complete requires source and terminals"
                 )
+            if self.candidate.intended_paths is None:
+                raise ValueError(
+                    "intended_paths_complete requires an explicit intended_paths set"
+                )
             if self.candidate.source in self.candidate.terminals:
                 raise ValueError("source cannot also be a terminal")
         return self
@@ -108,6 +112,12 @@ class GraphPathReductionRequest(PluginRequestContext):
             and (self.target.source is None or not self.target.terminals)
         ):
             raise ValueError("path claims require source and terminals")
+        if (
+            self.target_kind == "candidate"
+            and self.claim.predicate == "intended_paths_complete"
+            and self.target.intended_paths is None
+        ):
+            raise ValueError("path claims require an explicit intended_paths set")
         if (
             self.target_kind == "candidate"
             and self.claim.predicate == "intended_paths_complete"

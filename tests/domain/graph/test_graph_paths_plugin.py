@@ -58,6 +58,19 @@ def test_path_closure_rejects_candidate_without_semantic_roles() -> None:
         evaluate_capability({"claim": claim, "candidate": candidate})
 
 
+def test_path_closure_rejects_candidate_without_intended_path_set() -> None:
+    claim = {"predicate": "intended_paths_complete", "simple": True}
+    candidate = {
+        "vertices": ["s", "t"],
+        "arcs": [["s", "t"]],
+        "source": "s",
+        "terminals": ["t"],
+    }
+
+    with pytest.raises(ValueError, match="does not match"):
+        evaluate_capability({"claim": claim, "candidate": candidate})
+
+
 def test_bounded_path_search_does_not_claim_exhaustive_coverage() -> None:
     claim = {
         "predicate": "intended_paths_complete",

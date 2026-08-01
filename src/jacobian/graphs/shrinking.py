@@ -351,7 +351,7 @@ class GraphCounterexampleShrinkAdapter:
             artifact_uris=(*parent_uris, trace.artifact_uri),
         )
 
-    def _load_graph(self, graph_uri: str) -> dict[str, Any]:
+    def _load_graph_artifact(self, graph_uri: str) -> Any:
         try:
             artifact = self.store.get(graph_uri)
             if (
@@ -364,7 +364,7 @@ class GraphCounterexampleShrinkAdapter:
             edges = payload["edges"]
             if vertices != sorted(vertices) or edges != sorted(edges):
                 raise ValueError
-            return cast(dict[str, Any], payload)
+            return artifact
         except (StoreError, KeyError, TypeError, ValueError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
@@ -378,12 +378,17 @@ class GraphCounterexampleShrinkAdapter:
                 )
             ) from exc
 
+    def _load_graph(self, graph_uri: str) -> dict[str, Any]:
+        return cast(dict[str, Any], self._load_graph_artifact(graph_uri).payload)
+
     def _attempt(self, step: Any) -> GraphReductionAttempt:
         deleted_vertex = None
         deleted_edge = None
+        proposed_artifact = None
         if step.proposed_uri is not None:
             before = self._load_graph(step.from_uri)
-            after = self._load_graph(step.proposed_uri)
+            proposed_artifact = self._load_graph_artifact(step.proposed_uri)
+            after = cast(dict[str, Any], proposed_artifact.payload)
             try:
                 deleted_vertex, deleted_edge = _exact_graph_reduction(
                     step.reducer,
@@ -415,8 +420,8 @@ class GraphCounterexampleShrinkAdapter:
             verification_record_uri=step.verification_record_uri,
             detail=step.detail,
             candidate_digest=(
-                "sha256:" + step.proposed_uri.removeprefix("artifact://sha256/")
-                if step.proposed_uri is not None
+                proposed_artifact.manifest.object_digest
+                if proposed_artifact is not None
                 else None
             ),
         )

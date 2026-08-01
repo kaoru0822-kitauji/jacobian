@@ -18,7 +18,11 @@ from jacobian.contracts.memory import (
     PersistedTags,
     ResearchEpisode,
 )
-from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
+from jacobian.persistence import (
+    PersistenceCorruptionCode,
+    PersistenceCorruptionError,
+    decode_persisted_model,
+)
 from jacobian.persistence.research_index import failure_metadata
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.store import ArtifactStore, StoreCorruptionError
@@ -38,13 +42,7 @@ def _decode_memory_hits(
                 mode=CapabilityMode(row["mode"]),
                 assurance_level=CapabilityAssuranceLevel(row["assurance_level"]),
                 summary=row["summary"],
-                tags=decode_persisted_model(
-                    PersistedTags,
-                    row["tags_json"],
-                    record_kind="research_episode",
-                    record_id=row["episode_uri"],
-                    field="tags_json",
-                ).root,
+                tags=_decode_persisted_tags(row),
                 created_at=datetime.fromisoformat(row["created_at"]),
                 score=(1000 if terms else 500),
                 matched_query_terms=terms,
@@ -54,6 +52,24 @@ def _decode_memory_hits(
         )
     except PersistenceCorruptionError as exc:
         raise StoreCorruptionError(exc) from exc
+
+
+def _decode_persisted_tags(row: Any) -> tuple[str, ...]:
+    try:
+        return decode_persisted_model(
+            PersistedTags,
+            row["tags_json"],
+            record_kind="research_episode",
+            record_id=row["episode_uri"],
+            field="tags_json",
+        ).root
+    except PersistenceCorruptionError as exc:
+        if exc.failure_code is not PersistenceCorruptionCode.NON_CANONICAL_JSON:
+            raise
+        try:
+            return PersistedTags.model_validate(json.loads(row["tags_json"])).root
+        except (TypeError, ValueError) as decode_error:
+            raise exc from decode_error
 
 
 class ResearchMemory:

@@ -161,11 +161,12 @@ def _inspect_python_distribution_identity(
             )
         distribution = importlib.metadata.distribution(distribution_name)
         digest = _distribution_record_digest(distribution)
-    except (
-        ImportError,
-        importlib.metadata.PackageNotFoundError,
-        ProviderRuntimeError,
-    ) as exc:
+    except ProviderRuntimeError as exc:
+        raise ProviderRuntimeError(
+            f"the {distribution_name} distribution identity is unavailable",
+            code=exc.code,
+        ) from exc
+    except (ImportError, importlib.metadata.PackageNotFoundError) as exc:
         raise ProviderRuntimeError(
             f"the {distribution_name} distribution identity is unavailable",
             code=ProviderRuntimeErrorCode.UNAVAILABLE,
@@ -462,7 +463,7 @@ def _require_python_identity(runtime: CapabilityProviderRuntime) -> None:
     except ProviderRuntimeError as exc:
         raise ProviderRuntimeError(
             "Python distribution identity is unavailable",
-            code=ProviderRuntimeErrorCode.UNAVAILABLE,
+            code=exc.code,
         ) from exc
     if version != runtime.version or digest != runtime.digest:
         raise ProviderRuntimeError(

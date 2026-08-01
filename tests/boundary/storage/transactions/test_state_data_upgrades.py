@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -228,6 +229,25 @@ def test_future_state_format_metadata_without_ledger_fails_closed(
     assert exc_info.value.detected_revision == 99
 
 
+def test_state_format_metadata_below_supported_floor_fails_closed(
+    tmp_path: Path,
+) -> None:
+    with ArtifactStore(tmp_path):
+        pass
+    connection = _connection(tmp_path)
+    try:
+        connection.execute(
+            "UPDATE jacobian_state_format SET format_revision = 2 WHERE id = 0"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    with pytest.raises(UnsupportedStateVersionError) as exc_info:
+        ArtifactStore(tmp_path)
+    assert exc_info.value.detected_revision == 2
+
+
 def test_research_memory_constructor_does_not_run_data_upgrade(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -240,3 +260,26 @@ def test_research_memory_constructor_does_not_run_data_upgrade(
 
         monkeypatch.setattr(state_upgrade, "upgrade_state_data", fail)
         ResearchMemory(store, schemas)
+
+
+def test_research_memory_reads_legacy_tags_from_an_indexed_row(
+    tmp_path: Path,
+) -> None:
+    episode_uri = _record_episode(tmp_path)
+    connection = _connection(tmp_path)
+    try:
+        connection.execute(
+            "UPDATE research_episodes SET tags_json = ? WHERE episode_uri = ?",
+            (json.dumps(["fixture", "one"], separators=(",", ":")), episode_uri),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    with ArtifactStore(tmp_path) as store:
+        result = ResearchMemory(store, SchemaRegistry(store)).search(
+            tags_all=("fixture",),
+        )
+
+    assert result.hits[0].episode_uri == episode_uri
+    assert result.hits[0].tags == ("fixture", "one")

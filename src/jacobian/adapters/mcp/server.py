@@ -66,6 +66,14 @@ _LOGGER = logging.getLogger(__name__)
 class JacobianMCPServer(MCPServer[AppState]):
     """MCP server with SDK-owned static argument validation."""
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        for tool in self._tool_manager.list_tools():
+            argument_model = tool.fn_metadata.arg_model
+            argument_model.model_config["extra"] = "forbid"
+            argument_model.model_rebuild(force=True)
+            tool.parameters = argument_model.model_json_schema(by_alias=True)
+
     async def call_tool(
         self,
         name: str,

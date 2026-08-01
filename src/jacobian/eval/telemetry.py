@@ -62,10 +62,13 @@ def _contains_value(value: object, *, field: str, accepted: set[object]) -> bool
 
 def _mcp_text_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
     result = item.get("result")
-    content = result.get("content") if isinstance(result, Mapping) else None
-    if not isinstance(content, list):
-        return None
-    for block in content:
+    blocks: list[object] = []
+    if isinstance(result, Mapping):
+        for key in ("content", "contents"):
+            value = result.get(key)
+            if isinstance(value, list):
+                blocks.extend(value)
+    for block in blocks:
         if not isinstance(block, Mapping) or not isinstance(block.get("text"), str):
             continue
         try:
@@ -144,10 +147,18 @@ def _mcp_resource_identity_preserved(
             manifest_digest = (
                 "sha256:" + hashlib.sha256(canonicalize_json(manifest)).hexdigest()
             )
+            payload_digest = manifest.get("payload_digest")
+            actual_payload_digest = (
+                "sha256:"
+                + hashlib.sha256(canonicalize_json(payload["payload"])).hexdigest()
+            )
         except (TypeError, ValueError):
             manifest_digest = None
-        digest_preserved = manifest_digest == (
-            "sha256:" + uri.removeprefix("artifact://sha256/")
+            actual_payload_digest = None
+        digest_preserved = (
+            uri_preserved
+            and manifest_digest == "sha256:" + uri.removeprefix("artifact://sha256/")
+            and payload_digest == actual_payload_digest
         )
     return uri_preserved, digest_preserved
 
@@ -170,8 +181,9 @@ def _record_mcp_resource_telemetry(
     output_complete = (
         projection.get("output_complete") if isinstance(projection, Mapping) else None
     )
-    if isinstance(output_complete, bool):
-        for uri in link_uris:
+    for uri in link_uris:
+        telemetry.link_output_complete.setdefault(uri, True)
+        if isinstance(output_complete, bool):
             telemetry.link_output_complete[uri] = output_complete
 
     resource_read_uri = _mcp_resource_read_uri(item)

@@ -59,6 +59,10 @@ def test_mcp_exposes_capability_and_workspace_tools_with_read_only_resources(
                 in (tools["capability.describe"].description or "").lower()
             )
             describe_schema = tools["capability.describe"].input_schema
+            assert all(
+                tool.input_schema.get("additionalProperties") is False
+                for tool in tools.values()
+            )
             assert set(describe_schema["properties"]) == {
                 "capability_id",
                 "query",

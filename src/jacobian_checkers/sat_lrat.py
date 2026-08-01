@@ -38,6 +38,15 @@ def _result(accepted: bool, detail: str) -> dict[str, Any]:
     }
 
 
+def _unsupported_detail(error: NotImplementedError) -> str:
+    detail = str(error)
+    return (
+        detail
+        if detail.startswith("unsupported LRAT feature:")
+        else "unsupported LRAT feature: " + detail
+    )
+
+
 def _artifact(value: object) -> bool:
     return (
         isinstance(value, dict)
@@ -261,8 +270,8 @@ def check_lrat(request: dict[str, Any]) -> dict[str, Any]:
         return _result(
             accepted, detail if accepted else detail + "; empty clause absent"
         )
-    except NotImplementedError:
-        return _result(False, "unsupported LRAT feature: negative RAT hints")
+    except NotImplementedError as exc:
+        return _result(False, _unsupported_detail(exc))
     except TimeoutError:
         return _result(False, "LRAT replay timed out")
     except (KeyError, TypeError, ValueError, OverflowError):

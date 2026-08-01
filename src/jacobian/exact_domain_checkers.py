@@ -501,7 +501,15 @@ def _available_declaration_bundles(
     available: list[tuple[InstalledDomainBundle, ExactReplayCheckerDeclaration]] = []
     owners: dict[str, str] = {}
     for domain_id, (bundle, installed) in bundles.items():
+        producer_capability_ids = {
+            operation.capability_id for operation in bundle.capabilities
+        }
         for declaration in bundle.checker_declarations:
+            if declaration.capability_id not in producer_capability_ids:
+                raise ValueError(
+                    "exact replay declaration is not backed by a domain producer "
+                    f"schema: {domain_id}/{declaration.capability_id}"
+                )
             if declaration.capability_id not in installed.result_schema_uris:
                 continue
             previous = owners.setdefault(declaration.capability_id, domain_id)
