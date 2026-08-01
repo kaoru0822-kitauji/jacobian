@@ -52,8 +52,7 @@ Append-only margin marks record paper-like lifecycle state:
 - `SUPERSEDED` names a replacement and invalidates old dependents;
 - `ARCHIVED` files a card without invalidating dependents.
 
-Every mark requires `reason`; the unambiguous `summary` input alias normalizes
-to it. A `RETRACTED` or `SUPERSEDED` card must be explicitly restored with
+Every mark requires `reason`. A `RETRACTED` or `SUPERSEDED` card must be explicitly restored with
 `ACTIVE` before `CLOSED` or `ARCHIVED` can clear its invalidating state.
 Supersession does not prove equivalence or reconnect dependents.
 

@@ -62,5 +62,10 @@ def test_harbor_verifier_support_copies_are_identical() -> None:
     targets = sorted(
         (ROOT / "benchmarks" / "tasks").glob("*/tests/verifier_support.py")
     )
-    assert len(targets) == sum(len(suite.tasks) for suite in load_registry())
+    expected = {
+        ref.path / "tests" / "verifier_support.py"
+        for suite in load_registry()
+        for ref in suite.tasks
+    }
+    assert set(targets) == expected
     assert all(target.read_bytes() == source for target in targets)

@@ -29,6 +29,7 @@ _TOPOLOGY_CANDIDATES = (Path("tests/topology.toml"), Path("topology.toml"))
 _BUILTIN_PORTFOLIO_NAMES = frozenset(
     {
         "BUILTIN_PORTFOLIO",
+        "build_builtin_portfolio",
         "PortfolioAssembler",
         "install_builtin_portfolio",
         "install_complete_portfolio",

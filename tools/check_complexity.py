@@ -263,11 +263,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="replace the baseline with the current canonical Ruff C901 snapshot",
     )
-    parser.add_argument("paths", nargs="*", default=DEFAULT_PATHS)
+    parser.add_argument("paths", nargs="*")
     args = parser.parse_args(argv)
+    if args.update and args.paths:
+        parser.error("--update cannot be combined with path filters")
+    paths = tuple(args.paths) if args.paths else DEFAULT_PATHS
     try:
         baseline = load_baseline(args.baseline)
-        current = run_ruff(tuple(args.paths), max_complexity=baseline.max_complexity)
+        current = run_ruff(paths, max_complexity=baseline.max_complexity)
         current_baseline = ComplexityBaseline(baseline.max_complexity, current)
         if args.update:
             write_baseline(args.baseline, current_baseline)
