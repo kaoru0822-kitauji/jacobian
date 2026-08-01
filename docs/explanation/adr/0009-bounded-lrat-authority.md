@@ -31,5 +31,5 @@ broader LRAT authority is implied.
 The required corpus includes valid proofs, malformed and truncated proofs,
 wrong-CNF bindings, altered hints, unsupported steps, and resource-limit
 failures. Rejection or an unavailable backend remains `UNKNOWN` and creates no
-verification record. The current feasibility record is
-[LRAT authority feasibility](../../reference/lrat-authority-evaluation.md).
+verification record. No production authority changes until an independent
+maintained checker passes this gate.

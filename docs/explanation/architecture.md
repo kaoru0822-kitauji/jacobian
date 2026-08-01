@@ -561,8 +561,7 @@ When a result has a durable episode URI, the adapter additionally emits an
 MCP `ResourceLink` with the result's JSON media type and known size. The link
 is additive: clients that ignore it still receive the text and structured
 result, and tenant/resource authorization follows the direct resource-read
-path. The [MCP ResourceLink evaluation](../reference/mcp-resourcelink-evaluation.md)
-defines the internal projection comparison and its evidence gates.
+path.
 
 The Python SDK advertises these stable tools and static resources through the
 `io.jacobian/core` v1 extension. They remain ordinary MCP tools and resources:
