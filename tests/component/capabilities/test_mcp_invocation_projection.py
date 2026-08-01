@@ -79,3 +79,34 @@ def test_standard_invocation_does_not_drop_large_undurable_output() -> None:
     assert projection["output"] == result.output
     assert projection["mcp_projection"]["output_complete"] is True
     assert len(call_result.content) == 1
+
+
+def test_resource_link_comparison_strategies_keep_structured_content_canonical() -> (
+    None
+):
+    result = _large_result(durable=True)
+
+    full_inline = _capability_call_tool_result(
+        result,
+        view="STANDARD",
+        projection_strategy="FULL_INLINE",
+    )
+    compact_uri_text = _capability_call_tool_result(
+        result,
+        view="STANDARD",
+        projection_strategy="COMPACT_URI_TEXT",
+    )
+    compact_with_link = _capability_call_tool_result(
+        result,
+        view="STANDARD",
+        projection_strategy="COMPACT_URI_TEXT_RESOURCE_LINK",
+    )
+
+    assert len(full_inline.content) == 1
+    assert json.loads(full_inline.content[0].text)["output"] == result.output
+    assert len(compact_uri_text.content) == 1
+    assert json.loads(compact_uri_text.content[0].text)["output"] == {"status": "FOUND"}
+    assert len(compact_with_link.content) == 2
+    assert compact_with_link.content[1].type == "resource_link"
+    for call_result in (full_inline, compact_uri_text, compact_with_link):
+        assert call_result.structured_content == result.model_dump(mode="json")

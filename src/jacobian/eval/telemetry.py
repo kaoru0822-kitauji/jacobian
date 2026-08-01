@@ -6,8 +6,11 @@ import hashlib
 import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from jacobian.canonical import canonicalize_json
 
 _PARAMETER_ERROR_CODES = frozenset(
     {
@@ -20,6 +23,23 @@ _PARAMETER_ERROR_CODES = frozenset(
         "invalid_params",
     }
 )
+_RESOURCE_READ_TOOL_NAMES = frozenset(
+    {"resources/read", "resources.read", "resources_read"}
+)
+
+
+@dataclass
+class _McpResourceTelemetry:
+    links_returned: int = 0
+    link_uris: list[str] = field(default_factory=list)
+    link_output_complete: dict[str, bool] = field(default_factory=dict)
+    read_attempts: int = 0
+    read_uris: list[str] = field(default_factory=list)
+    read_successes: int = 0
+    unnecessary_reads: int = 0
+    uri_preservation_attempts: int = 0
+    uri_preservation_successes: int = 0
+    digest_preservation_successes: int = 0
 
 
 def _contains_value(value: object, *, field: str, accepted: set[object]) -> bool:
@@ -66,6 +86,115 @@ def _mcp_structured_payload(item: Mapping[str, Any]) -> dict[str, Any] | None:
         if isinstance(payload, dict):
             return payload
     return None
+
+
+def _mcp_resource_link_uris(item: Mapping[str, Any]) -> tuple[str, ...]:
+    result = item.get("result")
+    content = result.get("content") if isinstance(result, Mapping) else None
+    if not isinstance(content, list):
+        return ()
+    return tuple(
+        block["uri"]
+        for block in content
+        if isinstance(block, Mapping)
+        and block.get("type") == "resource_link"
+        and isinstance(block.get("uri"), str)
+    )
+
+
+def _mcp_resource_read_uri(item: Mapping[str, Any]) -> str | None:
+    item_type = item.get("type")
+    tool = item.get("tool")
+    if item_type != "mcp_resource_read" and tool not in _RESOURCE_READ_TOOL_NAMES:
+        return None
+    for key in ("arguments", "params", "input"):
+        value = item.get(key)
+        if isinstance(value, Mapping):
+            uri = value.get("uri")
+            if isinstance(uri, str):
+                return uri
+    value = item.get("uri")
+    return value if isinstance(value, str) else None
+
+
+def _mcp_resource_read_failed(item: Mapping[str, Any]) -> bool:
+    result = item.get("result")
+    return bool(
+        item.get("status") in {"error", "failed", "CANCELLED", "ERROR", "TIMEOUT"}
+        or item.get("error")
+        or (
+            isinstance(result, Mapping)
+            and (result.get("isError") is True or result.get("is_error") is True)
+        )
+    )
+
+
+def _mcp_resource_identity_preserved(
+    item: Mapping[str, Any],
+    uri: str,
+) -> tuple[bool, bool]:
+    payload = _mcp_structured_payload(item) or _mcp_text_payload(item)
+    if payload is None:
+        return False, False
+    uri_preserved = payload.get("artifact_uri") == uri
+    manifest = payload.get("manifest")
+    digest_preserved = False
+    if isinstance(manifest, Mapping) and uri.startswith("artifact://sha256/"):
+        try:
+            manifest_digest = (
+                "sha256:" + hashlib.sha256(canonicalize_json(manifest)).hexdigest()
+            )
+        except (TypeError, ValueError):
+            manifest_digest = None
+        digest_preserved = manifest_digest == (
+            "sha256:" + uri.removeprefix("artifact://sha256/")
+        )
+    return uri_preserved, digest_preserved
+
+
+def _record_mcp_resource_telemetry(
+    telemetry: _McpResourceTelemetry,
+    item: object,
+) -> None:
+    if not isinstance(item, Mapping):
+        return
+    link_uris = _mcp_resource_link_uris(item)
+    telemetry.links_returned += len(link_uris)
+    telemetry.link_uris.extend(link_uris)
+    text_payload = _mcp_text_payload(item)
+    projection = (
+        text_payload.get("mcp_projection")
+        if isinstance(text_payload, Mapping)
+        else None
+    )
+    output_complete = (
+        projection.get("output_complete") if isinstance(projection, Mapping) else None
+    )
+    if isinstance(output_complete, bool):
+        for uri in link_uris:
+            telemetry.link_output_complete[uri] = output_complete
+
+    resource_read_uri = _mcp_resource_read_uri(item)
+    if resource_read_uri is None:
+        return
+    telemetry.read_attempts += 1
+    telemetry.read_uris.append(resource_read_uri)
+    read_failed = _mcp_resource_read_failed(item)
+    if resource_read_uri in telemetry.link_output_complete:
+        telemetry.uri_preservation_attempts += 1
+        if not read_failed:
+            telemetry.uri_preservation_successes += 1
+        if telemetry.link_output_complete[resource_read_uri]:
+            telemetry.unnecessary_reads += 1
+    if read_failed:
+        return
+    telemetry.read_successes += 1
+    _, digest_preserved = _mcp_resource_identity_preserved(
+        item,
+        resource_read_uri,
+    )
+    if digest_preserved:
+        telemetry.digest_preservation_successes += 1
 
 
 def _serialized_bytes(value: object) -> int:
@@ -175,6 +304,7 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
     mcp_logical_payload_bytes_by_tool: Counter[str] = Counter()
     mcp_logical_payload_observed_calls = 0
     mcp_call_signatures: Counter[tuple[str, str]] = Counter()
+    resource_telemetry = _McpResourceTelemetry()
     capability_describe_index_calls = 0
     capability_describe_exact_calls = 0
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -342,6 +472,7 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
                 accepted=set(_PARAMETER_ERROR_CODES),
             ):
                 parameter_error_count += 1
+        _record_mcp_resource_telemetry(resource_telemetry, item)
         if event.get("type") == "turn.completed" and isinstance(
             event.get("usage"), dict
         ):
@@ -358,9 +489,6 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
         "capability_ids": capability_ids,
         "capability_invocations": capability_invocations,
         "capability_descriptions": capability_descriptions,
-        # Compatibility aliases retained for existing evaluation summaries.
-        "mcp_response_bytes": mcp_wire_bytes,
-        "mcp_response_bytes_by_tool": dict(sorted(mcp_wire_bytes_by_tool.items())),
         "mcp_wire_bytes": mcp_wire_bytes,
         "mcp_wire_bytes_by_tool": dict(sorted(mcp_wire_bytes_by_tool.items())),
         "mcp_model_visible_bytes": mcp_model_visible_bytes,
@@ -372,6 +500,21 @@ def parse_agent_transcript(path: Path) -> dict[str, Any]:
             sorted(mcp_logical_payload_bytes_by_tool.items())
         ),
         "mcp_logical_payload_observed_calls": mcp_logical_payload_observed_calls,
+        "mcp_resource_links_returned": resource_telemetry.links_returned,
+        "mcp_resource_link_uris": resource_telemetry.link_uris,
+        "mcp_resource_read_attempts": resource_telemetry.read_attempts,
+        "mcp_resource_read_uris": resource_telemetry.read_uris,
+        "mcp_resource_read_successes": resource_telemetry.read_successes,
+        "mcp_resource_unnecessary_reads": resource_telemetry.unnecessary_reads,
+        "mcp_resource_uri_preservation_attempts": (
+            resource_telemetry.uri_preservation_attempts
+        ),
+        "mcp_resource_uri_preservation_successes": (
+            resource_telemetry.uri_preservation_successes
+        ),
+        "mcp_resource_digest_preservation_successes": (
+            resource_telemetry.digest_preservation_successes
+        ),
         "repeated_mcp_call_count": sum(
             count - 1 for count in mcp_call_signatures.values() if count > 1
         ),

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jacobian.invalid/schemas/mcp-resourcelink-pilot-v1.json",
+  "title": "Jacobian MCP ResourceLink pilot plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "status",
+    "seed",
+    "projection_strategies",
+    "cases",
+    "repetitions",
+    "episode_count",
+    "randomization",
+    "gates",
+    "execution_gate",
+    "claim_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "plan_id": {"const": "jacobian.mcp-resourcelink.v1"},
+    "status": {"const": "SCAFFOLD_ONLY"},
+    "seed": {"const": 104729},
+    "projection_strategies": {
+      "const": [
+        "FULL_INLINE",
+        "COMPACT_URI_TEXT",
+        "COMPACT_URI_TEXT_RESOURCE_LINK"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "kind",
+          "capability_id",
+          "large_artifact",
+          "baseline_structured_content_digest"
+        ],
+        "properties": {
+          "case_id": {"type": "string", "minLength": 1},
+          "kind": {
+            "enum": [
+              "SCALAR",
+              "GRAPH_DISTANCE",
+              "COUNTERMODEL_TABLE",
+              "CERTIFICATE_VERIFICATION"
+            ]
+          },
+          "capability_id": {"type": "string", "minLength": 3},
+          "large_artifact": {"type": "boolean"},
+          "baseline_structured_content_digest": {
+            "type": ["string", "null"],
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "repetitions": {"const": 3},
+    "episode_count": {"const": 36},
+    "randomization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "strategy", "paired"],
+      "properties": {
+        "unit": {"const": "CASE_PROJECTION_REPETITION"},
+        "strategy": {"const": "BLOCK_RANDOMIZED"},
+        "paired": {"const": true}
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_certifications",
+        "assurance_regressions",
+        "uri_preservation_on_read_attempts",
+        "large_artifact_followthrough_minimum",
+        "large_artifact_episode_count",
+        "canonical_structured_content_identical"
+      ],
+      "properties": {
+        "false_certifications": {"const": 0},
+        "assurance_regressions": {"const": 0},
+        "uri_preservation_on_read_attempts": {"const": 1.0},
+        "large_artifact_followthrough_minimum": {"const": 8},
+        "large_artifact_episode_count": {"const": 9},
+        "canonical_structured_content_identical": {"const": true}
+      }
+    },
+    "execution_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explicit_authorization",
+        "model_identity",
+        "credentials_present",
+        "runtime_snapshot",
+        "hard_run_budget",
+        "model_execution_allowed"
+      ],
+      "properties": {
+        "explicit_authorization": {"const": false},
+        "model_identity": {"type": "null"},
+        "credentials_present": {"const": false},
+        "runtime_snapshot": {"type": "null"},
+        "hard_run_budget": {"type": "null"},
+        "model_execution_allowed": {"const": false}
+      }
+    },
+    "claim_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status_until_pass",
+        "final_expansion_requires_authorization",
+        "causal_claims_allowed"
+      ],
+      "properties": {
+        "status_until_pass": {"const": "RESOURCE_LINK_ADVISORY"},
+        "final_expansion_requires_authorization": {"const": true},
+        "causal_claims_allowed": {"const": false}
+      }
+    }
+  }
+}

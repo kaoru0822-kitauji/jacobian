@@ -11,7 +11,7 @@ from mcp_types import CallToolResult
 from pydantic import Field, StrictInt
 
 from jacobian.adapters.mcp.constants import _CAPABILITY_SCOPE_RULE
-from jacobian.adapters.mcp.context import AppState, _runtime
+from jacobian.adapters.mcp.context import AppState, _projection_strategy, _runtime
 from jacobian.adapters.mcp.projections import (
     _capability_call_tool_result,
     _capability_descriptor_view,
@@ -258,7 +258,11 @@ async def capability_invoke(
         mode=mode,
         ctx=ctx,
     )
-    return _capability_call_tool_result(result, view=view)
+    return _capability_call_tool_result(
+        result,
+        view=view,
+        projection_strategy=_projection_strategy(ctx),
+    )
 
 
 async def workspace_open(

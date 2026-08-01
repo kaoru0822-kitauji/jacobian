@@ -1,0 +1,18 @@
+{
+  "capability_id": "sat.lrat.verify",
+  "mode": "VERIFY",
+  "setup": [
+    {
+      "capability_id": "sat.cnf.materialize",
+      "mode": "EXPLORE",
+      "input": {
+        "variable_names": ["x"],
+        "clauses": [[-1], [1]]
+      }
+    }
+  ],
+  "input": {
+    "cnf_uri": "<setup:sat.cnf.materialize.output.cnf_uri>",
+    "proof_base64": "MyAwIDEgMiAwCg=="
+  }
+}

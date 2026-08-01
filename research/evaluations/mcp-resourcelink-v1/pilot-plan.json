@@ -1,0 +1,69 @@
+{
+  "schema_version": "1",
+  "plan_id": "jacobian.mcp-resourcelink.v1",
+  "status": "SCAFFOLD_ONLY",
+  "seed": 104729,
+  "projection_strategies": [
+    "FULL_INLINE",
+    "COMPACT_URI_TEXT",
+    "COMPACT_URI_TEXT_RESOURCE_LINK"
+  ],
+  "cases": [
+    {
+      "case_id": "scalar-gcd",
+      "kind": "SCALAR",
+      "capability_id": "polynomial.compute.gcd",
+      "large_artifact": false,
+      "baseline_structured_content_digest": null
+    },
+    {
+      "case_id": "graph-distance",
+      "kind": "GRAPH_DISTANCE",
+      "capability_id": "graph.distance_matrix.compute",
+      "large_artifact": true,
+      "baseline_structured_content_digest": null
+    },
+    {
+      "case_id": "countermodel-table",
+      "kind": "COUNTERMODEL_TABLE",
+      "capability_id": "universal_algebra.search.countermodel",
+      "large_artifact": true,
+      "baseline_structured_content_digest": null
+    },
+    {
+      "case_id": "certificate-verification",
+      "kind": "CERTIFICATE_VERIFICATION",
+      "capability_id": "sat.lrat.verify",
+      "large_artifact": true,
+      "baseline_structured_content_digest": null
+    }
+  ],
+  "repetitions": 3,
+  "episode_count": 36,
+  "randomization": {
+    "unit": "CASE_PROJECTION_REPETITION",
+    "strategy": "BLOCK_RANDOMIZED",
+    "paired": true
+  },
+  "gates": {
+    "false_certifications": 0,
+    "assurance_regressions": 0,
+    "uri_preservation_on_read_attempts": 1.0,
+    "large_artifact_followthrough_minimum": 8,
+    "large_artifact_episode_count": 9,
+    "canonical_structured_content_identical": true
+  },
+  "execution_gate": {
+    "explicit_authorization": false,
+    "model_identity": null,
+    "credentials_present": false,
+    "runtime_snapshot": null,
+    "hard_run_budget": null,
+    "model_execution_allowed": false
+  },
+  "claim_policy": {
+    "status_until_pass": "RESOURCE_LINK_ADVISORY",
+    "final_expansion_requires_authorization": true,
+    "causal_claims_allowed": false
+  }
+}

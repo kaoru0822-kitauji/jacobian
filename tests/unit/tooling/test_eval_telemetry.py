@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
+from jacobian.canonical import canonicalize_json
 from jacobian.eval.telemetry import parse_agent_transcript
 
 
@@ -131,17 +133,16 @@ def test_agent_telemetry_counts_response_bytes_and_repeated_calls(
 
     telemetry = parse_agent_transcript(transcript)
 
-    assert telemetry["mcp_response_bytes"] > 0
+    assert telemetry["mcp_wire_bytes"] > 0
     assert (
-        telemetry["mcp_response_bytes_by_tool"]["capability.describe"]
-        == telemetry["mcp_response_bytes"]
+        telemetry["mcp_wire_bytes_by_tool"]["capability.describe"]
+        == telemetry["mcp_wire_bytes"]
     )
     assert telemetry["repeated_mcp_call_count"] == 1
     assert telemetry["repeated_mcp_calls"][0]["tool"] == "capability.describe"
     assert telemetry["repeated_mcp_calls"][0]["count"] == 2
     assert telemetry["capability_describe_index_calls"] == 2
     assert telemetry["capability_describe_exact_calls"] == 1
-    assert telemetry["mcp_wire_bytes"] == telemetry["mcp_response_bytes"]
     assert telemetry["mcp_model_visible_bytes"] > 0
     assert telemetry["mcp_logical_payload_observed_calls"] == 3
 
@@ -199,5 +200,81 @@ def test_agent_telemetry_separates_wire_model_and_logical_invocation_bytes(
     assert telemetry["mcp_logical_payload_bytes"] == 12_345
     assert telemetry["mcp_logical_payload_observed_calls"] == 1
     assert telemetry["mcp_wire_bytes"] > telemetry["mcp_model_visible_bytes"]
-    assert telemetry["mcp_response_bytes"] == telemetry["mcp_wire_bytes"]
     assert telemetry["capability_invocations"][0]["output"] == canonical["output"]
+
+
+def test_agent_telemetry_tracks_resource_link_follow_through_and_identity(
+    tmp_path: Path,
+) -> None:
+    def read_event(seed: str) -> tuple[str, dict[str, object]]:
+        manifest = {
+            "manifest_version": "1",
+            "object_digest": "sha256:" + seed * 64,
+            "payload_digest": "sha256:" + (seed.upper() * 64),
+            "schema_uri": "artifact://sha256/" + ("c" * 64),
+            "semantics_uri": "artifact://sha256/" + ("d" * 64),
+            "canonicalizer_digest": "sha256:" + ("e" * 64),
+            "parents": [],
+            "summary": "",
+        }
+        uri = (
+            "artifact://sha256/"
+            + hashlib.sha256(canonicalize_json(manifest)).hexdigest()
+        )
+        return uri, _tool_event(
+            "resources/read",
+            {"uri": uri},
+            {"artifact_uri": uri, "manifest": manifest},
+        )
+
+    uri, first_read = read_event("a")
+    unnecessary_uri, second_read = read_event("b")
+
+    def link_event(link_uri: str, *, output_complete: bool) -> dict[str, object]:
+        projection = {
+            "capability_id": "graph.search.atlas",
+            "mcp_projection": {"output_complete": output_complete},
+        }
+        return {
+            "type": "item.completed",
+            "item": {
+                "type": "mcp_tool_call",
+                "tool": "capability.invoke",
+                "arguments": {"capability_id": "graph.search.atlas"},
+                "status": "completed",
+                "result": {
+                    "isError": False,
+                    "content": [
+                        {"type": "text", "text": json.dumps(projection)},
+                        {"type": "resource_link", "uri": link_uri},
+                    ],
+                },
+            },
+        }
+
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        "\n".join(
+            json.dumps(event)
+            for event in (
+                link_event(uri, output_complete=False),
+                link_event(unnecessary_uri, output_complete=True),
+                first_read,
+                second_read,
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = parse_agent_transcript(transcript)
+
+    assert telemetry["mcp_resource_links_returned"] == 2
+    assert telemetry["mcp_resource_link_uris"] == [uri, unnecessary_uri]
+    assert telemetry["mcp_resource_read_attempts"] == 2
+    assert telemetry["mcp_resource_read_uris"] == [uri, unnecessary_uri]
+    assert telemetry["mcp_resource_read_successes"] == 2
+    assert telemetry["mcp_resource_unnecessary_reads"] == 1
+    assert telemetry["mcp_resource_uri_preservation_attempts"] == 2
+    assert telemetry["mcp_resource_uri_preservation_successes"] == 2
+    assert telemetry["mcp_resource_digest_preservation_successes"] == 2

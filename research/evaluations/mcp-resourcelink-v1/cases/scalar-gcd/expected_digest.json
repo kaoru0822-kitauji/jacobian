@@ -1,0 +1,5 @@
+{
+  "status": "UNMEASURED",
+  "structured_content_digest": null,
+  "reason": "Requires a frozen runtime invocation before the model pilot is authorized."
+}
