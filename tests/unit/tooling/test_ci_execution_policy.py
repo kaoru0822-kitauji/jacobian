@@ -6,6 +6,15 @@ from pathlib import Path
 ROOT = Path(__file__).parents[3]
 
 
+def test_pr_base_edits_trigger_ci() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    pull_request_trigger = workflow.split("  pull_request:", 1)[1].split(
+        "  merge_group:", 1
+    )[0]
+
+    assert "edited" in pull_request_trigger
+
+
 def test_python_313_uses_the_narrow_compatibility_smoke() -> None:
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     compatibility = workflow.split("  compatibility-test:", 1)[1].split(
