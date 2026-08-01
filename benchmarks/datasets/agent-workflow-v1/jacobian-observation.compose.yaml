@@ -20,7 +20,7 @@ services:
     volumes:
       - jacobian-state:/state
   jacobian-auth-proxy:
-    image: ${JACOBIAN_AUTH_PROXY_IMAGE:-caddy@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d}
+    image: caddy@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     depends_on:
       - jacobian
     command:
@@ -29,7 +29,7 @@ services:
       - --from
       - :8080
       - --to
-      - 127.0.0.1:8000
+      - jacobian:8000
       - --header-up
       - "Authorization: Bearer ${JACOBIAN_MCP_TOKEN:?JACOBIAN_MCP_TOKEN is required}"
 secrets:
