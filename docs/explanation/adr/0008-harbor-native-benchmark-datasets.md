@@ -4,14 +4,13 @@ Status: Accepted, pre-stable
 
 ## Context
 
-ADR 0007 organized `benchmarks/` by artifact class. That made the distinction
-between workflow observations, public reproductions, research diagnostics,
-performance measurements, provider spikes, and examples visible, but only one
-class was executable as Harbor tasks. The frozen `regression-v1` name also
-suggested a product regression gate even though its model runs observe fixed
-agent workflows and do not establish causal performance. Non-runnable research
-plans and discovery handoffs need a separate home from executable benchmark
-cases.
+The benchmark tree distinguishes workflow observations, public reproductions,
+research diagnostics, performance measurements, provider spikes, and examples,
+but only one class is executable as Harbor tasks. The frozen `regression-v1`
+name also suggested a product regression gate even though its model runs
+observe fixed agent workflows and do not establish causal performance.
+Non-runnable research plans and discovery handoffs need a separate home from
+executable benchmark cases.
 
 Harbor local dataset loading inspects only immediate child task directories.
 The mathematical subject taxonomy we want is nested by domain and field, so a
@@ -89,5 +88,5 @@ environment, an Oracle path, an independent verifier, explicit provenance,
 and a suite entry. In return, every retained case has one publishable identity,
 one content digest, and inspectable visibility boundaries.
 
-This ADR supersedes only the benchmark-layout decision in ADR 0007. ADR 0007's
-package layout and no-shim package decisions remain accepted.
+This ADR owns the benchmark dataset boundary. Changes to that boundary require
+a new ADR rather than a silent rewrite.
