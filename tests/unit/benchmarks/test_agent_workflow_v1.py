@@ -15,6 +15,7 @@ EXPECTED_TASKS = {
     "distinct-sum-pairing-optimum",
     "divisibility-construction-witness",
     "erdos-gallai-realization-audit",
+    "euler-fourth-power-scope-audit",
     "euler-line-symbolic-certificate",
     "finite-magma-countermodel",
     "generated-lemma-vacuity-audit",

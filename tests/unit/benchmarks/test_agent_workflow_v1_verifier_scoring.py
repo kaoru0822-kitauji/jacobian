@@ -1233,6 +1233,26 @@ def test_degree_sequence_reference_solution_is_schema_valid() -> None:
     Draft202012Validator(schema).validate(submission)
 
 
+def test_fourth_power_scope_rejects_boolean_joint_gcd(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "euler-fourth-power-scope-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["joint_gcd"] = True
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+
+
+def test_fourth_power_scope_accepts_reference_solution(tmp_path: Path) -> None:
+    result = _run_verifier(
+        *_prepare_case(tmp_path, "euler-fourth-power-scope-audit", "computed")
+    )
+    assert result["correctness"] == 1.0
+    assert result["reward"] == pytest.approx(1.0)
+
+
 def test_dead_end_local_density_audit_accepts_case_reordering(tmp_path: Path) -> None:
     task, app, logs = _prepare_case(
         tmp_path, "dead-end-local-density-audit", "computed"

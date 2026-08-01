@@ -48,6 +48,12 @@ maximum_assurance = "COMPUTED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-euler-fourth-power-scope-audit"
+path = "tasks/mathematical-sciences/number-theory/euler-fourth-power-scope-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-graph-counterexample"
 path = "tasks/mathematical-sciences/graph-theory/graph-counterexample"
 maximum_assurance = "COMPUTED"

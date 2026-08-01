@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "jacobian/agent-workflow-v1-euler-fourth-power-scope-audit"},
+    "conclusion": {"const": "FALSE"},
+    "result": {
+      "type": "object",
+      "required": ["left_bases", "target_base", "left_fourth_powers", "left_sum", "right_fourth_power", "joint_gcd", "residue_checks", "claim_status"],
+      "properties": {
+        "left_bases": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer"}},
+        "target_base": {"type": "integer"},
+        "left_fourth_powers": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer"}},
+        "left_sum": {"type": "integer"},
+        "right_fourth_power": {"type": "integer"},
+        "joint_gcd": {"const": 1},
+        "residue_checks": {"type": "array", "items": {"type": "object"}},
+        "claim_status": {"const": "REFUTED_BY_COUNTEREXAMPLE"}
+      },
+      "additionalProperties": false
+    },
+    "claimed_assurance": {"const": "COMPUTED"},
+    "scope": {"type": "string"},
+    "completeness": {"const": "COMPLETE"},
+    "evidence": {"type": "array"},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

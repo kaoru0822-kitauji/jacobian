@@ -1,0 +1,11 @@
+{
+  "task_id": "jacobian/agent-workflow-v1-euler-fourth-power-scope-audit",
+  "claim": "No positive fourth power is a sum of three positive fourth powers.",
+  "search_scope": {"maximum_base": 500000, "term_count": 3},
+  "required_moduli": [5, 7, 11, 13, 17],
+  "source": {
+    "url": "https://mathoverflow.net/questions/12085/experimental-mathematics-leading-to-major-advances/216002",
+    "license": "CC BY-SA 4.0",
+    "captured": "2026-07-31"
+  }
+}
