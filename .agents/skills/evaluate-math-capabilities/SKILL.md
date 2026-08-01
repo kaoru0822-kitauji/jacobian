@@ -14,13 +14,19 @@ for inputs, returns, and portfolio decisions.
 
 ## Classify the evidence before running
 
-Label each case and result as exactly one of:
+Give each case and result one primary evidence role:
 
+- **task/verifier validation:** checks the benchmark harness, task contract,
+  independent Oracle, or deliberate failure cases; it is harness evidence,
+  not model capability evidence;
 - **regression/public reproduction:** known or public case; useful for contract
   and breakage detection, never held-out causal evidence;
 - **assurance/conformance:** tests calibration, scope, schemas, artifacts,
   discovery, or parameterization, and may not measure mathematical capability
-  value; or
+  value;
+- **Jacobian workflow observation:** records agent discovery, tool use,
+  artifacts, and assurance behavior on a configured Harbor workflow; it is
+  workflow evidence, not comparative performance evidence;
 - **held-out causal comparison:** an unseen or transformed case with a frozen
   control/treatment intervention and an independently judgeable outcome.
 

@@ -215,9 +215,14 @@ harbor-adapter-check: ## Check deterministic regeneration for ADAPTER=<id>.
 	@test -x "benchmarks/adapters/$(ADAPTER)/check.sh" || { echo "adapter check.sh is missing: $(ADAPTER)" >&2; exit 2; }
 	"benchmarks/adapters/$(ADAPTER)/check.sh"
 
+JACOBIAN_ENABLED ?= 1
+ifneq ($(filter 0 1,$(JACOBIAN_ENABLED)),$(JACOBIAN_ENABLED))
+$(error JACOBIAN_ENABLED must be exactly 0 or 1 (got '$(JACOBIAN_ENABLED)'))
+endif
+
 ifeq ($(JACOBIAN_ENABLED),0)
 EVAL_CONFIG ?= benchmarks/config/agent-workflow-v1-control.json
-MCP_CONFIG ?=
+override MCP_CONFIG :=
 else
 EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)/jobs/jacobian-observation.json
 MCP_CONFIG ?= benchmarks/config/jacobian.mcp.json

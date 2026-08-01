@@ -1,6 +1,6 @@
 {
   "jobs_dir": "benchmarks/results/agent-workflow-v1",
-  "n_attempts": 1,
+  "n_attempts": 3,
   "timeout_multiplier": 1,
   "orchestrator": {
     "type": "local",

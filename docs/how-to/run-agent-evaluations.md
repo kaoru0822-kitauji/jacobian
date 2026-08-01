@@ -15,6 +15,26 @@ make harbor-check
 make harbor-oracle DATASET=agent-workflow-v1
 ```
 
+## Set shared run conditions
+
+For a paired comparison, set the same model, authentication, proxy, task
+filter, prompt, budget, and environment before running either condition. A
+proxy is optional, but if the host requires one for package installation or
+model access, export it before both runs:
+
+```sh
+export JACOBIAN_MODEL='your-model'
+export CODEX_FORCE_AUTH_JSON=1
+
+export JACOBIAN_EVAL_HTTP_PROXY='http://host.docker.internal:7890'
+export JACOBIAN_EVAL_HTTPS_PROXY='http://host.docker.internal:7890'
+export JACOBIAN_EVAL_NO_PROXY='localhost,127.0.0.1,jacobian'
+```
+
+Unset the proxy variables for direct networking. On Linux, the host proxy must
+accept connections from Docker's bridge interface; a proxy listening only on
+`127.0.0.1` is not reachable from the container.
+
 ## Run with Jacobian
 
 The local path uses Harbor's Docker environment, a Jacobian Compose sidecar,
@@ -23,8 +43,6 @@ and Harbor's external MCP configuration. The default sidecar image is
 
 ```sh
 export JACOBIAN_IMAGE='jacobian:local'
-export JACOBIAN_MODEL='your-model'
-export CODEX_FORCE_AUTH_JSON=1
 
 make agent-eval DATASET=agent-workflow-v1 \
   JACOBIAN_ENABLED=1 EVAL_EXECUTE=1
@@ -35,12 +53,9 @@ Use `TASKS=graph-counterexample` for a small smoke run. The treatment run uses
 
 ## Run without Jacobian
 
-Use the same model, task filter, prompt, budget, and environment:
+Use the same shared run conditions:
 
 ```sh
-export JACOBIAN_MODEL='your-model'
-export CODEX_FORCE_AUTH_JSON=1
-
 make agent-eval DATASET=agent-workflow-v1 \
   JACOBIAN_ENABLED=0 \
   TASKS=graph-counterexample EVAL_EXECUTE=1
@@ -50,25 +65,10 @@ make agent-eval DATASET=agent-workflow-v1 \
 MCP configuration. `JACOBIAN_ENABLED=1` selects the treatment job and passes
 Harbor's `--mcp-config` option.
 
-## Optional Docker proxy
-
-Networking is direct by default. If the host requires a proxy for package
-installation or model access, configure it explicitly:
-
-```sh
-export JACOBIAN_EVAL_HTTP_PROXY='http://host.docker.internal:7890'
-export JACOBIAN_EVAL_HTTPS_PROXY='http://host.docker.internal:7890'
-export JACOBIAN_EVAL_NO_PROXY='localhost,127.0.0.1,jacobian'
-```
-
 The shared Compose overlay maps `host.docker.internal` to the Docker host and
 passes upper- and lower-case proxy variables to Harbor's `main` container,
-including the agent installation phase. On Linux, the host proxy must accept
-connections from Docker's bridge interface; a proxy listening only on
-`127.0.0.1` is not reachable from the container.
-
-Unset proxy variables to use direct networking. Keep `jacobian` in `NO_PROXY`
-so the agent reaches the sidecar over Harbor's internal network.
+including the agent installation phase. Keep `jacobian` in `NO_PROXY` so the
+agent reaches the sidecar over Harbor's internal network.
 
 ## Docker and Daytona
 
