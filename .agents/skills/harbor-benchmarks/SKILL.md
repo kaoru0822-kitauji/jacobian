@@ -28,10 +28,20 @@ Classify the work before editing a task:
 ## Author or change a task
 
 Read `AGENTS.md`, `CONTRIBUTING.md`, and
-`docs/reference/capability-workflow-evaluations.md`. Work under
-`benchmarks/datasets/<dataset>/tasks/<domain>/<field>/<task>/` and keep each
-task self-contained. Add its nested path to the dataset's `suite.toml`;
-`dataset.toml` is generated and must not be edited by hand.
+`docs/reference/capability-workflow-evaluations.md`. Canonical task bundles live
+once under `benchmarks/tasks/<task-id>/`, using a globally unique, flat
+directory name. Keep domain, field, provenance, and evaluation classification
+in typed `task.toml` metadata rather than directory hierarchy. A dataset selects
+canonical tasks through one `benchmarks/datasets/<dataset>/members/<task-id>.toml`
+fragment per member; `suite.toml` contains only the dataset header and
+`dataset.toml` is generated. Never copy a task into another dataset.
+
+Before adding a task, run the benchmark planner and check for a global ID
+collision. Manually authored or substantially transformed cases remain authored
+tasks; create `benchmarks/adapters/<source>/` only when a pinned external source
+can be converted reproducibly, with source revision and digest, license status,
+included/excluded rows, deterministic conversion, pinned dependencies, Oracle
+evidence, and parity evidence.
 
 Every task has a maintainer `README.md`, frozen offline input, schema 1.4
 metadata, concise provenance, an agent-visible
@@ -58,17 +68,19 @@ Use the pinned Harbor runner from the repository:
 
 ```sh
 uvx --from harbor==0.20.0 harbor --version
-make test-plan BASE=origin/main
-make check
-make harbor-check
+make benchmark-plan BASE=origin/main
+make benchmark-sync
+make benchmark-check
+make benchmark-oracle DATASET=agent-workflow-v1 TASKS="task-id"
 ```
 
 After any input, instruction, metadata, verifier, dependency, image, or task
 contract change:
 
-1. Recompute each task content digest with Harbor's task model and update the
-   corresponding `dataset.toml` entry; do not invent a custom digest.
-2. Parse/check every nested task declared by its suite.
+1. Recompute each canonical task content digest with Harbor's task model and
+   regenerate every affected `dataset.toml`; do not invent a custom digest.
+2. Parse/check every canonical task selected by member fragments and reject
+   missing, duplicate, ambiguous, or escaping references.
 3. Run every task through the dataset's Oracle job and require full applicable
    reward.
 4. Exercise deliberate failures: empty or malformed output, wrong answers,
@@ -78,7 +90,19 @@ contract change:
    secrets, host paths, raw caches, and floating dependencies.
 
 Do not treat `harbor sync` as a local digest calculator when the task is not
-published. The committed dataset manifest and local task content must agree.
+published. The committed dataset manifest and canonical task content must
+agree. `benchmark-check` is outside the product `tests/` topology; keep Harbor
+validation from entering product Python coverage.
+
+The independent benchmark planner emits `run-benchmark-check`,
+`run-benchmark-oracle`, `benchmark-oracle-scope`, an exact dataset/task/digest
+matrix, and reasons. README-only task changes run contract checks without
+Docker. Executable task changes run the exact task Oracle; membership, shared
+verifier, image, or unknown benchmark changes escalate to the affected dataset
+or full portfolio. The stable `Benchmark Validation` workflow job is the only
+required branch-protection context; dynamic Oracle jobs run at most four in
+parallel and upload result JSON, verifier logs, source SHA, task digest, and
+Harbor version.
 
 ## Run Jacobian observation
 
