@@ -207,6 +207,14 @@ environment writes raw pyperf JSON and controlled-environment metadata. Reward
 checks that the expected measurement set was produced and that its evidence is
 digest-bound; it does not depend on measured duration.
 
+Version 1 is a historical baseline fixed at repository revision
+`6fd5fc5df6bc49f230484bc5c78cbd365941c78c`; its
+[`baseline.toml`](../../benchmarks/datasets/performance-v1/baseline.toml)
+records the matching Jacobian, MCP, and uv versions. It must not be interpreted
+as a current-main measurement. A moving or updated environment requires a new
+versioned dataset and fresh Oracle evidence so comparisons never silently mix
+source and toolchain revisions.
+
 Scheduled jobs retain the raw Harbor artifacts. Compare base and candidate runs
 only on the same controlled runner with matching task, environment, dependency,
 and corpus digests. Thresholds remain report-only until repeated controlled

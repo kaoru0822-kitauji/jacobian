@@ -17,8 +17,8 @@ catalog and current reference documents for present capability membership.
 
 ## Development environment
 
-Jacobian uses Python 3.12, `uv`, and a small `Makefile` that keeps local
-commands aligned:
+Jacobian uses Python 3.12, the uv release pinned in `.uv-version`, and a small
+`Makefile` that keeps local commands aligned:
 
 ```sh
 make setup

@@ -28,6 +28,7 @@ npm install -g jacobian
 
 ```sh
 jacobian setup [--client <id>...] [--all] [--yes] [--dry-run] [--json]
+               [--source <checkout> --state-dir <path> --profile <name>]
   Configure MCP clients to use Jacobian.
 jacobian upgrade
   Refresh the launcher-managed Python package.
@@ -42,6 +43,11 @@ jacobian <command> [args...]
 ```
 
 Supported clients: `claude`, `cursor`, `opencode`, `codex`, `gemini`.
+
+`--source` writes a launcher bound to an absolute Jacobian checkout and uses
+`uv run --project <checkout> --locked --no-sync jacobian-mcp`. Run the
+checkout's `scripts/setup-agent` command for the complete locked dependency,
+state initialization, source doctor, and client configuration workflow.
 
 ## Environment
 

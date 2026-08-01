@@ -13,7 +13,7 @@ the generated `dataset.toml` records Harbor task digests. Run the Oracle
 contract gate with:
 
 ```sh
-make benchmark-oracle DATASET=research-diagnostics-v1
+make harbor-oracle DATASET=research-diagnostics-v1
 ```
 
 Oracle success establishes solvability and verifier integrity. Results are

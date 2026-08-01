@@ -17,13 +17,31 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static benchmark-plan benchmark-sync benchmark-check benchmark-oracle benchmark-oracle-run benchmark-oracle-all benchmark-adapter-check agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
+.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-check harbor-oracle harbor-oracle-run harbor-oracle-all harbor-adapter-check agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-setup: ## Install the locked development environment.
+uv-version-check: ## Require the repository-pinned uv release.
+	@test "$$(uv --version | awk '{print $$2}')" = "$$(tr -d '[:space:]' < .uv-version)" || { \
+		echo "install uv $$(tr -d '[:space:]' < .uv-version) before using this checkout" >&2; \
+		exit 2; \
+	}
+
+setup: uv-version-check ## Install the locked development environment.
 	uv sync --locked --dev
+
+setup-agent: ## Configure an agent against this source checkout (ARGS="--client codex --profile full-python").
+	./scripts/setup-agent $(ARGS)
+
+container-image: ## Build a revision-labelled local image (IMAGE=jacobian:local).
+	@test -z "$$(git status --porcelain)" || { echo "container-image requires a clean worktree" >&2; exit 2; }
+	@revision=$$(git rev-parse HEAD); \
+	version=$$(uv version --short); \
+	docker build \
+		--build-arg JACOBIAN_REVISION="$$revision" \
+		--build-arg JACOBIAN_VERSION="$$version" \
+		-t "$(or $(IMAGE),jacobian:local)" .
 
 deploy-check: ## Validate the clone-to-systemd deployment entrypoint.
 	bash -n deploy/install.sh
@@ -159,25 +177,25 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
-benchmark-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
+harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	@changed_paths=$$(if [ -n "$(BASE)" ]; then git diff --name-only "$(BASE)" HEAD; else git diff --name-only HEAD; fi); \
 	$(HARBOR_PYTHON) .github/scripts/plan-benchmarks $$changed_paths
 
-benchmark-sync: ## Update vendored verifier support and deterministic task digests.
+harbor-sync: ## Update vendored verifier support and deterministic task digests.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
 
-benchmark-check: ## Run Harbor topology, digest, provenance, and host-side validation checks.
+harbor-check: ## Run Harbor topology, digest, provenance, and host-side validation checks.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 	$(UV_RUN) pytest -n 0 benchmarks/validation
 
-benchmark-oracle: benchmark-check benchmark-oracle-run ## Check contracts, then run a dataset Oracle.
+harbor-oracle: harbor-check harbor-oracle-run ## Check contracts, then run a dataset Oracle.
 
-benchmark-oracle-run: ## Run a dataset Oracle after an already-successful contract gate.
+harbor-oracle-run: ## Run a dataset Oracle after an already-successful contract gate.
 	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
 	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
-	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-benchmark-oracle.XXXXXX.json") && \
+	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-harbor-oracle.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
 	$(UV_RUN) python tools/render_harbor_job.py --dataset "$(DATASET)" --role oracle --output "$$resolved_job" --tasks $(TASKS) && \
 	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS) && \
@@ -186,12 +204,12 @@ benchmark-oracle-run: ## Run a dataset Oracle after an already-successful contra
 		--jobs-dir "benchmarks/results/$(DATASET)-oracle" \
 		--tasks $(TASKS)
 
-benchmark-oracle-all: benchmark-check ## Run every registered dataset Oracle.
+harbor-oracle-all: harbor-check ## Run every registered dataset Oracle.
 	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 performance-v1 provider-feasibility-v1 examples-v1; do \
-		$(MAKE) --no-print-directory benchmark-oracle-run DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
+		$(MAKE) --no-print-directory harbor-oracle-run DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
 	done
 
-benchmark-adapter-check: ## Check deterministic regeneration for ADAPTER=<id>.
+harbor-adapter-check: ## Check deterministic regeneration for ADAPTER=<id>.
 	@test -n "$(ADAPTER)" || { echo "ADAPTER is required" >&2; exit 2; }
 	@test -x "benchmarks/adapters/$(ADAPTER)/check.sh" || { echo "adapter check.sh is missing: $(ADAPTER)" >&2; exit 2; }
 	"benchmarks/adapters/$(ADAPTER)/check.sh"
@@ -202,15 +220,21 @@ agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 
 		exit 0; \
 	fi; \
 	image=$${JACOBIAN_IMAGE:-}; \
+	identity=$${JACOBIAN_IMAGE_IDENTITY_FILE:-}; \
 	if ! printf '%s\n' "$$image" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then \
 		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
+		exit 2; \
+	fi; \
+	if [ -z "$$identity" ] || [ ! -f "$$identity" ]; then \
+		echo "JACOBIAN_IMAGE_IDENTITY_FILE must name a trusted image identity JSON file" >&2; \
 		exit 2; \
 	fi; \
 	if [ -z "$${JACOBIAN_MCP_TOKEN:-}" ] || [ -z "$${JACOBIAN_AUTH_TOKENS_JSON:-}" ] || [ -z "$${JACOBIAN_MODEL:-}" ]; then \
 		echo "JACOBIAN_MCP_TOKEN, JACOBIAN_AUTH_TOKENS_JSON, and JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
-	$(MAKE) benchmark-check && \
+	$(UV_RUN) python tools/check_jacobian_image.py --image "$$image" --identity-lock "$$identity" --pull && \
+	$(MAKE) harbor-check && \
 	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-job.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
 	$(UV_RUN) python tools/render_harbor_job.py \
@@ -221,12 +245,12 @@ agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 
 	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
 performance-eval: ## Run the report-only performance dataset through its Oracle job.
-	$(MAKE) benchmark-oracle DATASET=performance-v1
+	$(MAKE) harbor-oracle DATASET=performance-v1
 
 provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gudhi|lean-repl|nauty|regina).
 	@test -n "$(PROVIDER)" || { echo "PROVIDER is required" >&2; exit 2; }
 	@case "$(PROVIDER)" in cddlib|cgal|gudhi|lean-repl|nauty|regina) ;; *) echo "unknown provider: $(PROVIDER)" >&2; exit 2;; esac
-	@$(MAKE) benchmark-check && \
+	@$(MAKE) harbor-check && \
 	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-provider-eval.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
 	$(UV_RUN) python tools/render_harbor_job.py \

@@ -49,6 +49,7 @@ How-to guides assume you already understand Jacobian's basic model and need to
 complete a specific task.
 
 - [Discover, invoke, and verify domain capabilities](how-to/invoke-domain-capabilities.md)
+- [Configure an agent from a source checkout](how-to/setup-agent-from-source.md)
 - [Deploy the remote MCP server](how-to/deploy-remote-mcp.md)
 - [Author a Harbor benchmark task](how-to/author-harbor-benchmark-task.md)
 

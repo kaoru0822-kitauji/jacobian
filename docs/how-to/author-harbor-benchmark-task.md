@@ -15,10 +15,10 @@ and the clean-room verifier plus fixtures under `tests/`. The member fragment
 declares only the canonical task ID, assurance ceiling, and provider
 requirement; `dataset.toml` is generated.
 
-Run `make benchmark-plan BASE=origin/main`, then `make benchmark-sync`, inspect
+Run `make harbor-plan BASE=origin/main`, then `make harbor-sync`, inspect
 the generated `dataset.toml` and rendered job paths, and run
-`make benchmark-check` followed by
-`make benchmark-oracle DATASET=<dataset-id> TASKS="<task-id>"`.
+`make harbor-check` followed by
+`make harbor-oracle DATASET=<dataset-id> TASKS="<task-id>"`.
 
 Do not add task symlinks, aliases, or a second fixture home. The task
 README is maintainer context and is not injected into a trial. Instructions

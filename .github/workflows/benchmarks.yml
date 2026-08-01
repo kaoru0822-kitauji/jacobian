@@ -101,7 +101,7 @@ jobs:
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-      - run: make benchmark-check
+      - run: make harbor-check
 
   oracle:
     name: Benchmark Oracle (${{ matrix.dataset }}/${{ matrix.task }})
@@ -126,7 +126,7 @@ jobs:
         env:
           DATASET: ${{ matrix.dataset }}
           TASKS: ${{ matrix.task }}
-        run: make benchmark-oracle-run DATASET="$DATASET" TASKS="$TASKS"
+        run: make harbor-oracle-run DATASET="$DATASET" TASKS="$TASKS"
       - name: Upload Oracle evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

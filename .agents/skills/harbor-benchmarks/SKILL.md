@@ -68,10 +68,10 @@ Use the pinned Harbor runner from the repository:
 
 ```sh
 uvx --from harbor==0.20.0 harbor --version
-make benchmark-plan BASE=origin/main
-make benchmark-sync
-make benchmark-check
-make benchmark-oracle DATASET=agent-workflow-v1 TASKS="task-id"
+make harbor-plan BASE=origin/main
+make harbor-sync
+make harbor-check
+make harbor-oracle DATASET=agent-workflow-v1 TASKS="task-id"
 ```
 
 After any input, instruction, metadata, verifier, dependency, image, or task
@@ -91,7 +91,7 @@ contract change:
 
 Do not treat `harbor sync` as a local digest calculator when the task is not
 published. The committed dataset manifest and canonical task content must
-agree. `benchmark-check` is outside the product `tests/` topology; keep Harbor
+agree. `harbor-check` is outside the product `tests/` topology; keep Harbor
 validation from entering product Python coverage.
 
 The independent benchmark planner emits `run-benchmark-check`,

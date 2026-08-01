@@ -94,8 +94,8 @@ def test_oracle_workers_do_not_repeat_benchmark_contract_suite() -> None:
     oracle = workflow.split("  oracle:", 1)[1].split("  validation:", 1)[0]
 
     assert "needs: [plan, contract]" in oracle
-    assert "make benchmark-oracle-run" in oracle
-    assert "make benchmark-oracle DATASET" not in oracle
+    assert "make harbor-oracle-run" in oracle
+    assert "make harbor-oracle DATASET" not in oracle
 
 
 def test_composition_lane_uses_timing_shards() -> None:

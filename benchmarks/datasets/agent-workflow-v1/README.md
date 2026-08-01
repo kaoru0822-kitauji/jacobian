@@ -9,7 +9,7 @@ Oracle, and verifier containers.
 from Harbor-computed task digests. The Oracle contract gate is:
 
 ```sh
-make benchmark-oracle DATASET=agent-workflow-v1
+make harbor-oracle DATASET=agent-workflow-v1
 ```
 
 The observation job uses the Jacobian MCP sidecar and is selected with:

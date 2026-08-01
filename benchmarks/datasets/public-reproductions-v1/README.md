@@ -10,7 +10,7 @@ make Oracle solutions or verifier code agent-visible.
 hand. The Oracle job runs every migrated case:
 
 ```sh
-make benchmark-oracle DATASET=public-reproductions-v1
+make harbor-oracle DATASET=public-reproductions-v1
 ```
 
 These tasks establish deterministic public-case correctness. They are not a

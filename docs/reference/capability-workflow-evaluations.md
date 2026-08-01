@@ -27,8 +27,8 @@ canonical task IDs, computes Harbor-native digests, checks visibility, and
 renders explicit task paths:
 
 ```sh
-make benchmark-check
-make benchmark-oracle DATASET=agent-workflow-v1
+make harbor-check
+make harbor-oracle DATASET=agent-workflow-v1
 ```
 
 The verifier scores only evidence its contract authorizes. Timeout,

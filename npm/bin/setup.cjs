@@ -1,14 +1,19 @@
 "use strict";
 
 const {
+  chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
   rmSync,
+  statSync,
 } = require("node:fs");
+const { randomUUID } = require("node:crypto");
 const { homedir } = require("node:os");
-const { dirname, join } = require("node:path");
+const { basename, dirname, join, resolve } = require("node:path");
 const readline = require("node:readline/promises");
 const { stdin, stdout, stderr } = require("node:process");
 
@@ -24,6 +29,7 @@ const { stdin, stdout, stderr } = require("node:process");
  */
 
 const SERVER_NAME = "jacobian";
+const TOML_SERVER_ENTRY = /^jacobian\s*=/;
 
 /**
  * @typedef {"claude" | "cursor" | "opencode" | "codex" | "gemini"} ClientId
@@ -146,6 +152,100 @@ function buildLauncher() {
 }
 
 /**
+ * Build a launcher bound to one source checkout and state directory.
+ *
+ * The configured client never syncs dependencies on startup.  The source
+ * bootstrap owns the locked sync, while every agent launch reuses that exact
+ * checkout and environment.
+ *
+ * @param {string} source
+ * @param {string} stateDir
+ * @param {string} [uvBin]
+ * @param {string} [profile]
+ * @param {string} [providerPath]
+ * @param {string} [projectEnvironment]
+ * @param {string} [elanHome]
+ * @param {string} [leanRuntime]
+ * @returns {{ command: string, args: string[], version: string, package: null, source: string, stateDir: string, profile: string, env: object }}
+ */
+function buildSourceLauncher(
+  source,
+  stateDir,
+  uvBin = "uv",
+  profile = "core",
+  providerPath = process.env.PATH || "",
+  projectEnvironment = process.env.UV_PROJECT_ENVIRONMENT || "",
+  elanHome = process.env.ELAN_HOME || "",
+  leanRuntime = process.env.JACOBIAN_LEAN_RUNTIME || "",
+) {
+  const profiles = new Set(["core", "full-python", "lean", "external-proof"]);
+  if (!profiles.has(profile)) {
+    throw new Error(`Unknown Jacobian source profile: ${profile}.`);
+  }
+  const sourcePath = resolve(source);
+  const statePath = resolve(stateDir);
+  const pyprojectPath = join(sourcePath, "pyproject.toml");
+  const projectLines = existsSync(pyprojectPath)
+    ? readFileSync(pyprojectPath, "utf8").split(/\r?\n/)
+    : [];
+  let inProjectSection = false;
+  let hasJacobianName = false;
+  for (const line of projectLines) {
+    const trimmed = line.trim();
+    if (trimmed === "[project]") {
+      inProjectSection = true;
+      continue;
+    }
+    if (inProjectSection && trimmed.startsWith("[")) break;
+    if (
+      inProjectSection &&
+      /^name\s*=\s*["']jacobian["']\s*(?:#.*)?$/.test(trimmed)
+    ) {
+      hasJacobianName = true;
+      break;
+    }
+  }
+  if (
+    !hasJacobianName ||
+    !existsSync(join(sourcePath, "uv.lock")) ||
+    !existsSync(join(sourcePath, "src", "jacobian", "__init__.py"))
+  ) {
+    throw new Error(
+      `${sourcePath} is not a Jacobian source checkout: project.name must be ` +
+        "jacobian and src/jacobian/__init__.py plus uv.lock are required.",
+    );
+  }
+  const environment = {};
+  if (providerPath) environment.PATH = providerPath;
+  if (projectEnvironment) {
+    environment.UV_PROJECT_ENVIRONMENT = projectEnvironment;
+  }
+  if (elanHome) environment.ELAN_HOME = elanHome;
+  if (leanRuntime) {
+    environment.JACOBIAN_LEAN_RUNTIME = leanRuntime;
+  }
+  return {
+    command: uvBin,
+    args: [
+      "run",
+      "--project",
+      sourcePath,
+      "--locked",
+      "--no-sync",
+      "jacobian-mcp",
+      "--state-dir",
+      statePath,
+    ],
+    version: "source",
+    package: null,
+    source: sourcePath,
+    stateDir: statePath,
+    profile,
+    env: environment,
+  };
+}
+
+/**
  * Build the MCP server entry value for a JSON config.
  *
  * @param {ClientDef} def
@@ -159,11 +259,15 @@ function jsonEntry(def, launcher) {
       command: [launcher.command, ...launcher.args].join(" "),
       cwd: ".",
       enabled: true,
+      ...(Object.keys(launcher.env || {}).length > 0
+        ? { environment: launcher.env }
+        : {}),
     };
   }
   return {
     command: launcher.command,
     args: launcher.args,
+    ...(Object.keys(launcher.env || {}).length > 0 ? { env: launcher.env } : {}),
   };
 }
 
@@ -182,17 +286,52 @@ function readOptional(path) {
   }
 }
 
+/** Refuse to replace a symlink instead of the config file it names. */
+function rejectSymlink(path) {
+  try {
+    if (lstatSync(path).isSymbolicLink()) {
+      throw new Error(
+        `${path} is a symbolic link. Jacobian will not replace linked client ` +
+          "configs; update the link target directly or use a regular config file",
+      );
+    }
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+}
+
 /**
  * Write a file only if its content would change.
  *
  * @param {string} path
  * @param {string} content
+ * @returns {boolean} Whether the target was replaced.
  */
 function writeIfChanged(path, content) {
   const existing = readOptional(path);
-  if (existing === content) return;
+  if (existing === content) return false;
+  rejectSymlink(path);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content, { encoding: "utf8" });
+  const mode = existsSync(path) ? statSync(path).mode & 0o777 : 0o600;
+  const temporary = join(
+    dirname(path),
+    `.${basename(path)}.jacobian-${randomUUID()}.tmp`,
+  );
+  try {
+    writeFileSync(temporary, content, {
+      encoding: "utf8",
+      flag: "wx",
+      mode,
+    });
+    chmodSync(temporary, mode);
+    renameSync(temporary, path);
+    return true;
+  } finally {
+    if (existsSync(temporary)) {
+      rmSync(temporary, { force: true });
+    }
+  }
 }
 
 /**
@@ -298,7 +437,7 @@ function resolveTomlEdit(operation, def, launcher) {
     const after = lines.slice(sectionEnd);
 
     const filtered = sectionLines.filter(
-      (line) => !line.trim().startsWith("jacobian"),
+      (line) => !TOML_SERVER_ENTRY.test(line.trim()),
     );
     // If only the header remains, remove the section entirely.
     const nonHeader = filtered.filter(
@@ -314,10 +453,13 @@ function resolveTomlEdit(operation, def, launcher) {
   }
 
   // Setup: build the entry.
-  const entryLines = [
-    `[mcp_servers]`,
-    `jacobian = { command = "${launcher.command}", args = [${launcher.args.map((a) => `"${a}"`).join(", ")}], startup_timeout_sec = 30 }`,
-  ];
+  const environment = Object.entries(launcher.env || {});
+  const environmentEntry =
+    environment.length > 0
+      ? `, env = { ${environment.map(([key, value]) => `${key} = ${JSON.stringify(value)}`).join(", ")} }`
+      : "";
+  const expectedEntry = `jacobian = { command = ${JSON.stringify(launcher.command)}, args = [${launcher.args.map((argument) => JSON.stringify(argument)).join(", ")}], startup_timeout_sec = 30${environmentEntry} }`;
+  const entryLines = [`[mcp_servers]`, expectedEntry];
 
   if (sectionStart === -1) {
     // No existing section: append.
@@ -330,7 +472,6 @@ function resolveTomlEdit(operation, def, launcher) {
 
   // Check if jacobian is already there with the right config.
   const sectionLines = lines.slice(sectionStart, sectionEnd);
-  const expectedEntry = `jacobian = { command = "${launcher.command}", args = [${launcher.args.map((a) => `"${a}"`).join(", ")}], startup_timeout_sec = 30 }`;
   for (const line of sectionLines) {
     if (line.trim() === expectedEntry) {
       return { action: "already_current", original, updated: null };
@@ -343,7 +484,9 @@ function resolveTomlEdit(operation, def, launcher) {
   const rest = lines.slice(sectionEnd);
 
   // Remove any existing jacobian entry in the section.
-  const cleanedAfter = after.filter((line) => !line.trim().startsWith("jacobian"));
+  const cleanedAfter = after.filter(
+    (line) => !TOML_SERVER_ENTRY.test(line.trim()),
+  );
   const updated = [...before, expectedEntry, ...cleanedAfter, ...rest].join("\n");
   return { action: "update", original, updated };
 }
@@ -375,16 +518,55 @@ function resolveClientEdit(operation, def, launcher) {
  * Apply one client edit to disk.
  *
  * @param {{ path: string, original: string | null, updated: string | null, action: string }} edit
+ * @returns {boolean} Whether this edit changed disk.
  */
 function applyEdit(edit) {
-  if (edit.action === "remove") {
-    if (existsSync(edit.path)) {
-      rmSync(edit.path, { force: true });
-    }
+  if (edit.updated === null) return false;
+  if (readOptional(edit.path) !== edit.original) {
+    throw new Error(`${edit.path} changed after setup preflight; no write was made`);
+  }
+  return writeIfChanged(edit.path, edit.updated);
+}
+
+/** Restore a config file to the content observed during preflight. */
+function restoreEdit(edit) {
+  if (readOptional(edit.path) !== edit.updated) {
+    throw new Error(
+      "the config changed after Jacobian wrote it; the concurrent value was left untouched",
+    );
+  }
+  if (edit.original === null) {
+    rmSync(edit.path, { force: true });
     return;
   }
-  if (edit.updated !== null) {
-    writeIfChanged(edit.path, edit.updated);
+  writeIfChanged(edit.path, edit.original);
+}
+
+/**
+ * Apply a setup plan transactionally.  If any client write fails, every
+ * earlier write in the plan is restored before the error reaches the caller.
+ *
+ * @param {object[]} edits
+ */
+function applyEdits(edits) {
+  const applied = [];
+  try {
+    for (const edit of edits) {
+      if (applyEdit(edit)) applied.push(edit);
+    }
+  } catch (error) {
+    const rollbackErrors = [];
+    for (const edit of applied.reverse()) {
+      try {
+        restoreEdit(edit);
+      } catch (rollbackError) {
+        rollbackErrors.push(`${edit.path}: ${rollbackError.message}`);
+      }
+    }
+    const suffix = rollbackErrors.length
+      ? ` Rollback also failed for ${rollbackErrors.join("; ")}.`
+      : " Earlier config writes were rolled back.";
+    throw new Error(`${error.message}.${suffix}`);
   }
 }
 
@@ -467,13 +649,39 @@ async function interactiveConfirm() {
  * @param {boolean} [options.yes] Skip confirmation.
  * @param {boolean} [options.dryRun] Print plan without writing.
  * @param {boolean} [options.json] Output as JSON.
+ * @param {string} [options.source] Absolute or relative source checkout.
+ * @param {string} [options.stateDir] Fixed state directory for source launches.
+ * @param {string} [options.uvBin] uv executable used by source launches.
+ * @param {string} [options.profile] Source dependency profile metadata.
+ * @param {string} [options.providerPath] PATH audited by the source doctor.
+ * @param {string} [options.projectEnvironment] uv environment used for sync and launch.
+ * @param {string} [options.elanHome] ELAN_HOME audited by the Lean source profile.
+ * @param {string} [options.leanRuntime] Mathlib runtime audited by the Lean source profile.
  * @returns {Promise<object>} Setup report.
  */
 async function run(options) {
   const operation = options.operation;
   const home = homedir();
   const defs = clientDefinitions(home);
-  const launcher = buildLauncher();
+  const supportedIds = new Set(defs.map((definition) => definition.id));
+  const invalidClients = (options.clients || []).filter(
+    (client) => !supportedIds.has(client),
+  );
+  if (invalidClients.length > 0) {
+    throw new Error(`Unknown MCP client: ${invalidClients.join(", ")}.`);
+  }
+  const launcher = options.source
+    ? buildSourceLauncher(
+        options.source,
+        options.stateDir || join(resolve(options.source), ".jacobian"),
+        options.uvBin || "uv",
+        options.profile || "core",
+        options.providerPath || process.env.PATH || "",
+        options.projectEnvironment || process.env.UV_PROJECT_ENVIRONMENT || "",
+        options.elanHome || process.env.ELAN_HOME || "",
+        options.leanRuntime || process.env.JACOBIAN_LEAN_RUNTIME || "",
+      )
+    : buildLauncher();
   const detectedIds = defs.filter((d) => isClientDetected(home, d.id)).map((d) => d.id);
 
   let selected;
@@ -517,26 +725,14 @@ async function run(options) {
     printPlan(plan);
   }
 
-  // Apply edits.
-  const results = [];
-  for (const edit of edits) {
-    try {
-      applyEdit(edit);
-      results.push({
-        client: edit.client.id,
-        path: edit.path,
-        status: edit.action,
-        error: null,
-      });
-    } catch (error) {
-      results.push({
-        client: edit.client.id,
-        path: edit.path,
-        status: "failed",
-        error: error.message,
-      });
-    }
-  }
+  // Apply all client edits as one transaction.
+  applyEdits(edits);
+  const results = edits.map((edit) => ({
+    client: edit.client.id,
+    path: edit.path,
+    status: edit.action,
+    error: null,
+  }));
 
   if (options.json) {
     stdout.write(JSON.stringify({ operation, cancelled: false, dryRun: false, results }, null, 2) + "\n");
@@ -546,7 +742,16 @@ async function run(options) {
       const status = result.error ? `FAILED: ${result.error}` : result.status;
       stderr.write(`    ${result.client}: ${status}\n`);
     }
-    stderr.write("\n  Restart or reload configured clients, then run `npx jacobian doctor` to verify.\n\n");
+    if (launcher.source) {
+      stderr.write(
+        "\n  Restart or reload configured clients. Re-run the checkout's " +
+          "`scripts/setup-agent` command after source updates.\n\n",
+      );
+    } else {
+      stderr.write(
+        "\n  Restart or reload configured clients, then run `npx jacobian doctor` to verify.\n\n",
+      );
+    }
   }
 
   return { operation, cancelled: false, dryRun: false, results };
@@ -557,6 +762,8 @@ module.exports = {
   clientDefinitions,
   isClientDetected,
   buildLauncher,
+  buildSourceLauncher,
+  applyEdits,
   resolveClientEdit,
   run,
 };

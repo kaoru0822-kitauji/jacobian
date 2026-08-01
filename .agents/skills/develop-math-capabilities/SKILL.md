@@ -72,7 +72,7 @@ reports. Keep `scored=false` when the answer is public.
 Plan a no-retrieval public run before spending model budget:
 
 ```console
-make benchmark-oracle DATASET=research-diagnostics-v1
+make harbor-oracle DATASET=research-diagnostics-v1
 ```
 
 Execute only with explicit model-work authorization and a hard process budget:
