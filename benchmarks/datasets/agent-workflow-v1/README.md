@@ -1,6 +1,6 @@
 # Jacobian agent-workflow-v1
 
-This Harbor dataset contains 35 fixed Jacobian-enabled mathematical workflows
+This Harbor dataset contains 36 fixed Jacobian-enabled mathematical workflows
 for Oracle validation and agent observation. Tasks are organized as
 `tasks/mathematical-sciences/<field>/<task-name>/` and retain separate agent,
 Oracle, and verifier containers.

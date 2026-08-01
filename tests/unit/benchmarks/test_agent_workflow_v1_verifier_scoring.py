@@ -30,6 +30,7 @@ RESOURCE_DERIVED_TASKS = (
     "generated-lemma-vacuity-audit",
     "inverse-distance-remainder-audit",
     "lcm-highly-abundant-scope-audit",
+    "lean-transitive-axiom-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",

@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 35,
-    "manifest_sha256": "sha256:29e82bad3dd66a06851daf82a524bcee06a8bb0aa9438bfdd09507a1d42b14ca",
+    "task_count": 36,
+    "manifest_sha256": "sha256:6e78181d843b2601923608550762cc1fe274f39bcfe1c4186c9e865ff39d2051",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -424,6 +424,19 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep counterexample construction and minimality-scope auditing as agent-owned composition; do not add a problem-specific highly-abundant solver."
+    },
+    {
+      "task_id": "lean-transitive-axiom-audit",
+      "mathematical_moves": [
+        "Compute transitive declaration dependencies from frozen roots.",
+        "Separate shallow axiom reports from complete trust closure."
+      ],
+      "current_capabilities": [{"capability_id":"lean.trust.inspect","availability":"AVAILABLE","boundary":"Current inspection contracts do not replay this historical collector defect."}],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep historical trust-report comparison as an agent-owned audit."
     },
     {
       "task_id": "log-exponent-recovery",
