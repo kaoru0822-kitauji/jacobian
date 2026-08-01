@@ -67,12 +67,16 @@ directly.
 ```sh
 git clone https://github.com/morluto/jacobian.git
 cd jacobian
-uv sync --dev
-uv run jacobian --state-dir .jacobian init
+./scripts/setup-agent --client codex --profile full-python --yes
 ```
 
-The default `init` output is a short onboarding summary. Add `init --json`
-when a script needs the complete reference catalog.
+This performs a locked full-Python sync and configures the selected agent to
+start MCP from the absolute source and state paths with `--no-sync`. It also
+records a doctor report containing the Git revision, package version, catalog
+digest, and provider availability. See
+[Configure an agent from a source checkout](docs/how-to/setup-agent-from-source.md)
+for the `core`, `full-python`, `lean`, and `external-proof` profiles, dry-run,
+repeatability, and rollback behavior.
 
 Use `uv run jacobian --help` to inspect the CLI or `uv run jacobian-mcp` to
 start the MCP adapter.
@@ -190,6 +194,10 @@ Architecture decisions are recorded in the
 `jacobian upgrade` refreshes the pinned Python kernel in the launcher's managed
 environment; use `npm install -g jacobian@latest` to upgrade the npm launcher
 itself.
+For a clone, `jacobian setup --source <checkout> --state-dir <path> --profile
+full-python` explicitly binds the client to that source environment;
+the maintained `scripts/setup-agent` wrapper performs the required locked sync
+and doctor checks first.
 The server advertises the capability entry points and direct workspace tools;
 `capability.describe(query=...)` searches compact installed outcomes before an
 agent inspects an exact contract and invokes it. This is a toolbox interface:

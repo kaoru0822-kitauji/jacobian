@@ -1,4 +1,9 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:0.11.28-python3.12-bookworm-slim
+
+ARG JACOBIAN_REVISION=unknown
+ARG JACOBIAN_VERSION=0+unknown
+LABEL org.opencontainers.image.revision=$JACOBIAN_REVISION
+LABEL org.opencontainers.image.version=$JACOBIAN_VERSION
 
 WORKDIR /app
 
@@ -13,6 +18,7 @@ VOLUME ["/var/lib/jacobian"]
 
 # Keep the default state root on the declared persistent volume.
 ENV JACOBIAN_STATE_DIR=/var/lib/jacobian
+ENV JACOBIAN_BUILD_REVISION=$JACOBIAN_REVISION
 
 ENTRYPOINT ["uv", "run", "--no-sync", "jacobian-mcp"]
 CMD ["--help"]
