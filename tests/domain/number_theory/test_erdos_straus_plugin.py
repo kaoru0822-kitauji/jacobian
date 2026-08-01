@@ -7,8 +7,6 @@ import pytest
 from jacobian.plugins.erdos_straus import (
     evaluate_capability,
     find_witness_capability,
-    validate_candidate,
-    validate_claim,
 )
 
 
@@ -24,12 +22,19 @@ def _candidate(lower: int = 2, upper: int = 100) -> dict[str, int]:
     return {"lower_bound": lower, "upper_bound": upper}
 
 
-def test_validate_bounded_range() -> None:
-    assert validate_claim(_claim()) == []
-    assert validate_candidate(_candidate()) == []
-    assert validate_claim(_claim(1, 100))
-    assert validate_candidate(_candidate(10, 9))
-    assert validate_candidate(_candidate(2, 10_001))
+@pytest.mark.parametrize(
+    ("claim", "candidate"),
+    (
+        (_claim(1, 100), _candidate()),
+        (_claim(), _candidate(10, 9)),
+        (_claim(), _candidate(2, 10_001)),
+    ),
+)
+def test_capability_rejects_invalid_ranges(
+    claim: dict[str, object], candidate: dict[str, int]
+) -> None:
+    with pytest.raises(ValueError):
+        evaluate_capability({"claim": claim, "candidate": candidate})
 
 
 def test_evaluate_finds_every_decomposition_through_1000() -> None:
@@ -85,7 +90,7 @@ def test_find_witness_returns_complete_exact_table() -> None:
                 "candidate": _candidate(2, 99),
                 "witness_role": "SUPPORTS_CLAIM",
             },
-            "candidate range must exactly match the claim range",
+            "Erdős-Straus request does not match its contract",
         ),
     ),
 )

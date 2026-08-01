@@ -46,6 +46,7 @@ The npm launcher installs Jacobian and configures supported MCP clients:
 ```sh
 npm install -g jacobian
 jacobian setup
+jacobian upgrade
 jacobian doctor
 ```
 
@@ -186,6 +187,9 @@ Architecture decisions are recorded in the
 ## MCP clients and deployment
 
 `jacobian setup` registers the local server with one or more supported clients.
+`jacobian upgrade` refreshes the pinned Python kernel in the launcher's managed
+environment; use `npm install -g jacobian@latest` to upgrade the npm launcher
+itself.
 The server advertises the capability entry points and direct workspace tools;
 `capability.describe(query=...)` searches compact installed outcomes before an
 agent inspects an exact contract and invokes it. This is a toolbox interface:
