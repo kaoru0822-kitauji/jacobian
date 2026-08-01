@@ -115,6 +115,10 @@ name = "jacobian/agent-workflow-v1-polynomial-tail-counterexample"
 digest = "sha256:35267a292d95eedbacd71faacafb052db248fb9b89710bdd4d809d616a3d53f4"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-putnam-2adic-induction-audit"
+digest = "sha256:81f451240952e86206a0eb57c78b27d1c3c168f2eb6fcb334223a3c66c7136e9"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-random-function-expectation-audit"
 digest = "sha256:d0b51ae1e25e1a0b8f99cbc9e1eac73c5b4867fadbf9f285c46e70fb454b1c72"
 

@@ -35,6 +35,7 @@ RESOURCE_DERIVED_TASKS = (
     "noncompact-lefschetz-proof-audit",
     "parameterized-sharp-bound-audit",
     "polynomial-tail-counterexample",
+    "putnam-2adic-induction-audit",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
     "well-total-domination-counterexample",
@@ -913,6 +914,35 @@ def test_inverse_distance_audit_rejects_corrupted_certificates(
         target = target[key]
     target[path[-1]] = replacement
     _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        (("valuation_induction", "sub_one_terms", 1), [1, 2]),
+        (("target_transfer", "b_difference"), [2, 3]),
+        (("finite_testing_role",), "FINITE_CASES_PROVE_ALL_K"),
+    ],
+)
+def test_putnam_2adic_audit_rejects_corrupted_induction_certificates(
+    tmp_path: Path,
+    path: tuple[object, ...],
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "putnam-2adic-induction-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    target = submission["result"]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = replacement
     _write_json(submission_path, submission)
 
     rejected = _run_verifier(task, app, logs)
