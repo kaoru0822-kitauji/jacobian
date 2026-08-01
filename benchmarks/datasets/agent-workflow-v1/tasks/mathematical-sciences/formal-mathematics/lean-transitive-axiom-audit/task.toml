@@ -19,7 +19,7 @@ category = "mathematics"
 tags = ["lean-audit", "transitive-dependencies", "trust-boundary", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "public-defect-derived"
-fixture_digest = "sha256:be1c100df0aaeaf400c287b51c49ecb345ed59511b0992a3b61e6add300de7e6"
+fixture_digest = "sha256:8fcd92345ab364311a85ceeef22277c81d8c972ebd9bd6492c29279ba57b4c46"
 derivation = "Derived from leanprover/lean4 issue 8840, captured 2026-07-31."
 [agent]
 timeout_sec = 600.0

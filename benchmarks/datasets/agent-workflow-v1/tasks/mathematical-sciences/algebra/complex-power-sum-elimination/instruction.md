@@ -1,14 +1,16 @@
 # Eliminate a complex power-sum system
 
-Solve the frozen complex-number problem completely. Introduce symmetric
-variables and a power-sum recurrence, then provide an exact certificate that:
+Solve the frozen complex-number problem completely and provide an exact
+certificate that:
 
-1. derives the polynomial relation for the two possible values of `s=x+y`;
-2. records the exact power-sum polynomials through `A_6`;
-3. proves every denominator used in the two hypotheses and target is nonzero;
-4. returns both and only the possible target values as quadratic surds; and
-5. certifies achievability by reconstructing `x,y` as the two complex roots
-   of a quadratic with the submitted sum and product.
+1. establishes that the submitted branches are exhaustive;
+2. proves every denominator used in the two hypotheses and target is nonzero;
+3. returns both and only the possible target values as quadratic surds; and
+4. certifies that each submitted branch is achievable.
+
+The optional `recurrence` and `hypothesis_factorization` fields describe one
+accepted exact certificate format; they are not required, and any derivation
+strategy may be used.
 
 The two algebraic branches may appear in either order. Rational numbers must be
 reduced with positive denominators. Write the result to

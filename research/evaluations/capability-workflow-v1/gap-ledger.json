@@ -5,7 +5,7 @@
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
     "task_count": 37,
-    "manifest_sha256": "sha256:d1889061ec1c9c20bd7e5ad5789c9f97b6f27290a1a475559e61227a770f3530",
+    "manifest_sha256": "sha256:7148c0671821747822ab8745355ca9f94cc0b267d0ad22136a0aa858170205cb",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -441,7 +441,7 @@
         "Compute transitive declaration dependencies from frozen roots.",
         "Separate shallow axiom reports from complete trust closure."
       ],
-      "current_capabilities": [{"capability_id":"lean.trust.inspect","availability":"AVAILABLE","boundary":"Current inspection contracts do not replay this historical collector defect."}],
+      "current_capabilities": [{"capability_id":"lean.proof.axioms.inspect","availability":"UNAVAILABLE","boundary":"The capability is catalogued, but the frozen runtime snapshot does not have the pinned Lean provider installed; it also does not replay this historical collector defect."}],
       "gap_classes": ["MODEL_REASONING"],
       "contamination": "PUBLIC_ANSWER_VISIBLE",
       "candidate_ids": [],
