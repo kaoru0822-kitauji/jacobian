@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from benchmarks.tooling.harbor_suite import load_registry
+
 from jacobian.adapters.mcp.server import JacobianCoreExtension
 from jacobian.domains.builtins import BUILTIN_DOMAIN_BUNDLE_FACTORIES
 
@@ -58,7 +60,7 @@ def test_core_extension_exposes_exactly_the_stable_five_tools() -> None:
 def test_harbor_verifier_support_copies_are_identical() -> None:
     source = (ROOT / "benchmarks" / "tooling" / "verifier_support.py").read_bytes()
     targets = sorted(
-        (ROOT / "benchmarks" / "datasets").glob("*/tasks/**/tests/verifier_support.py")
+        (ROOT / "benchmarks" / "tasks").glob("*/tests/verifier_support.py")
     )
-    assert len(targets) == 89
+    assert len(targets) == sum(len(suite.tasks) for suite in load_registry())
     assert all(target.read_bytes() == source for target in targets)

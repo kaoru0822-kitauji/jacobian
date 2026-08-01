@@ -1,0 +1,3 @@
+task_id = "modular-cubic-obstruction"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

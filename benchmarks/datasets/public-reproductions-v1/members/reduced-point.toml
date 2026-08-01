@@ -1,0 +1,3 @@
+task_id = "reduced-point"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

@@ -1,0 +1,3 @@
+task_id = "smith-rank-deficient"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

@@ -11,17 +11,17 @@ authors = [
 ]
 
 [[tasks]]
-name = "jacobian/performance-v1-complete-runtime-startup"
-digest = "sha256:256a54519527ecf32ae9b3006804fc8cbdc6d1b105afe5d3e4549b25bc44b242"
+name = "jacobian/complete-runtime-startup"
+digest = "sha256:030966ee2d3c9002f11b83674b7c3afd696a45867a941a5e3fded6be0a4b2bc1"
 
 [[tasks]]
-name = "jacobian/performance-v1-core-operations"
-digest = "sha256:76677f7cac0925f82acc1f9c4fff6862f42790806887304f9efcb2cc9f394012"
+name = "jacobian/core-operations"
+digest = "sha256:0bab177ccba78a06bc937ffb8c0d57a079a8c0c5a4c481498c59914cbcda2b75"
 
 [[tasks]]
-name = "jacobian/performance-v1-startup-phases"
-digest = "sha256:8a095d80282f4800f1d9003a942050cb7ba353078411a057725780b29509e416"
+name = "jacobian/startup-phases"
+digest = "sha256:fcc1e8be6e9c8f0e5f23e08033dd14c24ca256aa61680a3d5e95f011e9f6f3f9"
 
 [[tasks]]
-name = "jacobian/performance-v1-v02-compatibility-surface"
-digest = "sha256:0a0862dada386aebe3cebc3f37036f508953448ed9298c0d8d5a17aa57f3e89b"
+name = "jacobian/v02-compatibility-surface"
+digest = "sha256:7abc713a8f5add830778653702a581453b9acc4febf5db66aa1b9d8475d09ef3"

@@ -316,7 +316,7 @@ conclusion `TRUE`. Rejection reports `UNKNOWN`; it does not establish SAT.
 ## Public reproductions
 
 The unscored manifest
-[`sat-small`](../../benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/logic/sat-small/)
+[`sat-small`](../../benchmarks/tasks/sat-small/)
 replays three public cases through the real installed backends:
 
 - the complete `BOOL-MUS-001` formula, without treating later shrinking as

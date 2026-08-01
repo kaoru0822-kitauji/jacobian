@@ -1,0 +1,1 @@
+{"task_id":"jacobian/symmetry-colored-reflection","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/symmetry-colored-reflection","complete finite input"],"expected_vertex_orbits":[["a","c"],["b"]],"expected_edge_orbits":[[["a","b"],["b","c"]]]}

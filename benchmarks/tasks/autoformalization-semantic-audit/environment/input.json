@@ -1,0 +1,12 @@
+{
+  "task_id":"jacobian/autoformalization-semantic-audit",
+  "source_id": "Rudin|exercise_1_18a",
+  "informal_statement": "If k >= 2 and x is in R^k, prove that there exists y in R^k such that y != 0 but x dot y = 0.",
+  "reference_formalization": "theorem exercise_1_18a (n : ℕ) (h : n > 1) (x : EuclideanSpace ℝ (Fin n)) : ∃ (y : EuclideanSpace ℝ (Fin n)), y ≠ 0 ∧ (inner x y) = (0 : ℝ) :=",
+  "proposed_formalization": "theorem dummy (k : ℕ) (x : Fin k → ℝ) : ∃ y : Fin k → ℝ, y ≠ 0 ∧ ∀ i, x i * y i = 0 := sorry",
+  "audit_scope": {
+    "semantic_faithfulness": true,
+    "lean_compilation": false,
+    "truth_of_reference_claim": "NOT_REQUIRED"
+  }
+}

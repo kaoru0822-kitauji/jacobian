@@ -23,7 +23,7 @@ production capabilities remain deferred.
 
 The version, source digest, license text, command profiles, and exact expected
 outputs are frozen in
-[`benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty/environment/nauty_provider_pin.json`](../../benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty/environment/nauty_provider_pin.json).
+[`benchmarks/tasks/nauty/environment/nauty_provider_pin.json`](../../benchmarks/tasks/nauty/environment/nauty_provider_pin.json).
 The source and command semantics were checked against the
 [official nauty/Traces page](https://users.cecs.anu.edu.au/~bdm/nauty/) and the
 [2.9.3 user's guide](https://users.cecs.anu.edu.au/~bdm/nauty/nug29.pdf).
@@ -36,7 +36,7 @@ The canonical repository entry point is
 Build the official source archive outside the repository, then run:
 
 ```sh
-uv run python benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty/environment/spike.py \
+uv run python benchmarks/tasks/nauty/environment/spike.py \
   --source-archive /path/to/nauty2_9_3.tar.gz \
   --geng /path/to/nauty2_9_3/geng \
   --labelg /path/to/nauty2_9_3/labelg \

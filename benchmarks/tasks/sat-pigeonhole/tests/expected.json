@@ -1,0 +1,1 @@
+{"task_id":"jacobian/sat-pigeonhole","conclusion":"UNSATISFIABLE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/sat-pigeonhole","complete finite input"],"expected_status":"UNSATISFIABLE"}

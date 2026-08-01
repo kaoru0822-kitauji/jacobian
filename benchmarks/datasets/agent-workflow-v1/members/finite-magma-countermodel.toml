@@ -1,0 +1,3 @@
+task_id = "finite-magma-countermodel"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

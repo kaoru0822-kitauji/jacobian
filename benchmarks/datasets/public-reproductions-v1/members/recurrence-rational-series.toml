@@ -1,0 +1,3 @@
+task_id = "recurrence-rational-series"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

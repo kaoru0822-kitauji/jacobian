@@ -1,7 +1,7 @@
 # Jacobian performance-v1
 
-This dataset records controlled operational measurements for four existing
-Jacobian benchmark entry points. Its Oracle jobs run the fixed drivers and
+This dataset records controlled operational measurements for existing Jacobian
+benchmark entry points. Its Oracle jobs run the fixed drivers and
 publish raw pyperf-compatible JSON plus environment metadata.
 
 Reward covers only task-contract validity, evidence integrity, and successful

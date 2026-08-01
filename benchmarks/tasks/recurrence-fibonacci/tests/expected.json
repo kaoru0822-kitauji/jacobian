@@ -1,0 +1,1 @@
+{"task_id":"jacobian/recurrence-fibonacci","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/recurrence-fibonacci","complete finite input"],"expected_first":"combinatorics.compute.fibonacci"}

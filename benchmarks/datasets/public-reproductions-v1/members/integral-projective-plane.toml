@@ -1,0 +1,3 @@
+task_id = "integral-projective-plane"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

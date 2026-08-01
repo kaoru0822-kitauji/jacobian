@@ -1,0 +1,1 @@
+{"task_id":"jacobian/recurrence-lucas","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/recurrence-lucas","complete finite input"],"expected_first":"combinatorics.compute.lucas"}

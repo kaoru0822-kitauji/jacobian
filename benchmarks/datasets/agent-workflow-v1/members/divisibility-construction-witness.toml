@@ -1,0 +1,3 @@
+task_id = "divisibility-construction-witness"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

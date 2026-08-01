@@ -1,0 +1,3 @@
+task_id = "symmetry-identity-subgroup"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

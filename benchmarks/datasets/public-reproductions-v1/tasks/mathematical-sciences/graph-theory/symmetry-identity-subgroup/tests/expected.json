@@ -1,1 +1,0 @@
-{"task_id":"jacobian/public-reproductions-v1-symmetry-identity-subgroup","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/public-reproductions-v1-symmetry-identity-subgroup","complete finite input"],"expected_vertex_orbits":[["a"],["b"],["c"]],"expected_edge_orbits":[[["a","b"]],[["b","c"]]]}

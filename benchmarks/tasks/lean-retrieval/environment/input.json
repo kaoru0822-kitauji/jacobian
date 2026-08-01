@@ -1,0 +1,1 @@
+{"environment":"MATHLIB","statement":"(n : Nat) \u2192 Nat.gcd n 0 = n","proof_prefix":["intro n"],"limit":5,"task_id":"jacobian/lean-retrieval"}

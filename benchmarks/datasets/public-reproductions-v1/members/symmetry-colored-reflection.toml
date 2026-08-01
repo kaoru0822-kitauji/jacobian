@@ -1,0 +1,3 @@
+task_id = "symmetry-colored-reflection"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

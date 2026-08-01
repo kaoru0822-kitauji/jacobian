@@ -19,16 +19,16 @@
   ],
   "tasks": [
     {
-      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/complete-runtime-startup"
+      "path": "benchmarks/tasks/complete-runtime-startup"
     },
     {
-      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/core-operations"
+      "path": "benchmarks/tasks/core-operations"
     },
     {
-      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/startup-phases"
+      "path": "benchmarks/tasks/startup-phases"
     },
     {
-      "path": "benchmarks/datasets/performance-v1/tasks/software-systems/runtime-performance/v02-compatibility-surface"
+      "path": "benchmarks/tasks/v02-compatibility-surface"
     }
   ]
 }

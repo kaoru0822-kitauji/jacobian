@@ -1,1 +1,0 @@
-{"variables":["x","y","z"],"clauses":[[1],[-1],[2,3]],"literal_encoding":"positive means true; negative means false","task_id":"jacobian/public-reproductions-v1-sat-bool-mus"}

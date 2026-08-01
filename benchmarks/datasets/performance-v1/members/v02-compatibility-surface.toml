@@ -1,0 +1,3 @@
+task_id = "v02-compatibility-surface"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

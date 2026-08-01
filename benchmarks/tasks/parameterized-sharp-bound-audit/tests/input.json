@@ -1,0 +1,33 @@
+{
+  "task_id": "jacobian/parameterized-sharp-bound-audit",
+  "source": {
+    "dataset": "AI4Math/IneqMath",
+    "repository": "https://huggingface.co/datasets/AI4Math/IneqMath",
+    "revision": "3c7c32c786eb77117f3476d7f6d9af8419fa6ecc",
+    "split": "train",
+    "row_index": 53,
+    "data_id": "53",
+    "file": "json/train.json",
+    "file_sha256": "sha256:3531264d1e988bfbacf4070fd4a635b84d6ca705e3baa5a6dbf91c8a966bfcd5",
+    "row_sha256": "sha256:811d71c04f1be8345f05f1b0076af9189e8851eb2d98d5b4f557492eca0699fb",
+    "license": "CC BY-SA 4.0; upstream problem content retains its original authorship and test-use conditions"
+  },
+  "problem": {
+    "domain": "a,b,c,d are positive real numbers",
+    "constraint": "a+b+c=1",
+    "expression": "a^3+b^3+c^3+abc*d",
+    "frozen_answer": "min(1/4, 1/9+d/27)"
+  },
+  "frozen_explanation_defects": [
+    "It says equality at a=b=c=1/3 for arbitrary d even when that value is not the sharp branch.",
+    "It describes a boundary configuration with c tending to zero as a minimum although strict positivity makes it only an infimum.",
+    "It does not state the transition d=15/4 or separate the threshold case from d>15/4."
+  ],
+  "certificate_scope": {
+    "exact_rational_coefficients": true,
+    "polynomial_identity_replay": true,
+    "strict_positivity_attainment_audit": true,
+    "general_inequality_prover": false,
+    "truth_outside_frozen_family": "NOT_ASSESSED"
+  }
+}

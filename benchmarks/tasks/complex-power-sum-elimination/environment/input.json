@@ -1,0 +1,30 @@
+{
+  "task_id": "jacobian/complex-power-sum-elimination",
+  "source": {
+    "dataset": "ConstructiveBench",
+    "repository": "https://github.com/JackSun200312/ECP",
+    "revision": "ac6b9ff5614ce8454c03d8c03bff571b91f6d31a",
+    "path": "data/dataset/constructivebench.json",
+    "row": 1672,
+    "name": "omnimath1603",
+    "source_collection": "HMMT_2",
+    "row_sha256": "sha256:3c90414d1940aeff2f696b02fa5757ecd506180128e5ffd0b2db681e4c8d3f51",
+    "file_sha256": "sha256:dd00af369c5559f3e8825fd51bba1edfc7002245b4372be5c4a84379604f1a6c",
+    "license": "MIT"
+  },
+  "problem": {
+    "domain": "complex numbers",
+    "hypotheses": [
+      "(x^2+y^2)/(x+y)=4",
+      "(x^4+y^4)/(x^3+y^3)=2"
+    ],
+    "target": "all possible values of (x^6+y^6)/(x^5+y^5)"
+  },
+  "certificate_contract": {
+    "symmetric_variables": ["s=x+y", "p=xy"],
+    "power_sums": "A_n=x^n+y^n",
+    "recurrence": "A_n=s*A_(n-1)-p*A_(n-2)",
+    "required_denominators": ["A_1", "A_3", "A_5"],
+    "answer_assurance": "COMPUTED"
+  }
+}

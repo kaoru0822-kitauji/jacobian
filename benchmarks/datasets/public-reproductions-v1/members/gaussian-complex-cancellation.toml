@@ -1,0 +1,3 @@
+task_id = "gaussian-complex-cancellation"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

@@ -1,0 +1,1 @@
+{"task_id":"jacobian/symmetry-identity-subgroup","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/symmetry-identity-subgroup","complete finite input"],"expected_vertex_orbits":[["a"],["b"],["c"]],"expected_edge_orbits":[[["a","b"]],[["b","c"]]]}

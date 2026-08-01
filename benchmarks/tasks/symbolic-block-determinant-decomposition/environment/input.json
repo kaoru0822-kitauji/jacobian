@@ -1,0 +1,25 @@
+{
+  "task_id": "jacobian/symbolic-block-determinant-decomposition",
+  "source": {
+    "dataset": "Jiahao004/DeepTheorem",
+    "revision": "f5935720f176cedff4ecd8ebf83d1696e31cfac8",
+    "config": "default",
+    "split": "train",
+    "row_index": 10002,
+    "source_id": 86822,
+    "canonical_row_sha256": "sha256:54c987e38d7fdddd3e8b05103ca12708fd28e2ff60d5229256516aac9cbd1e96",
+    "license": "MIT"
+  },
+  "symbolic_family": {
+    "block_dimension": 2,
+    "block_count": 3,
+    "diagonal_block": "A",
+    "off_diagonal_block": "B",
+    "coefficient_domain": "QQ[a11,a12,a21,a22,b11,b12,b21,b22]"
+  },
+  "scope": {
+    "required_identity": "(S^-1 tensor I2) C (S tensor I2) is block diagonal",
+    "general_n_k_theorem": "NOT_ASSESSED",
+    "source_proof_machine_checked": false
+  }
+}

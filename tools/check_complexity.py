@@ -224,7 +224,7 @@ def run_ruff(
     *,
     max_complexity: int,
 ) -> tuple[ComplexityViolation, ...]:
-    """Run Ruff with the ratchet limit while ignoring legacy suppressions."""
+    """Run Ruff with the ratchet limit while ignoring inline suppressions."""
 
     command = [
         "ruff",

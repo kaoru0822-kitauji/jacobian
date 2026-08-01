@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Jacobian Harbor suite manifest",
+  "title": "Jacobian Harbor dataset header",
+  "description": "Dataset metadata. Membership is declared by one member fragment per canonical task under members/.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "dataset", "tasks"],
+  "required": ["schema_version", "dataset"],
   "properties": {
-    "schema_version": {"const": "1"},
+    "schema_version": {"const": "2"},
     "dataset": {
       "type": "object",
       "additionalProperties": false,
@@ -20,20 +21,6 @@
         "default_execution_profile": {"type": "string", "minLength": 1},
         "keywords": {"type": "array", "items": {"type": "string"}},
         "authors": {"type": "array", "items": {"type": "object"}}
-      }
-    },
-    "tasks": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "path", "maximum_assurance", "required_provider"],
-        "properties": {
-          "id": {"type": "string", "pattern": "^jacobian/[a-z0-9][a-z0-9-]*$"},
-          "path": {"type": "string", "minLength": 1},
-          "maximum_assurance": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
-          "required_provider": {"type": "string", "minLength": 1}
-        }
       }
     }
   }

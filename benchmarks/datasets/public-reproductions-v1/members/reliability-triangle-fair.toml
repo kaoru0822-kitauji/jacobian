@@ -1,0 +1,3 @@
+task_id = "reliability-triangle-fair"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

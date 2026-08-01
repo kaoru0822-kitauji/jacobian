@@ -57,7 +57,7 @@ lift that action to edge states or establish a reliability identity.
 - Base revision: `765cf5cb48dcf0f2b40e8dc3bffc3988ae8aa7e1`.
 - Runtime: CPython 3.12 and pinned `python-flint==0.9.0`; no dependency change.
 - Public reproduction:
-  [`reliability-single-edge`](../../benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/reliability-single-edge/).
+  [`reliability-single-edge`](../../benchmarks/tasks/reliability-single-edge/).
 
 ### Checker and evaluation
 

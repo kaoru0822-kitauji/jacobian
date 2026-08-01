@@ -1,0 +1,1 @@
+{"task_id":"jacobian/rational-linear-solution","variables":["x","y"],"equations":[{"coefficients":[2,3],"rhs":7},{"coefficients":[1,-2],"rhs":1}],"domain":"Q"}

@@ -19,22 +19,22 @@
   ],
   "tasks": [
     {
-      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cddlib"
+      "path": "benchmarks/tasks/cddlib"
     },
     {
-      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/cgal"
+      "path": "benchmarks/tasks/cgal"
     },
     {
-      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/gudhi"
+      "path": "benchmarks/tasks/gudhi"
     },
     {
-      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/lean-repl"
+      "path": "benchmarks/tasks/lean-repl"
     },
     {
-      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/nauty"
+      "path": "benchmarks/tasks/nauty"
     },
     {
-      "path": "benchmarks/datasets/provider-feasibility-v1/tasks/software-systems/provider-integration/regina"
+      "path": "benchmarks/tasks/regina"
     }
   ]
 }

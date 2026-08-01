@@ -19,58 +19,58 @@
   ],
   "tasks": [
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/additive-combinatorics/jcb-postdoc-015"
+      "path": "benchmarks/tasks/jcb-postdoc-015"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/algebraic-geometry/jcb-postdoc-014"
+      "path": "benchmarks/tasks/jcb-postdoc-014"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/analytic-number-theory/jcb-postdoc-008"
+      "path": "benchmarks/tasks/jcb-postdoc-008"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/commutative-algebra/jcb-postdoc-001"
+      "path": "benchmarks/tasks/jcb-postdoc-001"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/commutative-algebra/jcb-postdoc-012"
+      "path": "benchmarks/tasks/jcb-postdoc-012"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/computational-number-theory/jcb-postdoc-016"
+      "path": "benchmarks/tasks/jcb-postdoc-016"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/enumerative-combinatorics/jcb-postdoc-013"
+      "path": "benchmarks/tasks/jcb-postdoc-013"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-002"
+      "path": "benchmarks/tasks/jcb-postdoc-002"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-004"
+      "path": "benchmarks/tasks/jcb-postdoc-004"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-006"
+      "path": "benchmarks/tasks/jcb-postdoc-006"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/extremal-graph-theory/jcb-postdoc-018"
+      "path": "benchmarks/tasks/jcb-postdoc-018"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/lattice-theory/jcb-postdoc-009"
+      "path": "benchmarks/tasks/jcb-postdoc-009"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/matrix-analysis/jcb-postdoc-010"
+      "path": "benchmarks/tasks/jcb-postdoc-010"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/percolation-theory/jcb-postdoc-011"
+      "path": "benchmarks/tasks/jcb-postdoc-011"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/probability-theory/jcb-postdoc-005"
+      "path": "benchmarks/tasks/jcb-postdoc-005"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/submodular-optimization/jcb-postdoc-017"
+      "path": "benchmarks/tasks/jcb-postdoc-017"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/universal-algebra/jcb-postdoc-003"
+      "path": "benchmarks/tasks/jcb-postdoc-003"
     },
     {
-      "path": "benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/universal-algebra/jcb-postdoc-007"
+      "path": "benchmarks/tasks/jcb-postdoc-007"
     }
   ]
 }

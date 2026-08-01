@@ -1,0 +1,43 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/jcb-postdoc-016"
+version = "1.0.0"
+description = "Research diagnostic: Erdős Problem 364: kernel-checked finite range versus an unbounded powerful-number conjecture"
+keywords = ["research", "diagnostic", "mathematical-sciences", "computational number theory", "formal verification", "bounded exhaustive search"]
+[metadata]
+evaluation_kind = "research-diagnostic"
+domain = "mathematical-sciences"
+field = "computational-number-theory"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-answer-visible-diagnostic"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "hard"
+category = "mathematics"
+tags = ["research", "diagnostic", "answer-visible", "offline", "computational-number-theory", "formal-verification", "bounded-exhaustive-search"]
+case_version = "research-diagnostics-v1"
+contamination_class = "public-answer-visible-diagnostic"
+fixture_digest = "sha256:59f5ae71bc5d27c96705e323c75f72fd1ad43f81a5cd437fa8b569abb0415440"
+derivation = "The conjecture that three consecutive powerful numbers do not exist remains open, while a separate artifact kernel-checks the finite range through 10^14. This is an unusually clean test of bounded-certificate ingestion, exact scope, and resistance to promoting massive finite verification into an unbounded theorem."
+historical_fit = "MISSING"
+current_status = "OPEN_GAP"
+evaluation_status = "BLOCKED_ON_INTERVENTION"
+next_action = "Implement and independently check the atomic powerful-number predicate first; keep the 10^14 chunk replay as a separate provider- and format-bound candidate."
+
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

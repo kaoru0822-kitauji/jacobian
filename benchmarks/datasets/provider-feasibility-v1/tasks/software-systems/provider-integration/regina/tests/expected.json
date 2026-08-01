@@ -1,8 +1,0 @@
-{
-  "task_id": "jacobian/provider-feasibility-v1-regina",
-  "provider": "regina",
-  "contract": "jacobian.regina-outcomes-spike/v1",
-  "pin_sha256": "sha256:b5736de228ddc8b4e6dbdf375736b78faafb68add6ae57c49facaafebf8fb7bc",
-  "report_conclusion": "SPIKE_PASSED_PRODUCTION_DEFERRED",
-  "report_assurance": "OBSERVED_PROVIDER_BEHAVIOR_WITH_PARTIAL_INDEPENDENT_REPLAY"
-}

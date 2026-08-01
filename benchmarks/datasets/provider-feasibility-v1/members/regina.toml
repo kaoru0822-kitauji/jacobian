@@ -1,0 +1,3 @@
+task_id = "regina"
+assurance_ceiling = "COMPUTED"
+required_provider = "regina"

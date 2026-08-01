@@ -1,9 +1,0 @@
-{
-  "task_id":"jacobian/agent-workflow-v1-modular-cubic-obstruction",
-  "problem": "Show that there are no integers x and y such that 4*x^3 - 7*y^3 = 2003.",
-  "required_output": {
-    "modular_obstruction": true,
-    "complete_residue_certificate": true,
-    "universal_integer_conclusion": true
-  }
-}

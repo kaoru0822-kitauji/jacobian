@@ -16,7 +16,9 @@ The suite separates semantic ownership from execution policy:
 
 A test's directory answers what kind of behavior it owns. A marker is retained
 only when it changes execution. The CI impact manifest maps changed paths to
-every affected lane, with additive matches and a fail-closed fallback. Make
+every explicitly owned lane, with additive multi-owner rules and a fail-closed
+fallback. Product Python lanes are selected independently; benchmark paths are
+excluded from this control plane and use the separate Harbor planner. Make
 targets keep local and hosted execution aligned. Timing data affects domain
 sharding only: successful `main` runs publish it, consumers validate it, and
 any absence or corruption falls back to equal weighting without changing which

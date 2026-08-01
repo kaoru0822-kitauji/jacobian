@@ -168,7 +168,7 @@ for an opposite mathematical claim.
 ## Public reproductions and evaluation status
 
 The answer-visible, unscored reproduction file
-[`smith-rank-deficient`](../../benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/linear-algebra/smith-rank-deficient/)
+[`smith-rank-deficient`](../../benchmarks/tasks/smith-rank-deficient/)
 contains rectangular and rank-deficient matrix cases, a circle,
 \(\mathbb{RP}^2\), and reduced-point homology. It also records a frozen
 held-out comparison design. That held-out evaluation remains

@@ -1,0 +1,3 @@
+task_id = "reliability-series-path"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
