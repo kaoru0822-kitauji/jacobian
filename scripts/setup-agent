@@ -117,7 +117,7 @@ require_checkout_path_ignored() {
       exit 2
       ;;
     "$REPO_ROOT"/*)
-      if ! git -C "$REPO_ROOT" check-ignore -q -- "$target"; then
+      if ! git -C "$REPO_ROOT" check-ignore -q -- "$target/"; then
         echo "$label inside the checkout must be ignored by Git: $target" >&2
         exit 2
       fi

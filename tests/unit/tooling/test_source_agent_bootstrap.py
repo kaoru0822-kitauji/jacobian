@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import tomllib
 from pathlib import Path
 from types import ModuleType
@@ -194,3 +195,21 @@ def test_bootstrap_dry_run_and_client_preflight_fail_closed() -> None:
     assert 'require_checkout_path_ignored "a custom uv project environment"' in script
     assert '--python "$PYTHON_PATH"' in script
     assert 'Path(part or ".").resolve()' in script
+
+
+def test_nonexistent_checkout_directory_uses_git_directory_ignore_semantics(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text(".state/\n")
+    state = tmp_path / ".state"
+    assert not state.exists()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "check-ignore", "-q", "--", f"{state}/"],
+            check=False,
+        ).returncode
+        == 0
+    )
+    script = (ROOT / "scripts" / "setup-agent").read_text()
+    assert 'check-ignore -q -- "$target/"' in script
