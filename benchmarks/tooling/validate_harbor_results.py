@@ -232,13 +232,14 @@ def validate(
     jobs_dir: Path,
     result_path: Path | None = None,
 ) -> Path:
+    jobs_dir = jobs_dir.resolve()
     suite = get_suite(dataset)
     known = {ref.path.name: ref for ref in suite.tasks}
     requested = set(tasks) if tasks else set(known)
     unknown = sorted(requested - set(known))
     if unknown:
         raise HarborSuiteError(f"unknown task(s) for {dataset}: {', '.join(unknown)}")
-    result_path = result_path or _find_result(jobs_dir)
+    result_path = (result_path or _find_result(jobs_dir)).resolve()
     try:
         payload = json.loads(result_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
