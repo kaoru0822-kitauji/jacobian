@@ -27,7 +27,7 @@ derivation = "A fixed six-vertex triangle-free graph with an odd cycle and minim
 [agent]
 timeout_sec = 600.0
 network_mode = "allowlist"
-allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "jacobian", "jacobian-auth-proxy"]
+allowed_hosts = ["chatgpt.com", "*.chatgpt.com"]
 
 [verifier]
 timeout_sec = 120.0
