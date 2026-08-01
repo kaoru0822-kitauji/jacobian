@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""Plan Harbor contract and Oracle work from changed benchmark paths.
+
+This planner is deliberately independent from the product CI classifier.  A
+benchmark-only change never turns on a product Python lane, and a product-only
+change never turns on Harbor execution.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+CANONICAL_PREFIX = "benchmarks/tasks/"
+
+
+def _json(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _harbor_suite() -> Any:
+    return importlib.import_module("benchmarks.tooling.harbor_suite")
+
+
+def _digest(path: Path) -> str:
+    digest = _harbor_suite().task_digest(path)
+    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
+
+
+def _membership() -> tuple[dict[str, list[tuple[str, Path]]], dict[str, Any]]:
+    by_task: dict[str, list[tuple[str, Path]]] = {}
+    suites: dict[str, Any] = {}
+    for suite in _harbor_suite().load_registry():
+        suites[suite.id] = suite
+        for ref in suite.tasks:
+            by_task.setdefault(ref.path.name, []).append((suite.id, ref.path))
+    return by_task, suites
+
+
+def plan(paths: list[str], *, force_full: bool = False) -> dict[str, str]:
+    if force_full:
+        suites = _harbor_suite().load_registry()
+        matrix = [
+            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
+            for suite in suites
+            for ref in suite.tasks
+        ]
+        return {
+            "run-benchmark-check": "true",
+            "run-benchmark-oracle": "true",
+            "benchmark-oracle-scope": "all",
+            "benchmark-oracle-matrix": _json(matrix),
+            "benchmark-plan-reasons": _json(["forced full portfolio"]),
+        }
+
+    benchmark_paths = [
+        path for path in paths if path == "benchmarks" or path.startswith("benchmarks/")
+    ]
+    if not benchmark_paths:
+        return {
+            "run-benchmark-check": "false",
+            "run-benchmark-oracle": "false",
+            "benchmark-oracle-scope": "none",
+            "benchmark-oracle-matrix": "[]",
+            "benchmark-plan-reasons": "[]",
+        }
+
+    by_task, suites_by_id = _membership()
+    changed_tasks: set[str] = set()
+    affected_datasets: set[str] = set()
+    reasons: list[str] = []
+    run_oracle = False
+    scope = "none"
+    unknown = False
+
+    for path in benchmark_paths:
+        if path.startswith(CANONICAL_PREFIX):
+            remainder = path.removeprefix(CANONICAL_PREFIX)
+            task_id, _, relative = remainder.partition("/")
+            if not task_id or task_id not in by_task:
+                unknown = True
+                reasons.append(f"unknown canonical task path: {path}")
+                continue
+            changed_tasks.add(task_id)
+            memberships = by_task[task_id]
+            affected_datasets.update(dataset for dataset, _ in memberships)
+            if relative != "README.md":
+                run_oracle = True
+                reasons.append(f"executable task change: {task_id}")
+            else:
+                reasons.append(f"task documentation change: {task_id}")
+            continue
+
+        parts = Path(path).parts
+        if len(parts) >= 3 and parts[:2] == ("benchmarks", "datasets"):
+            dataset_id = parts[2]
+            if dataset_id not in suites_by_id:
+                unknown = True
+                reasons.append(f"unknown dataset path: {path}")
+                continue
+            if len(parts) >= 4 and parts[3] == "dataset.toml":
+                reasons.append(f"generated manifest drift check: {dataset_id}")
+            elif len(parts) >= 4 and parts[3] == "members":
+                affected_datasets.add(dataset_id)
+                scope = "affected-datasets"
+                run_oracle = True
+                reasons.append(f"dataset membership change: {dataset_id}")
+            elif len(parts) >= 4 and parts[3] in {"suite.toml", "jobs"}:
+                affected_datasets.add(dataset_id)
+                scope = "affected-datasets"
+                run_oracle = True
+                reasons.append(f"dataset execution configuration: {dataset_id}")
+            else:
+                affected_datasets.add(dataset_id)
+                scope = "affected-datasets"
+                run_oracle = True
+                reasons.append(f"dataset support change: {dataset_id}")
+            continue
+
+        if path.startswith("benchmarks/validation/"):
+            reasons.append("benchmark validation change")
+            continue
+        if path.startswith("benchmarks/adapters/"):
+            unknown = True
+            scope = "all"
+            run_oracle = True
+            reasons.append("adapter change requires generated-task Oracle sweep")
+            continue
+        if path.startswith(("benchmarks/tooling/", "benchmarks/schemas/")):
+            scope = "all"
+            run_oracle = True
+            reasons.append("shared benchmark support change")
+            continue
+        unknown = True
+        reasons.append(f"unclassified benchmark path: {path}")
+
+    if unknown:
+        scope = "all"
+        run_oracle = True
+        reasons.append("fail-closed benchmark path classification")
+
+    if scope == "all":
+        matrix = [
+            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
+            for suite in suites_by_id.values()
+            for ref in suite.tasks
+        ]
+    elif scope == "affected-datasets":
+        matrix = [
+            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
+            for suite in suites_by_id.values()
+            if suite.id in affected_datasets
+            for ref in suite.tasks
+        ]
+    else:
+        matrix = [
+            {"dataset": dataset, "task": task_id, "digest": _digest(path)}
+            for task_id in sorted(changed_tasks)
+            for dataset, path in by_task[task_id]
+        ]
+
+    if run_oracle and scope == "none":
+        scope = "changed-tasks"
+    return {
+        "run-benchmark-check": "true",
+        "run-benchmark-oracle": str(run_oracle).lower(),
+        "benchmark-oracle-scope": scope,
+        "benchmark-oracle-matrix": _json(matrix if run_oracle else []),
+        "benchmark-plan-reasons": _json(reasons),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force-full", action="store_true")
+    parser.add_argument("paths", nargs="*")
+    args = parser.parse_args()
+    paths = args.paths[1:] if args.paths[:1] == ["--"] else args.paths
+    try:
+        for key, value in plan(paths, force_full=args.force_full).items():
+            print(f"{key}={value}")
+    except _harbor_suite().HarborSuiteError as exc:
+        parser.error(str(exc))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

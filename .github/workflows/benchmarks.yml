@@ -1,0 +1,140 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  merge_group:
+    types: [checks_requested]
+
+concurrency:
+  group: benchmarks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    outputs:
+      run-benchmark-check: ${{ steps.plan.outputs.run-benchmark-check }}
+      run-benchmark-oracle: ${{ steps.plan.outputs.run-benchmark-oracle }}
+      benchmark-oracle-scope: ${{ steps.plan.outputs.benchmark-oracle-scope }}
+      benchmark-oracle-matrix: ${{ steps.plan.outputs.benchmark-oracle-matrix }}
+      benchmark-plan-reasons: ${{ steps.plan.outputs.benchmark-plan-reasons }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - id: plan
+        name: Classify benchmark changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:benchmark-full') }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            mapfile -d '' changed_paths < <(git diff --name-only -z "$BASE_SHA" "$HEAD_SHA")
+            plan_output=$(uvx --from harbor==0.20.0 --with tomli-w==1.2.0 python .github/scripts/plan-benchmarks "${changed_paths[@]}")
+          elif [ "$FORCE_FULL" = "true" ]; then
+            plan_output=$(uvx --from harbor==0.20.0 --with tomli-w==1.2.0 python .github/scripts/plan-benchmarks --force-full)
+          else
+            plan_output=$(uvx --from harbor==0.20.0 --with tomli-w==1.2.0 python .github/scripts/plan-benchmarks --force-full)
+          fi
+          printf '%s\n' "$plan_output" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Benchmark plan"
+            echo
+            echo '```text'
+            echo "$plan_output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  contract:
+    name: Benchmark Contract Checks
+    needs: plan
+    if: needs.plan.outputs.run-benchmark-check == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - run: make benchmark-check
+
+  oracle:
+    name: Benchmark Oracle (${{ matrix.dataset }}/${{ matrix.task }})
+    needs: plan
+    if: needs.plan.outputs.run-benchmark-oracle == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.benchmark-oracle-matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Run exact task Oracle
+        env:
+          DATASET: ${{ matrix.dataset }}
+          TASKS: ${{ matrix.task }}
+        run: make benchmark-oracle DATASET="$DATASET" TASKS="$TASKS"
+      - name: Upload Oracle evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-oracle-${{ matrix.dataset }}-${{ matrix.task }}
+          path: |
+            benchmarks/results/${{ matrix.dataset }}-oracle
+            benchmarks/results/${{ matrix.dataset }}-oracle/**/oracle-evidence.json
+          if-no-files-found: ignore
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 90 }}
+
+  validation:
+    name: Benchmark Validation
+    if: ${{ !cancelled() }}
+    needs: [plan, contract, oracle]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require planned benchmark validation
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          RUN_CHECK: ${{ needs.plan.outputs.run-benchmark-check }}
+          RUN_ORACLE: ${{ needs.plan.outputs.run-benchmark-oracle }}
+          CHECK_RESULT: ${{ needs.contract.result }}
+          ORACLE_RESULT: ${{ needs.oracle.result }}
+        run: |
+          test "$PLAN_RESULT" = success
+          case "$RUN_CHECK" in
+            true) test "$CHECK_RESULT" = success ;;
+            false) test "$CHECK_RESULT" = skipped ;;
+            *) exit 1 ;;
+          esac
+          case "$RUN_ORACLE" in
+            true) test "$ORACLE_RESULT" = success ;;
+            false) test "$ORACLE_RESULT" = skipped ;;
+            *) exit 1 ;;
+          esac
