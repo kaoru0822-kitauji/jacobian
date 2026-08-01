@@ -40,7 +40,7 @@ digest = "sha256:8066dd253f3d05e024ffd47f87091e26113c7a2d69455554bd01ce925e583ac
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-generated-lemma-vacuity-audit"
-digest = "sha256:765b097afb48e1f4cff9166e1735aa99edd997f89abfea35efe11511f24cb58b"
+digest = "sha256:9fdc468cfbc18d305e9eafe4bca1e841159d5b8a46466d42a59dad87de7f8015"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-graph-artifact-composition"
@@ -84,7 +84,7 @@ digest = "sha256:31dd23d70b61ae9e2afc48c7e9b7d0954ae62fda7ebc550b6a26daeeaec4728
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-noncompact-lefschetz-proof-audit"
-digest = "sha256:758684ec6e0bb1d575184027692ec60ee04ca2e4519b28bc2318370c75f0a776"
+digest = "sha256:f75fab21bed8d6b7913c85968a4814f3e46e9bf6c0f4e0bd88b67ed2713466a4"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-nondifferentiable-maximum-construction"
@@ -124,7 +124,7 @@ digest = "sha256:6a1d30e49d29b7b086194b09fc3df259c28e5d44fd70f71f2a8fe863967cc52
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-symbolic-block-determinant-decomposition"
-digest = "sha256:08e7463ab962184d9907d9adb67cfdd6202465fd2e6fa6e84a50345f34635344"
+digest = "sha256:c7be5651cc0520ef53910c11de9422c01f409f724e2609b136097c508ed8768d"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-well-total-domination-counterexample"

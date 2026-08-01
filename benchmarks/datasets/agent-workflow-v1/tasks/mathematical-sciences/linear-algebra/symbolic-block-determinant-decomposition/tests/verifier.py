@@ -202,7 +202,7 @@ def _symbolic_certificate_valid(result: object, source: dict) -> bool:
             return False
     return bool(
         channels == derived_channels
-        and sorted(channels) == ["A+2B", "A-B", "A-B"]
+        and channels == ["A+2B", "A-B", "A-B"]
         and result["determinant_identity"] == "det(C)=det(A-B)^2*det(A+2B)"
         and result["invertibility_assumption"] == "NOT_REQUIRED_FOR_POLYNOMIAL_IDENTITY"
     )

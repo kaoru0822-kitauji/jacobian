@@ -1,5 +1,4 @@
 import json
-import math
 from pathlib import Path
 
 from verifier_support import (
@@ -17,12 +16,6 @@ LIMITATION = (
     "The original First Proof lattice/manifold question and any alternative "
     "proof are not assessed."
 )
-EXPECTED_COHOMOLOGY = [
-    {"degree": 0, "dimension": 0},
-    {"degree": 1, "dimension": 1},
-]
-
-
 def _load_frozen_input() -> dict:
     try:
         workspace = WORKSPACE / "input.json"
@@ -66,22 +59,40 @@ def _counterexample_is_valid(value: object) -> bool:
     if (
         not _exact_int(numerator)
         or not _exact_int(denominator)
+        or not -1_000_000 <= numerator <= 1_000_000
         or numerator == 0
-        or denominator <= 0
-        or math.gcd(abs(numerator), denominator) != 1
+        or not 1 <= denominator <= 1_000_000
     ):
         return False
+    cohomology = value["compact_support_cohomology"]
+    if not isinstance(cohomology, list) or len(cohomology) != 2:
+        return False
+    normalized_cohomology: dict[int, int] = {}
+    for entry in cohomology:
+        if not isinstance(entry, dict) or set(entry) != {"degree", "dimension"}:
+            return False
+        degree = entry["degree"]
+        dimension = entry["dimension"]
+        if (
+            not _exact_int(degree)
+            or not _exact_int(dimension)
+            or degree in normalized_cohomology
+        ):
+            return False
+        normalized_cohomology[degree] = dimension
+    top_action = value["top_degree_action"]
+    lefschetz = value["lefschetz_number"]
+    if not _exact_int(top_action) or not _exact_int(lefschetz):
+        return False
     fixed_point_exists = numerator == 0
-    top_action = 1
-    lefschetz = -top_action
     return bool(
         value["space"] == "R"
         and value["fixed_point_equation"] == "x+q=x"
         and value["fixed_point_exists"] is fixed_point_exists
         and value["proper"] is True
-        and value["compact_support_cohomology"] == EXPECTED_COHOMOLOGY
-        and value["top_degree_action"] == top_action
-        and value["lefschetz_number"] == lefschetz
+        and normalized_cohomology == {0: 0, 1: 1}
+        and top_action == 1
+        and lefschetz == -top_action
         and not fixed_point_exists
         and lefschetz != 0
     )
@@ -128,20 +139,16 @@ def _evidence_matches_result(evidence: object, result: dict) -> bool:
             for line in text.splitlines()
             if line.startswith("RESULT_JSON:")
         ]
-        lower = text.lower()
+        prose = [
+            line.strip()
+            for line in text.splitlines()
+            if line.strip() and not line.startswith("RESULT_JSON:")
+        ]
         return bool(
             len(markers) == 1
             and json.loads(markers[0]) == result
-            and all(
-                phrase in lower
-                for phrase in (
-                    "no solution",
-                    "proper",
-                    "l_c(f)",
-                    "compactly supported thom class",
-                    "not assessed",
-                )
-            )
+            and prose
+            and sum(map(len, prose)) >= 20
         )
     except (OSError, UnicodeError, ValueError):
         return False

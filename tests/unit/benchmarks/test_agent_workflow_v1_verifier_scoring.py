@@ -799,3 +799,109 @@ def test_autoformalization_rejects_positive_lean_compile_claim(
     assert rejected["correctness"] == 1.0
     assert rejected["evidence_validity"] == 0.0
     assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_generated_lemma_audit_enforces_visible_divisor_witness_bounds(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "generated-lemma-vacuity-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    audit = submission["result"]["common_divisor_audit"]
+    audit["a"] = 1_000_001
+    audit["b"] = 1_000_002
+    audit["dividends"] = [
+        4 * audit["a"] * audit["b"] - 1,
+        2 * audit["a"] - 1,
+        2 * audit["a"] + 1,
+    ]
+    audit["original_premise_holds"] = False
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_noncompact_lefschetz_accepts_equivalent_rational_and_cohomology_forms(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "noncompact-lefschetz-proof-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    counterexample = submission["result"]["counterexample"]
+    counterexample["translation"] = {"numerator": 2, "denominator": 2}
+    counterexample["compact_support_cohomology"].reverse()
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("field", ["top_degree_action", "lefschetz_number"])
+def test_noncompact_lefschetz_rejects_boolean_in_integer_fields(
+    tmp_path: Path, field: str
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "noncompact-lefschetz-proof-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["counterexample"][field] = True
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_noncompact_lefschetz_enforces_visible_translation_bounds(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "noncompact-lefschetz-proof-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["counterexample"]["translation"] = {
+        "numerator": 1_000_001,
+        "denominator": 1,
+    }
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_symbolic_block_certificate_enforces_common_channel_first(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "symbolic-block-determinant-decomposition", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    for row in result["basis_change"]:
+        row[0], row[1] = row[1], row[0]
+    result["basis_change_inverse"][0], result["basis_change_inverse"][1] = (
+        result["basis_change_inverse"][1],
+        result["basis_change_inverse"][0],
+    )
+    result["channels"] = ["A-B", "A+2B", "A-B"]
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
