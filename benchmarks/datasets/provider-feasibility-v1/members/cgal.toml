@@ -1,0 +1,3 @@
+task_id = "cgal"
+assurance_ceiling = "COMPUTED"
+required_provider = "cgal"

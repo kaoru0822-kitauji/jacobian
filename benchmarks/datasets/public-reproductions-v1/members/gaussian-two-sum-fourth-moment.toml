@@ -1,0 +1,3 @@
+task_id = "gaussian-two-sum-fourth-moment"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

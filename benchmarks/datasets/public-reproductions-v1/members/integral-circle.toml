@@ -1,0 +1,3 @@
+task_id = "integral-circle"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

@@ -1,0 +1,3 @@
+task_id = "smith-rectangular"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

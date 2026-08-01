@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Validate the benchmark planner's GitHub Actions output contract."""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from typing import Any
+
+KEYS = {
+    "run-benchmark-check",
+    "run-benchmark-oracle",
+    "benchmark-oracle-scope",
+    "benchmark-oracle-matrix",
+    "benchmark-plan-reasons",
+}
+SCOPES = {"none", "changed-tasks", "affected-datasets", "all"}
+DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
+MAX_MATRIX_JOBS = 256
+
+
+def fail(message: str) -> None:
+    raise SystemExit(message)
+
+
+def _json_array(value: str, name: str) -> list[Any]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        fail(f"{name} is not valid JSON: {exc}")
+    if not isinstance(parsed, list):
+        fail(f"{name} must be a JSON array")
+    return parsed
+
+
+def main() -> None:
+    plan: dict[str, str] = {}
+    for raw_line in sys.stdin:
+        line = raw_line.rstrip("\n")
+        if "=" not in line:
+            fail(f"invalid benchmark plan line: {line}")
+        key, value = line.split("=", 1)
+        if key in plan:
+            fail(f"duplicate benchmark plan key: {key}")
+        plan[key] = value
+    if set(plan) != KEYS:
+        fail(f"benchmark plan keys differ: expected {sorted(KEYS)}, got {sorted(plan)}")
+
+    for key in ("run-benchmark-check", "run-benchmark-oracle"):
+        if plan[key] not in {"true", "false"}:
+            fail(f"invalid benchmark boolean {key}: {plan[key]}")
+    scope = plan["benchmark-oracle-scope"]
+    if scope not in SCOPES:
+        fail(f"invalid benchmark Oracle scope: {scope}")
+
+    matrix = _json_array(plan["benchmark-oracle-matrix"], "benchmark Oracle matrix")
+    reasons = _json_array(plan["benchmark-plan-reasons"], "benchmark plan reasons")
+    if not all(isinstance(reason, str) and reason for reason in reasons):
+        fail("benchmark plan reasons must be non-empty strings")
+    if len(matrix) > MAX_MATRIX_JOBS:
+        fail(f"benchmark Oracle matrix exceeds {MAX_MATRIX_JOBS} jobs")
+
+    pairs: set[tuple[str, str]] = set()
+    for index, entry in enumerate(matrix):
+        if not isinstance(entry, dict) or set(entry) != {"dataset", "task", "digest"}:
+            fail(f"benchmark Oracle matrix entry {index} has an invalid shape")
+        dataset = entry["dataset"]
+        task = entry["task"]
+        digest = entry["digest"]
+        if not isinstance(dataset, str) or not dataset:
+            fail(f"benchmark Oracle matrix entry {index} has an invalid dataset")
+        if not isinstance(task, str) or not task:
+            fail(f"benchmark Oracle matrix entry {index} has an invalid task")
+        if not isinstance(digest, str) or DIGEST.fullmatch(digest) is None:
+            fail(f"benchmark Oracle matrix entry {index} has an invalid digest")
+        pair = (dataset, task)
+        if pair in pairs:
+            fail(f"duplicate benchmark Oracle matrix entry: {dataset}/{task}")
+        pairs.add(pair)
+
+    run_check = plan["run-benchmark-check"] == "true"
+    run_oracle = plan["run-benchmark-oracle"] == "true"
+    if run_oracle and (not run_check or scope == "none" or not matrix):
+        fail("benchmark Oracle work requires checks, a scope, and a non-empty matrix")
+    if not run_oracle and (scope != "none" or matrix):
+        fail("disabled benchmark Oracle work must have none scope and an empty matrix")
+    if not run_check and (run_oracle or reasons):
+        fail("a skipped benchmark plan cannot contain work or reasons")
+
+
+if __name__ == "__main__":
+    main()

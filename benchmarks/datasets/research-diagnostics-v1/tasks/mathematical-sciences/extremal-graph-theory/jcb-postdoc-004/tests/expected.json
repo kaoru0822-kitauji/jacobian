@@ -1,1 +1,0 @@
-{"task_id":"jacobian/research-diagnostics-v1-jcb-postdoc-004","conclusion":"COUNTEREXAMPLE_EXISTS","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/research-diagnostics-v1-jcb-postdoc-004","answer-visible diagnostic"],"expected_conclusion":"COUNTEREXAMPLE_EXISTS","expected_key_facts":{"vertices":"18","alpha":"4","l_avg":"3"}}

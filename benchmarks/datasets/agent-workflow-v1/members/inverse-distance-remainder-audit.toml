@@ -1,0 +1,3 @@
+task_id = "inverse-distance-remainder-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

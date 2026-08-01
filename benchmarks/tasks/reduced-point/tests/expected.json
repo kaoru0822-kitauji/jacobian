@@ -1,0 +1,1 @@
+{"task_id":"jacobian/reduced-point","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/reduced-point","complete finite input"],"expected_free_ranks":[0],"expected_torsion":[[]]}

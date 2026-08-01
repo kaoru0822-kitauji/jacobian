@@ -1,0 +1,3 @@
+task_id = "lean-repl"
+assurance_ceiling = "COMPUTED"
+required_provider = "lean-repl"

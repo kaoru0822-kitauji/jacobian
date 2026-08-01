@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "jacobian/lcm-highly-abundant-scope-audit"},
+    "conclusion": {"enum": ["VALID_COUNTEREXAMPLE_INVALID_MINIMALITY", "INSUFFICIENT_EVIDENCE"]},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["counterexample_at_97", "minimality_claim", "witnesses"],
+      "properties": {
+        "counterexample_at_97": {"type": "string", "minLength": 1},
+        "minimality_claim": {"type": "string", "minLength": 1},
+        "witnesses": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/witness"}}
+      }
+    },
+    "claimed_assurance": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
+    "scope": {"type": "string"},
+    "completeness": {"enum": ["COMPLETE", "PARTIAL", "UNKNOWN"]},
+    "evidence": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"const": "evidence/answer.txt"}, "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "prime_exponent": {"type": "object", "additionalProperties": false, "required": ["prime", "exponent"], "properties": {"prime": {"type": "integer", "minimum": 2}, "exponent": {"type": "integer", "minimum": 1}}},
+    "delta": {"type": "object", "additionalProperties": false, "required": ["prime", "delta"], "properties": {"prime": {"type": "integer", "minimum": 2}, "delta": {"type": "integer"}}},
+    "witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "lcm_factorization", "exponent_deltas", "lcm_value", "competitor", "sigma_lcm", "sigma_competitor"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 1, "maximum": 97},
+        "lcm_factorization": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/prime_exponent"}},
+        "exponent_deltas": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/delta"}},
+        "lcm_value": {"type": "integer", "minimum": 1},
+        "competitor": {"type": "integer", "minimum": 1},
+        "sigma_lcm": {"type": "integer", "minimum": 1},
+        "sigma_competitor": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

@@ -18,13 +18,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / ".github" / "ci-config.json"
-ARTIFACT_NAME = "domain-test-durations"
-ARTIFACT_FILE = "domain-test-durations.json"
+SHARDED_SUITES = ("domain", "composition")
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ENTRIES = 10_000
 MAX_CANDIDATES = 5
 HTTP_TIMEOUT_SECONDS = 10
-TEST_ROOTS = ("tests/domain/",)
 
 
 class CrossOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -59,17 +57,28 @@ class CrossOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
-def domain_shard_count() -> int:
-    return int(ci_config()["domain_shard_count"])
+def shard_count(suite: str) -> int:
+    if suite not in SHARDED_SUITES:
+        raise ValueError(f"unsupported timing suite: {suite}")
+    return int(ci_config()[f"{suite}_shard_count"])
+
+
+def artifact_name(suite: str) -> str:
+    return f"{suite}-test-durations"
+
+
+def artifact_file(suite: str) -> str:
+    return f"{suite}-test-durations.json"
 
 
 def ci_config() -> dict[str, Any]:
     payload = json.loads(CONFIG.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("ci-config.json must contain a JSON object")
-    count = payload.get("domain_shard_count")
-    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-        raise ValueError("domain_shard_count must be a positive integer")
+    for suite in SHARDED_SUITES:
+        count = payload.get(f"{suite}_shard_count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            raise ValueError(f"{suite}_shard_count must be a positive integer")
     for key in ("node_version_jscpd", "node_version_npm"):
         value = payload.get(key)
         if not isinstance(value, str) or not value:
@@ -102,9 +111,10 @@ def emit_plan_outputs() -> None:
     """Print GitHub Actions outputs for shard, Node, and pytest-split pins."""
 
     config = ci_config()
-    count = int(config["domain_shard_count"])
-    print(f"domain-shard-count={count}")
-    print(f"domain-shards={json.dumps(list(range(1, count + 1)))}")
+    for suite in SHARDED_SUITES:
+        count = int(config[f"{suite}_shard_count"])
+        print(f"{suite}-shard-count={count}")
+        print(f"{suite}-shards={json.dumps(list(range(1, count + 1)))}")
     print(f"node-version-jscpd={config['node_version_jscpd']}")
     print(f"node-version-npm={config['node_version_npm']}")
     print(f"pytest-randomly-shard-seed={config['pytest_randomly_shard_seed']}")
@@ -121,7 +131,7 @@ def load_json_bytes(payload: bytes, source: str) -> Any:
     return json.loads(payload)
 
 
-def validate_durations(value: Any, source: str) -> dict[str, float]:
+def validate_durations(value: Any, source: str, suite: str) -> dict[str, float]:
     if not isinstance(value, dict):
         raise ValueError(f"{source} must contain a JSON object")
     if len(value) > MAX_ENTRIES:
@@ -129,7 +139,7 @@ def validate_durations(value: Any, source: str) -> dict[str, float]:
 
     durations: dict[str, float] = {}
     for nodeid, duration in value.items():
-        if not isinstance(nodeid, str) or not nodeid.startswith(TEST_ROOTS):
+        if not isinstance(nodeid, str) or not nodeid.startswith(f"tests/{suite}/"):
             raise ValueError(f"{source} contains an invalid test node id: {nodeid!r}")
         if isinstance(duration, bool) or not isinstance(duration, (int, float)):
             raise ValueError(f"{source} contains a non-numeric duration for {nodeid}")
@@ -181,6 +191,7 @@ def artifact_durations(
     api: str,
     repository: str,
     token: str,
+    suite: str,
 ) -> dict[str, float] | None:
     run = api_json(
         f"{api}/repos/{repository}/actions/runs/{artifact['workflow_run']['id']}",
@@ -192,30 +203,31 @@ def artifact_durations(
     archive = download(artifact["archive_download_url"], token)
     if len(archive) > MAX_BYTES:
         raise ValueError("timing artifact archive is too large")
+    filename = artifact_file(suite)
     with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
-        member = bundle.getinfo(ARTIFACT_FILE)
+        member = bundle.getinfo(filename)
         if member.file_size > MAX_BYTES:
             raise ValueError("timing artifact payload is too large")
-        payload = load_json_bytes(bundle.read(member), ARTIFACT_FILE)
+        payload = load_json_bytes(bundle.read(member), filename)
     if not isinstance(payload, dict):
         raise ValueError("timing artifact payload must be a JSON object")
     if (
         payload.get("version") != 1
-        or payload.get("suite") != "domain"
-        or payload.get("shard_count") != domain_shard_count()
+        or payload.get("suite") != suite
+        or payload.get("shard_count") != shard_count(suite)
     ):
         raise ValueError("timing artifact metadata is incompatible")
-    return validate_durations(payload.get("durations"), ARTIFACT_FILE)
+    return validate_durations(payload.get("durations"), filename, suite)
 
 
-def prepare(output: Path) -> None:
+def prepare(output: Path, suite: str) -> None:
     try:
         repository = os.environ["GITHUB_REPOSITORY"]
         token = os.environ["GH_TOKEN"]
         api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
         listing = api_json(
             f"{api}/repos/{repository}/actions/artifacts"
-            f"?name={ARTIFACT_NAME}&per_page={MAX_CANDIDATES}",
+            f"?name={artifact_name(suite)}&per_page={MAX_CANDIDATES}",
             token,
         )
         artifacts = sorted(
@@ -231,6 +243,7 @@ def prepare(output: Path) -> None:
                     api=api,
                     repository=repository,
                     token=token,
+                    suite=suite,
                 )
             except (
                 IndexError,
@@ -242,7 +255,7 @@ def prepare(output: Path) -> None:
             ) as exc:
                 artifact_id = artifact.get("id", "unknown")
                 warning(
-                    "rejected domain timing artifact "
+                    f"rejected {suite} timing artifact "
                     f"{artifact_id}: {type(exc).__name__}"
                 )
                 continue
@@ -250,7 +263,7 @@ def prepare(output: Path) -> None:
                 break
         if durations is None:
             raise ValueError(
-                "no valid successful main-branch domain timing artifact is available"
+                f"no valid successful main-branch {suite} timing artifact is available"
             )
     except (
         IndexError,
@@ -260,7 +273,7 @@ def prepare(output: Path) -> None:
         ValueError,
         zipfile.BadZipFile,
     ) as exc:
-        warning(f"{exc}; domain shards will use equal weighting")
+        warning(f"{exc}; {suite} shards will use equal weighting")
         durations = {}
     write_durations(output, durations)
 
@@ -271,16 +284,17 @@ def merge(
     source_sha: str,
     python_version: str,
     pytest_split_version: str,
+    suite: str,
 ) -> None:
-    shard_count = domain_shard_count()
-    if len(inputs) != shard_count:
+    count = shard_count(suite)
+    if len(inputs) != count:
         raise ValueError(
-            f"expected {shard_count} shard timing files, received {len(inputs)}"
+            f"expected {count} shard timing files, received {len(inputs)}"
         )
     merged: dict[str, float] = {}
     for path in inputs:
         payload = load_json_bytes(path.read_bytes(), str(path))
-        durations = validate_durations(payload, str(path))
+        durations = validate_durations(payload, str(path), suite)
         duplicates = merged.keys() & durations.keys()
         if duplicates:
             duplicate = min(duplicates)
@@ -289,11 +303,11 @@ def merge(
 
     envelope = {
         "version": 1,
-        "suite": "domain",
+        "suite": suite,
         "source_sha": source_sha,
         "generated_at": datetime.now(UTC).isoformat(),
         "python_version": python_version,
-        "shard_count": shard_count,
+        "shard_count": count,
         "pytest_split_version": pytest_split_version,
         "durations": dict(sorted(merged.items())),
     }
@@ -307,12 +321,14 @@ def main() -> None:
 
     prepare_parser = subparsers.add_parser("prepare")
     prepare_parser.add_argument("--output", type=Path, required=True)
+    prepare_parser.add_argument("--suite", choices=SHARDED_SUITES, required=True)
 
     merge_parser = subparsers.add_parser("merge")
     merge_parser.add_argument("--input", action="append", type=Path, required=True)
     merge_parser.add_argument("--output", type=Path, required=True)
     merge_parser.add_argument("--source-sha", required=True)
     merge_parser.add_argument("--python-version", required=True)
+    merge_parser.add_argument("--suite", choices=SHARDED_SUITES, required=True)
     merge_parser.add_argument(
         "--pytest-split-version",
         default=None,
@@ -325,7 +341,7 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.command == "prepare":
-        prepare(args.output)
+        prepare(args.output, args.suite)
     elif args.command == "emit-plan-outputs":
         emit_plan_outputs()
     elif args.command == "node-version":
@@ -338,6 +354,7 @@ def main() -> None:
             args.source_sha,
             args.python_version,
             split_version,
+            args.suite,
         )
 
 

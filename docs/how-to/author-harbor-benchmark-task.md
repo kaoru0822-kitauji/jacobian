@@ -2,22 +2,25 @@
 
 [Documentation home](../index.md)
 
-Executable benchmark cases live under
-`benchmarks/datasets/<dataset>/tasks/<domain>/<field>/<task>/`. Start from
-`benchmarks/templates/task/`, then choose the dataset whose claim matches the
-case.
+Executable benchmark cases live once under `benchmarks/tasks/<task-id>/`.
+Choose a globally unique flat task ID; keep domain, field, provenance, and
+evaluation classification in `task.toml` metadata. Add one member fragment at
+`benchmarks/datasets/<dataset>/members/<task-id>.toml` for every dataset that
+owns the case. Start from `benchmarks/templates/task/`, then choose the
+dataset whose claim matches the case.
 
 Freeze agent-visible input and the strict submission schema under
 `environment/`. Keep expected answers and solution material under `solution/`,
-and the clean-room verifier plus fixtures under `tests/`. Add the nested
-relative path, global task ID, assurance ceiling, and provider requirement to
-the dataset's `suite.toml`.
+and the clean-room verifier plus fixtures under `tests/`. The member fragment
+declares only the canonical task ID, assurance ceiling, and provider
+requirement; `dataset.toml` is generated.
 
-Run `make harbor-sync`, inspect the generated `dataset.toml` and rendered job
-paths, then run `make harbor-check` and
-`make harbor-oracle DATASET=<dataset-directory-name>`.
+Run `make harbor-plan BASE=origin/main`, then `make harbor-sync`, inspect
+the generated `dataset.toml` and rendered job paths, and run
+`make harbor-check` followed by
+`make harbor-oracle DATASET=<dataset-id> TASKS="<task-id>"`.
 
-Do not add task symlinks, legacy aliases, or a second fixture home. The task
+Do not add task symlinks, aliases, or a second fixture home. The task
 README is maintainer context and is not injected into a trial. Instructions
 describe the requested outcome without prescribing Jacobian capabilities or a
 research strategy.

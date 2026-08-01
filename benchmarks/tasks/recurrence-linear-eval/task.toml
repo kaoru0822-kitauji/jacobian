@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/recurrence-linear-eval"
+version = "1.0.0"
+description = "Select the most specific capability for a recurrence-series query."
+keywords = ["capability-discovery", "recurrence", "regression", "verification"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "combinatorics"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "easy"
+category = "mathematics"
+tags = ["discovery", "recurrence", "regression", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:ffe8545f6e89d41a944855d150fe52d1187d438a9fe0381781f7c2b113892bbe"
+derivation = "Discovery regression for 'evaluate requested indices of a constant coefficient linear recurrence'; expected first capability combinatorics.recurrence.linear.evaluate."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

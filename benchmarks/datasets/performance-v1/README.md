@@ -1,7 +1,7 @@
 # Jacobian performance-v1 historical baseline
 
-This dataset records controlled operational measurements for four existing
-Jacobian benchmark entry points. Its Oracle jobs run the fixed drivers and
+This dataset records controlled operational measurements for existing Jacobian
+benchmark entry points. Its Oracle jobs run the fixed drivers and
 publish raw pyperf-compatible JSON plus environment metadata.
 
 `performance-v1` is intentionally a historical baseline, not a current-main

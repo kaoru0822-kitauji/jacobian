@@ -1,1 +1,0 @@
-{"task_id":"jacobian/agent-workflow-v1-graph-artifact-composition","vertices":["0","1","2","3","4","5"],"edges":[["0","3"],["0","4"],["1","4"],["2","4"],["3","4"],["3","5"]]}

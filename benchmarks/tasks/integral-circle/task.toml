@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/integral-circle"
+version = "1.0.0"
+description = "Compute unreduced integral homology of a triangle boundary model of S^1."
+keywords = ["simplicial-homology", "integral-homology", "free-rank", "torsion"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "algebraic-topology"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["homology", "simplicial", "integral", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:e9eeef994de1405c803276dea4925072df54060e605ecf034851352b0304c7cd"
+derivation = "Triangle boundary simplicial complex; unreduced integral homology replay."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

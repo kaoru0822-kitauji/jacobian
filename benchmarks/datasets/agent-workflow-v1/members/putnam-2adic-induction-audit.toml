@@ -1,0 +1,3 @@
+task_id = "putnam-2adic-induction-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

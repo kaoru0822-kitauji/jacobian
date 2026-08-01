@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/gaussian-two-sum-fourth-moment"
+version = "1.0.0"
+description = "Compute the exact order-4 complex Gaussian moment of a polynomial."
+keywords = ["gaussian-moment", "complex-gaussian", "exact-rational", "verification"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "probability"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "mathematics"
+tags = ["gaussian", "moment", "exact-rational", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:c4b07257493d8f87f2f82a27e145363892a6b620bb9dbe19a2da83ed8b9d47b7"
+derivation = "Two-variable Gaussian sum fourth moment; exact rational replay."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

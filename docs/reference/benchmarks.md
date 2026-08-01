@@ -3,7 +3,7 @@
 [Documentation home](../index.md)
 
 All executable benchmark cases are Harbor tasks under
-[`benchmarks/datasets/`](../../benchmarks/README.md). The six datasets retain
+[`benchmarks/tasks/`](../../benchmarks/README.md). The six datasets retain
 separate claims:
 
 - `agent-workflow-v1` checks fixed workflows and evidence handling;
@@ -13,13 +13,13 @@ separate claims:
 - `provider-feasibility-v1` reproduces optional-provider pins and outcomes;
 - `examples-v1` owns non-comparative tutorial and smoke workflows.
 
-`registry.toml` is the discovery index. A dataset's `suite.toml` owns local
-membership, claim metadata, and nested paths. Its `dataset.toml` is generated
-from the suite and Harbor task checksums.
+`registry.toml` is the discovery index. A dataset's `suite.toml` owns its
+header, while sorted `members/*.toml` fragments select canonical task IDs.
+Its `dataset.toml` is generated from the suite and Harbor task checksums.
 
 ## Task contract
 
-Tasks use `tasks/<domain>/<field>/<task>/` with a maintainer README,
+Tasks use `benchmarks/tasks/<task-id>/` with a maintainer README,
 agent-visible instruction and environment, Oracle-only solution, and
 verifier-only tests. Mathematical tasks use `mathematical-sciences`; runtime,
 provider, and product-surface tasks use `software-systems`.

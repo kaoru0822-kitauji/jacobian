@@ -1,0 +1,38 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+[task]
+name = "jacobian/recurrence-fibonacci"
+version = "1.0.0"
+description = "Select the most specific capability for a recurrence-series query."
+keywords = ["capability-discovery", "recurrence", "regression", "verification"]
+[metadata]
+evaluation_kind = "public-reproduction"
+domain = "mathematical-sciences"
+field = "combinatorics"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "public"
+provenance_class = "public-reproduction"
+required_provider = "core"
+author_name = "Jacobian contributors"
+difficulty = "easy"
+category = "mathematics"
+tags = ["discovery", "recurrence", "regression", "offline"]
+case_version = "public-reproductions-v1"
+contamination_class = "public-answer-visible-reproduction"
+fixture_digest = "sha256:fc43c498939df4bd10be94405d48a4d0c16bfa52d89db9a0ee0a1910cb29872b"
+derivation = "Discovery regression for 'compute the Fibonacci number at index n'; expected first capability combinatorics.compute.fibonacci."
+[agent]
+timeout_sec = 600.0
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+[environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-check harbor-sync harbor-oracle harbor-oracle-all agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
+.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-check harbor-oracle harbor-oracle-run harbor-oracle-all harbor-adapter-check agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -177,29 +177,42 @@ precommit: ## Fix and run every routine local handoff check.
 
 check-static: lint-full typecheck test-architecture todo-check build ## Run CI-owned static checks plus a local package build.
 
-harbor-check: ## Verify committed Harbor task digests against local task contents.
-	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
-	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
+harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
+	@changed_paths=$$(if [ -n "$(BASE)" ]; then git diff --name-only "$(BASE)" HEAD; else git diff --name-only HEAD; fi); \
+	$(HARBOR_PYTHON) .github/scripts/plan-benchmarks $$changed_paths
 
 harbor-sync: ## Update vendored verifier support and deterministic task digests.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
 
-harbor-oracle: harbor-check ## Run one dataset's Harbor Oracle contract gate (DATASET=...).
-	@test -n "$(DATASET)" || { echo "DATASET is required (for example, DATASET=agent-workflow-v1)" >&2; exit 2; }
+harbor-check: ## Run Harbor topology, digest, provenance, and host-side validation checks.
+	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
+	$(UV_RUN) pytest -n 0 benchmarks/validation
+
+harbor-oracle: harbor-check harbor-oracle-run ## Check contracts, then run a dataset Oracle.
+
+harbor-oracle-run: ## Run a dataset Oracle after an already-successful contract gate.
+	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
 	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
 	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-harbor-oracle.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \
-	$(UV_RUN) python tools/render_harbor_job.py \
+	$(UV_RUN) python tools/render_harbor_job.py --dataset "$(DATASET)" --role oracle --output "$$resolved_job" --tasks $(TASKS) && \
+	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS) && \
+	$(HARBOR_PYTHON) benchmarks/tooling/validate_harbor_results.py \
 		--dataset "$(DATASET)" \
-		--role oracle \
-		--output "$$resolved_job" && \
-	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
+		--jobs-dir "benchmarks/results/$(DATASET)-oracle" \
+		--tasks $(TASKS)
 
-harbor-oracle-all: harbor-check ## Explicitly run every registered dataset's Oracle job.
+harbor-oracle-all: harbor-check ## Run every registered dataset Oracle.
 	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 performance-v1 provider-feasibility-v1 examples-v1; do \
-		$(MAKE) --no-print-directory harbor-oracle DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
+		$(MAKE) --no-print-directory harbor-oracle-run DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
 	done
+
+harbor-adapter-check: ## Check deterministic regeneration for ADAPTER=<id>.
+	@test -n "$(ADAPTER)" || { echo "ADAPTER is required" >&2; exit 2; }
+	@test -x "benchmarks/adapters/$(ADAPTER)/check.sh" || { echo "adapter check.sh is missing: $(ADAPTER)" >&2; exit 2; }
+	"benchmarks/adapters/$(ADAPTER)/check.sh"
 
 agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 EVAL_EXECUTE=1).
 	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \

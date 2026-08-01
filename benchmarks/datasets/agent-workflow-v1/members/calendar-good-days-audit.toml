@@ -1,0 +1,3 @@
+task_id = "calendar-good-days-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

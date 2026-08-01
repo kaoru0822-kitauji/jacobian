@@ -5,24 +5,28 @@ import subprocess
 from fnmatch import fnmatchcase
 from pathlib import Path
 
-from tests.boundary.process.tooling.ci import run_ci_script
-
 OWNERSHIP = Path(__file__).parents[4] / ".github" / "ci-impact.json"
 
 
-def test_every_lean_python_test_enables_the_lean_lane() -> None:
-    lean_tests = sorted(
-        path.as_posix()
-        for path in (
-            Path(__file__).parents[4] / "tests" / "boundary" / "providers" / "lean"
-        ).glob("test_*.py")
-    )
+def test_every_lean_python_test_has_explicit_lean_ownership() -> None:
+    manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
+    lean_tests = subprocess.run(
+        ["git", "ls-files", "tests/boundary/providers/lean/**/test_*.py"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.splitlines()
     assert lean_tests
 
     for lean_test in lean_tests:
-        completed = run_ci_script("classify-ci-paths", lean_test, check=True)
-        plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
-        assert plan["run-lean"] == "true", lean_test
+        owned_suites = {
+            str(suite)
+            for rule in manifest["rules"]
+            if any(fnmatchcase(lean_test, pattern) for pattern in rule["patterns"])
+            for suite in rule["suites"]
+        }
+        assert "lean" in owned_suites, lean_test
 
 
 def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:

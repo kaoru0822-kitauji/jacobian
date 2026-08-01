@@ -1,0 +1,41 @@
+schema_version = "1.4"
+artifacts = ["/app/submission.json", "/app/evidence"]
+
+[task]
+name = "jacobian/startup-phases"
+version = "1.0.0"
+description = "Record pyperf measurements for Jacobian startup phases."
+keywords = ["performance", "pyperf", "runtime", "jacobian"]
+
+[metadata]
+author_name = "Jacobian contributors"
+difficulty = "medium"
+category = "software-systems"
+tags = ["performance", "oracle-only", "report-only"]
+evaluation_kind = "performance"
+domain = "software-systems"
+field = "runtime-performance"
+assurance_ceiling = "COMPUTED"
+answer_visibility = "not-applicable"
+provenance_class = "repository-benchmark-entry-point"
+fixture_digest = "sha256:61e3b0cbfc8477260218b8e6a5cbe29718fa57b289839160b77a65c0929c2c1e"
+required_provider = "core"
+
+[agent]
+timeout_sec = 1800.0
+
+[verifier]
+timeout_sec = 120.0
+environment_mode = "separate"
+
+[environment]
+network_mode = "no-network"
+cpus = 2
+memory_mb = 4096
+storage_mb = 8192
+
+[verifier.environment]
+network_mode = "no-network"
+cpus = 1
+memory_mb = 1024
+storage_mb = 4096

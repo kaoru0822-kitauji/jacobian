@@ -1,0 +1,1 @@
+{"task_id":"jacobian/parameterized-sharp-bound-audit","conclusion":"PIECEWISE_BOUND_REPAIRED","maximum_assurance":"COMPUTED","required_scope":"the frozen parameterized inequality, its two sharp-bound regimes, and strict-positivity attainment semantics"}

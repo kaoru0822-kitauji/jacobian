@@ -5,7 +5,7 @@
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
     "task_count": 38,
-    "manifest_sha256": "sha256:b95cbb9029cfe59c0d16619c5b2b5a3e76cb0a80154bbf7d4bc49ae877fe2620",
+    "manifest_sha256": "sha256:6f2c533e58654f0f268c97eb569fe0992bd2c6d58ae9a979d82246142b155ae6",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -932,10 +932,10 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/number-theory/modular-cubic-obstruction"
+          "ref": "benchmarks/tasks/modular-cubic-obstruction"
         },
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/number-theory/divisibility-construction-witness"
+          "ref": "benchmarks/tasks/divisibility-construction-witness"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: ONLY_WEAK_LEXICAL_MATCHES for a complete sparse polynomial residue image"
@@ -988,13 +988,13 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/subspace-direct-sum-counterexample"
+          "ref": "benchmarks/tasks/subspace-direct-sum-counterexample"
         },
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/autoformalization-semantic-audit"
+          "ref": "benchmarks/tasks/autoformalization-semantic-audit"
         },
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/geometry/euler-line-symbolic-certificate"
+          "ref": "benchmarks/tasks/euler-line-symbolic-certificate"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: only Ax=b solution and inconsistency outcomes matched"
@@ -1052,7 +1052,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/matrix-square-zero-counterexample"
+          "ref": "benchmarks/tasks/matrix-square-zero-counterexample"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: determinant, rank, inverse, adjugate, trace, and normal forms matched but no matrix product"
@@ -1105,7 +1105,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/graph-theory/metric-tsp-proof-repair"
+          "ref": "benchmarks/tasks/metric-tsp-proof-repair"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: spanning-tree count present, weighted minimum spanning tree absent"
@@ -1155,7 +1155,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/graph-theory/metric-tsp-proof-repair"
+          "ref": "benchmarks/tasks/metric-tsp-proof-repair"
         }
       ],
       "contract_ref": null,
@@ -1200,7 +1200,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/probability-statistics/random-function-expectation-audit"
+          "ref": "benchmarks/tasks/random-function-expectation-audit"
         }
       ],
       "contract_ref": null,
@@ -1244,7 +1244,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/analysis/nondifferentiable-maximum-construction"
+          "ref": "benchmarks/tasks/nondifferentiable-maximum-construction"
         }
       ],
       "contract_ref": null,

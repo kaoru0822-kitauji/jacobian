@@ -13,109 +13,109 @@ authors = [
 ]
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-gaussian-complex-cancellation"
-digest = "sha256:f6b2ffff4f429b774ff7c5aa5cca06525a447818da1a4382745019c57f12dac9"
+name = "jacobian/gaussian-complex-cancellation"
+digest = "sha256:6a109ec20ed088703a6f8a0e02cb725558be81674bd8fba7d69c45cf4b06a413"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-gaussian-sixth-moment"
-digest = "sha256:a967b0dba8c2ba6bb448bedc1f73ebf744249540d9a10e2f7d9d0b6bdb906c16"
+name = "jacobian/gaussian-sixth-moment"
+digest = "sha256:01b1cd711c8aacc85dcd9ecf44c824e381c9f3dfb71e6f45d675afe577f9d29f"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-gaussian-two-sum-fourth-moment"
-digest = "sha256:5a4de8f2846cfb5153ea0079891514c2e1acf3d35a11d15e44ac8ffffdab1b8f"
+name = "jacobian/gaussian-two-sum-fourth-moment"
+digest = "sha256:27e89b3807f117f23da7637088519c4faa581c166ed50df25ccbd266e9e2d5d8"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-integral-circle"
-digest = "sha256:c1e0cb99979d001947250185696b2720bc30ed22cac3f5de4c6a90e54a8dc98e"
+name = "jacobian/integral-circle"
+digest = "sha256:a64336237e6089d9cec1d8adbe4661e60b783e888eed9cbfc98f526770879934"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-integral-projective-plane"
-digest = "sha256:722751818283dc4bcd08947a7b2a04afb3476fcc1a934fceb7be2aa99667bb00"
+name = "jacobian/integral-projective-plane"
+digest = "sha256:e68b5c30af7ba660f12feaf1a9faf4ee473b746244a5399644739def26c6c0cc"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-jacobian-inverse-obstruction"
-digest = "sha256:53b5cc66602e9b6278e7202ef297b8293d7a65cb21c59be15ea543f4d93b7b7f"
+name = "jacobian/jacobian-inverse-obstruction"
+digest = "sha256:b8c5a8721d66b151d01f85c30bc8660232b125391050785ac257b03ebf4761fa"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-jacobian-keller"
-digest = "sha256:9d9e04c1116c8a829125ccf6d361f209e23417133d814211e8962f9f3a3950ac"
+name = "jacobian/jacobian-keller"
+digest = "sha256:fb0cde5d0f14bdc17cf4516fbbdf3c6ff053c19d0fd79a31c323d40be49b93a4"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-jacobian-negative-control"
-digest = "sha256:3ebc94735d11b6e2346dff2dd545ae32e421d195896ad59fcd8dc06c25ca8fee"
+name = "jacobian/jacobian-negative-control"
+digest = "sha256:81f8708d231b9acdaaff0b692176d91b29e759b18c91de3393b1f8fd68149201"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-lean-retrieval"
-digest = "sha256:a3fc1cc939252a52d96421ed8c3611496550111f5f970598f0fb074e0bcf1dec"
+name = "jacobian/lean-retrieval"
+digest = "sha256:55fc92d62433e29a03baa580110ceb1cedfc3d17d1d463eea65e27f184c59c69"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-lean-transition"
-digest = "sha256:7391be361bddad2b163b2bbe5bca406c83622869df568936710960e0ddd60f2d"
+name = "jacobian/lean-transition"
+digest = "sha256:a54c63ad37c1a62dac691a68914c5e7c6154b2027cf0b9ac24f126990ba994e5"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-recurrence-fibonacci"
-digest = "sha256:dc714eb50bce08e6320870b773add3a18860fafc2bfee9523f04357a32273fbe"
+name = "jacobian/recurrence-fibonacci"
+digest = "sha256:a1d09296ec0413b097e760d65170f81cfc31a41954e29c354e1561347109024e"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-recurrence-linear-eval"
-digest = "sha256:d7f934c2700a8ef7bed4e035671a657e7549b19f6445235f57e5a20ca9617eba"
+name = "jacobian/recurrence-linear-eval"
+digest = "sha256:7000b8a69e7a3eb29259e5f03b6ec1b8a085ccca0948ff344777fb7c02bcad68"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-recurrence-lucas"
-digest = "sha256:752975c5316f9330f1e23a7dd78b327fa3211685b838f005db88414ed82c37f9"
+name = "jacobian/recurrence-lucas"
+digest = "sha256:a2a611904bcf6089d1c19e8b0ceb08191a3f3c383286dc7d0979f5ea0743c0eb"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-recurrence-rational-series"
-digest = "sha256:13b7e950fcdab22d61c5f7be64175a4c12df4f53ce724812887080b545897f56"
+name = "jacobian/recurrence-rational-series"
+digest = "sha256:9028aed63c7680774bc1e6b3fe61e43250f860e4f057f05e1a499a1c18288e97"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-reduced-point"
-digest = "sha256:5871ebb7ba0077674b14e2541f2824355835cf97b743f2871beb2ed90ef85b9e"
+name = "jacobian/reduced-point"
+digest = "sha256:c06ada50201b4ef674c00637cee780dbf2c302e7c8ab607d2157a5dc2c45b884"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-reliability-series-path"
-digest = "sha256:12fe83ecf8000a4b08954dffb6a3d0adfa6e709fdd6f3a047b67fd863fa6a1e8"
+name = "jacobian/reliability-series-path"
+digest = "sha256:2fd7ad710dcd2704bcfae2f126cfeff7f3d5c176991e985731ae4c60a371a386"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-reliability-single-edge"
-digest = "sha256:67c115905667499453c04926ae75f6892d5f5acf8d8d66e9364d133f5bbd58cd"
+name = "jacobian/reliability-single-edge"
+digest = "sha256:523763464b08d57a8d08fb4a6b51efb4eb7498543ab25d79ffc3450454142f45"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-reliability-triangle-fair"
-digest = "sha256:589f0abe0ac048b08a8ebbca85a8a8efea6dbc20b6f19e4f16f1542296ae5dcd"
+name = "jacobian/reliability-triangle-fair"
+digest = "sha256:a917837158d833e1a02298939c3efa5a58e2522bb82ccdc0c195feec19e36946"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-sat-bool-mus"
-digest = "sha256:9c6dab788593f0446b2a9c75665f7a2a12bfa19ff2afb01c089ae713371f41d4"
+name = "jacobian/sat-bool-mus"
+digest = "sha256:109d1bfcebd61514485ed04ed25eb79e303dd47deee3f998607f00dfd588488c"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-sat-erdos-schur-f4"
-digest = "sha256:0005210ac504de613e1655f13eee9fdafbf31835426542f9076047a3023a4749"
+name = "jacobian/sat-erdos-schur-f4"
+digest = "sha256:8c0c0ea9da090721d607a517717c93e4e3b6cb725f82a94a230b6f1f46c90370"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-sat-pigeonhole"
-digest = "sha256:3c78dedfd14377351b3cf6acc86a2c403183b623a947be8c7206ef7ac9b5458d"
+name = "jacobian/sat-pigeonhole"
+digest = "sha256:b8668bfc78c1aee174aea103de8e4f12d83f27fe8438822778aab61309cf2ea9"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-sat-small"
-digest = "sha256:35d49c1d3d7cd08d5d8b63c800c0a67a9080ca50af06171a0b9281ffc5838a19"
+name = "jacobian/sat-small"
+digest = "sha256:a6a89663ab6b87795c1124cbacae830027d786851555b0b64812f4c58e887569"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-smith-rank-deficient"
-digest = "sha256:75a0aa756bd7c05d782120821ed83feda9db250c694df827a669f1ae479c4329"
+name = "jacobian/smith-rank-deficient"
+digest = "sha256:79022f4179020e182226d52996aff23a421772824a30ccd28cb2fb5721f4758f"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-smith-rectangular"
-digest = "sha256:7eaf0f7979106487fbc2873c225f6946122570cb97bcef61d34a514dff16b93c"
+name = "jacobian/smith-rectangular"
+digest = "sha256:b1f18c6091b95e7c888dee1ab11046b94bee8ce6325dcc945c58d231f008734c"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-symmetry-colored-reflection"
-digest = "sha256:28cd8125e1841253ddd075fece310c4de80dcc72671044487688302257d45a11"
+name = "jacobian/symmetry-colored-reflection"
+digest = "sha256:0317c222f2e2feaa5b73c10f92e18738b8746057125d58dff83fdd684a091f19"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-symmetry-cycle-rotation"
-digest = "sha256:09b5d2e7e6404896ddd801786e20deb2ac0a5b9c13b6565136d21319db46a2b7"
+name = "jacobian/symmetry-cycle-rotation"
+digest = "sha256:5f53746f2a85ef1d4cc8aa1d2b3a6236543adfa4de05f5e3ae155139e3e33ae1"
 
 [[tasks]]
-name = "jacobian/public-reproductions-v1-symmetry-identity-subgroup"
-digest = "sha256:3a173b19908fb793b1b77ce68afedbdb987a3304bae834bb9090ab450ce24cb8"
+name = "jacobian/symmetry-identity-subgroup"
+digest = "sha256:b3686efc3297d0f5ed40a4c1d90b663a05cf726055f2f58c68d14b1257fd13ca"

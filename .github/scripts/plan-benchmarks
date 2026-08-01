@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""Plan Harbor contract and Oracle work from changed benchmark paths.
+
+This planner is deliberately independent from the product CI classifier.  A
+benchmark-only change never turns on a product Python lane, and a product-only
+change never turns on Harbor execution.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+CANONICAL_PREFIX = "benchmarks/tasks/"
+EVENTS = ("pull_request", "merge_group", "push", "schedule", "workflow_dispatch")
+MAX_PULL_REQUEST_ORACLE_TASKS = 8
+BENCHMARK_CONTROL_PATHS = frozenset(
+    {
+        ".github/scripts/plan-benchmarks",
+        ".github/scripts/validate-benchmark-plan",
+        ".github/workflows/benchmarks.yml",
+        "Makefile",
+        "tools/check_harbor_dataset.py",
+        "tools/render_harbor_job.py",
+        "tools/sync_harbor_verifier_support.py",
+    }
+)
+BENCHMARK_EXECUTION_CONTROL_PATHS = frozenset(
+    {
+        "tools/check_harbor_dataset.py",
+        "tools/render_harbor_job.py",
+        "tools/sync_harbor_verifier_support.py",
+    }
+)
+
+
+def _json(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _harbor_suite() -> Any:
+    return importlib.import_module("benchmarks.tooling.harbor_suite")
+
+
+def _digest(path: Path) -> str:
+    digest = _harbor_suite().task_digest(path)
+    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
+
+
+def _membership() -> tuple[dict[str, list[tuple[str, Path]]], dict[str, Any]]:
+    by_task: dict[str, list[tuple[str, Path]]] = {}
+    suites: dict[str, Any] = {}
+    for suite in _harbor_suite().load_registry():
+        suites[suite.id] = suite
+        for ref in suite.tasks:
+            by_task.setdefault(ref.path.name, []).append((suite.id, ref.path))
+    return by_task, suites
+
+
+def _full_plan(reason: str) -> dict[str, str]:
+    suites = _harbor_suite().load_registry()
+    matrix = [
+        {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
+        for suite in suites
+        for ref in suite.tasks
+    ]
+    return {
+        "run-benchmark-check": "true",
+        "run-benchmark-oracle": "true",
+        "benchmark-oracle-scope": "all",
+        "benchmark-oracle-matrix": _json(matrix),
+        "benchmark-plan-reasons": _json([reason]),
+    }
+
+
+def plan(
+    paths: list[str],
+    *,
+    event: str = "pull_request",
+    force_full: bool = False,
+) -> dict[str, str]:
+    if event not in EVENTS:
+        raise ValueError(f"unsupported benchmark event: {event}")
+    if force_full or event in {"schedule", "workflow_dispatch"}:
+        reason = "forced full portfolio" if force_full else f"{event} full portfolio"
+        return _full_plan(reason)
+
+    benchmark_paths = [
+        path
+        for path in paths
+        if path == "benchmarks"
+        or path.startswith("benchmarks/")
+        or path in BENCHMARK_CONTROL_PATHS
+    ]
+    if not benchmark_paths:
+        return {
+            "run-benchmark-check": "false",
+            "run-benchmark-oracle": "false",
+            "benchmark-oracle-scope": "none",
+            "benchmark-oracle-matrix": "[]",
+            "benchmark-plan-reasons": "[]",
+        }
+
+    # Merge groups own integration Oracle evidence.  A main push repeats the
+    # deterministic contract check for the landed tree without rerunning the
+    # same Docker portfolio after merge-queue validation.
+    if event == "push":
+        return {
+            "run-benchmark-check": "true",
+            "run-benchmark-oracle": "false",
+            "benchmark-oracle-scope": "none",
+            "benchmark-oracle-matrix": "[]",
+            "benchmark-plan-reasons": _json(
+                ["main push repeats contracts; merge queue owns Oracle evidence"]
+            ),
+        }
+
+    by_task, suites_by_id = _membership()
+    changed_tasks: set[str] = set()
+    affected_datasets: set[str] = set()
+    reasons: list[str] = []
+    run_oracle = False
+    scope = "none"
+    unknown = False
+    integration = event == "merge_group"
+
+    for path in benchmark_paths:
+        if path in BENCHMARK_CONTROL_PATHS:
+            if path in BENCHMARK_EXECUTION_CONTROL_PATHS and integration:
+                scope = "all"
+                run_oracle = True
+                reasons.append("benchmark execution control-plane change")
+            elif path in BENCHMARK_EXECUTION_CONTROL_PATHS:
+                reasons.append("control-plane Oracle deferred to merge queue")
+            else:
+                reasons.append("benchmark planning or workflow contract change")
+            continue
+
+        if path.startswith(CANONICAL_PREFIX):
+            remainder = path.removeprefix(CANONICAL_PREFIX)
+            task_id, _, relative = remainder.partition("/")
+            if not task_id or task_id not in by_task:
+                unknown = True
+                reasons.append(f"unknown canonical task path: {path}")
+                continue
+            changed_tasks.add(task_id)
+            affected_datasets.update(dataset for dataset, _ in by_task[task_id])
+            if relative != "README.md":
+                run_oracle = True
+                reasons.append(f"executable task change: {task_id}")
+            else:
+                reasons.append(f"task documentation change: {task_id}")
+            continue
+
+        parts = Path(path).parts
+        if len(parts) >= 3 and parts[:2] == ("benchmarks", "datasets"):
+            dataset_id = parts[2]
+            if dataset_id not in suites_by_id:
+                unknown = True
+                reasons.append(f"unknown dataset path: {path}")
+                continue
+            relative = parts[3:]
+            if relative[:1] in {("README.md",), ("dataset.toml",)}:
+                reasons.append(
+                    f"dataset documentation or generated manifest: {dataset_id}"
+                )
+                continue
+            affected_datasets.add(dataset_id)
+            if integration:
+                scope = "affected-datasets"
+                run_oracle = True
+                reasons.append(f"dataset integration change: {dataset_id}")
+            else:
+                reasons.append(f"dataset Oracle deferred to merge queue: {dataset_id}")
+            continue
+
+        if path.startswith("benchmarks/validation/") or path in {
+            "benchmarks/README.md",
+            "benchmarks/__init__.py",
+        }:
+            reasons.append("benchmark validation or documentation change")
+            continue
+        if path.startswith("benchmarks/templates/"):
+            reasons.append("benchmark authoring template change")
+            continue
+        if path == "benchmarks/adapters/README.md":
+            reasons.append("adapter documentation change")
+            continue
+        if path.startswith("benchmarks/adapters/"):
+            if integration:
+                scope = "all"
+                run_oracle = True
+                reasons.append("adapter integration change")
+            else:
+                reasons.append("adapter Oracle deferred to merge queue")
+            continue
+        if path.startswith(("benchmarks/tooling/", "benchmarks/schemas/")) or path == (
+            "benchmarks/registry.toml"
+        ):
+            if integration:
+                scope = "all"
+                run_oracle = True
+                reasons.append("shared benchmark integration change")
+            else:
+                reasons.append("shared-support Oracle deferred to merge queue")
+            continue
+        unknown = True
+        reasons.append(f"unclassified benchmark path: {path}")
+
+    if unknown:
+        scope = "all"
+        run_oracle = True
+        reasons.append("fail-closed benchmark path classification")
+
+    if (
+        event == "pull_request"
+        and scope == "none"
+        and len(changed_tasks) > MAX_PULL_REQUEST_ORACLE_TASKS
+    ):
+        run_oracle = False
+        changed_tasks.clear()
+        reasons.append(
+            "large changed-task Oracle set deferred to merge queue "
+            f"(limit {MAX_PULL_REQUEST_ORACLE_TASKS})"
+        )
+
+    if scope == "all":
+        suites = _harbor_suite().load_registry()
+        matrix = [
+            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
+            for suite in suites
+            for ref in suite.tasks
+        ]
+    elif scope == "affected-datasets":
+        matrix = [
+            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
+            for suite in suites_by_id.values()
+            if suite.id in affected_datasets
+            for ref in suite.tasks
+        ]
+    else:
+        matrix = [
+            {"dataset": dataset, "task": task_id, "digest": _digest(path)}
+            for task_id in sorted(changed_tasks)
+            for dataset, path in by_task[task_id]
+        ]
+
+    if run_oracle and scope == "none":
+        scope = "changed-tasks"
+    return {
+        "run-benchmark-check": "true",
+        "run-benchmark-oracle": str(run_oracle).lower(),
+        "benchmark-oracle-scope": scope,
+        "benchmark-oracle-matrix": _json(matrix if run_oracle else []),
+        "benchmark-plan-reasons": _json(list(dict.fromkeys(reasons))),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--event", choices=EVENTS, default="pull_request")
+    parser.add_argument("--force-full", action="store_true")
+    parser.add_argument("paths", nargs="*")
+    args = parser.parse_args()
+    paths = args.paths[1:] if args.paths[:1] == ["--"] else args.paths
+    try:
+        for key, value in plan(
+            paths, event=args.event, force_full=args.force_full
+        ).items():
+            print(f"{key}={value}")
+    except _harbor_suite().HarborSuiteError as exc:
+        parser.error(str(exc))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

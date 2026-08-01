@@ -12,15 +12,17 @@ The suite separates semantic ownership from execution policy:
 | Execution-affecting traits | Pytest markers |
 | Change impact | `.github/ci-impact.json` |
 | Canonical execution | Make targets |
-| Shard scheduling | Ephemeral domain timing artifact |
+| Shard scheduling | Ephemeral per-lane timing artifacts |
 
 A test's directory answers what kind of behavior it owns. A marker is retained
 only when it changes execution. The CI impact manifest maps changed paths to
-every affected lane, with additive matches and a fail-closed fallback. Make
-targets keep local and hosted execution aligned. Timing data affects domain
-sharding only: successful `main` runs publish it, consumers validate it, and
-any absence or corruption falls back to equal weighting without changing which
-tests run.
+every explicitly owned lane, with additive multi-owner rules and a fail-closed
+fallback. Product Python lanes are selected independently; benchmark paths are
+excluded from this control plane and use the separate Harbor planner. Make
+targets keep local and hosted execution aligned. Timing data affects domain and
+composition sharding only: successful `main` runs publish it, consumers validate
+it, and any absence or corruption falls back to equal weighting without changing
+which tests run.
 
 The canonical local commands are the semantic targets `make test-unit`,
 `make test-component`, `make test-domain`, `make test-composition`,
@@ -91,7 +93,7 @@ complete user workflows. Directory ownership replaces the old catch-all
 integration category.
 `make test-stress` repeats only tests marked `property`, while
 `make test-ordering` reproduces the scheduled ordering seed.
-Domain timing shards use one fixed `pytest-randomly` seed from
+Domain and composition timing shards use one fixed `pytest-randomly` seed from
 `.github/ci-config.json`. Every shard must collect tests in the same order
 before `pytest-split` partitions them; otherwise independently randomized
 collections can overlap or omit tests. The merged timing artifact rejects
@@ -110,14 +112,17 @@ objects are never shared. Composition fixtures make their cost visible through
 names such as `fresh_complete_runtime`, `attached_complete_runtime`, and
 `authorized_complete_runtime`.
 
-Pull-request CI runs separate semantic jobs for unit, component, domain,
-composition, storage, process, MCP, provider, and e2e behavior. Domain shards
-may use validated timing history; storage, process, provider, Lean, and e2e
-remain separate resource lanes. Merge-queue and `main` add compatibility,
-coverage, ordering, stress, and performance evidence. Python 3.13 runs the
-small compatibility smoke target rather than duplicating every correctness
-lane. A manually dispatched debug workflow accepts one pytest node or file for
-focused reproduction.
+Pull-request CI runs independently selected unit, component, domain,
+composition, storage, process, MCP, and e2e jobs. Provider and Lean lanes follow
+the topology policy and normally defer to the exhaustive merge-queue/main gate;
+`ci:lean` and `ci:full` can add them to a pull request. Domain and composition
+shards may use validated timing history, while storage, process, provider, Lean,
+and e2e retain separate resource lanes. Merge-queue and `main` add compatibility
+and coverage; scheduled validation owns alternate ordering, stress,
+optional-provider, and performance evidence. Python 3.13 runs the small
+compatibility smoke target rather than duplicating every correctness lane. A
+manually dispatched debug workflow accepts one pytest node or file for focused
+reproduction.
 
 Optional providers are selected only when the production readiness probe says
 their complete environment is usable (executable, version/toolchain,

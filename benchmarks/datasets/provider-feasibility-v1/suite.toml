@@ -1,4 +1,4 @@
-schema_version = "1"
+schema_version = "2"
 
 [dataset]
 id = "jacobian/provider-feasibility-v1"
@@ -8,41 +8,11 @@ purpose = "Pinned optional-backend feasibility checks with provider-specific exp
 claim_class = "provider-feasibility"
 answer_visibility = "public"
 default_execution_profile = "oracle-only"
-keywords = ["mathematics", "jacobian", "provider-feasibility"]
-authors = [{ name = "Jacobian contributors", email = "maintainers@jacobian.invalid" }]
-
-[[tasks]]
-id = "jacobian/provider-feasibility-v1-cddlib"
-path = "tasks/software-systems/provider-integration/cddlib"
-maximum_assurance = "COMPUTED"
-required_provider = "cddlib"
-
-[[tasks]]
-id = "jacobian/provider-feasibility-v1-cgal"
-path = "tasks/software-systems/provider-integration/cgal"
-maximum_assurance = "COMPUTED"
-required_provider = "cgal"
-
-[[tasks]]
-id = "jacobian/provider-feasibility-v1-gudhi"
-path = "tasks/software-systems/provider-integration/gudhi"
-maximum_assurance = "COMPUTED"
-required_provider = "gudhi"
-
-[[tasks]]
-id = "jacobian/provider-feasibility-v1-lean-repl"
-path = "tasks/software-systems/provider-integration/lean-repl"
-maximum_assurance = "COMPUTED"
-required_provider = "lean-repl"
-
-[[tasks]]
-id = "jacobian/provider-feasibility-v1-nauty"
-path = "tasks/software-systems/provider-integration/nauty"
-maximum_assurance = "COMPUTED"
-required_provider = "nauty"
-
-[[tasks]]
-id = "jacobian/provider-feasibility-v1-regina"
-path = "tasks/software-systems/provider-integration/regina"
-maximum_assurance = "COMPUTED"
-required_provider = "regina"
+keywords = [
+    "mathematics",
+    "jacobian",
+    "provider-feasibility",
+]
+authors = [
+    { name = "Jacobian contributors", email = "maintainers@jacobian.invalid" },
+]

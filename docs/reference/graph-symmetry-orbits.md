@@ -82,7 +82,7 @@ checker for the resulting weighted orbit sum.
 - Base revision: `851414bad7fffab9afa7631ab95b7691ba8aabf3`.
 - Runtime: CPython 3.12 and Jacobian standard library; no dependency change.
 - Public reproduction:
-  [`symmetry-cycle-rotation`](../../benchmarks/datasets/public-reproductions-v1/tasks/mathematical-sciences/graph-theory/symmetry-cycle-rotation/).
+  [`symmetry-cycle-rotation`](../../benchmarks/tasks/symmetry-cycle-rotation/).
 
 ### Checker and evaluation
 

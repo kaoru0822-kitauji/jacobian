@@ -1,0 +1,11 @@
+{
+  "task_id":"jacobian/subspace-direct-sum-counterexample",
+  "claim": "For four subspaces S1,S2,S3,S4 of a rational vector space, if Si intersects Sj+Sk only in zero whenever i,j,k are distinct, then S1+S2+S3+S4 is a direct sum.",
+  "ambient_space": "Q^3",
+  "required_witness": {
+    "four_one_dimensional_subspaces": true,
+    "integer_generators": true,
+    "all_declared_pair-sum_intersections_are_zero": true,
+    "nontrivial_four-term_dependence": true
+  }
+}

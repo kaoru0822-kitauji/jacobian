@@ -1,6 +1,0 @@
-{
-  "task_id":"jacobian/agent-workflow-v1-erdos-gallai-realization-audit",
-  "source":{"url":"https://mathoverflow.net/questions/37665/degree-sequences-and-graph-enumeration","license":"CC BY-SA 4.0","captured_at":"2026-07-31"},
-  "cases":[{"case_id":"constructive","degrees":[4,4,3,3,3,1]},{"case_id":"obstruction","degrees":[5,4,4,2,2,1]}],
-  "assurance_ceiling":"COMPUTED"
-}

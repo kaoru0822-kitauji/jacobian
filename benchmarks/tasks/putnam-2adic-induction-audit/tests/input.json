@@ -1,0 +1,23 @@
+{
+  "task_id": "jacobian/putnam-2adic-induction-audit",
+  "source": {
+    "dataset": "AxiomProver at Putnam 2025",
+    "repository": "https://github.com/AxiomMath/putnam2025",
+    "revision": "2653cded72f5112acdc935b4f674711a780af95d",
+    "problem_path": "Putnam2025/A6/problem.lean",
+    "solution_path": "Putnam2025/A6/solution.lean",
+    "license": "MIT"
+  },
+  "problem": {
+    "recurrence": "b_0=0; b_(n+1)=2*b_n^2+b_n+1",
+    "target": "v2(b_(2^(k+1))-2*b_(2^k))=2*k+2 for every k>=1",
+    "derived_sequence": "u_n=2*b_n",
+    "derivative_product": "P_n=product_(0<=j<n)(2*u_j+1)"
+  },
+  "certificate_contract": {
+    "affine_encoding": "[a,b] means a*k+b",
+    "required_base_index": 2,
+    "required_symbolic_range": "all integers k>=1",
+    "assurance_ceiling": "COMPUTED"
+  }
+}

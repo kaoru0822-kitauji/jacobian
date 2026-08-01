@@ -11,153 +11,153 @@ authors = [
 ]
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-autoformalization-semantic-audit"
-digest = "sha256:ce83532bbdd9b6c781a51bfc85a1a74c5c828065b432f0100e977a52700156d2"
+name = "jacobian/autoformalization-semantic-audit"
+digest = "sha256:406ea0bbf90d5a5c12f8aeb0e6b2dc8858baf4bb57f71cb284d7c1347e8647b0"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-calendar-good-days-audit"
-digest = "sha256:9b5f8b6551fe13ddfa9c9e05b99de374ebb6bd1097c1a297c80253053d26fcca"
+name = "jacobian/calendar-good-days-audit"
+digest = "sha256:8f914774c132f6d4f120adfd42d95d21377dcf75c4b90f6f0f9e50f683dd9c18"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-complex-power-sum-elimination"
-digest = "sha256:4293ae14599dcd9ba61130f0747ad673d616617d657286733b4df933e340145a"
+name = "jacobian/complex-power-sum-elimination"
+digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d8406017410"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-dead-end-local-density-audit"
-digest = "sha256:02b4353210a62aaeaab9d523ca3630e4f3f8f8d3e92ed38b51441e4be6aaab3f"
+name = "jacobian/dead-end-local-density-audit"
+digest = "sha256:131bb73beb7ee4e44d086a85228d9bdf5d4adadab4951ff1ebc8567c8b020c7a"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"
-digest = "sha256:05e4f1a4cfc6ef1c6aa97d0c3c01c462e27a22c04c50e0c9121c5d985f7b5308"
+name = "jacobian/distinct-sum-pairing-optimum"
+digest = "sha256:86dd5bff719c7e007b1ed3c356f22985ba4cda663abd401fe4bb77e347016f36"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-divisibility-construction-witness"
-digest = "sha256:997a76faef7340ca7c78227dd251d793924a5b23bb94c84697c53010ba170f4c"
+name = "jacobian/divisibility-construction-witness"
+digest = "sha256:1d45b7351f18a9e7df86274fdc28252397c8abd900dbc26bf7e7e31cf21c9854"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-erdos-gallai-realization-audit"
-digest = "sha256:7562b43b10f387e90c80564bd6eb8a5e3587f3760c3f5f675aba0915b057590f"
+name = "jacobian/erdos-gallai-realization-audit"
+digest = "sha256:1106d2c5d64e0d5443007235b00d4383983880867bbd346563b82a2daaa2ba02"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-euler-fourth-power-scope-audit"
-digest = "sha256:583c03a0bc3a870e9769b7852210dc8d3133cc8cb3c7eeae59cad75b1af5cd6c"
+name = "jacobian/euler-fourth-power-scope-audit"
+digest = "sha256:587c3771acdf47ac62a7efa2b9c450a15503756e620bb031e9dd2cfc82927375"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"
-digest = "sha256:aafcb0a6b87229c4cabcfb7719a3b7eb96d3c3c088cce1f831b433b9d3756d9f"
+name = "jacobian/euler-line-symbolic-certificate"
+digest = "sha256:8eb84393869b3e20c3b0f57e8c8e58184d8c4a8c3fa1341842951f1975ce8792"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-finite-magma-countermodel"
-digest = "sha256:11e303e8401b819f76a51717e25fed8a0f678e12de77765205a07a03a8ff20f2"
+name = "jacobian/finite-magma-countermodel"
+digest = "sha256:49fb5a3a407dbafee9a5e215888c9acca52d062458ece01a4f53cb27bbdb9f55"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-finite-partition"
-digest = "sha256:8066dd253f3d05e024ffd47f87091e26113c7a2d69455554bd01ce925e583ac5"
+name = "jacobian/finite-partition"
+digest = "sha256:fec54cdc4c494da4d0dd3c0b9d158dd094bc9ae9e145ef9431d415b39517f385"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-generated-lemma-vacuity-audit"
-digest = "sha256:9fdc468cfbc18d305e9eafe4bca1e841159d5b8a46466d42a59dad87de7f8015"
+name = "jacobian/generated-lemma-vacuity-audit"
+digest = "sha256:37e4ca9cc1cc33434e043bdecd156b565bbd8fb0d89d68a3632cd7276b4bc0ce"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-graph-artifact-composition"
-digest = "sha256:1a1a488e045b737e915e5d8ce0306fbdfc19f528a6b649d9a0f229f61fb2639a"
+name = "jacobian/graph-artifact-composition"
+digest = "sha256:1544f699a13f4ec41b2226a5cca1ee8e9d26fd5d1e24be9f203cbc87bff56637"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-graph-counterexample"
-digest = "sha256:94f03b9e3fd2e9d4252da06264712964e7a9140810f7c16c8552855449239d34"
+name = "jacobian/graph-counterexample"
+digest = "sha256:7de68c8b4e42c26ee2e10ac68c170283d199a94719d37258a7b32c35c23130cb"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-grounded-premise-proof"
-digest = "sha256:38ac8b864dd0be1ff39f9c3a1fbb124e5c3a48acfd2d5377f671996b219fc609"
+name = "jacobian/grounded-premise-proof"
+digest = "sha256:a00ca1a55750718e9cb5bd08253044a88021f84a3d4d9884e423cdc13edb1394"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-hermite-normal-form"
-digest = "sha256:46e9171b30f73a249c1189d0b3105557259d5ce4991992b5428ee2597a6ef0e3"
+name = "jacobian/hermite-normal-form"
+digest = "sha256:b4bd0a8c4aaf2d13ace7ae29603abac2eb00fa41d437f0588fa72789f4686013"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-inverse-distance-remainder-audit"
-digest = "sha256:59adf9386e1857293498a90b60c12cca275200626f51b8012146f55ba94cba50"
+name = "jacobian/inverse-distance-remainder-audit"
+digest = "sha256:da39b223acfdc15423a11baf90c99851877c2bc97670870ee3b4d5742aa4b54a"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-lcm-highly-abundant-scope-audit"
-digest = "sha256:710330e56557df33d758dac76ff04d7a8705a314dfffe0b26abf4298b6fd87de"
+name = "jacobian/lcm-highly-abundant-scope-audit"
+digest = "sha256:e6624814316f1d764306b46c6ef344ee2871675823392aa3e41b319093e90663"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-lean-transitive-axiom-audit"
-digest = "sha256:4b7e8869f461811c5b776b3a7832f6d683f0749b45d8d45311cdd55edd9aac18"
+name = "jacobian/lean-transitive-axiom-audit"
+digest = "sha256:9522b73e4f9e42b545b26fe86cd1e55ffce5e1935f5e92194aecb7a32b3acaa3"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-log-exponent-recovery"
-digest = "sha256:96aee022fb6e4bf3abf9a9216b6474c575ea433686b69f121c37a79c6d2dc827"
+name = "jacobian/log-exponent-recovery"
+digest = "sha256:7994b322ddba8ad66707ae556b808945f0643e9405765eb31be19534fc3bb0da"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-log-inequality-meta-audit"
-digest = "sha256:86d0bc51e6ae9e67d1a74b1e14eddf8fe1642d57dd4a82b95011b3094ddc4aa4"
+name = "jacobian/log-inequality-meta-audit"
+digest = "sha256:4f36f05075fb23e1fd1f55adde124057375200b5637cc18aa9ad8841d46538ca"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-matrix-square-zero-counterexample"
-digest = "sha256:e058f25f6a3cbadac156ee03b43a33f9356a285358055b8fcb75cbe213fbce2f"
+name = "jacobian/matrix-square-zero-counterexample"
+digest = "sha256:e35c3e5f22d7f768e21001ff7b94f85cd748076ead6d322959d04ecc1592db36"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-metric-tsp-proof-repair"
-digest = "sha256:198c1156a325eb01599b3e9f146e6a47f8c1ce0af9718aa3d798afe890a7d184"
+name = "jacobian/metric-tsp-proof-repair"
+digest = "sha256:0c22548b8e77847b09173bbf56a2d3c04e87da92ff7da29d62d4f3d08144478c"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-modular-cubic-obstruction"
-digest = "sha256:69f5fc78b745f44133b0ced9782f97f78f9f4306f72f123c365e0e1b7a0fe076"
+name = "jacobian/modular-cubic-obstruction"
+digest = "sha256:66ecd40087311e603929041bd0ef166ef61f930c3dfb520458a9324f36c5c079"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-natural-subtraction-proof-repair"
-digest = "sha256:31dd23d70b61ae9e2afc48c7e9b7d0954ae62fda7ebc550b6a26daeeaec47281"
+name = "jacobian/natural-subtraction-proof-repair"
+digest = "sha256:913e498b2f3abaad21133497df1043331bd39956d1124b8e6fb39158ffd36f25"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-noncompact-lefschetz-proof-audit"
-digest = "sha256:0803e65d7d51e58e58b6411427d840bccf4d710065b1e8400db3cef9ee356cc2"
+name = "jacobian/noncompact-lefschetz-proof-audit"
+digest = "sha256:14f4382bc30c0af019d53a6a4c20c7915310d42b8fb876287a5ad681f022711e"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-nondifferentiable-maximum-construction"
-digest = "sha256:38ac5dd84d79a174394c91020d05c2aad1b9e55e3a53464d24e3b54d6be1fe60"
+name = "jacobian/nondifferentiable-maximum-construction"
+digest = "sha256:aaef634eaa01e05ff751122255ae37b63b73f1caf51b373d7aeca5a90f5c6100"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-parameterized-sharp-bound-audit"
-digest = "sha256:cdcd91b3422b934cfd4da38f5b767b8ff969597de8e811a666b4a73d1e2bb873"
+name = "jacobian/parameterized-sharp-bound-audit"
+digest = "sha256:057a1079c58d718bd55a5056449f908d80a4dae47ae6fc3f9e9213615b06afb8"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-polynomial-map-collision"
-digest = "sha256:6e82e0db295d3f92732f09bf95ce9b9bc6073304084b73f7d9212e11eb7b8d7c"
+name = "jacobian/polynomial-map-collision"
+digest = "sha256:0c7c5a81fd92c4e5a8790f67d3bf4aca8e3f131905a91b58d7ec93e49b17f538"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-polynomial-normalization"
-digest = "sha256:0c07bd7c1baeec0d548a08e806274c6bdb9ac0c7778965e8430e44f619f3f00f"
+name = "jacobian/polynomial-normalization"
+digest = "sha256:5b592996a2e01a1f685a2afaa0d3f9acc05696d38519605f7dd86da8a6904c4f"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-polynomial-tail-counterexample"
-digest = "sha256:35267a292d95eedbacd71faacafb052db248fb9b89710bdd4d809d616a3d53f4"
+name = "jacobian/polynomial-tail-counterexample"
+digest = "sha256:a5cde3157ce98b58fa7e0d0d8d9b82213e66ddc611fa271c5183dce25e41ae45"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-putnam-2adic-induction-audit"
-digest = "sha256:e8c73cab20025bfcfa4d0416eb5acd8a0b39af16c53bc8b8278f7b7e58d7ff65"
+name = "jacobian/putnam-2adic-induction-audit"
+digest = "sha256:a5b765c629efa4cb3f6f16d25115d599b3a578f31bd999c306ecfa8ef69d762d"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-random-function-expectation-audit"
-digest = "sha256:d0b51ae1e25e1a0b8f99cbc9e1eac73c5b4867fadbf9f285c46e70fb454b1c72"
+name = "jacobian/random-function-expectation-audit"
+digest = "sha256:d33292b3af0fcc126c7d156ee806e8fec6b9edd0d5cbf0fbd9825b0e7f37041c"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-rational-linear-solution"
-digest = "sha256:9dc8322a5b78b4875450b461290abb6f56100e5d852c784a3f5371322b890f99"
+name = "jacobian/rational-linear-solution"
+digest = "sha256:8c75dedca26f1e5d415dbb29ef0702e4eff0a0a38b101134579b8d228438098d"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-sat-witness"
-digest = "sha256:18787277b8793c660245e20624762dc92cddbf54876b21119664f0a6e129cdfa"
+name = "jacobian/sat-witness"
+digest = "sha256:f8a8cd0791e229a8b64fbe3e3b805d2f6d113795d82c113b05f713b0e38c613d"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-subspace-direct-sum-counterexample"
-digest = "sha256:6a1d30e49d29b7b086194b09fc3df259c28e5d44fd70f71f2a8fe863967cc52c"
+name = "jacobian/subspace-direct-sum-counterexample"
+digest = "sha256:dd54c483a3df187dea49c541a9a6b0e085ff6eb85e3f51fd2338249d50881462"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-symbolic-block-determinant-decomposition"
-digest = "sha256:87171f8a5776807cee98889ebb455a39343e7ee84d3aec1dc425764813e68797"
+name = "jacobian/symbolic-block-determinant-decomposition"
+digest = "sha256:da1d342960318e1d6076cee11ea07125bf3516993ccf20a55de96b61b50c44a8"
 
 [[tasks]]
-name = "jacobian/agent-workflow-v1-well-total-domination-counterexample"
-digest = "sha256:f7aa51bcaa1fd1b30b1c107c02187972e3a0c4c4f63ccf3820cad5309eadb76d"
+name = "jacobian/well-total-domination-counterexample"
+digest = "sha256:c4ddc45cee639e284eaf95919983ef3714e918b102d7910f45075f16b7a69885"

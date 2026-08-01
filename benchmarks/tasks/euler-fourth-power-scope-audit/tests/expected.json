@@ -1,0 +1,6 @@
+{
+  "task_id": "jacobian/euler-fourth-power-scope-audit",
+  "conclusion": "FALSE",
+  "maximum_assurance": "COMPUTED",
+  "required_scope": "the frozen three-summand fourth-power claim only"
+}

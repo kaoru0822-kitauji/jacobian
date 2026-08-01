@@ -1,8 +1,8 @@
 # Jacobian research-diagnostics-v1
 
-This Harbor dataset contains 18 public, answer-visible research challenges.
-Each challenge is one self-contained task under
-`tasks/mathematical-sciences/<field>/jcb-postdoc-<id>/`.
+This Harbor dataset contains public, answer-visible research challenges. Each
+challenge is one self-contained task under
+`benchmarks/tasks/jcb-postdoc-<id>/`.
 
 The prompt and permitted runtime context are agent-visible; source answers,
 Oracle summaries, and verifier material remain outside the agent image.

@@ -1,8 +1,9 @@
 """Repository-owned control plane for Jacobian's Harbor datasets.
 
-The registry describes published dataset identities.  Each suite manifest is
-the source of truth for its nested task membership; ``dataset.toml`` is a
-generated Harbor manifest and never supplies membership on its own.
+Datasets own membership policy; canonical Harbor bundles live once under
+``benchmarks/tasks/<task-id>``.  A dataset's ``members/*.toml`` files select
+those bundles without copying them.  ``dataset.toml`` is generated from the
+resolved membership and remains the Harbor-native digest boundary.
 """
 
 from __future__ import annotations
@@ -111,6 +112,37 @@ class TaskDigest:
     digest: str
 
 
+def _canonical_task_directories(root: Path) -> set[Path]:
+    """Return the flat canonical task inventory, rejecting hidden bundles."""
+
+    if not root.exists():
+        return set()
+    if root.is_symlink() or not root.is_dir():
+        raise HarborSuiteError(f"canonical task root must be a directory: {root}")
+
+    tasks: set[Path] = set()
+    for entry in sorted(root.iterdir()):
+        if entry.is_symlink() or not entry.is_dir():
+            raise HarborSuiteError(
+                f"canonical task root contains a non-task entry: {entry}"
+            )
+        manifest = entry / "task.toml"
+        if manifest.is_symlink() or not manifest.is_file():
+            raise HarborSuiteError(
+                f"canonical task directory is missing task.toml: {entry}"
+            )
+        nested = sorted(
+            candidate for candidate in entry.rglob("task.toml") if candidate != manifest
+        )
+        if nested:
+            raise HarborSuiteError(
+                "canonical task bundles must be one directory deep: "
+                + ", ".join(str(path) for path in nested)
+            )
+        tasks.add(entry.resolve())
+    return tasks
+
+
 def _resolve(value: str, base: Path) -> Path:
     path = Path(value)
     candidate = path if path.is_absolute() else (base / path).absolute()
@@ -148,73 +180,73 @@ def _read_toml(path: Path) -> dict[str, Any]:
     return value
 
 
+def _task_ref(
+    *,
+    task_id: str,
+    task_path: Path,
+    assurance: Any,
+    provider: Any,
+    label: str,
+) -> TaskRef:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", task_id):
+        raise HarborSuiteError(f"{label}: invalid canonical task id {task_id!r}")
+    if task_path.name != task_id or task_path.parent != (ROOT / "benchmarks" / "tasks"):
+        raise HarborSuiteError(f"{label}: task path must be a direct canonical task")
+    if not task_path.is_dir() or not (task_path / "task.toml").is_file():
+        raise HarborSuiteError(f"{label}: canonical task is missing: {task_id}")
+    return TaskRef(
+        name=f"jacobian/{task_id}",
+        path=task_path,
+        maximum_assurance=_require_string(assurance, f"{label} assurance_ceiling"),
+        required_provider=str(provider or "core"),
+    )
+
+
 def _parse_suite_manifest(
     suite: Suite,
-) -> tuple[dict[str, Any], tuple[TaskRef, ...], bool]:
-    """Parse suite.toml, returning (header, tasks, is_new_format)."""
+) -> tuple[dict[str, Any], tuple[TaskRef, ...]]:
+    """Parse the v2 dataset header and canonical-task member fragments."""
 
     raw = _read_toml(suite.suite_manifest)
-    schema_version = raw.get("schema_version")
-    if schema_version is not None and schema_version != "1":
-        raise HarborSuiteError(f"{suite.suite_manifest}: schema_version must be '1'")
-    is_new_format = "dataset" in raw
+    if raw.get("schema_version") != "2":
+        raise HarborSuiteError(f"{suite.suite_manifest}: schema_version must be '2'")
     dataset = raw.get("dataset")
     if not isinstance(dataset, dict):
-        suite_section = raw.get("suite")
-        if isinstance(suite_section, dict):
-            dataset = suite_section
-        else:
-            raise HarborSuiteError(
-                f"{suite.suite_manifest}: [dataset] or [suite] is required"
-            )
-    if (
-        dataset.get("id") != suite.dataset_name
-        and dataset.get("name") != suite.dataset_name
-    ):
+        raise HarborSuiteError(f"{suite.suite_manifest}: [dataset] is required")
+    if dataset.get("id") != suite.dataset_name:
         raise HarborSuiteError(
             f"{suite.suite_manifest}: dataset.id disagrees with registry"
         )
-    task_entries = list(raw.get("tasks", []))
-    for field in raw.get("fields", []):
-        if isinstance(field, dict):
-            task_entries.extend(field.get("tasks", []))
-    if not isinstance(task_entries, list):
-        raise HarborSuiteError(f"{suite.suite_manifest}: [[tasks]] must be an array")
+    if "tasks" in raw or "fields" in raw:
+        raise HarborSuiteError(
+            f"{suite.suite_manifest}: membership belongs in members/*.toml"
+        )
     refs: list[TaskRef] = []
     names: set[str] = set()
-    for entry in task_entries:
-        if not isinstance(entry, dict):
+    members_dir = suite.path / "members"
+    if not members_dir.is_dir():
+        raise HarborSuiteError(f"{suite.id}: members directory is missing")
+    if members_dir.is_symlink():
+        raise HarborSuiteError(f"{suite.id}: members directory symlink is forbidden")
+    for member_file in sorted(members_dir.glob("*.toml")):
+        if member_file.is_symlink():
             raise HarborSuiteError(
-                f"{suite.suite_manifest}: each task entry must be a table"
+                f"{member_file.relative_to(ROOT)}: member symlink is forbidden"
             )
-        name = _require_string(entry.get("id") or entry.get("name"), "task id")
-        path_value = _require_string(entry.get("path"), f"{name} path")
-        path = _resolve(path_value, suite.path)
-        try:
-            path.relative_to(suite.tasks_dir)
-        except ValueError as exc:
-            raise HarborSuiteError(
-                f"{suite.id}: task path must be below {suite.tasks_dir.relative_to(ROOT)}: {path_value}"
-            ) from exc
-        if not path.is_dir() or not (path / "task.toml").is_file():
-            raise HarborSuiteError(
-                f"{suite.id}: task path is not a Harbor task: {path_value}"
-            )
-        if name in names:
-            raise HarborSuiteError(f"{suite.id}: duplicate task id {name}")
-        names.add(name)
-        refs.append(
-            TaskRef(
-                name=name,
-                path=path,
-                maximum_assurance=_require_string(
-                    entry.get("assurance_ceiling") or entry.get("maximum_assurance"),
-                    f"{name} assurance_ceiling or maximum_assurance",
-                ),
-                required_provider=str(entry.get("required_provider", "core")),
-            )
+        member = _read_toml(member_file)
+        task_id = _require_string(member.get("task_id"), f"{member_file.name} task_id")
+        ref = _task_ref(
+            task_id=task_id,
+            task_path=_resolve(task_id, ROOT / "benchmarks" / "tasks"),
+            assurance=member.get("assurance_ceiling"),
+            provider=member.get("required_provider", "core"),
+            label=str(member_file.relative_to(ROOT)),
         )
-    return dataset, tuple(refs), is_new_format
+        if ref.name in names:
+            raise HarborSuiteError(f"{suite.id}: duplicate task id {task_id}")
+        names.add(ref.name)
+        refs.append(ref)
+    return dataset, tuple(refs)
 
 
 def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
@@ -226,7 +258,7 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
         raise HarborSuiteError("registry must contain [[datasets]] entries")
     suites: list[Suite] = []
     ids: set[str] = set()
-    task_ids: set[str] = set()
+    declared_task_paths: set[Path] = set()
     for entry in entries:
         if not isinstance(entry, dict):
             raise HarborSuiteError("registry dataset entries must be tables")
@@ -250,7 +282,7 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
         dataset_manifest = _resolve(
             str(entry.get("dataset_manifest", "dataset.toml")), suite_path
         )
-        tasks_dir = _resolve(str(entry.get("tasks", "tasks")), suite_path)
+        tasks_dir = ROOT / "benchmarks" / "tasks"
         jobs = entry.get("jobs")
         if not isinstance(jobs, dict):
             raise HarborSuiteError(f"{short_id}: jobs table is required")
@@ -301,8 +333,8 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
             ),
             tasks=(),
         )
-        dataset, tasks, is_new_format = _parse_suite_manifest(suite)
-        if is_new_format and (
+        dataset, tasks = _parse_suite_manifest(suite)
+        if (
             dataset.get("title") != suite.title
             or dataset.get("purpose") != suite.purpose
             or any(
@@ -317,14 +349,16 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
             raise HarborSuiteError(
                 f"{short_id}: suite metadata disagrees with registry"
             )
-        for task in tasks:
-            if task.name in task_ids:
-                raise HarborSuiteError(
-                    f"duplicate task id across datasets: {task.name}"
-                )
-            task_ids.add(task.name)
+        declared_task_paths.update(ref.path for ref in tasks)
         object.__setattr__(suite, "tasks", tasks)
         suites.append(suite)
+    discovered = _canonical_task_directories(ROOT / "benchmarks" / "tasks")
+    missing = sorted(discovered - {path.resolve() for path in declared_task_paths})
+    if missing:
+        raise HarborSuiteError(
+            "canonical task is not assigned to a dataset: "
+            + ", ".join(path.name for path in missing)
+        )
     return tuple(suites)
 
 
@@ -374,7 +408,9 @@ def suite_digests(suite: Suite) -> tuple[TaskDigest, ...]:
 
 def expected_dataset_manifest(suite: Suite) -> str:
     raw = _read_toml(suite.suite_manifest)
-    suite_data = raw.get("dataset") or raw.get("suite") or {}
+    suite_data = raw.get("dataset")
+    if not isinstance(suite_data, dict):
+        raise HarborSuiteError(f"{suite.suite_manifest}: [dataset] is required")
     authors = suite_data.get("authors", [{"name": "Jacobian contributors"}])
     keywords = suite_data.get("keywords", [suite.evaluation_kind])
     value: dict[str, Any] = {
@@ -462,6 +498,7 @@ def render_suite_job(
     role: str,
     model: str | None = None,
     provider: str | None = None,
+    tasks: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     template = suite.job_oracle if role == "oracle" else suite.job_observation
     if template is None:
@@ -470,6 +507,17 @@ def render_suite_job(
     config.pop("datasets", None)
     config.pop("tasks", None)
     task_refs = suite.tasks
+    if tasks is not None:
+        requested = set(tasks)
+        known = {ref.path.name for ref in task_refs}
+        unknown = sorted(requested - known)
+        if unknown:
+            raise HarborSuiteError(
+                f"dataset {suite.id} has unknown task(s): {', '.join(unknown)}"
+            )
+        task_refs = tuple(ref for ref in task_refs if ref.path.name in requested)
+        if not task_refs:
+            raise HarborSuiteError(f"dataset {suite.id} has no selected tasks")
     if provider is not None:
         task_refs = tuple(ref for ref in task_refs if ref.required_provider == provider)
         if not task_refs:
@@ -712,16 +760,6 @@ def sync_verifier_support(suite: Suite) -> int:
 
 def check_suite_topology(suite: Suite) -> list[str]:
     failures: list[str] = []
-    declared = {ref.path.resolve() for ref in suite.tasks}
-    discovered = (
-        {path.parent.resolve() for path in suite.tasks_dir.rglob("task.toml")}
-        if suite.tasks_dir.is_dir()
-        else set()
-    )
-    for extra in sorted(discovered - declared):
-        failures.append(
-            f"{extra.relative_to(ROOT)}: task is not declared in suite.toml"
-        )
     for ref in suite.tasks:
         failures.extend(validate_task(suite, ref.path))
     failures.extend(check_verifier_support(suite))

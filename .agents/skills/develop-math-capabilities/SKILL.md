@@ -64,7 +64,8 @@ those are the actual gap. Require recurring move evidence or a justified
 fundamental-primitive exception before adding a capability.
 
 Add public diagnostic cases to the versioned Harbor corpus under
-`benchmarks/datasets/research-diagnostics-v1/tasks/mathematical-sciences/`.
+`benchmarks/tasks/`, then add a member fragment under
+`benchmarks/datasets/research-diagnostics-v1/members/`.
 Preserve immutable task inputs and fold status into task metadata or generated
 reports. Keep `scored=false` when the answer is public.
 

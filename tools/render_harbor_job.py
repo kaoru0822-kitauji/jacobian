@@ -40,6 +40,11 @@ def main() -> int:
         "--provider",
         help="restrict a suite job to tasks requiring this provider",
     )
+    parser.add_argument(
+        "--tasks",
+        nargs="*",
+        help="restrict a suite job to these canonical task IDs",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model", default=MODEL_PLACEHOLDER)
     args = parser.parse_args()
@@ -49,6 +54,7 @@ def main() -> int:
             role=args.role,
             model=args.model,
             provider=args.provider,
+            tasks=tuple(args.tasks) if args.tasks else None,
         )
     else:
         if args.provider:

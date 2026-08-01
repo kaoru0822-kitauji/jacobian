@@ -4,7 +4,7 @@
 
 Jacobian's fixed workflow observation surface is the Harbor
 [`agent-workflow-v1`](../../benchmarks/datasets/agent-workflow-v1/README.md)
-dataset. Its 26 self-contained mathematical tasks cover graph, algebra,
+dataset. Its self-contained mathematical tasks cover graph, algebra,
 linear-algebra, number-theory, geometry, combinatorics, probability, and
 formal-mathematics workflows, including the original graph, partition, SAT,
 linear-system, Hermite, and polynomial cases.
@@ -23,8 +23,8 @@ make harbor-check
 make harbor-oracle DATASET=agent-workflow-v1
 ```
 
-The suite module resolves nested domain and field paths, renders them as
-explicit Harbor task entries, and checks the generated task digests. Wrong
+The suite module resolves canonical task IDs, renders them as explicit Harbor
+task entries, and checks the generated task digests. Wrong
 answers, malformed or escaped evidence, incomplete scope, and false
 certification receive zero reward.
 

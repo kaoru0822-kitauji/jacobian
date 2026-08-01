@@ -12,15 +12,7 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-TASK_ROOT = (
-    PROJECT_ROOT
-    / "benchmarks"
-    / "datasets"
-    / "public-reproductions-v1"
-    / "tasks"
-    / "mathematical-sciences"
-    / "probability"
-)
+TASK_ROOT = PROJECT_ROOT / "benchmarks" / "tasks"
 
 
 def _load_suite() -> list[dict[str, Any]]:

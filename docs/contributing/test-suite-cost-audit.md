@@ -195,10 +195,10 @@ parallel and were not on the measured critical span. Consolidating them would
 increase workflow coupling without materially shortening feedback, so this
 audit leaves them unchanged.
 
-An ephemeral timing artifact feeds domain sharding only. Successful `main` runs
-publish fresh history; missing or invalid history falls back to equal weighting.
-Storage, process, provider, Lean, and e2e lanes retain their own resource
-topology rather than being mixed to equalize aggregate duration.
+Ephemeral timing artifacts feed the domain and composition shards. Successful
+`main` runs publish fresh history; missing or invalid history falls back to equal
+weighting. Storage, process, provider, Lean, and e2e lanes retain their own
+resource topology rather than being mixed to equalize aggregate duration.
 
 Do not stack a local duration refresh, full integration profiling, and focused
 module debugging on the same host at once. That contention recreates the

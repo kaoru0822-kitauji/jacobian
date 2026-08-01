@@ -1,0 +1,3 @@
+task_id = "symbolic-block-determinant-decomposition"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

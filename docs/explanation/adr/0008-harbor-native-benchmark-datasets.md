@@ -12,15 +12,15 @@ observe fixed agent workflows and do not establish causal performance.
 Non-runnable research plans and discovery handoffs need a separate home from
 executable benchmark cases.
 
-Harbor local dataset loading inspects only immediate child task directories.
-The mathematical subject taxonomy we want is nested by domain and field, so a
-nested `tasks/` directory cannot itself be passed to Harbor as a local dataset.
+Harbor local dataset loading expects standalone task directories. The
+mathematical subject taxonomy is useful metadata, but it must not become a
+second identity or force a task to be copied for another dataset.
 
 ## Decision
 
-Every executable benchmark case is owned by one self-contained Harbor task
-under `benchmarks/datasets/<dataset>/tasks/<domain>/<field>/<task>/`. The task
-layout follows the Terminal-Bench Science review pattern: agent-visible
+Every executable benchmark case is one self-contained Harbor task under
+`benchmarks/tasks/<task-id>/`. Dataset member fragments select canonical tasks
+without copying them. The task layout follows the Terminal-Bench Science review pattern: agent-visible
 instructions and environment, Oracle-only solution material, verifier-only
 tests, and a maintainer README. Jacobian retains its stricter provenance,
 assurance, artifact-integrity, and fail-closed verification rules.
@@ -48,11 +48,11 @@ declares its claim class, answer visibility, execution profile, and assurance
 ceiling.
 
 `registry.toml` discovers datasets but does not duplicate task membership.
-Each dataset's `suite.toml` is the source of truth for local task membership
-and nested paths. `dataset.toml` is generated from the validated suite and
+Each dataset's `members/*.toml` fragments are the source of truth for dataset
+membership and policy. `dataset.toml` is generated from the validated members and
 Harbor's task checksum implementation; manual digest edits are drift. Job
 templates are rendered into temporary Harbor configs containing one explicit
-`tasks: [{"path": ...}]` entry per suite task.
+`tasks: [{"path": ...}]` entry per selected canonical task.
 
 The canonical verifier protocol support lives in repository-owned Harbor
 tooling. Each task receives a byte-identical ordinary file because task and

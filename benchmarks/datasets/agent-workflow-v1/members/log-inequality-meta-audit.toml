@@ -1,0 +1,3 @@
+task_id = "log-inequality-meta-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

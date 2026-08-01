@@ -1,0 +1,7 @@
+{
+  "task_id": "jacobian/complete-runtime-startup",
+  "repository_revision": "6fd5fc5df6bc49f230484bc5c78cbd365941c78c",
+  "driver": "benchmark.py",
+  "pyperf_profile": "fast",
+  "timing_thresholds": "report-only"
+}

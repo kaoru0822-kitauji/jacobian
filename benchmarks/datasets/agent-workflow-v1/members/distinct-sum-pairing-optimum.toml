@@ -1,0 +1,3 @@
+task_id = "distinct-sum-pairing-optimum"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

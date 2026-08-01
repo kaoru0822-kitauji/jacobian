@@ -1,8 +1,0 @@
-{
-  "task_id":"jacobian/agent-workflow-v1-log-exponent-recovery",
-  "problem": "Let x,y,z all exceed 1 and w be positive. Given log_x(w)=24, log_y(w)=40, and log_(xyz)(w)=12, determine log_z(w).",
-  "required_output": {
-    "exact_integer_value": true,
-    "derive_using_reciprocal_logarithms": true
-  }
-}

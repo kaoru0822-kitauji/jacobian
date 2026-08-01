@@ -222,7 +222,7 @@ def test_incompatible_environment_has_explicit_diagnostics(tmp_path: Path) -> No
     payload["environment"] = {
         **payload["environment"],
         "lean_version": "3.51.1",
-        "mathlib_revision": "legacy-mathlib-revision",
+        "mathlib_revision": "untracked-mathlib-revision",
         "project_files": [],
     }
 

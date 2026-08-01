@@ -1,0 +1,3 @@
+task_id = "grounded-premise-proof"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

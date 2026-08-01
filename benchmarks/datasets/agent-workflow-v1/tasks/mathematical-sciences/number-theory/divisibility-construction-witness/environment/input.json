@@ -1,9 +1,0 @@
-{
-  "task_id":"jacobian/agent-workflow-v1-divisibility-construction-witness",
-  "problem": "Find positive integers a and b such that 7 does not divide a*b*(a+b), while 7^7 divides (a+b)^7-a^7-b^7.",
-  "search_scope": {"minimum": 1, "maximum": 1000},
-  "required_output": {
-    "explicit_witness": true,
-    "exact_divisibility_certificate": true
-  }
-}

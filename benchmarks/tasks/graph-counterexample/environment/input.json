@@ -1,0 +1,7 @@
+{
+  "task_id": "jacobian/graph-counterexample",
+  "claim": "Every connected triangle-free simple graph on six vertices with minimum degree at least two is bipartite.",
+  "vertices": ["0", "1", "2", "3", "4", "5"],
+  "hypotheses": {"order": 6, "connected": true, "triangle_free": true, "minimum_degree_at_least": 2},
+  "conclusion": "bipartite"
+}

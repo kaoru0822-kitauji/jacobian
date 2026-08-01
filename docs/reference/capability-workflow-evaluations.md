@@ -22,8 +22,9 @@ an agent container.
 
 Every task has frozen agent-visible input, schema 1.4 metadata, an Oracle-only
 solution, and a separate clean-room verifier. The repository suite module
-validates `registry.toml` and `suite.toml`, resolves nested task paths, computes
-Harbor-native digests, checks visibility, and renders explicit task paths:
+validates `registry.toml`, suite headers, and member fragments, resolves
+canonical task IDs, computes Harbor-native digests, checks visibility, and
+renders explicit task paths:
 
 ```sh
 make harbor-check

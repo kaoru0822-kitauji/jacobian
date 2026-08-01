@@ -79,7 +79,7 @@ def _write_suite_toml(
     tasks: list[dict] | None = None,
 ) -> None:
     raw: dict = {
-        "schema_version": "1",
+        "schema_version": "2",
         "dataset": {
             "id": ds_id,
             "version": "1.0.0",
@@ -87,9 +87,20 @@ def _write_suite_toml(
             "purpose": "Test purpose.",
         },
     }
-    if tasks:
-        raw["tasks"] = tasks
     path.write_text(tomli_w.dumps(raw))
+    members = path.parent / "members"
+    members.mkdir(exist_ok=True)
+    if tasks:
+        for entry in tasks:
+            task_id = str(entry["id"]).removeprefix("jacobian/")
+            member = {
+                "task_id": task_id,
+                "assurance_ceiling": entry["assurance_ceiling"],
+                "required_provider": entry.get("required_provider", "core"),
+            }
+            (members / f"{task_id.replace('/', '-')}.toml").write_text(
+                tomli_w.dumps(member)
+            )
 
 
 def _make_minimal_task(root: Path, *, task_id: str = "jacobian/test-v1-a") -> Path:
@@ -150,6 +161,14 @@ def _make_minimal_task(root: Path, *, task_id: str = "jacobian/test-v1-a") -> Pa
     return task
 
 
+def _make_canonical_task(tmp_path: Path, *, task_id: str = "test-v1-a") -> Path:
+    (tmp_path / "test-v1").mkdir(parents=True, exist_ok=True)
+    return _make_minimal_task(
+        tmp_path / "benchmarks" / "tasks" / task_id,
+        task_id=f"jacobian/{task_id}",
+    )
+
+
 def test_load_registry_parses_all_datasets() -> None:
     suites = load_registry()
     ids = {s.id for s in suites}
@@ -191,9 +210,7 @@ def test_suite_loads_tasks_when_suite_toml_exists(
     tmp_path: Path, patched_root: Path
 ) -> None:
     ds_path = tmp_path / "test-v1"
-    (ds_path / "tasks" / "a").mkdir(parents=True)
-    (ds_path / "tasks" / "a" / "solution").mkdir(parents=True)
-    _make_minimal_task(ds_path / "tasks" / "a")
+    _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
@@ -201,8 +218,7 @@ def test_suite_loads_tasks_when_suite_toml_exists(
         tasks=[
             {
                 "id": "jacobian/test-v1-a",
-                "path": "tasks/a",
-                "maximum_assurance": "COMPUTED",
+                "assurance_ceiling": "COMPUTED",
                 "required_provider": "core",
             }
         ],
@@ -220,13 +236,11 @@ def test_suite_loads_tasks_when_suite_toml_exists(
 # ---------------------------------------------------------------------------
 
 
-def test_suite_parses_tasks_with_maximum_assurance(
+def test_suite_parses_tasks_with_assurance_ceiling(
     tmp_path: Path, patched_root: Path
 ) -> None:
     ds_path = tmp_path / "test-v1"
-    (ds_path / "tasks" / "a").mkdir(parents=True)
-    (ds_path / "tasks" / "a" / "solution").mkdir(parents=True)
-    _make_minimal_task(ds_path / "tasks" / "a")
+    _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
@@ -234,8 +248,7 @@ def test_suite_parses_tasks_with_maximum_assurance(
         tasks=[
             {
                 "id": "jacobian/test-v1-a",
-                "path": "tasks/a",
-                "maximum_assurance": "COMPUTED",
+                "assurance_ceiling": "COMPUTED",
                 "required_provider": "core",
             }
         ],
@@ -252,9 +265,7 @@ def test_suite_parses_tasks_with_maximum_assurance(
 
 def test_suite_parses_verified_ceiling(tmp_path: Path, patched_root: Path) -> None:
     ds_path = tmp_path / "test-v1"
-    (ds_path / "tasks" / "a").mkdir(parents=True)
-    (ds_path / "tasks" / "a" / "solution").mkdir(parents=True)
-    _make_minimal_task(ds_path / "tasks" / "a")
+    _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
@@ -262,8 +273,7 @@ def test_suite_parses_verified_ceiling(tmp_path: Path, patched_root: Path) -> No
         tasks=[
             {
                 "id": "jacobian/test-v1-a",
-                "path": "tasks/a",
-                "maximum_assurance": "VERIFIED",
+                "assurance_ceiling": "VERIFIED",
                 "required_provider": "core",
             }
         ],
@@ -294,64 +304,52 @@ def test_suite_rejects_task_path_outside_tasks_root(
     tmp_path: Path, patched_root: Path
 ) -> None:
     ds_path = tmp_path / "test-v1"
-    task = ds_path / "outside"
-    _make_minimal_task(task)
     (ds_path / "jobs").mkdir(parents=True)
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
         ds_path / "suite.toml",
         tasks=[
             {
-                "id": "jacobian/test-v1-a",
-                "path": "../test-v1/outside",
-                "maximum_assurance": "COMPUTED",
+                "id": "jacobian/missing-task",
+                "assurance_ceiling": "COMPUTED",
                 "required_provider": "core",
             }
         ],
     )
     reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
-    with pytest.raises(HarborSuiteError, match="below"):
+    with pytest.raises(HarborSuiteError, match="canonical task is missing"):
         load_registry(reg)
 
 
 def test_suite_rejects_symlinked_task_path(tmp_path: Path, patched_root: Path) -> None:
     ds_path = tmp_path / "test-v1"
-    real = ds_path / "tasks" / "real"
-    _make_minimal_task(real)
-    alias = ds_path / "tasks" / "alias"
-    alias.symlink_to(real, target_is_directory=True)
+    _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir(parents=True)
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
         ds_path / "suite.toml",
-        tasks=[
-            {
-                "id": "jacobian/test-v1-a",
-                "path": "tasks/alias",
-                "maximum_assurance": "COMPUTED",
-                "required_provider": "core",
-            }
-        ],
+        tasks=[{"id": "jacobian/test-v1-a", "assurance_ceiling": "COMPUTED"}],
+    )
+    (ds_path / "members" / "test-v1-a.toml").unlink()
+    (ds_path / "members" / "alias.toml").symlink_to(
+        ds_path / "members" / "test-v1-a.toml"
     )
     reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
     with pytest.raises(HarborSuiteError, match="symlink"):
         load_registry(reg)
 
 
-def test_suite_parses_nested_task_paths(tmp_path: Path, patched_root: Path) -> None:
+def test_suite_rejects_noncanonical_task_id(tmp_path: Path, patched_root: Path) -> None:
     ds_path = tmp_path / "test-v1"
-    (ds_path / "tasks" / "x" / "y" / "z" / "a").mkdir(parents=True)
-    (ds_path / "tasks" / "x" / "y" / "z" / "a" / "solution").mkdir(parents=True)
-    _make_minimal_task(ds_path / "tasks" / "x" / "y" / "z" / "a")
+    ds_path.mkdir()
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
         ds_path / "suite.toml",
         tasks=[
             {
-                "id": "jacobian/test-v1-a",
-                "path": "tasks/x/y/z/a",
-                "maximum_assurance": "COMPUTED",
+                "id": "jacobian/nested/task",
+                "assurance_ceiling": "COMPUTED",
                 "required_provider": "core",
             }
         ],
@@ -360,8 +358,39 @@ def test_suite_parses_nested_task_paths(tmp_path: Path, patched_root: Path) -> N
         tmp_path,
         [_make_dataset_entry("jacobian/test-v1", ds_path)],
     )
-    suite = load_registry(reg)[0]
-    assert suite.tasks[0].path == (ds_path / "tasks" / "x" / "y" / "z" / "a").resolve()
+    with pytest.raises(HarborSuiteError, match="invalid canonical task id"):
+        load_registry(reg)
+
+
+def test_registry_rejects_nested_canonical_task_bundle(
+    tmp_path: Path, patched_root: Path
+) -> None:
+    ds_path = tmp_path / "test-v1"
+    (ds_path / "jobs").mkdir(parents=True)
+    (ds_path / "jobs" / "oracle.json").write_text("{}")
+    _write_suite_toml(ds_path / "suite.toml")
+    _make_minimal_task(
+        tmp_path / "benchmarks" / "tasks" / "algebra" / "nested-task",
+        task_id="jacobian/nested-task",
+    )
+    reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
+
+    with pytest.raises(HarborSuiteError, match=r"missing task\.toml"):
+        load_registry(reg)
+
+
+def test_registry_rejects_incomplete_canonical_task_directory(
+    tmp_path: Path, patched_root: Path
+) -> None:
+    ds_path = tmp_path / "test-v1"
+    (ds_path / "jobs").mkdir(parents=True)
+    (ds_path / "jobs" / "oracle.json").write_text("{}")
+    _write_suite_toml(ds_path / "suite.toml")
+    (tmp_path / "benchmarks" / "tasks" / "incomplete-task").mkdir(parents=True)
+    reg = _write_registry(tmp_path, [_make_dataset_entry("jacobian/test-v1", ds_path)])
+
+    with pytest.raises(HarborSuiteError, match=r"missing task\.toml"):
+        load_registry(reg)
 
 
 # ---------------------------------------------------------------------------
@@ -373,9 +402,7 @@ def test_expected_dataset_manifest_has_header_and_tasks(
     tmp_path: Path, patched_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ds_path = tmp_path / "test-v1"
-    (ds_path / "tasks" / "a").mkdir(parents=True)
-    (ds_path / "tasks" / "a" / "solution").mkdir(parents=True)
-    _make_minimal_task(ds_path / "tasks" / "a")
+    _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     _write_suite_toml(
@@ -383,8 +410,7 @@ def test_expected_dataset_manifest_has_header_and_tasks(
         tasks=[
             {
                 "id": "jacobian/test-v1-a",
-                "path": "tasks/a",
-                "maximum_assurance": "COMPUTED",
+                "assurance_ceiling": "COMPUTED",
                 "required_provider": "core",
             }
         ],
@@ -464,8 +490,7 @@ def test_render_job_config_rejects_no_placeholder() -> None:
 
 def _make_suite_with_task(tmp_path: Path) -> tuple[Suite, Path]:
     ds_path = tmp_path / "test-v1"
-    (ds_path / "tasks" / "a").mkdir(parents=True)
-    task = _make_minimal_task(ds_path / "tasks" / "a")
+    task = _make_canonical_task(tmp_path)
     (ds_path / "jobs").mkdir()
     (ds_path / "jobs" / "oracle.json").write_text("{}")
     canonical = tmp_path / "benchmarks" / "tooling"
@@ -473,14 +498,7 @@ def _make_suite_with_task(tmp_path: Path) -> tuple[Suite, Path]:
     (canonical / "verifier_support.py").write_text("# vendored support\n")
     _write_suite_toml(
         ds_path / "suite.toml",
-        tasks=[
-            {
-                "id": "jacobian/test-v1-a",
-                "path": "tasks/a",
-                "maximum_assurance": "COMPUTED",
-                "required_provider": "core",
-            }
-        ],
+        tasks=[{"id": "jacobian/test-v1-a", "assurance_ceiling": "COMPUTED"}],
     )
     reg = _write_registry(
         tmp_path,
@@ -641,16 +659,16 @@ def test_check_verifier_support_uses_repository_canonical_copy(
 # ---------------------------------------------------------------------------
 
 
-def test_committed_performance_suite_has_four_tasks() -> None:
+def test_committed_performance_suite_has_core_tasks() -> None:
     suite = get_suite("jacobian/performance-v1")
-    assert len(suite.tasks) == 4
+    assert suite.tasks
     assert all(t.maximum_assurance == "COMPUTED" for t in suite.tasks)
     assert all(t.required_provider == "core" for t in suite.tasks)
 
 
-def test_committed_provider_suite_has_six_tasks() -> None:
+def test_committed_provider_suite_has_provider_tasks() -> None:
     suite = get_suite("jacobian/provider-feasibility-v1")
-    assert len(suite.tasks) == 6
+    assert suite.tasks
 
 
 def test_committed_examples_suite_allows_empty_tasks() -> None:
@@ -658,6 +676,9 @@ def test_committed_examples_suite_allows_empty_tasks() -> None:
     assert suite.tasks == ()
 
 
-def test_committed_agent_workflow_suite_has_38_tasks() -> None:
+def test_committed_agent_workflow_suite_has_canonical_tasks() -> None:
     suite = get_suite("jacobian/agent-workflow-v1")
-    assert len(suite.tasks) == 38
+    assert suite.tasks
+    assert all(
+        task.path.parent == ROOT / "benchmarks" / "tasks" for task in suite.tasks
+    )

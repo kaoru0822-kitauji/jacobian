@@ -1,1 +1,0 @@
-{"task_id":"jacobian/agent-workflow-v1-polynomial-map-collision","map":"f(x,y)=(x+y, x*y)","point_p":[1,2],"point_q":[2,1],"domain":"Z^2"}

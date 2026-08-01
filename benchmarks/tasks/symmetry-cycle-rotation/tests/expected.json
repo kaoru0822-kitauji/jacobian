@@ -1,0 +1,1 @@
+{"task_id":"jacobian/symmetry-cycle-rotation","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/symmetry-cycle-rotation","complete finite input"],"expected_vertex_orbits":[["a","b","c","d"]],"expected_edge_orbits":[[["a","b"],["a","d"],["b","c"],["c","d"]]]}

@@ -1,0 +1,1 @@
+{"task_id":"jacobian/integral-circle","conclusion":"TRUE","maximum_assurance":"COMPUTED","required_scope_terms":["jacobian/integral-circle","complete finite input"],"expected_free_ranks":[1,1],"expected_torsion":[[],[]]}

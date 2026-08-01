@@ -1,0 +1,3 @@
+task_id = "polynomial-normalization"
+assurance_ceiling = "VERIFIED"
+required_provider = "core"

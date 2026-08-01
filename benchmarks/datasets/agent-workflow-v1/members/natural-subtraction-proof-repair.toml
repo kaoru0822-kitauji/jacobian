@@ -1,0 +1,3 @@
+task_id = "natural-subtraction-proof-repair"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

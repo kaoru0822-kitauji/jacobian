@@ -45,8 +45,11 @@ jobs:
       run-security: ${{ steps.classify.outputs.run-security }}
       run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
       run-docs: ${{ steps.classify.outputs.run-docs }}
+      product-lane-matrix: ${{ steps.classify.outputs.product-lane-matrix }}
       domain-shard-count: ${{ steps.shards.outputs.domain-shard-count }}
       domain-shards: ${{ steps.shards.outputs.domain-shards }}
+      composition-shard-count: ${{ steps.shards.outputs.composition-shard-count }}
+      composition-shards: ${{ steps.shards.outputs.composition-shards }}
       node-version-jscpd: ${{ steps.shards.outputs.node-version-jscpd }}
       node-version-npm: ${{ steps.shards.outputs.node-version-npm }}
       pytest-randomly-shard-seed: ${{ steps.shards.outputs.pytest-randomly-shard-seed }}
@@ -57,7 +60,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - id: shards
-        name: Load domain shard configuration
+        name: Load sharded-lane configuration
         run: .github/scripts/manage-test-timings emit-plan-outputs >> "$GITHUB_OUTPUT"
       - id: classify
         name: Classify changed paths
@@ -104,6 +107,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           .github/scripts/manage-test-timings prepare
+          --suite domain
           --output .ci/test-durations.json
       - name: Share domain timing hint
         if: steps.classify.outputs.run-domain == 'true'
@@ -111,6 +115,22 @@ jobs:
         with:
           name: domain-test-durations-input
           path: .ci/test-durations.json
+          include-hidden-files: true
+          retention-days: 1
+      - name: Prepare composition timing hint
+        if: steps.classify.outputs.run-composition == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .github/scripts/manage-test-timings prepare
+          --suite composition
+          --output .ci/composition-test-durations.json
+      - name: Share composition timing hint
+        if: steps.classify.outputs.run-composition == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: composition-test-durations-input
+          path: .ci/composition-test-durations.json
           include-hidden-files: true
           retention-days: 1
 
@@ -370,6 +390,67 @@ jobs:
           path: .coverage.domain-${{ matrix.shard }}
           include-hidden-files: true
 
+  composition-test:
+    name: >-
+      Tests (composition ${{ matrix.shard }} of
+      ${{ needs.plan.outputs.composition-shard-count }}, Python 3.12)
+    needs: plan
+    if: needs.plan.outputs.run-composition == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.composition-shards) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download composition timing hint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: composition-test-durations-input
+          path: .ci
+      - uses: ./.github/actions/setup-python-tests
+        with:
+          python-version: "3.12"
+      - run: make test-composition
+        env:
+          PYTEST_ARGS: >-
+            --splits ${{ needs.plan.outputs.composition-shard-count }}
+            --group ${{ matrix.shard }}
+            --splitting-algorithm least_duration
+            --durations-path .ci/composition-test-durations.json
+            --randomly-seed ${{ needs.plan.outputs.pytest-randomly-shard-seed }}
+            --store-durations
+            --clean-durations
+            --junitxml=pytest.xml
+            ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
+      - name: Upload composition shard timings
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: composition-duration-shard-${{ matrix.shard }}
+          path: .ci/composition-test-durations.json
+          include-hidden-files: true
+          retention-days: 1
+      - if: ${{ !cancelled() }}
+        run: uv cache prune --ci
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: junit-composition-${{ matrix.shard }}-3.12
+          path: pytest.xml
+          if-no-files-found: ignore
+          retention-days: 7
+      - if: needs.plan.outputs.run-coverage == 'true'
+        run: mv .coverage .coverage.composition-${{ matrix.shard }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && needs.plan.outputs.run-coverage == 'true' }}
+        with:
+          name: coverage-data-composition-${{ matrix.shard }}
+          path: .coverage.composition-${{ matrix.shard }}
+          include-hidden-files: true
+
   process-test:
     name: Tests (process boundary, Python 3.12)
     needs: plan
@@ -401,53 +482,39 @@ jobs:
   semantic-lane-test:
     name: Tests (${{ matrix.lane }}, Python 3.12)
     needs: plan
-    if: needs.plan.outputs.run-python == 'true'
+    if: needs.plan.outputs.product-lane-matrix != '{"include":[]}'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        lane: [component, composition, storage, mcp, provider, e2e]
+      matrix: ${{ fromJSON(needs.plan.outputs.product-lane-matrix) }}
     steps:
-      - name: Select planned lane
-        id: select
-        env:
-          RUN_LANE: ${{ needs.plan.outputs[format('run-{0}', matrix.lane)] }}
-        run: |
-          case "$RUN_LANE" in
-            true) echo "selected=true" >> "$GITHUB_OUTPUT" ;;
-            false) echo "selected=false" >> "$GITHUB_OUTPUT" ;;
-            *) echo "invalid plan value for ${{ matrix.lane }}: $RUN_LANE" >&2; exit 1 ;;
-          esac
-      - if: steps.select.outputs.selected == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - if: steps.select.outputs.selected == 'true'
-        uses: ./.github/actions/setup-python-tests
+      - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
       - name: Run semantic lane
-        if: steps.select.outputs.selected == 'true'
         env:
           LANE: ${{ matrix.lane }}
           PYTEST_ARGS: >-
             --junitxml=pytest.xml
             ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
         run: make "test-${LANE}"
-      - if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+      - if: needs.plan.outputs.run-coverage == 'true'
         run: mv .coverage .coverage.${{ matrix.lane }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+        if: needs.plan.outputs.run-coverage == 'true'
         with:
           name: coverage-data-${{ matrix.lane }}
           path: .coverage.${{ matrix.lane }}
           include-hidden-files: true
 
   publish-test-durations:
-    name: Publish domain test durations
+    name: Publish sharded test durations
     if: github.ref == 'refs/heads/main'
-    needs: [plan, domain-test]
+    needs: [plan, domain-test, composition-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -457,9 +524,9 @@ jobs:
       - name: Download shard timings
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: domain-duration-shard-*
+          pattern: '*-duration-shard-*'
           path: .ci/shards
-      - name: Merge shard timings
+      - name: Merge domain shard timings
         env:
           SHARD_COUNT: ${{ needs.plan.outputs.domain-shard-count }}
         run: |
@@ -468,16 +535,39 @@ jobs:
             inputs+=(--input ".ci/shards/domain-duration-shard-${shard}/test-durations.json")
           done
           .github/scripts/manage-test-timings merge \
+            --suite domain \
             "${inputs[@]}" \
             --output .ci/domain-test-durations.json \
             --source-sha "${{ github.sha }}" \
             --python-version "3.12" \
             --pytest-split-version "${{ needs.plan.outputs.pytest-split-version }}"
-      - name: Publish timing hint
+      - name: Merge composition shard timings
+        env:
+          SHARD_COUNT: ${{ needs.plan.outputs.composition-shard-count }}
+        run: |
+          inputs=()
+          for shard in $(seq 1 "$SHARD_COUNT"); do
+            inputs+=(--input ".ci/shards/composition-duration-shard-${shard}/composition-test-durations.json")
+          done
+          .github/scripts/manage-test-timings merge \
+            --suite composition \
+            "${inputs[@]}" \
+            --output .ci/composition-test-durations.json \
+            --source-sha "${{ github.sha }}" \
+            --python-version "3.12" \
+            --pytest-split-version "${{ needs.plan.outputs.pytest-split-version }}"
+      - name: Publish domain timing hint
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: domain-test-durations
           path: .ci/domain-test-durations.json
+          include-hidden-files: true
+          retention-days: 90
+      - name: Publish composition timing hint
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: composition-test-durations
+          path: .ci/composition-test-durations.json
           include-hidden-files: true
           retention-days: 90
 
@@ -511,7 +601,7 @@ jobs:
     name: Python Tests
     if: ${{ !cancelled() }}
     needs:
-      [plan, unit-test, domain-test, process-test, semantic-lane-test, compatibility-test]
+      [plan, unit-test, domain-test, composition-test, process-test, semantic-lane-test, compatibility-test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -521,10 +611,13 @@ jobs:
           RUN_PYTHON: ${{ needs.plan.outputs.run-python }}
           RUN_UNIT: ${{ needs.plan.outputs.run-unit }}
           RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
+          RUN_COMPOSITION: ${{ needs.plan.outputs.run-composition }}
           RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
           RUN_COMPATIBILITY: ${{ needs.plan.outputs.run-compatibility }}
+          PRODUCT_LANE_MATRIX: ${{ needs.plan.outputs.product-lane-matrix }}
           UNIT_RESULT: ${{ needs.unit-test.result }}
           DOMAIN_RESULT: ${{ needs.domain-test.result }}
+          COMPOSITION_RESULT: ${{ needs.composition-test.result }}
           PROCESS_RESULT: ${{ needs.process-test.result }}
           SEMANTIC_RESULT: ${{ needs.semantic-lane-test.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility-test.result }}
@@ -554,14 +647,19 @@ jobs:
             false) test "$DOMAIN_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
+          case "$RUN_COMPOSITION" in
+            true) test "$COMPOSITION_RESULT" = "success" ;;
+            false) test "$COMPOSITION_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
           case "$RUN_PROCESS" in
             true) test "$PROCESS_RESULT" = "success" ;;
             false) test "$PROCESS_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
-          case "$RUN_PYTHON" in
-            true) test "$SEMANTIC_RESULT" = "success" ;;
-            false) test "$SEMANTIC_RESULT" = "skipped" ;;
+          case "$PRODUCT_LANE_MATRIX" in
+            '{"include":[]}') test "$SEMANTIC_RESULT" = "skipped" ;;
+            '{"include":['*) test "$SEMANTIC_RESULT" = "success" ;;
             *) exit 1 ;;
           esac
           case "$RUN_COMPATIBILITY" in
@@ -628,7 +726,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs:
-      [plan, unit-test, domain-test, process-test, semantic-lane-test]
+      [plan, unit-test, domain-test, composition-test, process-test, semantic-lane-test]
     permissions:
       contents: read
       pull-requests: write
@@ -639,9 +737,11 @@ jobs:
           RUN_COVERAGE: ${{ needs.plan.outputs.run-coverage }}
           RUN_UNIT: ${{ needs.plan.outputs.run-unit }}
           RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
+          RUN_COMPOSITION: ${{ needs.plan.outputs.run-composition }}
           RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
           UNIT_RESULT: ${{ needs.unit-test.result }}
           DOMAIN_RESULT: ${{ needs.domain-test.result }}
+          COMPOSITION_RESULT: ${{ needs.composition-test.result }}
           PROCESS_RESULT: ${{ needs.process-test.result }}
           SEMANTIC_RESULT: ${{ needs.semantic-lane-test.result }}
         run: |
@@ -670,7 +770,13 @@ jobs:
             false) test "$DOMAIN_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
+          case "$RUN_COMPOSITION" in
+            true) test "$COMPOSITION_RESULT" = "success" ;;
+            false) test "$COMPOSITION_RESULT" = "skipped" ;;
+            *) exit 1 ;;
+          esac
           if [ "$RUN_COVERAGE" = "true" ]; then
+            test "$COMPOSITION_RESULT" = "success"
             test "$RUN_PROCESS" = "true"
             test "$PROCESS_RESULT" = "success"
             test "$SEMANTIC_RESULT" = "success"
@@ -939,6 +1045,7 @@ jobs:
       - validate-built-package
       - unit-test
       - domain-test
+      - composition-test
       - compatibility-test
       - python-test
       - process-test

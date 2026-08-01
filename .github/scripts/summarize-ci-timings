@@ -26,11 +26,11 @@ def _jobs(payload: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _domain_shard_seconds(rows: list[tuple[str, float]]) -> list[float]:
+def _shard_seconds(rows: list[tuple[str, float]], lane: str) -> list[float]:
     return [
         seconds
         for name, seconds in rows
-        if "domain" in name.casefold() and " of " in name.casefold()
+        if lane in name.casefold() and " of " in name.casefold()
     ]
 
 
@@ -63,26 +63,27 @@ def render(payload: Any) -> str:
         f"| Completed jobs | {len(rows)} |",
         "",
     ]
-    shard_seconds = _domain_shard_seconds(rows)
-    if len(shard_seconds) >= 2:
-        slowest = max(shard_seconds)
-        fastest = min(shard_seconds)
-        skew_ratio = slowest / fastest if fastest > 0 else float("inf")
-        lines.extend(
-            (
-                f"| Domain shard skew (max/min) | {skew_ratio:.2f}x |",
-                "",
-            )
-        )
-        if skew_ratio >= 1.5:
+    for lane in ("domain", "composition"):
+        shard_seconds = _shard_seconds(rows, lane)
+        if len(shard_seconds) >= 2:
+            slowest = max(shard_seconds)
+            fastest = min(shard_seconds)
+            skew_ratio = slowest / fastest if fastest > 0 else float("inf")
             lines.extend(
                 (
-                    "Integration shards differ by at least 1.5x. The next successful "
-                    "main-branch domain run will publish fresh timings; until "
-                    "then, shards fall back to equal weighting.",
+                    f"| {lane.title()} shard skew (max/min) | {skew_ratio:.2f}x |",
                     "",
                 )
             )
+            if skew_ratio >= 1.5:
+                lines.extend(
+                    (
+                        f"{lane.title()} shards differ by at least 1.5x. The next "
+                        f"successful main-branch {lane} run will publish fresh "
+                        "timings; until then, shards fall back to equal weighting.",
+                        "",
+                    )
+                )
     return "\n".join(lines)
 
 

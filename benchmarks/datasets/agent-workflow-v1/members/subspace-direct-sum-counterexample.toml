@@ -1,0 +1,3 @@
+task_id = "subspace-direct-sum-counterexample"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

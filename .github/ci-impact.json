@@ -88,36 +88,44 @@
       ]
     },
     {
-      "name": "unit-component-tests",
-      "patterns": [
-        "tests/unit/**",
-        "tests/component/**"
-      ],
-      "suites": [
-        "unit",
-        "component",
-        "static"
-      ]
+      "name": "unit-tests",
+      "patterns": ["tests/unit/**"],
+      "suites": ["unit", "static"]
     },
     {
-      "name": "semantic-test-lanes",
-      "patterns": [
-        "tests/domain/**",
-        "tests/composition/**",
-        "tests/boundary/storage/**",
-        "tests/boundary/process/**",
-        "tests/boundary/mcp/**",
-        "tests/e2e/**"
-      ],
-      "suites": [
-        "domain",
-        "composition",
-        "storage",
-        "process",
-        "mcp",
-        "e2e",
-        "static"
-      ]
+      "name": "component-tests",
+      "patterns": ["tests/component/**"],
+      "suites": ["component", "static"]
+    },
+    {
+      "name": "domain-tests",
+      "patterns": ["tests/domain/**"],
+      "suites": ["domain", "static"]
+    },
+    {
+      "name": "composition-tests",
+      "patterns": ["tests/composition/**"],
+      "suites": ["composition", "static"]
+    },
+    {
+      "name": "storage-tests",
+      "patterns": ["tests/boundary/storage/**"],
+      "suites": ["storage", "static"]
+    },
+    {
+      "name": "process-tests",
+      "patterns": ["tests/boundary/process/**"],
+      "suites": ["process", "static"]
+    },
+    {
+      "name": "mcp-tests",
+      "patterns": ["tests/boundary/mcp/**"],
+      "suites": ["mcp", "static"]
+    },
+    {
+      "name": "end-to-end-tests",
+      "patterns": ["tests/e2e/**"],
+      "suites": ["e2e", "static"]
     },
     {
       "name": "verification-boundary",
@@ -414,18 +422,7 @@
       "patterns": [
         "benchmarks/**"
       ],
-      "suites": [
-        "unit",
-        "component",
-        "domain",
-        "composition",
-        "storage",
-        "process",
-        "mcp",
-        "e2e",
-        "static",
-        "build"
-      ]
+      "suites": []
     }
   ],
   "fallback": {

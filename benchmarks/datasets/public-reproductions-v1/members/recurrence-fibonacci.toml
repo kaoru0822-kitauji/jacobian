@@ -1,0 +1,3 @@
+task_id = "recurrence-fibonacci"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

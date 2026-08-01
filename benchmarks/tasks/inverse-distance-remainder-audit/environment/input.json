@@ -1,0 +1,32 @@
+{
+  "task_id": "jacobian/inverse-distance-remainder-audit",
+  "source": {
+    "dataset": "Jiahao004/DeepTheorem",
+    "repository": "https://huggingface.co/datasets/Jiahao004/DeepTheorem",
+    "revision": "f5935720f176cedff4ecd8ebf83d1696e31cfac8",
+    "config": "default",
+    "split": "train",
+    "row": 5001,
+    "source_id": 43363,
+    "row_sha256": "sha256:c5bfe234c517c99357fbabc3325bb1289829822aa3db7908ff40a9e191e76497",
+    "license": "MIT",
+    "upstream_source": "stackexchange-math"
+  },
+  "claim": {
+    "ambient_space": "R^n",
+    "assumptions": ["|x|>0", "|y|/|x| tends to 0"],
+    "formula": "1/|x-y| = 1/|x| + (x dot y)/|x|^3 + O(|y|^3/|x|^3)",
+    "dataset_label": false
+  },
+  "frozen_response_summary": {
+    "conclusion": "disproved",
+    "stated_correct_remainder": "O(|y|^2/|x|^3)",
+    "reasoning_step": "after epsilon=-2(x dot y)/|x|^2+|y|^2/|x|^2, the response replaces O(epsilon^2) by O((|y|/|x|)^4)"
+  },
+  "audit_contract": {
+    "normalization": "by rotational invariance set x=e_1 and y=t*u with |u|=1",
+    "required_positive_and_negative_quadratic_witnesses": true,
+    "correct_second_order_term": "(3(x dot y)^2-|x|^2|y|^2)/(2|x|^5)",
+    "truth_or_provability_assurance": "NOT_EXTERNALLY_VERIFIED"
+  }
+}
