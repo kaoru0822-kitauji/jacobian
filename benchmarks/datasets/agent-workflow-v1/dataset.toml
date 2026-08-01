@@ -20,7 +20,7 @@ digest = "sha256:9b5f8b6551fe13ddfa9c9e05b99de374ebb6bd1097c1a297c80253053d26fcc
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-complex-power-sum-elimination"
-digest = "sha256:521412c77dc5bbc30d56f6465fca773a524852729a1cbf04c58bc584d1e7c6f0"
+digest = "sha256:9c117e931e4c306188256c1baab3be11bbda681a964c89ac83f3e3a277e2d209"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"

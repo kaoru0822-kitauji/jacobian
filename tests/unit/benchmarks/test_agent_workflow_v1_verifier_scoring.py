@@ -1048,3 +1048,23 @@ def test_inverse_distance_enforces_visible_rational_bounds(tmp_path: Path) -> No
     _write_json(submission_path, submission)
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
+
+
+def test_complex_elimination_does_not_require_prescribed_recurrence(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "complex-power-sum-elimination", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"].pop("recurrence")
+    submission["result"]["elimination"].pop("hypothesis_factorization")
+    schema = json.loads((task / "environment" / "submission_schema.json").read_text())
+    Draft202012Validator(schema).validate(submission)
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
