@@ -5,7 +5,7 @@
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
     "task_count": 38,
-    "manifest_sha256": "sha256:86d3a19c7d213bd0df9ae4c872f6b08348c770613bb5c887c6ef7ebd10d58299",
+    "manifest_sha256": "sha256:db1c835fc9f788d378aa5a703aa47e35c106375e84192e55b558f6d3d9584469",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -197,12 +197,12 @@
     {
       "task_id": "erdos-gallai-realization-audit",
       "mathematical_moves": ["Construct a simple graph realizing one degree sequence.","Compute every Erdős–Gallai obstruction for a nongraphical sequence."],
-      "current_capabilities": [{"capability_id":"graph.compute.properties","availability":"AVAILABLE","boundary":"Computes properties of a supplied graph but does not realize or obstruct degree sequences."}],
-      "gap_classes": ["MODEL_REASONING"],
+      "current_capabilities": [{"capability_id":"graph.realize.degree_sequence","availability":"AVAILABLE","boundary":"Directly constructs a realization or returns an exact Erdős–Gallai obstruction; the task additionally asks for every violating index."},{"capability_id":"graph.compute.properties","availability":"AVAILABLE","boundary":"Replays properties of a supplied graph."}],
+      "gap_classes": ["EXISTING_WORKS"],
       "contamination": "PUBLIC_ANSWER_VISIBLE",
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
-      "next_action": "Keep realization construction and theorem-based obstruction as agent-owned composition."
+      "next_action": "Use graph.realize.degree_sequence for the realization or obstruction, with agent-owned enumeration only for the task's all-violations requirement."
     },
     {
       "task_id": "euler-fourth-power-scope-audit",
@@ -451,7 +451,7 @@
         "Compute transitive declaration dependencies from frozen roots.",
         "Separate shallow axiom reports from complete trust closure."
       ],
-      "current_capabilities": [{"capability_id":"lean.trust.inspect","availability":"AVAILABLE","boundary":"Current inspection contracts do not replay this historical collector defect."}],
+      "current_capabilities": [{"capability_id":"lean.proof.axioms.inspect","availability":"UNAVAILABLE","boundary":"The capability is catalogued, but the frozen runtime snapshot does not have the pinned Lean provider installed; it also does not replay this historical collector defect."}],
       "gap_classes": ["MODEL_REASONING"],
       "contamination": "PUBLIC_ANSWER_VISIBLE",
       "candidate_ids": [],

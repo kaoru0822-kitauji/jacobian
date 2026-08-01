@@ -42,7 +42,12 @@ def _rational(value: object) -> Fraction | None:
         return None
     numerator = value["numerator"]
     denominator = value["denominator"]
-    if type(numerator) is not int or type(denominator) is not int or denominator <= 0:
+    if (
+        type(numerator) is not int
+        or type(denominator) is not int
+        or not -1_000_000 <= numerator <= 1_000_000
+        or not 1 <= denominator <= 1_000_000
+    ):
         return None
     if math.gcd(abs(numerator), denominator) != 1:
         return None
@@ -95,6 +100,8 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
         or source.get("source", {}).get("row_sha256")
         != "sha256:c5bfe234c517c99357fbabc3325bb1289829822aa3db7908ff40a9e191e76497"
         or source.get("claim", {}).get("dataset_label") is not False
+        or source.get("audit_contract", {}).get("normalization")
+        != "by rotational invariance set x=e_1 and y=t*u with |u|=1"
     ):
         return False
     if not isinstance(result, dict) or set(result) != {

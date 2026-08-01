@@ -24,7 +24,7 @@
     "reasoning_step": "after epsilon=-2(x dot y)/|x|^2+|y|^2/|x|^2, the response replaces O(epsilon^2) by O((|y|/|x|)^4)"
   },
   "audit_contract": {
-    "normalization": "set |x|=1 and y=t*u with |u|=1",
+    "normalization": "by rotational invariance set x=e_1 and y=t*u with |u|=1",
     "required_positive_and_negative_quadratic_witnesses": true,
     "correct_second_order_term": "(3(x dot y)^2-|x|^2|y|^2)/(2|x|^5)",
     "truth_or_provability_assurance": "NOT_EXTERNALLY_VERIFIED"

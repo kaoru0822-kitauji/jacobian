@@ -23,3 +23,8 @@ Write `/app/submission.json` and bind a concise explanation at
 `/app/evidence/answer.txt` by SHA-256. Do not claim that you established the
 actual smallest counterexample, and do not claim `VERIFIED`; the independent
 checker provides exact computation, not proof-assistant verification.
+
+The frozen source URLs are provenance pointers only and are not bound to a
+content digest. Include this checked limitation exactly: `The checker refutes
+minimality at index 97 but does not establish the actual smallest counterexample
+or replay the complete public conversation.`
