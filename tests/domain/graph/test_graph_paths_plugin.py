@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+import pytest
+
 from jacobian.plugins.graph_paths import (
-    evaluate,
-    find_witness,
+    evaluate_capability,
+    find_witness_capability,
     materialize,
-    reductions,
     reductions_capability,
-    validate_candidate,
-    validate_claim,
 )
 
 
@@ -41,55 +40,22 @@ def _bipartite_candidate() -> dict:
     }
 
 
-def test_validate_candidate_accepts_path_closure_fixture() -> None:
-    assert validate_candidate(_path_closure_candidate()) == []
-
-
-def test_validate_candidate_rejects_duplicate_vertices() -> None:
-    cand = _path_closure_candidate()
-    cand["vertices"] = ["s", "a", "a", "x", "t1", "t2"]
-    assert any("unique" in e for e in validate_candidate(cand))
-
-
-def test_validate_candidate_rejects_out_of_domain_arc() -> None:
-    cand = _path_closure_candidate()
-    cand["arcs"].append(["s", "z"])
-    assert any("out of domain" in e for e in validate_candidate(cand))
-
-
-def test_validate_claim_accepts_supported_predicates() -> None:
-    assert (
-        validate_claim({"predicate": "intended_paths_complete", "simple": True}) == []
-    )
-    assert validate_claim({"predicate": "is_bipartite"}) == []
-
-
-def test_validate_claim_rejects_unknown_predicate() -> None:
-    errors = validate_claim({"predicate": "has_hamiltonian_path"})
-    assert errors
-
-
 def test_evaluate_path_closure_is_incomplete() -> None:
     claim = {"predicate": "intended_paths_complete", "simple": True}
-    resp = evaluate({"claim": claim, "candidate": _path_closure_candidate()})
-    assert resp["input"]["status"] == "ACCEPTED"
-    result = resp["results"][0]
-    assert result["objective"]["value"] is False
-    assert result["objective"]["num_actual"] == 4
-    assert result["objective"]["num_intended"] == 2
-    assert result["proposed_witness"]["payload"]["path"] not in [
-        ["s", "a", "x", "t1"],
-        ["s", "b", "x", "t2"],
-    ]
+    response = evaluate_capability(
+        {"claim": claim, "candidate": _path_closure_candidate()}
+    )
+    assert response["conclusion"] == "FALSE"
+    assert response["failure_classifications"] == ["omitted_semantic_object"]
+    assert response["features"] == {"num_actual": "4", "num_intended": "2"}
 
 
 def test_path_closure_rejects_candidate_without_semantic_roles() -> None:
     claim = {"predicate": "intended_paths_complete", "simple": True}
     candidate = {"vertices": ["s", "t"], "arcs": [["s", "t"]]}
 
-    resp = evaluate({"claim": claim, "candidate": candidate})
-
-    assert resp["input"]["status"] == "REJECTED"
+    with pytest.raises(ValueError, match="graph evaluation request does not match"):
+        evaluate_capability({"claim": claim, "candidate": candidate})
 
 
 def test_bounded_path_search_does_not_claim_exhaustive_coverage() -> None:
@@ -106,7 +72,7 @@ def test_bounded_path_search_does_not_claim_exhaustive_coverage() -> None:
         "intended_paths": [],
     }
 
-    resp = find_witness(
+    resp = find_witness_capability(
         {
             "claim": claim,
             "candidate": candidate,
@@ -120,7 +86,7 @@ def test_bounded_path_search_does_not_claim_exhaustive_coverage() -> None:
 
 def test_negative_support_search_keeps_assurance_metadata() -> None:
     claim = {"predicate": "is_bipartite"}
-    resp = find_witness(
+    resp = find_witness_capability(
         {
             "claim": claim,
             "candidate": _bipartite_candidate(),
@@ -143,15 +109,14 @@ def test_path_claim_rejects_source_as_terminal() -> None:
         "intended_paths": [["s", "t"]],
     }
 
-    resp = find_witness(
-        {
-            "claim": claim,
-            "candidate": candidate,
-            "witness_role": "DEFEATS_CANDIDATE",
-        }
-    )
-
-    assert resp["input"]["status"] == "REJECTED"
+    with pytest.raises(ValueError, match="graph capability request does not match"):
+        find_witness_capability(
+            {
+                "claim": claim,
+                "candidate": candidate,
+                "witness_role": "DEFEATS_CANDIDATE",
+            }
+        )
 
 
 def test_evaluate_bipartite_true() -> None:
@@ -160,24 +125,20 @@ def test_evaluate_bipartite_true() -> None:
         "arcs": [["a", "b"], ["b", "c"]],
     }
     claim = {"predicate": "is_bipartite"}
-    resp = evaluate({"claim": claim, "candidate": cand})
-    assert resp["results"][0]["objective"]["value"] is True
-    assert resp["results"][0]["proposed_witness"]["witness_format"] == "graph.2coloring"
+    resp = evaluate_capability({"claim": claim, "candidate": cand})
+    assert resp["conclusion"] == "TRUE"
 
 
 def test_evaluate_bipartite_false_for_triangle() -> None:
     claim = {"predicate": "is_bipartite"}
-    resp = evaluate({"claim": claim, "candidate": _bipartite_candidate()})
-    result = resp["results"][0]
-    assert result["objective"]["value"] is False
-    assert result["proposed_witness"]["witness_format"] == "graph.odd_cycle"
-    cycle = result["proposed_witness"]["payload"]["cycle"]
-    assert len(cycle) == 3
+    resp = evaluate_capability({"claim": claim, "candidate": _bipartite_candidate()})
+    assert resp["conclusion"] == "FALSE"
+    assert resp["objectives"] == {"is_bipartite": False}
 
 
 def test_find_witness_returns_omitted_path() -> None:
     claim = {"predicate": "intended_paths_complete", "simple": True}
-    resp = find_witness(
+    resp = find_witness_capability(
         {
             "claim": claim,
             "candidate": _path_closure_candidate(),
@@ -195,7 +156,7 @@ def test_find_witness_returns_omitted_path() -> None:
 
 def test_find_witness_returns_odd_cycle() -> None:
     claim = {"predicate": "is_bipartite"}
-    resp = find_witness(
+    resp = find_witness_capability(
         {
             "claim": claim,
             "candidate": _bipartite_candidate(),
@@ -219,23 +180,26 @@ def test_materialize_enumerates_all_four_paths() -> None:
     }
 
 
-def test_reductions_for_path_closure() -> None:
+def test_reduction_capability_for_path_closure() -> None:
     claim = {"predicate": "intended_paths_complete", "simple": True}
-    resp = reductions(
+    response = reductions_capability(
         {
             "target_kind": "candidate",
             "target": _path_closure_candidate(),
             "claim": claim,
         }
     )
-    assert resp["input"]["status"] == "ACCEPTED"
-    kinds = {r["reduction_kind"] for r in resp["reductions"]}
-    assert "delete_vertex" in kinds
+    assert response["current_objectives"] == {}
     # Deleting vertices b and t1 (outside the chosen omitted path) must be proposed.
     vertices_to_delete = {
-        r["vertex"]
-        for r in resp["reductions"]
-        if r["reduction_kind"] == "delete_vertex"
+        next(
+            iter(
+                set(_path_closure_candidate()["vertices"])
+                - set(item["payload"]["vertices"])
+            )
+        )
+        for item in response["reductions"]
+        if item["reducer"] == "delete_vertex"
     }
     assert {"b", "t1"}.issubset(vertices_to_delete) or {"b", "t2"}.issubset(
         vertices_to_delete
@@ -261,26 +225,32 @@ def test_reduction_capability_projects_requested_objectives() -> None:
 
 def test_reductions_for_bipartite_triangle() -> None:
     claim = {"predicate": "is_bipartite"}
-    resp = reductions(
+    response = reductions_capability(
         {"target_kind": "candidate", "target": _bipartite_candidate(), "claim": claim}
     )
-    assert resp["input"]["status"] == "ACCEPTED"
     vertices_to_delete = {
-        r["vertex"]
-        for r in resp["reductions"]
-        if r["reduction_kind"] == "delete_vertex"
+        next(
+            iter(
+                set(_bipartite_candidate()["vertices"])
+                - set(item["payload"]["vertices"])
+            )
+        )
+        for item in response["reductions"]
+        if item["reducer"] == "delete_vertex"
     }
     assert {"u0", "u1", "u2"}.issubset(vertices_to_delete)
     # No triangle edge or vertex should be proposed for deletion.
-    for r in resp["reductions"]:
-        if r["reduction_kind"] == "delete_vertex":
-            assert r["vertex"] in {"u0", "u1", "u2"}
-        if r["reduction_kind"] == "delete_edge":
-            assert tuple(r["edge"]) not in {("v0", "v1"), ("v1", "v2"), ("v2", "v0")}
+    for item in response["reductions"]:
+        if item["reducer"] == "delete_vertex":
+            deleted = set(_bipartite_candidate()["vertices"]) - set(
+                item["payload"]["vertices"]
+            )
+            assert deleted <= {"u0", "u1", "u2"}
+    assert all(item["reducer"] != "delete_edge" for item in response["reductions"])
 
 
-def test_results_are_unverified() -> None:
-    resp = evaluate(
+def test_evaluation_does_not_grant_verification_authority() -> None:
+    response = evaluate_capability(
         {"claim": {"predicate": "is_bipartite"}, "candidate": _bipartite_candidate()}
     )
-    assert resp["verified"] is False
+    assert "verified" not in response

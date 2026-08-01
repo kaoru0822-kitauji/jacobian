@@ -218,39 +218,9 @@
       "complexity": 12
     },
     {
-      "path": "src/jacobian/plugins/graph_paths.py",
-      "symbol": "find_witness",
-      "complexity": 14
-    },
-    {
-      "path": "src/jacobian/plugins/graph_paths.py",
-      "symbol": "reductions",
-      "complexity": 11
-    },
-    {
-      "path": "src/jacobian/plugins/graph_paths.py",
-      "symbol": "validate_candidate",
-      "complexity": 16
-    },
-    {
       "path": "src/jacobian/plugins/matrices.py",
       "symbol": "_kernel_vector",
       "complexity": 11
-    },
-    {
-      "path": "src/jacobian/plugins/matrices.py",
-      "symbol": "find_witness",
-      "complexity": 15
-    },
-    {
-      "path": "src/jacobian/plugins/matrices.py",
-      "symbol": "reductions",
-      "complexity": 12
-    },
-    {
-      "path": "src/jacobian/plugins/matrices.py",
-      "symbol": "validate_candidate",
-      "complexity": 12
     },
     {
       "path": "src/jacobian/polynomials/inverse.py",
