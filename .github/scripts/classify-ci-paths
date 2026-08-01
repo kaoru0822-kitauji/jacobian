@@ -18,43 +18,50 @@ def load_manifest() -> dict[str, Any]:
         return json.load(handle)
 
 
-def suites_for_path(path: str, manifest: dict[str, Any]) -> tuple[set[str], set[str]]:
+def suites_for_path(path: str, manifest: dict[str, Any]) -> set[str]:
     matching_rules: list[dict[str, Any]] = []
     for rule in manifest["rules"]:
         if any(fnmatchcase(path, pattern) for pattern in rule["patterns"]):
             matching_rules.append(rule)
     if matching_rules:
-        return (
-            {str(rule["name"]) for rule in matching_rules},
-            {str(suite) for rule in matching_rules for suite in rule["suites"]},
-        )
+        return {str(suite) for rule in matching_rules for suite in rule["suites"]}
     fallback = manifest["fallback"]
-    return {str(fallback["name"])}, set(fallback["suites"])
+    return set(fallback["suites"])
 
 
-def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[str, str]:
+def classify(
+    paths: list[str],
+    *,
+    exhaustive: bool,
+    force_lean: bool,
+) -> dict[str, str]:
     manifest = load_manifest()
     exhaustive = exhaustive or not paths
     all_suites = set(manifest["suites"])
     code_suites = all_suites - {"docs"}
     suites: set[str] = set()
-    owners: set[str] = set()
 
     if exhaustive or not paths:
         suites = all_suites
     else:
         for path in paths:
-            path_owners, owned_suites = suites_for_path(path, manifest)
-            owners.update(path_owners)
-            suites.update(owned_suites)
+            suites.update(suites_for_path(path, manifest))
 
     if force_lean:
         suites.add("lean")
 
-    run_unit = bool({"unit", "component"} & suites)
-    run_domain = bool(
-        {"domain", "composition", "storage", "process", "mcp", "e2e"} & suites
+    python_lanes = (
+        "unit",
+        "component",
+        "domain",
+        "composition",
+        "storage",
+        "process",
+        "mcp",
+        "provider",
+        "e2e",
     )
+    selected_python_lanes = tuple(lane for lane in python_lanes if lane in suites)
     if exhaustive:
         classification = "exhaustive"
     elif suites == {"docs"}:
@@ -62,51 +69,36 @@ def classify(paths: list[str], *, exhaustive: bool, force_lean: bool) -> dict[st
     elif suites in (code_suites, all_suites):
         classification = "full"
     elif not suites:
-        classification = "docs"
+        classification = "none"
     elif suites == {"npm"}:
         classification = "npm"
     elif suites == {"lean"}:
         classification = "lean"
-    elif (
-        suites <= {"unit", "component", "static"} and run_unit and not run_domain
-    ) or (
-        suites
-        <= {
-            "domain",
-            "composition",
-            "storage",
-            "process",
-            "mcp",
-            "e2e",
-            "static",
-        }
-        and run_domain
-        and not run_unit
-    ):
+    elif suites <= {*python_lanes, "static"} and selected_python_lanes:
         classification = "python"
     else:
         classification = "selective"
 
-    # Existing impact rules identify broad Python ownership. Expand that
-    # ownership into the semantic resource lanes; each lane still executes
-    # through its own topology runner and timeout.
-    semantic_lanes = {
-        "run-unit": run_unit,
-        "run-component": run_unit,
-        "run-domain": run_domain,
-        "run-composition": run_domain,
-        "run-storage": run_domain,
-        "run-process": run_domain,
-        "run-mcp": run_domain,
-        "run-provider": "provider" in suites,
-        "run-e2e": run_domain,
-    }
+    semantic_lanes = {f"run-{lane}": lane in suites for lane in python_lanes}
+    matrix_lanes = (
+        "component",
+        "composition",
+        "storage",
+        "mcp",
+        "provider",
+        "e2e",
+    )
+    selected_matrix_lanes = [lane for lane in matrix_lanes if lane in suites]
     plan: dict[str, str] = {
         "classification": classification,
-        "run-python": str(run_unit or run_domain or ("provider" in suites)).lower(),
+        "run-python": str(bool(selected_python_lanes)).lower(),
+        "product-lane-matrix": json.dumps(
+            {"include": [{"lane": lane} for lane in selected_matrix_lanes]},
+            separators=(",", ":"),
+        ),
         **{key: str(value).lower() for key, value in semantic_lanes.items()},
-        "run-coverage": str(exhaustive and run_unit and run_domain).lower(),
-        "run-compatibility": str(exhaustive and run_unit and run_domain).lower(),
+        "run-coverage": str(exhaustive and set(python_lanes) <= suites).lower(),
+        "run-compatibility": str(exhaustive and set(python_lanes) <= suites).lower(),
     }
     for suite in (
         "lean",

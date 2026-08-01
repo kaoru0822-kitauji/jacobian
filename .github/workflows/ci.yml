@@ -45,6 +45,7 @@ jobs:
       run-security: ${{ steps.classify.outputs.run-security }}
       run-duplicate: ${{ steps.classify.outputs.run-duplicate }}
       run-docs: ${{ steps.classify.outputs.run-docs }}
+      product-lane-matrix: ${{ steps.classify.outputs.product-lane-matrix }}
       domain-shard-count: ${{ steps.shards.outputs.domain-shard-count }}
       domain-shards: ${{ steps.shards.outputs.domain-shards }}
       node-version-jscpd: ${{ steps.shards.outputs.node-version-jscpd }}
@@ -397,44 +398,30 @@ jobs:
   semantic-lane-test:
     name: Tests (${{ matrix.lane }}, Python 3.12)
     needs: plan
-    if: needs.plan.outputs.run-python == 'true'
+    if: needs.plan.outputs.product-lane-matrix != '{"include":[]}'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        lane: [component, composition, storage, mcp, provider, e2e]
+      matrix: ${{ fromJSON(needs.plan.outputs.product-lane-matrix) }}
     steps:
-      - name: Select planned lane
-        id: select
-        env:
-          RUN_LANE: ${{ needs.plan.outputs[format('run-{0}', matrix.lane)] }}
-        run: |
-          case "$RUN_LANE" in
-            true) echo "selected=true" >> "$GITHUB_OUTPUT" ;;
-            false) echo "selected=false" >> "$GITHUB_OUTPUT" ;;
-            *) echo "invalid plan value for ${{ matrix.lane }}: $RUN_LANE" >&2; exit 1 ;;
-          esac
-      - if: steps.select.outputs.selected == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - if: steps.select.outputs.selected == 'true'
-        uses: ./.github/actions/setup-python-tests
+      - uses: ./.github/actions/setup-python-tests
         with:
           python-version: "3.12"
       - name: Run semantic lane
-        if: steps.select.outputs.selected == 'true'
         env:
           LANE: ${{ matrix.lane }}
           PYTEST_ARGS: >-
             --junitxml=pytest.xml
             ${{ needs.plan.outputs.run-coverage == 'true' && '--cov --cov-report= --cov-fail-under=0' || '' }}
         run: make "test-${LANE}"
-      - if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+      - if: needs.plan.outputs.run-coverage == 'true'
         run: mv .coverage .coverage.${{ matrix.lane }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ steps.select.outputs.selected == 'true' && needs.plan.outputs.run-coverage == 'true' }}
+        if: needs.plan.outputs.run-coverage == 'true'
         with:
           name: coverage-data-${{ matrix.lane }}
           path: .coverage.${{ matrix.lane }}
@@ -519,6 +506,7 @@ jobs:
           RUN_DOMAIN: ${{ needs.plan.outputs.run-domain }}
           RUN_PROCESS: ${{ needs.plan.outputs.run-process }}
           RUN_COMPATIBILITY: ${{ needs.plan.outputs.run-compatibility }}
+          PRODUCT_LANE_MATRIX: ${{ needs.plan.outputs.product-lane-matrix }}
           UNIT_RESULT: ${{ needs.unit-test.result }}
           DOMAIN_RESULT: ${{ needs.domain-test.result }}
           PROCESS_RESULT: ${{ needs.process-test.result }}
@@ -555,9 +543,9 @@ jobs:
             false) test "$PROCESS_RESULT" = "skipped" ;;
             *) exit 1 ;;
           esac
-          case "$RUN_PYTHON" in
-            true) test "$SEMANTIC_RESULT" = "success" ;;
-            false) test "$SEMANTIC_RESULT" = "skipped" ;;
+          case "$PRODUCT_LANE_MATRIX" in
+            '{"include":[]}') test "$SEMANTIC_RESULT" = "skipped" ;;
+            '{"include":['*) test "$SEMANTIC_RESULT" = "success" ;;
             *) exit 1 ;;
           esac
           case "$RUN_COMPATIBILITY" in
