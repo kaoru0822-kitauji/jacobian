@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import cast
 
+import pytest
 from tests.boundary.process.tooling.ci import run_ci_script
 
 
@@ -74,8 +75,8 @@ def plan_outputs() -> dict[str, str]:
     )
 
 
-def shard_count() -> int:
-    return int(plan_outputs()["domain-shard-count"])
+def shard_count(suite: str = "domain") -> int:
+    return int(plan_outputs()[f"{suite}-shard-count"])
 
 
 def pinned_pytest_split_version() -> str:
@@ -91,7 +92,13 @@ def test_prepare_falls_back_to_equal_weighting_without_github_context(
     env.pop("GH_TOKEN", None)
 
     result = run_ci_script(
-        "manage-test-timings", "prepare", "--output", output, env=env
+        "manage-test-timings",
+        "prepare",
+        "--output",
+        output,
+        "--suite",
+        "domain",
+        env=env,
     )
 
     assert result.returncode == 0
@@ -99,17 +106,20 @@ def test_prepare_falls_back_to_equal_weighting_without_github_context(
     assert "equal weighting" in result.stderr
 
 
-def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> None:
-    count = shard_count()
+@pytest.mark.parametrize("suite", ["domain", "composition"])
+def test_merge_publishes_versioned_metadata_and_all_shards(
+    tmp_path: Path, suite: str
+) -> None:
+    count = shard_count(suite)
     inputs: list[str] = []
     for shard in range(1, count + 1):
         path = tmp_path / f"shard-{shard}.json"
         path.write_text(
-            json.dumps({f"tests/domain/test_{shard}.py::test_case": shard}),
+            json.dumps({f"tests/{suite}/test_{shard}.py::test_case": shard}),
             encoding="utf-8",
         )
         inputs.extend(["--input", str(path)])
-    output = tmp_path / "domain-test-durations.json"
+    output = tmp_path / f"{suite}-test-durations.json"
 
     result = run_ci_script(
         "manage-test-timings",
@@ -121,6 +131,8 @@ def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> No
         "a" * 40,
         "--python-version",
         "3.12",
+        "--suite",
+        suite,
         "--pytest-split-version",
         pinned_pytest_split_version(),
     )
@@ -128,7 +140,7 @@ def test_merge_publishes_versioned_metadata_and_all_shards(tmp_path: Path) -> No
     assert result.returncode == 0, result.stderr
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["version"] == 1
-    assert payload["suite"] == "domain"
+    assert payload["suite"] == suite
     assert payload["shard_count"] == count
     assert len(payload["durations"]) == count
 
@@ -154,6 +166,8 @@ def test_merge_defaults_pytest_split_version_from_pyproject(tmp_path: Path) -> N
         "a" * 40,
         "--python-version",
         "3.12",
+        "--suite",
+        "domain",
     )
 
     assert result.returncode == 0, result.stderr
@@ -167,6 +181,8 @@ def test_emit_plan_outputs_exposes_ci_config_ssot() -> None:
     assert outputs["node-version-npm"] == "24"
     assert outputs["pytest-randomly-shard-seed"] == "0"
     assert outputs["pytest-split-version"]
+    assert int(outputs["composition-shard-count"]) == 2
+    assert json.loads(outputs["composition-shards"]) == [1, 2]
     assert (
         run_ci_script("manage-test-timings", "node-version", "npm").stdout.strip()
         == outputs["node-version-npm"]
@@ -194,6 +210,8 @@ def test_merge_rejects_duplicate_node_ids(tmp_path: Path) -> None:
         "a" * 40,
         "--python-version",
         "3.12",
+        "--suite",
+        "domain",
         "--pytest-split-version",
         pinned_pytest_split_version(),
     )

@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import tomllib
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / ".github" / "ci-impact.json"
+TOPOLOGY = ROOT / "tests" / "topology.toml"
 
 
 def load_manifest() -> dict[str, Any]:
@@ -27,6 +29,15 @@ def suites_for_path(path: str, manifest: dict[str, Any]) -> set[str]:
         return {str(suite) for rule in matching_rules for suite in rule["suites"]}
     fallback = manifest["fallback"]
     return set(fallback["suites"])
+
+
+def deferred_pull_request_lanes() -> set[str]:
+    data = tomllib.loads(TOPOLOGY.read_text(encoding="utf-8"))
+    return {
+        str(lane["name"])
+        for lane in data["lanes"]
+        if lane["ci"]["pull_request"] is False
+    }
 
 
 def classify(
@@ -46,6 +57,9 @@ def classify(
     else:
         for path in paths:
             suites.update(suites_for_path(path, manifest))
+
+    if not exhaustive:
+        suites.difference_update(deferred_pull_request_lanes())
 
     if force_lean:
         suites.add("lean")
@@ -82,7 +96,6 @@ def classify(
     semantic_lanes = {f"run-{lane}": lane in suites for lane in python_lanes}
     matrix_lanes = (
         "component",
-        "composition",
         "storage",
         "mcp",
         "provider",

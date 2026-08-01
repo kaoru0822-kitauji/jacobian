@@ -48,7 +48,7 @@ distribution = "worksteal"
 timeout_seconds = 120
 required_environment = []
 required_provider = ""
-timing_sharding = false
+timing_sharding = true
 ci = { pull_request = true, merge_queue = true, main = true, scheduled = true }
 
 [[lanes]]

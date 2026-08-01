@@ -134,7 +134,7 @@ def main() -> None:
     include = matrix["include"]
     if not isinstance(include, list):
         fail("product-lane-matrix include must be an array")
-    matrix_lanes = ("component", "composition", "storage", "mcp", "provider", "e2e")
+    matrix_lanes = ("component", "storage", "mcp", "provider", "e2e")
     expected_lanes = [lane for lane in matrix_lanes if plan[f"run-{lane}"] == "true"]
     actual_lanes: list[str] = []
     for entry in include:

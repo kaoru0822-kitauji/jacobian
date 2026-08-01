@@ -31,10 +31,10 @@ FUNCTIONAL_KEYS = tuple(
     for key in BOOLEAN_KEYS
     if key not in {"run-coverage", "run-compatibility", "run-docs"}
 )
-NON_PROVIDER_FUNCTIONAL_KEYS = tuple(
-    key for key in FUNCTIONAL_KEYS if key != "run-provider"
+PULL_REQUEST_FUNCTIONAL_KEYS = tuple(
+    key for key in FUNCTIONAL_KEYS if key not in {"run-provider", "run-lean"}
 )
-MATRIX_LANES = ("component", "composition", "storage", "mcp", "provider", "e2e")
+MATRIX_LANES = ("component", "storage", "mcp", "provider", "e2e")
 GENERIC_PYTHON_KEYS = (
     "run-python",
     "run-unit",
@@ -103,15 +103,14 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             ("lean/JacobianLeanRuntime.lean",),
-            _expected_plan("lean", "run-lean"),
+            _expected_plan("none"),
         ),
         (
             ("tests/unit/test_runtime.py", "lean/JacobianLeanRuntime.lean"),
             _expected_plan(
-                "selective",
+                "python",
                 "run-python",
                 "run-unit",
-                "run-lean",
                 "run-static",
             ),
         ),
@@ -130,22 +129,19 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             ("src/jacobian/runtime/model.py",),
-            _expected_plan("selective", *NON_PROVIDER_FUNCTIONAL_KEYS),
+            _expected_plan("selective", *PULL_REQUEST_FUNCTIONAL_KEYS),
         ),
         (
             ("tests/boundary/providers/lean/startup/test_lean.py",),
             _expected_plan(
                 "selective",
-                "run-lean",
                 "run-static",
             ),
         ),
         (
             ("tests/boundary/providers/cvc5/runtime/test_polytope_separation.py",),
             _expected_plan(
-                "python",
-                "run-python",
-                "run-provider",
+                "selective",
                 "run-static",
             ),
         ),
@@ -154,7 +150,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             _expected_plan(
                 "selective",
                 *GENERIC_PYTHON_KEYS,
-                "run-provider",
                 "run-static",
                 "run-build",
             ),
@@ -162,22 +157,16 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         (
             ("tests/support/provider_lean.py",),
             _expected_plan(
-                "selective",
+                "python",
                 "run-python",
                 "run-composition",
                 "run-e2e",
-                "run-lean",
                 "run-static",
             ),
         ),
         (
             ("tests/support/provider_external_sat.py",),
-            _expected_plan(
-                "python",
-                "run-python",
-                "run-provider",
-                "run-static",
-            ),
+            _expected_plan("selective", "run-static"),
         ),
         (
             ("tests/support/provider_spike_isolation.py",),
@@ -197,7 +186,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-component",
                 "run-domain",
                 "run-composition",
-                "run-provider",
                 "run-e2e",
                 "run-static",
             ),
@@ -206,7 +194,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ("tests/boundary/providers/lean/test_lean_replayable_state_capability.py",),
             _expected_plan(
                 "selective",
-                "run-lean",
                 "run-static",
             ),
         ),
@@ -214,7 +201,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             ("tests/boundary/providers/lean/test_lean_statement_capabilities.py",),
             _expected_plan(
                 "selective",
-                "run-lean",
                 "run-static",
             ),
         ),
@@ -227,31 +213,19 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         (
             ("src/jacobian/contracts/results.py",),
             _expected_plan(
-                "selective",
-                *GENERIC_PYTHON_KEYS,
-                "run-lean",
-                "run-static",
-                "run-build",
+                "selective", *GENERIC_PYTHON_KEYS, "run-static", "run-build"
             ),
         ),
         (
             ("src/jacobian/contracts/lean.py",),
             _expected_plan(
-                "selective",
-                *GENERIC_PYTHON_KEYS,
-                "run-lean",
-                "run-static",
-                "run-build",
+                "selective", *GENERIC_PYTHON_KEYS, "run-static", "run-build"
             ),
         ),
         (
             ("src/jacobian/contracts/plugins.py",),
             _expected_plan(
-                "selective",
-                *GENERIC_PYTHON_KEYS,
-                "run-lean",
-                "run-static",
-                "run-build",
+                "selective", *GENERIC_PYTHON_KEYS, "run-static", "run-build"
             ),
         ),
         (
@@ -266,11 +240,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         (
             ("src/jacobian/lean_proof_edit.py",),
             _expected_plan(
-                "selective",
-                *GENERIC_PYTHON_KEYS,
-                "run-lean",
-                "run-static",
-                "run-build",
+                "selective", *GENERIC_PYTHON_KEYS, "run-static", "run-build"
             ),
         ),
         (
@@ -285,7 +255,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         ),
         (
             ("docs/index.md", "pyproject.toml"),
-            _expected_plan("selective", *NON_PROVIDER_FUNCTIONAL_KEYS, "run-docs"),
+            _expected_plan("selective", *PULL_REQUEST_FUNCTIONAL_KEYS, "run-docs"),
         ),
         (
             (".github/workflows/ci.yml",),
@@ -321,20 +291,16 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
         (
             ("tests/support/services.py",),
             _expected_plan(
-                "selective",
+                "python",
                 *GENERIC_PYTHON_KEYS,
-                "run-provider",
-                "run-lean",
                 "run-static",
             ),
         ),
         (
             ("tests/conftest.py",),
             _expected_plan(
-                "selective",
+                "python",
                 *GENERIC_PYTHON_KEYS,
-                "run-provider",
-                "run-lean",
                 "run-static",
             ),
         ),
