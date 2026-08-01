@@ -1,6 +1,7 @@
 "use strict";
 
 const {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -164,6 +165,7 @@ function buildLauncher() {
  * @param {string} [providerPath]
  * @param {string} [projectEnvironment]
  * @param {string} [elanHome]
+ * @param {string} [leanRuntime]
  * @returns {{ command: string, args: string[], version: string, package: null, source: string, stateDir: string, profile: string, env: object }}
  */
 function buildSourceLauncher(
@@ -174,6 +176,7 @@ function buildSourceLauncher(
   providerPath = process.env.PATH || "",
   projectEnvironment = process.env.UV_PROJECT_ENVIRONMENT || "",
   elanHome = process.env.ELAN_HOME || "",
+  leanRuntime = process.env.JACOBIAN_LEAN_RUNTIME || "",
 ) {
   const profiles = new Set(["core", "full-python", "lean", "external-proof"]);
   if (!profiles.has(profile)) {
@@ -181,9 +184,35 @@ function buildSourceLauncher(
   }
   const sourcePath = resolve(source);
   const statePath = resolve(stateDir);
-  if (!existsSync(join(sourcePath, "pyproject.toml")) || !existsSync(join(sourcePath, "uv.lock"))) {
+  const pyprojectPath = join(sourcePath, "pyproject.toml");
+  const projectLines = existsSync(pyprojectPath)
+    ? readFileSync(pyprojectPath, "utf8").split(/\r?\n/)
+    : [];
+  let inProjectSection = false;
+  let hasJacobianName = false;
+  for (const line of projectLines) {
+    const trimmed = line.trim();
+    if (trimmed === "[project]") {
+      inProjectSection = true;
+      continue;
+    }
+    if (inProjectSection && trimmed.startsWith("[")) break;
+    if (
+      inProjectSection &&
+      /^name\s*=\s*["']jacobian["']\s*(?:#.*)?$/.test(trimmed)
+    ) {
+      hasJacobianName = true;
+      break;
+    }
+  }
+  if (
+    !hasJacobianName ||
+    !existsSync(join(sourcePath, "uv.lock")) ||
+    !existsSync(join(sourcePath, "src", "jacobian", "__init__.py"))
+  ) {
     throw new Error(
-      `${sourcePath} is not a Jacobian source checkout: pyproject.toml and uv.lock are required.`,
+      `${sourcePath} is not a Jacobian source checkout: project.name must be ` +
+        "jacobian and src/jacobian/__init__.py plus uv.lock are required.",
     );
   }
   const environment = {};
@@ -191,7 +220,10 @@ function buildSourceLauncher(
   if (projectEnvironment) {
     environment.UV_PROJECT_ENVIRONMENT = projectEnvironment;
   }
-  if (profile === "lean" && elanHome) environment.ELAN_HOME = elanHome;
+  if (elanHome) environment.ELAN_HOME = elanHome;
+  if (leanRuntime) {
+    environment.JACOBIAN_LEAN_RUNTIME = leanRuntime;
+  }
   return {
     command: uvBin,
     args: [
@@ -291,6 +323,7 @@ function writeIfChanged(path, content) {
       flag: "wx",
       mode,
     });
+    chmodSync(temporary, mode);
     renameSync(temporary, path);
   } finally {
     if (existsSync(temporary)) {
@@ -614,6 +647,7 @@ async function interactiveConfirm() {
  * @param {string} [options.providerPath] PATH audited by the source doctor.
  * @param {string} [options.projectEnvironment] uv environment used for sync and launch.
  * @param {string} [options.elanHome] ELAN_HOME audited by the Lean source profile.
+ * @param {string} [options.leanRuntime] Mathlib runtime audited by the Lean source profile.
  * @returns {Promise<object>} Setup report.
  */
 async function run(options) {
@@ -636,6 +670,7 @@ async function run(options) {
         options.providerPath || process.env.PATH || "",
         options.projectEnvironment || process.env.UV_PROJECT_ENVIRONMENT || "",
         options.elanHome || process.env.ELAN_HOME || "",
+        options.leanRuntime || process.env.JACOBIAN_LEAN_RUNTIME || "",
       )
     : buildLauncher();
   const detectedIds = defs.filter((d) => isClientDetected(home, d.id)).map((d) => d.id);

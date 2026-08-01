@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  chmod,
   mkdtemp,
   mkdir,
   lstat,
@@ -180,11 +181,29 @@ test("buildSourceLauncher preserves a nondefault Lean toolchain home", () => {
     "/providers/bin:/usr/bin",
     "",
     "/toolchains/elan",
+    "/runtimes/lean",
   );
   assert.deepEqual(launcher.env, {
     PATH: "/providers/bin:/usr/bin",
     ELAN_HOME: "/toolchains/elan",
+    JACOBIAN_LEAN_RUNTIME: "/runtimes/lean",
   });
+});
+
+test("buildSourceLauncher rejects an unrelated uv project", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-unrelated-source-"));
+  try {
+    await writeFile(join(base, "pyproject.toml"), '[project]\nname = "unrelated"\n');
+    await writeFile(join(base, "uv.lock"), "version = 1\n");
+    await mkdir(join(base, "src", "jacobian"), { recursive: true });
+    await writeFile(join(base, "src", "jacobian", "__init__.py"), "");
+    assert.throws(
+      () => buildSourceLauncher(base, join(base, ".state")),
+      /not a Jacobian source checkout/,
+    );
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });
 
 test("normalizes release-please Python prerelease versions for npm", () => {
@@ -447,6 +466,32 @@ test("config creation uses a private atomic replacement", async () => {
   }
 });
 
+test("atomic config replacement preserves an existing mode under umask", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-config-mode-"));
+  try {
+    const configPath = join(base, "config.json");
+    await writeFile(configPath, "before\n");
+    await chmod(configPath, 0o664);
+    const previousUmask = process.umask(0o077);
+    try {
+      applyEdits([
+        {
+          path: configPath,
+          original: "before\n",
+          updated: "after\n",
+          action: "update",
+        },
+      ]);
+    } finally {
+      process.umask(previousUmask);
+    }
+    assert.equal(await readFile(configPath, "utf8"), "after\n");
+    assert.equal((await stat(configPath)).mode & 0o777, 0o664);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
 test("config writes reject symbolic links without detaching them", async () => {
   const base = await mkdtemp(join(tmpdir(), "jacobian-symlink-config-"));
   try {
@@ -546,6 +591,42 @@ test("source setup rejects an unsupported client before writing config", async (
     );
     assert.equal(result.status, 1);
     assert.match(result.stderr, /Unknown MCP client: codxe/);
+    assert.equal(existsSync(join(home, ".codex", "config.toml")), false);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("source setup rejects every missing option value", async () => {
+  const home = await mkdtemp(join(tmpdir(), "jacobian-cli-missing-value-"));
+  try {
+    const flags = [
+      "--source",
+      "--state-dir",
+      "--uv-bin",
+      "--profile",
+      "--provider-path",
+      "--project-environment",
+      "--elan-home",
+      "--lean-runtime",
+      "--client",
+    ];
+    for (const flag of flags) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(npmRoot, "bin", "jacobian.cjs"),
+          "setup",
+          "--client",
+          "codex",
+          "--yes",
+          flag,
+        ],
+        { encoding: "utf8", env: { ...process.env, HOME: home } },
+      );
+      assert.equal(result.status, 1, flag);
+      assert.ok(result.stderr.includes(`${flag} requires a value`), result.stderr);
+    }
     assert.equal(existsSync(join(home, ".codex", "config.toml")), false);
   } finally {
     await rm(home, { recursive: true, force: true });

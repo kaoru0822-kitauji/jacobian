@@ -113,6 +113,10 @@ if test -n "${ELAN_HOME:-}"; then
   ELAN_HOME=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).expanduser().resolve())' "$ELAN_HOME")
   export ELAN_HOME
 fi
+if test -n "${JACOBIAN_LEAN_RUNTIME:-}"; then
+  JACOBIAN_LEAN_RUNTIME=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).expanduser().resolve())' "$JACOBIAN_LEAN_RUNTIME")
+  export JACOBIAN_LEAN_RUNTIME
+fi
 REVISION=$(git -C "$REPO_ROOT" rev-parse HEAD)
 if test -n "$(git -C "$REPO_ROOT" status --porcelain)"; then
   REPO_STATE=dirty
@@ -139,16 +143,13 @@ fi
 INIT=(uv run --project "$REPO_ROOT" --locked --no-sync jacobian --state-dir "$STATE_DIR" init)
 CONFIG=(node "$REPO_ROOT/npm/bin/jacobian.cjs" setup --source "$REPO_ROOT" --state-dir "$STATE_DIR" --uv-bin "$UV_BIN" --profile "$PROFILE" --provider-path "$PATH")
 test -z "${UV_PROJECT_ENVIRONMENT:-}" || CONFIG+=(--project-environment "$UV_PROJECT_ENVIRONMENT")
-if test "$PROFILE" = lean && test -n "${ELAN_HOME:-}"; then
-  CONFIG+=(--elan-home "$ELAN_HOME")
-fi
+test -z "${ELAN_HOME:-}" || CONFIG+=(--elan-home "$ELAN_HOME")
+test -z "${JACOBIAN_LEAN_RUNTIME:-}" || CONFIG+=(--lean-runtime "$JACOBIAN_LEAN_RUNTIME")
 for client in "${CLIENTS[@]}"; do CONFIG+=(--client "$client"); done
 ((ALL)) && CONFIG+=(--all)
 ((YES)) && CONFIG+=(--yes)
 ((DRY_RUN)) && CONFIG+=(--dry-run)
-DOCTOR_ELAN_HOME=
-test "$PROFILE" != lean || DOCTOR_ELAN_HOME="${ELAN_HOME:-}"
-DOCTOR=(uv run --project "$REPO_ROOT" --locked --no-sync python "$REPO_ROOT/tools/source_agent_doctor.py" --repo "$REPO_ROOT" --state-dir "$STATE_DIR" --profile "$PROFILE" --expected-revision "$REVISION" --provider-path "$PATH" --project-environment "${UV_PROJECT_ENVIRONMENT:-}" --elan-home "$DOCTOR_ELAN_HOME" --output "$STATE_DIR/bootstrap-doctor.json")
+DOCTOR=(uv run --project "$REPO_ROOT" --locked --no-sync python "$REPO_ROOT/tools/source_agent_doctor.py" --repo "$REPO_ROOT" --state-dir "$STATE_DIR" --profile "$PROFILE" --expected-revision "$REVISION" --provider-path "$PATH" --project-environment "${UV_PROJECT_ENVIRONMENT:-}" --elan-home "${ELAN_HOME:-}" --lean-runtime "${JACOBIAN_LEAN_RUNTIME:-}" --output "$STATE_DIR/bootstrap-doctor.json")
 
 echo "Jacobian source bootstrap"
 echo "  checkout: $REPO_ROOT ($REVISION, $REPO_STATE)"
@@ -157,9 +158,8 @@ echo "  uv:       $ACTIVE_UV"
 echo "  profile:  $PROFILE"
 echo "  state:    $STATE_DIR"
 test -z "${UV_PROJECT_ENVIRONMENT:-}" || echo "  uv env:   $UV_PROJECT_ENVIRONMENT"
-if test "$PROFILE" = lean && test -n "${ELAN_HOME:-}"; then
-  echo "  elan:     $ELAN_HOME"
-fi
+test -z "${ELAN_HOME:-}" || echo "  elan:     $ELAN_HOME"
+test -z "${JACOBIAN_LEAN_RUNTIME:-}" || echo "  Lean dir: $JACOBIAN_LEAN_RUNTIME"
 
 if ((DRY_RUN)); then
   printf '  sync:     '; printf '%q ' "${SYNC[@]}"; printf '\n'

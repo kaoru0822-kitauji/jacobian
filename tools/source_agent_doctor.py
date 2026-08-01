@@ -134,6 +134,7 @@ def inspect_installation(
     launcher_provider_path: str,
     launcher_project_environment: str,
     launcher_elan_home: str,
+    launcher_lean_runtime: str,
 ) -> dict[str, Any]:
     """Return a source, catalog, and provider identity report."""
 
@@ -175,6 +176,7 @@ def inspect_installation(
     effective_provider_path = os.environ.get("PATH", "")
     effective_project_environment = os.environ.get("UV_PROJECT_ENVIRONMENT", "")
     effective_elan_home = os.environ.get("ELAN_HOME", "")
+    effective_lean_runtime = os.environ.get("JACOBIAN_LEAN_RUNTIME", "")
     checks = {
         "git_clean": not dirty,
         "revision_matches": revision == expected_revision,
@@ -186,9 +188,8 @@ def inspect_installation(
         "project_environment_preserved": (
             effective_project_environment == launcher_project_environment
         ),
-        "elan_home_preserved": (
-            profile != "lean" or effective_elan_home == launcher_elan_home
-        ),
+        "elan_home_preserved": effective_elan_home == launcher_elan_home,
+        "lean_runtime_preserved": (effective_lean_runtime == launcher_lean_runtime),
     }
     return {
         "status": "ok" if all(checks.values()) else "error",
@@ -208,6 +209,8 @@ def inspect_installation(
         "launcher_project_environment": launcher_project_environment,
         "elan_home": effective_elan_home,
         "launcher_elan_home": launcher_elan_home,
+        "lean_runtime": effective_lean_runtime,
+        "launcher_lean_runtime": launcher_lean_runtime,
         "catalog_digest": digest,
         "catalog_size": len(catalog.capabilities),
         "policy_profile": catalog.policy_profile,
@@ -228,6 +231,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-path", required=True)
     parser.add_argument("--project-environment", default="")
     parser.add_argument("--elan-home", default="")
+    parser.add_argument("--lean-runtime", default="")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--json", action="store_true")
     return parser
@@ -244,6 +248,7 @@ def main() -> int:
             launcher_provider_path=args.provider_path,
             launcher_project_environment=args.project_environment,
             launcher_elan_home=args.elan_home,
+            launcher_lean_runtime=args.lean_runtime,
         )
     except (
         OSError,

@@ -29,7 +29,8 @@ both doctor and MCP, so GUI clients resolve the same Lean and external-proof
 executables that were audited in the terminal. If the bootstrap inherits a
 custom `UV_PROJECT_ENVIRONMENT`, it resolves that path absolutely and records
 it in the launcher. The `lean` profile likewise records a nondefault
-`ELAN_HOME`, so a GUI restart uses the toolchain home that doctor audited.
+`ELAN_HOME` and any `JACOBIAN_LEAN_RUNTIME` override, so a GUI restart uses the
+toolchain home and mathlib checkout that doctor audited.
 
 ## Profiles
 

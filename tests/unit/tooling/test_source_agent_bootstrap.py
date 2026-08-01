@@ -142,3 +142,4 @@ def test_bootstrap_dry_run_and_client_preflight_fail_closed() -> None:
     assert '--provider-path "$PATH"' in script
     assert '--project-environment "$UV_PROJECT_ENVIRONMENT"' in script
     assert '--elan-home "$ELAN_HOME"' in script
+    assert '--lean-runtime "$JACOBIAN_LEAN_RUNTIME"' in script
