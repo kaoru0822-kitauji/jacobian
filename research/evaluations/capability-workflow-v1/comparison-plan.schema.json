@@ -266,10 +266,10 @@
       ],
       "properties": {
         "path": {
-          "const": "benchmarks/datasets/agent-workflow-v1/tasks"
+          "const": "benchmarks/tasks"
         },
         "task_count": {
-          "const": 34
+          "const": 38
         },
         "manifest_digest": {
           "$ref": "#/$defs/digest"

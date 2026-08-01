@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "type":"object","additionalProperties":false,
+  "required":["task_id","conclusion","result","claimed_assurance","scope","completeness","evidence","limitations"],
+  "properties":{
+    "task_id":{"const":"jacobian/dead-end-local-density-audit"},
+    "conclusion":{"enum":["ALL_LOCAL_FACTORS_AUDITED","INCOMPLETE"]},
+    "result":{"type":"object","additionalProperties":false,"required":["cases"],"properties":{"cases":{"type":"array","minItems":4,"maxItems":4,"items":{"$ref":"#/$defs/case"}}}},
+    "claimed_assurance":{"enum":["UNVERIFIED","COMPUTED","CHECKED","VERIFIED"]},
+    "scope":{"type":"string"},"completeness":{"enum":["COMPLETE","PARTIAL","UNKNOWN"]},
+    "evidence":{"type":"array","minItems":1,"maxItems":1,"items":{"type":"object","additionalProperties":false,"required":["path","sha256"],"properties":{"path":{"const":"evidence/answer.txt"},"sha256":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}}},
+    "limitations":{"type":"array","items":{"type":"string"}}
+  },
+  "$defs":{"case":{"type":"object","additionalProperties":false,"required":["case_id","branch","forbidden_residues","valid_count","density_numerator","density_denominator"],"properties":{"case_id":{"type":"string"},"branch":{"enum":["INVERTIBLE","SINGLY_DIVISIBLE","SQUARE_DIVISIBLE"]},"forbidden_residues":{"type":"array","items":{"type":"integer","minimum":0}},"valid_count":{"type":"integer","minimum":0},"density_numerator":{"type":"integer","minimum":0},"density_denominator":{"type":"integer","minimum":1}}}}
+}

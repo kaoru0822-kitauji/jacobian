@@ -9,9 +9,9 @@
     "HELD_OUT_COMPARATIVE_EVALUATION"
   ],
   "public_reproduction": {
-    "path": "benchmarks/datasets/agent-workflow-v1/tasks",
-    "task_count": 34,
-    "manifest_digest": "sha256:6f2cef931e40491d7ba3719724d49a7591fe1eeb1c0d8f2b18030b6cbde8c025",
+    "path": "benchmarks/tasks",
+    "task_count": 38,
+    "manifest_digest": "sha256:c5d94ebddfdbdf46f960bce801e2cd5b00d285da7c0d075a9dabad49cf376275",
     "contamination": "PUBLIC_ANSWER_VISIBLE",
     "causal_claims_allowed": false
   },

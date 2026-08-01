@@ -1,11 +1,12 @@
 # Capability workflow evaluation v1
 
 This directory contains the non-runnable discovery handoff and comparison
-design derived from the public 26-task Harbor `agent-workflow-v1` suite. It is
+design derived from the public Harbor `agent-workflow-v1` suite. It is
 research metadata, not a Harbor dataset: it contains no executable tasks, job
 configuration, Compose file, model result, or held-out score.
 
 The executable public cases remain the canonical
+`benchmarks/tasks/` bundles selected by the
 `benchmarks/datasets/agent-workflow-v1` dataset. Reusable Harbor support lives
 under `benchmarks/tooling`; this directory may reference those datasets and
 tools, but it does not copy their task lists or inject research records into

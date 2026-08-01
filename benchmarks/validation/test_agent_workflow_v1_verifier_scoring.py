@@ -32,6 +32,7 @@ RESOURCE_DERIVED_TASKS = (
     "generated-lemma-vacuity-audit",
     "inverse-distance-remainder-audit",
     "lcm-highly-abundant-scope-audit",
+    "lean-transitive-axiom-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
@@ -1172,6 +1173,115 @@ def test_lcm_scope_audit_rejects_corrupted_or_overclaimed_certificates(
         target = target[key]
     target[path[-1]] = replacement
     _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_local_density_rejects_boolean_integer_fields(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"][1]["density_numerator"] = True
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+
+
+def test_local_density_rejects_duplicate_evidence_descriptors(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"].append(dict(submission["evidence"][0]))
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+
+
+def test_lean_axiom_fixture_requires_genuine_transitive_closure() -> None:
+    task = _task("lean-transitive-axiom-audit")
+    source = json.loads((task / "environment" / "input.json").read_text())
+    case = next(
+        item for item in source["cases"] if item["case_id"] == "axiom-type-closure"
+    )
+    assert "A0" not in case["dependencies"]["A2"]
+    assert case["dependencies"]["A1"] == ["A0"]
+
+
+def test_degree_sequence_accepts_reversed_one_based_edges(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "erdos-gallai-realization-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    case = next(
+        item for item in submission["result"]["cases"] if item["status"] == "GRAPHICAL"
+    )
+    case["edges"] = [[v + 1, u + 1] for u, v in case["edges"]]
+    _write_json(submission_path, submission)
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_degree_sequence_reference_solution_is_schema_valid() -> None:
+    task = _task("erdos-gallai-realization-audit")
+    schema = json.loads((task / "environment" / "submission_schema.json").read_text())
+    submission = json.loads((task / "solution" / "submission.json").read_text())
+    Draft202012Validator(schema).validate(submission)
+
+
+def test_fourth_power_scope_rejects_boolean_joint_gcd(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "euler-fourth-power-scope-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["joint_gcd"] = True
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+
+
+def test_fourth_power_scope_accepts_reference_solution(tmp_path: Path) -> None:
+    result = _run_verifier(
+        *_prepare_case(tmp_path, "euler-fourth-power-scope-audit", "computed")
+    )
+    assert result["correctness"] == 1.0
+    assert result["reward"] == pytest.approx(1.0)
+
+
+def test_dead_end_local_density_audit_accepts_case_reordering(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"].reverse()
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_dead_end_local_density_audit_rejects_duplicate_case_id(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "dead-end-local-density-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cases"][1]["case_id"] = submission["result"]["cases"][0][
+        "case_id"
+    ]
+    _write_json(submission_path, submission)
+
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0

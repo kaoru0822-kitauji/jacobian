@@ -23,12 +23,24 @@ name = "jacobian/complex-power-sum-elimination"
 digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d8406017410"
 
 [[tasks]]
+name = "jacobian/dead-end-local-density-audit"
+digest = "sha256:131bb73beb7ee4e44d086a85228d9bdf5d4adadab4951ff1ebc8567c8b020c7a"
+
+[[tasks]]
 name = "jacobian/distinct-sum-pairing-optimum"
 digest = "sha256:04dbedf40d06cc65109d4b66e1051ec55b2846b24d3a3207c3ae24a5073504d0"
 
 [[tasks]]
 name = "jacobian/divisibility-construction-witness"
 digest = "sha256:72c7dd9a8ece3597252234a4ecc030219407dc8494090ec38db52904323ecb83"
+
+[[tasks]]
+name = "jacobian/erdos-gallai-realization-audit"
+digest = "sha256:1106d2c5d64e0d5443007235b00d4383983880867bbd346563b82a2daaa2ba02"
+
+[[tasks]]
+name = "jacobian/euler-fourth-power-scope-audit"
+digest = "sha256:587c3771acdf47ac62a7efa2b9c450a15503756e620bb031e9dd2cfc82927375"
 
 [[tasks]]
 name = "jacobian/euler-line-symbolic-certificate"
@@ -69,6 +81,10 @@ digest = "sha256:da39b223acfdc15423a11baf90c99851877c2bc97670870ee3b4d5742aa4b54
 [[tasks]]
 name = "jacobian/lcm-highly-abundant-scope-audit"
 digest = "sha256:e6624814316f1d764306b46c6ef344ee2871675823392aa3e41b319093e90663"
+
+[[tasks]]
+name = "jacobian/lean-transitive-axiom-audit"
+digest = "sha256:9522b73e4f9e42b545b26fe86cd1e55ffce5e1935f5e92194aecb7a32b3acaa3"
 
 [[tasks]]
 name = "jacobian/log-exponent-recovery"

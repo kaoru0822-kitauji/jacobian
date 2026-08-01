@@ -1,0 +1,9 @@
+{
+  "task_id":"jacobian/lean-transitive-axiom-audit",
+  "source":{"issue":"https://github.com/leanprover/lean4/issues/8840","repository":"https://github.com/leanprover/lean4","license":"Apache-2.0","captured_at":"2026-07-31"},
+  "cases":[
+    {"case_id":"axiom-type-closure","roots":["A2"],"observed":["A2"],"dependencies":{"A2":["A1","A2"],"A0":[],"A1":["A0"]},"roles":{"A0":"TYPE_DEPENDENCY","A1":"TYPE_DEPENDENCY","A2":"SELF_AXIOM"}},
+    {"case_id":"native-decide-trust","roots":["Lean.ofReduceBool"],"observed":["Lean.ofReduceBool"],"dependencies":{"Lean.ofReduceBool":["Lean.trustCompiler"],"Lean.trustCompiler":[]},"roles":{"Lean.ofReduceBool":"SELF_AXIOM","Lean.trustCompiler":"COMPILER_TRUST"}}
+  ],
+  "assurance_ceiling":"COMPUTED"
+}

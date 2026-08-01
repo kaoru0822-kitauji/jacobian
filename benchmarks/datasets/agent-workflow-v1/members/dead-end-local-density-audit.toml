@@ -1,0 +1,3 @@
+task_id = "dead-end-local-density-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

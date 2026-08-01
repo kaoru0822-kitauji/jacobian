@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 34,
-    "manifest_sha256": "sha256:6f2cef931e40491d7ba3719724d49a7591fe1eeb1c0d8f2b18030b6cbde8c025",
+    "task_count": 38,
+    "manifest_sha256": "sha256:c5d94ebddfdbdf46f960bce801e2cd5b00d285da7c0d075a9dabad49cf376275",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -129,6 +129,28 @@
       "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
     },
     {
+      "task_id": "dead-end-local-density-audit",
+      "mathematical_moves": [
+        "Separate local congruence analysis by the p-adic valuation of the base.",
+        "Detect collisions and vacuous digit constraints in forbidden residue classes.",
+        "Reconstruct exact reduced local-density factors from complete finite residue audits."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "modular.enumerate.quadratic_residues",
+          "availability": "AVAILABLE",
+          "boundary": "Enumerates quadratic residues, not affine divisibility obstructions across valuation branches."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep branch selection, collision analysis, and local-factor reconstruction as agent-owned composition; do not add a problem-specific square-free-density solver."
+    },
+    {
       "task_id": "distinct-sum-pairing-optimum",
       "mathematical_moves": [
         "Search for disjoint pairs with distinct bounded sums and establish finite optimality."
@@ -171,6 +193,26 @@
       ],
       "disposition": "ACCEPT_CANDIDATE",
       "next_action": "Use this as the second structurally distinct public episode for a complete polynomial residue-image producer."
+    },
+    {
+      "task_id": "erdos-gallai-realization-audit",
+      "mathematical_moves": ["Construct a simple graph realizing one degree sequence.","Compute every Erdős–Gallai obstruction for a nongraphical sequence."],
+      "current_capabilities": [{"capability_id":"graph.realize.degree_sequence","availability":"AVAILABLE","boundary":"Directly constructs a realization or returns an exact Erdős–Gallai obstruction; the task additionally asks for every violating index."},{"capability_id":"graph.compute.properties","availability":"AVAILABLE","boundary":"Replays properties of a supplied graph."}],
+      "gap_classes": ["EXISTING_WORKS"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Use graph.realize.degree_sequence for the realization or obstruction, with agent-owned enumeration only for the task's all-violations requirement."
+    },
+    {
+      "task_id": "euler-fourth-power-scope-audit",
+      "mathematical_moves": ["Supply a primitive bounded fourth-power identity.","Use one exact witness to refute only the frozen universal claim."],
+      "current_capabilities": [],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep Diophantine witness discovery and assurance-scope calibration agent-owned."
     },
     {
       "task_id": "euler-line-symbolic-certificate",
@@ -402,6 +444,19 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep counterexample construction and minimality-scope auditing as agent-owned composition; do not add a problem-specific highly-abundant solver."
+    },
+    {
+      "task_id": "lean-transitive-axiom-audit",
+      "mathematical_moves": [
+        "Compute transitive declaration dependencies from frozen roots.",
+        "Separate shallow axiom reports from complete trust closure."
+      ],
+      "current_capabilities": [{"capability_id":"lean.proof.axioms.inspect","availability":"UNAVAILABLE","boundary":"The capability is catalogued, but the frozen runtime snapshot does not have the pinned Lean provider installed; it also does not replay this historical collector defect."}],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep historical trust-report comparison as an agent-owned audit."
     },
     {
       "task_id": "log-exponent-recovery",
@@ -877,10 +932,10 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/number-theory/modular-cubic-obstruction"
+          "ref": "benchmarks/tasks/modular-cubic-obstruction"
         },
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/number-theory/divisibility-construction-witness"
+          "ref": "benchmarks/tasks/divisibility-construction-witness"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: ONLY_WEAK_LEXICAL_MATCHES for a complete sparse polynomial residue image"
@@ -933,13 +988,13 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/subspace-direct-sum-counterexample"
+          "ref": "benchmarks/tasks/subspace-direct-sum-counterexample"
         },
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/autoformalization-semantic-audit"
+          "ref": "benchmarks/tasks/autoformalization-semantic-audit"
         },
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/geometry/euler-line-symbolic-certificate"
+          "ref": "benchmarks/tasks/euler-line-symbolic-certificate"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: only Ax=b solution and inconsistency outcomes matched"
@@ -997,7 +1052,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/linear-algebra/matrix-square-zero-counterexample"
+          "ref": "benchmarks/tasks/matrix-square-zero-counterexample"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: determinant, rank, inverse, adjugate, trace, and normal forms matched but no matrix product"
@@ -1050,7 +1105,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/graph-theory/metric-tsp-proof-repair"
+          "ref": "benchmarks/tasks/metric-tsp-proof-repair"
         },
         {
           "ref": "MCP capability.describe capture on 2026-07-31: spanning-tree count present, weighted minimum spanning tree absent"
@@ -1100,7 +1155,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/graph-theory/metric-tsp-proof-repair"
+          "ref": "benchmarks/tasks/metric-tsp-proof-repair"
         }
       ],
       "contract_ref": null,
@@ -1145,7 +1200,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/probability-statistics/random-function-expectation-audit"
+          "ref": "benchmarks/tasks/random-function-expectation-audit"
         }
       ],
       "contract_ref": null,
@@ -1189,7 +1244,7 @@
       },
       "evidence_refs": [
         {
-          "ref": "benchmarks/datasets/agent-workflow-v1/tasks/mathematical-sciences/analysis/nondifferentiable-maximum-construction"
+          "ref": "benchmarks/tasks/nondifferentiable-maximum-construction"
         }
       ],
       "contract_ref": null,

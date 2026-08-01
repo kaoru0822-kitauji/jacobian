@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -33,7 +34,11 @@ def test_gap_ledger_covers_the_frozen_public_suite() -> None:
 
     assert ledger_task_ids == task_dirs
     assert len(ledger_task_ids) == len(set(ledger_task_ids))
-    assert ledger["source_suite"]["manifest_sha256"].startswith("sha256:")
+    manifest_bytes = (
+        ROOT / "benchmarks" / "datasets" / "agent-workflow-v1" / "dataset.toml"
+    ).read_bytes()
+    manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+    assert ledger["source_suite"]["manifest_sha256"] == manifest_digest
 
 
 def test_gap_ledger_handoffs_are_closed_over_task_candidates() -> None:
@@ -51,7 +56,7 @@ def test_gap_ledger_handoffs_are_closed_over_task_candidates() -> None:
     for handoff in handoffs:
         for evidence in handoff.get("evidence_refs", []):
             ref = evidence["ref"]
-            if ref.startswith("benchmarks/datasets/agent-workflow-v1/"):
+            if ref.startswith("benchmarks/tasks/"):
                 assert Path(ref).name in workflow_task_ids
 
     assert task_candidates == set(handoff_by_id)
