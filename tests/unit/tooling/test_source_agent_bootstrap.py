@@ -45,14 +45,23 @@ def test_image_preflight_binds_revision_and_package(
     monkeypatch.setattr(checker.subprocess, "run", fake_run)
     report = checker.inspect_image(
         image,
+        identity={
+            "schema_version": checker.IDENTITY_SCHEMA,
+            "image_digest": "sha256:" + "a" * 64,
+            "git_revision": "abc123",
+            "package_version": "0.6.0",
+        },
         expected_revision="abc123",
         expected_version="0.6.0",
         pull=False,
     )
     assert report["status"] == "ok"
     assert report["checks"] == {
-        "revision_matches": True,
-        "version_matches": True,
+        "identity_digest_matches": True,
+        "identity_revision_matches": True,
+        "identity_version_matches": True,
+        "revision_label_matches": True,
+        "version_label_matches": True,
     }
 
 
@@ -66,13 +75,51 @@ def test_image_preflight_rejects_a_mislabeled_image(
     monkeypatch.setattr(checker.subprocess, "run", lambda *_args, **_kwargs: completed)
     report = checker.inspect_image(
         image,
+        identity={
+            "schema_version": checker.IDENTITY_SCHEMA,
+            "image_digest": "sha256:" + "b" * 64,
+            "git_revision": "new",
+            "package_version": "0.6.0",
+        },
         expected_revision="new",
         expected_version="0.6.0",
         pull=False,
     )
     assert report["status"] == "error"
-    assert report["checks"]["revision_matches"] is False
-    assert report["checks"]["version_matches"] is False
+    assert report["checks"]["revision_label_matches"] is False
+    assert report["checks"]["version_label_matches"] is False
+
+
+def test_image_preflight_rejects_forged_matching_labels_without_digest_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checker = _load_tool("check_jacobian_image")
+    image = "registry.invalid/jacobian@sha256:" + "c" * 64
+    inspected = [
+        {
+            "Config": {
+                "Labels": {
+                    checker.REVISION_LABEL: "expected",
+                    checker.VERSION_LABEL: "0.6.0",
+                }
+            }
+        }
+    ]
+    completed = type("Completed", (), {"stdout": json.dumps(inspected)})()
+    monkeypatch.setattr(checker.subprocess, "run", lambda *_args, **_kwargs: completed)
+    with pytest.raises(ValueError, match="image_digest"):
+        checker.inspect_image(
+            image,
+            identity={
+                "schema_version": checker.IDENTITY_SCHEMA,
+                "image_digest": "sha256:" + "d" * 64,
+                "git_revision": "expected",
+                "package_version": "0.6.0",
+            },
+            expected_revision="expected",
+            expected_version="0.6.0",
+            pull=False,
+        )
 
 
 def test_version_identity_uses_uv_normalization(
@@ -143,3 +190,4 @@ def test_bootstrap_dry_run_and_client_preflight_fail_closed() -> None:
     assert '--project-environment "$UV_PROJECT_ENVIRONMENT"' in script
     assert '--elan-home "$ELAN_HOME"' in script
     assert '--lean-runtime "$JACOBIAN_LEAN_RUNTIME"' in script
+    assert 'git -C "$REPO_ROOT" check-ignore -q -- "$STATE_DIR"' in script

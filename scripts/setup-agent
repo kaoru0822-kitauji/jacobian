@@ -128,6 +128,18 @@ test "$REPO_STATE" = clean || {
   exit 2
 }
 STATE_DIR=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$STATE_DIR")
+case "$STATE_DIR" in
+  "$REPO_ROOT")
+    echo "the repository root cannot be used as the Jacobian state directory" >&2
+    exit 2
+    ;;
+  "$REPO_ROOT"/*)
+    if ! git -C "$REPO_ROOT" check-ignore -q -- "$STATE_DIR"; then
+      echo "a state directory inside the checkout must be ignored by Git: $STATE_DIR" >&2
+      exit 2
+    fi
+    ;;
+esac
 UV_BIN=$(command -v uv)
 
 SYNC=(uv sync --project "$REPO_ROOT" --locked --no-dev)

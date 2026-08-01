@@ -207,15 +207,20 @@ agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 
 		exit 0; \
 	fi; \
 	image=$${JACOBIAN_IMAGE:-}; \
+	identity=$${JACOBIAN_IMAGE_IDENTITY_FILE:-}; \
 	if ! printf '%s\n' "$$image" | grep -Eq '^.+@sha256:[0-9a-f]{64}$$'; then \
 		echo "JACOBIAN_IMAGE must be an image reference pinned by @sha256:<64 lowercase hex digits>" >&2; \
+		exit 2; \
+	fi; \
+	if [ -z "$$identity" ] || [ ! -f "$$identity" ]; then \
+		echo "JACOBIAN_IMAGE_IDENTITY_FILE must name a trusted image identity JSON file" >&2; \
 		exit 2; \
 	fi; \
 	if [ -z "$${JACOBIAN_MCP_TOKEN:-}" ] || [ -z "$${JACOBIAN_AUTH_TOKENS_JSON:-}" ] || [ -z "$${JACOBIAN_MODEL:-}" ]; then \
 		echo "JACOBIAN_MCP_TOKEN, JACOBIAN_AUTH_TOKENS_JSON, and JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
-	$(UV_RUN) python tools/check_jacobian_image.py --image "$$image" --pull && \
+	$(UV_RUN) python tools/check_jacobian_image.py --image "$$image" --identity-lock "$$identity" --pull && \
 	$(MAKE) harbor-check && \
 	resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-job.XXXXXX.json") && \
 	trap 'rm -f "$$resolved_job"' EXIT HUP INT TERM && \

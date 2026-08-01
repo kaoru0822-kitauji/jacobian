@@ -23,6 +23,10 @@ performs a locked sync, initializes the state directory, and audits the exact
 Git revision, package version, catalog digest, and provider runtimes before it
 writes any client configuration. The audit is saved as
 `.jacobian/bootstrap-doctor.json` unless `--state-dir` selects another path.
+An alternate state directory inside the checkout must already be ignored by
+Git; the bootstrap rejects a path that would make its clean source identity
+dirty during initialization. A state directory outside the checkout is also
+supported.
 The generated launcher preserves the provider-bearing base `PATH` used by
 doctor. uv prepends the project virtual environment to that same base path for
 both doctor and MCP, so GUI clients resolve the same Lean and external-proof
