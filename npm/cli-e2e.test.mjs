@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -12,21 +13,42 @@ const npmRoot = dirname(fileURLToPath(import.meta.url));
 const packageMetadata = require("./package.json");
 
 function runNpx(tarball, args, cwd, env) {
-  return spawnSync(
-    "npx",
-    ["--yes", "--offline", "--package", tarball, "jacobian", ...args],
-    {
-      cwd,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        HOME: join(cwd, "home"),
-        npm_config_cache: join(cwd, "npm-cache"),
-        ...env,
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "npx",
+      ["--yes", "--offline", "--package", tarball, "jacobian", ...args],
+      {
+        cwd,
+        env: {
+          ...process.env,
+          HOME: join(cwd, "home"),
+          npm_config_cache: join(cwd, "npm-cache"),
+          npm_config_prefix: join(cwd, "global"),
+          ...env,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
       },
-      timeout: 120_000,
-    },
-  );
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    const timer = setTimeout(() => child.kill("SIGTERM"), 120_000);
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("close", (status, signal) => {
+      clearTimeout(timer);
+      resolve({ status, signal, stdout, stderr });
+    });
+  });
 }
 
 async function packNpmPackage(destination) {
@@ -54,7 +76,7 @@ test("npx jacobian setup writes and reapplies a client configuration", async () 
     const tarball = await packNpmPackage(base);
     const env = { XDG_CONFIG_HOME: join(base, "config") };
 
-    const first = runNpx(
+    const first = await runNpx(
       tarball,
       ["setup", "--client", "claude", "--yes", "--json"],
       base,
@@ -68,10 +90,15 @@ test("npx jacobian setup writes and reapplies a client configuration", async () 
     const configPath = join(base, "home", ".claude.json");
     const config = JSON.parse(await readFile(configPath, "utf8"));
     const server = config.mcpServers.jacobian;
-    assert.equal(typeof server.command, "string");
+    assert.equal(server.command, process.execPath);
+    assert.ok(server.args[0].endsWith("npx-cli.js"));
+    assert.ok(server.args.includes(`--package=jacobian@${packageMetadata.version}`));
+    assert.ok(server.args.includes("--"));
+    assert.ok(server.args.includes("jacobian"));
     assert.equal(server.args.at(-1), "mcp");
+    assert.equal(server.args.some((arg) => arg.includes("npm-cache")), false);
 
-    const second = runNpx(
+    const second = await runNpx(
       tarball,
       ["setup", "--client", "claude", "--yes", "--json"],
       base,
@@ -123,7 +150,7 @@ if (process.argv[2] === "--version") {
 `,
       );
 
-      const result = runNpx(tarball, ["upgrade"], base, {
+      const result = await runNpx(tarball, ["upgrade"], base, {
         FAKE_UV_LOG: uvLog,
         JACOBIAN_PACKAGE: `jacobian==${packageMetadata.version}`,
         PATH: `${dirname(uv)}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`,
@@ -146,6 +173,7 @@ if (process.argv[2] === "--version") {
           `jacobian==${packageMetadata.version}`,
         ],
       ]);
+      assert.equal(existsSync(join(base, "global")), false);
     } finally {
       await rm(base, { recursive: true, force: true });
     }
