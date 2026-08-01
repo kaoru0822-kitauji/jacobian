@@ -108,6 +108,12 @@ maximum_assurance = "COMPUTED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-symbolic-block-determinant-decomposition"
+path = "tasks/mathematical-sciences/linear-algebra/symbolic-block-determinant-decomposition"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-log-exponent-recovery"
 path = "tasks/mathematical-sciences/algebra/log-exponent-recovery"
 maximum_assurance = "COMPUTED"

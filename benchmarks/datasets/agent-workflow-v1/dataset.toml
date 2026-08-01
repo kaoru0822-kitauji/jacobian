@@ -119,5 +119,9 @@ name = "jacobian/agent-workflow-v1-subspace-direct-sum-counterexample"
 digest = "sha256:6a1d30e49d29b7b086194b09fc3df259c28e5d44fd70f71f2a8fe863967cc52c"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-symbolic-block-determinant-decomposition"
+digest = "sha256:10b33ac59d65d86986064a7b586612412ad759117c7b85fef320626539e0b7e5"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-well-total-domination-counterexample"
 digest = "sha256:f7aa51bcaa1fd1b30b1c107c02187972e3a0c4c4f63ccf3820cad5309eadb76d"
