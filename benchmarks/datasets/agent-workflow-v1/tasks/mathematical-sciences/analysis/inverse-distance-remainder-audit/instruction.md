@@ -7,9 +7,10 @@ reasoning in the frozen response.
 Submit a complete exact certificate that:
 
 1. gives the correct second-order term in invariant form;
-2. supplies two rational unit directions for the normalized family
-   `|x|=1`, `y=t*u`, one with a positive and one with a negative nonzero
-   quadratic residual coefficient;
+2. uses rotational invariance to normalize `x=e_1`, then supplies two rational
+   unit directions for `y=t*u`, one with a positive and one with a negative
+   nonzero quadratic residual coefficient (coordinates are in this normalized
+   frame);
 3. records each exact quadratic coefficient, thereby showing that the residual
    after the linear approximation is not generally `O(t^3)`; and
 4. distinguishes the response's correct final conclusion from any invalid
