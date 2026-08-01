@@ -5,7 +5,7 @@
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
     "task_count": 37,
-    "manifest_sha256": "sha256:7148c0671821747822ab8745355ca9f94cc0b267d0ad22136a0aa858170205cb",
+    "manifest_sha256": "sha256:8fb3c190db3c4527eb901cd27ccdc82d12488b5558c5c2eadf4b4b74d15bf348",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -197,12 +197,12 @@
     {
       "task_id": "erdos-gallai-realization-audit",
       "mathematical_moves": ["Construct a simple graph realizing one degree sequence.","Compute every Erdős–Gallai obstruction for a nongraphical sequence."],
-      "current_capabilities": [{"capability_id":"graph.compute.properties","availability":"AVAILABLE","boundary":"Computes properties of a supplied graph but does not realize or obstruct degree sequences."}],
-      "gap_classes": ["MODEL_REASONING"],
+      "current_capabilities": [{"capability_id":"graph.realize.degree_sequence","availability":"AVAILABLE","boundary":"Directly constructs a realization or returns an exact Erdős–Gallai obstruction; the task additionally asks for every violating index."},{"capability_id":"graph.compute.properties","availability":"AVAILABLE","boundary":"Replays properties of a supplied graph."}],
+      "gap_classes": ["EXISTING_WORKS"],
       "contamination": "PUBLIC_ANSWER_VISIBLE",
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
-      "next_action": "Keep realization construction and theorem-based obstruction as agent-owned composition."
+      "next_action": "Use graph.realize.degree_sequence for the realization or obstruction, with agent-owned enumeration only for the task's all-violations requirement."
     },
     {
       "task_id": "euler-line-symbolic-certificate",

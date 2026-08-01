@@ -36,7 +36,7 @@ digest = "sha256:997a76faef7340ca7c78227dd251d793924a5b23bb94c84697c53010ba170f4
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-erdos-gallai-realization-audit"
-digest = "sha256:bc0d854140e934ed035c62950885c51dab15e7c1335f4ee85675dc2ac6600399"
+digest = "sha256:7562b43b10f387e90c80564bd6eb8a5e3587f3760c3f5f675aba0915b057590f"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"

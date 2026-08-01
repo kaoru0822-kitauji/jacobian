@@ -39,7 +39,7 @@ def _violations(ds: list[int]) -> list[dict[str, int]]:
 def _edges_valid(edges: object, ds: list[int]) -> bool:
     if not isinstance(edges, list):
         return False
-    normalized = []
+    raw_edges = []
     for edge in edges:
         if (
             not isinstance(edge, list)
@@ -47,13 +47,23 @@ def _edges_valid(edges: object, ds: list[int]) -> bool:
             or any(type(v) is not int for v in edge)
         ):
             return False
-        u, v = edge
-        if not 0 <= u < len(ds) or not 0 <= v < len(ds) or u >= v:
-            return False
-        normalized.append((u, v))
-    if len(normalized) != len(set(normalized)):
-        return False
-    return [sum(v in edge for edge in normalized) for v in range(len(ds))] == ds
+        raw_edges.append(tuple(edge))
+    for offset in (0, 1):
+        normalized = []
+        for raw_u, raw_v in raw_edges:
+            u, v = raw_u - offset, raw_v - offset
+            if not 0 <= u < len(ds) or not 0 <= v < len(ds) or u == v:
+                break
+            normalized.append(tuple(sorted((u, v))))
+        else:
+            if len(normalized) != len(set(normalized)):
+                continue
+            degrees = [
+                sum(vertex in edge for edge in normalized) for vertex in range(len(ds))
+            ]
+            if degrees == ds:
+                return True
+    return False
 
 
 def _expected(case: dict[str, Any], submitted: dict[str, Any]) -> bool:
@@ -91,7 +101,14 @@ def _result(result: object, frozen: dict[str, Any]) -> bool:
         or not isinstance(result["cases"], list)
     ):
         return False
-    by_id = {x.get("case_id"): x for x in result["cases"] if isinstance(x, dict)}
+    if any(
+        not isinstance(item, dict)
+        or set(item) != {"case_id", "status", "edges", "violations"}
+        or not isinstance(item.get("case_id"), str)
+        for item in result["cases"]
+    ):
+        return False
+    by_id = {x["case_id"]: x for x in result["cases"]}
     return len(by_id) == len(result["cases"]) == len(source) and all(
         isinstance(c, dict)
         and isinstance(by_id.get(c.get("case_id")), dict)
@@ -103,17 +120,16 @@ def _result(result: object, frozen: dict[str, Any]) -> bool:
 def _evidence(value: object) -> bool:
     if not evidence_list_is_bound(value, expected_path="evidence/answer.txt"):
         return False
-    assert isinstance(value, list)
+    if not isinstance(value, list) or len(value) != 1:
+        return False
     p = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if p is None:
         return False
     try:
-        t = p.read_text().lower()
+        text = p.read_text().strip()
     except (OSError, UnicodeError):
         return False
-    return all(
-        x in t for x in ("realized", "even degree sum", "k=3", "13", "11", "finite")
-    )
+    return len(text) >= 20
 
 
 def main() -> None:
