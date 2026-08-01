@@ -24,7 +24,7 @@ digest = "sha256:9c117e931e4c306188256c1baab3be11bbda681a964c89ac83f3e3a277e2d20
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-dead-end-local-density-audit"
-digest = "sha256:ee47c45979f56837486b469ac266c7b91fd5ea0554872b7e95e317710ea53321"
+digest = "sha256:02b4353210a62aaeaab9d523ca3630e4f3f8f8d3e92ed38b51441e4be6aaab3f"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-distinct-sum-pairing-optimum"
