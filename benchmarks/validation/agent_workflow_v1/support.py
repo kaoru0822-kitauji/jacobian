@@ -28,6 +28,7 @@ RESOURCE_DERIVED_TASKS = (
     "autoformalization-semantic-audit",
     "calendar-good-days-audit",
     "finite-magma-countermodel",
+    "gaussian-moment-generality-audit",
     "generated-lemma-vacuity-audit",
     "inverse-distance-remainder-audit",
     "lcm-highly-abundant-scope-audit",

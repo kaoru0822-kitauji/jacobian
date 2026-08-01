@@ -22,6 +22,33 @@ def test_metric_tsp_scope_is_part_of_correctness(tmp_path: Path) -> None:
     assert rejected["reward"] == 0.0
 
 
+def test_gaussian_moment_audit_accepts_alternative_rational_parameter(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "gaussian-moment-generality-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"].update(
+        parameter_a="2",
+        h_coefficients=["2", "1"],
+        v_coefficients=["-1", "-3/4", "-1/8"],
+        zeta={"numerator": ["0", "2"], "denominator": ["1", "-1"]},
+    )
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "Finite moment checks cannot prove the result. The exact branch and "
+        "formal square root cancel for every m>=1, giving the COMPUTED identity."
+    )
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
 def test_metric_tsp_evidence_requires_calculations(tmp_path: Path) -> None:
     task, app, logs = support._prepare_case(
         tmp_path, "metric-tsp-proof-repair", "computed"

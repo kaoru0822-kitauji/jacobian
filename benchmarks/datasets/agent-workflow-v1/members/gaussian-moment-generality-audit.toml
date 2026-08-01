@@ -1,0 +1,3 @@
+task_id = "gaussian-moment-generality-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

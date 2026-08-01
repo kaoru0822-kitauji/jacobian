@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:23e9d2268d32ee6b70a68c94f5c8a724e82379477cfb42db62e0b15c00dcbba6",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -283,6 +283,34 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Use trace evidence to diagnose discovery or payload failures; do not add a duplicate producer."
+    },
+    {
+      "task_id": "gaussian-moment-generality-audit",
+      "mathematical_moves": [
+        "Reject finite-moment extrapolation as evidence for a universal exponent claim.",
+        "Synthesize a bounded rational polynomial correction inside a one-parameter Gaussian template.",
+        "Replay exact rational-function branch, cancellation, and coefficient-extraction identities."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay cleared-denominator polynomial identities, but does not select the formal branch or infer the all-exponents moment consequence."
+        },
+        {
+          "capability_id": "rational.compute.product",
+          "availability": "AVAILABLE",
+          "boundary": "Supports exact coefficient arithmetic without performing the proof-generality audit."
+        }
+      ],
+      "gap_classes": [
+        "EXISTING_WORKS",
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep branch selection, finite-versus-universal evidence judgment, and coefficient interpretation agent-owned; do not create a source-specific Gaussian-moment tool from one episode."
     },
     {
       "task_id": "generated-lemma-vacuity-audit",

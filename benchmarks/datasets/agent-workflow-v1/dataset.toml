@@ -55,6 +55,10 @@ name = "jacobian/finite-partition"
 digest = "sha256:fec54cdc4c494da4d0dd3c0b9d158dd094bc9ae9e145ef9431d415b39517f385"
 
 [[tasks]]
+name = "jacobian/gaussian-moment-generality-audit"
+digest = "sha256:45fc08053bd6461b3edc86d46c45ef475d3e8bb094f370aa84005dfbdaed3f16"
+
+[[tasks]]
 name = "jacobian/generated-lemma-vacuity-audit"
 digest = "sha256:37e4ca9cc1cc33434e043bdecd156b565bbd8fb0d89d68a3632cd7276b4bc0ce"
 
