@@ -32,6 +32,7 @@ RESOURCE_DERIVED_TASKS = (
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
     "noncompact-lefschetz-proof-audit",
+    "parameterized-sharp-bound-audit",
     "polynomial-tail-counterexample",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
@@ -77,8 +78,22 @@ def _bind_result_evidence(app: Path, submission: dict) -> None:
     marker = "RESULT_JSON: " + json.dumps(
         submission["result"], sort_keys=True, separators=(",", ":")
     )
+    boundary = submission["result"].get("boundary_family")
+    boundary_marker = (
+        "BOUNDARY_FAMILY_JSON: "
+        + json.dumps(boundary, sort_keys=True, separators=(",", ":"))
+        if boundary is not None
+        else None
+    )
     evidence_path.write_text(
-        "\n".join(marker if line.startswith("RESULT_JSON:") else line for line in lines)
+        "\n".join(
+            marker
+            if line.startswith("RESULT_JSON:")
+            else boundary_marker
+            if boundary_marker is not None and line.startswith("BOUNDARY_FAMILY_JSON:")
+            else line
+            for line in lines
+        )
         + "\n"
     )
     submission["evidence"][0]["sha256"] = _digest(evidence_path)
@@ -596,6 +611,77 @@ def test_symbolic_block_decomposition_accepts_alternative_sum_zero_basis(
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_parameterized_sharp_bound_accepts_permuted_certificates(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "parameterized-sharp-bound-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["certificate"]["tangent_variables"] = ["c", "a", "b"]
+    result["certificate"]["schur_ordering"] = ["b", "c", "a"]
+    result["boundary_family"] = {
+        "vanishing_variable": "a",
+        "other_variables": ["c", "b"],
+        "parameter": "t->0+",
+        "limit": "1/4",
+        "attained_for_positive_parameter": False,
+    }
+    result["audit"]["defects"].reverse()
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("transition", {"numerator": 4, "denominator": 1}),
+        (
+            "high_regime",
+            {
+                "condition": "d>=15/4",
+                "bound": "1/4",
+                "remainder_coefficient": "d-15/4",
+                "attainment": "ATTAINED_FOR_ALL_D",
+            },
+        ),
+        (
+            "boundary_family",
+            {
+                "vanishing_variable": "c",
+                "other_variables": ["a", "b"],
+                "parameter": "t->0+",
+                "limit": "1/4",
+                "attained_for_positive_parameter": True,
+            },
+        ),
+    ],
+)
+def test_parameterized_sharp_bound_rejects_corrupted_sharpness(
+    tmp_path: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "parameterized-sharp-bound-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"][field] = replacement
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 @pytest.mark.parametrize(
     ("field", "replacement"),
     [
@@ -832,4 +918,30 @@ def test_symbolic_block_certificate_enforces_common_channel_first(
 
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_parameterized_bound_evidence_binds_boundary_family(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "parameterized-sharp-bound-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["boundary_family"]["vanishing_variable"] = "a"
+    submission["result"]["boundary_family"]["other_variables"] = ["b", "c"]
+    _bind_result_evidence(app, submission)
+    evidence_path = app / "evidence" / "answer.txt"
+    text = evidence_path.read_text().replace(
+        'BOUNDARY_FAMILY_JSON: {"attained_for_positive_parameter":false,"limit":"1/4","other_variables":["b","c"],"parameter":"t->0+","vanishing_variable":"a"}',
+        'BOUNDARY_FAMILY_JSON: {"attained_for_positive_parameter":false,"limit":"1/4","other_variables":["a","b"],"parameter":"t->0+","vanishing_variable":"c"}',
+    )
+    evidence_path.write_text(text)
+    submission["evidence"][0]["sha256"] = _digest(evidence_path)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
     assert rejected["reward"] == 0.0

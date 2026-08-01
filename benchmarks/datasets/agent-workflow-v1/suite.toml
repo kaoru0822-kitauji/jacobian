@@ -156,6 +156,12 @@ maximum_assurance = "COMPUTED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-parameterized-sharp-bound-audit"
+path = "tasks/mathematical-sciences/inequalities/parameterized-sharp-bound-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-polynomial-tail-counterexample"
 path = "tasks/mathematical-sciences/algebra/polynomial-tail-counterexample"
 maximum_assurance = "COMPUTED"

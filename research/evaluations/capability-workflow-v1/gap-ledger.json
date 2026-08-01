@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 29,
-    "manifest_sha256": "sha256:2dd968a0a453df2b6c42573a5195900f77f5d913452707e8d18d4fc2a4df6d8c",
+    "task_count": 30,
+    "manifest_sha256": "sha256:79934dd1a55da28febf10a1a45bbc10e518761793bbc07aa5bbca6a10216284c",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -535,6 +535,28 @@
       ],
       "disposition": "DEFER_RESEARCH",
       "next_action": "Mine independent piecewise-linear continuity and extremum episodes before fixing a domain contract."
+    },
+    {
+      "task_id": "parameterized-sharp-bound-audit",
+      "mathematical_moves": [
+        "Separate an attained symmetric minimum from a strict-positivity boundary infimum.",
+        "Derive the exact parameter transition and replay two affine polynomial certificate decompositions.",
+        "Audit equality, threshold, and limiting-family semantics independently of the dataset answer."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay scalar polynomial identities but does not establish nonnegativity regimes, sharpness, or boundary attainment."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Use as a proof-audit diagnostic; do not add an inequality-specific sharp-bound solver without repeated independent workflows."
     },
     {
       "task_id": "polynomial-map-collision",
