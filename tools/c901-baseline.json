@@ -48,11 +48,6 @@
       "complexity": 28
     },
     {
-      "path": "benchmarks/tooling/validate_harbor_results.py",
-      "symbol": "_validate_payload",
-      "complexity": 21
-    },
-    {
       "path": "src/jacobian/adapters/mcp/remote.py",
       "symbol": "load_static_token_file",
       "complexity": 11

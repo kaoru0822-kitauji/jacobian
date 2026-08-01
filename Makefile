@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static benchmark-plan benchmark-sync benchmark-check benchmark-oracle benchmark-oracle-all benchmark-adapter-check agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
+.PHONY: help setup hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static benchmark-plan benchmark-sync benchmark-check benchmark-oracle benchmark-oracle-run benchmark-oracle-all benchmark-adapter-check agent-eval performance-eval provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -172,7 +172,9 @@ benchmark-check: ## Run Harbor topology, digest, provenance, and host-side valid
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 	$(UV_RUN) pytest -n 0 benchmarks/validation
 
-benchmark-oracle: benchmark-check ## Run a dataset Oracle, optionally restricting TASKS="id ...".
+benchmark-oracle: benchmark-check benchmark-oracle-run ## Check contracts, then run a dataset Oracle.
+
+benchmark-oracle-run: ## Run a dataset Oracle after an already-successful contract gate.
 	@test -n "$(DATASET)" || { echo "DATASET is required" >&2; exit 2; }
 	@test -f "benchmarks/datasets/$(DATASET)/jobs/oracle.json" || { echo "unknown dataset or missing Oracle job: $(DATASET)" >&2; exit 2; }
 	@resolved_job=$$(mktemp "$${TMPDIR:-/tmp}/jacobian-benchmark-oracle.XXXXXX.json") && \
@@ -186,7 +188,7 @@ benchmark-oracle: benchmark-check ## Run a dataset Oracle, optionally restrictin
 
 benchmark-oracle-all: benchmark-check ## Run every registered dataset Oracle.
 	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 performance-v1 provider-feasibility-v1 examples-v1; do \
-		$(MAKE) --no-print-directory benchmark-oracle DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
+		$(MAKE) --no-print-directory benchmark-oracle-run DATASET=$$dataset EVAL_ARGS="$(EVAL_ARGS)"; \
 	done
 
 benchmark-adapter-check: ## Check deterministic regeneration for ADAPTER=<id>.

@@ -97,12 +97,17 @@ validation from entering product Python coverage.
 The independent benchmark planner emits `run-benchmark-check`,
 `run-benchmark-oracle`, `benchmark-oracle-scope`, an exact dataset/task/digest
 matrix, and reasons. README-only task changes run contract checks without
-Docker. Executable task changes run the exact task Oracle; membership, shared
-verifier, image, or unknown benchmark changes escalate to the affected dataset
-or full portfolio. The stable `Benchmark Validation` workflow job is the only
-required branch-protection context; dynamic Oracle jobs run at most four in
-parallel and upload result JSON, verifier logs, source SHA, task digest, and
-Harbor version.
+Docker. Executable task changes run the exact task Oracle on pull requests.
+Large multi-task edits are capped on the pull-request critical path and defer
+their Oracle matrix to the merge queue.
+Dataset membership and execution configuration changes defer their affected
+dataset sweep to the merge queue; shared tooling, schemas, adapters, and unknown
+integration changes escalate there to the full portfolio. Main pushes repeat
+contract checks without replaying merge-queue Oracles. Scheduled, manual, and
+`ci:benchmark-full` runs own explicit full-portfolio sweeps. The stable
+`Benchmark Validation` workflow job is the only required branch-protection
+context; dynamic Oracle jobs run at most four in parallel and upload result JSON,
+verifier logs, source SHA, task digest, and Harbor version.
 
 ## Run Jacobian observation
 

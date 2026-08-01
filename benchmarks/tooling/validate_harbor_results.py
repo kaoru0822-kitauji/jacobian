@@ -29,98 +29,158 @@ def _task_id(name: Any) -> str:
     return name.rsplit("/", 1)[-1] if isinstance(name, str) else ""
 
 
+def _is_nonnegative_integer(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _validate_execution_summary(
+    payload: dict[str, Any], *, trial_count: int
+) -> list[str]:
+    failures: list[str] = []
+    for key in ("id", "started_at", "finished_at", "n_total_trials", "stats"):
+        if key not in payload:
+            failures.append(f"result.json: missing {key}")
+
+    total = payload.get("n_total_trials")
+    if not _is_nonnegative_integer(total) or total == 0:
+        failures.append("result.json: n_total_trials must be positive")
+    elif trial_count != total:
+        failures.append(
+            "result.json: per-trial result count disagrees with n_total_trials"
+        )
+
+    stats = payload.get("stats")
+    if not isinstance(stats, dict):
+        return [*failures, "result.json: stats must be an object"]
+
+    count_keys = (
+        "n_completed_trials",
+        "n_errored_trials",
+        "n_running_trials",
+        "n_pending_trials",
+        "n_cancelled_trials",
+    )
+    for key in count_keys:
+        if not _is_nonnegative_integer(stats.get(key, 0)):
+            failures.append(f"result.json: stats.{key} must be non-negative")
+    incomplete_keys = count_keys[1:]
+    if any(stats.get(key, 0) for key in incomplete_keys):
+        failures.append("result.json: execution is incomplete or contains errors")
+    if stats.get("n_completed_trials", 0) != trial_count:
+        failures.append(
+            "result.json: completed-trial count disagrees with per-trial results"
+        )
+    return failures
+
+
+def _validate_reward(
+    rewards: dict[str, Any], *, dimension: str, trial_index: int
+) -> list[str]:
+    value = rewards.get(dimension)
+    if dimension == "false_certification" and isinstance(value, bool):
+        if value is False:
+            return []
+        return [f"trial result {trial_index}: {dimension} must be zero"]
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+    ):
+        return [
+            f"trial result {trial_index}: {dimension} reward is missing or not finite"
+        ]
+    expected = 0.0 if dimension == "false_certification" else 1.0
+    if math.isclose(float(value), expected, rel_tol=0.0, abs_tol=1e-12):
+        return []
+    requirement = "zero" if dimension == "false_certification" else "full reward"
+    return [f"trial result {trial_index}: {dimension} must be {requirement}"]
+
+
+def _validate_trial(
+    trial: Any,
+    *,
+    index: int,
+    expected_tasks: set[str],
+    expected_digests: dict[str, str],
+) -> tuple[str | None, list[str]]:
+    if not isinstance(trial, dict):
+        return None, [f"trial result {index} must be an object"]
+    task_id = _task_id(trial.get("task_name"))
+    if not task_id:
+        return None, [f"trial result {index}: missing task_name"]
+
+    failures: list[str] = []
+    if task_id not in expected_tasks:
+        failures.append(f"trial result {index}: unexpected task {task_id}")
+    checksum = str(trial.get("task_checksum", ""))
+    expected = expected_digests.get(task_id)
+    if expected and checksum.removeprefix("sha256:") != expected.removeprefix(
+        "sha256:"
+    ):
+        failures.append(f"trial result {index}: task digest mismatch for {task_id}")
+    if trial.get("exception_info") is not None:
+        failures.append(f"trial result {index}: exception result is not certifying")
+
+    verifier = trial.get("verifier_result")
+    rewards = verifier.get("rewards") if isinstance(verifier, dict) else None
+    if not isinstance(rewards, dict) or not rewards:
+        return task_id, [*failures, f"trial result {index}: incomplete verifier reward"]
+    dimensions = (
+        "correctness",
+        "evidence_validity",
+        "scope_accuracy",
+        "assurance_calibration",
+        "reward",
+        "false_certification",
+    )
+    for dimension in dimensions:
+        failures.extend(
+            _validate_reward(rewards, dimension=dimension, trial_index=index)
+        )
+    return task_id, failures
+
+
 def _validate_payload(
     payload: Any,
     *,
+    trial_results: list[Any],
     expected_tasks: set[str],
     expected_digests: dict[str, str],
 ) -> list[str]:
     failures: list[str] = []
     if not isinstance(payload, dict):
         return ["result.json must contain an object"]
-    for key in ("id", "started_at", "finished_at", "n_total_trials", "stats"):
-        if key not in payload:
-            failures.append(f"result.json: missing {key}")
-    total = payload.get("n_total_trials")
-    if not isinstance(total, int) or total <= 0:
-        failures.append("result.json: n_total_trials must be positive")
-    stats = payload.get("stats")
-    if not isinstance(stats, dict):
-        failures.append("result.json: stats must be an object")
-        stats = {}
-    for key in (
-        "n_completed_trials",
-        "n_errored_trials",
-        "n_running_trials",
-        "n_pending_trials",
-        "n_cancelled_trials",
-    ):
-        value = stats.get(key, 0)
-        if not isinstance(value, int) or value < 0:
-            failures.append(f"result.json: stats.{key} must be non-negative")
-    if any(
-        stats.get(key, 0)
-        for key in (
-            "n_errored_trials",
-            "n_running_trials",
-            "n_pending_trials",
-            "n_cancelled_trials",
-        )
-    ):
-        failures.append("result.json: execution is incomplete or contains errors")
+    if not trial_results:
+        failures.append("result.json: no per-trial result files were found")
+    failures.extend(
+        _validate_execution_summary(payload, trial_count=len(trial_results))
+    )
 
-    trials = payload.get("trial_results")
-    if not isinstance(trials, list) or not trials:
-        failures.append("result.json: trial_results is missing or empty")
-        trials = []
-    if isinstance(total, int) and len(trials) != total:
-        failures.append(
-            "result.json: trial_results count disagrees with n_total_trials"
+    observed_task_counts: dict[str, int] = {}
+    for index, trial in enumerate(trial_results):
+        task_id, trial_failures = _validate_trial(
+            trial,
+            index=index,
+            expected_tasks=expected_tasks,
+            expected_digests=expected_digests,
         )
-    if stats.get("n_completed_trials", 0) != len(trials):
-        failures.append(
-            "result.json: completed-trial count disagrees with trial_results"
-        )
-
-    observed_tasks: set[str] = set()
-    for index, trial in enumerate(trials):
-        if not isinstance(trial, dict):
-            failures.append(f"trial_results[{index}] must be an object")
+        failures.extend(trial_failures)
+        if task_id is None:
             continue
-        task_id = _task_id(trial.get("task_name"))
-        if not task_id:
-            failures.append(f"trial_results[{index}]: missing task_name")
-            continue
-        observed_tasks.add(task_id)
-        if task_id not in expected_tasks:
-            failures.append(f"trial_results[{index}]: unexpected task {task_id}")
-        checksum = str(trial.get("task_checksum", ""))
-        expected = expected_digests.get(task_id)
-        if expected and checksum.removeprefix("sha256:") != expected.removeprefix(
-            "sha256:"
-        ):
-            failures.append(
-                f"trial_results[{index}]: task digest mismatch for {task_id}"
-            )
-        if trial.get("exception_info") is not None:
-            failures.append(
-                f"trial_results[{index}]: exception result is not certifying"
-            )
-        verifier = trial.get("verifier_result")
-        rewards = verifier.get("rewards") if isinstance(verifier, dict) else None
-        if not isinstance(rewards, dict) or not rewards:
-            failures.append(f"trial_results[{index}]: incomplete verifier reward")
-        elif any(
-            not isinstance(value, (int, float))
-            or isinstance(value, bool)
-            or not math.isfinite(float(value))
-            for value in rewards.values()
-        ):
-            failures.append(f"trial_results[{index}]: verifier reward is not finite")
+        observed_task_counts[task_id] = observed_task_counts.get(task_id, 0) + 1
+    observed_tasks = set(observed_task_counts)
     if observed_tasks != expected_tasks:
         failures.append(
             "result.json: task coverage differs from requested tasks: "
             f"expected={sorted(expected_tasks)}, observed={sorted(observed_tasks)}"
+        )
+    duplicates = sorted(
+        task_id for task_id, count in observed_task_counts.items() if count != 1
+    )
+    if duplicates:
+        failures.append(
+            "result.json: expected exactly one trial for each task; duplicates="
+            f"{duplicates}"
         )
     return failures
 
@@ -134,6 +194,21 @@ def _find_result(jobs_dir: Path) -> Path:
     if not candidates:
         raise HarborSuiteError(f"no Harbor result.json found below {jobs_dir}")
     return candidates[0]
+
+
+def _load_trial_results(result_path: Path) -> tuple[list[Any], list[Path]]:
+    paths = sorted(
+        path for path in result_path.parent.glob("*/result.json") if path.is_file()
+    )
+    results: list[Any] = []
+    for path in paths:
+        try:
+            results.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise HarborSuiteError(
+                f"unable to read Harbor trial result {path}: {exc}"
+            ) from exc
+    return results, paths
 
 
 def _git_sha() -> str:
@@ -171,8 +246,10 @@ def validate(
         for task_id, ref in known.items()
         if task_id in requested
     }
+    trial_results, trial_paths = _load_trial_results(result_path)
     failures = _validate_payload(
         payload,
+        trial_results=trial_results,
         expected_tasks=requested,
         expected_digests=expected_digests,
     )
@@ -213,6 +290,13 @@ def validate(
                     for task_id in sorted(requested)
                 ],
                 "result": result_path.relative_to(ROOT).as_posix(),
+                "trial_results": [
+                    {
+                        "path": path.relative_to(ROOT).as_posix(),
+                        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    }
+                    for path in trial_paths
+                ],
             },
             indent=2,
             sort_keys=True,

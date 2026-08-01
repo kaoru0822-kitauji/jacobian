@@ -8,6 +8,9 @@ on:
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
+  schedule:
+    - cron: "41 4 * * 3"
+  workflow_dispatch:
 
 concurrency:
   group: benchmarks-${{ github.workflow }}-${{ github.ref }}
@@ -40,18 +43,41 @@ jobs:
         name: Classify benchmark changes
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: >-
+            ${{ github.event.pull_request.base.sha ||
+                github.event.merge_group.base_sha ||
+                github.event.before }}
+          HEAD_SHA: >-
+            ${{ github.event.pull_request.head.sha ||
+                github.event.merge_group.head_sha ||
+                github.sha }}
           FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:benchmark-full') }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            mapfile -d '' changed_paths < <(git diff --name-only -z "$BASE_SHA" "$HEAD_SHA")
-            plan_output=$(uvx --from harbor==0.20.0 --with tomli-w==1.2.0 python .github/scripts/plan-benchmarks "${changed_paths[@]}")
-          elif [ "$FORCE_FULL" = "true" ]; then
-            plan_output=$(uvx --from harbor==0.20.0 --with tomli-w==1.2.0 python .github/scripts/plan-benchmarks --force-full)
-          else
-            plan_output=$(uvx --from harbor==0.20.0 --with tomli-w==1.2.0 python .github/scripts/plan-benchmarks --force-full)
-          fi
+          planner_args=(--event "$EVENT_NAME" --)
+          changed_paths=()
+          case "$EVENT_NAME" in
+            schedule|workflow_dispatch)
+              planner_args=(--event "$EVENT_NAME" --force-full --)
+              ;;
+            pull_request|merge_group|push)
+              if [ "$FORCE_FULL" = "true" ]; then
+                planner_args=(--event "$EVENT_NAME" --force-full --)
+              elif [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+                planner_args=(--event "$EVENT_NAME" --force-full --)
+              else
+                mapfile -d '' changed_paths < <(
+                  git diff --name-only -z "$BASE_SHA" "$HEAD_SHA"
+                )
+              fi
+              ;;
+            *) exit 2 ;;
+          esac
+          plan_output=$(
+            uvx --from harbor==0.20.0 --with tomli-w==1.2.0 \
+              python .github/scripts/plan-benchmarks \
+              "${planner_args[@]}" "${changed_paths[@]}"
+          )
+          printf '%s\n' "$plan_output" | python .github/scripts/validate-benchmark-plan
           printf '%s\n' "$plan_output" >> "$GITHUB_OUTPUT"
           {
             echo "## Benchmark plan"
@@ -79,7 +105,7 @@ jobs:
 
   oracle:
     name: Benchmark Oracle (${{ matrix.dataset }}/${{ matrix.task }})
-    needs: plan
+    needs: [plan, contract]
     if: needs.plan.outputs.run-benchmark-oracle == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -100,7 +126,7 @@ jobs:
         env:
           DATASET: ${{ matrix.dataset }}
           TASKS: ${{ matrix.task }}
-        run: make benchmark-oracle DATASET="$DATASET" TASKS="$TASKS"
+        run: make benchmark-oracle-run DATASET="$DATASET" TASKS="$TASKS"
       - name: Upload Oracle evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

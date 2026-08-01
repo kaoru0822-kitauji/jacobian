@@ -44,6 +44,14 @@ make performance-eval
 make provider-eval PROVIDER=cgal
 ```
 
+Pull requests run contract checks and exact Oracles for changed executable
+tasks; large multi-task edits defer that matrix to the merge queue. Merge-queue
+groups add affected-dataset or shared-infrastructure Oracle
+coverage, while pushes to `main` repeat the deterministic contract gate without
+duplicating those Docker jobs. The weekly and manually dispatched benchmark
+workflow performs the full portfolio sweep; maintainers can request the same
+scope on a pull request with `ci:benchmark-full`.
+
 Performance timing is reported separately from reward, and research datasets
 are explicitly non-comparative diagnostics. Uniform task structure does not
 make rewards across these datasets comparable.
