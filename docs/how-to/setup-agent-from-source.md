@@ -32,7 +32,11 @@ doctor. uv prepends the project virtual environment to that same base path for
 both doctor and MCP, so GUI clients resolve the same Lean and external-proof
 executables that were audited in the terminal. If the bootstrap inherits a
 custom `UV_PROJECT_ENVIRONMENT`, it resolves that path absolutely and records
-it in the launcher. The `lean` profile likewise records a nondefault
+it in the launcher; a checkout-local custom environment must already be
+ignored by Git. Relative entries in the inherited `PATH` are likewise resolved
+against the bootstrap working directory before doctor and client configuration
+so later GUI working directories cannot change provider resolution. The `lean`
+profile likewise records a nondefault
 `ELAN_HOME` and any `JACOBIAN_LEAN_RUNTIME` override, so a GUI restart uses the
 toolchain home and mathlib checkout that doctor audited.
 
@@ -57,10 +61,13 @@ Add `--dev` when the clone also needs the locked development group. Use
 `--dry-run` to inspect every sync, init, configuration, and doctor command
 without changing the environment, state directory, or client files. Repeating
 the same command is idempotent. Client edits are one transaction: if any write
-fails, all earlier files from that run are restored. `jacobian remove` removes
-only the Jacobian entry and preserves unrelated client settings. Client config
-symlinks are rejected rather than replaced; update the link target directly or
-temporarily use a regular config file.
+fails, changed earlier files from that run are restored. No-op clients are not
+part of rollback, and a concurrently changed config is left untouched instead
+of being overwritten. Declining the confirmation exits without printing the
+ready message. `jacobian remove` removes only the Jacobian entry and preserves
+unrelated client settings. Client config symlinks are rejected rather than
+replaced; update the link target directly or temporarily use a regular config
+file.
 
 After pulling a new commit, rerun the bootstrap. The client already points at
 the same source path, while the locked sync and doctor refresh its environment

@@ -105,8 +105,29 @@ if ((DRY_RUN)); then
 else
   PYTHON_PATH=$(uv python find '>=3.12,<3.14')
 fi
+PATH=$("$PYTHON_PATH" -c 'import os, sys; from pathlib import Path; print(os.pathsep.join(str(Path(part or ".").resolve()) for part in sys.argv[1].split(os.pathsep)))' "$PATH")
+export PATH
+
+require_checkout_path_ignored() {
+  local label=$1
+  local target=$2
+  case "$target" in
+    "$REPO_ROOT")
+      echo "the repository root cannot be used as $label" >&2
+      exit 2
+      ;;
+    "$REPO_ROOT"/*)
+      if ! git -C "$REPO_ROOT" check-ignore -q -- "$target"; then
+        echo "$label inside the checkout must be ignored by Git: $target" >&2
+        exit 2
+      fi
+      ;;
+  esac
+}
+
 if test -n "${UV_PROJECT_ENVIRONMENT:-}"; then
   UV_PROJECT_ENVIRONMENT=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).expanduser().resolve())' "$UV_PROJECT_ENVIRONMENT")
+  require_checkout_path_ignored "a custom uv project environment" "$UV_PROJECT_ENVIRONMENT"
   export UV_PROJECT_ENVIRONMENT
 fi
 if test -n "${ELAN_HOME:-}"; then
@@ -128,26 +149,15 @@ test "$REPO_STATE" = clean || {
   exit 2
 }
 STATE_DIR=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$STATE_DIR")
-case "$STATE_DIR" in
-  "$REPO_ROOT")
-    echo "the repository root cannot be used as the Jacobian state directory" >&2
-    exit 2
-    ;;
-  "$REPO_ROOT"/*)
-    if ! git -C "$REPO_ROOT" check-ignore -q -- "$STATE_DIR"; then
-      echo "a state directory inside the checkout must be ignored by Git: $STATE_DIR" >&2
-      exit 2
-    fi
-    ;;
-esac
+require_checkout_path_ignored "the Jacobian state directory" "$STATE_DIR"
 UV_BIN=$(command -v uv)
 
-SYNC=(uv sync --project "$REPO_ROOT" --locked --no-dev)
+SYNC=(uv sync --project "$REPO_ROOT" --python "$PYTHON_PATH" --locked --no-dev)
 case "$PROFILE" in
   full-python|lean|external-proof) SYNC+=(--all-extras) ;;
 esac
 if ((DEV)); then
-  SYNC=(uv sync --project "$REPO_ROOT" --locked --dev)
+  SYNC=(uv sync --project "$REPO_ROOT" --python "$PYTHON_PATH" --locked --dev)
   case "$PROFILE" in
     full-python|lean|external-proof) SYNC+=(--all-extras) ;;
   esac

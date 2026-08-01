@@ -137,9 +137,17 @@ function main() {
       reportSetupFailure(error);
       return;
     }
-    setup.run(options).catch((error) => {
-      reportSetupFailure(error);
-    });
+    setup
+      .run(options)
+      .then((result) => {
+        if (result.cancelled) {
+          stderr.write("Jacobian setup cancelled; no client configuration was applied.\n");
+          process.exitCode = 1;
+        }
+      })
+      .catch((error) => {
+        reportSetupFailure(error);
+      });
     return;
   }
 

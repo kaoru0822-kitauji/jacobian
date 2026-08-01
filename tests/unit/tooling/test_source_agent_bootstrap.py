@@ -190,4 +190,7 @@ def test_bootstrap_dry_run_and_client_preflight_fail_closed() -> None:
     assert '--project-environment "$UV_PROJECT_ENVIRONMENT"' in script
     assert '--elan-home "$ELAN_HOME"' in script
     assert '--lean-runtime "$JACOBIAN_LEAN_RUNTIME"' in script
-    assert 'git -C "$REPO_ROOT" check-ignore -q -- "$STATE_DIR"' in script
+    assert 'require_checkout_path_ignored "the Jacobian state directory"' in script
+    assert 'require_checkout_path_ignored "a custom uv project environment"' in script
+    assert '--python "$PYTHON_PATH"' in script
+    assert 'Path(part or ".").resolve()' in script

@@ -306,10 +306,11 @@ function rejectSymlink(path) {
  *
  * @param {string} path
  * @param {string} content
+ * @returns {boolean} Whether the target was replaced.
  */
 function writeIfChanged(path, content) {
   const existing = readOptional(path);
-  if (existing === content) return;
+  if (existing === content) return false;
   rejectSymlink(path);
   mkdirSync(dirname(path), { recursive: true });
   const mode = existsSync(path) ? statSync(path).mode & 0o777 : 0o600;
@@ -325,6 +326,7 @@ function writeIfChanged(path, content) {
     });
     chmodSync(temporary, mode);
     renameSync(temporary, path);
+    return true;
   } finally {
     if (existsSync(temporary)) {
       rmSync(temporary, { force: true });
@@ -516,15 +518,23 @@ function resolveClientEdit(operation, def, launcher) {
  * Apply one client edit to disk.
  *
  * @param {{ path: string, original: string | null, updated: string | null, action: string }} edit
+ * @returns {boolean} Whether this edit changed disk.
  */
 function applyEdit(edit) {
-  if (edit.updated !== null) {
-    writeIfChanged(edit.path, edit.updated);
+  if (edit.updated === null) return false;
+  if (readOptional(edit.path) !== edit.original) {
+    throw new Error(`${edit.path} changed after setup preflight; no write was made`);
   }
+  return writeIfChanged(edit.path, edit.updated);
 }
 
 /** Restore a config file to the content observed during preflight. */
 function restoreEdit(edit) {
+  if (readOptional(edit.path) !== edit.updated) {
+    throw new Error(
+      "the config changed after Jacobian wrote it; the concurrent value was left untouched",
+    );
+  }
   if (edit.original === null) {
     rmSync(edit.path, { force: true });
     return;
@@ -542,8 +552,7 @@ function applyEdits(edits) {
   const applied = [];
   try {
     for (const edit of edits) {
-      applyEdit(edit);
-      applied.push(edit);
+      if (applyEdit(edit)) applied.push(edit);
     }
   } catch (error) {
     const rollbackErrors = [];

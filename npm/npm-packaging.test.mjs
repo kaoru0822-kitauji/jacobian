@@ -446,6 +446,72 @@ test("multi-client config writes roll back as one transaction", async () => {
   }
 });
 
+test("rollback excludes no-op edits and preserves concurrent config creation", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-noop-rollback-"));
+  try {
+    const concurrentPath = join(base, "concurrent.json");
+    const blockedParent = join(base, "blocked");
+    await writeFile(concurrentPath, "created concurrently\n");
+    await writeFile(blockedParent, "not a directory\n");
+    assert.throws(
+      () =>
+        applyEdits([
+          {
+            path: concurrentPath,
+            original: null,
+            updated: null,
+            action: "not_configured",
+          },
+          {
+            path: join(blockedParent, "config.json"),
+            original: null,
+            updated: "{}\n",
+            action: "create",
+          },
+        ]),
+      /Earlier config writes were rolled back/,
+    );
+    assert.equal(await readFile(concurrentPath, "utf8"), "created concurrently\n");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("rollback does not overwrite a config changed after Jacobian wrote it", async () => {
+  const base = await mkdtemp(join(tmpdir(), "jacobian-concurrent-rollback-"));
+  try {
+    const firstPath = join(base, "first.json");
+    const blockedParent = join(base, "blocked");
+    await writeFile(firstPath, "before\n");
+    await writeFile(blockedParent, "not a directory\n");
+    const failingEdit = {
+      original: null,
+      updated: "{}\n",
+      action: "create",
+      get path() {
+        writeFileSync(firstPath, "concurrent update\n");
+        return join(blockedParent, "config.json");
+      },
+    };
+    assert.throws(
+      () =>
+        applyEdits([
+          {
+            path: firstPath,
+            original: "before\n",
+            updated: "after\n",
+            action: "update",
+          },
+          failingEdit,
+        ]),
+      /concurrent value was left untouched/,
+    );
+    assert.equal(await readFile(firstPath, "utf8"), "concurrent update\n");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
 test("config creation uses a private atomic replacement", async () => {
   const base = await mkdtemp(join(tmpdir(), "jacobian-atomic-config-"));
   try {
@@ -566,6 +632,27 @@ test("top-level setup failure gives a retry action without a stack trace", async
     assert.match(result.stderr, /retry `npx jacobian setup`/);
     assert.doesNotMatch(result.stderr, /\n\s+at /);
     assert.equal(await readFile(configPath, "utf8"), "{ invalid");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("declining setup exits nonzero without claiming completion", async () => {
+  const home = await mkdtemp(join(tmpdir(), "jacobian-cli-cancel-"));
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [join(npmRoot, "bin", "jacobian.cjs"), "setup", "--client", "codex"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, HOME: home },
+        input: "n\n",
+      },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /setup cancelled/);
+    assert.doesNotMatch(result.stderr, /Setup complete/);
+    assert.equal(existsSync(join(home, ".codex", "config.toml")), false);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
