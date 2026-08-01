@@ -809,3 +809,27 @@ def test_noncompact_lefschetz_enforces_visible_translation_bounds(
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_symbolic_block_certificate_enforces_common_channel_first(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "symbolic-block-determinant-decomposition", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    for row in result["basis_change"]:
+        row[0], row[1] = row[1], row[0]
+    result["basis_change_inverse"][0], result["basis_change_inverse"][1] = (
+        result["basis_change_inverse"][1],
+        result["basis_change_inverse"][0],
+    )
+    result["channels"] = ["A-B", "A+2B", "A-B"]
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
