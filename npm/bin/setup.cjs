@@ -132,9 +132,12 @@ function buildLauncher() {
     const npm = process.env.npm_execpath;
     if (node && npm) {
       const pkg = `jacobian@${version}`;
+      const npmArgs = basename(npm).toLowerCase() === "npx-cli.js"
+        ? ["--yes", `--package=${pkg}`, "--", "jacobian", "mcp"]
+        : ["exec", "--yes", `--package=${pkg}`, "--", "jacobian", "mcp"];
       return {
         command: node,
-        args: [npm, "exec", "--yes", `--package=${pkg}`, "--", "jacobian", "mcp"],
+        args: [npm, ...npmArgs],
         version,
         package: pkg,
       };
