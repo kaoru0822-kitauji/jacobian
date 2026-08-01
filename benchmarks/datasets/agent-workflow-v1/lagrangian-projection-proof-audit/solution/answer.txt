@@ -1,0 +1,1 @@
+The nonzero Lagrangian defect mixes the two naive projections; the corrected coupled identities reconstruct the exact witness.

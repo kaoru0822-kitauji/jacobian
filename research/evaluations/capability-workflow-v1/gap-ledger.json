@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:0ad73a23d68f50cfc39e6d4ac3b4dc9ff47883c280df70565ed9c1c37522318e",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -422,6 +422,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Use as an asymptotic proof-audit diagnostic; do not add a general series-remainder capability from one directional certificate family."
+    },
+    {
+      "task_id": "lagrangian-projection-proof-audit",
+      "mathematical_moves": [
+        "Expose a hidden Lagrangian assumption in a research-proof projection step.",
+        "Construct a non-unique exact rational symplectic-defect witness.",
+        "Replay the corrected coupled coefficient identities."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "matrix.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay exact finite matrix identities but does not diagnose which geometric premise authorizes a simplification."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Retain as a premise-discipline diagnostic; do not create a symplectic proof-audit tool from one corrected-paper episode."
     },
     {
       "task_id": "lcm-highly-abundant-scope-audit",

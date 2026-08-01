@@ -1,0 +1,3 @@
+task_id = "lagrangian-projection-proof-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

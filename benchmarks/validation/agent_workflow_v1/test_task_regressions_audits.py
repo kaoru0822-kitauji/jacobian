@@ -199,6 +199,30 @@ def test_inverse_distance_audit_accepts_alternative_rational_direction(
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_lagrangian_projection_audit_accepts_alternative_coefficients(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "lagrangian-projection-proof-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result.update(
+        P=[["2", "0"], ["0", "2"]],
+        W=[["2", "2/5"], ["0", "2"], ["-1", "1"], ["0", "-4/5"]],
+        naive_P=[["2", "2/5"], ["-2/5", "2"]],
+        naive_Q=[["1", "-1"], ["1", "1"]],
+        corrected_first_projection=[["2", "2/5"], ["-2/5", "2"]],
+        corrected_second_projection=[["1", "-1"], ["1", "1"]],
+    )
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize(
     ("path", "replacement"),
     [
