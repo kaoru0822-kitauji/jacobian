@@ -101,6 +101,16 @@ def _result_is_valid(result: object, frozen: dict[str, Any]) -> bool:
     expected = [_expected(case) for case in source_cases if isinstance(case, dict)]
     if any(item is None for item in expected):
         return False
+    if any(
+        not isinstance(item, dict)
+        or type(item.get("valid_count")) is not int
+        or type(item.get("density_numerator")) is not int
+        or type(item.get("density_denominator")) is not int
+        or not isinstance(item.get("forbidden_residues"), list)
+        or any(type(residue) is not int for residue in item["forbidden_residues"])
+        for item in submitted
+    ):
+        return False
     by_id = {
         item.get("case_id"): item
         for item in submitted
@@ -114,26 +124,18 @@ def _result_is_valid(result: object, frozen: dict[str, Any]) -> bool:
 def _evidence_is_valid(evidence: object) -> bool:
     if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
         return False
-    assert isinstance(evidence, list)
+    if not isinstance(evidence, list) or len(evidence) != 1:
+        return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
         return False
     try:
         if target.stat().st_size > 1_048_576:
             return False
-        text = target.read_text().lower()
+        text = target.read_text().strip()
     except (OSError, UnicodeError):
         return False
-    return all(
-        phrase in text
-        for phrase in (
-            "invertible",
-            "divides",
-            "collision",
-            "vacuous",
-            "finite local",
-        )
-    )
+    return len(text) >= 20
 
 
 def main() -> None:

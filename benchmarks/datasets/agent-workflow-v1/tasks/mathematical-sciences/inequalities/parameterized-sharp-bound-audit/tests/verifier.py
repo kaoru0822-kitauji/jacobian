@@ -296,20 +296,16 @@ def _evidence_matches_result(evidence: object, result: dict[str, Any]) -> bool:
             for line in text.splitlines()
             if line.startswith("RESULT_JSON:")
         ]
-        lower = text.lower()
+        boundary_markers = [
+            line.removeprefix("BOUNDARY_FAMILY_JSON:").strip()
+            for line in text.splitlines()
+            if line.startswith("BOUNDARY_FAMILY_JSON:")
+        ]
         return bool(
             len(markers) == 1
             and json.loads(markers[0]) == result
-            and all(
-                phrase in lower
-                for phrase in (
-                    "15/4",
-                    "attained",
-                    "infimum",
-                    "strict positivity",
-                    "boundary",
-                )
-            )
+            and len(boundary_markers) == 1
+            and json.loads(boundary_markers[0]) == result["boundary_family"]
         )
     except (OSError, UnicodeError, ValueError):
         return False
