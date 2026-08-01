@@ -168,6 +168,78 @@ def _rational(value: object) -> Fraction | None:
     return Fraction(numerator, denominator)
 
 
+def _certificate_is_valid(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "tangent_variables",
+        "schur_ordering",
+        "identity_scope",
+    }:
+        return False
+    tangent_variables = value["tangent_variables"]
+    ordering = value["schur_ordering"]
+    return bool(
+        isinstance(tangent_variables, list)
+        and set(tangent_variables) == {"a", "b", "c"}
+        and len(tangent_variables) == 3
+        and isinstance(ordering, list)
+        and set(ordering) == {"a", "b", "c"}
+        and len(ordering) == 3
+        and value["identity_scope"] == "a+b+c=1; a,b,c>0"
+        and _certificate_identities_hold(ordering)
+    )
+
+
+def _symmetric_witness_is_valid(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {"a", "b", "c"}:
+        return False
+    values = [_rational(value[name]) for name in ("a", "b", "c")]
+    if values != [Fraction(1, 3)] * 3:
+        return False
+    exact_values = cast(list[Fraction], values)
+    product = exact_values[0] * exact_values[1] * exact_values[2]
+    transition_value = sum(item**3 for item in exact_values) + Fraction(15, 4) * product
+    return transition_value == Fraction(1, 4)
+
+
+def _boundary_family_is_valid(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "vanishing_variable",
+        "other_variables",
+        "parameter",
+        "limit",
+        "attained_for_positive_parameter",
+    }:
+        return False
+    vanishing = value["vanishing_variable"]
+    others = value["other_variables"]
+    return bool(
+        vanishing in {"a", "b", "c"}
+        and isinstance(others, list)
+        and len(others) == 2
+        and set(others) == {"a", "b", "c"} - {vanishing}
+        and value["parameter"] == "t->0+"
+        and value["limit"] == "1/4"
+        and value["attained_for_positive_parameter"] is False
+    )
+
+
+def _audit_is_valid(value: object) -> bool:
+    expected_defects = {
+        "SYMMETRIC_EQUALITY_OVERCLAIMED_FOR_ALL_D",
+        "BOUNDARY_INFIMUM_MISLABELED_AS_MINIMUM",
+        "TRANSITION_CASE_NOT_SEPARATED",
+    }
+    return bool(
+        isinstance(value, dict)
+        and set(value) == {"frozen_explanation_status", "defects"}
+        and value["frozen_explanation_status"]
+        == "PARTIALLY_CORRECT_BUT_SHARPNESS_JUSTIFICATION_DEFECTIVE"
+        and isinstance(value["defects"], list)
+        and len(value["defects"]) == 3
+        and set(value["defects"]) == expected_defects
+    )
+
+
 def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
     required = {
         "transition",
@@ -202,81 +274,15 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
         "remainder_coefficient": "d-15/4",
         "attainment": "ATTAINED_ONLY_AT_THRESHOLD; INFIMUM_ONLY_ABOVE_THRESHOLD",
     }
-    certificate = result["certificate"]
-    if not isinstance(certificate, dict) or set(certificate) != {
-        "tangent_variables",
-        "schur_ordering",
-        "identity_scope",
-    }:
-        return False
-    tangent_variables = certificate["tangent_variables"]
-    ordering = certificate["schur_ordering"]
-    if (
-        not isinstance(tangent_variables, list)
-        or set(tangent_variables) != {"a", "b", "c"}
-        or len(tangent_variables) != 3
-        or not isinstance(ordering, list)
-        or set(ordering) != {"a", "b", "c"}
-        or len(ordering) != 3
-        or certificate["identity_scope"] != "a+b+c=1; a,b,c>0"
-        or not _certificate_identities_hold(ordering)
-    ):
-        return False
-
-    witness = result["symmetric_witness"]
-    if not isinstance(witness, dict) or set(witness) != {"a", "b", "c"}:
-        return False
-    values = [_rational(witness[name]) for name in ("a", "b", "c")]
-    if values != [Fraction(1, 3)] * 3:
-        return False
-    exact_values = cast(list[Fraction], values)
-    product = exact_values[0] * exact_values[1] * exact_values[2]
-    transition_value = (
-        sum(value**3 for value in exact_values) + Fraction(15, 4) * product
-    )
-    if transition_value != Fraction(1, 4):
-        return False
-
-    family = result["boundary_family"]
-    if not isinstance(family, dict) or set(family) != {
-        "vanishing_variable",
-        "other_variables",
-        "parameter",
-        "limit",
-        "attained_for_positive_parameter",
-    }:
-        return False
-    vanishing = family["vanishing_variable"]
-    others = family["other_variables"]
-    if (
-        vanishing not in {"a", "b", "c"}
-        or not isinstance(others, list)
-        or len(others) != 2
-        or set(others) != {"a", "b", "c"} - {vanishing}
-        or family["parameter"] != "t->0+"
-        or family["limit"] != "1/4"
-        or family["attained_for_positive_parameter"] is not False
-    ):
-        return False
-
-    audit = result["audit"]
-    expected_defects = {
-        "SYMMETRIC_EQUALITY_OVERCLAIMED_FOR_ALL_D",
-        "BOUNDARY_INFIMUM_MISLABELED_AS_MINIMUM",
-        "TRANSITION_CASE_NOT_SEPARATED",
-    }
     return bool(
         result["low_regime"] == expected_low
         and result["high_regime"] == expected_high
         and result["threshold_case"]
         == "BOTH_FORMULAS_AGREE_AND_SYMMETRIC_EQUALITY_IS_ATTAINED"
-        and isinstance(audit, dict)
-        and set(audit) == {"frozen_explanation_status", "defects"}
-        and audit["frozen_explanation_status"]
-        == "PARTIALLY_CORRECT_BUT_SHARPNESS_JUSTIFICATION_DEFECTIVE"
-        and isinstance(audit["defects"], list)
-        and len(audit["defects"]) == 3
-        and set(audit["defects"]) == expected_defects
+        and _certificate_is_valid(result["certificate"])
+        and _symmetric_witness_is_valid(result["symmetric_witness"])
+        and _boundary_family_is_valid(result["boundary_family"])
+        and _audit_is_valid(result["audit"])
     )
 
 
