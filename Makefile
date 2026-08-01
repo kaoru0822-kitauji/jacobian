@@ -242,7 +242,8 @@ agent-eval: ## Run a Harbor Jacobian observation job (DATASET=agent-workflow-v1 
 		--dataset "$(or $(DATASET),agent-workflow-v1)" \
 		--role observation \
 		--output "$$resolved_job" \
-		--model "$${JACOBIAN_MODEL}" && \
+		--model "$${JACOBIAN_MODEL}" \
+		$(if $(TASKS),--tasks $(TASKS),) && \
 	$(HARBOR_RUNNER) run -c "$$resolved_job" $(EVAL_ARGS)
 
 performance-eval: ## Run the report-only performance dataset through its Oracle job.
