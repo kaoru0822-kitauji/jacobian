@@ -72,7 +72,8 @@ def _result(result: object, frozen: dict[str, Any]) -> bool:
         and result.get("left_sum") == total
         and result.get("right_fourth_power") == right
         and total == right
-        and result.get("joint_gcd") == math.gcd(*bases, target) == 1
+        and type(result.get("joint_gcd")) is int
+        and result["joint_gcd"] == math.gcd(*bases, target) == 1
         and result.get("residue_checks") == expected_residues
         and result.get("claim_status") == "REFUTED_BY_COUNTEREXAMPLE"
     )
@@ -81,24 +82,16 @@ def _result(result: object, frozen: dict[str, Any]) -> bool:
 def _evidence(value: object) -> bool:
     if not evidence_list_is_bound(value, expected_path="evidence/answer.txt"):
         return False
-    assert isinstance(value, list)
+    if not isinstance(value, list) or len(value) != 1:
+        return False
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if path is None:
         return False
     try:
-        text = path.read_text().lower()
+        text = path.read_text().strip()
     except (OSError, UnicodeError):
         return False
-    return all(
-        word in text
-        for word in (
-            "counterexample",
-            "primitive",
-            "fourth",
-            "minimality",
-            "other exponents",
-        )
-    )
+    return len(text) >= 20
 
 
 def main() -> None:

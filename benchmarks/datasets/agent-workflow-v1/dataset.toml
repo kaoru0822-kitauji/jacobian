@@ -40,7 +40,7 @@ digest = "sha256:7562b43b10f387e90c80564bd6eb8a5e3587f3760c3f5f675aba0915b057590
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-euler-fourth-power-scope-audit"
-digest = "sha256:290b752484772c10bae0c41e30114b1d95f9f84d7c21f020e4155ca6832cb755"
+digest = "sha256:583c03a0bc3a870e9769b7852210dc8d3133cc8cb3c7eeae59cad75b1af5cd6c"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-euler-line-symbolic-certificate"

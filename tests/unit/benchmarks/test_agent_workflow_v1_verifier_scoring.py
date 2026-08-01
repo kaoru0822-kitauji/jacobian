@@ -82,8 +82,22 @@ def _bind_result_evidence(app: Path, submission: dict) -> None:
     marker = "RESULT_JSON: " + json.dumps(
         submission["result"], sort_keys=True, separators=(",", ":")
     )
+    boundary = submission["result"].get("boundary_family")
+    boundary_marker = (
+        "BOUNDARY_FAMILY_JSON: "
+        + json.dumps(boundary, sort_keys=True, separators=(",", ":"))
+        if boundary is not None
+        else None
+    )
     evidence_path.write_text(
-        "\n".join(marker if line.startswith("RESULT_JSON:") else line for line in lines)
+        "\n".join(
+            marker
+            if line.startswith("RESULT_JSON:")
+            else boundary_marker
+            if boundary_marker is not None and line.startswith("BOUNDARY_FAMILY_JSON:")
+            else line
+            for line in lines
+        )
         + "\n"
     )
     submission["evidence"][0]["sha256"] = _digest(evidence_path)
@@ -1059,6 +1073,13 @@ def test_parameterized_bound_evidence_binds_boundary_family(
     submission["result"]["boundary_family"]["vanishing_variable"] = "a"
     submission["result"]["boundary_family"]["other_variables"] = ["b", "c"]
     _bind_result_evidence(app, submission)
+    evidence_path = app / "evidence" / "answer.txt"
+    text = evidence_path.read_text().replace(
+        'BOUNDARY_FAMILY_JSON: {"attained_for_positive_parameter":false,"limit":"1/4","other_variables":["b","c"],"parameter":"t->0+","vanishing_variable":"a"}',
+        'BOUNDARY_FAMILY_JSON: {"attained_for_positive_parameter":false,"limit":"1/4","other_variables":["a","b"],"parameter":"t->0+","vanishing_variable":"c"}',
+    )
+    evidence_path.write_text(text)
+    submission["evidence"][0]["sha256"] = _digest(evidence_path)
     _write_json(submission_path, submission)
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 1.0
@@ -1210,6 +1231,26 @@ def test_degree_sequence_reference_solution_is_schema_valid() -> None:
     schema = json.loads((task / "environment" / "submission_schema.json").read_text())
     submission = json.loads((task / "solution" / "submission.json").read_text())
     Draft202012Validator(schema).validate(submission)
+
+
+def test_fourth_power_scope_rejects_boolean_joint_gcd(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "euler-fourth-power-scope-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["joint_gcd"] = True
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+
+
+def test_fourth_power_scope_accepts_reference_solution(tmp_path: Path) -> None:
+    result = _run_verifier(
+        *_prepare_case(tmp_path, "euler-fourth-power-scope-audit", "computed")
+    )
+    assert result["correctness"] == 1.0
+    assert result["reward"] == pytest.approx(1.0)
 
 
 def test_dead_end_local_density_audit_accepts_case_reordering(tmp_path: Path) -> None:

@@ -1,5 +1,5 @@
 FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
-LABEL jacobian.checksum="9b5e8a1cae9fb3b1f79dbabbd9d72f15506511933e1c705e053ead33fe516e53"
+LABEL jacobian.checksum="aa6e4ffb6c704131ec0f8c27c4bc7ea636171fa2678aed1bf03dbad44f7b8a2c"
 LABEL jacobian.task="jacobian/agent-workflow-v1-euler-fourth-power-scope-audit"
 COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
 COPY input.json /app/input.json
