@@ -138,3 +138,13 @@ def test_nested_matrix_scope_is_typed_and_bounded() -> None:
                 "witness_role": "unsupported",
             }
         )
+
+
+def test_matrix_candidate_rejects_noncanonical_integer_strings() -> None:
+    with pytest.raises(ValidationError):
+        MatrixCapabilityRequest.model_validate(
+            {
+                "claim": {"predicate": "is_nonsingular"},
+                "candidate": {"rows": 1, "cols": 1, "entries": [["01"]]},
+            }
+        )

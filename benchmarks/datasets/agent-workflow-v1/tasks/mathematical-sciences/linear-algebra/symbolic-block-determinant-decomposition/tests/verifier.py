@@ -152,29 +152,32 @@ def _block_at(matrix: list[list[dict]], index: int) -> list[list[dict]]:
     return [[matrix[2 * index + i][2 * index + j] for j in range(2)] for i in range(2)]
 
 
-def _off_diagonal_blocks_are_zero(matrix: list[list[dict]]) -> bool:
-    return all(
-        matrix[2 * block_row + i][2 * block_col + j] == ZERO
-        for block_row in range(3)
-        for block_col in range(3)
-        if block_row != block_col
-        for i in range(2)
-        for j in range(2)
-    )
+def _is_block_diagonal(matrix: list[list[dict]]) -> bool:
+    for block_row in range(3):
+        for block_col in range(3):
+            if block_row == block_col:
+                continue
+            for i in range(2):
+                for j in range(2):
+                    if matrix[2 * block_row + i][2 * block_col + j] != ZERO:
+                        return False
+    return True
 
 
-def _derive_channels(
+def _classify_channels(
     matrix: list[list[dict]],
     common: list[list[dict]],
     difference: list[list[dict]],
 ) -> list[str] | None:
-    mapping = [(common, "A+2B"), (difference, "A-B")]
-    channels: list[str] = []
+    channels = []
     for index in range(3):
-        matches = [name for block, name in mapping if _block_at(matrix, index) == block]
-        if len(matches) != 1:
+        block = _block_at(matrix, index)
+        if block == common:
+            channels.append("A+2B")
+        elif block == difference:
+            channels.append("A-B")
+        else:
             return None
-        channels.append(matches[0])
     return channels
 
 
@@ -208,13 +211,14 @@ def _symbolic_certificate_valid(result: object, source: dict) -> bool:
     ]
     if identity != expected_identity:
         return False
-    if not _off_diagonal_blocks_are_zero(left):
+    if not _is_block_diagonal(left):
         return False
     common = _block_add(a, b, 2)
     difference = _block_add(a, b, -1)
-    derived_channels = _derive_channels(left, common, difference)
+    derived_channels = _classify_channels(left, common, difference)
     return bool(
-        channels == derived_channels
+        derived_channels is not None
+        and channels == derived_channels
         and channels == ["A+2B", "A-B", "A-B"]
         and result["determinant_identity"] == "det(C)=det(A-B)^2*det(A+2B)"
         and result["invertibility_assumption"] == "NOT_REQUIRED_FOR_POLYNOMIAL_IDENTITY"
