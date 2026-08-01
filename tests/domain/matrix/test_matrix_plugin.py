@@ -7,14 +7,11 @@ from typing import Any
 
 import pytest
 
-from jacobian.plugins import matrices as matrix_plugin
 from jacobian.plugins.matrices import (
-    evaluate,
-    find_witness,
+    evaluate_capability,
+    find_witness_capability,
     materialize,
-    reductions,
-    validate_candidate,
-    validate_claim,
+    reductions_capability,
 )
 
 
@@ -46,28 +43,6 @@ def _maxdet_maximizer() -> dict:
     }
 
 
-def test_validate_candidate_accepts_kernel_fixture() -> None:
-    assert validate_candidate(_kernel_candidate()) == []
-
-
-def test_validate_candidate_rejects_floats() -> None:
-    cand = _kernel_candidate()
-    cand["entries"] = [[2.0, 4], [1, 2]]
-    assert validate_candidate(cand)
-
-
-def test_validate_candidate_rejects_bools() -> None:
-    cand = _kernel_candidate()
-    cand["entries"] = [[True, 4], [1, 2]]
-    assert validate_candidate(cand)
-
-
-def test_validate_candidate_rejects_non_rectangular() -> None:
-    cand = _kernel_candidate()
-    cand["entries"] = [[2, 4, 0], [1, 2]]
-    assert validate_candidate(cand)
-
-
 def test_determinant_predicate_rejects_rectangular_matrix() -> None:
     candidate = {
         "rows": 2,
@@ -75,9 +50,10 @@ def test_determinant_predicate_rejects_rectangular_matrix() -> None:
         "entries": [[1, 0, 0], [0, 1, 0]],
     }
 
-    resp = evaluate({"claim": {"predicate": "is_nonsingular"}, "candidate": candidate})
-
-    assert resp["input"]["status"] == "REJECTED"
+    with pytest.raises(ValueError, match="matrix evaluation request does not match"):
+        evaluate_capability(
+            {"claim": {"predicate": "is_nonsingular"}, "candidate": candidate}
+        )
 
 
 def test_maxdet_rejects_rectangular_scope() -> None:
@@ -86,41 +62,21 @@ def test_maxdet_rejects_rectangular_scope() -> None:
         "scope": {"rows": 2, "cols": 3, "entries": [-1, 1]},
     }
 
-    assert validate_claim(claim)
-
-
-def test_validate_claim_accepts_supported_predicates() -> None:
-    assert validate_claim({"predicate": "is_nonsingular"}) == []
-    assert (
-        validate_claim(
-            {"predicate": "maximize_absolute_determinant", "scope": _maxdet_scope()}
-        )
-        == []
-    )
-
-
-def test_validate_claim_rejects_missing_scope() -> None:
-    errors = validate_claim({"predicate": "maximize_absolute_determinant"})
-    assert errors
+    with pytest.raises(ValueError, match="matrix evaluation request does not match"):
+        evaluate_capability({"claim": claim, "candidate": _kernel_candidate()})
 
 
 def test_evaluate_kernel_matrix_is_singular() -> None:
     claim = {"predicate": "is_nonsingular"}
-    resp = evaluate({"claim": claim, "candidate": _kernel_candidate()})
-    assert resp["input"]["status"] == "ACCEPTED"
-    result = resp["results"][0]
-    assert result["is_singular"] is True
-    assert result["objective"]["value"] == {"num": "0", "den": "1"}
-    vec = result["proposed_witness"]["payload"]["vector"]
-    assert _matrix_times_vector(_kernel_candidate()["entries"], vec) == [
-        Fraction(0),
-        Fraction(0),
-    ]
+    response = evaluate_capability({"claim": claim, "candidate": _kernel_candidate()})
+    assert response["conclusion"] == "FALSE"
+    assert response["objectives"] == {"determinant": {"num": "0", "den": "1"}}
+    assert response["failure_classifications"] == ["nontrivial_kernel"]
 
 
 def test_find_witness_kernel_vector() -> None:
     claim = {"predicate": "is_nonsingular"}
-    resp = find_witness(
+    resp = find_witness_capability(
         {
             "claim": claim,
             "candidate": _kernel_candidate(),
@@ -138,22 +94,21 @@ def test_find_witness_kernel_vector() -> None:
 
 
 def test_find_witness_rejects_unsupported_role() -> None:
-    resp = find_witness(
-        {
-            "claim": {"predicate": "is_nonsingular"},
-            "candidate": _kernel_candidate(),
-            "witness_role": "SUPPORTS_CLAIM",
-        }
-    )
-
-    assert resp["input"]["status"] == "REJECTED"
+    with pytest.raises(ValueError, match="supports only DEFEATS_CANDIDATE"):
+        find_witness_capability(
+            {
+                "claim": {"predicate": "is_nonsingular"},
+                "candidate": _kernel_candidate(),
+                "witness_role": "SUPPORTS_CLAIM",
+            }
+        )
 
 
 def test_evaluate_maxdet_maximizer() -> None:
     claim = {"predicate": "maximize_absolute_determinant", "scope": _maxdet_scope()}
-    resp = evaluate({"claim": claim, "candidate": _maxdet_maximizer()})
-    result = resp["results"][0]
-    assert result["objective"]["value"] == {"num": "4", "den": "1"}
+    response = evaluate_capability({"claim": claim, "candidate": _maxdet_maximizer()})
+    assert response["conclusion"] == "UNKNOWN"
+    assert response["objectives"] == {"abs_determinant": {"num": "4", "den": "1"}}
 
 
 def test_evaluate_maxdet_rejects_candidate_outside_scope() -> None:
@@ -161,15 +116,13 @@ def test_evaluate_maxdet_rejects_candidate_outside_scope() -> None:
     candidate = _maxdet_maximizer()
     candidate["entries"][0][0] = 100
 
-    resp = evaluate({"claim": claim, "candidate": candidate})
-
-    assert resp["input"]["status"] == "REJECTED"
-    assert "outside claim scope" in resp["input"]["errors"][0]
+    with pytest.raises(ValueError, match="matrix evaluation request does not match"):
+        evaluate_capability({"claim": claim, "candidate": candidate})
 
 
 def test_find_witness_maxdet_returns_maximizer() -> None:
     claim = {"predicate": "maximize_absolute_determinant", "scope": _maxdet_scope()}
-    resp = find_witness({"claim": claim, "witness_role": "SUPPORTS_CLAIM"})
+    resp = find_witness_capability({"claim": claim, "witness_role": "SUPPORTS_CLAIM"})
     assert resp["status"] == "FOUND"
     assert resp["witness_format"] == "matrix.maximizer"
     mat = resp["witness"]["matrix"]
@@ -181,34 +134,23 @@ def test_find_witness_maxdet_returns_maximizer() -> None:
 def test_find_witness_maxdet_requires_supporting_role() -> None:
     claim = {"predicate": "maximize_absolute_determinant", "scope": _maxdet_scope()}
 
-    resp = find_witness(
-        {
-            "claim": claim,
-            "witness_role": "DEFEATS_CANDIDATE",
-        }
-    )
+    with pytest.raises(ValueError, match="supports only SUPPORTS_CLAIM"):
+        find_witness_capability(
+            {
+                "claim": claim,
+                "witness_role": "DEFEATS_CANDIDATE",
+            }
+        )
 
-    assert resp["input"]["status"] == "REJECTED"
 
-
-def test_find_witness_maxdet_rejects_over_budget_before_search(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def unexpected_iterator(_: dict[str, object]) -> object:
-        raise AssertionError("over-budget scope must not be enumerated")
-
-    monkeypatch.setattr(matrix_plugin, "_scope_iterator", unexpected_iterator)
+def test_find_witness_maxdet_rejects_over_budget_before_search() -> None:
     claim = {
         "predicate": "maximize_absolute_determinant",
         "scope": {"rows": 5, "cols": 5, "entries": [-1, 1]},
     }
 
-    response = find_witness({"claim": claim, "witness_role": "SUPPORTS_CLAIM"})
-
-    assert response["input"]["status"] == "REJECTED"
-    assert response["input"]["errors"] == [
-        "scope exceeds witness search limit of 65536 candidates"
-    ]
+    with pytest.raises(ValueError, match="scope exceeds witness search limit"):
+        find_witness_capability({"claim": claim, "witness_role": "SUPPORTS_CLAIM"})
 
 
 def test_materialize_maxdet_scope_count() -> None:
@@ -222,10 +164,9 @@ def test_materialize_maxdet_scope_count() -> None:
 
 def test_reductions_kernel_fixture_is_minimal() -> None:
     claim = {"predicate": "is_nonsingular"}
-    resp = reductions(
+    resp = reductions_capability(
         {"target_kind": "candidate", "target": _kernel_candidate(), "claim": claim}
     )
-    assert resp["input"]["status"] == "ACCEPTED"
     assert resp["reductions"] == []
 
 
@@ -241,16 +182,18 @@ def test_reductions_finds_singular_principal_submatrix() -> None:
         ],
     }
     claim = {"predicate": "is_nonsingular"}
-    resp = reductions({"target_kind": "candidate", "target": cand, "claim": claim})
-    kinds = {r["reduction_kind"] for r in resp["reductions"]}
+    resp = reductions_capability(
+        {"target_kind": "candidate", "target": cand, "claim": claim}
+    )
+    kinds = {r["reducer"] for r in resp["reductions"]}
     assert "delete_row_column" in kinds
 
 
-def test_results_are_unverified() -> None:
-    resp = evaluate(
+def test_evaluation_does_not_grant_verification_authority() -> None:
+    response = evaluate_capability(
         {"claim": {"predicate": "is_nonsingular"}, "candidate": _kernel_candidate()}
     )
-    assert resp["verified"] is False
+    assert "verified" not in response
 
 
 # ---------------------------------------------------------------------------
