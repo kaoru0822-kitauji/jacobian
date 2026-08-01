@@ -180,6 +180,12 @@ maximum_assurance = "COMPUTED"
 required_provider = "core"
 
 [[tasks]]
+id = "jacobian/agent-workflow-v1-putnam-2adic-induction-audit"
+path = "tasks/mathematical-sciences/number-theory/putnam-2adic-induction-audit"
+maximum_assurance = "COMPUTED"
+required_provider = "core"
+
+[[tasks]]
 id = "jacobian/agent-workflow-v1-random-function-expectation-audit"
 path = "tasks/mathematical-sciences/probability-statistics/random-function-expectation-audit"
 maximum_assurance = "COMPUTED"

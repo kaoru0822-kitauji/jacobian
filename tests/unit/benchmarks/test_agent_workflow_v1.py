@@ -36,6 +36,7 @@ EXPECTED_TASKS = {
     "polynomial-normalization",
     "polynomial-map-collision",
     "polynomial-tail-counterexample",
+    "putnam-2adic-induction-audit",
     "random-function-expectation-audit",
     "subspace-direct-sum-counterexample",
     "symbolic-block-determinant-decomposition",

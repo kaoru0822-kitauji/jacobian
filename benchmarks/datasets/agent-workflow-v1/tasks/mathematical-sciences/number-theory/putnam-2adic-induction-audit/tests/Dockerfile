@@ -1,0 +1,7 @@
+FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
+LABEL jacobian.checksum="03fc4946495bd4e24670f06e8571e00e7b0d6005d2782c800cbceee88736406a"
+LABEL jacobian.task="jacobian/agent-workflow-v1-putnam-2adic-induction-audit"
+COPY expected.json input.json test.sh verifier.py verifier_support.py /tests/
+COPY input.json /app/input.json
+RUN chmod +x /tests/test.sh && \
+    python -c 'import json; assert json.load(open("/tests/expected.json"))["task_id"] == "jacobian/agent-workflow-v1-putnam-2adic-induction-audit"'
