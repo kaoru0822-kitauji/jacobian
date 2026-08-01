@@ -17,13 +17,21 @@ Classify the work before editing a task:
 
 - **Task/verifier validation:** parse the bundles, run the Oracle, and attack
   deliberate failure cases. This is harness evidence.
+- **Regression or public reproduction:** replay a known or public case to
+  detect breakage. This is not held-out evidence and must not support a causal
+  capability claim.
+- **Assurance or contract conformance:** test assurance calibration, scope,
+  schemas, artifacts, discovery, or parameterization. These cases may measure
+  workflow quality without measuring mathematical capability value.
 - **Jacobian workflow observation:** use the committed Harbor observation job,
   its direct local MCP service, and Harbor ATIF plus Jacobian telemetry. This is
   workflow evidence, not comparative performance.
 - **Future causal comparison:** put control/treatment conditions in Harbor job
   configuration, outside task bundles, with identical task digests, prompts,
-  models, budgets, environments, and seeds. Do not add an A/B condition merely
-  to validate v1.
+  models, budgets, environments, and seeds. Require held-out or transformed
+  cases, a non-ceiling control pilot, multiple repetitions, and separately
+  reported correctness and assurance metrics. Do not treat an A/B run on the
+  public suite as a causal result.
 
 ## Author or change a task
 
@@ -116,13 +124,19 @@ verifier logs, source SHA, task digest, and Harbor version.
 Review the committed observation job and run the local Harbor composition. The
 Jacobian service is intentionally anonymous for this local evaluation path;
 Harbor connects directly to `http://jacobian:8000/mcp`. Set `JACOBIAN_IMAGE`
-only when overriding the default local image:
+only when overriding the default local image. Use the toggle explicitly:
 
 ```sh
 export JACOBIAN_MODEL='your-model'
 export JACOBIAN_IMAGE='jacobian:local'
-make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
+make agent-eval DATASET=agent-workflow-v1 \
+  JACOBIAN_ENABLED=1 EVAL_EXECUTE=1
 ```
+
+For a control run, use `JACOBIAN_ENABLED=0`; it selects the matching Harbor
+job without the sidecar or MCP configuration. Keep the task filter, model,
+prompt, budget, and environment fixed when comparing the two modes. The
+external MCP configuration belongs to the treatment job, not task TOMLs.
 
 Inspect Harbor ATIF together with Jacobian telemetry for capability discovery
 and descriptions, invocation and parameter errors, artifact and verification

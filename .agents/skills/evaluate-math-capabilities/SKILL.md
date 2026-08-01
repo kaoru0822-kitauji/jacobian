@@ -12,6 +12,25 @@ outcomes and evidence, not a preferred sequence of calls.
 Use the [shared handoff format](../../../docs/reference/capability-development-handoffs.md)
 for inputs, returns, and portfolio decisions.
 
+## Classify the evidence before running
+
+Label each case and result as exactly one of:
+
+- **regression/public reproduction:** known or public case; useful for contract
+  and breakage detection, never held-out causal evidence;
+- **assurance/conformance:** tests calibration, scope, schemas, artifacts,
+  discovery, or parameterization, and may not measure mathematical capability
+  value; or
+- **held-out causal comparison:** an unseen or transformed case with a frozen
+  control/treatment intervention and an independently judgeable outcome.
+
+Do not promote a public regression, a single observation, or a reward change
+caused only by assurance calibration into a claim that Jacobian improved
+mathematical problem solving. A causal comparison is not ready until a control
+pilot is below the success ceiling, treatment has a plausible capability-to-
+outcome hypothesis, and the plan specifies multiple repetitions and uncertainty
+reporting.
+
 ## Confirm evaluation readiness
 
 Start from a concrete intervention:
@@ -155,6 +174,12 @@ Make these primary:
 - scope and completeness accuracy;
 - evidence and verification-record bindings; and
 - acceptance of mathematically valid alternative strategies.
+
+Keep mathematical correctness, evidence validity, scope/completeness, false
+certification, and assurance calibration as separate reported metrics. An
+aggregate reward may summarize a workflow contract, but it must not be the
+primary evidence for a capability-benefit claim when it combines these
+dimensions.
 
 Among semantically correct runs, measure:
 
