@@ -196,6 +196,45 @@ def _submitted_powers_match(value: object, expected: dict[str, Poly]) -> bool:
     )
 
 
+def _recurrence_is_valid(value: object, expected_powers: dict[str, Poly]) -> bool:
+    if value is None:
+        return True
+    expected_product: Poly = (Fraction(), Fraction(-2), Fraction(1, 2))
+    return bool(
+        isinstance(value, dict)
+        and set(value) == {"seed", "product_polynomial", "power_sums"}
+        and value["seed"] == ["2", "s"]
+        and _poly(value["product_polynomial"]) == expected_product
+        and _submitted_powers_match(value["power_sums"], expected_powers)
+    )
+
+
+def _elimination_is_valid(value: object, expected_powers: dict[str, Poly]) -> bool:
+    if (
+        not isinstance(value, dict)
+        or not {"sum_polynomial", "target_polynomial"} <= set(value)
+        or not set(value)
+        <= {"sum_polynomial", "hypothesis_factorization", "target_polynomial"}
+    ):
+        return False
+    expected_factorization = "A4-2*A3=-(s^2/2)*(s^2-10*s+8)"
+    factorization = value.get("hypothesis_factorization")
+    difference = _padd(
+        expected_powers["4"], _pscale(expected_powers["3"], Fraction(-2))
+    )
+    factorized = _pmul(
+        (Fraction(), Fraction(), Fraction(-1, 2)),
+        (Fraction(8), Fraction(-10), Fraction(1)),
+    )
+    return bool(
+        _poly(value["sum_polynomial"]) == (Fraction(8), Fraction(-10), Fraction(1))
+        and _poly(value["target_polynomial"])
+        == (Fraction(32), Fraction(-20), Fraction(1))
+        and factorization in {None, expected_factorization}
+        and difference == factorized
+    )
+
+
 def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
     frozen_source = source.get("source", {})
     if (
@@ -210,50 +249,9 @@ def _result_is_valid(result: object, source: dict[str, Any]) -> bool:
         return False
     expected_product: Poly = (Fraction(), Fraction(-2), Fraction(1, 2))
     expected_powers = _power_sum_polynomials(expected_product)
-    recurrence = result.get("recurrence")
-    if recurrence is not None:
-        if not isinstance(recurrence, dict) or set(recurrence) != {
-            "seed",
-            "product_polynomial",
-            "power_sums",
-        }:
-            return False
-        if (
-            recurrence["seed"] != ["2", "s"]
-            or _poly(recurrence["product_polynomial"]) != expected_product
-            or not _submitted_powers_match(recurrence["power_sums"], expected_powers)
-        ):
-            return False
-
-    elimination = result["elimination"]
-    if (
-        not isinstance(elimination, dict)
-        or not {"sum_polynomial", "target_polynomial"} <= set(elimination)
-        or not set(elimination)
-        <= {"sum_polynomial", "hypothesis_factorization", "target_polynomial"}
-    ):
-        return False
-    if _poly(elimination["sum_polynomial"]) != (
-        Fraction(8),
-        Fraction(-10),
-        Fraction(1),
-    ) or _poly(elimination["target_polynomial"]) != (
-        Fraction(32),
-        Fraction(-20),
-        Fraction(1),
-    ):
-        return False
-    factorization = elimination.get("hypothesis_factorization")
-    if factorization is not None and factorization != "A4-2*A3=-(s^2/2)*(s^2-10*s+8)":
-        return False
-    difference = _padd(
-        expected_powers["4"], _pscale(expected_powers["3"], Fraction(-2))
-    )
-    factorized = _pmul(
-        (Fraction(), Fraction(), Fraction(-1, 2)),
-        (Fraction(8), Fraction(-10), Fraction(1)),
-    )
-    if difference != factorized:
+    if not _recurrence_is_valid(
+        result.get("recurrence"), expected_powers
+    ) or not _elimination_is_valid(result["elimination"], expected_powers):
         return False
 
     branches = result["branches"]
