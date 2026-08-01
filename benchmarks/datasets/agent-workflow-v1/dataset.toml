@@ -12,11 +12,11 @@ authors = [
 
 [[tasks]]
 name = "jacobian/autoformalization-semantic-audit"
-digest = "sha256:406ea0bbf90d5a5c12f8aeb0e6b2dc8858baf4bb57f71cb284d7c1347e8647b0"
+digest = "sha256:ee75210320f381280e5a7c91ca3298df626570eecc4ff69e14cf61222eb9e17f"
 
 [[tasks]]
 name = "jacobian/calendar-good-days-audit"
-digest = "sha256:8f914774c132f6d4f120adfd42d95d21377dcf75c4b90f6f0f9e50f683dd9c18"
+digest = "sha256:82a262072c509a6c56297a14dcf830165856cfb347cec30bd97e7a48c9652d90"
 
 [[tasks]]
 name = "jacobian/complex-power-sum-elimination"
@@ -24,15 +24,15 @@ digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d840601741
 
 [[tasks]]
 name = "jacobian/distinct-sum-pairing-optimum"
-digest = "sha256:86dd5bff719c7e007b1ed3c356f22985ba4cda663abd401fe4bb77e347016f36"
+digest = "sha256:04dbedf40d06cc65109d4b66e1051ec55b2846b24d3a3207c3ae24a5073504d0"
 
 [[tasks]]
 name = "jacobian/divisibility-construction-witness"
-digest = "sha256:1d45b7351f18a9e7df86274fdc28252397c8abd900dbc26bf7e7e31cf21c9854"
+digest = "sha256:72c7dd9a8ece3597252234a4ecc030219407dc8494090ec38db52904323ecb83"
 
 [[tasks]]
 name = "jacobian/euler-line-symbolic-certificate"
-digest = "sha256:8eb84393869b3e20c3b0f57e8c8e58184d8c4a8c3fa1341842951f1975ce8792"
+digest = "sha256:44831f32ea461a0c54e43445012436ae1c929ff077cc400c5f2573ef103e7dec"
 
 [[tasks]]
 name = "jacobian/finite-magma-countermodel"
@@ -56,7 +56,7 @@ digest = "sha256:7de68c8b4e42c26ee2e10ac68c170283d199a94719d37258a7b32c35c23130c
 
 [[tasks]]
 name = "jacobian/grounded-premise-proof"
-digest = "sha256:a00ca1a55750718e9cb5bd08253044a88021f84a3d4d9884e423cdc13edb1394"
+digest = "sha256:070134406a5214537558307a7a16f196e88c56dc7703fcc84aad87e41a1eeab2"
 
 [[tasks]]
 name = "jacobian/hermite-normal-form"
@@ -72,27 +72,27 @@ digest = "sha256:e6624814316f1d764306b46c6ef344ee2871675823392aa3e41b319093e9066
 
 [[tasks]]
 name = "jacobian/log-exponent-recovery"
-digest = "sha256:7994b322ddba8ad66707ae556b808945f0643e9405765eb31be19534fc3bb0da"
+digest = "sha256:9638137202c75ced940d3c6523e1c5e2493a0cc571da1aa899d46fc7bb4fc00b"
 
 [[tasks]]
 name = "jacobian/log-inequality-meta-audit"
-digest = "sha256:4f36f05075fb23e1fd1f55adde124057375200b5637cc18aa9ad8841d46538ca"
+digest = "sha256:d42187501625fa0999875719f2c0aa15dfe430357da7f299d31d85086a6f7d8a"
 
 [[tasks]]
 name = "jacobian/matrix-square-zero-counterexample"
-digest = "sha256:e35c3e5f22d7f768e21001ff7b94f85cd748076ead6d322959d04ecc1592db36"
+digest = "sha256:5975c47f5fc1be0010abcada28bf51d0ae1df2f81f970d13af0fef6a8033e419"
 
 [[tasks]]
 name = "jacobian/metric-tsp-proof-repair"
-digest = "sha256:0c22548b8e77847b09173bbf56a2d3c04e87da92ff7da29d62d4f3d08144478c"
+digest = "sha256:27d28dfdbf2dd016ae5e1de92118755f531d233078f237955473bab4fe755a9b"
 
 [[tasks]]
 name = "jacobian/modular-cubic-obstruction"
-digest = "sha256:66ecd40087311e603929041bd0ef166ef61f930c3dfb520458a9324f36c5c079"
+digest = "sha256:549651a097f65dae7025c8dd5f22be5cac5264aabe2247f4949fa5861c58fe17"
 
 [[tasks]]
 name = "jacobian/natural-subtraction-proof-repair"
-digest = "sha256:913e498b2f3abaad21133497df1043331bd39956d1124b8e6fb39158ffd36f25"
+digest = "sha256:431d05de04cb492c6e4a444295919d47a127c025bd0eb72ef70dcb8d928199fd"
 
 [[tasks]]
 name = "jacobian/noncompact-lefschetz-proof-audit"
@@ -100,7 +100,7 @@ digest = "sha256:14f4382bc30c0af019d53a6a4c20c7915310d42b8fb876287a5ad681f022711
 
 [[tasks]]
 name = "jacobian/nondifferentiable-maximum-construction"
-digest = "sha256:aaef634eaa01e05ff751122255ae37b63b73f1caf51b373d7aeca5a90f5c6100"
+digest = "sha256:6e98836e30ec7eba6069a17b504a22755f3bf62fcd4282e964ad340f4db7e239"
 
 [[tasks]]
 name = "jacobian/parameterized-sharp-bound-audit"
@@ -116,7 +116,7 @@ digest = "sha256:5b592996a2e01a1f685a2afaa0d3f9acc05696d38519605f7dd86da8a6904c4
 
 [[tasks]]
 name = "jacobian/polynomial-tail-counterexample"
-digest = "sha256:a5cde3157ce98b58fa7e0d0d8d9b82213e66ddc611fa271c5183dce25e41ae45"
+digest = "sha256:c9cb424afb1e824f18aeb61b78d0968ec1472c5f26439d12e5effc343a99e63f"
 
 [[tasks]]
 name = "jacobian/putnam-2adic-induction-audit"
@@ -124,7 +124,7 @@ digest = "sha256:a5b765c629efa4cb3f6f16d25115d599b3a578f31bd999c306ecfa8ef69d762
 
 [[tasks]]
 name = "jacobian/random-function-expectation-audit"
-digest = "sha256:d33292b3af0fcc126c7d156ee806e8fec6b9edd0d5cbf0fbd9825b0e7f37041c"
+digest = "sha256:5566b7dc1a2d205a8912268c20cc941eb2f6dca9e48d736caa52752f8350cccc"
 
 [[tasks]]
 name = "jacobian/rational-linear-solution"
@@ -136,7 +136,7 @@ digest = "sha256:f8a8cd0791e229a8b64fbe3e3b805d2f6d113795d82c113b05f713b0e38c613
 
 [[tasks]]
 name = "jacobian/subspace-direct-sum-counterexample"
-digest = "sha256:dd54c483a3df187dea49c541a9a6b0e085ff6eb85e3f51fd2338249d50881462"
+digest = "sha256:eff5caf5fd2343f1852a6e0edb6a33a570fb0419b58df0d482fb3b929eee8c5a"
 
 [[tasks]]
 name = "jacobian/symbolic-block-determinant-decomposition"
