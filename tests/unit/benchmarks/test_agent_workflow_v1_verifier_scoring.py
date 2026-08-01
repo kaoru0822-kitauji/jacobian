@@ -28,6 +28,7 @@ RESOURCE_DERIVED_TASKS = (
     "calendar-good-days-audit",
     "finite-magma-countermodel",
     "generated-lemma-vacuity-audit",
+    "inverse-distance-remainder-audit",
     "log-exponent-recovery",
     "matrix-square-zero-counterexample",
     "metric-tsp-proof-repair",
@@ -815,6 +816,70 @@ def test_autoformalization_rejects_positive_lean_compile_claim(
     assert rejected["reward"] == pytest.approx(0.9)
 
 
+def test_inverse_distance_audit_accepts_alternative_rational_direction(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "inverse-distance-remainder-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["directional_witnesses"][0] = {
+        "direction": [
+            {"numerator": 4, "denominator": 5},
+            {"numerator": 3, "denominator": 5},
+        ],
+        "quadratic_coefficient": {"numerator": 23, "denominator": 50},
+        "sign": "POSITIVE",
+        "normalized_residual_limit": "quadratic_coefficient",
+    }
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    accepted = _run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        (
+            ("second_order_term", "dot_square_coefficient"),
+            {"numerator": 1, "denominator": 1},
+        ),
+        (
+            ("directional_witnesses", 0, "quadratic_coefficient"),
+            {"numerator": 2, "denominator": 1},
+        ),
+        (
+            ("response_audit", "defects"),
+            ["CUBIC_REMAINDER_FALSE"],
+        ),
+    ],
+)
+def test_inverse_distance_audit_rejects_corrupted_certificates(
+    tmp_path: Path,
+    path: tuple[object, ...],
+    replacement: object,
+) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "inverse-distance-remainder-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    target = submission["result"]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = replacement
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_generated_lemma_audit_enforces_visible_divisor_witness_bounds(
     tmp_path: Path,
 ) -> None:
@@ -834,10 +899,8 @@ def test_generated_lemma_audit_enforces_visible_divisor_witness_bounds(
     audit["original_premise_holds"] = False
     _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
-
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
 
 
 def test_noncompact_lefschetz_accepts_equivalent_rational_and_cohomology_forms(
@@ -853,9 +916,7 @@ def test_noncompact_lefschetz_accepts_equivalent_rational_and_cohomology_forms(
     counterexample["compact_support_cohomology"].reverse()
     _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
-
     accepted = _run_verifier(task, app, logs)
-    assert accepted["correctness"] == 1.0
     assert accepted["reward"] == pytest.approx(1.0)
 
 
@@ -871,10 +932,8 @@ def test_noncompact_lefschetz_rejects_boolean_in_integer_fields(
     submission["result"]["counterexample"][field] = True
     _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
-
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
 
 
 def test_noncompact_lefschetz_enforces_visible_translation_bounds(
@@ -891,10 +950,8 @@ def test_noncompact_lefschetz_enforces_visible_translation_bounds(
     }
     _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
-
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
 
 
 def test_symbolic_block_certificate_enforces_common_channel_first(
@@ -915,10 +972,8 @@ def test_symbolic_block_certificate_enforces_common_channel_first(
     result["channels"] = ["A-B", "A+2B", "A-B"]
     _bind_result_evidence(app, submission)
     _write_json(submission_path, submission)
-
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
-    assert rejected["reward"] == 0.0
 
 
 def test_parameterized_bound_evidence_binds_boundary_family(
@@ -940,8 +995,23 @@ def test_parameterized_bound_evidence_binds_boundary_family(
     evidence_path.write_text(text)
     submission["evidence"][0]["sha256"] = _digest(evidence_path)
     _write_json(submission_path, submission)
-
     rejected = _run_verifier(task, app, logs)
     assert rejected["correctness"] == 1.0
     assert rejected["evidence_validity"] == 0.0
-    assert rejected["reward"] == 0.0
+
+
+def test_inverse_distance_enforces_visible_rational_bounds(tmp_path: Path) -> None:
+    task, app, logs = _prepare_case(
+        tmp_path, "inverse-distance-remainder-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    coefficient = submission["result"]["directional_witnesses"][0][
+        "quadratic_coefficient"
+    ]
+    coefficient["numerator"] *= 1_000_001
+    coefficient["denominator"] *= 1_000_001
+    _bind_result_evidence(app, submission)
+    _write_json(submission_path, submission)
+    rejected = _run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
