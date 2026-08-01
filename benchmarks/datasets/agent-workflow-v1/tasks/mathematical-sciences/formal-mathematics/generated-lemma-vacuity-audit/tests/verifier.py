@@ -132,8 +132,9 @@ def _divisor_audit_is_valid(audit: object) -> bool:
     dividends = audit["dividends"]
     if (
         audit["defect"] != "TRIVIAL_EXISTENTIAL_WITNESS"
-        or a <= 0
-        or b <= 0
+        or not 1 <= a <= 1_000_000
+        or not 1 <= b <= 1_000_000
+        or not 1 <= d <= 1_000_000
         or a == b
         or d != 1
         or not isinstance(dividends, list)
