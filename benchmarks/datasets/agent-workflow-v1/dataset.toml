@@ -60,7 +60,7 @@ digest = "sha256:46e9171b30f73a249c1189d0b3105557259d5ce4991992b5428ee2597a6ef0e
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-inverse-distance-remainder-audit"
-digest = "sha256:5c7bc6ab16676c9cd527137a0cce7de212a8f8e23e50ff8f0ee6f4057b983f49"
+digest = "sha256:59adf9386e1857293498a90b60c12cca275200626f51b8012146f55ba94cba50"
 
 [[tasks]]
 name = "jacobian/agent-workflow-v1-log-exponent-recovery"
