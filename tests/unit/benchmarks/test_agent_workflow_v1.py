@@ -24,6 +24,7 @@ EXPECTED_TASKS = {
     "rational-linear-solution",
     "hermite-normal-form",
     "inverse-distance-remainder-audit",
+    "lcm-highly-abundant-scope-audit",
     "log-exponent-recovery",
     "log-inequality-meta-audit",
     "matrix-square-zero-counterexample",

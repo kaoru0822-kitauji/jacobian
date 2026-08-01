@@ -67,6 +67,10 @@ name = "jacobian/agent-workflow-v1-inverse-distance-remainder-audit"
 digest = "sha256:59adf9386e1857293498a90b60c12cca275200626f51b8012146f55ba94cba50"
 
 [[tasks]]
+name = "jacobian/agent-workflow-v1-lcm-highly-abundant-scope-audit"
+digest = "sha256:710330e56557df33d758dac76ff04d7a8705a314dfffe0b26abf4298b6fd87de"
+
+[[tasks]]
 name = "jacobian/agent-workflow-v1-log-exponent-recovery"
 digest = "sha256:96aee022fb6e4bf3abf9a9216b6474c575ea433686b69f121c37a79c6d2dc827"
 

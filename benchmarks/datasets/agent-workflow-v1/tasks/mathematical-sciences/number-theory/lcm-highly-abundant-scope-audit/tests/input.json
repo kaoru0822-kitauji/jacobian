@@ -1,0 +1,23 @@
+{
+  "task_id": "jacobian/agent-workflow-v1-lcm-highly-abundant-scope-audit",
+  "source": {
+    "conversation": "https://chatgpt.com/share/68ded9b1-37dc-800e-b04c-97095c70eb29",
+    "community_audit": "https://mathoverflow.net/questions/501066/is-the-least-common-multiple-sequence-textlcm1-2-dots-n-a-subset-of-t/501129",
+    "spreadsheet_tab": "AI Conversation/reasoning trace",
+    "spreadsheet_row": 26,
+    "captured_at": "2026-07-31",
+    "content_binding": "URL_ONLY_NOT_CONTENT_DIGEST_BOUND",
+    "community_license": "CC BY-SA 4.0"
+  },
+  "definitions": {
+    "L_n": "lcm(1,2,...,n)",
+    "sigma": "sum of positive divisors",
+    "highly_abundant": "sigma(N)>sigma(m) for every positive integer m<N"
+  },
+  "frozen_claims": {
+    "counterexample_index": 97,
+    "counterexample_claim": "L_97 is not highly abundant",
+    "minimality_claim": "97 is the smallest counterexample index"
+  },
+  "assurance_ceiling": "COMPUTED"
+}
