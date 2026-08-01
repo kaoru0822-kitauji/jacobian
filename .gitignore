@@ -36,7 +36,7 @@ build/
 dist/
 htmlcov/
 benchmarks/results/
-jobs/
+/jobs/
 lean/.lake/
 
 # Test infrastructure state

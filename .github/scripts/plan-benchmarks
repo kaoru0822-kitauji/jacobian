@@ -37,6 +37,7 @@ BENCHMARK_EXECUTION_CONTROL_PATHS = frozenset(
         "tools/sync_harbor_verifier_support.py",
     }
 )
+BENCHMARK_CONFIG_PREFIX = "benchmarks/config/"
 
 
 def _json(value: object) -> str:
@@ -130,6 +131,16 @@ def plan(
     integration = event == "merge_group"
 
     for path in benchmark_paths:
+        if path.startswith(BENCHMARK_CONFIG_PREFIX):
+            if integration:
+                scope = "all"
+                run_oracle = True
+                reasons.append("benchmark execution configuration change")
+            else:
+                reasons.append(
+                    "benchmark execution configuration Oracle deferred to merge queue"
+                )
+            continue
         if path in BENCHMARK_CONTROL_PATHS:
             if path in BENCHMARK_EXECUTION_CONTROL_PATHS and integration:
                 scope = "all"

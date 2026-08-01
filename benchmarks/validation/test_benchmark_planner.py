@@ -62,6 +62,21 @@ def test_benchmark_control_plane_changes_run_contract_checks(path: str) -> None:
     assert _matrix(result) == []
 
 
+def test_execution_configuration_change_defers_oracle_to_merge_queue() -> None:
+    path = "benchmarks/config/jacobian.mcp.json"
+
+    pull_request = planner.plan([path], event="pull_request")
+    merge_group = planner.plan([path], event="merge_group")
+
+    assert pull_request["run-benchmark-check"] == "true"
+    assert pull_request["run-benchmark-oracle"] == "false"
+    assert pull_request["benchmark-oracle-scope"] == "none"
+    assert _matrix(pull_request) == []
+    assert merge_group["run-benchmark-oracle"] == "true"
+    assert merge_group["benchmark-oracle-scope"] == "all"
+    assert _matrix(merge_group)
+
+
 def test_executable_control_plane_change_defers_oracle_to_merge_queue() -> None:
     path = "benchmarks/tooling/harbor_suite.py"
 
