@@ -12,20 +12,13 @@ from jacobian.contracts.capabilities import (
 from jacobian.contracts.results import ExecutionStatus
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-TASK_ROOT = (
-    PROJECT_ROOT
-    / "benchmarks"
-    / "datasets"
-    / "public-reproductions-v1"
-    / "tasks"
-    / "mathematical-sciences"
-)
+TASK_ROOT = PROJECT_ROOT / "benchmarks" / "tasks"
 
 
 def _suite() -> dict[str, list[dict[str, Any]]]:
     smith = []
     for slug in ("smith-rank-deficient", "smith-rectangular"):
-        task = TASK_ROOT / "linear-algebra" / slug
+        task = TASK_ROOT / slug
         expected = json.loads((task / "tests" / "expected.json").read_text())
         smith.append(
             {
@@ -38,7 +31,7 @@ def _suite() -> dict[str, list[dict[str, Any]]]:
         )
     homology = []
     for slug in ("integral-circle", "integral-projective-plane", "reduced-point"):
-        task = TASK_ROOT / "algebraic-topology" / slug
+        task = TASK_ROOT / slug
         request = json.loads((task / "environment" / "input.json").read_text())
         expected = json.loads((task / "tests" / "expected.json").read_text())
         homology.append(

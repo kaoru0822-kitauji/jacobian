@@ -14,15 +14,7 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.domains.combinatorics import build_combinatorics_bundle
 
 _RECURRENCE_CONVENTION = "A_N_EQUALS_SUM_C_J_TIMES_A_N_MINUS_J_FOR_J_FROM_1"
-_PUBLIC_TASKS = (
-    Path(__file__).resolve().parents[3]
-    / "benchmarks"
-    / "datasets"
-    / "public-reproductions-v1"
-    / "tasks"
-    / "mathematical-sciences"
-    / "combinatorics"
-)
+_PUBLIC_TASKS = Path(__file__).resolve().parents[3] / "benchmarks" / "tasks"
 _OVERLAP_CASES = []
 for _slug in (
     "recurrence-fibonacci",
