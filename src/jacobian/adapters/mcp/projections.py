@@ -172,15 +172,6 @@ def _capability_call_tool_result(
 ) -> CallToolResult:
     if projection_strategy == "FULL_INLINE":
         view = "FULL"
-    elif (
-        projection_strategy
-        in {
-            "COMPACT_URI_TEXT",
-            "COMPACT_URI_TEXT_RESOURCE_LINK",
-        }
-        and view == "FULL"
-    ):
-        raise ValueError("compact MCP projection strategies require a non-FULL view")
     canonical = result.model_dump(mode="json")
     projected, projection = _invocation_text_projection(result, view=view)
     text = _compact_json(canonical if view == "FULL" else projected)

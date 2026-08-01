@@ -110,3 +110,22 @@ def test_resource_link_comparison_strategies_keep_structured_content_canonical()
     assert compact_with_link.content[1].type == "resource_link"
     for call_result in (full_inline, compact_uri_text, compact_with_link):
         assert call_result.structured_content == result.model_dump(mode="json")
+
+
+def test_full_invocation_view_is_honored_by_every_projection_strategy() -> None:
+    result = _large_result(durable=True)
+
+    for strategy in (
+        "FULL_INLINE",
+        "COMPACT_URI_TEXT",
+        "COMPACT_URI_TEXT_RESOURCE_LINK",
+    ):
+        call_result = _capability_call_tool_result(
+            result,
+            view="FULL",
+            projection_strategy=strategy,
+        )
+
+        assert call_result.is_error is False
+        assert json.loads(call_result.content[0].text)["output"] == result.output
+        assert "mcp_projection" not in json.loads(call_result.content[0].text)

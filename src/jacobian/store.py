@@ -226,6 +226,15 @@ class ArtifactStore:
 
         revision = self._read_migration_revision()
         if revision is None:
+            format_revision = self._read_state_format_revision()
+            if format_revision is not None and (
+                format_revision < SUPPORTED_STATE_FLOOR
+                or format_revision > CURRENT_STATE_FORMAT_REVISION
+            ):
+                raise UnsupportedStateVersionError(
+                    format_revision,
+                    minimum_revision=SUPPORTED_STATE_FLOOR,
+                )
             return
         if revision < SUPPORTED_STATE_FLOOR or revision > CURRENT_STATE_FORMAT_REVISION:
             raise UnsupportedStateVersionError(
@@ -249,6 +258,30 @@ class ArtifactStore:
                     return None
                 row = connection.execute(
                     "SELECT MAX(revision) FROM jacobian_schema_migrations"
+                ).fetchone()
+        except sqlite3.DatabaseError:
+            return None
+        return None if row is None or row[0] is None else int(row[0])
+
+    def _read_state_format_revision(self) -> int | None:
+        if not self.db_path.exists() or self.db_path.is_dir():
+            return None
+        try:
+            with sqlite3.connect(self.db_path) as connection:
+                table = connection.execute(
+                    """
+                    SELECT 1 FROM sqlite_master
+                    WHERE type = 'table' AND name = 'jacobian_state_format'
+                    """
+                ).fetchone()
+                if table is None:
+                    return None
+                row = connection.execute(
+                    """
+                    SELECT format_revision
+                    FROM jacobian_state_format
+                    WHERE id = 0
+                    """
                 ).fetchone()
         except sqlite3.DatabaseError:
             return None

@@ -182,17 +182,17 @@ def _record_mcp_resource_telemetry(
     read_failed = _mcp_resource_read_failed(item)
     if resource_read_uri in telemetry.link_output_complete:
         telemetry.uri_preservation_attempts += 1
-        if not read_failed:
-            telemetry.uri_preservation_successes += 1
         if telemetry.link_output_complete[resource_read_uri]:
             telemetry.unnecessary_reads += 1
     if read_failed:
         return
     telemetry.read_successes += 1
-    _, digest_preserved = _mcp_resource_identity_preserved(
+    uri_preserved, digest_preserved = _mcp_resource_identity_preserved(
         item,
         resource_read_uri,
     )
+    if resource_read_uri in telemetry.link_output_complete and uri_preserved:
+        telemetry.uri_preservation_successes += 1
     if digest_preserved:
         telemetry.digest_preservation_successes += 1
 

@@ -43,17 +43,30 @@ from jacobian.store import ArtifactStore
 _AXIOM_LINE = re.compile(r"'jacobian_theorem' depends on axioms: \[([^\]]*)\]")
 _NO_AXIOMS = "'jacobian_theorem' does not depend on any axioms"
 _MESSAGE_KIND = re.compile(r"(?:^|:\s*)(error|warning|info)(?:\([^)]*\))?:", re.I)
-_FORBIDDEN_STATEMENT = re.compile(
-    r"\b(?:admit|axiom|class|def|elab|end|example|import|instance|lemma|macro|"
-    r"namespace|native_decide|opaque|run_tac|section|set_option|sorry|syntax|"
-    r"theorem|unsafe)\b|#",
-    re.I,
-)
-_FORBIDDEN_PROOF = re.compile(
-    r"\b(?:axiom|class|def|elab|end|example|import|instance|lemma|macro|"
-    r"namespace|native_decide|opaque|run_tac|section|set_option|syntax|"
-    r"theorem|unsafe)\b|#",
-    re.I,
+_FORBIDDEN_SOURCE_TOKENS = frozenset(
+    {
+        "admit",
+        "axiom",
+        "class",
+        "def",
+        "elab",
+        "end",
+        "example",
+        "import",
+        "instance",
+        "lemma",
+        "macro",
+        "namespace",
+        "native_decide",
+        "opaque",
+        "run_tac",
+        "section",
+        "set_option",
+        "sorry",
+        "syntax",
+        "theorem",
+        "unsafe",
+    }
 )
 
 
@@ -279,10 +292,109 @@ def _validate_source(statement: str, proof: str) -> None:
     for value, field_name in ((statement, "statement"), (proof, "proof")):
         if any(marker in value for marker in ("--", "/-", "-/")):
             raise ValueError(f"{field_name} comments are outside the source boundary")
-    if _FORBIDDEN_STATEMENT.search(statement):
+    if _contains_forbidden_source_token(statement):
         raise ValueError("statement contains an unsupported Lean command")
-    if _FORBIDDEN_PROOF.search(proof):
+    if _contains_forbidden_source_token(proof):
         raise ValueError("proof contains an unsupported Lean command")
+
+
+def _lean_source_tokens(source: str) -> tuple[str, ...]:
+    """Return Lean identifiers and command markers outside literals/comments."""
+
+    tokens: list[str] = []
+    index = 0
+    length = len(source)
+    while index < length:
+        if source.startswith("--", index):
+            index = _skip_line_comment(source, index, length)
+            continue
+        if source.startswith("/-", index):
+            index = _skip_block_comment(source, index, length)
+            continue
+        character = source[index]
+        if character == '"':
+            index = _skip_string_literal(source, index, length)
+            continue
+        if character == "'" and (
+            index == 0 or not _is_identifier_character(source[index - 1])
+        ):
+            index = _skip_char_literal(source, index, length)
+            continue
+        if _is_identifier_start(character):
+            end = index + 1
+            while end < length and _is_identifier_character(source[end]):
+                end += 1
+            tokens.append(source[index:end])
+            index = end
+            continue
+        if character == "#":
+            tokens.append(character)
+        index += 1
+    return tuple(tokens)
+
+
+def _skip_line_comment(source: str, index: int, length: int) -> int:
+    newline = source.find("\n", index + 2)
+    return length if newline == -1 else newline + 1
+
+
+def _skip_block_comment(source: str, index: int, length: int) -> int:
+    index += 2
+    depth = 1
+    while index < length and depth:
+        if source.startswith("/-", index):
+            depth += 1
+            index += 2
+        elif source.startswith("-/", index):
+            depth -= 1
+            index += 2
+        else:
+            index += 1
+    return index
+
+
+def _skip_string_literal(source: str, index: int, length: int) -> int:
+    index += 1
+    while index < length:
+        if source[index] == "\\":
+            index += 2
+        elif source[index] == '"':
+            return index + 1
+        else:
+            index += 1
+    return index
+
+
+def _skip_char_literal(source: str, index: int, length: int) -> int:
+    index += 1
+    if index < length and source[index] == "\\":
+        index += 2
+    elif index < length:
+        index += 1
+    return index + 1 if index < length and source[index] == "'" else index
+
+
+def _is_identifier_start(character: str) -> bool:
+    return character == "_" or character.isalpha()
+
+
+def _is_identifier_character(character: str) -> bool:
+    return character == "_" or character == "'" or character.isalnum()
+
+
+def _contains_forbidden_source_token(source: str) -> bool:
+    return any(
+        token == "#" or token.casefold() in _FORBIDDEN_SOURCE_TOKENS
+        for token in _lean_source_tokens(source)
+    )
+
+
+def _proof_hole_counts(source: str) -> tuple[int, int]:
+    tokens = _lean_source_tokens(source)
+    return (
+        sum(token.casefold() == "sorry" for token in tokens),
+        sum(token.casefold() == "admit" for token in tokens),
+    )
 
 
 def _inspect_source(request: LeanProofAxiomsInspectRequest) -> dict[str, Any]:
@@ -352,6 +464,7 @@ def _inspect_source(request: LeanProofAxiomsInspectRequest) -> dict[str, Any]:
                 details={"failure": type(exc).__name__},
             )
         ) from exc
+    sorry_count, admit_count = _proof_hole_counts(request.proof)
     return {
         "imports": imports,
         "package_manifest_digest": package_manifest_digest,
@@ -359,8 +472,8 @@ def _inspect_source(request: LeanProofAxiomsInspectRequest) -> dict[str, Any]:
         "inspection_complete": inspection_complete,
         "axioms_reported": axioms_reported,
         "axioms": axioms,
-        "sorry_count": len(re.findall(r"\bsorry\b", request.proof, re.I)),
-        "admit_count": len(re.findall(r"\badmit\b", request.proof, re.I)),
+        "sorry_count": sorry_count,
+        "admit_count": admit_count,
         "diagnostics": messages,
         "detail": "complete axiom inspection"
         if inspection_complete

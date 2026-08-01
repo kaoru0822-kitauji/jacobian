@@ -203,11 +203,19 @@ def test_state_below_supported_floor_fails_closed(
     assert exc_info.value.minimum_revision == 3
 
 
-def test_future_state_format_metadata_fails_closed(tmp_path: Path) -> None:
+@pytest.mark.parametrize("ledger_state", ["missing", "empty"])
+def test_future_state_format_metadata_without_ledger_fails_closed(
+    tmp_path: Path,
+    ledger_state: str,
+) -> None:
     with ArtifactStore(tmp_path):
         pass
     connection = _connection(tmp_path)
     try:
+        if ledger_state == "missing":
+            connection.execute("DROP TABLE jacobian_schema_migrations")
+        else:
+            connection.execute("DELETE FROM jacobian_schema_migrations")
         connection.execute(
             "UPDATE jacobian_state_format SET format_revision = 99 WHERE id = 0"
         )
