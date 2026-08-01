@@ -646,11 +646,4 @@ FINITE_PROBABILITY_CAPABILITIES = (
     ),
 )
 
-# Kept as a source-level alias for callers that imported the experimental tuple.
-FINITE_MOMENT_CAPABILITIES = FINITE_PROBABILITY_CAPABILITIES[:1]
-
-
-__all__ = [
-    "FINITE_MOMENT_CAPABILITIES",
-    "FINITE_PROBABILITY_CAPABILITIES",
-]
+__all__ = ["FINITE_PROBABILITY_CAPABILITIES"]

@@ -53,9 +53,8 @@ class IntegerValueRequest(ContractModel):
 class IntegerBaseDigitsRequest(ContractModel):
     """Expand one integer's absolute value in a positional base.
 
-    The legacy ``IntegerModulusRequest`` reused a ``modulus`` field for the
-    positional base; this contract names it ``base`` to avoid implying a
-    modular-arithmetic operation.
+    The positional base is named explicitly so this request cannot be confused
+    with modular arithmetic.
     """
 
     value: CanonicalInteger

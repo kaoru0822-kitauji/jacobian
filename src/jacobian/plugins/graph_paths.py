@@ -1,6 +1,6 @@
 """Search-side directed graph/path reference plugin.
 
-Implements the v0.2 graph-path reference scenarios:
+Implements the maintained graph-path reference scenarios:
 - PATH-CLOSURE-001: intended source-terminal path family is incomplete.
 - GRAPH-BIP-001: a triangle plus isolated vertices is not bipartite.
 
@@ -18,7 +18,7 @@ import networkx as nx
 from pydantic import ValidationError
 
 from jacobian.canonical import canonicalize_json
-from jacobian.contracts.plugin_inputs import (
+from jacobian.contracts.plugin_graphs import (
     GraphCanonicalizeRequest,
     GraphEnumerationRequest,
     GraphPathCapabilityRequest,

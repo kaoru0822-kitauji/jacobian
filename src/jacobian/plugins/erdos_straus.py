@@ -7,7 +7,7 @@ from typing import Any, TypeGuard
 
 from pydantic import ValidationError
 
-from jacobian.contracts.plugin_inputs import ErdosStrausCapabilityRequest
+from jacobian.contracts.plugin_number_theory import ErdosStrausCapabilityRequest
 
 _MIN_N = 2
 _MAX_N = 10_000

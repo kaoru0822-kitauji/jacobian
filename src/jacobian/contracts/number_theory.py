@@ -21,7 +21,7 @@ from pydantic import Field, StrictBool, StrictInt, StringConstraints, model_vali
 from jacobian.contracts.results import ContractModel
 
 # ---------------------------------------------------------------------------
-# Shared bounds — kept consistent with the legacy primitive adapters.
+# Shared bounds for the current bounded integer-domain contracts.
 # ---------------------------------------------------------------------------
 
 _MAX_INTEGER_LENGTH = 256

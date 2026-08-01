@@ -13,15 +13,15 @@ independent checkers may promote exact evidence to a verified result. The
 [product model](explanation/product-blueprint.md) defines the capability
 contract and ownership boundaries.
 
-The 0.6.0 package is a stable release. The v0.2 specification remains the
-last frozen conformance snapshot; current reference documents and the installed
-catalog define the supported capabilities and interfaces for this release.
+The current 0.6 architecture is pre-stable. The v0.2 specification remains a
+historical conformance snapshot; current reference documents and the installed
+catalog define the supported capabilities and interfaces.
 Evaluations guide portfolio behavior and maintenance; they do not grant
 verification authority.
 
 ## Project control documents
 
-These documents track the stable product contract and its ongoing evolution:
+These documents track the current product contract and its ongoing evolution:
 
 | Question | Document | Status |
 | --- | --- | --- |

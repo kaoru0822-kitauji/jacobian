@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib
 
+import pytest
+
 import jacobian
 
 PUBLIC_API = {
@@ -43,3 +45,19 @@ def test_root_namespace_stays_minimal() -> None:
     assert "arithmetic" not in jacobian.__all__
     assert "matrices" not in jacobian.__all__
     assert "graphs" not in jacobian.__all__
+
+
+def test_deleted_experimental_contract_modules_are_not_importable() -> None:
+    for module_name in (
+        "jacobian.contracts.proof_ir",
+        "jacobian.contracts.lean_artifacts",
+        "jacobian.contracts.plugin_inputs",
+    ):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(module_name)
+
+
+def test_unsupported_aliases_are_not_exposed() -> None:
+    operations = importlib.import_module("jacobian.domains.probability.operations")
+    assert hasattr(operations, "FINITE_PROBABILITY_CAPABILITIES")
+    assert not hasattr(operations, "FINITE_MOMENT_CAPABILITIES")

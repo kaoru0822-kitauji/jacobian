@@ -189,7 +189,7 @@ class ResultEnvelope(ContractModel):
                     "verified results require an immutable verification record"
                 )
             if self.candidate_digest is None:
-                raise ValueError("v0.2 verified results require a candidate binding")
+                raise ValueError("verified results require a candidate binding")
 
         return self
 

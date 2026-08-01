@@ -1,6 +1,6 @@
 """Search-side integer-matrix reference plugin.
 
-Implements the v0.2 matrix reference scenarios:
+Implements the maintained integer-matrix reference scenarios:
 - MAT-KERNEL-001: the 2x2 matrix [[2,4],[1,2]] is singular.
 - MAT-MAXDET3-001: maximize |det A| over 3x3 matrices with entries in {-1,1}.
 
@@ -19,7 +19,7 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
-from jacobian.contracts.plugin_inputs import (
+from jacobian.contracts.plugin_matrices import (
     MatrixCapabilityRequest,
     MatrixEnumerationRequest,
     MatrixEvaluationRequest,
@@ -856,7 +856,8 @@ def reductions(request: dict[str, Any]) -> dict[str, Any]:
                             }
                         )
 
-    # maximize_absolute_determinant has no candidate reductions in v0.2.
+    # maximize_absolute_determinant has no candidate reductions in the
+    # maintained reference profile.
 
     proposed.sort(
         key=lambda r: (r["objectives"]["elements"], r["objectives"]["max_abs_entry"])

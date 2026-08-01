@@ -63,7 +63,7 @@ def _reject_external_references(value: Any) -> None:
             reference = value.get(keyword)
             if isinstance(reference, str) and not reference.startswith("#"):
                 raise SchemaRegistryError(
-                    "v0.2 schemas cannot resolve external or network references"
+                    "registered schemas cannot resolve external or network references"
                 )
         for nested in value.values():
             _reject_external_references(nested)
