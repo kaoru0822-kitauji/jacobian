@@ -195,6 +195,7 @@ def test_bootstrap_dry_run_and_client_preflight_fail_closed() -> None:
     assert 'require_checkout_path_ignored "a custom uv project environment"' in script
     assert '--python "$PYTHON_PATH"' in script
     assert 'Path(part or ".").resolve()' in script
+    assert script.index("status --porcelain") < script.index("uv python find")
 
 
 def test_nonexistent_checkout_directory_uses_git_directory_ignore_semantics(

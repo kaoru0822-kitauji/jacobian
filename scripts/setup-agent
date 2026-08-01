@@ -90,6 +90,16 @@ test -f "$REPO_ROOT/uv.lock" && test -f "$REPO_ROOT/pyproject.toml" || {
   echo "pyproject.toml and uv.lock are required" >&2
   exit 2
 }
+REVISION=$(git -C "$REPO_ROOT" rev-parse HEAD)
+if test -n "$(git -C "$REPO_ROOT" status --porcelain)"; then
+  REPO_STATE=dirty
+else
+  REPO_STATE=clean
+fi
+test "$REPO_STATE" = clean || {
+  echo "source bootstrap requires a clean checkout so the recorded Git SHA identifies the running code" >&2
+  exit 2
+}
 
 PINNED_UV=$(tr -d '[:space:]' < "$REPO_ROOT/.uv-version")
 ACTIVE_UV=$(uv --version | awk '{print $2}')
@@ -138,16 +148,6 @@ if test -n "${JACOBIAN_LEAN_RUNTIME:-}"; then
   JACOBIAN_LEAN_RUNTIME=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).expanduser().resolve())' "$JACOBIAN_LEAN_RUNTIME")
   export JACOBIAN_LEAN_RUNTIME
 fi
-REVISION=$(git -C "$REPO_ROOT" rev-parse HEAD)
-if test -n "$(git -C "$REPO_ROOT" status --porcelain)"; then
-  REPO_STATE=dirty
-else
-  REPO_STATE=clean
-fi
-test "$REPO_STATE" = clean || {
-  echo "source bootstrap requires a clean checkout so the recorded Git SHA identifies the running code" >&2
-  exit 2
-}
 STATE_DIR=$("$PYTHON_PATH" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$STATE_DIR")
 require_checkout_path_ignored "the Jacobian state directory" "$STATE_DIR"
 UV_BIN=$(command -v uv)
