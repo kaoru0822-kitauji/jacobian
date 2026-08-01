@@ -33,6 +33,7 @@ from jacobian.graphs.isomorphism import GraphIsomorphismInstallation
 from jacobian.graphs.shrinking import GraphShrinkingInstallation
 from jacobian.lean_frontend.declarations import LeanDeclarationService
 from jacobian.lean_frontend.exploration import LeanExplorationInstallation
+from jacobian.lean_frontend.proof_axioms import LeanProofAxiomsInstallation
 from jacobian.lean_frontend.proof_edit import LeanProofEditInstallation
 from jacobian.lean_frontend.service import LeanService
 from jacobian.lean_frontend.statement import LeanStatementInstallation
@@ -275,6 +276,7 @@ class PortfolioInstallation:
     lean_declarations: LeanDeclarationService | None = None
     lean_exploration: LeanExplorationInstallation | None = None
     lean_proof_edit: LeanProofEditInstallation | None = None
+    lean_proof_axioms: LeanProofAxiomsInstallation | None = None
 
     # --- References ---
     references: dict[str, ReferenceInstallation] = field(default_factory=dict)

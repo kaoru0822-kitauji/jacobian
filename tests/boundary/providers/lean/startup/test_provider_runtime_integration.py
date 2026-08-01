@@ -169,6 +169,7 @@ def test_unhealthy_optional_lean_runtime_is_absent_from_catalog(
         "lean.declaration.dependencies",
         "lean.declaration.inspect",
         "lean.declaration.search",
+        "lean.proof.axioms.inspect",
         "lean.proof_edit.validate",
     }.isdisjoint(capability_ids)
 

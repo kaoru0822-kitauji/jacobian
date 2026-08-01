@@ -24,6 +24,9 @@ from jacobian.contracts.lean import LeanDependencyGraphArtifact
 from jacobian.installation.context import InstallationContext
 from jacobian.lean_frontend.declarations import installed_lean_declaration_service
 from jacobian.lean_frontend.exploration import install_lean_exploration_capabilities
+from jacobian.lean_frontend.proof_axioms import (
+    install_lean_proof_axioms_capability,
+)
 from jacobian.lean_frontend.proof_edit import install_lean_proof_edit_capability
 from jacobian.lean_frontend.service import LeanService
 from jacobian.portfolio.provider_resolution import ProviderAvailabilityResolver
@@ -122,6 +125,16 @@ class ReferenceLeanInstaller:
             result.lean_checkers,
         )
         ctx.register_capability(LeanCheckAdapter(result.lean, runtime))
+        proof_axioms_adapter, result.lean_proof_axioms = (
+            install_lean_proof_axioms_capability(
+                ctx.store,
+                ctx.schemas,
+                ctx.artifacts,
+                result.lean_checkers,
+                runtime,
+            )
+        )
+        ctx.register_capability(proof_axioms_adapter)
         adapters, result.lean_exploration = install_lean_exploration_capabilities(
             ctx.store,
             ctx.schemas,

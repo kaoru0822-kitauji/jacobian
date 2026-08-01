@@ -1,0 +1,455 @@
+"""Bounded, non-authoritative inspection of a Lean proof's axiom closure."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+import time
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal, cast
+
+from pydantic import ValidationError
+
+from jacobian.artifacts import ArtifactService
+from jacobian.canonical import canonicalize_json
+from jacobian.capabilities import CapabilityInvocationError
+from jacobian.contracts.capabilities import (
+    CapabilityAssurance,
+    CapabilityAssuranceLevel,
+    CapabilityCompleteness,
+    CapabilityCompletenessStatus,
+    CapabilityDescriptor,
+    CapabilityDiagnostic,
+    CapabilityInvocationExample,
+    CapabilityMode,
+    CapabilityProviderRuntime,
+    CapabilityRequest,
+    CapabilityResult,
+    CapabilityScope,
+)
+from jacobian.contracts.lean import LeanEnvironment
+from jacobian.contracts.lean_proof_axioms import (
+    LeanProofAxiomsArtifact,
+    LeanProofAxiomsInspectOutput,
+    LeanProofAxiomsInspectRequest,
+)
+from jacobian.contracts.lean_statement import LeanElaborationDiagnostic
+from jacobian.contracts.results import Execution, ExecutionStatus
+from jacobian.schema_registry import SchemaRegistry, model_schema
+from jacobian.store import ArtifactStore
+
+_AXIOM_LINE = re.compile(r"'jacobian_theorem' depends on axioms: \[([^\]]*)\]")
+_NO_AXIOMS = "'jacobian_theorem' does not depend on any axioms"
+_MESSAGE_KIND = re.compile(r"(?:^|:\s*)(error|warning|info)(?:\([^)]*\))?:", re.I)
+_FORBIDDEN_STATEMENT = re.compile(
+    r"\b(?:admit|axiom|class|def|elab|end|example|import|instance|lemma|macro|"
+    r"namespace|native_decide|opaque|run_tac|section|set_option|sorry|syntax|"
+    r"theorem|unsafe)\b|#",
+    re.I,
+)
+_FORBIDDEN_PROOF = re.compile(
+    r"\b(?:axiom|class|def|elab|end|example|import|instance|lemma|macro|"
+    r"namespace|native_decide|opaque|run_tac|section|set_option|syntax|"
+    r"theorem|unsafe)\b|#",
+    re.I,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class LeanProofAxiomsInstallation:
+    semantics_uri: str
+    artifact_schema_uri: str
+
+
+@dataclass(frozen=True, slots=True)
+class _InspectionResources:
+    artifacts: ArtifactService
+    installations: Mapping[LeanEnvironment, Any]
+    semantics_uri: str
+    artifact_schema_uri: str
+    provider_runtime: CapabilityProviderRuntime
+
+
+def install_lean_proof_axioms_capability(
+    store: ArtifactStore,
+    schemas: SchemaRegistry,
+    artifacts: ArtifactService,
+    installations: Mapping[LeanEnvironment, Any],
+    provider_runtime: CapabilityProviderRuntime,
+) -> tuple[LeanProofAxiomsAdapter, LeanProofAxiomsInstallation]:
+    """Install fact-only proof inspection for the exact pinned Lean runtime."""
+
+    semantics_uri = store.register_descriptor(
+        kind="semantics",
+        name="jacobian.lean4-proof-axioms",
+        version="1",
+        definition={
+            "description": (
+                "reported imports, axiom closure, and proof-hole counts for one "
+                "bounded proof source"
+            ),
+            "verification": "inspection facts only; never verification evidence",
+            "scope": "AXIOM_DEPENDENCY_ONLY",
+        },
+    )
+    artifact_schema_uri = schemas.register(
+        name="jacobian.lean4-proof-axioms",
+        version="1",
+        schema=model_schema(LeanProofAxiomsArtifact),
+    )
+    resources = _InspectionResources(
+        artifacts=artifacts,
+        installations=installations,
+        semantics_uri=semantics_uri,
+        artifact_schema_uri=artifact_schema_uri,
+        provider_runtime=provider_runtime,
+    )
+    return (
+        LeanProofAxiomsAdapter(resources),
+        LeanProofAxiomsInstallation(semantics_uri, artifact_schema_uri),
+    )
+
+
+class LeanProofAxiomsAdapter:
+    def __init__(self, resources: _InspectionResources) -> None:
+        self.resources = resources
+        self._descriptor = CapabilityDescriptor(
+            capability_id="lean.proof.axioms.inspect",
+            version="1",
+            title="Inspect a Lean proof's reported axiom closure",
+            description=(
+                "Compile one bounded Lean proof in its exact CORE or MATHLIB "
+                "environment and report imports, proof-hole counts, and the axiom "
+                "closure printed by Lean. This is inspection, not verification."
+            ),
+            provider="jacobian.lean4",
+            provider_runtime=resources.provider_runtime,
+            modes=(CapabilityMode.EXPLORE,),
+            input_schema=LeanProofAxiomsInspectRequest.model_json_schema(),
+            output_schema=LeanProofAxiomsInspectOutput.model_json_schema(),
+            read_only=True,
+            tags=("lean", "proof", "axioms", "trust-base", "inspection"),
+            invocation_examples=(
+                CapabilityInvocationExample(
+                    name="inspect_true",
+                    description="Inspect a proof of True without making a trust decision.",
+                    mode=CapabilityMode.EXPLORE,
+                    input={
+                        "environment": "CORE",
+                        "statement": "True",
+                        "proof": "by trivial",
+                    },
+                ),
+            ),
+        )
+
+    @property
+    def descriptor(self) -> CapabilityDescriptor:
+        return self._descriptor
+
+    def invoke(self, request: CapabilityRequest) -> CapabilityResult:
+        try:
+            validated = LeanProofAxiomsInspectRequest.model_validate(request.input)
+            _validate_source(validated.statement, validated.proof)
+        except (ValidationError, ValueError) as exc:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="INVALID_LEAN_PROOF_AXIOMS_REQUEST",
+                    stage="request_validation",
+                    message="The bounded Lean proof-inspection request is invalid.",
+                    hint=(
+                        "Provide one statement expression and a proof body without "
+                        "declarations, imports, or trust-policy commands."
+                    ),
+                )
+            ) from exc
+        if validated.environment not in self.resources.installations:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="LEAN_ENVIRONMENT_UNAVAILABLE",
+                    stage="environment_resolution",
+                    message="The requested pinned Lean environment is unavailable.",
+                    hint="Install the exact Lean/Mathlib runtime, then retry.",
+                )
+            )
+
+        started = time.monotonic()
+        inspection = _inspect_source(validated)
+        runtime = self.resources.provider_runtime
+        if runtime.version is None or runtime.digest is None:
+            raise CapabilityInvocationError(
+                CapabilityDiagnostic(
+                    code="LEAN_PROVIDER_IDENTITY_INCOMPLETE",
+                    stage="provider_identity",
+                    message="The Lean runtime did not provide a pinned version and digest.",
+                    hint="Install the exact authorized Lean runtime, then retry.",
+                )
+            )
+        manifest_digest = inspection["package_manifest_digest"]
+        environment_digest = _environment_digest(
+            validated.environment,
+            runtime,
+            manifest_digest,
+        )
+        artifact_payload = LeanProofAxiomsArtifact(
+            environment=validated.environment,
+            environment_digest=environment_digest,
+            provider_runtime_digest=runtime.digest,
+            lean_version=runtime.version,
+            lean_commit=_lean_commit(
+                validated.environment, self.resources.installations
+            ),
+            mathlib_commit=(
+                _mathlib_commit(self.resources.installations, validated.environment)
+            ),
+            imports=inspection["imports"],
+            package_manifest_digest=manifest_digest,
+            statement=validated.statement,
+            proof=validated.proof,
+            elaborated=inspection["elaborated"],
+            inspection_complete=inspection["inspection_complete"],
+            axioms_reported=inspection["axioms_reported"],
+            axioms=inspection["axioms"],
+            sorry_count=inspection["sorry_count"],
+            admit_count=inspection["admit_count"],
+            diagnostics=inspection["diagnostics"],
+        )
+        artifact = self.resources.artifacts.put(
+            schema_uri=self.resources.artifact_schema_uri,
+            semantics_uri=self.resources.semantics_uri,
+            payload=artifact_payload.model_dump(mode="json"),
+            summary=(
+                "Lean proof axiom inspection "
+                f"(complete={artifact_payload.inspection_complete})"
+            ),
+        )
+        output = LeanProofAxiomsInspectOutput(
+            **artifact_payload.model_dump(mode="python"),
+            proof_axioms_uri=artifact.artifact_uri,
+        )
+        complete = artifact_payload.inspection_complete
+        return CapabilityResult(
+            capability_id=self.descriptor.capability_id,
+            capability_version=self.descriptor.version,
+            mode=request.mode,
+            execution=Execution(
+                status=ExecutionStatus.COMPLETED,
+                runtime_ms=int((time.monotonic() - started) * 1000),
+                detail=inspection["detail"],
+            ),
+            output=output.model_dump(mode="json"),
+            scope=CapabilityScope(
+                description="one exact statement/proof source in one pinned environment",
+                parameters={
+                    "environment": validated.environment.value,
+                    "statement_digest": _digest_text(validated.statement),
+                    "proof_digest": _digest_text(validated.proof),
+                },
+                artifact_uri=artifact.artifact_uri,
+            ),
+            completeness=CapabilityCompleteness(
+                status=(
+                    CapabilityCompletenessStatus.COMPLETE
+                    if complete
+                    else CapabilityCompletenessStatus.UNKNOWN
+                ),
+                basis=(
+                    "Lean elaborated the source and emitted its exact axiom report"
+                    if complete
+                    else "Lean did not provide a complete elaboration and axiom report"
+                ),
+                assurance_level=CapabilityAssuranceLevel.COMPUTED,
+            ),
+            assurance=CapabilityAssurance(
+                level=CapabilityAssuranceLevel.COMPUTED,
+                basis=(
+                    "facts parsed from the pinned Lean process; no trust policy "
+                    "or theorem verification is asserted"
+                ),
+            ),
+            artifact_uris=(artifact.artifact_uri,),
+            provider=runtime.provider,
+            provider_digest=runtime.digest,
+        )
+
+
+def _validate_source(statement: str, proof: str) -> None:
+    for value, field_name in ((statement, "statement"), (proof, "proof")):
+        if any(marker in value for marker in ("--", "/-", "-/")):
+            raise ValueError(f"{field_name} comments are outside the source boundary")
+    if _FORBIDDEN_STATEMENT.search(statement):
+        raise ValueError("statement contains an unsupported Lean command")
+    if _FORBIDDEN_PROOF.search(proof):
+        raise ValueError("proof contains an unsupported Lean command")
+
+
+def _inspect_source(request: LeanProofAxiomsInspectRequest) -> dict[str, Any]:
+    from jacobian_checkers import lean4
+
+    imports = (
+        ("Init.Prelude",)
+        if request.environment is LeanEnvironment.CORE
+        else ("Mathlib",)
+    )
+    import_line = f"import {imports[0]}\n"
+    source = (
+        f"{import_line}"
+        "set_option autoImplicit false\n"
+        f"theorem jacobian_theorem : ({request.statement}) := {request.proof}\n"
+        "#print axioms jacobian_theorem\n"
+    )
+    try:
+        completed = lean4._run_lean(source, environment_name=request.environment.value)
+        output = (completed.stdout + completed.stderr).strip()
+    except (OSError, RuntimeError, TimeoutError) as exc:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="LEAN_BACKEND_UNAVAILABLE",
+                stage="inspection",
+                message="The pinned Lean process could not complete inspection.",
+                hint="Retry after restoring the exact pinned Lean environment.",
+                details={"failure": type(exc).__name__},
+            )
+        ) from exc
+
+    messages = tuple(_diagnostics(output))
+    errors = any(item.severity == "ERROR" for item in messages)
+    axioms_match = _AXIOM_LINE.search(output)
+    no_axioms = _NO_AXIOMS in output
+    axioms_reported = axioms_match is not None or no_axioms
+    axioms = (
+        tuple(
+            sorted(
+                item.strip()
+                for item in axioms_match.group(1).split(",")
+                if item.strip()
+            )
+        )
+        if axioms_match is not None
+        else ()
+    )
+    elaborated = completed.returncode == 0 and not errors
+    inspection_complete = elaborated and axioms_reported
+    if elaborated and not axioms_reported:
+        messages = (
+            *messages,
+            LeanElaborationDiagnostic(
+                severity="ERROR",
+                message="Lean completed without a parseable axiom-closure report.",
+            ),
+        )
+    try:
+        package_manifest_digest = _manifest_digest(request.environment)
+    except (OSError, RuntimeError) as exc:
+        raise CapabilityInvocationError(
+            CapabilityDiagnostic(
+                code="LEAN_RUNTIME_IDENTITY_UNAVAILABLE",
+                stage="runtime_identity",
+                message="The pinned Lean runtime identity could not be inspected.",
+                hint="Restore the exact authorized Lean runtime, then retry.",
+                details={"failure": type(exc).__name__},
+            )
+        ) from exc
+    return {
+        "imports": imports,
+        "package_manifest_digest": package_manifest_digest,
+        "elaborated": elaborated,
+        "inspection_complete": inspection_complete,
+        "axioms_reported": axioms_reported,
+        "axioms": axioms,
+        "sorry_count": len(re.findall(r"\bsorry\b", request.proof, re.I)),
+        "admit_count": len(re.findall(r"\badmit\b", request.proof, re.I)),
+        "diagnostics": messages,
+        "detail": "complete axiom inspection"
+        if inspection_complete
+        else "incomplete axiom inspection",
+    }
+
+
+def _diagnostics(output: str) -> tuple[LeanElaborationDiagnostic, ...]:
+    diagnostics: list[LeanElaborationDiagnostic] = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = _MESSAGE_KIND.search(stripped)
+        if match is None:
+            continue
+        severity = cast(
+            Literal["ERROR", "WARNING", "INFO"],
+            {
+                "error": "ERROR",
+                "warning": "WARNING",
+                "info": "INFO",
+            }[match.group(1).lower()],
+        )
+        diagnostics.append(
+            LeanElaborationDiagnostic(severity=severity, message=stripped)
+        )
+    return tuple(diagnostics)
+
+
+def _manifest_digest(environment: LeanEnvironment) -> str | None:
+    if environment is LeanEnvironment.CORE:
+        return None
+    from jacobian_checkers import lean4
+
+    _, runtime = lean4.inspect_runtime(require_mathlib=True)
+    if runtime is None:
+        raise RuntimeError("pinned Mathlib runtime is unavailable")
+    return _digest_file(runtime / "lake-manifest.json")
+
+
+def _environment_digest(
+    environment: LeanEnvironment,
+    runtime: CapabilityProviderRuntime,
+    manifest_digest: str | None,
+) -> str:
+    payload = {
+        "contract": "jacobian.lean.proof.axioms/v1",
+        "environment": environment.value,
+        "provider_runtime_digest": runtime.digest,
+        "manifest_digest": manifest_digest,
+    }
+    return "sha256:" + hashlib.sha256(canonicalize_json(payload)).hexdigest()
+
+
+def _digest_file(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _digest_text(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode()).hexdigest()
+
+
+def _lean_commit(
+    environment: LeanEnvironment, installations: Mapping[LeanEnvironment, Any]
+) -> str:
+    installation = installations.get(environment)
+    lean_commit = getattr(installation, "lean_commit", None)
+    if isinstance(lean_commit, str) and lean_commit:
+        return lean_commit
+    from jacobian_checkers import lean4
+
+    return lean4.LEAN_COMMIT
+
+
+def _mathlib_commit(
+    installations: Mapping[LeanEnvironment, Any],
+    environment: LeanEnvironment,
+) -> str | None:
+    installation = installations.get(environment)
+    return (
+        getattr(installation, "mathlib_commit", None)
+        if installation is not None
+        else None
+    )
+
+
+__all__ = [
+    "LeanProofAxiomsAdapter",
+    "LeanProofAxiomsInstallation",
+    "install_lean_proof_axioms_capability",
+]
