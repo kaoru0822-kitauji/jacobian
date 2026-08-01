@@ -16,6 +16,8 @@ LIMITATION = (
     "The original First Proof lattice/manifold question and any alternative "
     "proof are not assessed."
 )
+
+
 def _load_frozen_input() -> dict:
     try:
         workspace = WORKSPACE / "input.json"
