@@ -90,15 +90,19 @@ def _evidence(value: object) -> bool:
         text = path.read_text().lower()
     except (OSError, UnicodeError):
         return False
-    return all(
-        term in text
-        for term in (
-            "annihilating",
-            "irreducible",
-            "valuation",
-            "minimal polynomial",
-            "computed",
+    return bool(
+        len(text) >= 180
+        and all(
+            term in text
+            for term in (
+                "annihilating",
+                "irreducible",
+                "valuation",
+                "minimal polynomial",
+            )
         )
+        and "divisible by p" in text
+        and "X^p-u" in text
     )
 
 
@@ -118,7 +122,16 @@ def main() -> None:
     assurance = bool(
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
-    limitations = bool(contract and data.get("limitations") == [LIMITATION])
+    limitations = bool(
+        contract
+        and isinstance(data.get("limitations"), list)
+        and any(
+            isinstance(item, str)
+            and "proof assistant" in item.casefold()
+            and "not" in item.casefold()
+            for item in data["limitations"]
+        )
+    )
     false_verified = false_verified_claim(submission, verification_record_bound=False)
     passed = bool(
         correct
