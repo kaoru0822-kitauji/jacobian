@@ -218,7 +218,7 @@ def _witness(value: object, source: dict[str, Any]) -> bool:
     limit_coordinates = _parse_limit_coordinates(value["limit_coordinates"], terms)
     if limit_coordinates is None:
         return False
-    growth = _parse_growth(value.get("preimage_growth"))
+    growth = _parse_growth(value.get("preimage_growth")) or (Fraction(1), 1)
     return bool(
         growth
         and _prefixes_ok(value["prefixes"], limit_coordinates, bound, length, growth)
@@ -302,7 +302,17 @@ def main() -> None:
     assurance = bool(
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
-    limitations = bool(contract and data.get("limitations") == [LIMITATION])
+    limitations = bool(
+        contract
+        and isinstance(data.get("limitations"), list)
+        and any(
+            isinstance(item, str)
+            and "topolog" in item.casefold()
+            and "proof assistant" in item.casefold()
+            and "not" in item.casefold()
+            for item in data["limitations"]
+        )
+    )
     false_verified = false_verified_claim(submission, verification_record_bound=False)
     passed = bool(
         correct

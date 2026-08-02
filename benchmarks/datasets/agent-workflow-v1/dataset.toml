@@ -112,7 +112,7 @@ digest = "sha256:913e498b2f3abaad21133497df1043331bd39956d1124b8e6fb39158ffd36f2
 
 [[tasks]]
 name = "jacobian/nonclosed-projection-image"
-digest = "sha256:f00fc81e7218a7d95a946e99517d729a5360202b5facee8c8d51cdf434036527"
+digest = "sha256:e065e7004b97be7470ce9e49f62f5828c2f15dd1c193995fc6fe775864cad03b"
 
 [[tasks]]
 name = "jacobian/noncompact-lefschetz-proof-audit"
