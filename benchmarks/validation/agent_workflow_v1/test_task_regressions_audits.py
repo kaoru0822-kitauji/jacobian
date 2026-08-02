@@ -199,6 +199,44 @@ def test_inverse_distance_audit_accepts_alternative_rational_direction(
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_trigonometric_power_sum_rejects_corrupted_recurrence_term(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "trigonometric-power-sum-valuation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["terms"][12]["value"] += 7
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_trigonometric_power_sum_rejects_corrupted_induction_case(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "trigonometric-power-sum-valuation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["induction_cases"][1]["coefficient_adjusted_offsets"] = [
+        1,
+        1,
+        0,
+    ]
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 @pytest.mark.parametrize(
     ("path", "replacement"),
     [

@@ -159,5 +159,9 @@ name = "jacobian/symbolic-block-determinant-decomposition"
 digest = "sha256:da1d342960318e1d6076cee11ea07125bf3516993ccf20a55de96b61b50c44a8"
 
 [[tasks]]
+name = "jacobian/trigonometric-power-sum-valuation"
+digest = "sha256:d47a1796b2cb7b95ce3675480f1934cfb728e229b94dcc2308871c79a6bea2ce"
+
+[[tasks]]
 name = "jacobian/well-total-domination-counterexample"
 digest = "sha256:c4ddc45cee639e284eaf95919983ef3714e918b102d7910f45075f16b7a69885"

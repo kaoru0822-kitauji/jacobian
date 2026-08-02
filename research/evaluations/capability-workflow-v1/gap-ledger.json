@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:6a429ba02b4b01416c163ed538b9514b5d0846813eac194ba729ee1da42cb508",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -895,6 +895,27 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Use as a symbolic construction diagnostic; do not add a block-matrix-specific alias without repeated independent workflows."
+    },
+    {
+      "task_id": "trigonometric-power-sum-valuation",
+      "mathematical_moves": [
+        "Derive an exact cubic and recurrence for three algebraic trigonometric power sums.",
+        "Replay 7-adic valuations and a three-residue induction proving divisibility for all positive indices."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay scalar polynomial identities but does not certify the cyclotomic-to-trigonometric derivation or the valuation induction."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Retain as an exact symbolic-recurrence regression; require another independent valuation workflow before proposing a reusable capability."
     },
     {
       "task_id": "well-total-domination-counterexample",
