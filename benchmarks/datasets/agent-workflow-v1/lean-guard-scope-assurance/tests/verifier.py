@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from verifier_support import (
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
+MAX_EVIDENCE_BYTES = 1_048_576
 LIMITATION = "The verifier derives semantic classifications from frozen facts but does not run Lean or certify the upstream linter implementation."
 
 
@@ -98,9 +100,14 @@ def _result(value: object, source: dict[str, Any]) -> bool:
             and "DIVISION_BY_ZERO" in findings
             and (
                 not ("zero" in reason_text or "divisor" in reason_text)
-                or any(
-                    marker in reason_text
-                    for marker in ("no division", "not a division", "safe divisor")
+                or re.search(
+                    r"(?:division|divisor|zero)[^.;\n]{0,60}"
+                    r"(?:impossible|not possible|cannot|can['']?t|safe|never)\b",
+                    reason_text,
+                )
+                or re.search(
+                    r"\b(?:no|not)\b[^.;\n]{0,40}\b(?:division|divisor)\b",
+                    reason_text,
                 )
             )
         ):
@@ -110,8 +117,10 @@ def _result(value: object, source: dict[str, Any]) -> bool:
             and "INTEGER_DIVISION_TRUNCATION" in findings
             and (
                 "truncat" not in reason_text
-                or "no truncation" in reason_text
-                or "does not truncate" in reason_text
+                or re.search(
+                    r"\b(?:no|not|never|doesn['']?t|cannot)\b[^.;\n]{0,30}truncat",
+                    reason_text,
+                )
             )
         ):
             return False
@@ -124,21 +133,35 @@ def _result(value: object, source: dict[str, Any]) -> bool:
     return True
 
 
-def _evidence(value: object) -> bool:
+def _evidence(value: object, result: object) -> bool:
     if (
         not isinstance(value, list)
         or len(value) != 1
         or not evidence_list_is_bound(value)
     ):
         return False
-    assert isinstance(value, list)
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if path is None:
         return False
     try:
-        text = path.read_text().lower()
+        if path.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
+        raw_text = path.read_text()
     except (OSError, UnicodeError):
         return False
+    markers = [
+        line.removeprefix("RESULT_JSON:").strip()
+        for line in raw_text.splitlines()
+        if line.startswith("RESULT_JSON:")
+    ]
+    if len(markers) != 1:
+        return False
+    try:
+        if json.loads(markers[0]) != result:
+            return False
+    except (ValueError, RecursionError):
+        return False
+    text = raw_text.casefold()
     return all(
         term in text
         for term in ("full proof-state", "allzero", "proof-term", "computed")
@@ -156,7 +179,7 @@ def main() -> None:
         verification_record="forbidden",
     )
     correct = bool(contract and _result(data.get("result"), _source()))
-    evidence = bool(correct and _evidence(data.get("evidence")))
+    evidence = bool(correct and _evidence(data.get("evidence"), data.get("result")))
     scope = bool(contract and data.get("scope") == expected["required_scope"])
     assurance = bool(
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]
