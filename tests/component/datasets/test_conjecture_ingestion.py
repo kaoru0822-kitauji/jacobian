@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError, CapabilityService
+from jacobian.capability_service import CapabilityInvocationError, CapabilityService
 from jacobian.conjecture_ingestion import install_conjecture_ingestion_capability
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
@@ -13,11 +13,11 @@ from jacobian.contracts.capabilities import (
 )
 from jacobian.memory import ResearchMemory
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _adapter(tmp_path: Path):
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     adapter, _ = install_conjecture_ingestion_capability(store, schemas, artifacts)
@@ -301,7 +301,7 @@ def test_descriptor_disables_episode_recording(tmp_path: Path) -> None:
 
 
 def test_restricted_request_records_only_policy_safe_memory(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     memory = ResearchMemory(store, schemas)

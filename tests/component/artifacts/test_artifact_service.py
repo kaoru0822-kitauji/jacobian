@@ -6,13 +6,13 @@ import pytest
 
 from jacobian.artifacts import ArtifactService, ArtifactValidationError
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_artifact_put_validates_against_registered_json_schema(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     schema_uri = schemas.register(
         name="example.strict-integer",
@@ -55,7 +55,7 @@ def test_artifact_put_validates_against_registered_json_schema(
 def test_artifact_put_distinguishes_duplicate_parents_from_missing_descriptors(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     schema_uri = schemas.register(
         name="example.parented-integer",

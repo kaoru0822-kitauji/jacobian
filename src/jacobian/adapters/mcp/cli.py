@@ -144,7 +144,7 @@ def main() -> None:
     args.path = args.path if args.path.startswith("/") else f"/{args.path}"
 
     from jacobian.adapters.mcp.server import create_server
-    from jacobian.capabilities import CapabilityPolicy
+    from jacobian.capability_service import CapabilityPolicy
     from jacobian.contracts.capabilities import CapabilityMode
 
     capability_policy = CapabilityPolicy(

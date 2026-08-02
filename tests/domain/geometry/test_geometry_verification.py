@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityService
+from jacobian.capability_service import CapabilityService
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,
@@ -18,7 +18,7 @@ from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 ZERO = {"num": "0", "den": "1"}
@@ -32,7 +32,7 @@ PXY = {"x": TWO, "y": TWO}
 
 class _GeometryRuntime:
     def __init__(self, root: Path) -> None:
-        self.store = ArtifactStore(root)
+        self.store = ArtifactRepository(root)
         self.schemas = SchemaRegistry(self.store)
         self.artifacts = ArtifactService(self.store, self.schemas)
         self.checkers = CheckerRegistry(self.store)

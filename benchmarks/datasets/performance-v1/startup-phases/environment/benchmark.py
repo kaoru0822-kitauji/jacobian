@@ -20,7 +20,7 @@ import pyperf
 from jacobian.canonical import canonicalize_json
 from jacobian.schema_registry import _validated_schema
 from jacobian.schema_validation import check_draft202012_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _BENCHMARK_SCHEMA = canonicalize_json(
     {
@@ -36,7 +36,7 @@ _BENCHMARK_SCHEMA = canonicalize_json(
 def _store_bootstrap() -> None:
     with (
         tempfile.TemporaryDirectory(prefix="jacobian-store-startup-") as directory,
-        ArtifactStore(Path(directory)),
+        ArtifactRepository(Path(directory)),
     ):
         pass
 
@@ -53,7 +53,7 @@ def _store_bootstrap_normal() -> None:
         tempfile.TemporaryDirectory(
             prefix="jacobian-store-startup-normal-"
         ) as directory,
-        ArtifactStore(Path(directory), synchronous="NORMAL"),
+        ArtifactRepository(Path(directory), synchronous="NORMAL"),
     ):
         pass
 

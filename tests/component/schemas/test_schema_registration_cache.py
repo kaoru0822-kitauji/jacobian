@@ -6,14 +6,14 @@ import pytest
 
 import jacobian.schema_registry as schema_registry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_existing_descriptor_reuses_cached_meta_validation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     first = SchemaRegistry(store)
     schema = {"type": "object", "properties": {"value": {"type": "integer"}}}
     uri = first.register(name="component.cache", version="1", schema=schema)
@@ -36,7 +36,7 @@ def test_existing_descriptor_reuses_cached_meta_validation(
 def test_existing_descriptor_written_without_schema_validation_is_rejected(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = {"type": 17}
     uri = store.register_descriptor(
         kind="schema",
@@ -63,7 +63,7 @@ def test_existing_descriptor_written_without_schema_validation_is_rejected(
 def test_new_invalid_duplicate_definition_still_validates(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = SchemaRegistry(store)
     registry.register(
         name="component.invalid-duplicate",

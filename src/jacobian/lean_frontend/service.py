@@ -26,7 +26,8 @@ from jacobian.contracts.results import (
 from jacobian.contracts.verification import VerificationRecord
 from jacobian.references import LeanCheckerInstallation
 from jacobian.registry import CheckerRegistryError
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class LeanService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         verification: VerificationService,
         installations: dict[LeanEnvironment, LeanCheckerInstallation],
@@ -280,7 +281,7 @@ class LeanService:
                     or record.bindings != certificate.bindings
                 ):
                     return None
-        except (CheckerRegistryError, StoreError, ValueError):
+        except (CheckerRegistryError, StorageError, ValueError):
             return None
         return result.model_copy(
             update={

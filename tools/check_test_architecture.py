@@ -542,9 +542,9 @@ def check_test_architecture(
                         )
                     sqlite_import = module == "sqlite3" or imported_full == "sqlite3"
                     sqlite_store_import = (
-                        module == "jacobian.store"
-                        and imported in {"ArtifactStore", "StoreError"}
-                    ) or imported_full == "jacobian.store"
+                        module == "jacobian.storage.repository"
+                        and imported == "ArtifactRepository"
+                    ) or imported_full == "jacobian.storage.repository"
                     if tier == "unit" and (sqlite_import or sqlite_store_import):
                         violations.append(
                             Violation(

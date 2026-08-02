@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_store_open_recovers_process_death_before_blob_publication(
@@ -17,9 +17,9 @@ def test_store_open_recovers_process_death_before_blob_publication(
     script = """
 import os
 import sys
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
-store = ArtifactStore(sys.argv[1])
+store = ArtifactRepository(sys.argv[1])
 adjust = store._adjust_blob_bytes_committed
 
 def reserve_then_exit(delta, *, reconciliation_required):
@@ -38,7 +38,7 @@ store._write_blob(b"reserved-but-unpublished")
     )
     assert completed.returncode == 0, completed.stderr
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
 
     assert reopened._blob_bytes_committed() == 0
     assert not tuple((tmp_path / "blobs" / "sha256").glob("*/*"))
@@ -51,9 +51,9 @@ def test_store_open_recovers_process_death_after_blob_publication(
     script = """
 import os
 import sys
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
-store = ArtifactStore(sys.argv[1])
+store = ArtifactRepository(sys.argv[1])
 store._mark_blob_quota_reconciled = lambda: os._exit(0)
 store._write_blob(sys.argv[2].encode("ascii"))
 """
@@ -66,7 +66,7 @@ store._write_blob(sys.argv[2].encode("ascii"))
     )
     assert completed.returncode == 0, completed.stderr
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
     digest = f"sha256:{sha256(data).hexdigest()}"
 
     assert reopened._blob_bytes_committed() == len(data)
@@ -76,13 +76,13 @@ store._write_blob(sys.argv[2].encode("ascii"))
 def test_store_open_recovers_process_death_during_store_transaction(
     tmp_path: Path,
 ) -> None:
-    ArtifactStore(tmp_path)
+    ArtifactRepository(tmp_path)
     script = """
 import os
 import sys
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
-store = ArtifactStore(sys.argv[1])
+store = ArtifactRepository(sys.argv[1])
 with store.transaction():
     store.register_descriptor(
         kind="schema",
@@ -102,7 +102,7 @@ with store.transaction():
     assert completed.returncode == 0, completed.stderr
     assert (tmp_path / ".transaction-recovery").is_file()
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
     stored_blob_bytes = sum(
         blob.stat().st_size
         for prefix in reopened.blob_root.iterdir()
@@ -123,7 +123,7 @@ def test_clean_store_open_does_not_scan_the_blob_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     data = b"validated once per unchanged blob"
     digest = store._write_blob(data)
 
@@ -132,7 +132,7 @@ def test_clean_store_open_does_not_scan_the_blob_tree(
 
     monkeypatch.setattr(Path, "iterdir", unexpected_scan)
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
 
     assert reopened._blob_bytes_committed() == len(data)
     assert reopened._blob_path(digest).is_file()

@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
@@ -54,7 +54,8 @@ from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.sat_smt.sat import SatArtifactError, SatArtifactService
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -233,7 +234,7 @@ class SatCnfMaterializationAdapter:
 
 
 def install_sat_assignment_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     sat: SatArtifactService,
@@ -284,7 +285,7 @@ def install_sat_assignment_checker(
 
 
 def install_sat_unsat_proof_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     sat: SatArtifactService,
@@ -346,7 +347,7 @@ class SatAssignmentVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         sat: SatArtifactService,
         verification: VerificationService,
@@ -403,7 +404,7 @@ class SatAssignmentVerificationAdapter:
         try:
             resolved = self.sat.resolve_assignment(validated.assignment_uri)
             semantics = self.store.get(self.sat.installation.semantics_uri)
-        except (SatArtifactError, StoreError) as exc:
+        except (SatArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_SAT_ASSIGNMENT",
@@ -558,7 +559,7 @@ class SatUnsatProofVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         sat: SatArtifactService,
         verification: VerificationService,
@@ -616,7 +617,7 @@ class SatUnsatProofVerificationAdapter:
         try:
             resolved = self.sat.resolve_proof(validated.proof_uri)
             semantics = self.store.get(self.sat.installation.semantics_uri)
-        except (SatArtifactError, StoreError) as exc:
+        except (SatArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_SAT_UNSAT_PROOF",

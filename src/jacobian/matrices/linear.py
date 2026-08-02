@@ -20,7 +20,9 @@ from jacobian.contracts.linear import (
     linear_variable_order_digest,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 
 class LinearArtifactError(ValueError):
@@ -63,7 +65,7 @@ class LinearArtifactService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         installation: LinearArtifactInstallation,
@@ -95,7 +97,7 @@ class LinearArtifactService:
 
         try:
             artifact = self.store.get(system_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise LinearArtifactError(
                 "source is not an available rational linear-system artifact"
             ) from exc
@@ -160,7 +162,7 @@ class LinearArtifactService:
 
         try:
             artifact = self.store.get(solution_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise LinearArtifactError(
                 "source is not an available rational solution artifact"
             ) from exc
@@ -232,7 +234,7 @@ class LinearArtifactService:
 
         try:
             artifact = self.store.get(certificate_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise LinearArtifactError(
                 "source is not an available rational inconsistency artifact"
             ) from exc
@@ -269,7 +271,7 @@ class LinearArtifactService:
 
 
 def install_linear_artifacts(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> LinearArtifactService:

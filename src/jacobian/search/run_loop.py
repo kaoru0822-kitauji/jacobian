@@ -43,7 +43,8 @@ from jacobian.search._helpers import (
 )
 from jacobian.search.errors import SearchError, _SearchBudgetExhaustedError
 from jacobian.search.recovery import RestoredSearchProgress, restore_search_progress
-from jacobian.store import StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
 
 if TYPE_CHECKING:
     from jacobian.search.service import SearchService
@@ -118,7 +119,7 @@ def execute_search(service: SearchService, experiment_uri: str) -> None:
         SearchError,
         PluginRegistryError,
         SchemaRegistryError,
-        StoreError,
+        StorageError,
         ValidationError,
         ValueError,
     ) as exc:

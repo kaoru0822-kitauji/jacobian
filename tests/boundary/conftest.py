@@ -27,7 +27,7 @@ from jacobian.contracts.capabilities import (
     CapabilityProviderAvailability,
     CapabilityProviderRuntime,
 )
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 pytest_plugins = ("tests.support.runtime_fixtures",)
 
@@ -107,10 +107,10 @@ def _start_process(
 
 
 @pytest.fixture
-def durable_store(tmp_path: Path) -> Iterator[ArtifactStore]:
+def durable_store(tmp_path: Path) -> Iterator[ArtifactRepository]:
     """Open one test-owned SQLite store for durability and recovery claims."""
 
-    store = ArtifactStore(tmp_path / "state")
+    store = ArtifactRepository(tmp_path / "state")
     try:
         yield store
     finally:

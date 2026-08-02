@@ -14,7 +14,7 @@ from jacobian.builtin_capabilities import (
     LeanDeclarationSearchAdapter,
     LeanDependencyGraphAdapter,
 )
-from jacobian.capabilities import CapabilityAdapter, CapabilityError
+from jacobian.capability_service import CapabilityAdapter, CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityProviderAvailability,

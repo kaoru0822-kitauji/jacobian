@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -43,7 +43,8 @@ from jacobian.graphs.installation import GraphInstallation
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -66,7 +67,7 @@ class _SourceGraph:
 
 
 def install_graph_isomorphism(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     verification: VerificationService,
@@ -152,7 +153,7 @@ class GraphIsomorphismAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         verification: VerificationService,
         installation: GraphIsomorphismInstallation,
@@ -386,7 +387,7 @@ class GraphIsomorphismAdapter:
     ) -> _SourceGraph:
         try:
             artifact = self.store.get(graph_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="GRAPH_ARTIFACT_NOT_FOUND",

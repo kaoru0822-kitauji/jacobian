@@ -15,9 +15,9 @@ from jacobian.registry import (
     CheckerRegistryError,
 )
 from jacobian.schema_registry import SchemaRegistryError
-from jacobian.store import (
+from jacobian.storage.errors import (
     ArtifactIntegrityError,
-    StoreError,
+    StorageError,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ def _verification_input_failure_detail(exc: Exception) -> str:
     )
 
 
-def _verification_storage_failure_detail(exc: StoreError) -> str:
+def _verification_storage_failure_detail(exc: StorageError) -> str:
     if isinstance(exc, ArtifactIntegrityError):
         return (
             "Jacobian detected corrupted local verification data. Restore the "

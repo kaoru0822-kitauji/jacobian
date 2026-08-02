@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from mcp.server.auth.provider import AccessToken
 
-from jacobian.capabilities import CapabilityPolicy
+from jacobian.capability_service import CapabilityPolicy
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime
 

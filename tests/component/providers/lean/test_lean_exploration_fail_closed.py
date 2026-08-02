@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityInstallTier,
     CapabilityMode,
@@ -15,11 +15,9 @@ from jacobian.contracts.capabilities import (
     CapabilityRequest,
 )
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_frontend.exploration import (
-    LeanProofStateAdapter,
-    _Resources,
-    _single_proof_state,
-)
+from jacobian.lean_frontend.exploration import _Resources
+from jacobian.lean_frontend.proof_state import LeanProofStateAdapter
+from jacobian.lean_frontend.repl import _single_proof_state
 
 
 def test_typed_goal_extraction_failure_is_a_structured_non_conclusion(

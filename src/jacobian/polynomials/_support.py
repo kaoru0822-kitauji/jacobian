@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ValidationError
 
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -44,7 +44,8 @@ from jacobian.contracts.results import (
 from jacobian.polynomials._sympy import _sympy
 from jacobian.polynomials.resources import PolynomialResources
 from jacobian.provider_runtime import SYMPY_VERSION
-from jacobian.store import StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
 
 if TYPE_CHECKING:
     from sympy import Poly
@@ -71,7 +72,7 @@ def _load_evaluation(
 ) -> tuple[PolynomialMapEvaluation, StoredArtifact]:
     try:
         artifact = resources.store.get(evaluation_uri)
-    except StoreError as exc:
+    except StorageError as exc:
         raise CapabilityInvocationError(
             CapabilityDiagnostic(
                 code="POLYNOMIAL_EVALUATION_ARTIFACT_NOT_FOUND",
@@ -130,7 +131,7 @@ def _load_polynomial_map(
 ) -> tuple[RationalPolynomialMap, StoredArtifact]:
     try:
         artifact = resources.store.get(map_uri)
-    except StoreError as exc:
+    except StorageError as exc:
         raise CapabilityInvocationError(
             CapabilityDiagnostic(
                 code="POLYNOMIAL_MAP_ARTIFACT_NOT_FOUND",

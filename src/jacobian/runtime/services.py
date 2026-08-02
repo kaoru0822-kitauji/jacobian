@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityService
+from jacobian.capability_service import CapabilityAdapter, CapabilityService
 from jacobian.claim_decomposition_capabilities import (
     ClaimDecompositionInstallation,
     install_claim_decomposition_capabilities,
@@ -30,7 +30,7 @@ from jacobian.sat_smt.smt import SmtArtifactService
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.search import SearchService
 from jacobian.shrinking import ShrinkService
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
 from jacobian.verification import VerificationService
@@ -41,7 +41,7 @@ from jacobian.witnesses import WitnessSearchService
 class CoreServices:
     """Foundational persistence and registries shared across the portfolio."""
 
-    store: ArtifactStore
+    store: ArtifactRepository
     schemas: SchemaRegistry
     artifacts: ArtifactService
     operations: OperationInstaller

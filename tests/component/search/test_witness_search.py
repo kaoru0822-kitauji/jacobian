@@ -26,7 +26,7 @@ from jacobian.plugin_execution import PluginExecutionResult, PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
 
@@ -133,8 +133,8 @@ def test_none_certified_requires_certificate_verification(
 
 def _witness_fixture(
     root: Path,
-) -> tuple[WitnessSearchService, ArtifactStore, str, str, str]:
-    store = ArtifactStore(root)
+) -> tuple[WitnessSearchService, ArtifactRepository, str, str, str]:
+    store = ArtifactRepository(root)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     claim_schema = schemas.register(

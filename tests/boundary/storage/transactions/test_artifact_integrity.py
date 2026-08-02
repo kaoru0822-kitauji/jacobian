@@ -5,13 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.store import ArtifactIntegrityError, ArtifactStore, StoreError
+from jacobian.storage.errors import ArtifactIntegrityError, StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_artifact_identity_uses_canonical_payload_schema_and_semantics(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema_a = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -80,7 +81,7 @@ def test_repeated_put_validates_without_blob_or_metadata_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -137,7 +138,7 @@ def test_repeated_put_validates_without_blob_or_metadata_writes(
 
 
 def test_repeated_put_rejects_corrupted_committed_blob(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -171,7 +172,7 @@ def test_repeated_put_rejects_corrupted_committed_blob(tmp_path: Path) -> None:
 
 
 def test_modified_blob_is_rejected_on_read(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -206,7 +207,7 @@ def test_modified_artifact_metadata_is_rejected_on_read(
     tmp_path: Path,
     column: str,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -258,7 +259,7 @@ def test_missing_reference_metadata_is_rejected_on_read(
     tmp_path: Path,
     missing_reference: str,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -299,7 +300,7 @@ def test_missing_reference_metadata_is_rejected_on_read(
 
 
 def test_duplicate_put_rechecks_a_changed_blob(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     original = b"original"
     digest = store._write_blob(original)
     store._blob_path(digest).write_bytes(b"tampered")
@@ -313,7 +314,7 @@ def test_store_keeps_filesystem_paths_local(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schema = store.register_descriptor(
         kind="schema",
         name="example.candidate",
@@ -346,7 +347,7 @@ def test_store_keeps_filesystem_paths_local(
     monkeypatch.setattr(Path, "mkdir", fail_blob_directory)
 
     with pytest.raises(
-        StoreError,
+        StorageError,
         match=(
             r"Jacobian could not write artifact data\. Check the state directory "
             r"and available disk space, then retry\."

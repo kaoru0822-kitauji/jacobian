@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
@@ -39,7 +39,9 @@ from jacobian.operation_installation import InstalledDomainBundle
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _OPERATION_MODELS = {
@@ -72,7 +74,7 @@ class _ResolvedResult:
 
 
 def install_geometry_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     geometry: InstalledDomainBundle,
@@ -148,7 +150,7 @@ class GeometryResultVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         geometry: InstalledDomainBundle,
@@ -197,7 +199,7 @@ class GeometryResultVerificationAdapter:
         try:
             resolved = self._resolve(validated.result_uri)
             semantics = self.store.get(self.geometry.semantics_uri)
-        except (GeometryResultArtifactError, StoreError) as exc:
+        except (GeometryResultArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_GEOMETRY_RESULT",
@@ -329,7 +331,7 @@ class GeometryResultVerificationAdapter:
     def _resolve(self, result_uri: str) -> _ResolvedResult:
         try:
             result = self.store.get(result_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise GeometryResultArtifactError(
                 "candidate is not an available geometry result"
             ) from exc

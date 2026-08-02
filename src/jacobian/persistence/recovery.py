@@ -15,7 +15,7 @@ from typing import Any
 
 from jacobian.contracts.artifacts import ArtifactPutResult
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def quarantine_recovery_snapshot(
@@ -79,7 +79,7 @@ def quarantine_recovery_snapshot(
 
 
 def put_internal_artifact(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     semantics_uri: str,
     *,

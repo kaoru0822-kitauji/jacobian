@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -38,7 +38,7 @@ from jacobian.operations import (
     OperationExecutionFailure,
 )
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +96,7 @@ class OperationInstaller:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
     ) -> None:

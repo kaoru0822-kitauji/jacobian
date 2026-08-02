@@ -39,7 +39,9 @@ from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.registry import CheckerRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,7 +81,7 @@ class ShrinkService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         claims: ClaimValidationService,
@@ -182,7 +184,7 @@ class ShrinkService:
                 manifest.semantics_uri
             ).manifest.object_digest
         except (
-            StoreError,
+            StorageError,
             PluginRegistryError,
             CheckerRegistryError,
             ValueError,
@@ -420,7 +422,7 @@ class ShrinkService:
                 decision.execution.status is ExecutionStatus.COMPLETED
                 and decision.input.status is InputStatus.REJECTED
             )
-        except (StoreError, SchemaRegistryError, ValueError) as exc:
+        except (StorageError, SchemaRegistryError, ValueError) as exc:
             state.steps.append(
                 ShrinkStep(
                     index=len(state.steps),
@@ -552,7 +554,7 @@ def _shrink_failure_detail(exc: Exception) -> str:
     if isinstance(exc, (ValueError, CheckerRegistryError)):
         return str(exc)
     _LOGGER.warning("shrinking step failed", exc_info=exc)
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return (
             "A required shrinking artifact is unavailable. Check the artifact URIs "
             "and state directory, then retry."

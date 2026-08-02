@@ -34,7 +34,8 @@ from jacobian.contracts.witness_search import (
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class WitnessSearchService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         claims: ClaimValidationService,
@@ -273,7 +274,7 @@ class WitnessSearchService:
                 detail=response.detail,
             )
         except (
-            StoreError,
+            StorageError,
             SchemaRegistryError,
             PluginRegistryError,
             ValidationError,
@@ -335,11 +336,11 @@ def _proposed_conclusion(
 def _witness_failure_detail(exc: Exception) -> str:
     if isinstance(exc, ValueError) and not isinstance(
         exc,
-        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+        (PluginRegistryError, SchemaRegistryError, StorageError, ValidationError),
     ):
         return str(exc)
     _LOGGER.warning("witness search failed", exc_info=exc)
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return (
             "A required claim or candidate artifact is unavailable. Check the "
             "artifact URIs, then retry."

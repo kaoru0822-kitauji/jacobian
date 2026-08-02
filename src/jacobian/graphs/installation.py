@@ -43,7 +43,7 @@ from jacobian.graphs.neighborhood_independence import (
 )
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +63,7 @@ class GraphInstallation:
 
 
 def install_graph_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     checkers: CheckerRegistry,

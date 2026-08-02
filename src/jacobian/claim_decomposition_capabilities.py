@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -38,7 +38,8 @@ from jacobian.contracts.claim_decomposition import (
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _digest(node: LogicalClaimNode) -> str:
@@ -73,7 +74,7 @@ class ClaimDecompositionInstallation:
 
 @dataclass(frozen=True, slots=True)
 class _Resources:
-    store: ArtifactStore
+    store: ArtifactRepository
     artifacts: ArtifactService
     semantics_uri: str
     structured_claim_schema_uri: str
@@ -127,7 +128,7 @@ class ClaimDecompositionAdapter:
                 self.resources.structured_claim_schema_uri, source.payload
             )
             claim = StructuredClaimArtifact.model_validate(normalized)
-        except (ValidationError, StoreError, ValueError) as exc:
+        except (ValidationError, StorageError, ValueError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_STRUCTURED_CLAIM",
@@ -259,7 +260,7 @@ class ClaimDecompositionAdapter:
 
 
 def install_claim_decomposition_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> tuple[

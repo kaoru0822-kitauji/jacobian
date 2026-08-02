@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.capabilities import CapabilityError
+from jacobian.capability_service import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,

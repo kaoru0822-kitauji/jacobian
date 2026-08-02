@@ -12,15 +12,15 @@ from pathlib import Path
 import pytest
 
 from jacobian.runtime.services import CoreServices
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from tests.support.services import open_core_services
 
 
 @pytest.fixture
-def artifact_store(tmp_path: Path) -> Iterator[ArtifactStore]:
+def artifact_store(tmp_path: Path) -> Iterator[ArtifactRepository]:
     """Open one test-owned SQLite store for a storage-backed component."""
 
-    store = ArtifactStore(tmp_path / "state")
+    store = ArtifactRepository(tmp_path / "state")
     try:
         yield store
     finally:

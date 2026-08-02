@@ -17,7 +17,7 @@ from pathlib import Path
 import pyperf
 
 from jacobian.canonical import canonicalize_json
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _canonicalize_rational() -> None:
@@ -37,7 +37,7 @@ def main() -> None:
     runner.bench_func("canonicalize-64-rationals", _canonicalize_rational)
 
     with tempfile.TemporaryDirectory(prefix="jacobian-benchmark-") as directory:
-        store = ArtifactStore(Path(directory))
+        store = ArtifactRepository(Path(directory))
         schema_uri = store.register_descriptor(
             kind="schema",
             name="benchmark.payload",
@@ -73,7 +73,7 @@ def main() -> None:
             store._write_blob(f"startup-scaling-{index}".encode())
         runner.bench_func(
             "artifact-store-clean-open-populated",
-            ArtifactStore,
+            ArtifactRepository,
             Path(directory),
         )
 

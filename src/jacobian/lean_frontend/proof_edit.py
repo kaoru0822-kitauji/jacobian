@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -37,7 +37,7 @@ from jacobian.contracts.results import (
 )
 from jacobian.lean_frontend.service import LeanService
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _FORBIDDEN_PROOF_HOLE = re.compile(r"\b(?:admit|sorry)\b", re.IGNORECASE)
 
@@ -49,7 +49,7 @@ class LeanProofEditInstallation:
 
 
 def install_lean_proof_edit_capability(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     lean: LeanService,

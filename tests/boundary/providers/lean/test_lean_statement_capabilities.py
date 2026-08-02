@@ -13,7 +13,7 @@ from tests.support.provider_lean import (
 
 import jacobian.lean_frontend.statement as lean_statements
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
@@ -27,7 +27,7 @@ from jacobian.lean_frontend.statement import (
     install_lean_statement_capabilities,
 )
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 LEAN_AVAILABLE = pinned_lean_core_runtime_available()
 
@@ -43,7 +43,7 @@ def _build_adapters(
     LeanStatementProposalAdapter,
     LeanStatementCompareAdapter,
 ]:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     adapters, _installation = install_lean_statement_capabilities(

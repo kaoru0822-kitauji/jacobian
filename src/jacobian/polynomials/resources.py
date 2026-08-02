@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from jacobian.artifacts import ArtifactService
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -48,7 +48,7 @@ class PolynomialInstallation:
 
 @dataclass(frozen=True, slots=True)
 class PolynomialResources:
-    store: ArtifactStore
+    store: ArtifactRepository
     artifacts: ArtifactService
     verification: VerificationService
     installation: PolynomialInstallation

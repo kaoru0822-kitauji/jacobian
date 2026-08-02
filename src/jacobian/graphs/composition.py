@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -61,7 +61,7 @@ from jacobian.graphs.artifacts import (
 from jacobian.graphs.atlas import graph_atlas_order, networkx_loader
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -88,7 +88,7 @@ class GraphCompositionInstallation:
 class GraphCompositionResources:
     """Shared resources for graph composition and enumeration adapters."""
 
-    store: ArtifactStore
+    store: ArtifactRepository
     artifacts: ArtifactService
     semantics_uri: str
     graph_schema_uri: str
@@ -97,7 +97,7 @@ class GraphCompositionResources:
 
 
 def install_graph_composition_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     *,

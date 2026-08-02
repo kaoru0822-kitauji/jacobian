@@ -38,7 +38,7 @@ from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _ARTIFACT_PATTERN = r"^artifact://sha256/[0-9a-f]{64}$"
@@ -55,7 +55,7 @@ class FinitePartitionInstallation:
 
 
 def install_finite_partition(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     verification: VerificationService,
@@ -176,7 +176,7 @@ class FinitePartitionAdapter:
     def __init__(
         self,
         artifacts: ArtifactService,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         verification: VerificationService,
         installation: FinitePartitionInstallation,
     ) -> None:

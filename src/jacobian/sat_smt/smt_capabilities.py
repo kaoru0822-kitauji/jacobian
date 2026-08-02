@@ -8,7 +8,7 @@ from typing import Literal
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -36,7 +36,8 @@ from jacobian.contracts.smt import (
 from jacobian.registry import CheckerRegistry
 from jacobian.sat_smt.smt import SmtArtifactError, SmtArtifactService
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -47,7 +48,7 @@ class SmtUnsatProofCheckerInstallation:
 
 
 def install_smt_unsat_proof_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     smt: SmtArtifactService,
@@ -112,7 +113,7 @@ class SmtUnsatProofVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         smt: SmtArtifactService,
         verification: VerificationService,
@@ -166,7 +167,7 @@ class SmtUnsatProofVerificationAdapter:
         try:
             resolved = self.smt.resolve_proof(validated.proof_uri)
             semantics = self.store.get(self.smt.installation.semantics_uri)
-        except (SmtArtifactError, StoreError) as exc:
+        except (SmtArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_SMT_UNSAT_PROOF",

@@ -10,7 +10,7 @@ from jacobian.evaluation import EvaluationService
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_exact_exhaustive_evaluation_remains_unverified(tmp_path: Path) -> None:
@@ -39,7 +39,7 @@ def test_exact_exhaustive_evaluation_remains_unverified(tmp_path: Path) -> None:
 def _evaluation_fixture(
     root: Path,
 ) -> tuple[EvaluationService, str, str, str]:
-    store = ArtifactStore(root)
+    store = ArtifactRepository(root)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     claim_schema = schemas.register(

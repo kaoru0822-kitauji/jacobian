@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,

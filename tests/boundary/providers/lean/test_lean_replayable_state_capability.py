@@ -6,19 +6,19 @@ from pathlib import Path
 import pytest
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import CapabilityRequest
 from jacobian.contracts.lean import LeanEnvironment
 from jacobian.contracts.lean_exploration import LeanProofStateRequest, LeanTypedGoal
 from jacobian.lean_frontend.exploration import (
-    LeanProofStateAdapter,
     _Resources,
     install_lean_exploration_capabilities,
 )
+from jacobian.lean_frontend.proof_state import LeanProofStateAdapter
 from jacobian.provider_runtime import jacobian_provider_runtime
 from jacobian.references import LeanCheckerInstallation
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _ReplResponses = tuple[dict[str, object], dict[str, object], dict[str, object]]
 
@@ -46,7 +46,7 @@ def _installation(environment: LeanEnvironment) -> LeanCheckerInstallation:
 
 
 def _adapter(tmp_path: Path) -> LeanProofStateAdapter:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     installations = {

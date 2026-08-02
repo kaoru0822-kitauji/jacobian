@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -40,7 +40,8 @@ from jacobian.matrices.linear import LinearArtifactError, LinearArtifactService
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -57,7 +58,7 @@ class LinearRationalInconsistencyCheckerInstallation:
 
 
 def install_linear_rational_inconsistency_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     linear: LinearArtifactService,
@@ -111,7 +112,7 @@ def install_linear_rational_inconsistency_checker(
 
 
 def install_linear_rational_solution_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     linear: LinearArtifactService,
@@ -170,7 +171,7 @@ class LinearRationalSolutionVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         linear: LinearArtifactService,
         verification: VerificationService,
@@ -226,7 +227,7 @@ class LinearRationalSolutionVerificationAdapter:
         try:
             resolved = self.linear.resolve_solution(validated.solution_uri)
             semantics = self.store.get(self.linear.installation.semantics_uri)
-        except (LinearArtifactError, StoreError) as exc:
+        except (LinearArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_RATIONAL_SOLUTION",
@@ -397,7 +398,7 @@ class LinearRationalInconsistencyVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         linear: LinearArtifactService,
         verification: VerificationService,
@@ -452,7 +453,7 @@ class LinearRationalInconsistencyVerificationAdapter:
         try:
             resolved = self.linear.resolve_inconsistency(validated.certificate_uri)
             semantics = self.store.get(self.linear.installation.semantics_uri)
-        except (LinearArtifactError, StoreError) as exc:
+        except (LinearArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_RATIONAL_INCONSISTENCY_CERTIFICATE",

@@ -9,12 +9,13 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import CapabilityDiagnostic
 from jacobian.contracts.graph_isomorphism import SimpleUndirectedGraph
 from jacobian.graphs.atlas import networkx_loader
 from jacobian.schema_registry import model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 if TYPE_CHECKING:
     import networkx as nx_type
@@ -29,7 +30,7 @@ GRAPH_PAYLOAD_SCHEMA: dict[str, Any] = model_schema(SimpleUndirectedGraph)
 class GraphArtifactResources:
     """The common storage and semantics needed by graph outcomes."""
 
-    store: ArtifactStore
+    store: ArtifactRepository
     artifacts: ArtifactService
     semantics_uri: str
     graph_schema_uri: str
@@ -63,7 +64,7 @@ def load_graph(resources: GraphArtifactResources, graph_uri: str) -> nx_type.Gra
 
     try:
         artifact = resources.store.get(graph_uri)
-    except StoreError as exc:
+    except StorageError as exc:
         raise CapabilityInvocationError(
             CapabilityDiagnostic(
                 code="GRAPH_ARTIFACT_NOT_FOUND",

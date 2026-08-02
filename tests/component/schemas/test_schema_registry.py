@@ -12,7 +12,7 @@ from jacobian.schema_registry import (
     SchemaValidationError,
     model_schema,
 )
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 class _CachedSchemaModel(BaseModel):
@@ -56,7 +56,7 @@ def test_cached_model_schema_returns_independent_copies(
 
 
 def test_external_dynamic_reference_is_rejected(tmp_path: Path) -> None:
-    registry = SchemaRegistry(ArtifactStore(tmp_path))
+    registry = SchemaRegistry(ArtifactRepository(tmp_path))
 
     with pytest.raises(SchemaRegistryError):
         registry.register(
@@ -69,7 +69,7 @@ def test_external_dynamic_reference_is_rejected(tmp_path: Path) -> None:
 def test_schema_validator_cache_is_bound_to_canonical_schema(
     tmp_path: Path,
 ) -> None:
-    registry = SchemaRegistry(ArtifactStore(tmp_path))
+    registry = SchemaRegistry(ArtifactRepository(tmp_path))
     integer_schema = registry.register(
         name="cache-binding",
         version="1",
@@ -90,7 +90,7 @@ def test_registered_schema_resolves_from_immutable_local_cache(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = SchemaRegistry(store)
     schema_uri = registry.register(
         name="local-cache",
@@ -115,7 +115,7 @@ def test_identical_registration_writes_one_descriptor(
     monkeypatch: pytest.MonkeyPatch,
     inside_transaction: bool,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = SchemaRegistry(store)
     calls = 0
     register_descriptor = store.register_descriptor
@@ -160,7 +160,7 @@ def test_rolled_back_schema_is_not_retained_in_local_cache(
     tmp_path: Path,
     model: type[BaseModel] | None,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = SchemaRegistry(store)
     schema_uri = ""
 
@@ -203,7 +203,7 @@ def test_rolled_back_schema_is_not_retained_in_local_cache(
 def test_model_backed_schema_applies_cross_field_contracts(
     tmp_path: Path,
 ) -> None:
-    registry = SchemaRegistry(ArtifactStore(tmp_path))
+    registry = SchemaRegistry(ArtifactRepository(tmp_path))
     schema_uri = registry.register_model(
         name="ordered-pair",
         version="1",
@@ -223,7 +223,7 @@ def test_producer_only_model_registration_is_runtime_enforced(
     tmp_path: Path,
     inside_transaction: bool,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = SchemaRegistry(store)
 
     def register() -> str:
@@ -248,7 +248,7 @@ def test_existing_model_schema_reattaches_without_durable_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     installer = SchemaRegistry(store)
     schema_uri = installer.register_model(
         name="ordered-pair",

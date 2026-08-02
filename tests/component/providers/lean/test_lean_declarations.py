@@ -15,7 +15,7 @@ from jacobian.builtin_capabilities import (
     LeanDeclarationSearchAdapter,
     LeanDependencyGraphAdapter,
 )
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
@@ -35,7 +35,7 @@ from jacobian.lean_frontend.declarations import (
     _parse_session_response,
 )
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _DIGEST = "sha256:" + "a" * 64
 _RUNTIME = CapabilityProviderRuntime(
@@ -322,7 +322,7 @@ def test_dependency_adapter_exposes_partial_typed_subgraph(tmp_path: Path) -> No
             "closure_complete": False,
         }
     )
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     semantics_uri = store.register_descriptor(

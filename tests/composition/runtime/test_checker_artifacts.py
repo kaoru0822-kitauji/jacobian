@@ -10,7 +10,7 @@ from jacobian.contracts.evidence import (
     WitnessRole,
 )
 from jacobian.runtime.model import JacobianRuntime
-from jacobian.store import StoredArtifact
+from jacobian.storage.models import StoredArtifact
 
 
 def _witness_schema_uri(runtime: JacobianRuntime) -> str:

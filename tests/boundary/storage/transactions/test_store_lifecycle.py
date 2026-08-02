@@ -1,4 +1,4 @@
-"""Behavioral audit of :class:`ArtifactStore` lifecycle ownership.
+"""Behavioral audit of :class:`ArtifactRepository` lifecycle ownership.
 
 These tests pin the runtime ownership contract of the local content-addressed
 store: explicit ``close``, idempotence, context-manager semantics, WAL/SHM
@@ -15,11 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.store import (
-    ArtifactStore,
-    StoreClosedError,
-    StoreError,
-)
+from jacobian.storage.errors import StorageClosedError, StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _wal_files(root: Path) -> list[Path]:
@@ -35,13 +32,13 @@ def _wal_files(root: Path) -> list[Path]:
 
 
 def test_close_is_idempotent(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
 
     store.close()
     # A second close must not raise and must remain a no-op: the store stays
     # closed and operations against it still fail closed.
     store.close()
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.register_descriptor(
             kind="schema",
             name="after-double-close",
@@ -53,10 +50,10 @@ def test_close_is_idempotent(tmp_path: Path) -> None:
 def test_close_during_active_transaction_raises_and_keeps_store_open(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
 
     with store.transaction():
-        with pytest.raises(StoreError, match="cannot close"):
+        with pytest.raises(StorageError, match="cannot close"):
             store.close()
         # The store remains open and the transaction is still usable: a
         # descriptor committed inside the surviving transaction must succeed.
@@ -70,7 +67,7 @@ def test_close_during_active_transaction_raises_and_keeps_store_open(
 
     # After the transaction commits, close succeeds and the store is closed.
     store.close()
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.register_descriptor(
             kind="schema",
             name="after-transaction-close",
@@ -80,7 +77,7 @@ def test_close_during_active_transaction_raises_and_keeps_store_open(
 
 
 def test_context_manager_closes_store(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path) as store:
+    with ArtifactRepository(tmp_path) as store:
         # While open the store is usable.
         store.register_descriptor(
             kind="schema",
@@ -89,7 +86,7 @@ def test_context_manager_closes_store(tmp_path: Path) -> None:
             definition={"type": "object"},
         )
     # After the context manager exits the store is closed.
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.register_descriptor(
             kind="schema",
             name="after-context",
@@ -99,11 +96,11 @@ def test_context_manager_closes_store(tmp_path: Path) -> None:
 
 
 def test_context_manager_exit_suppresses_no_exception(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     with pytest.raises(ValueError, match="body failure"), store:
         raise ValueError("body failure")
     # The store is still closed even though the body raised.
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.register_descriptor(
             kind="schema",
             name="after-body-failure",
@@ -113,28 +110,28 @@ def test_context_manager_exit_suppresses_no_exception(tmp_path: Path) -> None:
 
 
 def test_enter_on_closed_store_raises(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     store.close()
 
-    with pytest.raises(StoreClosedError), store:
+    with pytest.raises(StorageClosedError), store:
         pytest.fail("entering a closed store must not succeed")
 
 
 def test_use_after_close_rejects_operations(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     store.close()
 
-    with pytest.raises(StoreClosedError), store.connection():
+    with pytest.raises(StorageClosedError), store.connection():
         pass
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.put(
             schema_uri="artifact://sha256/" + "0" * 64,
             semantics_uri="artifact://sha256/" + "1" * 64,
             payload={"value": "after-close"},
         )
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.get("artifact://sha256/" + "0" * 64)
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.register_descriptor(
             kind="schema",
             name="after-close",
@@ -146,11 +143,11 @@ def test_use_after_close_rejects_operations(tmp_path: Path) -> None:
 def test_transaction_on_closed_store_rejects_without_side_effects(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     store.close()
 
     assert not store.transaction_recovery_path.exists()
-    with pytest.raises(StoreClosedError), store.transaction():
+    with pytest.raises(StorageClosedError), store.transaction():
         pytest.fail("a closed store must not begin a transaction")
 
     # Rejecting the transaction must not leave a stale recovery marker behind.
@@ -161,7 +158,7 @@ def test_transaction_on_closed_store_rejects_without_side_effects(
 
 
 def test_close_checkpoints_wal_to_empty(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     store.register_descriptor(
         kind="schema",
         name="example.checkpoint",
@@ -178,7 +175,7 @@ def test_close_checkpoints_wal_to_empty(tmp_path: Path) -> None:
 
 
 def test_close_leaves_database_consistent(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     descriptor = store.register_descriptor(
         kind="schema",
         name="example.durable",
@@ -200,7 +197,7 @@ def test_close_leaves_database_consistent(tmp_path: Path) -> None:
 def test_repeated_close_after_context_manager_is_idempotent(
     tmp_path: Path,
 ) -> None:
-    with ArtifactStore(tmp_path) as store:
+    with ArtifactRepository(tmp_path) as store:
         store.register_descriptor(
             kind="schema",
             name="example.lifecycle",
@@ -209,7 +206,7 @@ def test_repeated_close_after_context_manager_is_idempotent(
         )
     # Explicit close after the context manager already closed the store.
     store.close()
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         store.register_descriptor(
             kind="schema",
             name="after-repeated-close",
@@ -219,7 +216,7 @@ def test_repeated_close_after_context_manager_is_idempotent(
 
 
 def test_reopened_store_after_close_is_usable(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     descriptor = store.register_descriptor(
         kind="schema",
         name="example.reopen",
@@ -231,7 +228,7 @@ def test_reopened_store_after_close_is_usable(tmp_path: Path) -> None:
         path.stat().st_size == 0 for path in _wal_files(tmp_path)
     )
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
     assert reopened.get_descriptor(descriptor, expected_kind="schema")["name"] == (
         "example.reopen"
     )
@@ -245,7 +242,7 @@ def test_failed_bootstrap_does_not_leave_recovery_marker(
     # leave a transaction-recovery marker that would force a rescan on reopen.
     (tmp_path / "metadata.sqlite3").mkdir()
 
-    with pytest.raises(StoreError, match="schema migration failed"):
-        ArtifactStore(tmp_path)
+    with pytest.raises(StorageError, match="schema migration failed"):
+        ArtifactRepository(tmp_path)
 
     assert not (tmp_path / ".transaction-recovery").exists()

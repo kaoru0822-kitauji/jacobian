@@ -24,7 +24,7 @@ from jacobian.contracts.results import (
 from jacobian.experiments import ExperimentError, ExperimentNotFoundError
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime
-from jacobian.store import StoreError
+from jacobian.storage.errors import StorageError
 
 
 def _claim(
@@ -680,7 +680,7 @@ def test_terminal_archive_failure_marks_enumeration_error(
 
     def fail_terminal_archive(**kwargs: object) -> object:
         if kwargs.get("summary") == "enumeration archive manifest":
-            raise StoreError("fixture archive failure")
+            raise StorageError("fixture archive failure")
         return original_put(**kwargs)
 
     monkeypatch.setattr(
@@ -711,7 +711,7 @@ def test_terminal_archive_failure_marks_enumeration_error(
     assert snapshot.archive_uri is None
     assert "could not save the final experiment archive" in snapshot.detail
     assert "experiment remains unverified" in snapshot.detail
-    assert "StoreError" not in snapshot.detail
+    assert "StorageError" not in snapshot.detail
     assert "runtime_ms" not in snapshot.detail
     assert "fixture archive failure" not in snapshot.detail
     assert "fixture archive failure" in caplog.text

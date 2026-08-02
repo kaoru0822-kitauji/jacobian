@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from jacobian.artifacts import ArtifactService
 from jacobian.bounded_process import BoundedProcessResult, ProcessResourceLimits
 from jacobian.canonical import loads_strict_json
-from jacobian.capabilities import CapabilityService
+from jacobian.capability_service import CapabilityService
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityCompletenessStatus,
@@ -29,13 +29,13 @@ from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.runtime import create_runtime
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 pytestmark = pytest.mark.usefixtures("attached_complete_runtime")
 
 
 def _service(tmp_path: Path) -> CapabilityService:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     service = CapabilityService(store, ResearchMemory(store, schemas))

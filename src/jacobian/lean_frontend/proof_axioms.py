@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -38,7 +38,7 @@ from jacobian.contracts.lean_proof_axioms import (
 from jacobian.contracts.lean_statement import LeanElaborationDiagnostic
 from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _AXIOM_LINE = re.compile(r"'jacobian_theorem' depends on axioms: \[([^\]]*)\]")
 _NO_AXIOMS = "'jacobian_theorem' does not depend on any axioms"
@@ -88,7 +88,7 @@ class _InspectionResources:
 
 
 def install_lean_proof_axioms_capability(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     installations: Mapping[LeanEnvironment, Any],

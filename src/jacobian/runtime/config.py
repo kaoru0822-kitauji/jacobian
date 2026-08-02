@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from jacobian.capabilities import CapabilityPolicy
+    from jacobian.capability_service import CapabilityPolicy
 
 
 class CheckerAuthorityMode(StrEnum):

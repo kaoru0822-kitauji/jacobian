@@ -18,7 +18,7 @@ from jacobian.contracts.lean import LeanEnvironment
 from jacobian.lean_frontend import proof_axioms
 from jacobian.lean_frontend.proof_axioms import install_lean_proof_axioms_capability
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_proof_hole_inspection_ignores_strings_and_identifiers(
@@ -55,7 +55,7 @@ def test_proof_hole_inspection_ignores_strings_and_identifiers(
         ),
     )
 
-    with ArtifactStore(tmp_path) as store:
+    with ArtifactRepository(tmp_path) as store:
         schemas = SchemaRegistry(store)
         artifacts = ArtifactService(store, schemas)
         adapter, _installation = install_lean_proof_axioms_capability(

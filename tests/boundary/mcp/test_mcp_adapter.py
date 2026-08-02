@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 
 from jacobian.adapters.mcp.guidance import OPERATING_GUIDE
 from jacobian.adapters.mcp.server import create_server
-from jacobian.capabilities import CapabilityPolicy
+from jacobian.capability_service import CapabilityPolicy
 from jacobian.contracts.capabilities import CapabilityDescriptor
 
 CAPABILITY_TOOL_NAMES = {"capability.describe", "capability.invoke"}

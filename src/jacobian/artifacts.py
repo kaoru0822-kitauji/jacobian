@@ -11,12 +11,12 @@ from jacobian.schema_registry import (
     SchemaRegistryError,
     SchemaValidationError,
 )
-from jacobian.store import (
+from jacobian.storage.errors import (
     ArtifactNotFoundError,
-    ArtifactStore,
-    StoreError,
-    StoreLimitError,
+    StorageError,
+    StorageLimitError,
 )
+from jacobian.storage.repository import ArtifactRepository
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class ArtifactValidationError(ValueError):
 class ArtifactService:
     """Validate domain payloads before committing immutable artifacts."""
 
-    def __init__(self, store: ArtifactStore, schemas: SchemaRegistry) -> None:
+    def __init__(self, store: ArtifactRepository, schemas: SchemaRegistry) -> None:
         self.store = store
         self.schemas = schemas
 
@@ -55,9 +55,9 @@ class ArtifactService:
                 semantics_uri,
                 expected_kind="semantics",
             )
-        except (SchemaRegistryError, StoreError, ValueError) as exc:
+        except (SchemaRegistryError, StorageError, ValueError) as exc:
             _LOGGER.warning("artifact input validation failed", exc_info=exc)
-            if isinstance(exc, (StoreError, SchemaRegistryError)) and not isinstance(
+            if isinstance(exc, (StorageError, SchemaRegistryError)) and not isinstance(
                 exc,
                 SchemaValidationError,
             ):
@@ -101,13 +101,13 @@ class ArtifactService:
             raise ArtifactValidationError(
                 "A parent artifact is unavailable. Check each parent URI, then retry."
             ) from exc
-        except StoreLimitError as exc:
+        except StorageLimitError as exc:
             _LOGGER.warning("artifact storage limit reached", exc_info=exc)
             raise ArtifactValidationError(
                 "The artifact exceeds a configured storage limit. Reduce its payload, "
                 "summary, or parent count, then retry."
             ) from exc
-        except StoreError as exc:
+        except StorageError as exc:
             _LOGGER.warning("artifact persistence failed", exc_info=exc)
             raise ArtifactValidationError(
                 "Jacobian could not save the artifact. Check the state directory and "

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityService
+from jacobian.capability_service import CapabilityService
 from jacobian.matrices.linear import install_linear_artifacts
 from jacobian.matrices.normal_forms import install_matrix_normal_form_artifacts
 from jacobian.memory import ResearchMemory
@@ -18,13 +18,13 @@ from jacobian.runtime.services import CoreServices
 from jacobian.sat_smt.sat import install_sat_artifacts
 from jacobian.sat_smt.smt import install_smt_artifacts
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreServices:
     """Open storage and construct the capability-independent service graph."""
 
-    store = ArtifactStore(root)
+    store = ArtifactRepository(root)
     try:
         schemas = SchemaRegistry(store)
         artifacts = ArtifactService(store, schemas)

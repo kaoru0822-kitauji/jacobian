@@ -19,7 +19,7 @@ from jacobian.contracts.results import (
     ResultEnvelope,
     Verification,
 )
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_failed_exhaustive_result_cannot_claim_complete_coverage(
@@ -47,7 +47,7 @@ def test_failed_exhaustive_result_cannot_claim_complete_coverage(
         input_schema={"type": "object", "additionalProperties": False},
         output_schema=ResultEnvelope.model_json_schema(),
         invoke=lambda _payload: failed,
-        store=ArtifactStore(tmp_path),
+        store=ArtifactRepository(tmp_path),
     )
 
     result = adapter.invoke(
@@ -86,7 +86,7 @@ def test_exhaustive_result_without_scope_cannot_claim_complete_coverage(
         input_schema={"type": "object", "additionalProperties": False},
         output_schema=ResultEnvelope.model_json_schema(),
         invoke=lambda _payload: exhaustive,
-        store=ArtifactStore(tmp_path),
+        store=ArtifactRepository(tmp_path),
     )
 
     result = adapter.invoke(

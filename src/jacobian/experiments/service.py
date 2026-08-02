@@ -50,11 +50,13 @@ from jacobian.experiments.errors import (
     ExperimentError,
     ExperimentNotFoundError,
 )
+from jacobian.lifecycle import LifecycleTimeoutError, wait_for_worker_quiescence
 from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.structures import StructureService
 
 _LOGGER = logging.getLogger(__name__)
@@ -92,7 +94,7 @@ class ExperimentService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         claims: ClaimValidationService,
@@ -147,32 +149,24 @@ class ExperimentService:
     def close(self, *, timeout_seconds: float = 30) -> None:
         """Quiesce enumeration starts and workers before storage teardown."""
 
-        if timeout_seconds < 0:
-            raise ValueError("timeout_seconds must be non-negative")
-        deadline = time.monotonic() + timeout_seconds
         with self._thread_lock:
             if self._closed:
                 return
             self._closing = True
-        while True:
-            with self._thread_lock:
-                active = tuple(
-                    thread for thread in self._threads.values() if thread.is_alive()
-                )
-                if not active and self._starts_in_flight == 0:
-                    self._closed = True
-                    self._closing = False
-                    return
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise ExperimentError(
-                    "enumeration workers did not quiesce before runtime shutdown"
-                )
-            if not active:
-                time.sleep(min(remaining, 0.01))
-                continue
-            for thread in active:
-                thread.join(timeout=min(remaining, 0.05))
+        try:
+            wait_for_worker_quiescence(
+                lock=self._thread_lock,
+                workers=self._threads,
+                starts_in_flight=lambda: self._starts_in_flight,
+                timeout_seconds=timeout_seconds,
+            )
+        except LifecycleTimeoutError as exc:
+            raise ExperimentError(
+                "enumeration workers did not quiesce before runtime shutdown"
+            ) from exc
+        with self._thread_lock:
+            self._closed = True
+            self._closing = False
 
     def _put_internal_artifact(
         self,
@@ -873,7 +867,7 @@ class ExperimentService:
             ExperimentError,
             PluginRegistryError,
             SchemaRegistryError,
-            StoreError,
+            StorageError,
             ValidationError,
             ValueError,
         ) as exc:
@@ -975,7 +969,7 @@ class ExperimentService:
             )
         except (
             ExperimentError,
-            StoreError,
+            StorageError,
             SchemaRegistryError,
             ValidationError,
         ) as exc:

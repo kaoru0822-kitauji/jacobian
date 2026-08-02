@@ -17,7 +17,7 @@ import pytest
 from pydantic import Field
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityService
+from jacobian.capability_service import CapabilityService
 from jacobian.contracts.capabilities import (
     CapabilityDiagnostic,
     CapabilityInstallTier,
@@ -50,7 +50,7 @@ from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.runtime.config import CheckerAuthorityMode
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -130,7 +130,7 @@ class _RecordingContext:
     """A self-contained InstallationContext plus its owned resources."""
 
     context: InstallationContext
-    store: ArtifactStore
+    store: ArtifactRepository
     registered: list[str]
 
 
@@ -138,7 +138,7 @@ class _RecordingContext:
 def assembly(tmp_path: Path) -> Iterator[_RecordingContext]:
     """Build a real, narrow InstallationContext without the full runtime."""
 
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     try:
         schemas = SchemaRegistry(store)
         artifacts = ArtifactService(store, schemas)

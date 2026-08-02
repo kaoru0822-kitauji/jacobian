@@ -34,7 +34,8 @@ from jacobian.contracts.transformations import (
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class TransformationService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         executor: PluginExecutor,
@@ -233,7 +234,7 @@ class TransformationService:
         except (
             PluginRegistryError,
             SchemaRegistryError,
-            StoreError,
+            StorageError,
             ValidationError,
             ValueError,
         ) as exc:
@@ -300,11 +301,11 @@ class TransformationService:
 def _transformation_failure_detail(exc: Exception) -> str:
     if isinstance(exc, ValueError) and not isinstance(
         exc,
-        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+        (PluginRegistryError, SchemaRegistryError, StorageError, ValidationError),
     ):
         return str(exc)
     _LOGGER.warning("representation transformation failed", exc_info=exc)
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return (
             "A required source or target artifact is unavailable. Check the "
             "artifact URIs, then retry."

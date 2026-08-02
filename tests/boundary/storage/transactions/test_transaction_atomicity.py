@@ -5,11 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from jacobian.store import ArtifactNotFoundError, ArtifactStore
+from jacobian.storage.errors import ArtifactNotFoundError
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_transaction_commits_multiple_descriptors_together(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
 
     with store.transaction():
         first = store.register_descriptor(
@@ -36,8 +37,8 @@ def test_transaction_commits_multiple_descriptors_together(tmp_path: Path) -> No
 
 
 def test_transactions_serialize_across_store_instances(tmp_path: Path) -> None:
-    first = ArtifactStore(tmp_path)
-    second = ArtifactStore(tmp_path)
+    first = ArtifactRepository(tmp_path)
+    second = ArtifactRepository(tmp_path)
     writer_started = threading.Event()
     writer_entered = threading.Event()
 
@@ -72,7 +73,7 @@ def test_transactions_serialize_across_store_instances(tmp_path: Path) -> None:
 def test_transaction_rolls_back_metadata_and_recovers_blob_accounting(
     tmp_path: Path,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     descriptor_uri = ""
 
     with pytest.raises(RuntimeError, match="abort bootstrap"), store.transaction():

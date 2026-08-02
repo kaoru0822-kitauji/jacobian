@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
@@ -41,7 +41,9 @@ from jacobian.schema_registry import (
     SchemaRegistryError,
     model_schema,
 )
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -64,7 +66,7 @@ class MatrixDeterminantCheckerInstallation:
 
 
 def install_matrix_determinant_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     matrices: MatrixInstallation,
@@ -126,7 +128,7 @@ class MatrixDeterminantVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         matrices: MatrixInstallation,
@@ -181,7 +183,7 @@ class MatrixDeterminantVerificationAdapter:
         try:
             resolved = self._resolve(validated.determinant_uri)
             semantics = self.store.get(self.matrices.semantics_uri)
-        except (MatrixDeterminantArtifactError, StoreError) as exc:
+        except (MatrixDeterminantArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_MATRIX_DETERMINANT",
@@ -335,7 +337,7 @@ class MatrixDeterminantVerificationAdapter:
     def _resolve(self, determinant_uri: str) -> ResolvedMatrixDeterminant:
         try:
             artifact = self.store.get(determinant_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise MatrixDeterminantArtifactError(
                 "candidate is not an available determinant artifact"
             ) from exc
@@ -358,7 +360,7 @@ class MatrixDeterminantVerificationAdapter:
             ) from exc
         try:
             matrix_artifact = self.store.get(candidate.matrix_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise MatrixDeterminantArtifactError(
                 "candidate source matrix is unavailable"
             ) from exc

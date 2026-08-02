@@ -31,7 +31,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -80,7 +80,7 @@ from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 from jacobian.providers import LazyLoader
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 if TYPE_CHECKING:
@@ -123,14 +123,14 @@ class PolynomialPositivityInstallation:
 
 @dataclass(frozen=True, slots=True)
 class PolynomialPositivityResources:
-    store: ArtifactStore
+    store: ArtifactRepository
     artifacts: ArtifactService
     verification: VerificationService
     installation: PolynomialPositivityInstallation
 
 
 def install_polynomial_positivity_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     verification: VerificationService,

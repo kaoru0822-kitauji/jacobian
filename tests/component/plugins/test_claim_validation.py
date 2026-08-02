@@ -8,11 +8,11 @@ from jacobian.contracts.claims import ClaimSpec
 from jacobian.contracts.plugins import PluginManifest
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_claim_validation_rejects_missing_plugin_capability(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     claim_schema = schemas.register(

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -44,7 +44,8 @@ from jacobian.references import ReferenceInstaller
 from jacobian.registry import CheckerRegistry, CheckerRegistryError
 from jacobian.schema_registry import SchemaRegistry, model_schema
 from jacobian.shrinking import ShrinkService
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 _DOMAIN_ID = "jacobian.graph-shrinking"
 _PROPERTY_ID = "graph.property.non_bipartite"
@@ -60,7 +61,7 @@ class GraphShrinkingInstallation:
 
 
 def install_graph_shrinking(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     plugins: PluginRegistry,
@@ -150,7 +151,7 @@ class GraphCounterexampleShrinkAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         checkers: CheckerRegistry,
         shrinking: ShrinkService,
@@ -365,7 +366,7 @@ class GraphCounterexampleShrinkAdapter:
             if vertices != sorted(vertices) or edges != sorted(edges):
                 raise ValueError
             return artifact
-        except (StoreError, KeyError, TypeError, ValueError) as exc:
+        except (StorageError, KeyError, TypeError, ValueError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="GRAPH_SHRINK_INPUT_INVALID",
