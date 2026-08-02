@@ -123,6 +123,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result.update(x2="1"),
         ),
         (
+            "polynomial-divisibility-uniqueness",
+            lambda result: result["remainder_x"].__setitem__(0, 3),
+        ),
+        (
             "subspace-direct-sum-counterexample",
             lambda result: result.update(dependence_coefficients=[1, 1, 1, 1]),
         ),
