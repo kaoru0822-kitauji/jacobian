@@ -594,6 +594,62 @@ def test_lean_transitive_evidence_rejects_empty_prose(tmp_path: Path) -> None:
     assert rejected["evidence_validity"] == 0.0
 
 
+def test_trigonometric_power_sum_rejects_corrupted_recurrence_term(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "trigonometric-power-sum-valuation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["terms"][12]["value"] += 7
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_trigonometric_power_sum_rejects_corrupted_induction_case(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "trigonometric-power-sum-valuation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["induction_cases"][1]["coefficient_adjusted_offsets"] = [
+        1,
+        1,
+        0,
+    ]
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_trigonometric_power_sum_rejects_negated_scope(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "trigonometric-power-sum-valuation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["scope"] = (
+        "This certificate does not cover the cubic recurrence or 7-adic induction."
+    )
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["scope_accuracy"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_putnam_2adic_evidence_rejects_empty_prose(tmp_path: Path) -> None:
     """Putnam 2-adic audit evidence must have non-empty prose."""
     task, app, logs = support._prepare_case(
