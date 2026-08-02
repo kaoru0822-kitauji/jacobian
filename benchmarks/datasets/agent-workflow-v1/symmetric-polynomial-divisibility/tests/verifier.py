@@ -174,12 +174,19 @@ def main():
     evidence_valid = bool(
         contract and math_correct and _evidence_matches(submission.get("evidence"))
     )
+    scope_text = (
+        submission.get("scope").casefold()
+        if isinstance(submission.get("scope"), str)
+        else ""
+    )
     scope_correct = bool(
         contract
-        and isinstance(submission.get("scope"), str)
-        and all(
-            term in submission["scope"].casefold()
-            for term in ("ideal", "integer", "divis")
+        and all(term in scope_text for term in ("ideal", "integer", "divis"))
+        and not re.search(
+            r"(?:\b(?:no|not|without|excluding|exclude|only)\b"
+            r"[\s_-]{0,20}(?:ideal|integer|divis)|"
+            r"\bno[_-](?:ideal|integer|divis))",
+            scope_text,
         )
     )
     assurance_correct = bool(
