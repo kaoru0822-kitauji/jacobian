@@ -1,6 +1,6 @@
 import json
 import re
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from pathlib import Path
 
 from verifier_support import (
@@ -52,6 +52,15 @@ def _is_int_matrix(value):
     )
 
 
+def _fits_small_integer(value, maximum):
+    if not _is_integer(value):
+        return False
+    try:
+        return -maximum <= value <= maximum
+    except (DecimalException, OverflowError):
+        return False
+
+
 def _valid_cover(result, bounds):
     n = result.get("modulus")
     step = result.get("subgroup_step")
@@ -59,6 +68,8 @@ def _valid_cover(result, bounds):
         not _is_integer(n)
         or not _is_integer(step)
         or not bounds["minimum_modulus"] <= n <= bounds["maximum_modulus"]
+        or not _fits_small_integer(n, bounds["maximum_modulus"])
+        or not _fits_small_integer(step, bounds["maximum_modulus"])
     ):
         return False
     n = int(n)
@@ -218,7 +229,13 @@ def _load_exact_submission():
         if path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576:
             return None
         return json.loads(path.read_text(), parse_float=Decimal)
-    except (OSError, UnicodeError, ValueError, RecursionError):
+    except (
+        OSError,
+        UnicodeError,
+        ValueError,
+        RecursionError,
+        DecimalException,
+    ):
         return None
 
 
