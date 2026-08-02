@@ -199,6 +199,36 @@ def test_inverse_distance_audit_accepts_alternative_rational_direction(
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_continuant_reversal_rejects_missing_symbolic_monomial(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "continuant-reversal-certificate", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["forward_monomials"].pop()
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_continuant_reversal_rejects_corrupted_reflection(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "continuant-reversal-certificate", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["reflection_pairs"][10]["reflected"] = [1]
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 @pytest.mark.parametrize(
     ("path", "replacement"),
     [
