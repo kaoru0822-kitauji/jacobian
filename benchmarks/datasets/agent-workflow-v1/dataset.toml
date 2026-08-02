@@ -140,7 +140,7 @@ digest = "sha256:a5b765c629efa4cb3f6f16d25115d599b3a578f31bd999c306ecfa8ef69d762
 
 [[tasks]]
 name = "jacobian/radical-system-uniqueness-audit"
-digest = "sha256:ff416130584eac45e7e4b977b3fe3252592f975c1e9d2ba4bde26916c8d3151e"
+digest = "sha256:a644bb4618c3673efd5e3d7a179cc2c3a1b65cf605f72b3a84c9112593a9c86b"
 
 [[tasks]]
 name = "jacobian/random-function-expectation-audit"

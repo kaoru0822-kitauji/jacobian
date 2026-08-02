@@ -1,7 +1,7 @@
 {
   "task_id": "jacobian/radical-system-uniqueness-audit",
   "conclusion": "UNIQUE_REAL_SOLUTION",
-  "certificate": {
+  "result": {
     "substitution": "u=b^(1/6)",
     "elimination_coefficients": [0, 0, -2, -1, 1],
     "linear_factors": [

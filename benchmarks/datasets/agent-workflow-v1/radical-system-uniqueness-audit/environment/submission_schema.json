@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["task_id", "conclusion", "certificate", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
   "properties": {
     "task_id": {"const": "jacobian/radical-system-uniqueness-audit"},
     "conclusion": {"enum": ["UNIQUE_REAL_SOLUTION", "MULTIPLE_REAL_SOLUTIONS", "INSUFFICIENT_EVIDENCE"]},
-    "certificate": {
+    "result": {
       "type": "object",
       "additionalProperties": false,
       "required": ["substitution", "elimination_coefficients", "linear_factors", "root_classification", "solutions"],

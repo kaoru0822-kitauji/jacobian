@@ -183,7 +183,7 @@ def main() -> None:
     math_correct = bool(
         math_contract
         and source_ok
-        and _certificate_is_valid(submission.get("certificate"))
+        and _certificate_is_valid(submission.get("result"))
         and submission.get("completeness") == "COMPLETE"
     )
     evidence = bool(math_contract and _evidence_is_valid(submission.get("evidence")))
