@@ -34,7 +34,11 @@ def _load_frozen_input():
 def _load_bounded_submission():
     path = W / "submission.json"
     try:
-        if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_SUBMISSION_BYTES:
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size > MAX_SUBMISSION_BYTES
+        ):
             return None
     except OSError:
         return None
@@ -161,7 +165,24 @@ def _is_nonzero_scalar_multiple(poly, template):
     if not poly or not template or set(poly) != set(template):
         return False
     scale = poly[next(iter(template))] / template[next(iter(template))]
-    return scale != 0 and all(value == scale * template[key] for key, value in poly.items())
+    return scale != 0 and all(
+        value == scale * template[key] for key, value in poly.items()
+    )
+
+
+def _generic_denominator_is_valid(poly, delta):
+    """Accept delta and the advertised positive A-factor variants.
+
+    A=e^x+e^y is strictly positive, so multiplying the generic denominator by
+    a bounded power of A does not change its nonzero branch. The verifier
+    still checks the exact polynomial identity after substitution.
+    """
+    factor = {(1, 0, 0, 0): Fraction(1)}
+    candidates = [delta]
+    for _ in range(1, 4):
+        candidates.append(_mul(delta, factor))
+        factor = _mul(factor, {(1, 0, 0, 0): Fraction(1)})
+    return any(_is_nonzero_scalar_multiple(poly, candidate) for candidate in candidates)
 
 
 def _result_is_valid(result, frozen):
@@ -193,7 +214,7 @@ def _result_is_valid(result, frozen):
         (1, 0, 1, 0): Fraction(1),
         (0, 2, 0, 0): Fraction(-1),
     }
-    if generic_denominator is None or not _is_nonzero_scalar_multiple(
+    if generic_denominator is None or not _generic_denominator_is_valid(
         generic_denominator, delta
     ):
         return False
@@ -209,20 +230,40 @@ def _result_is_valid(result, frozen):
 
 
 def _evidence_matches(evidence):
+    if not isinstance(evidence, list) or len(evidence) != 1:
+        return False
+    descriptor = evidence[0]
     if (
-        not isinstance(evidence, list)
-        or len(evidence) != 1
-        or not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt")
+        not isinstance(descriptor, dict)
+        or set(descriptor) != {"path", "sha256"}
+        or descriptor.get("path") != "evidence/answer.txt"
+        or not isinstance(descriptor.get("sha256"), str)
     ):
         return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    target = W / "evidence" / "answer.txt"
     try:
-        text = target.read_text().casefold() if target else ""
+        if (
+            target.is_symlink()
+            or not target.is_file()
+            or target.stat().st_size > 1_048_576
+        ):
+            return False
+    except OSError:
+        return False
+    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+        return False
+    target = resolve_evidence(descriptor, expected_path="evidence/answer.txt")
+    if target is None:
+        return False
+    try:
+        text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
     return bool(
         len(text) >= 180
-        and all(word in text for word in ("delta", "nonzero", "generic", "singular", "x=y"))
+        and all(
+            word in text for word in ("delta", "nonzero", "generic", "singular", "x=y")
+        )
         and re.search(r"\brational\b", text)
     )
 
@@ -257,19 +298,23 @@ def main():
         contract
         and submission.get("claimed_assurance") == expected["maximum_assurance"]
     )
-    limitations = submission.get("limitations", []) if isinstance(submission, dict) else []
+    limitations = (
+        submission.get("limitations", []) if isinstance(submission, dict) else []
+    )
     limitation_correct = False
     if contract and isinstance(limitations, list):
-        combined = " ".join(item.casefold() for item in limitations if isinstance(item, str))
+        combined = " ".join(
+            item.casefold() for item in limitations if isinstance(item, str)
+        )
         negative_pattern = (
-            r"\b(?:not|no|without|does not|doesn't)\b[^.]{0,60}"
-            r"\b(?:proof[- ]assistant|machine|formal(?:ly)?)\b"
+            r"\b(?:not|no|without|does not|doesn't|lacks?)\b[^.]{0,80}"
+            r"\b(?:proof(?:[- ]assistant)?|machine|formal(?:ly)?)\b"
         )
         negative = re.search(negative_pattern, combined)
         remainder = re.sub(negative_pattern, "", combined)
         limitation_correct = bool(
             negative
-            and "proof assistant" in combined
+            and re.search(r"\b(?:proof|machine|formal)", combined)
             and not re.search(
                 r"\b(?:machine|formal(?:ly)?|proof[- ]assistant)\b[^.]{0,60}"
                 r"\b(?:verified|checked|proof)\b",
