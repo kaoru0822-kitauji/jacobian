@@ -27,7 +27,7 @@ from jacobian.adapters.mcp.remote import (
 )
 from jacobian.adapters.mcp.server import create_server
 from jacobian.runtime import CheckerAuthorityMode
-from jacobian.store import ArtifactNotFoundError
+from jacobian.storage.errors import ArtifactNotFoundError
 
 
 def test_static_tokens_bind_distinct_authenticated_subjects() -> None:

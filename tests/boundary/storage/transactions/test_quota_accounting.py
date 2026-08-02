@@ -11,13 +11,15 @@ from typing import Any
 import pytest
 
 from jacobian.canonical import CanonicalizationError
-from jacobian.store import ArtifactStore, StoreError, StoreLimitError, StoreLimits
+from jacobian.storage.errors import StorageError, StorageLimitError
+from jacobian.storage.models import StorageLimits
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_over_limit_artifact_leaves_no_partial_metadata(tmp_path: Path) -> None:
-    store = ArtifactStore(
+    store = ArtifactRepository(
         tmp_path,
-        limits=StoreLimits(
+        limits=StorageLimits(
             max_artifact_bytes=2048,
             max_total_blob_bytes=1024 * 1024,
         ),
@@ -57,9 +59,9 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(
+    store = ArtifactRepository(
         tmp_path,
-        limits=StoreLimits(
+        limits=StorageLimits(
             max_artifact_bytes=2048,
             max_total_blob_bytes=900,
         ),
@@ -112,14 +114,14 @@ def test_concurrent_blob_commits_cannot_oversubscribe_quota(
     with call_lock:
         assert accounting_calls == 2
     assert sum(isinstance(outcome, str) for outcome in outcomes) == 1
-    assert sum(isinstance(outcome, StoreLimitError) for outcome in outcomes) == 1
+    assert sum(isinstance(outcome, StorageLimitError) for outcome in outcomes) == 1
 
 
 def test_blob_writes_do_not_rescan_the_blob_tree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
 
     def unexpected_scan(_path: Path) -> None:
         raise AssertionError("blob writes must use durable quota accounting")
@@ -129,14 +131,14 @@ def test_blob_writes_do_not_rescan_the_blob_tree(
 
 
 def test_store_open_reconciles_stale_quota_metadata(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     committed = store._blob_bytes_committed()
     store._adjust_blob_bytes_committed(
         512,
         reconciliation_required=True,
     )
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
 
     assert reopened._blob_bytes_committed() == committed
 
@@ -155,7 +157,7 @@ def test_store_open_migrates_legacy_quota_metadata(tmp_path: Path) -> None:
         )
         connection.execute("INSERT INTO blob_quota (id, size_bytes) VALUES (0, 999)")
 
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
 
     with sqlite3.connect(database) as connection:
         columns = {
@@ -190,9 +192,9 @@ def test_concurrent_store_open_migrates_legacy_quota_metadata_once(
         connection.execute("INSERT INTO blob_quota (id, size_bytes) VALUES (0, 0)")
     script = """
 import sys
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
-ArtifactStore(sys.argv[1])
+ArtifactRepository(sys.argv[1])
 """
     processes = [
         subprocess.Popen(
@@ -217,7 +219,7 @@ def test_failed_blob_publication_releases_quota_reservation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     committed = store._blob_bytes_committed()
 
     def fail_link(_source: str, _target: str) -> None:
@@ -225,7 +227,7 @@ def test_failed_blob_publication_releases_quota_reservation(
 
     monkeypatch.setattr(os, "link", fail_link)
 
-    with pytest.raises(StoreError, match="could not write"):
+    with pytest.raises(StorageError, match="could not write"):
         store._write_blob(b"unpublished")
 
     assert store._blob_bytes_committed() == committed
@@ -236,12 +238,14 @@ def test_cross_process_blob_writes_cannot_oversubscribe_quota(
 ) -> None:
     script = """
 import sys
-from jacobian.store import ArtifactStore, StoreLimitError, StoreLimits
+from jacobian.storage.repository import ArtifactRepository
+from jacobian.storage.errors import StorageLimitError
+from jacobian.storage.models import StorageLimits
 
-store = ArtifactStore(sys.argv[1], limits=StoreLimits(max_total_blob_bytes=900))
+store = ArtifactRepository(sys.argv[1], limits=StorageLimits(max_total_blob_bytes=900))
 try:
     store._write_blob(sys.argv[2].encode("ascii") * 600)
-except StoreLimitError:
+except StorageLimitError:
     print("limited")
 else:
     print("committed")

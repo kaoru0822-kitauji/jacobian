@@ -35,7 +35,9 @@ from jacobian.contracts.results import (
 from jacobian.plugin_execution import PluginExecutor
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +47,7 @@ class EvaluationService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         claims: ClaimValidationService,
@@ -124,7 +126,7 @@ class EvaluationService:
             semantics_digest = self.store.get(
                 manifest.semantics_uri
             ).manifest.object_digest
-        except (PluginRegistryError, StoreError) as exc:
+        except (PluginRegistryError, StorageError) as exc:
             return self._rejected_batch(
                 claim_uri=claim_uri,
                 plugin_id=plugin_id,
@@ -294,7 +296,7 @@ class EvaluationService:
                 detail=response.detail,
             )
         except (
-            StoreError,
+            StorageError,
             SchemaRegistryError,
             ValidationError,
             ValueError,
@@ -363,11 +365,11 @@ def require_complete_evaluation_batch(
 def _evaluation_failure_detail(exc: Exception) -> str:
     if isinstance(exc, ValueError) and not isinstance(
         exc,
-        (PluginRegistryError, SchemaRegistryError, StoreError, ValidationError),
+        (PluginRegistryError, SchemaRegistryError, StorageError, ValidationError),
     ):
         return str(exc)
     _LOGGER.warning("candidate evaluation failed", exc_info=exc)
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return (
             "A required claim or candidate artifact is unavailable. Check the "
             "artifact URIs, then retry."

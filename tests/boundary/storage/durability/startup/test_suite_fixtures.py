@@ -8,7 +8,7 @@ from pathlib import Path
 from tests.support.state import quiesce_sqlite_template
 
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _freeze_runtime_store(root: Path) -> None:
@@ -29,7 +29,7 @@ def _copy_and_check_store(
         assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
     finally:
         connection.close()
-    with ArtifactStore(destination) as store:
+    with ArtifactRepository(destination) as store:
         descriptor = store.get_descriptor(
             descriptor_uri,
             expected_kind="schema",

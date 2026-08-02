@@ -7,12 +7,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityService
+from jacobian.capability_service import CapabilityAdapter, CapabilityService
 from jacobian.operation_installation import OperationInstaller
 from jacobian.registry import CheckerRegistry
 from jacobian.runtime.config import CheckerAuthorityMode
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class InstallationContext:
     """Infrastructure used across independent domain installers."""
 
-    store: ArtifactStore
+    store: ArtifactRepository
     schemas: SchemaRegistry
     artifacts: ArtifactService
     capabilities: CapabilityService

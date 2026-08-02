@@ -12,7 +12,7 @@ from jacobian.contracts.discovery import (
 )
 from jacobian.experiments.errors import ExperimentError
 from jacobian.plugins.registry import PluginRegistryError
-from jacobian.store import StoreError
+from jacobian.storage.errors import StorageError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _enumeration_failure_detail(exc: Exception, experiment_uri: str) -> str:
     )
     if isinstance(exc, ExperimentError):
         return str(exc)
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return (
             "The enumeration stopped because required artifact or state data is "
             "unavailable. Check the state directory and artifact URIs, then inspect "

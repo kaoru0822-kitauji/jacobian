@@ -46,7 +46,7 @@ from jacobian.adapters.mcp.tools import (
     capability_describe,
     capability_invoke,
 )
-from jacobian.capabilities import CapabilityPolicy
+from jacobian.capability_service import CapabilityPolicy
 from jacobian.references import reference_catalog
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
 from jacobian.runtime.model import JacobianRuntime

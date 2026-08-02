@@ -7,17 +7,17 @@ from typing import Any
 from jacobian.artifacts import ArtifactService
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
 def install_capability_bundle(
     tmp_path: Path,
     installer: Callable[..., tuple[Any, Any]],
-) -> tuple[Any, Any, ArtifactStore]:
+) -> tuple[Any, Any, ArtifactRepository]:
     """Build a minimal store and install one capability bundle for focused tests."""
 
-    store = ArtifactStore(tmp_path / "store")
+    store = ArtifactRepository(tmp_path / "store")
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     checkers = CheckerRegistry(store)

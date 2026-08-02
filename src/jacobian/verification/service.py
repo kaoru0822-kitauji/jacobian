@@ -50,12 +50,9 @@ from jacobian.registry import (
     CheckerRegistryError,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import (
-    ArtifactNotFoundError,
-    ArtifactStore,
-    StoredArtifact,
-    StoreError,
-)
+from jacobian.storage.errors import ArtifactNotFoundError, StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification._helpers import (
     _CHECKER_CANCELLED,
     _CHECKER_CHANGED,
@@ -88,7 +85,7 @@ class VerificationService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         checker_registry: CheckerRegistry,
         *,
         checker_timeout_seconds: float = 30,
@@ -488,7 +485,7 @@ class VerificationService:
                 "Check the artifact URIs and retry.",
                 started=started,
             )
-        except StoreError as exc:
+        except StorageError as exc:
             _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
@@ -779,7 +776,7 @@ class VerificationService:
                 "Check the artifact URIs and retry.",
                 started=started,
             )
-        except StoreError as exc:
+        except StorageError as exc:
             _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
@@ -986,7 +983,7 @@ class VerificationService:
                 "Check the artifact URIs and retry.",
                 started=started,
             )
-        except StoreError as exc:
+        except StorageError as exc:
             _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,
@@ -1185,7 +1182,7 @@ class VerificationService:
                 "Check the artifact URIs and retry.",
                 started=started,
             )
-        except StoreError as exc:
+        except StorageError as exc:
             _LOGGER.warning("verification storage operation failed", exc_info=exc)
             return self._operational_failure(
                 status=ExecutionStatus.ERROR,

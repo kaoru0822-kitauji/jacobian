@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -43,7 +43,7 @@ from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.sat_smt.sat import SatArtifactService
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _SEMANTICS_NAME = "jacobian.simple-undirected-graph-coloring"
 _ENCODING_VERSION = "exactly-one-and-edge-separation/v1"
@@ -60,7 +60,7 @@ class GraphColoringInstallation:
 
 
 def install_graph_coloring_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     sat: SatArtifactService,
@@ -148,7 +148,7 @@ class GraphColoringEncodingAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         sat: SatArtifactService,
         installation: GraphColoringInstallation,

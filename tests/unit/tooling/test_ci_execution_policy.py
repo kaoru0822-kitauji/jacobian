@@ -60,17 +60,6 @@ def test_pre_push_hook_stays_in_the_static_feedback_lane() -> None:
     assert "entry: make check" not in hook
 
 
-def test_scheduled_performance_lane_reports_measurements_without_reward_gates() -> None:
-    workflow = (ROOT / ".github/workflows/scheduled-validation.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "name: Harbor performance measurements" in workflow
-    assert "make performance-eval" in workflow
-    assert "Compare with previous benchmark" not in workflow
-    assert "--threshold-percent" not in workflow
-
-
 def test_process_lane_is_invoked_by_ci() -> None:
     workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 

@@ -5,7 +5,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def test_store_reuses_one_connection_per_thread(
@@ -21,7 +21,7 @@ def test_store_reuses_one_connection_per_thread(
         return real_connect(*args, **kwargs)
 
     monkeypatch.setattr(sqlite3, "connect", counting_connect)
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     for index in range(12):
         store.register_descriptor(
             kind="schema",
@@ -37,7 +37,7 @@ def test_store_reuses_one_connection_per_thread(
 
 
 def test_store_closes_connections_owned_by_worker_threads(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     barrier = threading.Barrier(3)
     with ThreadPoolExecutor(max_workers=3) as workers:
         list(workers.map(lambda _: _read_store(store, barrier), range(3)))
@@ -50,19 +50,19 @@ def test_store_closes_connections_owned_by_worker_threads(tmp_path: Path) -> Non
     assert store.database.open_connection_count == 0
 
 
-def _read_store(store: ArtifactStore, barrier: threading.Barrier) -> None:
+def _read_store(store: ArtifactRepository, barrier: threading.Barrier) -> None:
     barrier.wait()
     with store.connection() as connection:
         connection.execute("SELECT 1").fetchone()
 
 
 def test_synchronous_policy_is_explicit_and_defaults_to_full(tmp_path: Path) -> None:
-    durable = ArtifactStore(tmp_path / "durable")
+    durable = ArtifactRepository(tmp_path / "durable")
     with durable.connection() as connection:
         assert connection.execute("PRAGMA synchronous").fetchone()[0] == 2
     durable.close()
 
-    disposable = ArtifactStore(tmp_path / "disposable", synchronous="NORMAL")
+    disposable = ArtifactRepository(tmp_path / "disposable", synchronous="NORMAL")
     with disposable.connection() as connection:
         assert connection.execute("PRAGMA synchronous").fetchone()[0] == 1
     disposable.close()

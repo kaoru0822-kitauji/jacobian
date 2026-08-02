@@ -20,7 +20,8 @@ from jacobian.persistence.migrations import (
     STATE_MIGRATIONS,
     SUPPORTED_STATE_FLOOR,
 )
-from jacobian.store import ArtifactStore, StoreError, UnsupportedStateVersionError
+from jacobian.storage.errors import StorageError, UnsupportedStateVersionError
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _ledger(root: Path) -> tuple[sqlite3.Row, ...]:
@@ -41,7 +42,7 @@ def _ledger(root: Path) -> tuple[sqlite3.Row, ...]:
 
 
 def test_fresh_store_records_immutable_ordered_migrations(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
 
     rows = _ledger(tmp_path)
@@ -90,7 +91,7 @@ def test_revisions_one_through_four_keep_their_historical_checksums() -> None:
 def test_revision_five_removes_populated_legacy_workspace_tables(
     tmp_path: Path,
 ) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
 
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
@@ -286,7 +287,7 @@ def test_revision_five_removes_populated_legacy_workspace_tables(
 
 
 def test_legacy_schema_without_ledger_is_adopted(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -295,14 +296,14 @@ def test_legacy_schema_without_ledger_is_adopted(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
 
     assert len(_ledger(tmp_path)) == len(STATE_MIGRATIONS)
 
 
 def test_revision_five_state_requires_export_to_current_floor(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -315,7 +316,7 @@ def test_revision_five_state_requires_export_to_current_floor(tmp_path: Path) ->
         connection.close()
 
     with pytest.raises(UnsupportedStateVersionError) as exc_info:
-        ArtifactStore(tmp_path)
+        ArtifactRepository(tmp_path)
     assert exc_info.value.detected_revision == 5
     assert exc_info.value.minimum_revision == SUPPORTED_STATE_FLOOR
 
@@ -324,7 +325,7 @@ def test_current_head_bootstrap_performs_no_sqlite_writes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
 
     original_connect = sqlite3.connect
@@ -358,7 +359,7 @@ def test_current_head_bootstrap_performs_no_sqlite_writes(
         return connection
 
     monkeypatch.setattr(sqlite3, "connect", observed_connect)
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
 
     assert write_actions == []
@@ -369,7 +370,7 @@ def test_changed_migration_identity_fails_closed(
     tmp_path: Path,
     field: str,
 ) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -381,12 +382,12 @@ def test_changed_migration_identity_fails_closed(
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="schema migration failed"):
-        ArtifactStore(tmp_path)
+    with pytest.raises(StorageError, match="schema migration failed"):
+        ArtifactRepository(tmp_path)
 
 
 def test_newer_revision_fails_closed(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -400,14 +401,14 @@ def test_newer_revision_fails_closed(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="UNSUPPORTED_STATE_VERSION") as exc_info:
-        ArtifactStore(tmp_path)
+    with pytest.raises(StorageError, match="UNSUPPORTED_STATE_VERSION") as exc_info:
+        ArtifactRepository(tmp_path)
     assert exc_info.value.detected_revision == 99
     assert exc_info.value.minimum_revision == SUPPORTED_STATE_FLOOR
 
 
 def test_missing_retirement_revision_requires_fresh_store(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -420,13 +421,13 @@ def test_missing_retirement_revision_requires_fresh_store(tmp_path: Path) -> Non
         connection.close()
 
     with pytest.raises(UnsupportedStateVersionError) as exc_info:
-        ArtifactStore(tmp_path)
+        ArtifactRepository(tmp_path)
     assert exc_info.value.detected_revision == 5
     assert exc_info.value.minimum_revision == SUPPORTED_STATE_FLOOR
 
 
 def test_missing_non_tail_revision_fails_closed(tmp_path: Path) -> None:
-    with ArtifactStore(tmp_path):
+    with ArtifactRepository(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -435,8 +436,8 @@ def test_missing_non_tail_revision_fails_closed(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    with pytest.raises(StoreError, match="schema migration failed"):
-        ArtifactStore(tmp_path)
+    with pytest.raises(StorageError, match="schema migration failed"):
+        ArtifactRepository(tmp_path)
 
 
 def test_failed_migration_rolls_back_and_can_be_retried(tmp_path: Path) -> None:
@@ -549,13 +550,13 @@ def test_two_processes_can_race_to_migrate_empty_state(tmp_path: Path) -> None:
 import sys
 import time
 from pathlib import Path
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 root = Path(sys.argv[1])
 ready = Path(sys.argv[2])
 while not ready.exists():
     time.sleep(0.005)
-with ArtifactStore(root):
+with ArtifactRepository(root):
     pass
 """
     processes = [

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityService
+from jacobian.capability_service import CapabilityService
 from jacobian.contracts.arithmetic import (
     IntegerBaseDigitsRequest,
     IntegerNthRootRequest,
@@ -72,7 +72,7 @@ from jacobian.memory import ResearchMemory
 from jacobian.operation_installation import OperationInstaller
 from jacobian.operations import BoundedSearchOperation
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 EXPECTED_IDS: frozenset[str] = frozenset(
     {
@@ -342,7 +342,7 @@ def test_unique_domain_ids() -> None:
 
 @pytest.fixture(scope="module")
 def service(tmp_path_factory: pytest.TempPathFactory) -> CapabilityService:
-    store = ArtifactStore(tmp_path_factory.mktemp("domain-bundles"))
+    store = ArtifactRepository(tmp_path_factory.mktemp("domain-bundles"))
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     service = CapabilityService(store, ResearchMemory(store, schemas))

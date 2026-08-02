@@ -24,7 +24,8 @@ from jacobian.persistence import (
 )
 from jacobian.persistence.research_index import failure_metadata
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreCorruptionError
+from jacobian.storage.errors import StorageCorruptionError
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _decode_memory_hits(
@@ -50,7 +51,7 @@ def _decode_memory_hits(
             for row in rows
         )
     except PersistenceCorruptionError as exc:
-        raise StoreCorruptionError(exc) from exc
+        raise StorageCorruptionError(exc) from exc
 
 
 def _decode_persisted_tags(row: Any) -> tuple[str, ...]:
@@ -66,7 +67,7 @@ def _decode_persisted_tags(row: Any) -> tuple[str, ...]:
 class ResearchMemory:
     """Index immutable capability episodes without promoting retrieved content."""
 
-    def __init__(self, store: ArtifactStore, schemas: SchemaRegistry) -> None:
+    def __init__(self, store: ArtifactRepository, schemas: SchemaRegistry) -> None:
         self.store = store
         self.schemas = schemas
         self.episode_schema_uri = schemas.register(

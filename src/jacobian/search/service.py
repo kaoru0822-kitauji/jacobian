@@ -39,6 +39,7 @@ from jacobian.evaluation import (
     EvaluationService,
 )
 from jacobian.experiment_identity import new_experiment_uri
+from jacobian.lifecycle import LifecycleTimeoutError, wait_for_worker_quiescence
 from jacobian.persistence import PersistenceCorruptionError, decode_persisted_model
 from jacobian.persistence.recovery import (
     put_internal_artifact,
@@ -60,7 +61,8 @@ from jacobian.search._helpers import (
     _updated_snapshot,
 )
 from jacobian.search.errors import SearchCorruptionError, SearchError
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
 
@@ -90,7 +92,7 @@ class SearchService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         claims: ClaimValidationService,
@@ -160,30 +162,24 @@ class SearchService:
 
         if timeout_seconds < 0:
             raise ValueError("timeout_seconds must be non-negative")
-        deadline = time.monotonic() + timeout_seconds
         with self._thread_lock:
             if self._closed:
                 return
             self._closing = True
-        while True:
-            with self._thread_lock:
-                active = tuple(
-                    thread for thread in self._threads.values() if thread.is_alive()
-                )
-                if not active and self._starts_in_flight == 0:
-                    self._closed = True
-                    self._closing = False
-                    return
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise SearchError(
-                    "search workers did not quiesce before runtime shutdown"
-                )
-            if not active:
-                time.sleep(min(remaining, 0.01))
-                continue
-            for thread in active:
-                thread.join(timeout=min(remaining, 0.05))
+        try:
+            wait_for_worker_quiescence(
+                lock=self._thread_lock,
+                workers=self._threads,
+                starts_in_flight=lambda: self._starts_in_flight,
+                timeout_seconds=timeout_seconds,
+            )
+        except LifecycleTimeoutError as exc:
+            raise SearchError(
+                "search workers did not quiesce before runtime shutdown"
+            ) from exc
+        with self._thread_lock:
+            self._closed = True
+            self._closing = False
 
     def _require_open(self) -> None:
         with self._thread_lock:
@@ -1061,7 +1057,7 @@ class SearchService:
             )
         except (
             SearchError,
-            StoreError,
+            StorageError,
             SchemaRegistryError,
             ValidationError,
         ) as exc:

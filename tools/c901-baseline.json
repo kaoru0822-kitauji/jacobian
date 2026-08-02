@@ -93,14 +93,14 @@
       "complexity": 13
     },
     {
-      "path": "src/jacobian/capabilities.py",
-      "symbol": "_validate_verified_result",
-      "complexity": 20
-    },
-    {
-      "path": "src/jacobian/capabilities.py",
+      "path": "src/jacobian/capability_dispatch.py",
       "symbol": "invoke",
       "complexity": 12
+    },
+    {
+      "path": "src/jacobian/capability_verification.py",
+      "symbol": "_validate_verified_result",
+      "complexity": 20
     },
     {
       "path": "src/jacobian/claims.py",
@@ -233,7 +233,7 @@
       "complexity": 12
     },
     {
-      "path": "src/jacobian/lean_frontend/exploration.py",
+      "path": "src/jacobian/lean_frontend/proof_state.py",
       "symbol": "invoke",
       "complexity": 13
     },
@@ -273,17 +273,17 @@
       "complexity": 17
     },
     {
-      "path": "src/jacobian/store.py",
-      "symbol": "_put",
-      "complexity": 11
-    },
-    {
-      "path": "src/jacobian/store.py",
+      "path": "src/jacobian/storage/blobs.py",
       "symbol": "_write_blob_unchecked",
       "complexity": 13
     },
     {
-      "path": "src/jacobian/store.py",
+      "path": "src/jacobian/storage/metadata.py",
+      "symbol": "_put",
+      "complexity": 11
+    },
+    {
+      "path": "src/jacobian/storage/transactions.py",
       "symbol": "transaction",
       "complexity": 22
     },

@@ -20,7 +20,7 @@ from jacobian.adapters.mcp.constants import (
 )
 from jacobian.bounded_process import bounded_process_cancellation
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityDiscoveryCursorError
+from jacobian.capability_service import CapabilityDiscoveryCursorError
 from jacobian.contracts.capabilities import (
     CapabilityDescriptor,
     CapabilityDiscoveryRequest,

@@ -13,7 +13,7 @@ from jacobian.contracts.search import (
 )
 from jacobian.search._helpers import _record_parents
 from jacobian.search.errors import SearchError
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +30,7 @@ class RestoredSearchProgress:
 def restore_search_progress(
     snapshot: SearchExperimentSnapshot,
     *,
-    store: ArtifactStore,
+    store: ArtifactRepository,
     semantics_uri: str,
     archive_page_schema_uri: str,
     checkpoint_schema_uri: str,
@@ -103,7 +103,7 @@ def _validate_archive_page(
     seen_uris: set[str],
     nominated_uris: set[str],
     seen_page_uris: set[str],
-    store: ArtifactStore,
+    store: ArtifactRepository,
     semantics_uri: str,
     archive_page_schema_uri: str,
 ) -> tuple[SearchArchivePage, int]:
@@ -174,7 +174,7 @@ def _validate_checkpoint(
     nominated_uris: set[str],
     verified_counterexamples: int,
     last_page: SearchArchivePage,
-    store: ArtifactStore,
+    store: ArtifactRepository,
     semantics_uri: str,
     checkpoint_schema_uri: str,
 ) -> dict[str, Any]:

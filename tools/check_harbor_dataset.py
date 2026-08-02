@@ -12,8 +12,8 @@ if str(ROOT) not in sys.path:
 
 from benchmarks.tooling.harbor_suite import (  # noqa: E402
     HarborSuiteError,
-    check_suite,
     check_selected_tasks,
+    check_suite,
     get_suite,
     load_registry,
     report_failures,

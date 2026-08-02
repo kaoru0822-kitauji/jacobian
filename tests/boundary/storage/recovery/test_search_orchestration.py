@@ -22,7 +22,8 @@ from jacobian.contracts.search import (
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import JacobianRuntime
 from jacobian.search import SearchError
-from jacobian.store import StoreError, StoreLimits
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StorageLimits
 
 pytestmark = [
     pytest.mark.usefixtures("attached_complete_runtime"),
@@ -842,7 +843,7 @@ def test_terminal_archive_failure_marks_search_error(
     claim_uri, plugin_id = _install_search_plugin(fresh_complete_runtime)
 
     def fail_archive(*_args: object, **_kwargs: object) -> object:
-        raise StoreError("fixture archive failure")
+        raise StorageError("fixture archive failure")
 
     monkeypatch.setattr(
         fresh_complete_runtime.services.search, "_store_archive", fail_archive
@@ -865,7 +866,7 @@ def test_terminal_archive_failure_marks_search_error(
     assert snapshot.archive_uri is None
     assert "could not save the final experiment archive" in snapshot.detail
     assert "experiment remains unverified" in snapshot.detail
-    assert "StoreError" not in snapshot.detail
+    assert "StorageError" not in snapshot.detail
     assert "fixture archive failure" not in snapshot.detail
     assert "fixture archive failure" in caplog.text
 
@@ -922,7 +923,7 @@ def test_search_batch_respects_evaluator_limit(fresh_complete_runtime) -> None:
 
 def test_search_batch_respects_archive_parent_limit(fresh_complete_runtime) -> None:
     claim_uri, plugin_id = _install_search_plugin(fresh_complete_runtime)
-    fresh_complete_runtime.core.store.limits = StoreLimits(max_parents=6)
+    fresh_complete_runtime.core.store.limits = StorageLimits(max_parents=6)
     handle = fresh_complete_runtime.services.search.start(
         _request(
             claim_uri,
@@ -995,7 +996,7 @@ def test_verified_counterexample_feedback_reaches_refiner(
         candidate_schema_uris=(manifest.candidate_schema_uri,),
         reason="search orchestration conformance fixture",
     )
-    fresh_complete_runtime.core.store.limits = StoreLimits(max_parents=9)
+    fresh_complete_runtime.core.store.limits = StorageLimits(max_parents=9)
     handle = fresh_complete_runtime.services.search.start(
         _request(
             claim_uri,

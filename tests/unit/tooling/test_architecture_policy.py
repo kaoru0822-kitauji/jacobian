@@ -27,7 +27,7 @@ import subprocess
 import sympy
 from jacobian.runtime import create_runtime
 from jacobian.portfolio import BUILTIN_PORTFOLIO
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 """,
     )
 

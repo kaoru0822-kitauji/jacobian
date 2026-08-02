@@ -304,12 +304,6 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
                 "run-static",
             ),
         ),
-        (
-            (
-                "benchmarks/datasets/performance-v1/core-operations/environment/benchmark.py",
-            ),
-            _expected_plan("none"),
-        ),
     ],
 )
 def test_ci_plan_fails_closed_outside_isolated_paths(

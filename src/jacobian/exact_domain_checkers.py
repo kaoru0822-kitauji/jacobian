@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_artifacts import put_witness_envelope
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation, ExactReplayCheckerDeclaration
@@ -56,7 +56,9 @@ from jacobian.providers.flint_runtime import (
 )
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
@@ -240,7 +242,7 @@ def install_exact_domain_checkers(
 
 
 def install_exact_domain_verification(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     verification: VerificationService,
@@ -564,7 +566,7 @@ class ExactDomainResultVerificationAdapter:
         title: str,
         description: str,
         tags: tuple[str, ...],
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         verification: VerificationService,
@@ -603,7 +605,7 @@ class ExactDomainResultVerificationAdapter:
             declaration, input_artifact, result_artifact, semantics_artifact = (
                 self._resolve(validated.result_uri)
             )
-        except (ExactDomainArtifactError, StoreError) as exc:
+        except (ExactDomainArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_EXACT_DOMAIN_RESULT",

@@ -17,7 +17,8 @@ from jacobian.contracts.results import (
 )
 from jacobian.plugins.registry import PluginRegistry, PluginRegistryError
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class ClaimValidationService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
     ) -> None:
@@ -84,13 +85,13 @@ class ClaimValidationService:
                 errors.append("claim semantics descriptor is invalid")
             semantics_digest = semantics_artifact.manifest.object_digest
         except (
-            StoreError,
+            StorageError,
             SchemaRegistryError,
             PluginRegistryError,
             ValueError,
         ) as exc:
             _LOGGER.warning("claim validation failed", exc_info=exc)
-            if isinstance(exc, StoreError):
+            if isinstance(exc, StorageError):
                 errors.append(
                     "The claim or its semantics artifact is unavailable. Check the "
                     "artifact URI, then retry."

@@ -24,14 +24,14 @@ from jacobian.registry import (
     CheckerRegistryError,
     CheckerRevokedError,
 )
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 CLAIM_SCHEMA_A = "artifact://sha256/" + "a" * 64
 CLAIM_SCHEMA_B = "artifact://sha256/" + "b" * 64
 
 
 def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
     selection = {
         "evidence_kind": "WITNESS",
@@ -68,7 +68,7 @@ def test_checker_selection_errors_explain_recovery(tmp_path: Path) -> None:
 
 
 def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="reject-all-v1",
@@ -97,7 +97,7 @@ def test_revoked_checker_cannot_authorize_new_verification(tmp_path: Path) -> No
 
 
 def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="reject-all-v1",
@@ -150,7 +150,7 @@ def test_checker_policy_lock_must_precede_store_transaction(tmp_path: Path) -> N
 
 
 def test_concurrent_duplicate_authorize_is_serialized(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
     barrier = threading.Barrier(8)
     registrations = []
@@ -192,7 +192,7 @@ def test_checker_registry_rejects_identity_metadata_corruption(
     tmp_path: Path,
     corruption: str,
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="reject-all-v1",
@@ -254,7 +254,7 @@ def test_checker_authorization_requires_explicit_compatibility_scope(
     candidate_schemas: tuple[str, ...],
     targets: tuple[str, ...],
 ) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
 
     with pytest.raises(CheckerRegistryError, match="Supply"):
@@ -287,7 +287,7 @@ def test_checker_registry_binds_external_runtime_identity(tmp_path: Path) -> Non
         license_id="MIT",
         configuration={"executable": str(executable.resolve())},
     )
-    store = ArtifactStore(tmp_path / "store")
+    store = ArtifactRepository(tmp_path / "store")
     registry = CheckerRegistry(store)
     checker = registry.authorize(
         name="externally-backed-v1",
@@ -325,7 +325,7 @@ def test_checker_registry_authorizes_python_distribution_runtime(
         configuration={"import_name": "pydantic"},
     )
     assert runtime.availability is CapabilityProviderAvailability.AVAILABLE
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     registry = CheckerRegistry(store)
 
     checker = registry.authorize(

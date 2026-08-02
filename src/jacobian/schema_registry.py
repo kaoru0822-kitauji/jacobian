@@ -14,7 +14,8 @@ from pydantic import ValidationError as PydanticValidationError
 
 from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.schema_validation import check_draft202012_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 
 class SchemaRegistryError(RuntimeError):
@@ -94,7 +95,7 @@ def _validated_schema(canonical_schema: bytes) -> Draft202012Validator:
 class SchemaRegistry:
     """Store and apply closed local JSON Schemas used by artifact contracts."""
 
-    def __init__(self, store: ArtifactStore) -> None:
+    def __init__(self, store: ArtifactRepository) -> None:
         self.store = store
         self._model_contracts: dict[str, type[BaseModel]] = {}
         self._producer_only_schemas: set[str] = set()
@@ -120,7 +121,7 @@ class SchemaRegistry:
             return cached_uri
 
         # Descriptor identity is content-addressed, but an existing descriptor
-        # may have been written through ArtifactStore.register_descriptor()
+        # may have been written through ArtifactRepository.register_descriptor()
         # without ever passing Draft 2020-12 validation.  Keep the validation
         # boundary here; _validated_schema is content-cached, so repeated
         # registrations still reuse the compiled validator.
@@ -230,7 +231,7 @@ class SchemaRegistry:
                 schema_uri,
                 expected_kind="schema",
             )
-        except StoreError as exc:
+        except StorageError as exc:
             raise SchemaRegistryError(f"unregistered schema: {schema_uri}") from exc
         definition = descriptor.get("definition")
         if not isinstance(definition, dict):
@@ -250,7 +251,7 @@ class SchemaRegistry:
             witness_uri = next(iter(pending.schemas))
             try:
                 self.store.get_descriptor(witness_uri, expected_kind="schema")
-            except StoreError:
+            except StorageError:
                 del self._pending[transaction_identity]
                 continue
             self._schema_bytes.update(pending.schemas)

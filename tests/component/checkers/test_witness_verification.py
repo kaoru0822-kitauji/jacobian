@@ -19,7 +19,7 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.registry import CheckerRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -29,7 +29,7 @@ def _graph_case(
     candidate_schema_definition: dict[str, object] | None = None,
     checker_entrypoint: str = "jacobian_checkers.graph_paths:check_omitted_path",
 ) -> tuple[
-    ArtifactStore,
+    ArtifactRepository,
     VerificationService,
     str,
     str,
@@ -37,7 +37,7 @@ def _graph_case(
     str,
     str,
 ]:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     claim_schema = store.register_descriptor(
         kind="schema",
         name="graph.path-closure.claim",

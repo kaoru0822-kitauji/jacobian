@@ -45,7 +45,9 @@ from jacobian.plugins.registry import (
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
 from jacobian.search import SearchError, SearchService
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,7 +67,7 @@ class ConjectureService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         plugins: PluginRegistry,
         claims: ClaimValidationService,
@@ -123,7 +125,7 @@ class ConjectureService:
             ConjectureError,
             PluginRegistryError,
             SchemaRegistryError,
-            StoreError,
+            StorageError,
             ValidationError,
             ValueError,
         ) as exc:
@@ -193,7 +195,7 @@ class ConjectureService:
             PluginRegistryError,
             SchemaRegistryError,
             SearchError,
-            StoreError,
+            StorageError,
             ValidationError,
             ValueError,
         ) as exc:
@@ -311,7 +313,7 @@ class ConjectureService:
             )
         except ConjectureError:
             raise
-        except (StoreError, ValidationError, ValueError) as exc:
+        except (StorageError, ValidationError, ValueError) as exc:
             raise ConjectureError(_workflow_failure_detail(exc)) from exc
 
         evidence = (
@@ -815,7 +817,7 @@ def _workflow_failure_detail(exc: Exception) -> str:
     if isinstance(exc, ConjectureError):
         return str(exc)
     _LOGGER.warning("conjecture workflow failed", exc_info=exc)
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return (
             "Jacobian could not read or save conjecture workflow data. Check the "
             "state directory and available disk space, then retry."

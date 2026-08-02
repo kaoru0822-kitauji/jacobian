@@ -7,7 +7,7 @@ import pytest
 from tests.component.capabilities.installations import install_capability_bundle
 from tests.unit.contracts.polynomials import univariate_term as _term
 
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityMode,

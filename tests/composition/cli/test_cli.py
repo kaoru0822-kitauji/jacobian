@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from jacobian.cli import _public_error, app
 from jacobian.runtime import CheckerAuthorityMode, create_runtime
-from jacobian.store import StoreLimitError, UnsupportedStateVersionError
+from jacobian.storage.errors import StorageLimitError, UnsupportedStateVersionError
 
 
 def test_cli_init_reports_reference_domains_and_polytope_formats(
@@ -205,7 +205,7 @@ def test_cli_json_shape_and_read_errors_use_the_json_envelope(
 
 
 def test_cli_storage_limit_has_a_capacity_recovery_action() -> None:
-    error, exit_code = _public_error(StoreLimitError("fixture internal limit"))
+    error, exit_code = _public_error(StorageLimitError("fixture internal limit"))
 
     assert exit_code == 1
     assert error == {

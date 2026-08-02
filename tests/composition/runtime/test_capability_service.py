@@ -10,7 +10,7 @@ from tests.support.provider_lean import (
 )
 from tests.support.services import DomainTestServices
 
-from jacobian.capabilities import CapabilityError
+from jacobian.capability_service import CapabilityError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,

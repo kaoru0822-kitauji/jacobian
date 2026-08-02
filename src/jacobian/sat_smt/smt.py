@@ -17,7 +17,9 @@ from jacobian.contracts.smt import (
     SmtResourceBudget,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 
 class SmtArtifactError(ValueError):
@@ -50,7 +52,7 @@ class SmtArtifactService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         installation: SmtArtifactInstallation,
@@ -80,7 +82,7 @@ class SmtArtifactService:
     def resolve_problem(self, problem_uri: str) -> ResolvedSmtProblem:
         try:
             artifact = self.store.get(problem_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise SmtArtifactError(
                 "source is not an available SMT problem artifact"
             ) from exc
@@ -149,7 +151,7 @@ class SmtArtifactService:
     def resolve_proof(self, proof_uri: str) -> ResolvedSmtProof:
         try:
             artifact = self.store.get(proof_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise SmtArtifactError(
                 "source is not an available SMT proof artifact"
             ) from exc
@@ -181,7 +183,7 @@ class SmtArtifactService:
 
 
 def install_smt_artifacts(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> SmtArtifactService:

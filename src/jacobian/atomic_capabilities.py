@@ -41,7 +41,8 @@ from jacobian.contracts.shrinking import ShrinkResult
 from jacobian.contracts.witness_search import WitnessFindResult
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.schema_registry import model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 if TYPE_CHECKING:
     from jacobian.installation.context import InstallationContext
@@ -79,7 +80,7 @@ class AtomicServiceAdapter:
         input_schema: dict[str, Any],
         output_schema: dict[str, Any],
         invoke: Callable[[dict[str, Any]], Any],
-        store: ArtifactStore,
+        store: ArtifactRepository,
         unverified_assurance_level: CapabilityAssuranceLevel = (
             CapabilityAssuranceLevel.COMPUTED
         ),
@@ -597,10 +598,10 @@ def _artifact_uris(value: Any) -> tuple[str, ...]:
 def _verification_bindings(
     record_uri: str,
     artifact_uris: tuple[str, ...],
-    store: ArtifactStore,
+    store: ArtifactRepository,
 ) -> tuple[str, ...] | None:
     try:
         record = store.get(record_uri)
-    except StoreError:
+    except StorageError:
         return None
     return tuple(sorted({*artifact_uris, record_uri, *record.manifest.parents}))

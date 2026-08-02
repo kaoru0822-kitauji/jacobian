@@ -19,7 +19,7 @@ from jacobian.contracts.plugins import PluginManifest
 from jacobian.plugins.registry import PluginRegistry
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 REFERENCE_INSTALLATION_DOMAINS = frozenset(
     {
@@ -75,7 +75,7 @@ class LeanCheckerInstallation:
 class ReferenceInstaller:
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         plugins: PluginRegistry,

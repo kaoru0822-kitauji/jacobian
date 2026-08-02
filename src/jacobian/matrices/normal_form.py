@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -39,7 +39,8 @@ from jacobian.matrices.normal_forms import (
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -50,7 +51,7 @@ class MatrixNormalFormCheckerInstallation:
 
 
 def install_matrix_normal_form_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     matrices: MatrixNormalFormArtifactService,
@@ -110,7 +111,7 @@ class MatrixHermiteNormalFormVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         matrices: MatrixNormalFormArtifactService,
         verification: VerificationService,
@@ -168,7 +169,7 @@ class MatrixHermiteNormalFormVerificationAdapter:
                 validated.normal_form_uri
             )
             semantics = self.store.get(self.matrices.installation.semantics_uri)
-        except (MatrixNormalFormArtifactError, StoreError) as exc:
+        except (MatrixNormalFormArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_HERMITE_NORMAL_FORM",

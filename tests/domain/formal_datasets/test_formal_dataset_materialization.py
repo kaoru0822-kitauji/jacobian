@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssuranceLevel,
     CapabilityRequest,
@@ -13,12 +13,12 @@ from jacobian.contracts.capabilities import (
 from jacobian.domains.formal_datasets import build_formal_dataset_bundle
 from jacobian.operation_installation import OperationInstaller
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian_checkers.lean4 import LEAN_VERSION, MATHLIB_COMMIT
 
 
 def _adapter(tmp_path: Path):
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     installation = OperationInstaller(store, schemas, artifacts).install(
@@ -316,7 +316,7 @@ def test_materialization_preserves_trailing_spaces_inside_source(
 
 
 def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
-    store = ArtifactStore(tmp_path)
+    store = ArtifactRepository(tmp_path)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     installation = OperationInstaller(store, schemas, artifacts).install(

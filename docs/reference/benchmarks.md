@@ -3,13 +3,12 @@
 [Documentation home](../index.md)
 
 All executable benchmark cases are Harbor tasks under their dataset roots
-([`benchmarks/datasets/`](../../benchmarks/README.md)). The six datasets retain
+([`benchmarks/datasets/`](../../benchmarks/README.md)). The five datasets retain
 separate claims:
 
 - `agent-workflow-v1` checks fixed workflows and evidence handling;
 - `public-reproductions-v1` replays known public mathematical outcomes;
 - `research-diagnostics-v1` supports answer-visible case diagnostics;
-- `performance-v1` records report-only operational measurements;
 - `provider-feasibility-v1` reproduces optional-provider pins and outcomes;
 - `examples-v1` owns non-comparative tutorial and smoke workflows.
 
@@ -37,5 +36,5 @@ witness remain non-conclusions. Only operator-authorized independent checkers
 may accept `VERIFIED`.
 
 See [agent workflow observations](agent-evaluations.md) and
-[performance measurements](performance-benchmarks.md) for dataset-specific
-interpretation.
+[performance measurements](performance-benchmarks.md) for interpretation
+guidance.

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from jacobian.contracts.lean import LeanEnvironment
-from jacobian.lean_frontend.exploration import (
+from jacobian.lean_frontend.repl import (
     LeanExplorationReplRuntime,
     LeanReplPolicy,
     PersistentLeanRepl,
@@ -125,7 +125,7 @@ def test_persistent_repl_kills_a_process_that_exceeds_rss_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "jacobian.lean_frontend.exploration._process_rss_kb",
+        "jacobian.lean_frontend.repl._process_rss_kb",
         lambda _pid: 2,
     )
     repl = PersistentLeanRepl(

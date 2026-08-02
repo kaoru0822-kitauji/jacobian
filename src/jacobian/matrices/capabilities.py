@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -37,7 +37,7 @@ from jacobian.contracts.results import Execution, ExecutionStatus
 from jacobian.domains._examples import example
 from jacobian.provider_runtime import SYMPY_VERSION, known_provider_runtime
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 if TYPE_CHECKING:
     from sympy import Matrix, Rational
@@ -58,7 +58,7 @@ class MatrixResources:
 
 
 def install_matrix_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> tuple[

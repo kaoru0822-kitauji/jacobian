@@ -19,7 +19,9 @@ from jacobian.contracts.sat import (
     canonicalize_cnf,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 
 class SatArtifactError(ValueError):
@@ -60,7 +62,7 @@ class SatArtifactService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         installation: SatArtifactInstallation,
@@ -94,7 +96,7 @@ class SatArtifactService:
 
         try:
             artifact = self.store.get(cnf_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise SatArtifactError(
                 "source is not an available canonical CNF artifact"
             ) from exc
@@ -164,7 +166,7 @@ class SatArtifactService:
 
         try:
             artifact = self.store.get(assignment_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise SatArtifactError(
                 "source is not an available SAT assignment artifact"
             ) from exc
@@ -225,7 +227,7 @@ class SatArtifactService:
 
         try:
             artifact = self.store.get(proof_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise SatArtifactError(
                 "source is not an available SAT proof artifact"
             ) from exc
@@ -257,7 +259,7 @@ class SatArtifactService:
 
 
 def install_sat_artifacts(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> SatArtifactService:

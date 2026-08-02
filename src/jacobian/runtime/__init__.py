@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from jacobian.runtime.config import CheckerAuthorityMode, RuntimeOptions
 
 if TYPE_CHECKING:
-    from jacobian.capabilities import CapabilityPolicy
+    from jacobian.capability_service import CapabilityPolicy
     from jacobian.runtime.model import JacobianRuntime
 
 

@@ -55,7 +55,7 @@ from jacobian.providers.flint_runtime import (
     exact_domain_checker_source_provider_runtime,
 )
 from jacobian.registry import CheckerExecutableChangedError, CheckerRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 
 def _installed(
@@ -139,7 +139,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
         "modular.polynomial_residue_image.compute",
     )
     projective_ids = ("geometry.projective_line_arrangement.flats.materialize",)
-    registry = CheckerRegistry(ArtifactStore(tmp_path / "store"))
+    registry = CheckerRegistry(ArtifactRepository(tmp_path / "store"))
 
     installation = install_exact_domain_checkers(
         registry,
@@ -232,7 +232,7 @@ def test_installer_authorizes_all_exact_domain_replays(tmp_path: Path) -> None:
 
 
 def test_installer_preserves_operator_control(tmp_path: Path) -> None:
-    registry = CheckerRegistry(ArtifactStore(tmp_path / "store"))
+    registry = CheckerRegistry(ArtifactRepository(tmp_path / "store"))
 
     installation = install_exact_domain_checkers(
         registry,
@@ -356,7 +356,7 @@ def test_installer_skips_checkers_for_an_unavailable_graph_bundle(
     ):
         registry_root = tmp_path / name
         installation = install_exact_domain_checkers(
-            CheckerRegistry(ArtifactStore(registry_root)),
+            CheckerRegistry(ArtifactRepository(registry_root)),
             polynomial=polynomial,
             matrix=matrix,
             authorize=True,
@@ -401,7 +401,7 @@ def test_installer_omits_exact_replay_when_its_provider_is_unavailable(
     )
 
     installation = install_exact_domain_checkers(
-        CheckerRegistry(ArtifactStore(tmp_path / "store")),
+        CheckerRegistry(ArtifactRepository(tmp_path / "store")),
         matrix=_installed(
             (
                 RationalMatrixRequest,
@@ -463,7 +463,7 @@ def test_installer_does_not_omit_replay_when_bundled_source_is_unavailable(
 
     with pytest.raises(CheckerExecutableChangedError):
         install_exact_domain_checkers(
-            CheckerRegistry(ArtifactStore(tmp_path / "store")),
+            CheckerRegistry(ArtifactRepository(tmp_path / "store")),
             matrix=_installed(
                 (
                     RationalMatrixRequest,

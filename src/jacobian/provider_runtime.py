@@ -130,7 +130,7 @@ def _license_files(
 def _jacobian_identity() -> tuple[str, str, tuple[str, ...]]:
     try:
         distribution = importlib.metadata.distribution("jacobian")
-        digest = package_source_digest("jacobian.capabilities:CapabilityService")
+        digest = package_source_digest("jacobian.capability_service:CapabilityService")
     except (importlib.metadata.PackageNotFoundError, ImplementationError) as exc:
         raise ProviderRuntimeError(
             "the Jacobian source runtime could not be identified",

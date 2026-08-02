@@ -136,7 +136,7 @@ def _classify_public_tool_error(
     )
     from jacobian.experiments import ExperimentNotFoundError
     from jacobian.registry import CheckerNotFoundError
-    from jacobian.store import ArtifactNotFoundError
+    from jacobian.storage.errors import ArtifactNotFoundError
 
     if isinstance(tool_error, AgentRecoveryError):
         return (

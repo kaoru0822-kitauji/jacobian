@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -63,7 +63,7 @@ from jacobian.domains._examples import example
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _COUNTERMODEL_TIMEOUT_MS = 10_000
 
@@ -83,13 +83,13 @@ class UniversalAlgebraInstallation:
 
 @dataclass(frozen=True, slots=True)
 class UniversalAlgebraResources:
-    store: ArtifactStore
+    store: ArtifactRepository
     artifacts: ArtifactService
     installation: UniversalAlgebraInstallation
 
 
 def install_universal_algebra_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     checkers: CheckerRegistry,

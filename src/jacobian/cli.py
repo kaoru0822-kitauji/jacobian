@@ -48,7 +48,7 @@ app = typer.Typer(
 
 
 def _storage_error_payload(exc: Exception) -> tuple[dict[str, str], int]:
-    from jacobian.store import UnsupportedStateVersionError
+    from jacobian.storage.errors import UnsupportedStateVersionError
 
     if isinstance(exc, UnsupportedStateVersionError):
         return (
@@ -81,7 +81,7 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
     # never import the runtime owner or heavy mathematical modules. These are
     # only needed on the exception path, where the import cost is unavoidable.
     from jacobian.artifacts import ArtifactValidationError
-    from jacobian.capabilities import CapabilityError
+    from jacobian.capability_service import CapabilityError
     from jacobian.conjectures import ConjectureError
     from jacobian.experiments import ExperimentError, ExperimentNotFoundError
     from jacobian.implementation import ImplementationError
@@ -95,11 +95,11 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
     )
     from jacobian.schema_registry import SchemaRegistryError, SchemaValidationError
     from jacobian.search import SearchError
-    from jacobian.store import (
+    from jacobian.storage.errors import (
         ArtifactIntegrityError,
         ArtifactNotFoundError,
-        StoreError,
-        StoreLimitError,
+        StorageError,
+        StorageLimitError,
     )
     from jacobian.verification import CheckerExecutionError
 
@@ -126,7 +126,7 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
         )
     if isinstance(
         exc,
-        StoreLimitError,
+        StorageLimitError,
     ):
         return (
             {
@@ -222,7 +222,7 @@ def _public_error(exc: Exception) -> tuple[dict[str, str], int]:
             },
             1,
         )
-    if isinstance(exc, StoreError):
+    if isinstance(exc, StorageError):
         return _storage_error_payload(exc)
     if isinstance(
         exc,
@@ -359,7 +359,7 @@ def provider_measure(
 ) -> None:
     """Measure the exact provider advertised for one installed capability."""
 
-    from jacobian.capabilities import CapabilityError
+    from jacobian.capability_service import CapabilityError
     from jacobian.provider_measurements import measure_provider
 
     descriptors = {

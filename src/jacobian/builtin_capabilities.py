@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,

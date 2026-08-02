@@ -21,7 +21,8 @@ from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.smt import SmtResourceBudget
 from jacobian.sat_smt.smt import install_smt_artifacts
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore, StoredArtifact
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian_checkers.smt import check_unsat_proof
 
 _FIXTURES = (
@@ -71,7 +72,7 @@ def _checker_artifact(artifact: StoredArtifact) -> dict[str, Any]:
 def proof_request_factory(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> ProofRequestFactory:
-    store = ArtifactStore(tmp_path_factory.mktemp("smt-proof-checker-store"))
+    store = ArtifactRepository(tmp_path_factory.mktemp("smt-proof-checker-store"))
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     smt = install_smt_artifacts(store, schemas, artifacts)

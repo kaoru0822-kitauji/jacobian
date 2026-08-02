@@ -44,7 +44,9 @@ from jacobian.contracts.results import (
     Verification,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError, model_schema
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,7 +91,7 @@ def _model_fraction(
 
 def _polytope_input_failure_detail(exc: Exception) -> str:
     _LOGGER.warning("polytope input validation failed", exc_info=exc)
-    if isinstance(exc, (StoreError, SchemaRegistryError, ValidationError)):
+    if isinstance(exc, (StorageError, SchemaRegistryError, ValidationError)):
         return (
             "The point or generator artifact is unavailable or invalid. Check the "
             "artifact URIs and the polytope reference contract, then retry."
@@ -108,7 +110,7 @@ class PolytopeService:
     separately implemented checker replays them.
     """
 
-    def __init__(self, store: ArtifactStore, schemas: SchemaRegistry) -> None:
+    def __init__(self, store: ArtifactRepository, schemas: SchemaRegistry) -> None:
         self.store = store
         self.schemas = schemas
         self.semantics_uri = store.register_descriptor(
@@ -240,7 +242,7 @@ class PolytopeService:
             )
         except (
             SchemaRegistryError,
-            StoreError,
+            StorageError,
             ValidationError,
             ValueError,
             ZeroDivisionError,

@@ -8,7 +8,7 @@ from typing import Literal
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -41,7 +41,8 @@ from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.sat_smt.sat import SatArtifactError, SatArtifactService
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -53,7 +54,7 @@ class SatLratInstallation:
 
 
 def install_sat_lrat_verifier(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     sat: SatArtifactService,
@@ -109,7 +110,7 @@ class SatLratVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         sat: SatArtifactService,
         verification: VerificationService,
@@ -152,7 +153,7 @@ class SatLratVerificationAdapter:
         try:
             resolved = self.sat.resolve_cnf(validated.cnf_uri)
             semantics = self.store.get(self.sat.installation.semantics_uri)
-        except (SatArtifactError, StoreError) as exc:
+        except (SatArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_SAT_CNF",

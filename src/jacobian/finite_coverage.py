@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import (
+from jacobian.capability_service import (
     CapabilityAdapter,
     CapabilityInvocationError,
 )
@@ -52,7 +52,7 @@ from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -84,7 +84,7 @@ _CANONICALIZER_SPECS: dict[str, dict[str, str]] = {
 
 
 def install_finite_coverage(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     verification: VerificationService,
@@ -205,7 +205,7 @@ class FiniteCoverageVerifyAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         verification: VerificationService,
         installation: FiniteCoverageInstallation,

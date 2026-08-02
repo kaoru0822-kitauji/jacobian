@@ -118,8 +118,8 @@ the topology policy and normally defer to the exhaustive merge-queue/main gate;
 `ci:lean` and `ci:full` can add them to a pull request. Domain and composition
 shards may use validated timing history, while storage, process, provider, Lean,
 and e2e retain separate resource lanes. Merge-queue and `main` add compatibility
-and coverage; scheduled validation owns alternate ordering, stress,
-optional-provider, and performance evidence. Python 3.13 runs the small
+and coverage; scheduled validation owns alternate ordering, stress, and
+optional-provider evidence. Python 3.13 runs the small
 compatibility smoke target rather than duplicating every correctness lane. A
 manually dispatched debug workflow accepts one pytest node or file for focused
 reproduction.
@@ -152,8 +152,7 @@ force all lanes or add Lean respectively; label events re-trigger CI so the
 override applies without an extra push. Overrides are additive only and
 cannot weaken the plan selected from changed paths. A scheduled validation
 workflow separately exercises repeated property stress, alternate ordering
-seeds, optional providers, and the core performance benchmark outside the
-pull-request critical path.
+seeds, and optional providers outside the pull-request critical path.
 
 The build lane produces the source distribution and wheel once. Its dependent
 package-validation job downloads that artifact and exercises both installed

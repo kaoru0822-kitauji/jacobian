@@ -3,7 +3,7 @@
 These tests pin the runtime ownership contract: explicit ``close``,
 idempotence, context-manager semantics, partial-bootstrap failure cleanup,
 and use-after-close behavior. The runtime quiesces application-owned workers
-before delegating storage teardown to :class:`ArtifactStore`; these tests
+before delegating storage teardown to :class:`ArtifactRepository`; these tests
 verify that ordering and that construction failures release every resource.
 
 The contract is verified through observable use-after-close behavior rather
@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian.contracts.discovery import ExperimentHandle
 from jacobian.contracts.search import ExperimentState
@@ -24,7 +25,7 @@ from jacobian.experiments import ExperimentError, ExperimentService
 from jacobian.runtime import create_runtime
 from jacobian.runtime.model import RuntimeClosedError
 from jacobian.search import SearchError, SearchService
-from jacobian.store import StoreClosedError
+from jacobian.storage.errors import StorageClosedError
 
 pytestmark = pytest.mark.usefixtures("attached_complete_runtime")
 
@@ -41,7 +42,7 @@ def test_close_is_idempotent(tmp_path: Path) -> None:
 
     runtime.close()
     runtime.close()
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         runtime.core.store.register_descriptor(
             kind="schema",
             name="after-double-close",
@@ -62,7 +63,7 @@ def test_context_manager_closes_runtime(tmp_path: Path) -> None:
             definition={"type": "object"},
         )
     # After the context manager exits the store is closed.
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         runtime.core.store.register_descriptor(
             kind="schema",
             name="after-context",
@@ -76,7 +77,7 @@ def test_context_manager_exit_suppresses_no_exception(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="body failure"), runtime:
         raise ValueError("body failure")
     # The store is still closed even though the body raised.
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         runtime.core.store.register_descriptor(
             kind="schema",
             name="after-body-failure",
@@ -125,7 +126,7 @@ def test_close_quiesces_search_workers_before_closing_store(
 
     assert worker_finished.is_set()
     assert worker_errors == []
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         runtime.core.store.register_descriptor(
             kind="schema",
             name="after-worker-close",
@@ -168,7 +169,7 @@ def test_close_quiesces_enumeration_workers_before_closing_store(
     releaser.join(timeout=1)
 
     assert worker_errors == []
-    with pytest.raises(StoreClosedError):
+    with pytest.raises(StorageClosedError):
         runtime.core.store.register_descriptor(
             kind="schema",
             name="after-enumeration-worker-close",
@@ -205,6 +206,32 @@ def test_enumeration_close_timeout_keeps_store_open_for_retry(
     )
     release_worker.set()
     runtime.close()
+
+
+def test_negative_search_close_timeout_does_not_enter_closing_state(
+    tmp_path: Path,
+) -> None:
+    runtime = create_runtime(tmp_path)
+    try:
+        with pytest.raises(ValueError, match="non-negative"):
+            runtime.services.search.close(timeout_seconds=-1)
+        with pytest.raises(ValidationError):
+            runtime.services.search.start({})
+    finally:
+        runtime.close()
+
+
+def test_negative_enumeration_close_timeout_does_not_enter_closing_state(
+    tmp_path: Path,
+) -> None:
+    runtime = create_runtime(tmp_path)
+    try:
+        with pytest.raises(ValueError, match="non-negative"):
+            runtime.services.experiments.close(timeout_seconds=-1)
+        with pytest.raises(ValidationError):
+            runtime.services.experiments.start_enumeration({})
+    finally:
+        runtime.close()
 
 
 def test_close_waits_for_a_reserved_search_start_through_worker_launch(
@@ -399,9 +426,9 @@ def test_partial_bootstrap_failure_releases_owned_store(
         create_runtime(tmp_path)
 
     # A fresh store can reopen the same root cleanly afterwards.
-    from jacobian.store import ArtifactStore
+    from jacobian.storage.repository import ArtifactRepository
 
-    reopened = ArtifactStore(tmp_path)
+    reopened = ArtifactRepository(tmp_path)
     reopened.close()
 
 
@@ -432,5 +459,5 @@ def test_close_failure_keeps_store_closable_on_retry(
     monkeypatch.undo()
     runtime.close()
 
-    with pytest.raises(StoreClosedError), store.connection():
+    with pytest.raises(StorageClosedError), store.connection():
         pass

@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from jacobian.artifacts import ArtifactService
 from jacobian.canonical import canonicalize_json
-from jacobian.capabilities import CapabilityInvocationError
+from jacobian.capability_service import CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,
@@ -37,7 +37,7 @@ from jacobian.domains._examples import example
 from jacobian.memory import ResearchMemory
 from jacobian.provider_runtime import jacobian_provider_runtime
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 
 _TEXT_ALLOWED = frozenset(
     {
@@ -109,7 +109,7 @@ class ExternalConjectureIngestAdapter:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         *,
         semantics_uri: str,
@@ -365,7 +365,7 @@ class ExternalConjectureIngestAdapter:
 
 
 def install_conjecture_ingestion_capability(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     memory: ResearchMemory | None = None,

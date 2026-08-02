@@ -29,7 +29,8 @@ from jacobian.provider_runtime import (
     ProviderRuntimeError,
     require_provider_runtime_unchanged,
 )
-from jacobian.store import ArtifactStore, transaction_active_for
+from jacobian.storage.repository import ArtifactRepository
+from jacobian.storage.transactions import transaction_active_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def _require_runtime_unchanged(runtime: CapabilityProviderRuntime | None) -> Non
 class CheckerRegistry:
     """Persist operator authorization, compatibility, audit, and revocation."""
 
-    def __init__(self, store: ArtifactStore) -> None:
+    def __init__(self, store: ArtifactRepository) -> None:
         self.store = store
         self.database_path = store.db_path
         self.policy_lock_path = self.database_path.with_name(

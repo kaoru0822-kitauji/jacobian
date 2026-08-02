@@ -26,7 +26,7 @@ from jacobian.contracts.evidence import (
     WitnessEnvelope,
     WitnessRole,
 )
-from jacobian.store import StoredArtifact
+from jacobian.storage.models import StoredArtifact
 
 
 def put_witness_envelope(

@@ -19,7 +19,7 @@ from jacobian.bounded_process import (
     bounded_process_cancelled,
     run_bounded_process,
 )
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.contracts.capabilities import (
     CapabilityAssurance,
     CapabilityAssuranceLevel,

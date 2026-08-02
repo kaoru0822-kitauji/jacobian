@@ -11,7 +11,7 @@ from jacobian.plugins.registry import PluginRegistry
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.shrinking import ShrinkService
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -153,8 +153,8 @@ def _shrink_fixture(
     checker_entrypoint: str = (
         "tests.component.plugins._fixture_plugins:preserve_positive"
     ),
-) -> tuple[ShrinkService, ArtifactStore, str, str, str, str]:
-    store = ArtifactStore(root)
+) -> tuple[ShrinkService, ArtifactRepository, str, str, str, str]:
+    store = ArtifactRepository(root)
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     claim_schema = schemas.register(

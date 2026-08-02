@@ -104,7 +104,7 @@ Pull requests now use separate semantic lanes on the canonical Python version.
 Domain shards may use validated `pytest-split` timing; xdist's `worksteal`
 balances compatible shards. Storage, process, provider, Lean, and e2e work
 retain dedicated resource lanes. The merge queue adds compatibility, coverage,
-ordering, stress, and performance evidence without mixing incompatible jobs.
+ordering, and stress evidence without mixing incompatible jobs.
 
 ## Development policy
 
@@ -180,9 +180,8 @@ run reports its critical span, summed runner minutes, and longest job, making
 both reviewer latency and compute growth visible. The critical span is the
 interval from the earliest reported job start to the latest reported job end;
 it is not a dependency-graph reconstruction or the full workflow elapsed time.
-Scheduled lanes exercise repeated property tests, alternate orders, optional
-providers, and the core performance benchmark outside the pull-request
-critical span.
+Scheduled lanes exercise repeated property tests, alternate orders, and
+optional providers outside the pull-request critical span.
 
 Do not run every semantic lane repeatedly during implementation and then
 immediately repeat them in pull-request CI. Use `make check` plus the affected
@@ -204,7 +203,7 @@ Do not stack a local duration refresh, full integration profiling, and focused
 module debugging on the same host at once. That contention recreates the
 pull-request wall-time problem the lane split exists to avoid: routine
 `make check`, exhaustive merge-queue validation, and scheduled
-stress/performance work must remain separate executions.
+stress work must remain separate executions.
 
 The fixture boundary is now explicit. Unit tests receive value fixtures only;
 component tests own one real service; domain tests receive `domain_services`

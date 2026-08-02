@@ -21,7 +21,8 @@ from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.sat import SatResourceBudget
 from jacobian.sat_smt.sat import install_sat_artifacts
 from jacobian.schema_registry import SchemaRegistry
-from jacobian.store import ArtifactStore, StoredArtifact
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 from jacobian_checkers.sat import check_unsat_proof
 
 _DEFAULT_PROOF = b"-1 0\n0\n"
@@ -57,7 +58,7 @@ def _checker_artifact(artifact: StoredArtifact) -> dict[str, Any]:
 def proof_request_factory(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> ProofRequestFactory:
-    store = ArtifactStore(tmp_path_factory.mktemp("sat-proof-checker-store"))
+    store = ArtifactRepository(tmp_path_factory.mktemp("sat-proof-checker-store"))
     schemas = SchemaRegistry(store)
     artifacts = ArtifactService(store, schemas)
     sat = install_sat_artifacts(store, schemas, artifacts)

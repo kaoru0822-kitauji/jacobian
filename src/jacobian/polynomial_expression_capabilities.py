@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from jacobian.artifacts import ArtifactService
-from jacobian.capabilities import CapabilityAdapter, CapabilityInvocationError
+from jacobian.capability_service import CapabilityAdapter, CapabilityInvocationError
 from jacobian.checker_installation import CheckerInstaller
 from jacobian.checker_operations import CheckerOperation
 from jacobian.contracts.capabilities import (
@@ -41,7 +41,8 @@ from jacobian.polynomial_expressions import (
 from jacobian.provider_runtime import known_provider_runtime
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
@@ -52,7 +53,7 @@ class PolynomialExpressionCheckerInstallation:
 
 
 def install_polynomial_expression_checker(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     expressions: PolynomialExpressionArtifactService,
@@ -115,7 +116,7 @@ class PolynomialExpressionNormalizationVerificationAdapter:
     def __init__(
         self,
         *,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         artifacts: ArtifactService,
         expressions: PolynomialExpressionArtifactService,
         verification: VerificationService,
@@ -179,7 +180,7 @@ class PolynomialExpressionNormalizationVerificationAdapter:
                 validated.normalization_uri
             )
             semantics = self.store.get(self.expressions.installation.semantics_uri)
-        except (PolynomialExpressionArtifactError, StoreError) as exc:
+        except (PolynomialExpressionArtifactError, StorageError) as exc:
             raise CapabilityInvocationError(
                 CapabilityDiagnostic(
                     code="INVALID_POLYNOMIAL_EXPRESSION_NORMALIZATION",

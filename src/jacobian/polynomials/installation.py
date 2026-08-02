@@ -46,12 +46,12 @@ from jacobian.polynomials.rational_identity import RationalFunctionIdentityAdapt
 from jacobian.polynomials.resources import PolynomialInstallation, PolynomialResources
 from jacobian.registry import CheckerRegistry
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
 def install_polynomial_capabilities(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
     verification: VerificationService,

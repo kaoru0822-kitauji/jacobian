@@ -8,14 +8,14 @@ from jacobian.canonical import canonicalize_json, loads_strict_json
 from jacobian.contracts.evidence import CertificateEnvelope, EvidenceBindings
 from jacobian.contracts.results import Conclusion, ExecutionStatus, Verification
 from jacobian.registry import CheckerRegistry
-from jacobian.store import ArtifactStore
+from jacobian.storage.repository import ArtifactRepository
 from jacobian.verification import VerificationService
 
 
 def _certificate_case(
     tmp_path: Path,
-) -> tuple[ArtifactStore, VerificationService, str]:
-    store = ArtifactStore(tmp_path)
+) -> tuple[ArtifactRepository, VerificationService, str]:
+    store = ArtifactRepository(tmp_path)
     claim_schema = store.register_descriptor(
         kind="schema",
         name="graph.path-closure.claim",

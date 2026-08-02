@@ -19,7 +19,9 @@ from jacobian.contracts.polynomial_expressions import (
 )
 from jacobian.contracts.polynomials import SparseRationalPolynomial
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 
 class PolynomialExpressionArtifactError(ValueError):
@@ -53,7 +55,7 @@ class PolynomialExpressionArtifactService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         installation: PolynomialExpressionInstallation,
@@ -86,7 +88,7 @@ class PolynomialExpressionArtifactService:
     def resolve_expression(self, expression_uri: str) -> ResolvedPolynomialExpression:
         try:
             artifact = self.store.get(expression_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise PolynomialExpressionArtifactError(
                 "source is not an available typed polynomial-expression artifact"
             ) from exc
@@ -158,7 +160,7 @@ class PolynomialExpressionArtifactService:
     ) -> ResolvedPolynomialNormalization:
         try:
             artifact = self.store.get(normalization_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise PolynomialExpressionArtifactError(
                 "source is not an available polynomial-normalization artifact"
             ) from exc
@@ -201,7 +203,7 @@ class PolynomialExpressionArtifactService:
 
 
 def install_polynomial_expression_artifacts(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> PolynomialExpressionArtifactService:

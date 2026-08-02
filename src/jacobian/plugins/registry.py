@@ -22,7 +22,8 @@ from jacobian.implementation import (
     package_source_digest,
 )
 from jacobian.schema_registry import SchemaRegistry, model_schema
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.repository import ArtifactRepository
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class PluginRegistry:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry | None = None,
     ) -> None:
         self.store = store
@@ -156,7 +157,7 @@ class PluginRegistry:
                     descriptor=descriptor,
                     implementation_digest=expected_digest,
                 )
-        except (StoreError, ValueError, ImplementationError) as exc:
+        except (StorageError, ValueError, ImplementationError) as exc:
             _LOGGER.warning("plugin installation failed", exc_info=exc)
             raise PluginRegistryError(
                 "The plugin manifest or one of its dependencies is invalid or "
@@ -281,7 +282,7 @@ class PluginRegistry:
             raise PluginRegistryError(f"plugin is not installed: {plugin_id}")
         try:
             return PluginManifest.model_validate(self.store.get(plugin_id).payload)
-        except (StoreError, ValueError) as exc:
+        except (StorageError, ValueError) as exc:
             _LOGGER.warning("installed plugin manifest is unreadable", exc_info=exc)
             raise PluginRegistryError(
                 "The installed plugin manifest is invalid or unavailable. Reload "
@@ -323,7 +324,7 @@ class PluginRegistry:
                 )
             snapshot = PluginRegistrySnapshot.model_validate(artifact.payload)
             manifest_artifact = self.store.get(plugin_id)
-        except (StoreError, ValueError) as exc:
+        except (StorageError, ValueError) as exc:
             _LOGGER.warning("installed plugin snapshot is unreadable", exc_info=exc)
             raise PluginRegistryError(
                 "The installed plugin snapshot is invalid or unavailable. Reload "
@@ -393,7 +394,7 @@ class PluginRegistry:
                 raise PluginRegistryError(
                     "plugin implementation bytes changed after installation"
                 )
-        except (StoreError, ImplementationError) as exc:
+        except (StorageError, ImplementationError) as exc:
             _LOGGER.warning("plugin resolution failed", exc_info=exc)
             raise PluginRegistryError(
                 "The plugin implementation is unavailable. Reload Jacobian to "

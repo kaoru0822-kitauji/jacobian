@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -12,6 +13,8 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[1]
 ADAPTERS = ROOT / "benchmarks" / "adapters"
 SCHEMA = ROOT / "benchmarks" / "schemas" / "source-adapter-lock.schema.json"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _display(path: Path) -> str:
@@ -19,6 +22,14 @@ def _display(path: Path) -> str:
         return path.relative_to(ROOT).as_posix()
     except ValueError:
         return path.as_posix()
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(65_536), b""):
+            digest.update(block)
+    return "sha256:" + digest.hexdigest()
 
 
 def _load_lock(lock_path: Path) -> tuple[dict[str, object] | None, list[str]]:
@@ -37,6 +48,35 @@ def _load_lock(lock_path: Path) -> tuple[dict[str, object] | None, list[str]]:
         location = ".".join(str(part) for part in error.absolute_path)
         failures.append(f"{_display(lock_path)} at {location}: {error.message}")
     return lock, failures
+
+
+def _evidence_failures(
+    adapter: Path, lock_path: Path, output: dict[str, object]
+) -> list[str]:
+    failures: list[str] = []
+    for field, filename in (
+        ("oracle_evidence_digest", "oracle-evidence.json"),
+        ("parity_evidence_digest", "parity-evidence.json"),
+    ):
+        evidence_path = adapter / filename
+        if not evidence_path.is_file():
+            failures.append(
+                f"{_display(lock_path)}: required evidence file is missing: "
+                f"{_display(evidence_path)}"
+            )
+            continue
+        if evidence_path.stat().st_size == 0:
+            failures.append(
+                f"{_display(lock_path)}: evidence file is empty: "
+                f"{_display(evidence_path)}"
+            )
+            continue
+        if output.get(field) != _sha256(evidence_path):
+            failures.append(
+                f"{_display(lock_path)}: {field} mismatch for "
+                f"{_display(evidence_path)}"
+            )
+    return failures
 
 
 def _semantic_failures(
@@ -89,6 +129,7 @@ def _semantic_failures(
                     f"{_display(lock_path)}: task digest mismatch for "
                     f"{pair[0]}/{pair[1]}"
                 )
+            failures.extend(_evidence_failures(adapter, lock_path, output))
     return failures
 
 

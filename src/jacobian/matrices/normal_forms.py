@@ -18,7 +18,9 @@ from jacobian.contracts.matrices import (
     MatrixHermiteResourceBudget,
 )
 from jacobian.schema_registry import SchemaRegistry, SchemaRegistryError
-from jacobian.store import ArtifactStore, StoredArtifact, StoreError
+from jacobian.storage.errors import StorageError
+from jacobian.storage.models import StoredArtifact
+from jacobian.storage.repository import ArtifactRepository
 
 
 class MatrixNormalFormArtifactError(ValueError):
@@ -52,7 +54,7 @@ class MatrixNormalFormArtifactService:
 
     def __init__(
         self,
-        store: ArtifactStore,
+        store: ArtifactRepository,
         schemas: SchemaRegistry,
         artifacts: ArtifactService,
         installation: MatrixNormalFormInstallation,
@@ -80,7 +82,7 @@ class MatrixNormalFormArtifactService:
     def resolve_matrix(self, matrix_uri: str) -> ResolvedIntegerMatrix:
         try:
             artifact = self.store.get(matrix_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise MatrixNormalFormArtifactError(
                 "source is not an available exact integer-matrix artifact"
             ) from exc
@@ -149,7 +151,7 @@ class MatrixNormalFormArtifactService:
     ) -> ResolvedHermiteNormalForm:
         try:
             artifact = self.store.get(normal_form_uri)
-        except StoreError as exc:
+        except StorageError as exc:
             raise MatrixNormalFormArtifactError(
                 "source is not an available Hermite-normal-form artifact"
             ) from exc
@@ -188,7 +190,7 @@ class MatrixNormalFormArtifactService:
 
 
 def install_matrix_normal_form_artifacts(
-    store: ArtifactStore,
+    store: ArtifactRepository,
     schemas: SchemaRegistry,
     artifacts: ArtifactService,
 ) -> MatrixNormalFormArtifactService:
