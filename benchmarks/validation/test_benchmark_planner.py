@@ -31,8 +31,12 @@ def stable_digests(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _matrix(result: dict[str, str]) -> list[dict[str, str]]:
+def _matrix(result: dict[str, str]) -> list[dict[str, object]]:
     return json.loads(result["benchmark-oracle-matrix"])
+
+
+def _matrix_tasks(result: dict[str, str]) -> set[str]:
+    return {str(task) for item in _matrix(result) for task in item["tasks"]}
 
 
 def test_product_only_changes_skip_benchmark_work() -> None:
@@ -109,7 +113,8 @@ def test_executable_task_change_selects_exact_task_and_all_memberships() -> None
     result = planner.plan(
         [
             "benchmarks/datasets/agent-workflow-v1/"
-            "parameterized-sharp-bound-audit/tests/verifier.py"
+            "parameterized-sharp-bound-audit/tests/verifier.py",
+            "benchmarks/datasets/agent-workflow-v1/suite.toml",
         ],
         event="pull_request",
     )
@@ -119,14 +124,19 @@ def test_executable_task_change_selects_exact_task_and_all_memberships() -> None
     matrix = _matrix(result)
     assert len(matrix) == 1
     assert matrix[0]["dataset"] == "agent-workflow-v1"
-    assert matrix[0]["task"] == "parameterized-sharp-bound-audit"
-    assert len(matrix[0]["digest"]) == 71
-    assert matrix[0]["digest"].startswith("sha256:")
+    assert matrix[0]["tasks"] == ["parameterized-sharp-bound-audit"]
+    digests = matrix[0]["task_digests"]
+    assert isinstance(digests, list)
+    assert len(digests[0]["digest"]) == 71
+    assert digests[0]["digest"].startswith("sha256:")
 
 
 def test_membership_change_defers_dataset_oracle_until_merge_queue() -> None:
     result = planner.plan(
-        ["benchmarks/datasets/agent-workflow-v1/members/new-task.toml"],
+        [
+            "benchmarks/datasets/agent-workflow-v1/members/new-task.toml",
+            "benchmarks/datasets/agent-workflow-v1/suite.toml",
+        ],
         event="pull_request",
     )
 
@@ -138,7 +148,10 @@ def test_membership_change_defers_dataset_oracle_until_merge_queue() -> None:
 
 def test_membership_change_runs_affected_dataset_in_merge_queue() -> None:
     result = planner.plan(
-        ["benchmarks/datasets/agent-workflow-v1/members/new-task.toml"],
+        [
+            "benchmarks/datasets/agent-workflow-v1/members/new-task.toml",
+            "benchmarks/datasets/agent-workflow-v1/suite.toml",
+        ],
         event="merge_group",
     )
 
@@ -177,6 +190,12 @@ def test_large_task_set_is_deferred_from_pull_request_to_merge_queue() -> None:
         for task_id in task_ids
         for dataset, _path in by_task[task_id]
     ]
+    paths.extend(
+        f"benchmarks/datasets/{dataset}/suite.toml"
+        for dataset in {
+            dataset for task_id in task_ids for dataset, _ in by_task[task_id]
+        }
+    )
 
     pull_request = planner.plan(paths, event="pull_request")
     merge_group = planner.plan(paths, event="merge_group")
@@ -185,7 +204,8 @@ def test_large_task_set_is_deferred_from_pull_request_to_merge_queue() -> None:
     assert pull_request["benchmark-oracle-scope"] == "none"
     assert _matrix(pull_request) == []
     assert merge_group["run-benchmark-oracle"] == "true"
-    assert len(_matrix(merge_group)) == 9
+    assert merge_group["benchmark-oracle-scope"] == "affected-datasets"
+    assert set(task_ids) <= _matrix_tasks(merge_group)
 
 
 def test_documentation_changes_do_not_consume_the_oracle_task_cap() -> None:
@@ -200,12 +220,13 @@ def test_documentation_changes_do_not_consume_the_oracle_task_cap() -> None:
         "benchmarks/datasets/"
         f"{by_task[task_ids[0]][0][0]}/{task_ids[0]}/tests/verifier.py"
     )
+    paths.append(f"benchmarks/datasets/{by_task[task_ids[0]][0][0]}/suite.toml")
 
     result = planner.plan(paths, event="pull_request")
 
     assert result["run-benchmark-oracle"] == "true"
     assert result["benchmark-oracle-scope"] == "changed-tasks"
-    assert {item["task"] for item in _matrix(result)} == {task_ids[0]}
+    assert _matrix_tasks(result) == {task_ids[0]}
 
 
 def test_main_push_does_not_repeat_merge_queue_oracles() -> None:
@@ -215,6 +236,32 @@ def test_main_push_does_not_repeat_merge_queue_oracles() -> None:
     assert result["run-benchmark-oracle"] == "false"
     assert result["benchmark-oracle-scope"] == "none"
     assert _matrix(result) == []
+
+
+def test_executable_task_change_requires_dataset_version_bump() -> None:
+    with pytest.raises(Exception, match="dataset version bump"):
+        planner.plan(
+            [
+                "benchmarks/datasets/agent-workflow-v1/"
+                "parameterized-sharp-bound-audit/tests/verifier.py"
+            ],
+            event="pull_request",
+        )
+
+
+def test_dataset_version_file_must_change_its_version_value() -> None:
+    suite = planner._harbor_suite().get_suite("public-reproductions-v1")
+    task = suite.tasks[0].path.name
+
+    with pytest.raises(Exception, match="version value did not change"):
+        planner.plan(
+            [
+                f"benchmarks/datasets/{suite.id}/{task}/tests/verifier.py",
+                f"benchmarks/datasets/{suite.id}/suite.toml",
+            ],
+            event="pull_request",
+            base="main",
+        )
 
 
 def test_adapter_documentation_change_never_runs_oracle() -> None:
@@ -241,6 +288,29 @@ def test_force_full_includes_each_dataset_task_pair() -> None:
     assert result["run-benchmark-check"] == "true"
     assert result["run-benchmark-oracle"] == "true"
     assert _matrix(result)
+    assert len(_matrix(result)) < 20
+    assert _matrix_tasks(result) == {
+        ref.path.name
+        for suite in planner._harbor_suite().load_registry()
+        for ref in suite.tasks
+    }
+
+
+def test_timing_weights_balance_slow_tasks_deterministically() -> None:
+    suites = planner._harbor_suite().load_registry()
+    suite = next(item for item in suites if len(item.tasks) > 12)
+    timings = {
+        f"{suite.id}/{ref.path.name}": float(index + 1)
+        for index, ref in enumerate(suite.tasks)
+    }
+
+    first = planner._shard_entries([suite], timings=timings)
+    second = planner._shard_entries([suite], timings=timings)
+
+    assert first == second
+    assert {task for shard in first for task in shard["tasks"]} == {
+        ref.path.name for ref in suite.tasks
+    }
 
 
 def test_task_bundles_live_directly_in_their_harbor_dataset() -> None:

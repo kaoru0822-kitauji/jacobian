@@ -260,6 +260,18 @@ def _parse_suite_manifest(
     return dataset, tuple(refs)
 
 
+def validate_global_task_ids(suites: tuple[Suite, ...] | list[Suite]) -> None:
+    owners: dict[str, str] = {}
+    for suite in suites:
+        for task in suite.tasks:
+            task_id = task.path.name
+            previous = owners.setdefault(task_id, suite.id)
+            if previous != suite.id:
+                raise HarborSuiteError(
+                    f"global task id {task_id!r} belongs to both {previous} and {suite.id}"
+                )
+
+
 def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
     raw = _read_toml(path)
     if raw.get("schema_version") != "1":
@@ -368,6 +380,7 @@ def load_registry(path: Path = REGISTRY_PATH) -> tuple[Suite, ...]:
                 f"{short_id}: Harbor task is not assigned in members/*.toml: "
                 + ", ".join(path.name for path in missing)
             )
+    validate_global_task_ids(suites)
     return tuple(suites)
 
 
@@ -725,6 +738,7 @@ __all__ = [
     "task_digest",
     "task_full_name",
     "task_short_name",
+    "validate_global_task_ids",
     "validate_task",
     "validate_task_topology",
     "validate_task_visibility",

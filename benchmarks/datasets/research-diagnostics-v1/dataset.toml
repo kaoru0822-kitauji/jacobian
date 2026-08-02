@@ -74,7 +74,7 @@ digest = "sha256:794561eac1d13eadcfd71292251e19ef4fccf06fcda75828e4b2a7ef210d10e
 
 [[tasks]]
 name = "jacobian/jcb-postdoc-016"
-digest = "sha256:4ecdd5ff803426735023594741b1358f367a5a70c058e1277a7bb3d543f6f2b9"
+digest = "sha256:cd05efeffac0892b440ca42bd49b18e8caa1062f85758863bb0ba3106a64a1ea"
 
 [[tasks]]
 name = "jacobian/jcb-postdoc-017"

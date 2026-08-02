@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jacobian.invalid/benchmarks/schemas/observation-evidence.schema.json",
+  "title": "Jacobian Harbor workflow observation evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence_class", "causal_claim_authorized", "status", "source_sha", "dataset", "condition", "job", "runtime_snapshot", "fixed_invariants", "result", "trials", "validation_failures"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "evidence_class": {"type": "string", "minLength": 1},
+    "causal_claim_authorized": {"const": false},
+    "status": {"enum": ["VALID", "INCOMPLETE"]},
+    "source_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "dataset": {"type": "string", "minLength": 1},
+    "condition": {"type": "string", "minLength": 1},
+    "job": {"type": "object"},
+    "runtime_snapshot": {"type": "object"},
+    "fixed_invariants": {"type": "object"},
+    "result": {"type": "object"},
+    "trials": {"type": "array", "items": {"type": "object"}},
+    "validation_failures": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -46,9 +46,12 @@ benchmark layout are retained.
 make harbor-plan BASE=origin/main
 make harbor-sync
 make harbor-check
+make benchmark-inventory OUTPUT=/tmp/benchmark-inventory.json
 make harbor-oracle DATASET=agent-workflow-v1 TASKS="task-id"
 make harbor-oracle-all
 make agent-eval DATASET=agent-workflow-v1 TASKS=graph-counterexample EVAL_EXECUTE=1
+make agent-eval-validate RESULTS=... JOB=... CONDITION=control OUTPUT=control-evidence.json
+make agent-eval-compare CONTROL=control-evidence.json TREATMENT=treatment-evidence.json OUTPUT=report
 make performance-eval
 make provider-eval PROVIDER=cgal
 ```
@@ -60,6 +63,27 @@ coverage, while pushes to `main` repeat the deterministic contract gate without
 duplicating those Docker jobs. The weekly and manually dispatched benchmark
 workflow performs the full portfolio sweep; maintainers can request the same
 scope on a pull request with `ci:benchmark-full`.
+
+Changed tasks remain one Oracle job each. Affected-dataset and full-portfolio
+sweeps use deterministic, dataset-bounded shards with at most four concurrent
+jobs. Every shard carries the exact task IDs and Harbor digests it owns, and
+the result validator still requires each selected task exactly once. The
+planner accepts an optional positive-seconds timing file and otherwise falls
+back to equal weights. Successful full runs on `main` publish median per-task
+timings as an artifact and cache; later plans restore that uncommitted history
+automatically.
+
+Observation results are normalized into content-bound JSON before comparison.
+Correctness, evidence validity, scope, assurance calibration, false
+certification, tool traces, tokens, time, and cost remain separate. Reports
+from the public workflow suite are workflow evidence only, never causal
+capability evidence.
+
+Private held-out evaluation is dispatched through the protected
+`Held-out Benchmarks` workflow. Its S3 manifest freezes the C1/C2 images,
+catalog and policy digests, task and Oracle identities, model, prompt, budget,
+randomization, and pilot/decision sample sizes. The workflow downloads it with
+OIDC, refuses unpinned or unsafe bundles, and uploads only non-Oracle evidence.
 
 Performance timing is reported separately from reward, and research datasets
 are explicitly non-comparative diagnostics. Uniform task structure does not

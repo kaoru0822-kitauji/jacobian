@@ -1,0 +1,134 @@
+name: Held-out Benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifest_key:
+        description: Private S3 object key for the frozen manifest
+        required: true
+        type: string
+      stage:
+        description: Frozen evaluation stage
+        required: true
+        default: pilot
+        type: choice
+        options: [pilot, decision]
+      max_tokens:
+        description: Must exactly match the frozen manifest budget
+        required: true
+        type: number
+      max_cost_usd:
+        description: Must exactly match the frozen manifest budget
+        required: true
+        type: number
+      confirmation:
+        description: Enter RUN_HELD_OUT to authorize model execution
+        required: true
+        type: string
+
+concurrency:
+  group: heldout-benchmarks
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  evaluate:
+    name: Protected Held-out Evaluation
+    if: inputs.confirmation == 'RUN_HELD_OUT'
+    environment: benchmark-eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Assume the read-only held-out bundle role
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          role-to-assume: ${{ vars.HELDOUT_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.HELDOUT_AWS_REGION }}
+      - name: Install the locked Jacobian environment
+        run: uv sync --locked --dev
+      - id: bundle
+        name: Fetch and verify the private bundle
+        env:
+          BUNDLE_ROOT: ${{ runner.temp }}/jacobian-heldout-${{ github.run_id }}
+          MANIFEST_URI: s3://${{ vars.HELDOUT_BUCKET }}/${{ inputs.manifest_key }}
+        run: |
+          uvx --from harbor==0.20.0 --with tomli-w==1.2.0 --with jsonschema \
+            python -m benchmarks.tooling.heldout_bundle fetch \
+            --manifest-uri "$MANIFEST_URI" --output "$BUNDLE_ROOT"
+          echo "root=$BUNDLE_ROOT" >> "$GITHUB_OUTPUT"
+      - id: plan
+        name: Render matched C1/C2 jobs
+        env:
+          BUNDLE_ROOT: ${{ steps.bundle.outputs.root }}
+          STAGE: ${{ inputs.stage }}
+          MAX_TOKENS: ${{ inputs.max_tokens }}
+          MAX_COST_USD: ${{ inputs.max_cost_usd }}
+        run: |
+          uvx --from harbor==0.20.0 --with tomli-w==1.2.0 --with jsonschema \
+            python -m benchmarks.tooling.heldout_bundle render \
+            --manifest "$BUNDLE_ROOT/manifest.json" \
+            --bundle-root "$BUNDLE_ROOT/bundle" \
+            --output "$BUNDLE_ROOT/rendered" \
+            --stage "$STAGE" --max-tokens "$MAX_TOKENS" \
+            --max-cost-usd "$MAX_COST_USD"
+          echo "run_plan=$BUNDLE_ROOT/rendered/run-plan.json" >> "$GITHUB_OUTPUT"
+      - name: Execute the randomized condition order
+        env:
+          RUN_PLAN: ${{ steps.plan.outputs.run_plan }}
+        run: |
+          model=$(jq -r '.model' "$RUN_PLAN")
+          effort=$(jq -r '.reasoning_effort' "$RUN_PLAN")
+          while IFS= read -r row; do
+            job=$(jq -r '.job' <<< "$row")
+            uvx --from harbor==0.20.0 harbor run \
+              -c "$job" -a codex -m "$model" \
+              --ak "reasoning_effort=$effort" \
+              --mcp-config benchmarks/config/jacobian.mcp.json
+          done < <(jq -c '.runs[]' "$RUN_PLAN")
+      - name: Normalize and compare held-out evidence
+        env:
+          BUNDLE_ROOT: ${{ steps.bundle.outputs.root }}
+          RUN_PLAN: ${{ steps.plan.outputs.run_plan }}
+        run: |
+          while IFS= read -r row; do
+            condition=$(jq -r '.condition' <<< "$row")
+            lower=$(tr '[:upper:]' '[:lower:]' <<< "$condition" | tr -d '\n')
+            uv run --locked python -m benchmarks.tooling.observation_results validate \
+              --dataset capability-held-out-v1 --condition "$condition" \
+              --job "$(jq -r '.job' <<< "$row")" \
+              --jobs-dir "$(jq -r '.jobs_dir' <<< "$row")" \
+              --runtime-snapshot "$(jq -r '.runtime_snapshot' <<< "$row")" \
+              --heldout-manifest "$BUNDLE_ROOT/manifest.json" \
+              --output "$BUNDLE_ROOT/rendered/$lower-observation-evidence.json"
+          done < <(jq -c '.runs[]' "$RUN_PLAN")
+          uv run --locked python -m benchmarks.tooling.observation_results compare \
+            --control "$BUNDLE_ROOT/rendered/c1-observation-evidence.json" \
+            --treatment "$BUNDLE_ROOT/rendered/c2-observation-evidence.json" \
+            --evidence-class held-out-comparison \
+            --output "$BUNDLE_ROOT/rendered/comparison"
+      - name: Publish evaluation summary
+        if: always()
+        env:
+          REPORT: ${{ steps.bundle.outputs.root }}/rendered/comparison/comparison-report.md
+        run: |
+          if [ -f "$REPORT" ]; then
+            cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload non-Oracle evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: heldout-evidence-${{ github.run_id }}
+          path: ${{ steps.bundle.outputs.root }}/rendered
+          if-no-files-found: error
+          retention-days: 90

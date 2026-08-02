@@ -11,7 +11,10 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import math
+import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -21,18 +24,25 @@ if str(ROOT) not in sys.path:
 
 EVENTS = ("pull_request", "merge_group", "push", "schedule", "workflow_dispatch")
 MAX_PULL_REQUEST_ORACLE_TASKS = 8
+TARGET_TASKS_PER_SHARD = 12
+MAX_DATASET_SHARDS = 4
 BENCHMARK_CONTROL_PATHS = frozenset(
     {
         ".github/scripts/plan-benchmarks",
         ".github/scripts/validate-benchmark-plan",
         ".github/workflows/benchmarks.yml",
+        ".github/workflows/heldout-benchmarks.yml",
         "Makefile",
+        "tools/check_benchmark_adapters.py",
+        "tools/check_benchmark_contracts.py",
         "tools/check_harbor_dataset.py",
         "tools/sync_harbor_verifier_support.py",
     }
 )
 BENCHMARK_EXECUTION_CONTROL_PATHS = frozenset(
     {
+        "tools/check_benchmark_adapters.py",
+        "tools/check_benchmark_contracts.py",
         "tools/check_harbor_dataset.py",
         "tools/sync_harbor_verifier_support.py",
     }
@@ -63,13 +73,67 @@ def _membership() -> tuple[dict[str, list[tuple[str, Path]]], dict[str, Any]]:
     return by_task, suites
 
 
-def _full_plan(reason: str) -> dict[str, str]:
+def _exact_entry(dataset: str, task: str, path: Path) -> dict[str, Any]:
+    return {
+        "dataset": dataset,
+        "shard": task,
+        "tasks": [task],
+        "task_digests": [{"task": task, "digest": _digest(path)}],
+    }
+
+
+def _shard_entries(
+    suites: list[Any] | tuple[Any, ...],
+    *,
+    timings: dict[str, float] | None = None,
+) -> list[dict[str, Any]]:
+    timings = timings or {}
+    matrix: list[dict[str, Any]] = []
+    for suite in suites:
+        tasks = list(suite.tasks)
+        if not tasks:
+            continue
+        shard_count = min(
+            MAX_DATASET_SHARDS,
+            max(1, math.ceil(len(tasks) / TARGET_TASKS_PER_SHARD)),
+        )
+        bins: list[tuple[float, list[Any]]] = [(0.0, []) for _ in range(shard_count)]
+        weighted = sorted(
+            tasks,
+            key=lambda ref: (
+                -timings.get(f"{suite.id}/{ref.path.name}", 1.0),
+                ref.path.name,
+            ),
+        )
+        for ref in weighted:
+            index = min(range(shard_count), key=lambda item: (bins[item][0], item))
+            weight, assigned = bins[index]
+            assigned.append(ref)
+            bins[index] = (
+                weight + timings.get(f"{suite.id}/{ref.path.name}", 1.0),
+                assigned,
+            )
+        for index, (_weight, assigned) in enumerate(bins, start=1):
+            ordered = sorted(assigned, key=lambda ref: ref.path.name)
+            matrix.append(
+                {
+                    "dataset": suite.id,
+                    "shard": f"{index:02d}-of-{shard_count:02d}",
+                    "tasks": [ref.path.name for ref in ordered],
+                    "task_digests": [
+                        {"task": ref.path.name, "digest": _digest(ref.path)}
+                        for ref in ordered
+                    ],
+                }
+            )
+    return matrix
+
+
+def _full_plan(
+    reason: str, *, timings: dict[str, float] | None = None
+) -> dict[str, str]:
     suites = _harbor_suite().load_registry()
-    matrix = [
-        {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
-        for suite in suites
-        for ref in suite.tasks
-    ]
+    matrix = _shard_entries(suites, timings=timings)
     return {
         "run-benchmark-check": "true",
         "run-benchmark-oracle": "true",
@@ -79,17 +143,98 @@ def _full_plan(reason: str) -> dict[str, str]:
     }
 
 
+def _require_dataset_version_bumps(
+    paths: list[str], *, base: str | None = None
+) -> None:
+    changed = set(paths)
+    requiring_bump: set[str] = set()
+    for path in paths:
+        parts = Path(path).parts
+        if len(parts) < 4 or parts[:2] != ("benchmarks", "datasets"):
+            continue
+        dataset = parts[2]
+        relative = parts[3:]
+        if relative[:1] == ("members",) or (
+            len(relative) >= 2
+            and relative[1:] != ("README.md",)
+            and relative[0] not in {"jobs", "members"}
+        ):
+            requiring_bump.add(dataset)
+    missing = sorted(
+        dataset
+        for dataset in requiring_bump
+        if f"benchmarks/datasets/{dataset}/suite.toml" not in changed
+    )
+    if missing:
+        raise _harbor_suite().HarborSuiteError(
+            "benchmark task or membership changes require a dataset version bump in "
+            + ", ".join(
+                f"benchmarks/datasets/{dataset}/suite.toml" for dataset in missing
+            )
+        )
+    if base is None:
+        return
+    unchanged: list[str] = []
+    for dataset in requiring_bump:
+        path = f"benchmarks/datasets/{dataset}/suite.toml"
+        current = tomllib.loads((ROOT / path).read_text(encoding="utf-8"))
+        previous_text = subprocess.run(
+            ["git", "show", f"{base}:{path}"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        ).stdout
+        if not previous_text:
+            continue
+        previous = tomllib.loads(previous_text)
+        if current.get("dataset", {}).get("version") == previous.get("dataset", {}).get(
+            "version"
+        ):
+            unchanged.append(path)
+    if unchanged:
+        raise _harbor_suite().HarborSuiteError(
+            "benchmark dataset version value did not change in "
+            + ", ".join(sorted(unchanged))
+        )
+
+
+def _oracle_matrix(
+    *,
+    scope: str,
+    oracle_tasks: set[str],
+    affected_datasets: set[str],
+    by_task: dict[str, list[tuple[str, Path]]],
+    suites_by_id: dict[str, Any],
+    timings: dict[str, float] | None,
+) -> list[dict[str, Any]]:
+    if scope == "all":
+        return _shard_entries(_harbor_suite().load_registry(), timings=timings)
+    if scope == "affected-datasets":
+        return _shard_entries(
+            [suite for suite in suites_by_id.values() if suite.id in affected_datasets],
+            timings=timings,
+        )
+    return [
+        _exact_entry(dataset, task_id, path)
+        for task_id in sorted(oracle_tasks)
+        for dataset, path in by_task[task_id]
+    ]
+
+
 def plan(
     paths: list[str],
     *,
     event: str = "pull_request",
     force_full: bool = False,
+    timings: dict[str, float] | None = None,
+    base: str | None = None,
 ) -> dict[str, str]:
     if event not in EVENTS:
         raise ValueError(f"unsupported benchmark event: {event}")
     if force_full or event in {"schedule", "workflow_dispatch"}:
         reason = "forced full portfolio" if force_full else f"{event} full portfolio"
-        return _full_plan(reason)
+        return _full_plan(reason, timings=timings)
 
     benchmark_paths = [
         path
@@ -106,6 +251,7 @@ def plan(
             "benchmark-oracle-matrix": "[]",
             "benchmark-plan-reasons": "[]",
         }
+    _require_dataset_version_bumps(benchmark_paths, base=base)
 
     # Merge groups own integration Oracle evidence.  A main push repeats the
     # deterministic contract check for the landed tree without rerunning the
@@ -237,26 +383,14 @@ def plan(
             f"(limit {MAX_PULL_REQUEST_ORACLE_TASKS})"
         )
 
-    if scope == "all":
-        suites = _harbor_suite().load_registry()
-        matrix = [
-            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
-            for suite in suites
-            for ref in suite.tasks
-        ]
-    elif scope == "affected-datasets":
-        matrix = [
-            {"dataset": suite.id, "task": ref.path.name, "digest": _digest(ref.path)}
-            for suite in suites_by_id.values()
-            if suite.id in affected_datasets
-            for ref in suite.tasks
-        ]
-    else:
-        matrix = [
-            {"dataset": dataset, "task": task_id, "digest": _digest(path)}
-            for task_id in sorted(oracle_tasks)
-            for dataset, path in by_task[task_id]
-        ]
+    matrix = _oracle_matrix(
+        scope=scope,
+        oracle_tasks=oracle_tasks,
+        affected_datasets=affected_datasets,
+        by_task=by_task,
+        suites_by_id=suites_by_id,
+        timings=timings,
+    )
 
     if run_oracle and scope == "none":
         scope = "changed-tasks"
@@ -273,12 +407,30 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--event", choices=EVENTS, default="pull_request")
     parser.add_argument("--force-full", action="store_true")
+    parser.add_argument("--timings-file", type=Path)
+    parser.add_argument("--base")
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
     paths = args.paths[1:] if args.paths[:1] == ["--"] else args.paths
     try:
+        timings: dict[str, float] | None = None
+        if args.timings_file is not None:
+            raw_timings = json.loads(args.timings_file.read_text(encoding="utf-8"))
+            if not isinstance(raw_timings, dict) or not all(
+                isinstance(key, str)
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and value > 0
+                for key, value in raw_timings.items()
+            ):
+                parser.error("timings file must map task keys to positive seconds")
+            timings = {key: float(value) for key, value in raw_timings.items()}
         for key, value in plan(
-            paths, event=args.event, force_full=args.force_full
+            paths,
+            event=args.event,
+            force_full=args.force_full,
+            timings=timings,
+            base=args.base,
         ).items():
             print(f"{key}={value}")
     except _harbor_suite().HarborSuiteError as exc:

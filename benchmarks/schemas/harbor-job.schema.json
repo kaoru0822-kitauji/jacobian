@@ -4,7 +4,7 @@
   "title": "Harbor job configuration",
   "description": "Reference contract for Harbor job JSON files committed under each dataset. Jobs select Harbor task bundles directly or use Harbor dataset paths and task-name filters.",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "required": ["jobs_dir", "n_attempts", "timeout_multiplier", "orchestrator", "environment", "agents"],
   "anyOf": [{"required": ["tasks"]}, {"required": ["datasets"]}],
   "properties": {
@@ -13,6 +13,7 @@
     "timeout_multiplier": {"type": "number", "exclusiveMinimum": 0},
     "orchestrator": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": {"type": "string", "minLength": 1},
@@ -22,6 +23,7 @@
     },
     "environment": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["type"],
       "properties": {
         "type": {"type": "string", "minLength": 1},
@@ -38,6 +40,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["name"],
         "properties": {
           "name": {"type": "string", "minLength": 1},
@@ -46,6 +49,7 @@
             "type": "array",
             "items": {
               "type": "object",
+              "additionalProperties": false,
               "required": ["name", "transport", "url"],
               "properties": {
                 "name": {"type": "string", "minLength": 1},
@@ -61,6 +65,7 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["path"],
         "properties": {
           "path": {"type": "string", "minLength": 1},
@@ -75,6 +80,7 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["path"],
         "properties": {"path": {"type": "string", "minLength": 1}}
       }

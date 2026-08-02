@@ -28,7 +28,14 @@ def _plan() -> dict[str, str]:
         "run-benchmark-oracle": "true",
         "benchmark-oracle-scope": "changed-tasks",
         "benchmark-oracle-matrix": json.dumps(
-            [{"dataset": "suite", "task": "task", "digest": "sha256:" + "a" * 64}]
+            [
+                {
+                    "dataset": "suite",
+                    "shard": "task",
+                    "tasks": ["task"],
+                    "task_digests": [{"task": "task", "digest": "sha256:" + "a" * 64}],
+                }
+            ]
         ),
         "benchmark-plan-reasons": json.dumps(["executable task change"]),
     }

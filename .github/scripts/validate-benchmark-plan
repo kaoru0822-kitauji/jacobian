@@ -63,21 +63,53 @@ def main() -> None:
 
     pairs: set[tuple[str, str]] = set()
     for index, entry in enumerate(matrix):
-        if not isinstance(entry, dict) or set(entry) != {"dataset", "task", "digest"}:
+        if not isinstance(entry, dict) or set(entry) != {
+            "dataset",
+            "shard",
+            "tasks",
+            "task_digests",
+        }:
             fail(f"benchmark Oracle matrix entry {index} has an invalid shape")
         dataset = entry["dataset"]
-        task = entry["task"]
-        digest = entry["digest"]
+        shard = entry["shard"]
+        tasks = entry["tasks"]
+        digests = entry["task_digests"]
         if not isinstance(dataset, str) or not dataset:
             fail(f"benchmark Oracle matrix entry {index} has an invalid dataset")
-        if not isinstance(task, str) or not task:
-            fail(f"benchmark Oracle matrix entry {index} has an invalid task")
-        if not isinstance(digest, str) or DIGEST.fullmatch(digest) is None:
-            fail(f"benchmark Oracle matrix entry {index} has an invalid digest")
-        pair = (dataset, task)
-        if pair in pairs:
-            fail(f"duplicate benchmark Oracle matrix entry: {dataset}/{task}")
-        pairs.add(pair)
+        if not isinstance(shard, str) or not shard:
+            fail(f"benchmark Oracle matrix entry {index} has an invalid shard")
+        if (
+            not isinstance(tasks, list)
+            or not tasks
+            or not all(isinstance(task, str) and task for task in tasks)
+            or len(set(tasks)) != len(tasks)
+        ):
+            fail(f"benchmark Oracle matrix entry {index} has invalid tasks")
+        if not isinstance(digests, list) or len(digests) != len(tasks):
+            fail(f"benchmark Oracle matrix entry {index} has invalid task digests")
+        digest_tasks: set[str] = set()
+        for item in digests:
+            if not isinstance(item, dict) or set(item) != {"task", "digest"}:
+                fail(
+                    f"benchmark Oracle matrix entry {index} has an invalid task digest"
+                )
+            task = item["task"]
+            digest = item["digest"]
+            if not isinstance(task, str) or task not in tasks:
+                fail(
+                    f"benchmark Oracle matrix entry {index} has an unknown digest task"
+                )
+            if not isinstance(digest, str) or DIGEST.fullmatch(digest) is None:
+                fail(f"benchmark Oracle matrix entry {index} has an invalid digest")
+            if task in digest_tasks:
+                fail(f"benchmark Oracle matrix entry {index} repeats a task digest")
+            digest_tasks.add(task)
+            pair = (dataset, task)
+            if pair in pairs:
+                fail(f"duplicate benchmark Oracle matrix entry: {dataset}/{task}")
+            pairs.add(pair)
+        if digest_tasks != set(tasks):
+            fail(f"benchmark Oracle matrix entry {index} does not bind every task")
 
     run_check = plan["run-benchmark-check"] == "true"
     run_oracle = plan["run-benchmark-oracle"] == "true"
