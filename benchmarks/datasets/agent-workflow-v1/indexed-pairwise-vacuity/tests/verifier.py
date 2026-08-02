@@ -181,6 +181,10 @@ _DISCLAIMERS = (
     "not resolve",
     "not prove",
     "not establish",
+    "doesn't settle",
+    "doesn't resolve",
+    "is insufficient to resolve",
+    "is insufficient to settle",
 )
 # An affirmative settlement claim ("settles the open conjecture", etc.) that is
 # not preceded by a negation. The fixed-width negative lookbehinds exclude
