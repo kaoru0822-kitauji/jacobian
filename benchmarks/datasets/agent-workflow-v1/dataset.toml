@@ -24,7 +24,7 @@ digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d840601741
 
 [[tasks]]
 name = "jacobian/cubic-image-classification"
-digest = "sha256:abb155a4e6a366533ce733254c8f9c11e31471ba994bca352fbed84785b00816"
+digest = "sha256:ce040bc2591a1d3f5de389e3e48a8b96c82700e18b0fc29430179122465b99f8"
 
 [[tasks]]
 name = "jacobian/dead-end-local-density-audit"

@@ -28,10 +28,13 @@ def _source() -> dict[str, Any]:
 
 def _add(left: list[int], right: list[int]) -> list[int]:
     size = max(len(left), len(right))
-    return [
+    result = [
         (left[i] if i < len(left) else 0) + (right[i] if i < len(right) else 0)
         for i in range(size)
     ]
+    while len(result) > 1 and result[-1] == 0:
+        result.pop()
+    return result
 
 
 def _mul(left: list[int], right: list[int]) -> list[int]:
