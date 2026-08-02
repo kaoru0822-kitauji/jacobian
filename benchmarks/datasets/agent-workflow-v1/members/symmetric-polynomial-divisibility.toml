@@ -1,0 +1,3 @@
+task_id = "symmetric-polynomial-divisibility"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
