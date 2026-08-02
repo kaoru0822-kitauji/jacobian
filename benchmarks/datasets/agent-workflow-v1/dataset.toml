@@ -23,6 +23,10 @@ name = "jacobian/complex-power-sum-elimination"
 digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d8406017410"
 
 [[tasks]]
+name = "jacobian/covering-path-lift-bijection"
+digest = "sha256:7072eeaf565d28dbbecf31c41d831aecf8b1b9016826aea1659d10ff516b612a"
+
+[[tasks]]
 name = "jacobian/dead-end-local-density-audit"
 digest = "sha256:131bb73beb7ee4e44d086a85228d9bdf5d4adadab4951ff1ebc8567c8b020c7a"
 

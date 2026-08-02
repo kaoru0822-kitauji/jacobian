@@ -1,0 +1,3 @@
+task_id = "covering-path-lift-bijection"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:36d91f39d2dd0e5a1547c484ef3d0771ce4c41fe246b1e5345a34cc0b34bc3e0",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -127,6 +127,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
+    },
+    {
+      "task_id": "covering-path-lift-bijection",
+      "mathematical_moves": [
+        "Validate a finite local graph-covering contract and choose a bounded simple base path.",
+        "Construct every unique lift and prove the endpoint transport is inverted by the reversed path."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "graph.compute.properties",
+          "availability": "AVAILABLE",
+          "boundary": "Computes elementary graph properties but does not certify local covering maps or path-lift transport."
+        }
+      ],
+      "gap_classes": [
+        "MISSING_OPERATION",
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "DEFER_RESEARCH",
+      "next_action": "Keep finite path-lift construction as agent-owned composition until another independent covering workflow establishes a reusable contract."
     },
     {
       "task_id": "dead-end-local-density-audit",
