@@ -1,4 +1,5 @@
 import json
+import re
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from verifier_support import (
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
 MAX_INPUT_BYTES = 1_048_576
+MAX_EVIDENCE_BYTES = 1_048_576
 LIMITATION = (
     "The verifier checks exact sequence identities and analytic bounds but does "
     "not formalize Hilbert-space topology in a proof assistant."
@@ -76,7 +78,9 @@ def _source() -> dict[str, Any]:
 
 
 def _fraction(value: object) -> Fraction | None:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or len(value) > 128:
+        return None
+    if not value.replace("/", "", 1).lstrip("+-").isdigit():
         return None
     try:
         result = Fraction(value)
@@ -137,6 +141,7 @@ def _prefixes_ok(
     bound: Fraction,
     length: int,
     growth: tuple[Fraction, int],
+    weighted_shift: bool,
 ) -> bool:
     if not isinstance(prefixes, list) or len(prefixes) != length:
         return False
@@ -156,9 +161,20 @@ def _prefixes_ok(
             or weight > bound
         ):
             return False
-        # Range identity: the limit coordinate is the weight applied to the
-        # forced preimage coordinate (y = T x on the diagonal operator).
-        if limit_coordinates[index - 1] != weight * preimage_coordinate:
+        # A diagonal witness relates coordinates at the same index. A weighted
+        # shift has y_1=0 and y_n=w_{n-1}x_{n-1} for n>=2, so the row's weight
+        # is applied to the preceding forced preimage coordinate.
+        if weighted_shift:
+            relation_ok = (
+                limit_coordinates[index - 1] == 0
+                if index == 1
+                else limit_coordinates[index - 1]
+                == weight
+                * _fraction(prefixes[index - 2]["preimage_coordinate"])
+            )
+        else:
+            relation_ok = limit_coordinates[index - 1] == weight * preimage_coordinate
+        if not relation_ok:
             return False
         limit_partial += limit_coordinates[index - 1] ** 2
         preimage_partial += preimage_coordinate**2
@@ -208,6 +224,31 @@ def _witness(value: object, source: dict[str, Any]) -> bool:
     for key in ("space", "operator", "subspace", "projection", "limit_preimage"):
         if not isinstance(value[key], str) or not value[key].strip():
             return False
+    space = value["space"].casefold()
+    operator = value["operator"].casefold()
+    subspace = value["subspace"].casefold()
+    projection = value["projection"].casefold()
+    preimage = value["limit_preimage"].casefold()
+    if "ell2" not in space or "graph" not in subspace or "closed" not in subspace:
+        return False
+    orthogonal_projection = bool(
+        "second" in projection
+        and (
+            re.search(r"\borthogonal\b", projection)
+            or "(0,v)" in projection.replace(" ", "")
+        )
+        and "nonorthogonal" not in projection
+    )
+    if not orthogonal_projection:
+        return False
+    if not any(term in preimage for term in ("not in ell2", "not square", "not summable")):
+        return False
+    weighted_shift = "weighted shift" in operator
+    if weighted_shift:
+        if not any(term in operator for term in ("1/n", "1/(n", "1 / n", "/n", "/(n")):
+            return False
+    elif "diagonal" not in operator or "1/n" not in operator:
+        return False
     bound = _positive_fraction(value["operator_bound"])
     if bound is None:
         return False
@@ -221,7 +262,14 @@ def _witness(value: object, source: dict[str, Any]) -> bool:
     growth = _parse_growth(value.get("preimage_growth")) or (Fraction(1), 1)
     return bool(
         growth
-        and _prefixes_ok(value["prefixes"], limit_coordinates, bound, length, growth)
+        and _prefixes_ok(
+            value["prefixes"],
+            limit_coordinates,
+            bound,
+            length,
+            growth,
+            weighted_shift,
+        )
         and _tail_bound_ok(limit_coordinates, coefficient, exponent, terms, length)
     )
 
@@ -239,7 +287,7 @@ def _extract_proof(text: str) -> dict[str, Any] | None:
         return None
     try:
         proof = json.loads(proof_marker)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     if not isinstance(proof, dict) or set(proof) != {
         name for name, _ in PROOF_OBLIGATIONS
@@ -265,13 +313,16 @@ def _evidence(value: object, result: object) -> bool:
     ``RESULT_JSON:`` marker and carry a ``PROOF_JSON:`` block whose obligation
     fields each contain a non-trivial argument naming the link they certify.
     """
-    if not evidence_list_is_bound(value):
+    if not isinstance(value, list) or len(value) != 1:
         return False
-    assert isinstance(value, list)
+    if not evidence_list_is_bound(value, expected_path="evidence/answer.txt"):
+        return False
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
     if path is None:
         return False
     try:
+        if path.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
         text = path.read_text()
     except (OSError, UnicodeError):
         return False
@@ -282,6 +333,30 @@ def _evidence(value: object, result: object) -> bool:
         return False
     proof = _extract_proof(text)
     return proof is not None and _proof_ok(proof)
+
+
+def _limitation_is_valid(value: str) -> bool:
+    folded = value.casefold()
+    if "topolog" not in folded or "proof assistant" not in folded:
+        return False
+    affirmative_pattern = re.compile(
+        r"\b(?:formaliz(?:e|ed|es)|verif(?:y|ied|ies)|prove(?:s|d)?)\b"
+        r"[^.;\n]{0,100}\b(?:topolog|proof assistant)\b",
+    )
+    for clause in re.split(r"[.;\n]", folded):
+        affirmative = affirmative_pattern.search(clause)
+        if affirmative and not re.search(
+            r"\b(?:not|no|without|does not|doesn't|cannot)\b",
+            clause[: affirmative.start()],
+        ):
+            return False
+    return bool(
+        re.search(
+            r"\b(?:not|no|without|does not|doesn't|cannot)\b"
+            r"[^.;\n]{0,100}\b(?:formal|topolog|proof assistant)\b",
+            folded,
+        )
+    )
 
 
 def main() -> None:
@@ -298,7 +373,24 @@ def main() -> None:
     result = data.get("result")
     correct = bool(contract and _witness(result, source))
     evidence = bool(correct and _evidence(data.get("evidence"), result))
-    scope = bool(contract and data.get("scope") == expected["required_scope"])
+    declared_scope = data.get("scope")
+    scope = bool(
+        contract
+        and isinstance(declared_scope, str)
+        and (
+            declared_scope == expected["required_scope"]
+            or (
+                all(
+                    term in declared_scope.casefold()
+                    for term in ("closed", "hilbert", "subspace", "orthogonal", "projection")
+                )
+                and any(
+                    term in declared_scope.casefold()
+                    for term in ("nonclosed", "not closed", "non-closed")
+                )
+            )
+        )
+    )
     assurance = bool(
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
@@ -307,9 +399,7 @@ def main() -> None:
         and isinstance(data.get("limitations"), list)
         and any(
             isinstance(item, str)
-            and "topolog" in item.casefold()
-            and "proof assistant" in item.casefold()
-            and "not" in item.casefold()
+            and _limitation_is_valid(item)
             for item in data["limitations"]
         )
     )
