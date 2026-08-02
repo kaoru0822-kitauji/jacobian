@@ -124,9 +124,7 @@ def _valid_predicates(result):
     # exposing pair is accepted in either order; the remaining checks are
     # symmetric in left/right.
     if not (
-        0 <= left < len(references)
-        and 0 <= right < len(references)
-        and left != right
+        0 <= left < len(references) and 0 <= right < len(references) and left != right
     ):
         return False
     unique_parts = list(dict.fromkeys(references))

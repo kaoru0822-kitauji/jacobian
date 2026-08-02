@@ -398,9 +398,7 @@ def test_indexed_pairwise_vacuity_accepts_schema_valid_integral_floats(
     result["subgroup_step"] = float(result["subgroup_step"])
     result["subgroup"] = [float(value) for value in result["subgroup"]]
     result["representatives"] = [float(value) for value in result["representatives"]]
-    result["cosets"] = [
-        [float(value) for value in coset] for coset in result["cosets"]
-    ]
+    result["cosets"] = [[float(value) for value in coset] for coset in result["cosets"]]
     result["part_artifact"]["elements"] = [
         float(value) for value in result["part_artifact"]["elements"]
     ]
@@ -513,9 +511,7 @@ def test_indexed_pairwise_vacuity_rejects_limitation_mentioning_only_keywords(
     )
     submission_path = app / "submission.json"
     submission = json.loads(submission_path.read_text())
-    submission["limitations"] = [
-        "This relates to the open conjecture."
-    ]
+    submission["limitations"] = ["This relates to the open conjecture."]
     support._write_json(submission_path, submission)
 
     rejected = support._run_verifier(task, app, logs)
