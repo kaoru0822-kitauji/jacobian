@@ -6,7 +6,6 @@ from pathlib import Path
 from verifier_support import (
     evidence_list_is_bound,
     false_verified_claim,
-    load_submission,
     resolve_evidence,
     strict_submission_contract,
 )
@@ -59,6 +58,17 @@ def _fits_small_integer(value, maximum):
         return -maximum <= value <= maximum
     except (DecimalException, OverflowError):
         return False
+
+
+def _bounded_index(value, maximum):
+    if not _is_integer(value):
+        return None
+    try:
+        if value < 0 or value > maximum:
+            return None
+        return int(value)
+    except (DecimalException, OverflowError):
+        return None
 
 
 def _valid_cover(result, bounds):
@@ -127,14 +137,12 @@ def _valid_predicates(result):
         or any(not _is_integer(reference) or reference != 0 for reference in references)
     ):
         return False
-    if (
-        not isinstance(pair, list)
-        or len(pair) != 2
-        or not all(_is_integer(index) for index in pair)
-        or not all(_fits_small_integer(index, len(references) - 1) for index in pair)
-    ):
+    if not isinstance(pair, list) or len(pair) != 2:
         return False
-    left, right = int(pair[0]), int(pair[1])
+    left = _bounded_index(pair[0], len(references) - 1)
+    right = _bounded_index(pair[1], len(references) - 1)
+    if left is None or right is None:
+        return False
     # The submission schema only requires two distinct in-range integers, so the
     # exposing pair is accepted in either order; the remaining checks are
     # symmetric in left/right.
@@ -240,14 +248,34 @@ def _load_exact_submission():
         return None
 
 
-def _evidence_valid(evidence):
+def _evidence_valid(evidence, result):
     # The published submission schema caps the evidence array at one descriptor,
     # so require exactly one before awarding evidence validity.
     if not isinstance(evidence, list) or len(evidence) != 1:
         return False
+    descriptor = evidence[0]
+    if (
+        not isinstance(descriptor, dict)
+        or set(descriptor) != {"path", "sha256"}
+        or descriptor.get("path") != "evidence/answer.txt"
+        or not isinstance(descriptor.get("sha256"), str)
+    ):
+        return False
+    target = Path("/app") / "evidence" / "answer.txt"
+    if target is None:
+        return False
+    try:
+        if (
+            target.is_symlink()
+            or not target.is_file()
+            or target.stat().st_size > 1_048_576
+        ):
+            return False
+    except OSError:
+        return False
     if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
         return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    target = resolve_evidence(descriptor, expected_path="evidence/answer.txt")
     if target is None:
         return False
     try:
@@ -257,6 +285,25 @@ def _evidence_valid(evidence):
     except (OSError, UnicodeError):
         return False
     if not all(term in text for term in ("exact cover", "set.range", "vacuously")):
+        return False
+    modulus = result.get("modulus") if isinstance(result, dict) else None
+    step = result.get("subgroup_step") if isinstance(result, dict) else None
+    if type(modulus) is not int or type(step) is not int:
+        return False
+    if not (
+        re.search(rf"\bz\s*/\s*{modulus}\s*z\b", text)
+        or re.search(rf"\b(?:modulus|n)\s*(?:=|is|:)\s*{modulus}\b", text)
+    ):
+        return False
+    subgroup = result.get("subgroup") if isinstance(result, dict) else None
+    subgroup_pattern = None
+    if isinstance(subgroup, list) and all(type(value) is int for value in subgroup):
+        values = r"\s*,\s*".join(str(value) for value in sorted(subgroup))
+        subgroup_pattern = rf"\{{\s*{values}\s*\}}"
+    if not (
+        re.search(rf"\b(?:subgroup\s+)?step\s*(?:=|is|:)\s*{step}\b", text)
+        or (subgroup_pattern is not None and re.search(subgroup_pattern, text))
+    ):
         return False
     # Reject evidence that contradicts the submitted conclusion. The audit
     # asserts an exact cover with a vacuously-true Set.range predicate, so any
@@ -286,7 +333,10 @@ def main():
         verification_record="forbidden",
     )
     math_correct = bool(contract and _valid_result(submission.get("result"), source))
-    evidence_valid = bool(contract and _evidence_valid(submission.get("evidence")))
+    evidence_valid = bool(
+        contract
+        and _evidence_valid(submission.get("evidence"), submission.get("result"))
+    )
     scope_correct = bool(
         contract and submission.get("scope") == expected["required_scope"]
     )
@@ -323,6 +373,7 @@ def main():
     correct = bool(
         contract
         and math_correct
+        and evidence_valid
         and scope_correct
         and assurance_within_ceiling
         and limitations_correct
