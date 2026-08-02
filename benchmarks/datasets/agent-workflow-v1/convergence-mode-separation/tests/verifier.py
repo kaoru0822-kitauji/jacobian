@@ -82,8 +82,6 @@ def _affirmative_solved_or_verified_claim(text):
     negation token in the preceding clause, so negated scope statements such as
     "does not solve" or "not machine verified" are accepted.
     """
-    if re.search(r"\b(machine|formally?)\s+(verified|certified)\b", text.casefold()):
-        return True
     for clause in re.split(r"[.!?;]+", text.casefold()):
         if not any(subject in clause for subject in ("open problem", "lean theorem")):
             continue
@@ -194,6 +192,8 @@ def _evidence_valid(evidence, result):
     if target is None:
         return False
     try:
+        if target.stat().st_size > 1_048_576:
+            return False
         text = target.read_text()
     except (OSError, UnicodeError):
         return False
@@ -288,7 +288,13 @@ def main():
         or _evidence_affirmative_claim(data.get("evidence"))
     )
     correct = bool(
-        contract and math_correct and limitations_correct and not false_certification
+        contract
+        and math_correct
+        and evidence_valid
+        and scope_correct
+        and assurance_correct
+        and limitations_correct
+        and not false_certification
     )
     reward = (
         0
