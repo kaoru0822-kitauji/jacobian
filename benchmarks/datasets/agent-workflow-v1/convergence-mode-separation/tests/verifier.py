@@ -89,7 +89,9 @@ def _affirmative_solved_or_verified_claim(text):
             continue
         words = _words(clause)
         for index, word in enumerate(words):
-            if word in _AFFIRMATIVE_LEMMAS and not any(token in words[max(0, index - 4):index] for token in _NEGATION_TOKENS):
+            if word in _AFFIRMATIVE_LEMMAS and not any(
+                token in words[max(0, index - 4) : index] for token in _NEGATION_TOKENS
+            ):
                 return True
     return False
 
