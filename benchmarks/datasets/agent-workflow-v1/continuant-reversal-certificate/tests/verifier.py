@@ -13,6 +13,12 @@ from verifier_support import (
 W = Path("/app")
 E = Path("/tests")
 MAX_EVIDENCE_BYTES = 1_048_576
+EXPECTED_PROOF = {
+    "base_cases": [{"length": 0, "value": "1"}, {"length": 1, "value": "1"}],
+    "partition": "each_tiling_ends_in_a_square_or_domino",
+    "recurrence": "F_k=F_(k-1)+a_k*F_(k-2)",
+    "reflection": "i_maps_to_n_minus_i_and_is_an_involution",
+}
 
 
 def _load_frozen_input():
@@ -46,13 +52,19 @@ def _parse_supports(value):
         return None
     parsed = []
     for support in value:
-        if not isinstance(support, list) or any(
-            type(item) is not int for item in support
-        ):
+        if not isinstance(support, list):
             return None
-        if support != sorted(set(support)):
+        normalized = []
+        for item in support:
+            if type(item) is int:
+                normalized.append(item)
+            elif type(item) is float and item.is_integer():
+                normalized.append(int(item))
+            else:
+                return None
+        if normalized != sorted(set(normalized)):
             return None
-        parsed.append(tuple(support))
+        parsed.append(tuple(normalized))
     return parsed
 
 
@@ -85,6 +97,7 @@ def _result_is_valid(result, frozen):
         "reverse_monomials",
         "reflection_pairs",
         "recurrence_contract",
+        "proof_obligations",
         "conclusion",
     }:
         return False
@@ -94,9 +107,16 @@ def _result_is_valid(result, frozen):
     supports = _supports(n)
     forward = _parse_supports(result["forward_monomials"])
     reverse = _parse_supports(result["reverse_monomials"])
+    try:
+        forward_set = set(forward)
+        reverse_set = set(reverse)
+    except TypeError:
+        return False
     return bool(
-        forward == supports
-        and reverse == supports
+        len(forward) == len(forward_set) == len(supports)
+        and len(reverse) == len(reverse_set) == len(supports)
+        and forward_set == set(supports)
+        and reverse_set == set(supports)
         and _pairs_are_valid(result["reflection_pairs"], supports, n)
         and result["recurrence_contract"]
         == {
@@ -105,12 +125,17 @@ def _result_is_valid(result, frozen):
             "reverse_coefficient": "a_(n-k)",
             "reflection_rule": "i_maps_to_n_minus_i",
         }
+        and result["proof_obligations"] == EXPECTED_PROOF
         and result["conclusion"] == "FINAL_POLYNOMIALS_EQUAL"
     )
 
 
 def _evidence_matches(evidence):
-    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+    if (
+        not isinstance(evidence, list)
+        or len(evidence) != 1
+        or not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt")
+    ):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
@@ -123,9 +148,22 @@ def _evidence_matches(evidence):
         return False
     if len(text) < 120:
         return False
-    proof = text
-    return all(
-        re.search(pattern, proof, re.IGNORECASE)
+    marker = next(
+        (
+            line[len("result_json:") :].strip()
+            for line in text.splitlines()
+            if line.startswith("result_json:")
+        ),
+        None,
+    )
+    if marker is None:
+        return False
+    try:
+        bound_proof = json.loads(marker)
+    except (TypeError, ValueError):
+        return False
+    return bound_proof == EXPECTED_PROOF and all(
+        re.search(pattern, text, re.IGNORECASE)
         for pattern in (
             r"tiling.{0,160}(?:recurrence|monomial)",
             r"recurrence.{0,160}(?:tiling|reflection)",
@@ -139,9 +177,8 @@ def _limitation_is_valid(limitations):
         return False
     return any(
         isinstance(item, str)
-        and "all real" in item.casefold()
         and re.search(r"\b(?:not|doesn['']?t|cannot|only|finite)\b", item, re.I)
-        and "arbitrary" in item.casefold()
+        and re.search(r"\b(?:all real|arbitrary(?:-n)?|universal)\b", item, re.I)
         for item in limitations
     )
 

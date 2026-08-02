@@ -4,4 +4,4 @@ Let `u_0=u_1=v_0=v_1=1`, `u_(k+1)=u_k+a_k*u_(k-1)`, and `v_(k+1)=v_k+a_(n-k)*v_(
 
 For the frozen board length `n=10`, list every square-free monomial support with no adjacent indices that occurs in each final recurrence polynomial. Then give the complete reflection pairing induced by `i -> n-i`, together with the general recurrence contract.
 
-The verifier independently enumerates the monomials and reflection map. Numeric coefficient substitutions, an answer-only equality, or an unsupported `VERIFIED` claim are insufficient.
+The verifier independently enumerates the monomials and reflection map. Numeric coefficient substitutions, an answer-only equality, or an unsupported `VERIFIED` claim are insufficient. Include a line beginning `RESULT_JSON:` followed by the exact JSON object used for `result.proof_obligations`; this is the structured proof certificate the verifier replays.
