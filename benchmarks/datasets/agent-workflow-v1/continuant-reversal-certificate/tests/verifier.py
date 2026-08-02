@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from verifier_support import (
@@ -58,11 +59,23 @@ def _parse_supports(value):
 def _pairs_are_valid(value, supports, n):
     if not isinstance(value, list) or len(value) != len(supports):
         return False
-    expected = [
-        {"forward": list(support), "reflected": sorted(n - item for item in support)}
+    expected = {
+        tuple(support): tuple(sorted(n - item for item in support))
         for support in supports
-    ]
-    return value == expected
+    }
+    actual = {}
+    for pair in value:
+        if not isinstance(pair, dict) or set(pair) != {"forward", "reflected"}:
+            return False
+        forward = _parse_supports([pair["forward"]])
+        reflected = _parse_supports([pair["reflected"]])
+        if forward is None or reflected is None:
+            return False
+        key = forward[0]
+        if key in actual or key not in expected or reflected[0] != expected[key]:
+            return False
+        actual[key] = reflected[0]
+    return actual == expected
 
 
 def _result_is_valid(result, frozen):
@@ -108,8 +121,28 @@ def _evidence_matches(evidence):
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
+    if len(text) < 120 or "result_json:" not in text:
+        return False
+    proof = text.split("result_json:", 1)[1]
     return all(
-        term in text for term in ("tiling", "recurrence", "reflection", "monomial")
+        re.search(pattern, proof, re.IGNORECASE)
+        for pattern in (
+            r"tiling.{0,160}(?:recurrence|monomial)",
+            r"recurrence.{0,160}(?:tiling|reflection)",
+            r"reflection.{0,160}(?:support|monomial)",
+        )
+    )
+
+
+def _limitation_is_valid(limitations):
+    if not isinstance(limitations, list):
+        return False
+    return any(
+        isinstance(item, str)
+        and "all real" in item.casefold()
+        and re.search(r"\b(?:not|doesn['']?t|cannot|only|finite)\b", item, re.I)
+        and "arbitrary" in item.casefold()
+        for item in limitations
     )
 
 
@@ -135,17 +168,19 @@ def main():
         and submission.get("claimed_assurance") == expected["maximum_assurance"]
     )
     limitation_correct = bool(
-        contract
-        and any(
-            "all real" in item.casefold() and "not" in item.casefold()
-            for item in submission.get("limitations", [])
-        )
+        contract and _limitation_is_valid(submission.get("limitations"))
     )
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
     correct = bool(
-        contract and math_correct and limitation_correct and not false_certification
+        contract
+        and math_correct
+        and evidence_valid
+        and scope_correct
+        and assurance_correct
+        and limitation_correct
+        and not false_certification
     )
     reward = (
         0
