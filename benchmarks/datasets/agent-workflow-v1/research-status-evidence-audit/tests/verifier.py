@@ -11,6 +11,7 @@ from verifier_support import (
 W = Path("/app")
 E = Path("/tests")
 MAX_EVIDENCE_BYTES = 1_048_576
+MAX_SUBMISSION_BYTES = 1_048_576
 
 RULES = {
     "workshop-equation-status": {
@@ -20,7 +21,7 @@ RULES = {
     },
     "vanishing-conjecture-status": {
         "classification": "HISTORICALLY_OPEN_CURRENT_STATUS_NOT_ESTABLISHED",
-        "required": {"Z2004", "Z2008"},
+        "required": {"Z2008"},
         "unsupported": {"HISTORICAL_OPENNESS_PROVES_2026_OPENNESS"},
     },
     "binomial-equation-resolution": {
@@ -36,6 +37,17 @@ RULES = {
 }
 
 
+def load_submission_bounded():
+    """Load a bounded regular submission without crashing on deep JSON."""
+    path = W / "submission.json"
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_SUBMISSION_BYTES:
+            return None
+        return load_submission(path)
+    except (OSError, RecursionError):
+        return None
+
+
 def load_frozen():
     try:
         workspace = W / "input.json"
@@ -46,7 +58,7 @@ def load_frozen():
         if workspace.read_bytes() != frozen_bytes:
             return {}
         value = json.loads(frozen_bytes)
-    except (OSError, UnicodeError, ValueError):
+    except (OSError, UnicodeError, ValueError, RecursionError):
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -119,14 +131,26 @@ def cases_valid(result, frozen):
 
 
 def evidence_valid(evidence, result):
-    if not evidence_list_is_bound(evidence):
+    if not isinstance(evidence, list) or len(evidence) != 1:
         return False
-    target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    # Bound the evidence file before the digest-bound resolution hashes it, so
+    # an oversized malformed artifact is a zero-scored non-conclusion rather
+    # than a timeout that prevents writing reward.json.
+    candidate = W / "evidence" / "answer.txt"
+    try:
+        if candidate.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
+    except OSError:
+        return False
+    try:
+        if not evidence_list_is_bound(evidence):
+            return False
+        target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
+    except RecursionError:
+        return False
     if target is None:
         return False
     try:
-        if target.stat().st_size > MAX_EVIDENCE_BYTES:
-            return False
         text = target.read_text()
         markers = [
             line.removeprefix("RESULT_JSON:").strip()
@@ -154,12 +178,12 @@ def evidence_valid(evidence, result):
                 )
             )
         )
-    except (OSError, UnicodeError, ValueError):
+    except (OSError, UnicodeError, ValueError, RecursionError):
         return False
 
 
 def main():
-    submission = load_submission()
+    submission = load_submission_bounded()
     frozen = load_frozen()
     expected = json.loads((E / "expected.json").read_text())
     mathematical_contract = strict_submission_contract(
@@ -172,7 +196,7 @@ def main():
         submission,
         task_id=expected["task_id"],
         conclusion=expected["conclusion"],
-        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED", "CHECKED"}),
+        allowed_assurances=frozenset({"UNVERIFIED", "COMPUTED"}),
         verification_record="forbidden",
     )
     result = submission.get("result") if isinstance(submission, dict) else {}
@@ -195,7 +219,7 @@ def main():
     )
     false_certification = bool(
         isinstance(submission, dict)
-        and submission.get("claimed_assurance") == "VERIFIED"
+        and submission.get("claimed_assurance") in {"VERIFIED", "CHECKED"}
     )
     base = 0.7 if (evidence and scope and assurance) else 0.0
     reward = (

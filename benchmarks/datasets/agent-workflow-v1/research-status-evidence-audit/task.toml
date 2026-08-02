@@ -21,7 +21,7 @@ category = "mathematics"
 tags = ["research-audit", "citation-grounding", "status-calibration", "offline"]
 case_version = "agent-workflow-v1"
 contamination_class = "public-dataset-derived-research-audit"
-fixture_digest = "sha256:4dbfc8ffabbac242e6e88a868a5615ca9b1fe055027cb343e7ec773f9071deca"
+fixture_digest = "sha256:7c1961f51159cfccfc66246bc8dd374f4d635de247a57f20adeda85b7d114e36"
 derivation = "Derived from ResearchMath-14k test rows 0, 1, 2, and 5 at revision f22d0f28b55e6e777acf82e722d97ae982dff02e."
 
 [agent]

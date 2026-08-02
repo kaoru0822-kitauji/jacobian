@@ -344,6 +344,63 @@ def test_research_status_audit_rejects_oversized_evidence(
     assert rejected["evidence_validity"] == 0.0
 
 
+def test_research_status_audit_oversized_evidence_does_not_block_reward_record(
+    tmp_path: Path,
+) -> None:
+    """The evidence byte bound fires before the digest-bound resolution hashes
+    the file, so an oversized malformed artifact yields a complete reward.json
+    (math still correct, evidence rejected) instead of a verifier timeout.
+    """
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    evidence_path = app / "evidence" / "answer.txt"
+    submission = json.loads((app / "submission.json").read_text())
+    evidence_path.write_text("x" * 2_097_152)
+    # A deliberately wrong digest proves the size gate, not the hash, rejects.
+    submission["evidence"][0]["sha256"] = "sha256:" + "0" * 64
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.2)
+
+
+def test_research_status_audit_rejects_deeply_nested_submission(
+    tmp_path: Path,
+) -> None:
+    """A deeply nested JSON payload overflows the CPython recursion limit; the
+    verifier treats it as a malformed submission and writes reward.json with
+    zero reward instead of crashing without a record.
+    """
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    (app / "submission.json").write_text("[" * 12000 + "1" + "]" * 12000)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_research_status_audit_rejects_checked_assurance_above_ceiling(
+    tmp_path: Path,
+) -> None:
+    """CHECKED is above the task's COMPUTED assurance ceiling, so it is an
+    unsupported certification for this task and forces reward to zero rather
+    than granting the partial reward a below-ceiling mismatch would earn.
+    """
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = "CHECKED"
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
 def test_research_status_audit_rejects_invalid_utf8_evidence(
     tmp_path: Path,
 ) -> None:

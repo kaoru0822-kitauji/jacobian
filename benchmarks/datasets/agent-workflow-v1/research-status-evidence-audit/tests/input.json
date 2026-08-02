@@ -19,7 +19,7 @@
     {
       "case_id": "vanishing-conjecture-status",
       "reported_status": "open",
-      "problem": "Degree-four Vanishing Conjecture for Hessian-nilpotent polynomials.",
+      "problem": "Vanishing Conjecture for Hessian-nilpotent polynomials.",
       "report_claim": "The conjecture remains open at the 2026 cutoff.",
       "citations": [
         {"id": "Z2004", "year": 2004, "url": "https://arxiv.org/abs/math/0409534", "text": "Introduces the Vanishing Conjecture and relates it to the Jacobian Conjecture."},
