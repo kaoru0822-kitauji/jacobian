@@ -1,5 +1,6 @@
 import json
 import re
+from decimal import Decimal
 from pathlib import Path
 
 from verifier_support import (
@@ -34,6 +35,8 @@ def _is_integer(value):
         return True
     if isinstance(value, float):
         return value.is_integer()
+    if isinstance(value, Decimal):
+        return value == value.to_integral_value()
     return False
 
 
@@ -205,6 +208,16 @@ def _limitation_disclaims_conjecture(text):
     return any(disclaimer in lowered for disclaimer in _DISCLAIMERS)
 
 
+def _load_exact_submission():
+    path = Path("/app/submission.json")
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576:
+            return None
+        return json.loads(path.read_text(), parse_float=Decimal)
+    except (OSError, UnicodeError, ValueError, RecursionError):
+        return None
+
+
 def _evidence_valid(evidence):
     # The published submission schema caps the evidence array at one descriptor,
     # so require exactly one before awarding evidence validity.
@@ -239,7 +252,7 @@ def _evidence_valid(evidence):
 
 
 def main():
-    submission = load_submission()
+    submission = _load_exact_submission()
     source = json.loads((E / "input.json").read_text())
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
@@ -261,11 +274,12 @@ def main():
         contract
         and isinstance(submission.get("limitations"), list)
         and submission.get("limitations")
-        and any(
+        and all(
             _limitation_disclaims_conjecture(item)
             for item in submission.get("limitations", [])
             if isinstance(item, str)
         )
+        and all(isinstance(item, str) for item in submission.get("limitations", []))
     )
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
