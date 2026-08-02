@@ -50,6 +50,8 @@ def _parse_polynomial(value, maximum_degree):
             coefficient = Fraction(term["coefficient"])
         except (TypeError, ValueError, ZeroDivisionError):
             return None
+        if coefficient.denominator != 1:
+            return None
         exponent = tuple(exponents)
         if (
             coefficient == 0
