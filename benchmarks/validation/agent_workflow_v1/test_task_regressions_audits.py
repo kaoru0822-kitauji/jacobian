@@ -192,7 +192,8 @@ def test_series_domain_audit_accepts_alternative_denominator(tmp_path: Path) -> 
     for block in result["blocks"]:
         block["block_sum_power_lower_bound"] = 2 ** (4 * block["level"] - 1)
     (app / "evidence" / "answer.txt").write_text(
-        "For q=5 the general dyadic block lower bound proves divergence. "
+        "For q=5 the general dyadic block lower bound is 2^(4k-1), "
+        "which proves divergence. "
         "The block sums do not tend to zero. The returned zero is a fallback "
         "artifact, not an analytic-continuation zero.\n"
     )

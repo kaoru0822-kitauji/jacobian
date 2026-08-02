@@ -139,21 +139,29 @@ def _limitation_is_valid(limitations):
         return False
     disclaimer = re.compile(
         r"(?:\b(?:not|no|doesn['']?t|cannot|without|only|unverified|unassessed)\b"
-        r".{0,100}(?:analytic continuation|genuine zeta zero|zeta zero)|"
-        r"(?:analytic continuation|genuine zeta zero|zeta zero).{0,100}"
+        r".{0,100}(?:analytic[- ]continuation|genuine zeta zero|zeta zero)|"
+        r"(?:analytic[- ]continuation|genuine zeta zero|zeta zero).{0,100}"
         r"\b(?:not|no|doesn['']?t|cannot|without|unverified|unassessed)\b)",
         re.I,
     )
     affirmative = re.compile(
         r"\b(?:verif(?:y|ies)|prove(?:s|n)?|establish(?:es|ed)?|"
         r"certif(?:y|ies|ied)|show(?:s|n)?|demonstrat(?:e|es|ed))\b"
-        r"[^.;\n]{0,120}\b(?:analytic continuation|genuine zeta zero|zeta zero)\b|"
-        r"\b(?:analytic continuation|genuine zeta zero|zeta zero)\b"
+        r"[^.;\n]{0,120}\b(?:analytic[- ]continuation|genuine zeta zero|zeta zero)\b|"
+        r"\b(?:analytic[- ]continuation|genuine zeta zero|zeta zero)\b"
         r"[^.;\n]{0,80}\b(?:is|was|has been)\s+(?:verified|proved|established|certified)\b",
         re.I,
     )
     items = [item for item in limitations if isinstance(item, str)]
-    return bool(items and not any(affirmative.search(item) for item in items) and any(disclaimer.search(item) for item in items))
+    positive_claim = any(
+        affirmative.search(clause)
+        and not re.search(
+            r"\b(?:not|no|never|without|doesn['']?t|cannot)\b", clause, re.I
+        )
+        for item in items
+        for clause in re.split(r"(?:[.;\n]|,\s*(?:but|however)\b)", item, flags=re.I)
+    )
+    return bool(items and not positive_claim and any(disclaimer.search(item) for item in items))
 
 
 def main():
