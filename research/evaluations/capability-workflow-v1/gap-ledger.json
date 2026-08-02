@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:f39b42871aadafd238ac5d02da977a0991bc88e1eccebe8d951d6a420630f60f",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -849,6 +849,26 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Retain as a fail-closed assurance and producer-to-checker regression."
+    },
+    {
+      "task_id": "squarefree-class-independence-audit",
+      "mathematical_moves": [
+        "Classify positive integers by squarefree kernel and translate square products into equality of class keys.",
+        "Convert the ordered-pair count into a sum of squared class sizes and independent selection into a class transversal.",
+        "Certify with exhaustive modular residues that 2023 is not a sum of at most three squares."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "modular.enumerate.quadratic_residues",
+          "availability": "AVAILABLE",
+          "boundary": "Computes one residue image but does not connect an equivalence-class count to a universal transversal conclusion."
+        }
+      ],
+      "gap_classes": ["EXISTING_WORKS", "MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Compose existing residue enumeration with agent-owned squarefree-class reasoning; do not create a theorem-specific wrapper."
     },
     {
       "task_id": "subspace-direct-sum-counterexample",

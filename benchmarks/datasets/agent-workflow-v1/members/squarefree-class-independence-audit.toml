@@ -1,0 +1,3 @@
+task_id = "squarefree-class-independence-audit"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"

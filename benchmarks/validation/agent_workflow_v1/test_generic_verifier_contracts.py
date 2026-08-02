@@ -134,6 +134,10 @@ def test_resource_derived_oracles_and_assurance_boundary(
             "random-function-expectation-audit",
             lambda result: result.update(expected_value="2025"),
         ),
+        (
+            "squarefree-class-independence-audit",
+            lambda result: result["modular_obstruction"].update(target_residue=6),
+        ),
     ],
 )
 def test_resource_derived_verifiers_reject_corrupted_witnesses(
