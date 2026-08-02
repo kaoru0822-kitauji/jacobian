@@ -112,6 +112,18 @@ def _result_is_valid(result, frozen):
         reverse_set = set(reverse)
     except TypeError:
         return False
+    proof_obligations = result["proof_obligations"]
+    proof_lengths_ok = (
+        isinstance(proof_obligations, dict)
+        and isinstance(proof_obligations.get("base_cases"), list)
+        and len(proof_obligations["base_cases"]) == 2
+        and all(
+            isinstance(case, dict)
+            and type(case.get("length")) is int
+            and isinstance(case.get("value"), str)
+            for case in proof_obligations["base_cases"]
+        )
+    )
     return bool(
         len(forward) == len(forward_set) == len(supports)
         and len(reverse) == len(reverse_set) == len(supports)
@@ -131,7 +143,8 @@ def _result_is_valid(result, frozen):
             "reverse_coefficient": "a_(n-k)",
             "reflection_rule": "i_maps_to_n_minus_i",
         }
-        and result["proof_obligations"] == EXPECTED_PROOF
+        and proof_lengths_ok
+        and proof_obligations == EXPECTED_PROOF
         and result["conclusion"] == "FINAL_POLYNOMIALS_EQUAL"
     )
 
