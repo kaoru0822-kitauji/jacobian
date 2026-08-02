@@ -185,9 +185,9 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	} | sort -u); \
 	$(HARBOR_PYTHON) .github/scripts/plan-benchmarks $(if $(BASE),--base "$(BASE)",) -- $$changed_paths
 
-harbor-sync: ## Update vendored verifier support and deterministic task digests.
+harbor-sync: ## Update vendored verifier support and validate leaf-only datasets.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --write
-	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 
 harbor-check: ## Run Harbor topology, digest, provenance, and host-side validation checks.
 	$(UV_RUN) python tools/sync_harbor_verifier_support.py --check
