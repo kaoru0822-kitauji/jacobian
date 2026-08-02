@@ -20,6 +20,7 @@ from benchmarks.tooling.harbor_suite import (
     get_suite,
     task_digest,
 )
+from jacobian.eval.telemetry import parse_agent_transcript
 
 
 def _read_json(path: Path) -> Any:
@@ -187,7 +188,13 @@ def _read_trace(path: Path, calls: Counter[str]) -> int:
 
 def _trace_summary(trial_path: Path | None) -> dict[str, Any]:
     if trial_path is None:
-        return {"artifacts": [], "tool_calls": {}, "tool_errors": 0}
+        return {
+            "artifacts": [],
+            "tool_calls": {},
+            "tool_errors": 0,
+            "raw_transcript_present": False,
+            "telemetry": {},
+        }
     root = trial_path.parent
     candidates = sorted(
         path
@@ -195,7 +202,7 @@ def _trace_summary(trial_path: Path | None) -> dict[str, Any]:
         if path.is_file()
         and any(
             marker in path.name.lower()
-            for marker in ("trajectory", "atif", "telemetry")
+            for marker in ("trajectory", "atif", "telemetry", "codex.txt")
         )
     )
     calls: Counter[str] = Counter()
@@ -204,10 +211,21 @@ def _trace_summary(trial_path: Path | None) -> dict[str, Any]:
         for path in candidates
     ]
     errors = sum(_read_trace(path, calls) for path in candidates)
+    transcript = root / "agent" / "codex.txt"
+    telemetry: dict[str, Any] = {}
+    telemetry_error: str | None = None
+    if transcript.is_file():
+        try:
+            telemetry = parse_agent_transcript(transcript)
+        except (OSError, ValueError) as exc:
+            telemetry_error = str(exc)
     return {
         "artifacts": artifacts,
         "tool_calls": dict(sorted(calls.items())),
         "tool_errors": errors,
+        "raw_transcript_present": transcript.is_file(),
+        "telemetry": telemetry,
+        "telemetry_error": telemetry_error,
     }
 
 
@@ -430,6 +448,252 @@ def build_observation_evidence(
         "validation_failures": failures,
     }
     return evidence, failures
+
+
+def _resolved_config_state(
+    config: dict[str, Any],
+) -> tuple[list[Any], bool, list[str]]:
+    agents = config.get("agents")
+    if not isinstance(agents, list) or len(agents) != 1:
+        return [], False, ["resolved config must contain exactly one agent"]
+    agent = agents[0]
+    if not isinstance(agent, dict) or agent.get("name") != "codex":
+        return [], False, ["resolved config must select the Codex agent"]
+    servers = agent.get("mcp_servers", [])
+    if not isinstance(servers, list):
+        return [], False, ["resolved agent mcp_servers must be an array"]
+    environment = _object(config.get("environment"))
+    compose = environment.get("extra_docker_compose", [])
+    if not isinstance(compose, list):
+        return [], False, ["resolved extra_docker_compose must be an array"]
+    has_sidecar = any(
+        Path(str(value)).name == "jacobian-observation.compose.yaml"
+        for value in compose
+    )
+    return servers, has_sidecar, []
+
+
+def resolved_config_failures(config: dict[str, Any], *, condition: str) -> list[str]:
+    """Validate the resolved Harbor condition before model execution."""
+
+    if condition not in {"control", "treatment"}:
+        return [f"unknown observation condition: {condition}"]
+    servers, has_sidecar, failures = _resolved_config_state(config)
+    if failures:
+        return failures
+    expected_server = {
+        "name": "jacobian",
+        "transport": "streamable-http",
+        "url": "http://jacobian:8000/mcp",
+    }
+    if condition == "treatment":
+        if servers != [expected_server]:
+            failures.append("treatment does not contain the exact Jacobian MCP server")
+        if not has_sidecar:
+            failures.append("treatment does not contain the Jacobian sidecar compose")
+    else:
+        if servers:
+            failures.append("control unexpectedly contains MCP servers")
+        if has_sidecar:
+            failures.append("control unexpectedly contains the Jacobian sidecar")
+    return failures
+
+
+def _opportunity(task_ref: Any) -> dict[str, Any]:
+    value = task_ref.tool_opportunity
+    if value is None:
+        return {
+            "value": "UNASSESSED",
+            "relevant_capability_ids": [],
+            "rationale": None,
+        }
+    return {
+        "value": value.value,
+        "relevant_capability_ids": list(value.relevant_capability_ids),
+        "rationale": value.rationale,
+    }
+
+
+def _described_routing_status(
+    descriptions: object,
+    *,
+    relevant_capability_ids: object,
+) -> str | None:
+    if not isinstance(descriptions, list) or not descriptions:
+        return None
+    observed_ids: set[str] = set()
+    for description in descriptions:
+        if not isinstance(description, dict):
+            continue
+        capability_id = description.get("capability_id")
+        if isinstance(capability_id, str):
+            observed_ids.add(capability_id)
+        matches = description.get("match_ids", [])
+        if isinstance(matches, list):
+            observed_ids.update(item for item in matches if isinstance(item, str))
+    relevant = (
+        set(relevant_capability_ids)
+        if isinstance(relevant_capability_ids, list)
+        else set()
+    )
+    return (
+        "DISCOVERY_MISS"
+        if relevant and not (relevant & observed_ids)
+        else "DESCRIBED_NOT_INVOKED"
+    )
+
+
+def _routing_status(
+    *,
+    condition: str,
+    config_failures: list[str],
+    trace: dict[str, Any],
+    opportunity: dict[str, Any],
+) -> str:
+    if condition == "control":
+        return "NOT_CONFIGURED"
+    if config_failures:
+        return "HARNESS_UNAVAILABLE"
+    if not trace.get("raw_transcript_present") or trace.get("telemetry_error"):
+        return "EVIDENCE_INCOMPLETE"
+    telemetry = _object(trace.get("telemetry"))
+    calls = telemetry.get("mcp_calls", [])
+    if not isinstance(calls, list) or not calls:
+        return "AVAILABLE_NO_CALL"
+    completed = telemetry.get("capability_ids", [])
+    if isinstance(completed, list) and completed:
+        return "USED"
+    attempted = telemetry.get("capability_attempt_ids", [])
+    if isinstance(attempted, list) and attempted:
+        return "INVOKE_FAILED"
+    described_status = _described_routing_status(
+        telemetry.get("capability_descriptions", []),
+        relevant_capability_ids=opportunity.get("relevant_capability_ids", []),
+    )
+    return described_status or "AVAILABLE_NO_CALL"
+
+
+def _routing_summary(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    statuses = Counter(str(trial["routing_status"]) for trial in trials)
+    by_opportunity: dict[str, dict[str, Any]] = {}
+    for value in ("NONE", "OPTIONAL", "HIGH", "UNASSESSED"):
+        selected = [trial for trial in trials if trial["opportunity"]["value"] == value]
+        used = sum(trial["routing_status"] == "USED" for trial in selected)
+        by_opportunity[value] = {
+            "trials": len(selected),
+            "used": used,
+            "adoption_rate": used / len(selected) if selected else None,
+        }
+    return {
+        "trial_count": len(trials),
+        "routing_status_counts": dict(sorted(statuses.items())),
+        "by_tool_opportunity": by_opportunity,
+    }
+
+
+def build_routing_observation(
+    *,
+    dataset: str,
+    condition: str,
+    resolved_config_path: Path,
+    jobs_dir: Path,
+    result_path: Path | None = None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Build a value-aware routing report without changing mathematical rewards."""
+
+    config = _read_json(resolved_config_path)
+    if not isinstance(config, dict):
+        raise HarborSuiteError("resolved Harbor config must be an object")
+    config_failures = resolved_config_failures(config, condition=condition)
+    result_path = (result_path or _find_result(jobs_dir)).resolve()
+    payload = _read_json(result_path)
+    if not isinstance(payload, dict):
+        raise HarborSuiteError("Harbor result must be an object")
+    raw_trials = _trial_results(result_path, payload)
+    raw_trials.sort(
+        key=lambda pair: (
+            _task_id(pair[1].get("task_name")),
+            str(pair[1].get("trial_name", "")),
+        )
+    )
+    suite = get_suite(dataset)
+    refs = {ref.path.name: ref for ref in suite.tasks}
+    expected_tasks = _expected_tasks(config, set(refs))
+    raw_attempts = config.get("n_attempts")
+    attempts = raw_attempts if isinstance(raw_attempts, int) else 0
+    expected_digests = {
+        task: "sha256:" + task_digest(refs[task].path).removeprefix("sha256:")
+        for task in expected_tasks
+        if task in refs
+    }
+    counters: Counter[str] = Counter()
+    trials: list[dict[str, Any]] = []
+    normalized_for_validation: list[dict[str, Any]] = []
+    for path, raw in raw_trials:
+        task = _task_id(raw.get("task_name"))
+        repetition = counters[task]
+        counters[task] += 1
+        trace = _trace_summary(path)
+        opportunity = (
+            _opportunity(refs[task])
+            if task in refs
+            else {
+                "value": "UNASSESSED",
+                "relevant_capability_ids": [],
+                "rationale": None,
+            }
+        )
+        verifier = _object(raw.get("verifier_result"))
+        trial = {
+            "task": task,
+            "repetition": repetition,
+            "opportunity": opportunity,
+            "routing_status": _routing_status(
+                condition=condition,
+                config_failures=config_failures,
+                trace=trace,
+                opportunity=opportunity,
+            ),
+            "rewards": _object(verifier.get("rewards")),
+            "telemetry": trace.get("telemetry", {}),
+            "trace_artifacts": trace.get("artifacts", []),
+            "raw_result_digest": _sha256(path)
+            if path is not None
+            else _json_digest(raw),
+        }
+        trials.append(trial)
+        normalized_for_validation.append(_normalize_trial(path, raw, repetition))
+    failures = [*config_failures]
+    failures.extend(
+        _observation_failures(
+            counters=counters,
+            expected_tasks=expected_tasks,
+            attempts=attempts,
+            expected_digests=expected_digests,
+            trials=normalized_for_validation,
+            payload=payload,
+        )
+    )
+    failures.extend(
+        f"{trial['task']} repetition {trial['repetition']}: routing evidence is incomplete"
+        for trial in trials
+        if trial["routing_status"] == "EVIDENCE_INCOMPLETE"
+    )
+    report = {
+        "schema_version": "1",
+        "status": "VALID" if not failures else "INCOMPLETE",
+        "source_sha": _git_sha(),
+        "dataset": suite.id,
+        "condition": condition,
+        "resolved_config": {
+            "path": _display_path(resolved_config_path),
+            "digest": _sha256(resolved_config_path),
+        },
+        "summary": _routing_summary(trials),
+        "trials": trials,
+        "validation_failures": failures,
+    }
+    return report, failures
 
 
 def _number(value: Any) -> float | None:
@@ -809,6 +1073,20 @@ def render_markdown(report: dict[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+    config_parser = subparsers.add_parser("validate-config")
+    config_parser.add_argument("--config", type=Path, required=True)
+    config_parser.add_argument(
+        "--condition", choices=("control", "treatment"), required=True
+    )
+    routing_parser = subparsers.add_parser("route")
+    routing_parser.add_argument("--dataset", required=True)
+    routing_parser.add_argument(
+        "--condition", choices=("control", "treatment"), required=True
+    )
+    routing_parser.add_argument("--config", type=Path, required=True)
+    routing_parser.add_argument("--jobs-dir", type=Path, required=True)
+    routing_parser.add_argument("--result", type=Path)
+    routing_parser.add_argument("--output", type=Path, required=True)
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--dataset", required=True)
     validate_parser.add_argument("--condition", required=True)
@@ -829,6 +1107,32 @@ def main() -> int:
     compare_parser.add_argument("--treatment", type=Path, required=True)
     compare_parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if args.command == "validate-config":
+        config = _read_json(args.config)
+        if not isinstance(config, dict):
+            raise HarborSuiteError("resolved Harbor config must be an object")
+        failures = resolved_config_failures(config, condition=args.condition)
+        if failures:
+            for failure in failures:
+                print(failure)
+            return 1
+        print(args.config)
+        return 0
+    if args.command == "route":
+        report, failures = build_routing_observation(
+            dataset=args.dataset,
+            condition=args.condition,
+            resolved_config_path=args.config,
+            jobs_dir=args.jobs_dir,
+            result_path=args.result,
+        )
+        _validate_contract(report, "routing-observation.schema.json")
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(args.output)
+        return 1 if failures else 0
     if args.command == "validate":
         runtime = _read_json(args.runtime_snapshot) if args.runtime_snapshot else None
         heldout = _read_json(args.heldout_manifest) if args.heldout_manifest else None
@@ -885,7 +1189,9 @@ if __name__ == "__main__":
 
 __all__ = [
     "build_observation_evidence",
+    "build_routing_observation",
     "collect_heldout_evidence",
     "compare_evidence",
     "render_markdown",
+    "resolved_config_failures",
 ]

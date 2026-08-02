@@ -1,0 +1,1 @@
+{"task_id":"jacobian/graph-atlas-enumeration","order":7,"graph_kind":"finite simple undirected","equivalence":"vertex relabelling","constraints":{"connected":true,"triangle_free":true,"bipartite":false,"minimum_degree_at_least":2}}

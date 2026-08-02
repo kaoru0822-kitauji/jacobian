@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:4850dc773b6968080e52837a7940759e30cf2fd1b92c3804a34bd209ba49565b",
+    "task_count": 39,
+    "manifest_sha256": "sha256:738a4bee90a4e97543bfec1cbcf3af71a5d7588ab3ead034d4d064b77b4b309f",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -325,6 +325,27 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Inspect model traces for artifact handoff friction before changing the portfolio."
+    },
+    {
+      "task_id": "graph-atlas-enumeration",
+      "mathematical_moves": [
+        "Enumerate every order-seven graph satisfying four exact constraints.",
+        "Quotient the finite result by graph isomorphism and bind completeness to the exact order."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "graph.search.atlas",
+          "availability": "AVAILABLE",
+          "boundary": "Directly searches all Graph Atlas representatives at one exact order, reports the complete finite match count, and returns replayable graph artifacts."
+        }
+      ],
+      "gap_classes": [
+        "EXISTING_WORKS"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "USE_EXISTING",
+      "next_action": "Use this as a high-opportunity routing calibration case; do not add another graph-enumeration producer."
     },
     {
       "task_id": "graph-counterexample",

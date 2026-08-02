@@ -19,6 +19,18 @@ make agent-eval DATASET=agent-workflow-v1 \
   JACOBIAN_ENABLED=1 EVAL_EXECUTE=1
 ```
 
+Before model execution the treatment resolves and validates the Harbor config,
+then waits for a read-only MCP readiness probe to initialize the sidecar, list
+the exact tool surface, read the catalog, and describe a required core
+capability. After execution, `routing-observation.json` classifies every Codex
+trial as unavailable, available without a call, a discovery miss, described
+without invocation, invocation failure, or successful use. A correct zero-call
+trial is an observation rather than a verifier failure.
+
+Evaluator-only `[tool_opportunity]` metadata lives in `members/*.toml` and is
+never mounted into task or verifier containers. Reports stratify adoption by
+`NONE`, `OPTIONAL`, and `HIGH`; raw call count is not a success metric.
+
 Use `TASKS=graph-counterexample` for a small run. Harbor loads the task bundles
 from this dataset directory and applies the task-name filter; Jacobian does not
 render or rewrite a Harbor task selection. The MCP endpoint is supplied through

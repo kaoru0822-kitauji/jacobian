@@ -11,7 +11,7 @@
   "public_reproduction": {
     "path": "benchmarks/datasets/agent-workflow-v1",
     "task_count": 38,
-    "manifest_digest": "sha256:4850dc773b6968080e52837a7940759e30cf2fd1b92c3804a34bd209ba49565b",
+    "manifest_digest": "sha256:738a4bee90a4e97543bfec1cbcf3af71a5d7588ab3ead034d4d064b77b4b309f",
     "contamination": "PUBLIC_ANSWER_VISIBLE",
     "causal_claims_allowed": false
   },

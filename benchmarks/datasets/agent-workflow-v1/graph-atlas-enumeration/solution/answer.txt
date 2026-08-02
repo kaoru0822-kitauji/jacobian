@@ -1,0 +1,1 @@
+The complete order-seven sweep has 8 isomorphism classes satisfying all four constraints. Each submitted graph is connected, triangle-free, non-bipartite, and has minimum degree at least two. Canonicalizing every representative over all 7! vertex permutations gives eight distinct labels, and the label set agrees with the frozen complete order-seven enumeration.

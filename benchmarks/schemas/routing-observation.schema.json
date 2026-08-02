@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jacobian.invalid/benchmarks/schemas/routing-observation.schema.json",
+  "title": "Jacobian Harbor tool-routing observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "source_sha", "dataset", "condition", "resolved_config", "summary", "trials", "validation_failures"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "status": {"enum": ["VALID", "INCOMPLETE"]},
+    "source_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "dataset": {"type": "string", "minLength": 1},
+    "condition": {"enum": ["control", "treatment"]},
+    "resolved_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "summary": {"type": "object"},
+    "trials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task", "repetition", "opportunity", "routing_status", "rewards", "telemetry", "raw_result_digest"]
+      }
+    },
+    "validation_failures": {"type": "array", "items": {"type": "string"}}
+  }
+}

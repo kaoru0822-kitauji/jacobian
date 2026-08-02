@@ -91,6 +91,49 @@ def test_total_domination_accepts_reordered_exact_witnesses(
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_graph_atlas_enumeration_accepts_reordered_representatives(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path,
+        "graph-atlas-enumeration",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["representatives"].reverse()
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate"])
+def test_graph_atlas_enumeration_rejects_incomplete_class_sets(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path,
+        "graph-atlas-enumeration",
+        "computed",
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    representatives = submission["result"]["representatives"]
+    if mutation == "missing":
+        representatives.pop()
+        submission["result"]["class_count"] = 7
+    else:
+        representatives[-1] = representatives[0]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 def test_autoformalization_audit_accepts_alternative_exact_witnesses(
     tmp_path: Path,
 ) -> None:

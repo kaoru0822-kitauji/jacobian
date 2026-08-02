@@ -2,13 +2,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jacobian.invalid/benchmarks/schemas/suite-entry.schema.json",
   "title": "Harbor dataset member fragment",
-  "description": "Reference contract for one dataset members/<task-id>.toml fragment. The task_id selects the direct Harbor task bundle with the same name under that dataset root; assurance_ceiling caps the claimed_assurance the verifier will accept, and required_provider names the optional backend the task depends on.",
+  "description": "Reference contract for one dataset members/<task-id>.toml fragment. Tool-opportunity metadata is evaluator-only and is never mounted into the task or verifier container.",
   "type": "object",
   "additionalProperties": false,
   "required": ["task_id", "assurance_ceiling", "required_provider"],
   "properties": {
     "task_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
     "assurance_ceiling": {"enum": ["UNVERIFIED", "COMPUTED", "CHECKED", "VERIFIED"]},
-    "required_provider": {"type": "string", "minLength": 1}
+    "required_provider": {"type": "string", "minLength": 1},
+    "tool_opportunity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "relevant_capability_ids", "rationale"],
+      "properties": {
+        "value": {"enum": ["NONE", "OPTIONAL", "HIGH"]},
+        "relevant_capability_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"}
+        },
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    }
   }
 }

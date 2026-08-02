@@ -1,3 +1,8 @@
 task_id = "graph-counterexample"
 assurance_ceiling = "COMPUTED"
 required_provider = "core"
+
+[tool_opportunity]
+value = "OPTIONAL"
+relevant_capability_ids = ["graph.search.atlas"]
+rationale = "The bounded atlas search can produce complete finite evidence, but this six-vertex witness is also short enough to construct and replay directly."

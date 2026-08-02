@@ -63,6 +63,10 @@ name = "jacobian/graph-artifact-composition"
 digest = "sha256:1544f699a13f4ec41b2226a5cca1ee8e9d26fd5d1e24be9f203cbc87bff56637"
 
 [[tasks]]
+name = "jacobian/graph-atlas-enumeration"
+digest = "sha256:83912390ca4f410227386e709b20579287801ad0dbf8a1c4c883747c58f27cc7"
+
+[[tasks]]
 name = "jacobian/graph-counterexample"
 digest = "sha256:29f314abd2cd6ff7abebfa5324b986cec5f64587a4d965ea98285271eebcfe2b"
 

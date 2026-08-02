@@ -64,11 +64,19 @@ class HarborSuiteError(ValueError):
 
 
 @dataclasses.dataclass(frozen=True)
+class ToolOpportunity:
+    value: str
+    relevant_capability_ids: tuple[str, ...]
+    rationale: str
+
+
+@dataclasses.dataclass(frozen=True)
 class TaskRef:
     name: str
     path: Path
     maximum_assurance: str
     required_provider: str
+    tool_opportunity: ToolOpportunity | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -195,6 +203,7 @@ def _task_ref(
     task_path: Path,
     assurance: Any,
     provider: Any,
+    tool_opportunity: Any,
     task_root: Path,
     label: str,
 ) -> TaskRef:
@@ -204,11 +213,29 @@ def _task_ref(
         raise HarborSuiteError(f"{label}: task path must be a direct Harbor task")
     if not task_path.is_dir() or not (task_path / "task.toml").is_file():
         raise HarborSuiteError(f"{label}: Harbor task is missing: {task_id}")
+    parsed_opportunity: ToolOpportunity | None = None
+    if isinstance(tool_opportunity, dict):
+        value = _require_string(tool_opportunity.get("value"), f"{label} tool value")
+        raw_ids = tool_opportunity.get("relevant_capability_ids")
+        if not isinstance(raw_ids, list) or not all(
+            isinstance(item, str) and item for item in raw_ids
+        ):
+            raise HarborSuiteError(
+                f"{label} tool relevant_capability_ids must be non-empty strings"
+            )
+        parsed_opportunity = ToolOpportunity(
+            value=value,
+            relevant_capability_ids=tuple(raw_ids),
+            rationale=_require_string(
+                tool_opportunity.get("rationale"), f"{label} tool rationale"
+            ),
+        )
     return TaskRef(
         name=f"jacobian/{task_id}",
         path=task_path,
         maximum_assurance=_require_string(assurance, f"{label} assurance_ceiling"),
         required_provider=str(provider or "core"),
+        tool_opportunity=parsed_opportunity,
     )
 
 
@@ -250,6 +277,7 @@ def _parse_suite_manifest(
             task_path=_resolve(task_id, suite.path),
             assurance=member.get("assurance_ceiling"),
             provider=member.get("required_provider", "core"),
+            tool_opportunity=member.get("tool_opportunity"),
             task_root=suite.path,
             label=str(member_file.relative_to(ROOT)),
         )

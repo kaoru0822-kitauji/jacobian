@@ -1,0 +1,8 @@
+task_id = "graph-atlas-enumeration"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
+
+[tool_opportunity]
+value = "HIGH"
+relevant_capability_ids = ["graph.search.atlas"]
+rationale = "The task requires a complete non-isomorphic class enumeration, not one short witness; bounded atlas search directly supplies the finite scope and match count."
