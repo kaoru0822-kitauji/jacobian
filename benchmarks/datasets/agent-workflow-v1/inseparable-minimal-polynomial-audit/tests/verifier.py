@@ -80,7 +80,7 @@ def _result(value: object, source: dict[str, Any]) -> bool:
 
 
 def _evidence(value: object) -> bool:
-    if not evidence_list_is_bound(value):
+    if not isinstance(value, list) or len(value) != 1 or not evidence_list_is_bound(value):
         return False
     assert isinstance(value, list)
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
