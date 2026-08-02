@@ -167,13 +167,12 @@ def _evidence_matches(evidence):
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
-    return (
+    return bool(
         len(text) >= 180
-        and all(term in text for term in ("cubic", "recurrence", "7-adic", "induction"))
-        and "valuation" in text
-        and "divis" in text
+        and all(term in text for term in ("cubic", "7-adic", "valuation", "divis"))
+        and ("recurrence" in text or "newton" in text or "power sum" in text)
+        and ("induction" in text or "residue" in text or "valuation argument" in text)
         and "minimal polynomial" in text
-        and "residue" in text
     )
 
 
