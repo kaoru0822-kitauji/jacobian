@@ -118,12 +118,27 @@ def _evidence_matches(evidence, result):
     q = str(result["reciprocal_denominator"])
     coefficient = result["general_block_power_exponent"]["level_coefficient"]
     constant = result["general_block_power_exponent"]["constant"]
+    # Accept equivalent bound notation: caret (2^(4k-1)) and double-star
+    # (2**(4*k-1)) forms both bind the affine exponent to the structured result.
     bound_pattern = re.compile(
         r"(?:block(?:-sum)?\s+lower[- ]bound|lower[- ]bound[^.;:\n]{0,40}block)"
-        rf"[^.;:\n]{{0,100}}2\s*\^\s*\(\s*{coefficient}\s*(?:\*|\s)?k\s*"
+        rf"[^.;:\n]{{0,100}}2\s*(?:\^|\*\*)\s*\(\s*{coefficient}\s*(?:\*|\s)?k\s*"
         rf"(?:\+\s*{constant}|-\s*{abs(constant)})\s*\)",
         re.I,
     )
+    # Reject affirmative analytic-continuation or genuine-zero claims in the
+    # evidence text, mirroring the limitation guard so contradictory evidence
+    # cannot earn full reward behind a valid negative limitation.
+    affirmative_claim = re.compile(
+        r"\b(?:verif(?:y|ies)|prove(?:s|n)?|establish(?:es|ed)?|"
+        r"certif(?:y|ies|ied)|show(?:s|n)?|demonstrat(?:e|es|ed))\b"
+        r"[^.;\n]{0,120}\b(?:analytic[- ]continuation|genuine zeta zero|zeta zero)\b|"
+        r"\b(?:analytic[- ]continuation|genuine zeta zero|zeta zero)\b"
+        r"[^.;\n]{0,80}\b(?:is|was|has been)\s+(?:verified|proved|established|certified)\b",
+        re.I,
+    )
+    if affirmative_claim.search(text):
+        return False
     return bool(
         len(text) >= 120
         and all(term in text for term in ("diverge", "fallback", "analytic", q))
