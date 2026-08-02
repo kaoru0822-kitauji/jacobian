@@ -158,16 +158,20 @@ def _evidence_matches(evidence, result):
     # Keep the operator name inside the same short relation as the property.
     # A sentence-level wildcard can accidentally transfer the claim from ST to
     # TS (or vice versa) when both products occur in one sentence.
+    relation_gap = rf"(?:(?!\b(?:{zero}|{identity})\b)[^.;:\n]){{0,100}}"
     zero_role = positive_relation(
         (
-            rf"\bzero\b[^.;:\n]{{0,80}}\b(?:eigenvalue|eigenvector|kernel)\b[^.;:\n]{{0,40}}\b{zero}\b",
-            rf"\b{zero}\b[^.;:\n]{{0,80}}\b(?:zero eigenvalue|zero vector|kernel|kills|annihilates)\b",
+            rf"\bzero\b{relation_gap}\b(?:eigenvalue|eigenvector|"
+            rf"nontrivial kernel|nonzero kernel vector)\b{relation_gap}\b{zero}\b",
+            rf"\b{zero}\b{relation_gap}\b(?:zero eigenvalue|zero vector|"
+            rf"eigenvector|nontrivial kernel|nonzero kernel vector|kills|"
+            rf"annihilates)\b",
         )
     )
     identity_role = positive_relation(
         (
-            rf"\bidentity\b[^.;:\n]{{0,80}}\b{identity}\b",
-            rf"\b{identity}\b[^.;:\n]{{0,80}}\b(?:identity|one-to-one|injective)\b",
+            rf"\bidentity\b{relation_gap}\b{identity}\b",
+            rf"\b{identity}\b{relation_gap}\b(?:identity|one-to-one|injective)\b",
         )
     )
     missing_assumption = positive_relation(
@@ -177,7 +181,20 @@ def _evidence_matches(evidence, result):
             r"\bfinite[- ]dimensional\b[^.;:\n]{0,80}\b(?:missing|omitted|absent|assumption|hypothesis)\b",
         )
     )
-    return bool(zero_role and identity_role and missing_assumption)
+    all_basis = re.search(
+        r"(?:every|each|all)\s+(?:basis|basis vector|e[_ ]?i)|"
+        r"for\s+every\s+(?:basis|i\b)|"
+        r"shift(?:s|ed|ing)?[^.\n]{0,80}(?:basis|e[_ ]?i)",
+        text,
+    )
+    no_shift = re.search(r"\b(?:no|not|without)\b[^.\n]{0,60}\b(?:shift|basis)\b", text)
+    return bool(
+        zero_role
+        and identity_role
+        and missing_assumption
+        and all_basis
+        and not no_shift
+    )
 
 
 def _limitation_is_valid(limitations):
@@ -186,9 +203,23 @@ def _limitation_is_valid(limitations):
     for item in limitations:
         if not isinstance(item, str) or "lean" not in item.casefold():
             continue
-        if re.search(
+        compilation_claim = re.search(
             r"\blean\b[^.\n]*(?:compiled|compilation|checked|verified)", item, re.I
-        ) and not re.search(r"\b(?:not|without|cannot)\b", item, re.I):
+        )
+        if compilation_claim and not (
+            re.search(
+                r"\b(?:not|never|without|cannot)\s+(?:be\s+)?"
+                r"(?:compiled|checked|verified)\b",
+                item,
+                re.I,
+            )
+            or re.search(
+                r"\b(?:compiled|compilation|checked|verified)\b[^.\n]{0,30}"
+                r"\bnot\s+(?:assessed|replayed|performed|run)\b",
+                item,
+                re.I,
+            )
+        ):
             continue
         if re.search(r"\b(?:not|doesn['']?t|cannot|without|only)\b", item, re.I):
             return True
@@ -211,8 +242,22 @@ def main():
         and math_correct
         and _evidence_matches(submission.get("evidence"), submission["result"])
     )
+    scope_text = (
+        submission.get("scope").casefold()
+        if isinstance(submission.get("scope"), str)
+        else ""
+    )
     scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
+        contract
+        and (
+            submission.get("scope") == expected["required_scope"]
+            or (
+                "finitely supported" in scope_text
+                and "rational" in scope_text
+                and "sequence" in scope_text
+                and ("operator" in scope_text or "space" in scope_text)
+            )
+        )
     )
     assurance_correct = bool(
         contract
