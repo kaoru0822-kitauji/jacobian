@@ -66,9 +66,8 @@ def _result(value: object, source: dict[str, Any]) -> bool:
         "inseparability",
         "sanity_prime",
     }
-    if keys != required and not (
-        keys == required | strategy_fields and len(keys & strategy_fields) == 1
-    ):
+    selected_strategy = keys & strategy_fields
+    if len(selected_strategy) != 1 or keys != required | selected_strategy:
         return False
     has_valuation = "valuation_obstruction" in value
     has_eisenstein = "irreducibility_certificate" in value
