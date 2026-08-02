@@ -116,32 +116,44 @@ def _evidence_matches(evidence, result):
     except (OSError, UnicodeError):
         return False
     q = str(result["reciprocal_denominator"])
-    return (
+    coefficient = result["general_block_power_exponent"]["level_coefficient"]
+    constant = result["general_block_power_exponent"]["constant"]
+    bound_pattern = re.compile(
+        r"(?:block(?:-sum)?\s+lower[- ]bound|lower[- ]bound[^.;:\n]{0,40}block)"
+        rf"[^.;:\n]{{0,100}}2\s*\^\s*\(\s*{coefficient}\s*(?:\*|\s)?k\s*"
+        rf"(?:\+\s*{constant}|-\s*{abs(constant)})\s*\)",
+        re.I,
+    )
+    return bool(
         len(text) >= 120
         and all(term in text for term in ("diverge", "fallback", "analytic", q))
         and "block" in text
         and ("lower bound" in text or "lower-bound" in text)
         and "not tend" in text
+        and bound_pattern.search(text)
     )
 
 
 def _limitation_is_valid(limitations):
     if not isinstance(limitations, list):
         return False
-    return any(
-        isinstance(item, str)
-        and re.search(
-            r"(?:\b(?:not|no|doesn['']?t|cannot|without|only)\b.{0,80}analytic continuation|analytic continuation.{0,80}\b(?:not|no|doesn['']?t|cannot|without|unverified|unassessed)\b)",
-            item,
-            re.I,
-        )
-        and not re.search(
-            r"analytic continuation\s+\b(?:is|was|has been)\s+(?:verified|proved|established|certified)\b",
-            item,
-            re.I,
-        )
-        for item in limitations
+    disclaimer = re.compile(
+        r"(?:\b(?:not|no|doesn['']?t|cannot|without|only|unverified|unassessed)\b"
+        r".{0,100}(?:analytic continuation|genuine zeta zero|zeta zero)|"
+        r"(?:analytic continuation|genuine zeta zero|zeta zero).{0,100}"
+        r"\b(?:not|no|doesn['']?t|cannot|without|unverified|unassessed)\b)",
+        re.I,
     )
+    affirmative = re.compile(
+        r"\b(?:verif(?:y|ies)|prove(?:s|n)?|establish(?:es|ed)?|"
+        r"certif(?:y|ies|ied)|show(?:s|n)?|demonstrat(?:e|es|ed))\b"
+        r"[^.;\n]{0,120}\b(?:analytic continuation|genuine zeta zero|zeta zero)\b|"
+        r"\b(?:analytic continuation|genuine zeta zero|zeta zero)\b"
+        r"[^.;\n]{0,80}\b(?:is|was|has been)\s+(?:verified|proved|established|certified)\b",
+        re.I,
+    )
+    items = [item for item in limitations if isinstance(item, str)]
+    return bool(items and not any(affirmative.search(item) for item in items) and any(disclaimer.search(item) for item in items))
 
 
 def main():
