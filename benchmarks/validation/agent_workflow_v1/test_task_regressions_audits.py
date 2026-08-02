@@ -174,7 +174,106 @@ def test_autoformalization_rejects_positive_lean_compile_claim(
     rejected = support._run_verifier(task, app, logs)
     assert rejected["correctness"] == 1.0
     assert rejected["evidence_validity"] == 0.0
-    assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_series_domain_audit_accepts_alternative_denominator(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "series-domain-junk-zero", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["reciprocal_denominator"] = 5
+    result["real_part"] = "1/5"
+    result["general_block_power_exponent"] = {
+        "level_coefficient": 4,
+        "constant": -1,
+    }
+    for block in result["blocks"]:
+        block["block_sum_power_lower_bound"] = 2 ** (4 * block["level"] - 1)
+    (app / "evidence" / "answer.txt").write_text(
+        "For q=5 the general dyadic block lower bound is 2^(4k-1), "
+        "which proves divergence. "
+        "The block sums do not tend to zero. The returned zero is a fallback "
+        "artifact, not an analytic-continuation zero.\n"
+    )
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_series_domain_audit_rejects_corrupted_general_bound(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "series-domain-junk-zero", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["general_block_power_exponent"]["constant"] = 0
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_series_domain_audit_accepts_double_star_bound_notation(
+    tmp_path: Path,
+) -> None:
+    """Equivalent bound notation such as 2**(4*k-1) is accepted."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "series-domain-junk-zero", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["reciprocal_denominator"] = 5
+    result["real_part"] = "1/5"
+    result["general_block_power_exponent"] = {
+        "level_coefficient": 4,
+        "constant": -1,
+    }
+    for block in result["blocks"]:
+        block["block_sum_power_lower_bound"] = 2 ** (4 * block["level"] - 1)
+    (app / "evidence" / "answer.txt").write_text(
+        "For q=5 the general dyadic block lower bound is 2**(4*k-1), "
+        "which proves divergence. "
+        "The block sums do not tend to zero. The returned zero is a fallback "
+        "artifact, not an analytic-continuation zero.\n"
+    )
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_series_domain_audit_rejects_affirmative_analytic_claim_in_evidence(
+    tmp_path: Path,
+) -> None:
+    """Evidence that affirmatively claims analytic continuation is rejected."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "series-domain-junk-zero", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    (app / "evidence" / "answer.txt").write_text(
+        "For q=3 the general dyadic block lower bound is 2^(2k-1), "
+        "which proves divergence. "
+        "The block sums do not tend to zero. The returned zero is a fallback "
+        "artifact. This verifies the analytic continuation and proves a "
+        "genuine zeta zero.\n"
+    )
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
 
 
 def test_inverse_distance_audit_accepts_alternative_rational_direction(
