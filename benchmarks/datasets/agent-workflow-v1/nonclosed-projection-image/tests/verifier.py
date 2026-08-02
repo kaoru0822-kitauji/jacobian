@@ -13,6 +13,7 @@ from verifier_support import (
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
+MAX_INPUT_BYTES = 1_048_576
 LIMITATION = (
     "The verifier checks exact sequence identities and analytic bounds but does "
     "not formalize Hilbert-space topology in a proof assistant."
@@ -51,15 +52,25 @@ _PREFIX_FIELDS = {
     "preimage_norm_sq_partial",
 }
 _TAIL_BOUND_FIELDS = {"bound_coefficient", "bound_exponent", "verification_terms"}
+_GROWTH_FIELDS = {"bound_coefficient", "bound_exponent"}
 
 
 def _source() -> dict[str, Any]:
     try:
-        raw = (TESTS / "input.json").read_bytes()
-        if (WORKSPACE / "input.json").read_bytes() != raw:
+        frozen_path = TESTS / "input.json"
+        visible_path = WORKSPACE / "input.json"
+        if any(
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size > MAX_INPUT_BYTES
+            for path in (frozen_path, visible_path)
+        ):
+            return {}
+        raw = frozen_path.read_bytes()
+        if visible_path.read_bytes() != raw:
             return {}
         value = json.loads(raw)
-    except (OSError, ValueError):
+    except (OSError, RecursionError, ValueError):
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -91,11 +102,21 @@ def _parse_tail_bound(
         coefficient is None
         or not isinstance(exponent, int)
         or exponent < 1
-        or not isinstance(terms, int)
+        or type(terms) is not int
         or terms < MIN_VERIFICATION_TERMS
     ):
         return None
     return coefficient, exponent, terms
+
+
+def _parse_growth(value: object) -> tuple[Fraction, int] | None:
+    if not isinstance(value, dict) or set(value) != _GROWTH_FIELDS:
+        return None
+    coefficient = _positive_fraction(value["bound_coefficient"])
+    exponent = value["bound_exponent"]
+    if coefficient is None or type(exponent) is not int or exponent < 1:
+        return None
+    return coefficient, exponent
 
 
 def _parse_limit_coordinates(value: object, terms: int) -> list[Fraction] | None:
@@ -115,6 +136,7 @@ def _prefixes_ok(
     limit_coordinates: list[Fraction],
     bound: Fraction,
     length: int,
+    growth: tuple[Fraction, int],
 ) -> bool:
     if not isinstance(prefixes, list) or len(prefixes) != length:
         return False
@@ -143,6 +165,7 @@ def _prefixes_ok(
         if (
             _fraction(item["limit_norm_sq_partial"]) != limit_partial
             or _fraction(item["preimage_norm_sq_partial"]) != preimage_partial
+            or preimage_partial < growth[0] * index ** growth[1]
         ):
             return False
     return True
@@ -195,9 +218,12 @@ def _witness(value: object, source: dict[str, Any]) -> bool:
     limit_coordinates = _parse_limit_coordinates(value["limit_coordinates"], terms)
     if limit_coordinates is None:
         return False
-    return _prefixes_ok(
-        value["prefixes"], limit_coordinates, bound, length
-    ) and _tail_bound_ok(limit_coordinates, coefficient, exponent, terms, length)
+    growth = _parse_growth(value.get("preimage_growth"))
+    return bool(
+        growth
+        and _prefixes_ok(value["prefixes"], limit_coordinates, bound, length, growth)
+        and _tail_bound_ok(limit_coordinates, coefficient, exponent, terms, length)
+    )
 
 
 def _extract_proof(text: str) -> dict[str, Any] | None:
