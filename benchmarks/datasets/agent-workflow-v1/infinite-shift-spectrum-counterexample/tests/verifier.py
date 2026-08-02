@@ -101,13 +101,19 @@ def _valid_result(result, frozen):
         return False
     orientation = _expected_orientation(result.get("orientation"))
     window = frozen.get("basis_window")
-    if orientation is None or window != [0, 8] or result.get("basis_window") != window:
+    if (
+        orientation is None
+        or window != [0, 8]
+        or result.get("basis_window") != window
+        or not all(type(value) is int for value in result["basis_window"])
+    ):
         return False
     s_action, t_action, zero_product, identity_product = orientation
     return bool(
         _valid_actions(result.get("actions"), s_action, t_action, *window)
         and result.get("zero_eigenvalue_product") == zero_product
         and result.get("identity_product") == identity_product
+        and type(result.get("zero_eigenvector_basis_index")) is int
         and result.get("zero_eigenvector_basis_index") == 0
         and result.get("spectral_conclusion") == "EIGENVALUE_SETS_DIFFER"
         and result.get("missing_assumption") == "FINITE_DIMENSIONALITY"
@@ -147,7 +153,12 @@ def _evidence_matches(evidence, result):
         rf"(?:identity|one-to-one|injective)[^.\n]*\b{identity}\b)",
         text,
     )
-    return bool(zero_role and identity_role)
+    return bool(
+        zero_role
+        and identity_role
+        and not re.search(r"\b(?:not|never|without|isn['']?t)\b", zero_role.group(), re.I)
+        and not re.search(r"\b(?:not|never|without|isn['']?t)\b", identity_role.group(), re.I)
+    )
 
 
 def _limitation_is_valid(limitations):
