@@ -236,3 +236,160 @@ def test_inverse_distance_audit_rejects_corrupted_certificates(
     rejected = support._run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_convergence_mode_separation_canonical_case_scores_full_reward(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+    assert accepted["false_certification"] is False
+
+
+def test_convergence_mode_separation_accepts_zero_as_a_probe(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    # Replace one probe with 0; its hit index at level k is 2^k + 0 = 2^k.
+    submission["result"]["probes"][0] = {
+        "point": "0",
+        "hit_indices": [2, 4, 8, 16, 32, 64, 128, 256],
+    }
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["evidence_validity"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_convergence_mode_separation_rejects_boolean_in_integer_fields(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    # JSON true == 1 in Python, but booleans are not integers.
+    submission["result"]["levels"][0]["level"] = True
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_convergence_mode_separation_rejects_keyword_only_evidence(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    (app / "evidence" / "answer.txt").write_text(
+        "probability almost surely infinitely often\n", encoding="utf-8"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(
+        app / "evidence" / "answer.txt"
+    )
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_convergence_mode_separation_rejects_mismatched_result_marker(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    (app / "evidence" / "answer.txt").write_text(
+        "probability almost surely infinitely often every point "
+        "one interval per level\n"
+        'RESULT_JSON: {"relationship":"EQUIVALENT"}\n',
+        encoding="utf-8",
+    )
+    submission["evidence"][0]["sha256"] = support._digest(
+        app / "evidence" / "answer.txt"
+    )
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_convergence_mode_separation_rejects_affirmative_verified_limitation(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["limitations"] = ["The open problem and Lean theorem are verified."]
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+    assert rejected["false_certification"] is True
+
+
+def test_convergence_mode_separation_rejects_bare_open_problem_limitation(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["limitations"] = ["The open problem is mentioned."]
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["reward"] == 0.0
+
+
+def test_convergence_mode_separation_rejects_machine_verified_evidence_claim(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "convergence-mode-separation", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "Under Lebesgue measure on [0,1), the indicators converge to zero in "
+        "probability. Every point lies in one interval per level, so the "
+        "sequence equals one infinitely often and zero infinitely often at "
+        "that point and cannot converge almost surely. This result is "
+        "machine verified.\n",
+        encoding="utf-8",
+    )
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["false_certification"] is True
+    assert rejected["reward"] == 0.0

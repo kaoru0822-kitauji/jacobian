@@ -19,7 +19,7 @@ category = "mathematics"
 tags = ["assurance", "convergence-modes", "exact-rational", "offline", "difficulty-provisional"]
 case_version = "agent-workflow-v1"
 contamination_class = "public-issue-derived-assurance-audit"
-fixture_digest = "sha256:231a10db8e8cb12a85fe23a8d517b7820e10e6737ce4ceb8e61b31413c0d8b33"
+fixture_digest = "sha256:08bd1c042f067266077b81129334d62b2bc5433ef5beca4374cba73db4b6b5b7"
 derivation = "Derived from formal-conjectures issue 3473 and pinned 522.lean blob 442b79dd1c1151740d9ce17551c1c9c9d77f5987."
 [agent]
 timeout_sec = 900.0
