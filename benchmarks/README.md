@@ -80,10 +80,22 @@ from the public workflow suite are workflow evidence only, never causal
 capability evidence.
 
 Private held-out evaluation is dispatched through the protected
-`Held-out Benchmarks` workflow. Its S3 manifest freezes the C1/C2 images,
+`Held-out Benchmarks` workflow. Its S3 manifest freezes the treatment image,
 catalog and policy digests, task and Oracle identities, model, prompt, budget,
 randomization, and pilot/decision sample sizes. The workflow downloads it with
 OIDC, refuses unpinned or unsafe bundles, and uploads only non-Oracle evidence.
+The control condition explicitly disables Jacobian and is forbidden from
+declaring an image, sidecar, or MCP server; only the treatment binds the
+digest-pinned Jacobian image and advertised server, catalog, and policy
+identities. Each task/repetition becomes a randomized C1/C2 pair of one-attempt
+Harbor jobs. A resumable ledger binds the exact plan and checks token and cost
+accounting after each complete pair. Because Harbor cannot currently hard-stop
+Codex at those limits, missing accounting or a pair-boundary overage makes the
+run incomplete and prevents a valid comparison.
+
+Run `make heldout-smoke` to build a temporary non-mathematical private-bundle
+fixture and exercise its rendered contract through Harbor's zero-model-cost
+`nop` and `oracle` agents.
 
 Performance timing is reported separately from reward, and research datasets
 are explicitly non-comparative diagnostics. Uniform task structure does not

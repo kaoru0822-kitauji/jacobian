@@ -154,7 +154,7 @@ def _require_dataset_version_bumps(
             continue
         dataset = parts[2]
         relative = parts[3:]
-        if relative[:1] == ("members",) or (
+        if relative == ("suite.toml",) or relative[:1] == ("members",) or (
             len(relative) >= 2
             and relative[1:] != ("README.md",)
             and relative[0] not in {"jobs", "members"}

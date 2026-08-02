@@ -24,7 +24,71 @@ def _read_json(path: Path) -> Any:
 
 
 def _digest(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise HarborSuiteError(f"unable to digest held-out file {path}: {exc}") from exc
+
+
+def _json_digest(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _tree_digest(root: Path) -> str:
+    """Bind a complete regular-file tree, including names and empty-tree state."""
+    if not root.is_dir():
+        raise HarborSuiteError(f"held-out tree is not a directory: {root}")
+    entries: list[dict[str, str]] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise HarborSuiteError(f"held-out tree contains a symlink: {path}")
+        if path.is_file():
+            entries.append(
+                {"path": path.relative_to(root).as_posix(), "digest": _digest(path)}
+            )
+    return _json_digest(entries)
+
+
+def _bundle_path(root: Path, declared: str) -> Path:
+    path = root / declared
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError as exc:
+        raise HarborSuiteError(f"held-out path escapes bundle: {declared}") from exc
+    return path
+
+
+def _validate_task_contracts(manifest: dict[str, Any]) -> set[str]:
+    task_ids = [item["id"] for item in manifest["tasks"]]
+    if len(set(task_ids)) != len(task_ids):
+        raise HarborSuiteError("held-out task ids must be unique")
+    families = {item["family"] for item in manifest["tasks"]}
+    if len(families) < manifest["dataset"]["minimum_independent_families"]:
+        raise HarborSuiteError("held-out bundle has too few independent families")
+    for task in manifest["tasks"]:
+        expected_prefix = f"dataset/{task['id']}/"
+        roots = (task["verifier_root"], task["oracle_root"])
+        if any(not root.startswith(expected_prefix) for root in roots):
+            raise HarborSuiteError(
+                f"held-out verifier/oracle roots must belong to task {task['id']}"
+            )
+    return set(task_ids)
+
+
+def _validate_experiment(manifest: dict[str, Any], task_ids: set[str]) -> None:
+    stages = manifest["experiment"]["stages"]
+    for stage, config in stages.items():
+        unknown = sorted(set(config["task_ids"]) - task_ids)
+        if unknown:
+            raise HarborSuiteError(f"{stage} references unknown task ids: {unknown}")
+    if len(stages["pilot"]["task_ids"]) != 3:
+        raise HarborSuiteError("pilot must freeze exactly three tasks")
+    decision = stages["decision"]
+    if len(decision["task_ids"]) < 5 or decision["repetitions"] < 5:
+        raise HarborSuiteError(
+            "decision stage requires at least five tasks and repetitions"
+        )
 
 
 def validate_manifest(path: Path) -> dict[str, Any]:
@@ -41,29 +105,17 @@ def validate_manifest(path: Path) -> dict[str, Any]:
         ]
         raise HarborSuiteError("held-out manifest is invalid:\n" + "\n".join(messages))
     assert isinstance(manifest, dict)
-    task_ids = [item["id"] for item in manifest["tasks"]]
-    if len(set(task_ids)) != len(task_ids):
-        raise HarborSuiteError("held-out task ids must be unique")
-    task_set = set(task_ids)
-    families = {item["family"] for item in manifest["tasks"]}
-    if len(families) < manifest["dataset"]["minimum_independent_families"]:
-        raise HarborSuiteError("held-out bundle has too few independent families")
-    for stage, config in manifest["experiment"]["stages"].items():
-        unknown = sorted(set(config["task_ids"]) - task_set)
-        if unknown:
-            raise HarborSuiteError(f"{stage} references unknown task ids: {unknown}")
-    if len(manifest["experiment"]["stages"]["pilot"]["task_ids"]) != 3:
-        raise HarborSuiteError("pilot must freeze exactly three tasks")
-    decision = manifest["experiment"]["stages"]["decision"]
-    if len(decision["task_ids"]) < 5 or decision["repetitions"] < 5:
-        raise HarborSuiteError(
-            "decision stage requires at least five tasks and repetitions"
-        )
-    conditions = {item["id"]: item["role"] for item in manifest["conditions"]}
-    if conditions != {"C1": "PRIMARY_CONTROL", "C2": "PRIMARY_TREATMENT"}:
-        raise HarborSuiteError(
-            "held-out conditions must be the frozen C1/C2 primary pair"
-        )
+    task_ids = _validate_task_contracts(manifest)
+    _validate_experiment(manifest, task_ids)
+    conditions = {
+        item["id"]: (item["role"], item["jacobian_enabled"])
+        for item in manifest["conditions"]
+    }
+    if conditions != {
+        "C1": ("PRIMARY_CONTROL", False),
+        "C2": ("PRIMARY_TREATMENT", True),
+    }:
+        raise HarborSuiteError("held-out conditions must be the frozen C1/C2 pair")
     return manifest
 
 
@@ -86,28 +138,26 @@ def _safe_extract(archive: Path, output: Path) -> None:
 
 
 def verify_bundle(manifest: dict[str, Any], root: Path) -> None:
-    dataset_manifest = root / manifest["dataset"]["path"] / "dataset.toml"
+    dataset_root = _bundle_path(root, manifest["dataset"]["path"])
+    dataset_manifest = dataset_root / "dataset.toml"
     if _digest(dataset_manifest) != manifest["dataset"]["manifest_digest"]:
         raise HarborSuiteError("held-out dataset manifest digest mismatch")
+    prompt = _bundle_path(root, manifest["experiment"]["prompt_path"])
+    if _digest(prompt) != manifest["experiment"]["prompt_digest"]:
+        raise HarborSuiteError("held-out prompt digest mismatch")
     for task in manifest["tasks"]:
-        task_root = root / "dataset" / task["id"]
+        task_root = dataset_root / task["id"]
         actual = "sha256:" + task_digest(task_root).removeprefix("sha256:")
         if actual != task["digest"]:
             raise HarborSuiteError(f"held-out task digest mismatch: {task['id']}")
-        for path_key, digest_key in (
-            ("verifier_path", "verifier_digest"),
-            ("oracle_path", "oracle_digest"),
+        for root_key, digest_key in (
+            ("verifier_root", "verifier_tree_digest"),
+            ("oracle_root", "oracle_tree_digest"),
         ):
-            declared = root / task[path_key]
-            try:
-                declared.resolve().relative_to(root.resolve())
-            except ValueError as exc:
+            declared = _bundle_path(root, task[root_key])
+            if _tree_digest(declared) != task[digest_key]:
                 raise HarborSuiteError(
-                    f"held-out path escapes bundle: {task[path_key]}"
-                ) from exc
-            if _digest(declared) != task[digest_key]:
-                raise HarborSuiteError(
-                    f"held-out {path_key} digest mismatch: {task['id']}"
+                    f"held-out {root_key} tree digest mismatch: {task['id']}"
                 )
 
 
@@ -153,6 +203,10 @@ def _compose(image: str) -> dict[str, Any]:
     }
 
 
+def _relative(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
 def render_plan(
     manifest_path: Path,
     bundle_root: Path,
@@ -172,94 +226,146 @@ def render_plan(
     stage_config = experiment["stages"][stage]
     output.mkdir(parents=True, exist_ok=False)
     conditions = {item["id"]: item for item in manifest["conditions"]}
-    order = ["C1", "C2"]
-    random.Random(experiment["randomization_seed"]).shuffle(order)
+    treatment = conditions["C2"]
+    compose_path = output / "c2.compose.json"
+    compose_path.write_text(
+        json.dumps(_compose(treatment["image"]), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    prompt_path = (bundle_root / experiment["prompt_path"]).resolve()
+    pairs = [
+        (task, repetition)
+        for task in stage_config["task_ids"]
+        for repetition in range(stage_config["repetitions"])
+    ]
+    rng = random.Random(experiment["randomization_seed"])
+    rng.shuffle(pairs)
     runs: list[dict[str, Any]] = []
-    for condition_id in order:
-        condition = conditions[condition_id]
-        compose_path = output / f"{condition_id.lower()}.compose.json"
-        compose_path.write_text(
-            json.dumps(_compose(condition["image"]), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        job_path = output / f"{condition_id.lower()}.job.json"
-        job = {
-            "jobs_dir": str(output / "results" / condition_id.lower()),
-            "n_attempts": stage_config["repetitions"],
-            "timeout_multiplier": 1,
-            "orchestrator": {
-                "type": "local",
-                "n_concurrent_trials": 1,
-                "quiet": False,
-            },
-            "environment": {
-                "type": "docker",
-                "force_build": True,
-                "delete": True,
-                "extra_docker_compose": [
-                    str(BENCHMARKS / "config" / "agent-eval-proxy.compose.yaml"),
-                    str(compose_path),
-                ],
-            },
-            "agents": [{"name": "codex"}],
-            "datasets": [
-                {
-                    "path": str(bundle_root / "dataset"),
-                    "task_names": stage_config["task_ids"],
-                }
-            ],
-        }
-        job_path.write_text(
-            json.dumps(job, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        snapshot_path = output / f"{condition_id.lower()}.runtime.json"
-        snapshot_path.write_text(
-            json.dumps(
-                {
-                    "bundle_id": manifest["bundle_id"],
-                    "bundle_version": manifest["bundle_version"],
-                    "bundle_manifest_digest": _digest(manifest_path),
-                    "dataset_manifest_digest": manifest["dataset"]["manifest_digest"],
-                    "condition": condition,
-                    "model": experiment["model"],
-                    "prompt_digest": experiment["prompt_digest"],
+    for pair_index, (task, repetition) in enumerate(pairs):
+        pair_id = f"{task}-r{repetition + 1:03d}"
+        order = ["C1", "C2"]
+        rng.shuffle(order)
+        for condition_id in order:
+            condition = conditions[condition_id]
+            run_root = output / "runs" / pair_id / condition_id.lower()
+            run_root.mkdir(parents=True)
+            job_path = run_root / "job.json"
+            jobs_dir = run_root / "results"
+            compose = [str(BENCHMARKS / "config" / "agent-eval-proxy.compose.yaml")]
+            agent: dict[str, Any] = {
+                "name": experiment["agent"]["name"],
+                "model_name": experiment["model"],
+                "kwargs": {
+                    "version": experiment["agent"]["version"],
+                    "prompt_template_path": str(prompt_path),
                     "reasoning_effort": experiment["reasoning_effort"],
-                    "randomization_seed": experiment["randomization_seed"],
-                    "stage": stage,
-                    "max_tokens": max_tokens,
-                    "max_cost_usd": max_cost_usd,
                 },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        runs.append(
-            {
-                "condition": condition_id,
-                "job": str(job_path),
-                "runtime_snapshot": str(snapshot_path),
-                "jobs_dir": job["jobs_dir"],
             }
-        )
+            if condition["jacobian_enabled"]:
+                compose.append(str(compose_path))
+                agent["mcp_servers"] = [
+                    {
+                        "name": "jacobian",
+                        "transport": "streamable-http",
+                        "url": "http://jacobian:8000/mcp",
+                    }
+                ]
+            job = {
+                "jobs_dir": str(jobs_dir),
+                "n_attempts": 1,
+                "timeout_multiplier": 1,
+                "orchestrator": {
+                    "type": "local",
+                    "n_concurrent_trials": 1,
+                    "quiet": False,
+                },
+                "environment": {
+                    "type": "docker",
+                    "force_build": True,
+                    "delete": True,
+                    "extra_docker_compose": compose,
+                },
+                "agents": [agent],
+                "datasets": [
+                    {
+                        "path": str(bundle_root / manifest["dataset"]["path"]),
+                        "task_names": [task],
+                    }
+                ],
+            }
+            job_path.write_text(
+                json.dumps(job, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            snapshot_path = run_root / "runtime.json"
+            snapshot_path.write_text(
+                json.dumps(
+                    {
+                        "bundle_id": manifest["bundle_id"],
+                        "bundle_version": manifest["bundle_version"],
+                        "bundle_manifest_digest": _digest(manifest_path),
+                        "dataset_manifest_digest": manifest["dataset"][
+                            "manifest_digest"
+                        ],
+                        "condition": condition,
+                        "harbor_version": experiment["harbor_version"],
+                        "agent": experiment["agent"],
+                        "model": experiment["model"],
+                        "prompt_path": experiment["prompt_path"],
+                        "prompt_digest": experiment["prompt_digest"],
+                        "reasoning_effort": experiment["reasoning_effort"],
+                        "randomization_seed": experiment["randomization_seed"],
+                        "stage": stage,
+                        "pair_id": pair_id,
+                        "pair_index": pair_index,
+                        "task": task,
+                        "repetition": repetition,
+                        "max_tokens": max_tokens,
+                        "max_cost_usd": max_cost_usd,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            runs.append(
+                {
+                    "pair_id": pair_id,
+                    "pair_index": pair_index,
+                    "task": task,
+                    "repetition": repetition,
+                    "condition": condition_id,
+                    "jacobian_enabled": condition["jacobian_enabled"],
+                    "job": _relative(job_path, output),
+                    "runtime_snapshot": _relative(snapshot_path, output),
+                    "jobs_dir": _relative(jobs_dir, output),
+                }
+            )
+    plan: dict[str, Any] = {
+        "schema_version": "2",
+        "stage": stage,
+        "bundle_manifest_digest": _digest(manifest_path),
+        "harbor_version": experiment["harbor_version"],
+        "agent": experiment["agent"],
+        "model": experiment["model"],
+        "prompt_path": experiment["prompt_path"],
+        "prompt_digest": experiment["prompt_digest"],
+        "reasoning_effort": experiment["reasoning_effort"],
+        "randomization_seed": experiment["randomization_seed"],
+        "budget": {
+            "max_tokens": max_tokens,
+            "max_cost_usd": max_cost_usd,
+            "enforcement": "PAIR_BOUNDARY_POST_RUN",
+            "missing_accounting": "INCOMPLETE",
+            "overage": "INCOMPLETE",
+        },
+        "pair_count": len(pairs),
+        "runs": runs,
+    }
+    plan["plan_digest"] = _json_digest(plan)
     run_plan = output / "run-plan.json"
     run_plan.write_text(
-        json.dumps(
-            {
-                "schema_version": "1",
-                "stage": stage,
-                "model": experiment["model"],
-                "reasoning_effort": experiment["reasoning_effort"],
-                "max_tokens": max_tokens,
-                "max_cost_usd": max_cost_usd,
-                "runs": runs,
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
+        json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return run_plan
 

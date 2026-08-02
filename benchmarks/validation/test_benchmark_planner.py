@@ -264,6 +264,15 @@ def test_dataset_version_file_must_change_its_version_value() -> None:
         )
 
 
+def test_suite_only_change_cannot_bypass_version_value_check() -> None:
+    with pytest.raises(Exception, match="version value did not change"):
+        planner.plan(
+            ["benchmarks/datasets/public-reproductions-v1/suite.toml"],
+            event="pull_request",
+            base="main",
+        )
+
+
 def test_adapter_documentation_change_never_runs_oracle() -> None:
     result = planner.plan(["benchmarks/adapters/README.md"], event="merge_group")
 

@@ -35,19 +35,29 @@ def _evidence(condition: str, correctness: list[float]) -> dict:
             }
         )
     return {
+        "schema_version": "1",
+        "evidence_class": "workflow-observation",
         "status": "VALID",
         "causal_claim_authorized": False,
         "source_sha": "a" * 40,
         "dataset": "agent-workflow-v1",
         "condition": condition,
-        "job": {"comparison_signature": "sha256:" + "b" * 64},
+        "job": {
+            "path": "job.json",
+            "digest": "sha256:" + "c" * 64,
+            "comparison_signature": "sha256:" + "b" * 64,
+            "n_attempts": len(correctness),
+        },
+        "runtime_snapshot": {},
         "fixed_invariants": {
             "model": "model",
             "tasks": [{"task": "case", "digest": "sha256:" + "a" * 64}],
             "sampling_seed": None,
             "sampling_deterministic": False,
         },
+        "result": {"path": "result.json", "digest": "sha256:" + "d" * 64},
         "trials": trials,
+        "validation_failures": [],
     }
 
 
@@ -85,6 +95,28 @@ def test_comparison_rejects_unpaired_repetitions() -> None:
     assert (
         "control/treatment trials do not pair exactly" in report["validation_failures"]
     )
+
+
+def test_comparison_rejects_duplicate_pair_keys() -> None:
+    control = _evidence("control", [1.0])
+    control["trials"].append(deepcopy(control["trials"][0]))
+
+    report = compare_evidence(control, _evidence("treatment", [1.0]))
+
+    assert report["status"] == "INVALID"
+    assert "duplicate" in " ".join(report["validation_failures"])
+
+
+def test_comparison_derives_heldout_class_from_both_inputs() -> None:
+    control = _evidence("C1", [1.0])
+    treatment = _evidence("C2", [1.0])
+    control["evidence_class"] = "held-out-comparative-evaluation"
+    treatment["evidence_class"] = "held-out-comparative-evaluation"
+
+    report = compare_evidence(control, treatment)
+
+    assert report["evidence_class"] == "held-out-comparison"
+    assert report["status"] == "VALID"
 
 
 def test_observation_normalization_binds_repetitions_and_model(

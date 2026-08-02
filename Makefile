@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-check benchmark-inventory harbor-oracle harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render agent-eval agent-eval-validate agent-eval-compare performance-eval provider-eval clean docs-linkcheck deploy-check
+.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-check benchmark-inventory harbor-oracle harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare performance-eval provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -234,6 +234,9 @@ heldout-render: ## Verify a private bundle and render matched jobs (MANIFEST=...
 	$(HARBOR_PYTHON) -m benchmarks.tooling.heldout_bundle render \
 		--manifest "$(MANIFEST)" --bundle-root "$(BUNDLE_ROOT)" --output "$(OUTPUT)" \
 		--stage "$(STAGE)" --max-tokens "$(MAX_TOKENS)" --max-cost-usd "$(MAX_COST_USD)"
+
+heldout-smoke: ## Render a synthetic private bundle and run Harbor nop/Oracle without model cost.
+	$(HARBOR_PYTHON) -m benchmarks.tooling.heldout_smoke --run-harbor
 
 JACOBIAN_ENABLED ?= 1
 ifneq ($(filter 0 1,$(JACOBIAN_ENABLED)),$(JACOBIAN_ENABLED))

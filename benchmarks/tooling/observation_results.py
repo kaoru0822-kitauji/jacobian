@@ -53,7 +53,7 @@ def _validate_contract(value: dict[str, Any], schema_name: str) -> None:
     )
     if errors:
         raise HarborSuiteError(
-            f"generated {schema_name} contract is invalid: {errors[0].message}"
+            f"{schema_name} contract is invalid: {errors[0].message}"
         )
 
 
@@ -340,8 +340,17 @@ def build_observation_evidence(
     for path, raw in raw_trials:
         task = _task_id(raw.get("task_name"))
         repetition = counters[task]
+        if runtime_snapshot is not None and isinstance(
+            runtime_snapshot.get("repetition"), int
+        ):
+            repetition = int(runtime_snapshot["repetition"])
         counters[task] += 1
-        trials.append(_normalize_trial(path, raw, repetition))
+        normalized = _normalize_trial(path, raw, repetition)
+        if runtime_snapshot is not None and isinstance(
+            runtime_snapshot.get("pair_id"), str
+        ):
+            normalized["pair_id"] = runtime_snapshot["pair_id"]
+        trials.append(normalized)
 
     known_digests, evidence_class, dataset_id = _observation_identity(
         dataset, heldout_manifest
@@ -379,6 +388,9 @@ def build_observation_evidence(
             "bundle_version",
             "bundle_manifest_digest",
             "dataset_manifest_digest",
+            "harbor_version",
+            "agent",
+            "prompt_path",
             "prompt_digest",
             "reasoning_effort",
             "randomization_seed",
@@ -413,7 +425,7 @@ def build_observation_evidence(
             "sampling_deterministic": False,
             "runtime": snapshot_invariants,
         },
-        "result": {"path": result_path.as_posix(), "digest": _sha256(result_path)},
+        "result": {"path": _display_path(result_path), "digest": _sha256(result_path)},
         "trials": trials,
         "validation_failures": failures,
     }
@@ -501,6 +513,9 @@ def _comparison_failures(
         "job", {}
     ).get("comparison_signature"):
         failures.append("job configuration differs outside the condition allowlist")
+    classes = {control.get("evidence_class"), treatment.get("evidence_class")}
+    if len(classes) != 1:
+        failures.append("evidence classes differ")
     return failures
 
 
@@ -509,6 +524,22 @@ def _indexed_trials(value: dict[str, Any]) -> dict[tuple[str, int], dict[str, An
         (str(item["task"]), int(item["repetition"])): item
         for item in value.get("trials", [])
     }
+
+
+def _duplicate_pair_keys(value: dict[str, Any]) -> list[tuple[str, int]]:
+    keys = [
+        (str(item["task"]), int(item["repetition"])) for item in value.get("trials", [])
+    ]
+    return sorted(key for key, count in Counter(keys).items() if count > 1)
+
+
+def _derived_comparison_class(
+    control: dict[str, Any], treatment: dict[str, Any]
+) -> str:
+    classes = {control.get("evidence_class"), treatment.get("evidence_class")}
+    if classes == {"held-out-comparative-evaluation"}:
+        return "held-out-comparison"
+    return "public-workflow-comparison"
 
 
 def _metric_report(
@@ -550,10 +581,14 @@ def _metric_report(
 def compare_evidence(
     control: dict[str, Any],
     treatment: dict[str, Any],
-    *,
-    evidence_class: str = "public-workflow-comparison",
 ) -> dict[str, Any]:
+    _validate_contract(control, "observation-evidence.schema.json")
+    _validate_contract(treatment, "observation-evidence.schema.json")
     failures = _comparison_failures(control, treatment)
+    for name, value in (("control", control), ("treatment", treatment)):
+        duplicates = _duplicate_pair_keys(value)
+        if duplicates:
+            failures.append(f"{name} evidence has duplicate task/repetition pairs")
     control_trials = _indexed_trials(control)
     treatment_trials = _indexed_trials(treatment)
     if set(control_trials) != set(treatment_trials):
@@ -575,9 +610,12 @@ def compare_evidence(
         metric: _metric_report(metric, pairs, control_trials, treatment_trials)
         for metric in metric_names
     }
+    for metric in ("correctness", "false_certification"):
+        if metrics[metric]["pair_count"] != len(pairs):
+            failures.append(f"core metric is missing from a complete pair: {metric}")
     return {
         "schema_version": "1",
-        "evidence_class": evidence_class,
+        "evidence_class": _derived_comparison_class(control, treatment),
         "causal_claim_authorized": False,
         "status": "VALID" if not failures else "INVALID",
         "dataset": control.get("dataset"),
@@ -590,6 +628,159 @@ def compare_evidence(
         "metrics": metrics,
         "validation_failures": failures,
     }
+
+
+def _heldout_plan_failures(
+    plan: dict[str, Any], ledger: dict[str, Any], condition: str
+) -> tuple[list[dict[str, Any]], list[str]]:
+    from benchmarks.tooling.heldout_runner import _plan_digest
+
+    failures: list[str] = []
+    plan_digest = _plan_digest(plan)
+    if plan.get("plan_digest") != plan_digest:
+        failures.append("held-out plan digest mismatch")
+    if ledger.get("plan_digest") != plan_digest:
+        failures.append("held-out ledger does not bind the run plan")
+    if ledger.get("status") != "COMPLETE":
+        failures.append("held-out execution ledger is not COMPLETE")
+    selected = [
+        run for run in plan.get("runs", []) if run.get("condition") == condition
+    ]
+    if len(selected) != plan.get("pair_count"):
+        failures.append(f"held-out {condition} run coverage is incomplete")
+    return selected, failures
+
+
+def _collect_heldout_runs(
+    *,
+    selected: list[dict[str, Any]],
+    root: Path,
+    manifest: dict[str, Any],
+    ledger: dict[str, Any],
+    condition: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, str]], list[str]]:
+    trials: list[dict[str, Any]] = []
+    signatures: list[dict[str, str]] = []
+    failures: list[str] = []
+    for run in selected:
+        runtime_path = root / run["runtime_snapshot"]
+        runtime = _read_json(runtime_path)
+        if not isinstance(runtime, dict):
+            failures.append(f"invalid runtime snapshot: {run['pair_id']}")
+            continue
+        evidence, run_failures = build_observation_evidence(
+            dataset=manifest["dataset"]["id"],
+            condition=condition,
+            job_path=root / run["job"],
+            jobs_dir=root / run["jobs_dir"],
+            runtime_snapshot=runtime,
+            heldout_manifest=manifest,
+        )
+        failures.extend(f"{run['pair_id']}: {failure}" for failure in run_failures)
+        run_id = f"{run['pair_id']}/{condition}"
+        ledger_run = ledger.get("runs", {}).get(run_id)
+        if not isinstance(ledger_run, dict) or ledger_run.get("status") != "COMPLETE":
+            failures.append(f"held-out ledger run is not COMPLETE: {run_id}")
+        elif ledger_run.get("result_digest") != evidence["result"]["digest"]:
+            failures.append(f"held-out result digest differs from ledger: {run_id}")
+        trials.extend(evidence["trials"])
+        signatures.append(
+            {
+                "pair_id": str(run["pair_id"]),
+                "signature": str(evidence["job"]["comparison_signature"]),
+            }
+        )
+    trials.sort(key=lambda item: (str(item["task"]), int(item["repetition"])))
+    return trials, signatures, failures
+
+
+def _heldout_runtime_invariants(plan: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: plan.get(key)
+        for key in (
+            "bundle_manifest_digest",
+            "harbor_version",
+            "agent",
+            "model",
+            "prompt_path",
+            "prompt_digest",
+            "reasoning_effort",
+            "randomization_seed",
+            "stage",
+            "budget",
+            "pair_count",
+            "plan_digest",
+        )
+    }
+
+
+def collect_heldout_evidence(
+    *,
+    run_plan_path: Path,
+    manifest_path: Path,
+    ledger_path: Path,
+    condition: str,
+) -> tuple[dict[str, Any], list[str]]:
+    from benchmarks.tooling.heldout_bundle import validate_manifest
+
+    plan = _read_json(run_plan_path)
+    manifest = validate_manifest(manifest_path)
+    ledger = _read_json(ledger_path)
+    if not isinstance(plan, dict) or not isinstance(ledger, dict):
+        raise HarborSuiteError("held-out plan and ledger must be JSON objects")
+    selected, failures = _heldout_plan_failures(plan, ledger, condition)
+    trials, signatures, run_failures = _collect_heldout_runs(
+        selected=selected,
+        root=run_plan_path.parent,
+        manifest=manifest,
+        ledger=ledger,
+        condition=condition,
+    )
+    failures.extend(run_failures)
+    experiment = manifest["experiment"]
+    stage = str(plan.get("stage", ""))
+    stage_tasks = (
+        experiment["stages"][stage]["task_ids"] if stage in experiment["stages"] else []
+    )
+    runtime_invariants = _heldout_runtime_invariants(plan)
+    models = sorted(
+        {str(item["model"]) for item in trials if item.get("model") is not None}
+    )
+    if models != [experiment["model"]]:
+        failures.append("observed model does not match the frozen experiment")
+    task_digests = {str(item["id"]): str(item["digest"]) for item in manifest["tasks"]}
+    evidence = {
+        "schema_version": "1",
+        "evidence_class": "held-out-comparative-evaluation",
+        "causal_claim_authorized": False,
+        "status": "VALID" if not failures else "INCOMPLETE",
+        "source_sha": _git_sha(),
+        "dataset": manifest["dataset"]["id"],
+        "condition": condition,
+        "job": {
+            "path": "run-plan.json",
+            "digest": _sha256(run_plan_path),
+            "comparison_signature": _json_digest(
+                sorted(signatures, key=lambda item: item["pair_id"])
+            ),
+            "n_attempts": len(selected),
+        },
+        "runtime_snapshot": runtime_invariants,
+        "fixed_invariants": {
+            "model": models[0] if len(models) == 1 else None,
+            "tasks": [
+                {"task": task, "digest": task_digests[task]}
+                for task in sorted(stage_tasks)
+            ],
+            "sampling_seed": experiment["randomization_seed"],
+            "sampling_deterministic": False,
+            "runtime": runtime_invariants,
+        },
+        "result": {"path": ledger_path.name, "digest": _sha256(ledger_path)},
+        "trials": trials,
+        "validation_failures": failures,
+    }
+    return evidence, failures
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -627,15 +818,16 @@ def main() -> int:
     validate_parser.add_argument("--runtime-snapshot", type=Path)
     validate_parser.add_argument("--heldout-manifest", type=Path)
     validate_parser.add_argument("--output", type=Path, required=True)
+    collect_parser = subparsers.add_parser("collect-heldout")
+    collect_parser.add_argument("--run-plan", type=Path, required=True)
+    collect_parser.add_argument("--manifest", type=Path, required=True)
+    collect_parser.add_argument("--ledger", type=Path, required=True)
+    collect_parser.add_argument("--condition", choices=("C1", "C2"), required=True)
+    collect_parser.add_argument("--output", type=Path, required=True)
     compare_parser = subparsers.add_parser("compare")
     compare_parser.add_argument("--control", type=Path, required=True)
     compare_parser.add_argument("--treatment", type=Path, required=True)
     compare_parser.add_argument("--output", type=Path, required=True)
-    compare_parser.add_argument(
-        "--evidence-class",
-        choices=("public-workflow-comparison", "held-out-comparison"),
-        default="public-workflow-comparison",
-    )
     args = parser.parse_args()
     if args.command == "validate":
         runtime = _read_json(args.runtime_snapshot) if args.runtime_snapshot else None
@@ -656,11 +848,25 @@ def main() -> int:
         )
         print(args.output)
         return 1 if failures else 0
+    if args.command == "collect-heldout":
+        evidence, failures = collect_heldout_evidence(
+            run_plan_path=args.run_plan,
+            manifest_path=args.manifest,
+            ledger_path=args.ledger,
+            condition=args.condition,
+        )
+        _validate_contract(evidence, "observation-evidence.schema.json")
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(args.output)
+        return 1 if failures else 0
     control = _read_json(args.control)
     treatment = _read_json(args.treatment)
     if not isinstance(control, dict) or not isinstance(treatment, dict):
         raise HarborSuiteError("comparison inputs must be JSON objects")
-    report = compare_evidence(control, treatment, evidence_class=args.evidence_class)
+    report = compare_evidence(control, treatment)
     _validate_contract(report, "comparison-report.schema.json")
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "comparison-report.json").write_text(
@@ -677,4 +883,9 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["build_observation_evidence", "compare_evidence", "render_markdown"]
+__all__ = [
+    "build_observation_evidence",
+    "collect_heldout_evidence",
+    "compare_evidence",
+    "render_markdown",
+]
