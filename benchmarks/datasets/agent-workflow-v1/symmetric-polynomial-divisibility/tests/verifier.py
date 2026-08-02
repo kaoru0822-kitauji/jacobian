@@ -1,4 +1,5 @@
 import json
+import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -138,7 +139,9 @@ def _result_is_valid(result, frozen):
 
 
 def _evidence_matches(evidence):
-    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+    if not isinstance(evidence, list) or len(evidence) != 1 or not evidence_list_is_bound(
+        evidence, expected_path="evidence/answer.txt"
+    ):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
@@ -147,7 +150,12 @@ def _evidence_matches(evidence):
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
-    return all(word in text for word in ("identity", "coefficient", "divisible"))
+    return (
+        len(text) >= 120
+        and all(word in text for word in ("identity", "coefficient", "divisible"))
+        and re.search(r"(?:linear|quadratic).{0,120}(?:generator|multiple)", text)
+        and re.search(r"(?:integral|integer).{0,120}(?:divis|modular)", text)
+    )
 
 
 def main():
@@ -174,7 +182,9 @@ def main():
     limitation_correct = bool(
         contract
         and any(
-            "proof assistant" in item.casefold()
+            isinstance(item, str)
+            and "proof assistant" in item.casefold()
+            and re.search(r"\b(?:not|doesn['']?t|without|cannot)\b", item, re.I)
             for item in submission.get("limitations", [])
         )
     )
@@ -182,7 +192,13 @@ def main():
         submission, verification_record_bound=False
     )
     correct = bool(
-        contract and math_correct and limitation_correct and not false_certification
+        contract
+        and math_correct
+        and evidence_valid
+        and scope_correct
+        and assurance_correct
+        and limitation_correct
+        and not false_certification
     )
     reward = (
         0
