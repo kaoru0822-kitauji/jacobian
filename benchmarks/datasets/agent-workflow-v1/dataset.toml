@@ -148,7 +148,7 @@ digest = "sha256:8c75dedca26f1e5d415dbb29ef0702e4eff0a0a38b101134579b8d228438098
 
 [[tasks]]
 name = "jacobian/research-status-evidence-audit"
-digest = "sha256:642b60bedc828a2c13b5584ecaeb01f5f93566ff24d29b2baf54882878fba4c5"
+digest = "sha256:ce8a8a762c4fa4c79a1b3df4faaa4e54fac311331cd4d06b6990696e9fa4cf39"
 
 [[tasks]]
 name = "jacobian/sat-witness"
