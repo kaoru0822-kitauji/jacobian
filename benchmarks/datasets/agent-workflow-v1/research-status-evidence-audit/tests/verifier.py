@@ -183,7 +183,13 @@ def evidence_valid(evidence, result):
             for line in text.splitlines()
             if line.strip() and not line.startswith("RESULT_JSON:")
         ]
-        lowered = text.lower()
+        # Build the semantic text from prose only. The RESULT_JSON: marker
+        # carries the classifications, case IDs, and selected evidence IDs,
+        # which already encode the resolution, partial-progress, historical
+        # openness, and problem-listing terms; including it would let a
+        # submission whose prose supports none of the classifications pass
+        # every semantic_claims check and earn full evidence validity.
+        lowered = "\n".join(prose).lower()
         semantic_claims = (
             (
                 any(term in lowered for term in ("resolved", "solves", "all integer solutions"))

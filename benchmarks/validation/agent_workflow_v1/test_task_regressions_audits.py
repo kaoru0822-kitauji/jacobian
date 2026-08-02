@@ -332,6 +332,30 @@ def test_research_status_audit_rejects_evidence_without_result_marker(
     assert rejected["reward"] == pytest.approx(0.2)
 
 
+def test_research_status_audit_rejects_escaped_semantics_in_result_marker(
+    tmp_path: Path,
+) -> None:
+    """The RESULT_JSON: marker carries the classifications, case IDs, and
+    selected evidence IDs, which already encode the resolution, partial
+    progress, historical openness, and problem-listing terms. A submission
+    whose prose supports none of the classifications must not pass the
+    semantic_claims checks or earn evidence validity, even though its result
+    marker is canonical and its prose is long enough.
+    """
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    evidence_path = app / "evidence" / "answer.txt"
+    submission = json.loads((app / "submission.json").read_text())
+    evidence_path.write_text("This is not a problem statement.\nRESULT_JSON: {}\n")
+    support._bind_result_evidence(app, submission)
+    support._write_json(app / "submission.json", submission)
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.2)
+
+
 def test_research_status_audit_rejects_oversized_evidence(
     tmp_path: Path,
 ) -> None:
