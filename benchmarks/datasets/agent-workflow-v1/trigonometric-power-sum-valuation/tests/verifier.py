@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from pathlib import Path
 
@@ -41,6 +42,14 @@ def _valuation(value, prime):
     return exponent
 
 
+def _integer(value):
+    if type(value) is int:
+        return value
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        return int(value)
+    return None
+
+
 def _expected_terms(limit):
     values = [3, 7, 21]
     for n in range(3, limit + 1):
@@ -59,12 +68,13 @@ def _terms_are_valid(terms, values):
             "required_valuation",
         }:
             return False
-        if not all(
-            type(term[field]) is int
+        normalized = {
+            field: _integer(term.get(field))
             for field in ("n", "value", "seven_adic_valuation", "required_valuation")
-        ):
+        }
+        if any(value is None for value in normalized.values()):
             return False
-        if term != {
+        if normalized != {
             "n": n,
             "value": value,
             "seven_adic_valuation": _valuation(value, 7),
@@ -80,19 +90,22 @@ def _induction_is_valid(cases):
         {"residue": 1, "coefficient_adjusted_offsets": [1, 0, 0]},
         {"residue": 2, "coefficient_adjusted_offsets": [1, 1, 0]},
     ]
-    return (
-        isinstance(cases, list)
-        and all(
-            isinstance(case, dict)
-            and type(case.get("residue")) is int
-            and isinstance(case.get("coefficient_adjusted_offsets"), list)
-            and all(
-                type(offset) is int for offset in case["coefficient_adjusted_offsets"]
-            )
-            for case in cases
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        return False
+    normalized = []
+    for case in cases:
+        if not isinstance(case, dict) or not isinstance(
+            case.get("coefficient_adjusted_offsets"), list
+        ):
+            return False
+        residue = _integer(case.get("residue"))
+        offsets = [_integer(value) for value in case["coefficient_adjusted_offsets"]]
+        if residue is None or any(value is None for value in offsets):
+            return False
+        normalized.append(
+            {"residue": residue, "coefficient_adjusted_offsets": offsets}
         )
-        and cases == expected
-    )
+    return sorted(normalized, key=lambda case: case["residue"]) == expected
 
 
 def _result_is_valid(result, frozen):
@@ -114,10 +127,12 @@ def _result_is_valid(result, frozen):
         "recurrence_coefficients",
     ):
         values = result[field]
-        if not isinstance(values, list) or not all(
-            type(value) is int for value in values
-        ):
+        if not isinstance(values, list):
             return False
+        normalized = [_integer(value) for value in values]
+        if any(value is None for value in normalized):
+            return False
+        result[field] = normalized
     values = _expected_terms(limit)
     return bool(
         result["minimal_polynomial_descending"] == [1, -7, 14, -7]
@@ -126,10 +141,10 @@ def _result_is_valid(result, frozen):
         and _terms_are_valid(result["terms"], values)
         and _induction_is_valid(result["induction_cases"])
         and isinstance(result["conclusion"], str)
-        and re.search(r"\bdivis(?:ible|ibility)\b", result["conclusion"], re.I)
-        and re.search(r"\bpositive\b|\ball\b", result["conclusion"], re.I)
+        and re.search(r"(?:\b|_)divis(?:ible|ibility)(?:\b|_)", result["conclusion"], re.I)
+        and re.search(r"(?:\b|_)(?:positive|all)(?:\b|_)", result["conclusion"], re.I)
         and not re.search(
-            r"\b(?:not|without|cannot|unknown|insufficient)\b",
+            r"\b(?:not|without|cannot|unknown|insufficient|fail(?:s|ure)?)\b",
             result["conclusion"],
             re.I,
         )
