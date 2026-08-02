@@ -106,7 +106,7 @@ def _evidence(value: object) -> bool:
             )
         )
         and "divisible by p" in text
-        and "X^p-u" in text
+        and "x^p-u" in text
     )
 
 
