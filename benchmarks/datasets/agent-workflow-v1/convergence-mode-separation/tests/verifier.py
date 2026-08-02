@@ -220,11 +220,16 @@ def _evidence_valid(evidence, result):
         return False
     folded = text.casefold()
     return (
-        all(term in folded for term in ("probability", "almost surely", "infinitely often"))
+        all(
+            term in folded
+            for term in ("probability", "almost surely", "infinitely often")
+        )
         and "every point" in folded
         and ("one interval per level" in folded or "one member" in folded)
         and ("zero infinitely often" in folded or "zeros infinitely often" in folded)
-        and ("equals one infinitely often" in folded or "ones infinitely often" in folded)
+        and (
+            "equals one infinitely often" in folded or "ones infinitely often" in folded
+        )
     )
 
 
