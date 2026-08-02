@@ -84,7 +84,7 @@ digest = "sha256:e6624814316f1d764306b46c6ef344ee2871675823392aa3e41b319093e9066
 
 [[tasks]]
 name = "jacobian/lean-guard-scope-assurance"
-digest = "sha256:79b42564107adf4caf2b539040568f37fb204d5985f7aaf8c5ea7e28070ca40b"
+digest = "sha256:c03fbf61e22ee60cfeffeff091ed35b937b2892f5ea64c26cf195e37686ba902"
 
 [[tasks]]
 name = "jacobian/lean-transitive-axiom-audit"

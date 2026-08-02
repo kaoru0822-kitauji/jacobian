@@ -17,11 +17,18 @@ LIMITATION = "The verifier derives semantic classifications from frozen facts bu
 
 def _source() -> dict[str, Any]:
     try:
-        raw = (TESTS / "input.json").read_bytes()
-        if (WORKSPACE / "input.json").read_bytes() != raw:
+        visible = WORKSPACE / "input.json"
+        frozen = TESTS / "input.json"
+        if any(
+            path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576
+            for path in (visible, frozen)
+        ):
+            return {}
+        raw = frozen.read_bytes()
+        if visible.read_bytes() != raw:
             return {}
         value = json.loads(raw)
-    except (OSError, ValueError):
+    except (OSError, RecursionError, ValueError):
         return {}
     return value if isinstance(value, dict) else {}
 
