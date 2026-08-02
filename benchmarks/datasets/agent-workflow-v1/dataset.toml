@@ -139,6 +139,10 @@ name = "jacobian/putnam-2adic-induction-audit"
 digest = "sha256:a5b765c629efa4cb3f6f16d25115d599b3a578f31bd999c306ecfa8ef69d762d"
 
 [[tasks]]
+name = "jacobian/radical-system-uniqueness-audit"
+digest = "sha256:ff416130584eac45e7e4b977b3fe3252592f975c1e9d2ba4bde26916c8d3151e"
+
+[[tasks]]
 name = "jacobian/random-function-expectation-audit"
 digest = "sha256:d33292b3af0fcc126c7d156ee806e8fec6b9edd0d5cbf0fbd9825b0e7f37041c"
 

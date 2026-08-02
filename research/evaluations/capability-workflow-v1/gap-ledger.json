@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:2074454b695ae4824ba15d77cabce6f52edf2bcd93208992beb6317911d293a5",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -776,6 +776,33 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep the simultaneous valuation induction as agent-owned composition; do not add a Putnam-specific recurrence solver."
+    },
+    {
+      "task_id": "radical-system-uniqueness-audit",
+      "mathematical_moves": [
+        "Eliminate coupled square, cube, and fourth roots through an exact sixth-root substitution.",
+        "Classify every algebraic root against principal-root domains and reconstruct the complete real solution set."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.factor.compute",
+          "availability": "AVAILABLE",
+          "boundary": "Factors the univariate elimination polynomial but does not derive it from radical semantics or certify domain filtering."
+        },
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay exact polynomial identities after the radical system has been translated into a polynomial contract."
+        }
+      ],
+      "gap_classes": [
+        "MISSING_ARTIFACT_HANDOFF",
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "DEFER_RESEARCH",
+      "next_action": "Keep radical substitution and principal-root filtering as agent-owned composition until a second independent workflow justifies a reusable artifact."
     },
     {
       "task_id": "random-function-expectation-audit",
