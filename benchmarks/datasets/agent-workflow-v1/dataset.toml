@@ -83,6 +83,10 @@ name = "jacobian/lcm-highly-abundant-scope-audit"
 digest = "sha256:e6624814316f1d764306b46c6ef344ee2871675823392aa3e41b319093e90663"
 
 [[tasks]]
+name = "jacobian/lean-guard-scope-assurance"
+digest = "sha256:23755de661f8001325af1ab9fd82dc0775de542ea639caf59a1ecf2d2e574a63"
+
+[[tasks]]
 name = "jacobian/lean-transitive-axiom-audit"
 digest = "sha256:9522b73e4f9e42b545b26fe86cd1e55ffce5e1935f5e92194aecb7a32b3acaa3"
 

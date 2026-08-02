@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:9d6a200ef4bd5ba4e6d32435f2ba7461acd5ddcf3c4445648de48ad8652ae135",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -444,6 +444,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep counterexample construction and minimality-scope auditing as agent-owned composition; do not add a problem-specific highly-abundant solver."
+    },
+    {
+      "task_id": "lean-guard-scope-assurance",
+      "mathematical_moves": [
+        "Distinguish full proof-state scope from textual binder order when evaluating semantic guards.",
+        "Reject numeral and order shortcuts on a pathological custom type where zero and one coincide.",
+        "Separate statement analysis, division-by-zero risk, and integer truncation semantics."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "lean.statement.elaborate",
+          "availability": "AVAILABLE",
+          "boundary": "Elaborates a proposition but does not audit semantic-guard soundness or linter finding calibration."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep type-sensitive finding calibration as an Assurance benchmark; do not add an alias for an external linter."
     },
     {
       "task_id": "lean-transitive-axiom-audit",
