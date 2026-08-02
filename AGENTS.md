@@ -119,25 +119,11 @@ checker authorization out of plugins and search code.
 
 ## Agent Workflow Entry Points
 
-Repository-local skills under `.agents/skills/` are the maintained entry points
-for recurring capability work:
-
-- use `develop-math-capabilities` for the complete challenge-to-evaluation
-  improvement loop;
-- use `discover-math-capabilities` to mine recurring mathematical moves and
-  produce evidence-gated candidates;
-- use `implement-math-capability` for a bounded producer contract;
-- use `implement-math-capability-checker` for an operator-authorized,
-  independent verification path; and
-- use `evaluate-math-capabilities` for frozen public reproductions or held-out
-  comparative evaluations.
-
-Read the selected skill completely and use
-[capability development handoffs](docs/reference/capability-development-handoffs.md)
-between stages. Record the git tree, installed catalog and policy digests,
-provider/runtime state, model and prompt settings, raw trace location,
-validation actually run, unresolved obligations, and next action. Do not use
-ignored transcripts or local review notes as the only handoff.
+Capability work remains agent-directed and is not coupled to a mandatory
+development workflow. For Harbor task authoring and verifier changes, use the
+repository-local [`harbor-benchmarks`](.agents/skills/harbor-benchmarks/SKILL.md)
+skill and its exact task validation path. Control/treatment model evaluations
+are explicit operator-run evidence exercises, not routine development gates.
 
 For remote MCP operation, use
 [Deploy the remote MCP server](docs/how-to/deploy-remote-mcp.md) and the

@@ -86,7 +86,6 @@ how its major parts fit together.
 - [ADR 0002: Sealed plugin packages](explanation/adr/0002-sealed-plugin-packages.md)
 - [ADR 0003: Durable search invocations](explanation/adr/0003-durable-search-invocations.md)
 - [ADR 0004: Verified parameter regions](explanation/adr/0004-verified-parameter-regions.md)
-- [ADR 0005: Direct epistemic workspaces](explanation/adr/0005-direct-epistemic-workspaces.md)
 
 ## Contributing
 
@@ -115,12 +114,10 @@ records the isolated GPL wheel/source boundary, bounded 3-manifold and
 normal-surface reproductions, partial independent replay, and outcome-specific
 production gates.
 
-Recurring agent work is encoded in the repository-local skills under
-`.agents/skills/`. Start with `develop-math-capabilities` for a complete
-challenge-to-evaluation loop, or select its discovery, producer, checker, or
-evaluation phase skill directly. Use the
-[capability development handoff](reference/capability-development-handoffs.md)
-between phases. For hosted operation, follow
+Harbor benchmark authoring and verifier work is encoded in the repository-local
+[`harbor-benchmarks`](../.agents/skills/harbor-benchmarks/SKILL.md) skill. Use
+the exact task gate for routine benchmark changes; control/treatment model runs
+are explicit operator-run evidence exercises. For hosted operation, follow
 [Deploy the remote MCP server](how-to/deploy-remote-mcp.md); ignored `tmp/`
 records are evidence from one host, not maintained instructions.
 

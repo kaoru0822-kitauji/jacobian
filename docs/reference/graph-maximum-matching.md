@@ -86,20 +86,3 @@ The checker tests include:
 
 Every rejection returns `UNKNOWN`; it never asserts that another matching is
 maximum.
-
-## Capability-development handoff
-
-`stage=implementation,status=complete`
-
-- Evidence: hosted OpenAI use exercised maximum matching repeatedly, while the
-  producer exposed only an unverified edge witness.
-- Availability delta: version `2` adds the certificate-bearing producer
-  contract and the domain-owned verification capability.
-- Assurance delta: producer output remains `COMPUTED`; only the independent,
-  operator-authorized clean-process checker can return `VERIFIED`.
-- Compatibility: the required certificate changes the result schema, so
-  version `1` artifacts are intentionally not accepted as version `2`
-  candidates.
-- Remaining proof obligation: comparative model-in-the-loop evaluation may
-  measure whether the verifier improves autonomous research outcomes; it is not
-  required to establish the local certificate theorem.

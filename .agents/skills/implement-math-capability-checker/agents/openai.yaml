@@ -1,4 +1,0 @@
-interface:
-  display_name: "Implement Math Capability Checker"
-  short_description: "Build independent mathematical verification paths"
-  default_prompt: "Use $implement-math-capability-checker to add an independent checker for a Jacobian capability."

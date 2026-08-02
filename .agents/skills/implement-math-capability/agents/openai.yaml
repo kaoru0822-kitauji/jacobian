@@ -1,4 +1,0 @@
-interface:
-  display_name: "Implement Math Capability"
-  short_description: "Build honest atomic Jacobian math capabilities"
-  default_prompt: "Use $implement-math-capability to implement an evidence-backed experimental Jacobian capability."
