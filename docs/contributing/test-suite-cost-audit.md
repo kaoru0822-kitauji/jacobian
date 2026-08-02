@@ -213,7 +213,7 @@ with explicit bundles; composition tests opt into visibly expensive
 `authorized_complete_runtime`; and boundary tests own durable stores,
 checker/process servers, MCP transports, and provider environments. Immutable
 templates are built in a temporary sibling and atomically renamed before tests
-copy their own state. No mutable runtime, registry, connection, or workspace is
+copy their own state. No mutable runtime, registry, or connection is
 shared between tests.
 
 

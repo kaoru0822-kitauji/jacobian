@@ -1,4 +1,4 @@
-"""MCP tool handlers for capability and workspace surfaces."""
+"""MCP tool handlers for the capability surface."""
 
 from __future__ import annotations
 
@@ -20,32 +20,11 @@ from jacobian.adapters.mcp.projections import (
 from jacobian.adapters.mcp.tooling import (
     AgentRecoveryError,
     _invoke_capability_attempt,
-    _run_blocking,
 )
 from jacobian.contracts.capabilities import (
     CapabilityInputKind,
     CapabilityMode,
     CapabilityResult,
-)
-from jacobian.contracts.workspaces import (
-    WorkspaceAttemptDraft,
-    WorkspaceBranchId,
-    WorkspaceCardId,
-    WorkspaceFindingDraft,
-    WorkspaceFocusDraft,
-    WorkspaceId,
-    WorkspaceIdempotencyKey,
-    WorkspaceMarkDraft,
-    WorkspaceOpenRequest,
-    WorkspaceOpenResult,
-    WorkspaceQueryRequest,
-    WorkspaceQueryResult,
-    WorkspaceQueryView,
-    WorkspaceRevisionId,
-    WorkspaceScratchDraft,
-    WorkspaceTag,
-    WorkspaceWriteRequest,
-    WorkspaceWriteResult,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -171,13 +150,8 @@ async def capability_describe(
         descriptor = descriptors[capability_id]
     except KeyError:
         hint = (
-            "workspace.* names are direct MCP tools, not capability IDs; call the "
-            "workspace tool directly using its published input schema."
-            if capability_id.startswith("workspace.")
-            else (
-                "Call capability.describe with a mathematical query to search "
-                "installed capabilities."
-            )
+            "Call capability.describe with a mathematical query to search "
+            "installed capabilities."
         )
         return {
             "error": {
@@ -265,176 +239,4 @@ async def capability_invoke(
         result,
         view=view,
         projection_strategy=_projection_strategy(ctx),
-    )
-
-
-async def workspace_open(
-    idempotency_key: WorkspaceIdempotencyKey,
-    name: Annotated[str, Field(min_length=1, max_length=128)],
-    problem: Annotated[str, Field(min_length=1, max_length=16_384)],
-    tags: Annotated[
-        list[WorkspaceTag] | None,
-        Field(max_length=16),
-    ] = None,
-    ctx: Context[AppState, Any] | None = None,
-) -> WorkspaceOpenResult:
-    active_runtime = _runtime(ctx)
-    return await _run_blocking(
-        active_runtime.core.workspaces.open,
-        WorkspaceOpenRequest(
-            idempotency_key=idempotency_key,
-            name=name,
-            problem=problem,
-            tags=tuple(tags or ()),
-        ),
-    )
-
-
-async def workspace_write(
-    workspace_id: Annotated[
-        WorkspaceId,
-        Field(description="workspace:// handle returned by workspace.open"),
-    ],
-    branch_id: Annotated[
-        WorkspaceBranchId,
-        Field(description="branch:// handle returned by workspace.open"),
-    ],
-    base_revision: Annotated[
-        WorkspaceRevisionId,
-        Field(
-            description=(
-                "Exact current revision:// head returned by workspace.open, "
-                "workspace.write, or workspace.query."
-            )
-        ),
-    ],
-    idempotency_key: Annotated[
-        WorkspaceIdempotencyKey,
-        Field(
-            description=(
-                "Caller-chosen key unique to this exact write payload; reuse only "
-                "to retry the identical request."
-            )
-        ),
-    ],
-    scratch: Annotated[
-        list[WorkspaceScratchDraft] | None,
-        Field(
-            max_length=64,
-            description="Optional unverified scratch entries to append.",
-        ),
-    ] = None,
-    findings: Annotated[
-        list[WorkspaceFindingDraft] | None,
-        Field(
-            max_length=64,
-            description="Optional typed, unverified cards to append.",
-            examples=[
-                [
-                    {
-                        "client_ref": "C1",
-                        "kind": "CLAIM",
-                        "title": "Candidate conclusion",
-                        "body": "Agent-authored reasoning; still unverified.",
-                    }
-                ]
-            ],
-        ),
-    ] = None,
-    attempts: Annotated[
-        list[WorkspaceAttemptDraft] | None,
-        Field(
-            max_length=64,
-            description="Optional unverified operational attempts to append.",
-            examples=[
-                [
-                    {
-                        "client_ref": "T1",
-                        "target_ref": "C1",
-                        "method": "direct",
-                        "outcome": "COMPLETED",
-                        "summary": "The operational attempt finished.",
-                    }
-                ]
-            ],
-        ),
-    ] = None,
-    marks: Annotated[
-        list[WorkspaceMarkDraft] | None,
-        Field(
-            max_length=64,
-            description=(
-                "Optional append-only lifecycle marks. CLOSED is workflow state, "
-                "not proof; RETRACTED and SUPERSEDED deterministically make explicit "
-                "dependents stale."
-            ),
-            examples=[
-                [
-                    {
-                        "client_ref": "M1",
-                        "target_ref": "C1",
-                        "state": "RETRACTED",
-                        "reason": "The recorded premise was withdrawn.",
-                    }
-                ]
-            ],
-        ),
-    ] = None,
-    focus: Annotated[
-        WorkspaceFocusDraft | None,
-        Field(
-            description=(
-                "Optional explicit focus update: set active_ref/pinned_refs, use "
-                "clear=true to clear, or omit to preserve current focus."
-            ),
-            examples=[{"active_ref": "C1", "pinned_refs": ["C1"]}],
-        ),
-    ] = None,
-    ctx: Context[AppState, Any] | None = None,
-) -> WorkspaceWriteResult:
-    active_runtime = _runtime(ctx)
-    return await _run_blocking(
-        active_runtime.core.workspaces.write,
-        WorkspaceWriteRequest(
-            idempotency_key=idempotency_key,
-            workspace_id=workspace_id,
-            branch_id=branch_id,
-            base_revision=base_revision,
-            scratch=tuple(scratch or ()),
-            findings=tuple(findings or ()),
-            attempts=tuple(attempts or ()),
-            marks=tuple(marks or ()),
-            focus=focus,
-        ),
-    )
-
-
-async def workspace_query(
-    workspace_id: WorkspaceId,
-    branch_id: WorkspaceBranchId,
-    revision_id: Annotated[
-        WorkspaceRevisionId | None,
-        Field(
-            description=(
-                "Optional expected branch head revision:// handle. The query "
-                "fails if the current head differs; omit to read the latest."
-            )
-        ),
-    ] = None,
-    view: WorkspaceQueryView = WorkspaceQueryView.RESUME,
-    target_card_id: WorkspaceCardId | None = None,
-    limit: Annotated[StrictInt, Field(ge=1, le=50)] = 10,
-    ctx: Context[AppState, Any] | None = None,
-) -> WorkspaceQueryResult:
-    active_runtime = _runtime(ctx)
-    return await _run_blocking(
-        active_runtime.core.workspaces.query,
-        WorkspaceQueryRequest(
-            workspace_id=workspace_id,
-            branch_id=branch_id,
-            revision_id=revision_id,
-            view=view,
-            target_card_id=target_card_id,
-            limit=limit,
-        ),
     )

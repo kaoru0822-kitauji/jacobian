@@ -15,7 +15,10 @@ from jacobian.persistence.database import (
     StateDatabase,
     StateDatabaseError,
 )
-from jacobian.persistence.migrations import STATE_MIGRATIONS
+from jacobian.persistence.migrations import (
+    CURRENT_STATE_FORMAT_REVISION,
+    STATE_MIGRATIONS,
+)
 from jacobian.store import ArtifactStore, StoreError
 
 
@@ -51,6 +54,81 @@ def test_fresh_store_records_immutable_ordered_migrations(tmp_path: Path) -> Non
         migration.checksum for migration in STATE_MIGRATIONS
     )
     assert all(row["applied_at"] for row in rows)
+
+    connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
+    try:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        assert not any(name.startswith("workspace") for name in tables)
+        assert connection.execute(
+            "SELECT format_revision FROM jacobian_state_format WHERE id = 0"
+        ).fetchone() == (CURRENT_STATE_FORMAT_REVISION,)
+    finally:
+        connection.close()
+
+
+def test_revisions_one_through_four_keep_their_historical_checksums() -> None:
+    assert tuple(migration.checksum for migration in STATE_MIGRATIONS[:4]) == (
+        "sha256:619080ade76dc63ca03acd3a8801e58f864357a9e164ec10308a1bae7bead0fe",
+        "sha256:a7741db8d914c9d57a3c4bada024c9c9dcfb4469517dc943cf18a51b30cedca9",
+        "sha256:fb7debf6933ec683bbf9b82294559737ee77801fa9a2f03f64bf299cc4b466f9",
+        "sha256:e14ad430c8469cc01dae835385cad8aa053cb4b667a16952ba230e54723c97b7",
+    )
+
+
+def test_revision_five_removes_populated_legacy_workspace_tables(
+    tmp_path: Path,
+) -> None:
+    with ArtifactStore(tmp_path):
+        pass
+
+    connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
+    try:
+        connection.execute("DELETE FROM jacobian_schema_migrations WHERE revision = 5")
+        connection.execute(
+            "UPDATE jacobian_state_format SET format_revision = 4 WHERE id = 0"
+        )
+        for table in (
+            "workspace_focus",
+            "workspace_marks",
+            "workspace_attempts",
+            "workspace_scratch",
+            "workspace_findings",
+            "workspace_branches",
+            "workspace_revisions",
+            "workspace_idempotency",
+            "workspaces",
+        ):
+            connection.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
+            connection.execute(f"INSERT INTO {table}(id) VALUES (1)")
+        connection.commit()
+    finally:
+        connection.close()
+
+    with ArtifactStore(tmp_path):
+        pass
+
+    connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
+    try:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        assert not any(name.startswith("workspace") for name in tables)
+        assert connection.execute(
+            "SELECT format_revision FROM jacobian_state_format WHERE id = 0"
+        ).fetchone() == (5,)
+        assert connection.execute(
+            "SELECT revision FROM jacobian_schema_migrations WHERE revision = 5"
+        ).fetchone() == (5,)
+    finally:
+        connection.close()
 
 
 def test_legacy_schema_without_ledger_is_adopted(tmp_path: Path) -> None:

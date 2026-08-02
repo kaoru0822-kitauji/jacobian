@@ -15,15 +15,13 @@ SERVER_INSTRUCTIONS = (
     "two relevant summaries, then request one CONTRACT view before invoking. Compose "
     "capability.invoke calls as you judge useful. "
     "Jacobian does not choose the task decomposition or research strategy. "
-    "Direct workspace.* tools publish their own input shape and do not use capability "
-    "discovery. EXPLORE returns proposed, heuristic, or computed evidence; use VERIFY "
+    "EXPLORE returns proposed, heuristic, or computed evidence; use VERIFY "
     "only with an installed independent checker. Execution status, completeness, "
     "mathematical conclusion, and assurance are separate. Failure to find a witness "
     "and bounded or exhausted search are not mathematical conclusions. Synchronous "
     "SAT/SMT calls are capped at 150 seconds; partition larger searches. Only assurance "
     "level VERIFIED with a local verification record is verified. Repeating finite or "
-    "bounded instances does not establish an all-orders or all-parameters theorem. A "
-    "workspace entry never promotes mathematical assurance. Read "
+    "bounded instances does not establish an all-orders or all-parameters theorem. Read "
     "jacobian://instructions for the complete operating guide."
 )
 
@@ -148,7 +146,7 @@ full episode when one was recorded. Request `view="SUMMARY"` to omit output or
 ## Exploration and verification
 
 `EXPLORE` returns proposed, heuristic, or computed evidence. Search, generation,
-evaluation, solver output, retrieved memory, and workspace entries are not proof.
+evaluation, solver output, and retrieved memory are not proof.
 
 `VERIFY` may return `VERIFIED` only when an operator-authorized independent checker
 accepts evidence bound to the exact claim, semantics, candidate, scope, certificate
@@ -165,15 +163,10 @@ establish an all-parameters or all-orders claim. A hard expression-growth diagno
 also remains a non-conclusion; increasing the size of the same full-expansion family
 does not turn that bounded operation into a symbolic proof.
 
-## Artifacts and workspaces
+## Artifacts
 
 Follow returned `artifact://` and `experiment://` resources instead of requesting
-large payloads inline. Workspace findings, attempts, lifecycle marks, focus, and
-retrieval remain agent-authored operational state. Writing, closing, retracting,
-superseding, archiving, or pinning a workspace entry never promotes mathematical
-assurance. In particular, a workspace card titled as an exact value remains
-UNVERIFIED unless a separate checker-backed capability returns VERIFIED with its
-bound verification record.
+large payloads inline.
 
 Reading an `artifact://sha256/<digest>` resource returns a JSON envelope with keys
 `artifact_uri`, `manifest`, and `payload`. The `payload` field holds the bare

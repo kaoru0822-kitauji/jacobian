@@ -179,9 +179,7 @@ def main():
         contract and math_correct and _evidence_matches(data.get("evidence"))
     )
     scope_text = (
-        data.get("scope").casefold()
-        if isinstance(data.get("scope"), str)
-        else ""
+        data.get("scope").casefold() if isinstance(data.get("scope"), str) else ""
     )
     scope_correct = bool(
         contract
@@ -194,8 +192,7 @@ def main():
         )
     )
     assurance_correct = bool(
-        contract
-        and data.get("claimed_assurance") == expected["maximum_assurance"]
+        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
     limitation_correct = bool(
         contract

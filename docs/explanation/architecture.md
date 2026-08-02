@@ -270,27 +270,6 @@ edit proposal, checker-backed edit validation, and `lean.check` as distinct
 operations. Generated edits remain unverified unless independent replay accepts
 the exact proof.
 
-### Epistemic workspace
-
-`WorkspaceService` owns durable agent working state independently of
-`CapabilityService`. The direct `workspace.open`, `workspace.write`, and
-`workspace.query` tools return operational revision and item handles rather
-than `CapabilityResult`: a successful write says only that state was accepted.
-
-Each accepted batch creates an immutable revision artifact and atomically
-advances a SQLite branch head from an exact `base_revision`. Findings, attempts,
-scratch entries, focus, and append-only lifecycle marks remain
-`AGENT_RECORDED` and `UNVERIFIED`. `RETRACTED` and `SUPERSEDED` marks produce
-mechanical stale warnings only through explicit dependency and assumption
-links. `CLOSED`, retrieval, pinning, and a `COMPLETED` attempt cannot promote a
-mathematical conclusion.
-
-The initial service has one `main` branch and one canonical problem card.
-`RESUME`, `FRONTIER`, `ATTEMPTS`, `CONTEXT`, and `STALE` are deterministic
-projections over one SQLite read snapshot. `CONTEXT` bounds returned dependency
-closure and reports truncation; it does not infer relevance or omitted
-premises.
-
 ## Common result model
 
 Operational state, mathematical conclusion, and assurance are orthogonal:
@@ -540,8 +519,6 @@ surface is deliberately small:
 
 - `capability.describe` returns the exact contract for an installed capability.
 - `capability.invoke` performs the selected bounded operation.
-- `workspace.open`, `workspace.write`, and `workspace.query` manage
-  agent-authored operational state without mathematical assurance.
 - `capability://catalog` exposes installed capability descriptors.
 - Resources expose large artifacts, traces, and experiment state.
 - Tool responses contain only compact structured summaries and resource URIs.

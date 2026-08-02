@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -194,7 +193,9 @@ def evidence_matches_result(evidence: object, result: object) -> bool:
         body = "\n".join(line for line in lines if not line.startswith("RESULT_JSON:"))
         lowered = body.lower()
         compact = "".join(lowered.split())
-        parameter = integer_value(result.get("parameter")) if isinstance(result, dict) else None
+        parameter = (
+            integer_value(result.get("parameter")) if isinstance(result, dict) else None
+        )
         expected_fragments = tuple(
             str(result.get(key)).replace(" ", "")
             for key in (
@@ -247,10 +248,11 @@ def limitation_is_bounded(value: object) -> bool:
         "does not generalize",
     )
     subject = ("polynomial", "family", "divisibility", "certificate", "input")
-    return (
-        any(word in lowered for word in subject)
-        and any(phrase in lowered for phrase in bounded_language)
+    return any(word in lowered for word in subject) and any(
+        phrase in lowered for phrase in bounded_language
     )
+
+
 def main() -> None:
     submission = load_regular_submission()
     data = submission if isinstance(submission, dict) else {}

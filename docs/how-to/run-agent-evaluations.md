@@ -2,18 +2,25 @@
 
 [Documentation home](../index.md) · [Evaluation reference](../reference/agent-evaluations.md)
 
-This guide covers the operational commands for Harbor workflow observations and
-paired Jacobian control/treatment runs. The evaluation roles, assurance rules,
-and interpretation boundaries are in the [reference page](../reference/agent-evaluations.md).
+This guide covers an explicit operator-run of Harbor workflow observations and
+paired Jacobian control/treatment runs. Model execution is not a routine
+development or pull-request gate. The evaluation roles, assurance rules, and
+interpretation boundaries are in the [reference page](../reference/agent-evaluations.md).
 
 ## Validate the dataset
 
-Run the contract checks before spending model or Docker time:
+Run the exact selected-task contract checks before spending model or Docker
+time:
 
 ```sh
-make harbor-check
-make harbor-oracle DATASET=agent-workflow-v1
+make harbor-check-task DATASET=agent-workflow-v1 TASKS="graph-counterexample"
+make harbor-oracle-task DATASET=agent-workflow-v1 TASKS="graph-counterexample"
 ```
+
+Use the full `make harbor-check` and explicitly scoped `make harbor-oracle`
+paths only for shared Harbor tooling, schemas, registry, suite policy, or
+other control-plane changes. Pass `TASKS="..."` for a bounded dataset Oracle;
+pass `FULL=1` only when a complete dataset sweep is intentional.
 
 ## Set shared run conditions
 

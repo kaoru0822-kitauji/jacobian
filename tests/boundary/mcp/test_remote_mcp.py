@@ -26,14 +26,8 @@ from jacobian.adapters.mcp.remote import (
     load_static_token_file,
 )
 from jacobian.adapters.mcp.server import create_server
-from jacobian.contracts.workspaces import (
-    WorkspaceOpenRequest,
-    WorkspaceQueryRequest,
-    WorkspaceQueryView,
-)
 from jacobian.runtime import CheckerAuthorityMode
 from jacobian.store import ArtifactNotFoundError
-from jacobian.workspaces import WorkspaceNotFoundError
 
 
 def test_static_tokens_bind_distinct_authenticated_subjects() -> None:
@@ -364,28 +358,6 @@ def test_anonymous_tenant_namespace_is_fixed_by_the_operator(tmp_path: Path) -> 
             checker_authority=CheckerAuthorityMode.NONE,
             allow_anonymous=True,
             anonymous_tenant_id="caller controlled",
-        )
-
-
-def test_tenant_router_isolates_epistemic_workspaces(tmp_path: Path) -> None:
-    router = TenantRuntimeRouter(tmp_path, checker_authority=CheckerAuthorityMode.NONE)
-    alpha = router.runtime_for("alpha")
-    beta = router.runtime_for("beta")
-    opened = alpha.core.workspaces.open(
-        WorkspaceOpenRequest(
-            idempotency_key="tenant-workspace-open-001",
-            name="alpha workspace",
-            problem="This working state belongs only to alpha.",
-        )
-    )
-
-    with pytest.raises(WorkspaceNotFoundError):
-        beta.core.workspaces.query(
-            WorkspaceQueryRequest(
-                workspace_id=opened.workspace_id,
-                branch_id=opened.branch_id,
-                view=WorkspaceQueryView.RESUME,
-            )
         )
 
 

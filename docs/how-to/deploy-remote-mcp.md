@@ -10,11 +10,10 @@ deployment source of truth. Keep host-specific copies, smoke output, and
 last-deployed notes outside source control; do not install configuration from
 operator scratch space or treat it as current.
 
-The server exposes `capability.describe`, `capability.invoke`, and the three
-direct `workspace.*` tools. Clients may read installed descriptors from
-`capability://catalog` and inspect exact contracts before invoking mathematical
-operations, which remain behind namespaced capability IDs. Workspace state is
-subject-bound operational data and never becomes mathematical assurance.
+The server exposes `capability.describe` and `capability.invoke`. Clients may
+read installed descriptors from `capability://catalog` and inspect exact
+contracts before invoking mathematical operations, which remain behind
+namespaced capability IDs.
 
 ## Install from a clone
 
@@ -135,7 +134,7 @@ uv run jacobian-mcp \
 
 `--anonymous-tenant-id` is fixed by the operator, never selected from a request.
 Give every independently operated anonymous test endpoint a different value so
-their workspaces, research episodes, and artifacts do not share one state
+their research episodes and artifacts do not share one state
 directory. This is namespace isolation, not authentication: every caller that
 can reach the same endpoint still shares that endpoint's tenant. Do not use
 anonymous mode for a production or sensitive endpoint. A deliberately public,
@@ -283,8 +282,8 @@ uv run python deploy/smoke_remote.py \
 
 For a token-protected endpoint, set `JACOBIAN_MCP_BEARER_TOKEN` in the smoke
 process environment without placing it on the command line. The script does
-not print the token and disables ambient proxy settings. It performs no
-workspace writes or capability invocations.
+not print the token and disables ambient proxy settings. It performs no state
+writes or capability invocations.
 
 Confirm the ingress route independently:
 
@@ -301,7 +300,7 @@ sudo journalctl -u jacobian-mcp.service --since "10 minutes ago" --no-pager
 sudo journalctl -u jacobian-caddy.service --since "10 minutes ago" --no-pager
 ```
 
-Do not report a deployment complete until the service version, five-tool
+Do not report a deployment complete until the service version, two-tool
 surface, catalog policy, required capabilities, and bounded discovery response
 all pass. Run deeper capability-specific smoke checks only for providers
 changed by the release.
@@ -318,7 +317,7 @@ the backend or smoke gate fails:
 5. confirm Caddy and Funnel still route to the restored backend.
 
 The state root is persistent and is not rolled back with code. Back it up before
-a release that changes stored artifacts or workspace formats, and verify
+a release that changes stored artifact formats, and verify
 backward compatibility before starting older code against newer state. Do not
 use `git reset --hard` as a deployment or rollback mechanism.
 
@@ -368,8 +367,7 @@ subject to the same tenant-routing interface.
 
 ## Operational boundaries
 
-- Back up the state volume; artifacts, workspaces, and research episodes live
-  there.
+- Back up the state volume; artifacts and research episodes live there.
 - Run one Jacobian process per state root until a lease model is implemented.
 - Record the deployed git commit and the MCP-advertised package version. Keep
   host-local deployment notes outside source control; they supplement, rather

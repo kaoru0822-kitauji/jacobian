@@ -1,4 +1,0 @@
-interface:
-  display_name: "Evaluate Math Capabilities"
-  short_description: "Test candidate operations with leakage-resistant evals"
-  default_prompt: "Use $evaluate-math-capabilities to turn this discovery candidate into a held-out Jacobian portfolio evaluation."

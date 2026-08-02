@@ -66,7 +66,7 @@ make test-component TESTS=tests/component/capabilities/test_mcp_invocation_proje
 make test-domain TESTS=tests/domain/graph/test_graph_invariant_domain.py
 make test-composition
 make test-mcp PYTEST_ARGS="-k authentication"
-make test-storage PYTEST_ARGS="-k workspace"
+make test-storage TESTS=tests/boundary/storage/transactions/test_state_database_migrations.py
 make test-process TESTS=tests/boundary/process/search/test_shrinking.py
 make test-provider
 make test-lean TESTS=tests/boundary/providers/lean/test_lean_repl_runtime.py PYTEST_ARGS="-k induction"
@@ -107,7 +107,7 @@ are containment policy, not performance assertions; process and native-backend
 work runs in killable children where a signal-only timeout cannot interrupt it.
 Immutable fixture templates are published by constructing in a temporary
 sibling and atomically renaming the completed directory. Each test receives a
-copied state directory; mutable stores, registries, workspaces, and runtime
+copied state directory; mutable stores, registries, and runtime
 objects are never shared. Composition fixtures make their cost visible through
 names such as `fresh_complete_runtime`, `attached_complete_runtime`, and
 `authorized_complete_runtime`.

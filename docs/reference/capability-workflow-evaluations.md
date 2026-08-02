@@ -20,17 +20,24 @@ job input, or enter an agent container.
 ## Task and verifier validation
 
 Every task has frozen agent-visible input, schema 1.4 metadata, an Oracle-only
-solution, and a separate clean-room verifier. The repository suite module
-validates `registry.toml`, suite headers, and member fragments, checks that
-member IDs resolve to direct Harbor task bundles, computes Harbor-native
-digests, checks global task-ID uniqueness and visibility, validates every
-submission schema and static Oracle submission, and emits a content-bound
-inventory:
+solution, and a separate clean-room verifier. A leaf task addition uses the
+explicit selected-task gate, which validates only the named member record,
+bundle topology, Harbor digest, and verifier support:
+
+```sh
+make harbor-check-task DATASET=<dataset-id> TASKS="<task-id>"
+make harbor-oracle-task DATASET=<dataset-id> TASKS="<task-id>"
+```
+
+The focused path requires explicit task IDs and never expands to all suites.
+The full repository gate remains the appropriate check for `registry.toml`,
+suite headers and policy, shared tooling, schemas, global task-ID uniqueness,
+or other control-plane changes:
 
 ```sh
 make harbor-check
 make benchmark-inventory OUTPUT=/tmp/benchmark-inventory.json
-make harbor-oracle DATASET=agent-workflow-v1
+make harbor-oracle DATASET=agent-workflow-v1 FULL=1
 ```
 
 The verifier scores only evidence its contract authorizes. Timeout,
@@ -39,11 +46,17 @@ non-conclusions. An Oracle answer does not authorize `VERIFIED`.
 
 ## Workflow observations and diagnostics
 
-Use the fixed `agent-workflow-v1` tasks for Jacobian workflow observations:
+Use the fixed `agent-workflow-v1` tasks for explicit operator-run Jacobian
+workflow observations:
 
 ```sh
-make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1
+make agent-eval DATASET=agent-workflow-v1 TASKS=graph-counterexample EVAL_EXECUTE=1
 ```
+
+The committed three-attempt control/treatment job files are reproducibility
+fixtures and remain unchanged. Running model jobs is not a routine task
+authoring or pull-request step; operators may run them when collecting
+evidence, then validate and compare the resulting records.
 
 Normalize each condition with `make agent-eval-validate`, passing a
 `RUNTIME_SNAPSHOT` that binds the immutable benchmark snapshot ID and pinned

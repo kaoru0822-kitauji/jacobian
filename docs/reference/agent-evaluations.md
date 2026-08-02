@@ -16,12 +16,21 @@ offline input, Oracle-only solution, and separate clean-room verifier.
 
 ## Validation boundary
 
-Task and verifier validation is separate from model observation:
+Task and verifier validation is separate from model observation. For an
+ordinary leaf change, validate the selected task and its exact Oracle:
 
 ```sh
-make harbor-check
-make harbor-oracle DATASET=agent-workflow-v1
+make harbor-check-task DATASET=agent-workflow-v1 TASKS="task-id"
+make harbor-oracle-task DATASET=agent-workflow-v1 TASKS="task-id"
 ```
+
+The focused commands require explicit task IDs and do not fall back to all
+tasks. Use the full `make harbor-check` and explicitly scoped
+`make harbor-oracle` paths for shared Harbor tooling, schemas, registry, suite
+policy, or other control-plane changes. Pass `FULL=1` only for an intentional
+complete dataset sweep. Model execution with `make agent-eval ... EVAL_EXECUTE=1` is an
+explicit operator-run evidence exercise; it is not a routine development or
+pull-request gate.
 
 The suite module checks that each member ID names a direct Harbor task bundle
 and validates the generated task digests. Wrong
@@ -50,10 +59,13 @@ certification, and assurance calibration separately. Aggregate reward may
 summarize a workflow contract, but is not primary evidence of Jacobian's
 mathematical capability value when it combines those dimensions.
 
-Start comparative work with three representative cases and three repetitions
-per condition. Stronger claims require held-out or transformed cases, a
-non-ceiling control pilot, more repetitions, and uncertainty reporting. Public
-suite results remain workflow observations, not held-out causal evidence.
+The committed control/treatment jobs preserve three attempts per condition as
+manual reproducibility fixtures. Starting comparative work with three
+representative cases and three repetitions per condition is an operator choice,
+not a required development step. Stronger claims require held-out or
+transformed cases, a non-ceiling control pilot, more repetitions, and
+uncertainty reporting. Public suite results remain workflow observations, not
+held-out causal evidence.
 
 Inspect Harbor ATIF together with Jacobian telemetry for discovery,
 descriptions, invocation and parameter errors, artifact and verification-record

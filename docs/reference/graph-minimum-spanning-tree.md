@@ -88,19 +88,3 @@ The public `metric-tsp-proof-repair` case motivated this fundamental primitive,
 but its answer is public and no model run was performed for this change. A
 held-out comparison across at least two independent weighted-graph families
 remains required before making a model-performance claim.
-
-## Capability-development handoff
-
-`stage=implementation/checker,status=complete`
-
-- Contract: `graph.spanning_tree.minimum.compute@1` and the optional
-  `graph.spanning_tree.minimum.verify` replay.
-- Provider: NetworkX constructs the tree over exact `Fraction` weights.
-- Assurance: the producer is capped at `COMPUTED`; only the independently
-  installed standard-library checker can return `VERIFIED`.
-- Failure semantics: malformed input is rejected before artifact writes;
-  disconnected and empty inputs return complete no-tree outcomes; checker
-  failure is non-conclusive.
-- Open obligation: run a frozen held-out control/treatment evaluation before
-  deciding portfolio benefit, and keep exact TSP deferred until independent
-  recurrence and checker evidence exist.

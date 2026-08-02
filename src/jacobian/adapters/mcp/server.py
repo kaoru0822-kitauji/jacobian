@@ -34,12 +34,7 @@ from jacobian.adapters.mcp.guidance import (
     SERVER_DESCRIPTION,
     SERVER_INSTRUCTIONS,
 )
-from jacobian.adapters.mcp.projections import (
-    WORKSPACE_OPEN_DESCRIPTION,
-    WORKSPACE_QUERY_DESCRIPTION,
-    WORKSPACE_WRITE_DESCRIPTION,
-    CapabilityProjectionStrategy,
-)
+from jacobian.adapters.mcp.projections import CapabilityProjectionStrategy
 from jacobian.adapters.mcp.remote import TenantRuntimeRouter
 from jacobian.adapters.mcp.resources import _register_resources_and_prompts
 from jacobian.adapters.mcp.tooling import (
@@ -50,9 +45,6 @@ from jacobian.adapters.mcp.tooling import (
 from jacobian.adapters.mcp.tools import (
     capability_describe,
     capability_invoke,
-    workspace_open,
-    workspace_query,
-    workspace_write,
 )
 from jacobian.capabilities import CapabilityPolicy
 from jacobian.references import reference_catalog
@@ -129,33 +121,6 @@ class JacobianCoreExtension(Extension):
                     "description": CAPABILITY_INVOKE_DESCRIPTION,
                     "annotations": _tool_annotations(),
                     "structured_output": True,
-                },
-            ),
-            ToolBinding(
-                _safe_tool_handler("workspace.open", workspace_open),
-                kwargs={
-                    "name": "workspace.open",
-                    "description": WORKSPACE_OPEN_DESCRIPTION,
-                    "annotations": _tool_annotations(idempotent=True),
-                    "structured_output": False,
-                },
-            ),
-            ToolBinding(
-                _safe_tool_handler("workspace.write", workspace_write),
-                kwargs={
-                    "name": "workspace.write",
-                    "description": WORKSPACE_WRITE_DESCRIPTION,
-                    "annotations": _tool_annotations(idempotent=True),
-                    "structured_output": False,
-                },
-            ),
-            ToolBinding(
-                _safe_tool_handler("workspace.query", workspace_query),
-                kwargs={
-                    "name": "workspace.query",
-                    "description": WORKSPACE_QUERY_DESCRIPTION,
-                    "annotations": _tool_annotations(read_only=True, idempotent=True),
-                    "structured_output": False,
                 },
             ),
         )

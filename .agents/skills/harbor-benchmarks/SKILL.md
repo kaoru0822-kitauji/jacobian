@@ -88,9 +88,16 @@ Use the pinned Harbor runner from the repository:
 ```sh
 uvx --from harbor==0.20.0 harbor --version
 make harbor-plan BASE=origin/main
-make harbor-check
-make harbor-oracle DATASET=agent-workflow-v1 TASKS="task-id"
+make harbor-check-task DATASET=agent-workflow-v1 TASKS="task-id"
+make harbor-oracle-task DATASET=agent-workflow-v1 TASKS="task-id"
 ```
+
+The selected-task commands are the normal leaf-task gates and require an
+explicit task selection. Use the full `make harbor-check` and explicitly
+scoped `make harbor-oracle` paths for shared tooling, schemas, registry, suite
+policy, or other control-plane changes. A full dataset Oracle requires
+`FULL=1`; ordinary Oracle runs require `TASKS` and never expand an omitted
+selection implicitly.
 
 After any input, instruction, metadata, verifier, dependency, image, or task
 contract change:
@@ -162,8 +169,8 @@ verifier logs, source SHA, task digest, and Harbor version.
 
 ## Run Jacobian observation
 
-Review the committed observation job and run the local Harbor composition. The
-Jacobian service is intentionally anonymous for this local evaluation path;
+Review the committed observation job and run the local Harbor composition only
+as an explicit operator evidence exercise. The Jacobian service is intentionally anonymous for this local evaluation path;
 Harbor connects directly to `http://jacobian:8000/mcp`. Set `JACOBIAN_IMAGE`
 only when overriding the default local image. Use the toggle explicitly:
 

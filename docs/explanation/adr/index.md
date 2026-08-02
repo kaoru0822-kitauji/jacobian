@@ -13,7 +13,6 @@ stable public contract.
 | [0002](0002-sealed-plugin-packages.md) | Seal plugin packages and registry snapshots | Accepted, pre-stable |
 | [0003](0003-durable-search-invocations.md) | Use SQLite acceptance with immutable search checkpoints | Accepted, pre-stable |
 | [0004](0004-verified-parameter-regions.md) | Verify parameter regions through immutable subjects | Accepted, pre-stable |
-| [0005](0005-direct-epistemic-workspaces.md) | Keep epistemic workspaces separate from capability assurance | Accepted, pre-stable |
 | [0006](0006-semantic-test-topology.md) | Isolate tests by semantic depth and resource ownership | Accepted, pre-stable |
 | [0008](0008-harbor-native-benchmark-datasets.md) | Package every executable benchmark case in claim-specific Harbor datasets | Accepted, pre-stable |
 | [0009](0009-bounded-lrat-authority.md) | Keep LRAT replay experimental and addition-only until an independent backend passes the authority gate | Accepted, pre-stable |

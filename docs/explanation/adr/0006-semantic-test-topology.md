@@ -59,7 +59,7 @@ Root `tests/conftest.py` contains only cheap universal fixtures and collection
 validation. Service, domain, complete-runtime, storage, process, MCP, and
 provider fixtures live beneath their owning tier.
 
-Mutable runtime, connection, registry, and workspace objects are function
+Mutable runtime, connection, and registry objects are function
 scoped. A session-scoped template may contain only immutable state. Shared
 templates are constructed in a temporary sibling and published by atomic
 rename; an in-directory readiness marker never represents completeness. Every

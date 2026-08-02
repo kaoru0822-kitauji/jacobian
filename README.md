@@ -160,10 +160,8 @@ Jacobian keeps four responsibilities separate:
 - **Checkers own trust.** Plugins and search code cannot authorize a checker or
   change verification policy.
 
-The public MCP surface stays small: the capability catalog plus
-`capability.describe`, `capability.invoke`, and three direct workspace tools.
-`workspace.open`, `workspace.write`, and `workspace.query` manage durable
-agent-authored state; workspace entries remain `UNVERIFIED`.
+The public MCP surface stays small: the capability catalog plus the two
+capability entry points, `capability.describe` and `capability.invoke`.
 
 ## Documentation
 
@@ -178,7 +176,6 @@ agent-authored state; workspace entries remain `UNVERIFIED`.
 | [Provider runtime](docs/reference/provider-runtime.md) | Backend availability, compatibility, and identity |
 | [v0.2 specification](docs/reference/specifications/v0.2.md) | Last frozen release snapshot and conformance baseline |
 | [Testing strategy](docs/reference/testing-strategy.md) | Validation layers, commands, and CI responsibilities |
-| [Capability development handoffs](docs/reference/capability-development-handoffs.md) | Evidence-preserving agent handoffs between discovery, implementation, checking, and evaluation |
 
 Specialized contracts cover
 [SAT artifacts](docs/reference/sat-artifacts.md),
@@ -205,7 +202,7 @@ For a clone, `jacobian setup --source <checkout> --state-dir <path> --profile
 full-python` explicitly binds the client to that source environment;
 the maintained `scripts/setup-agent` wrapper performs the required locked sync
 and doctor checks first.
-The server advertises the capability entry points and direct workspace tools;
+The server advertises only the capability entry points;
 `capability.describe(query=...)` searches compact installed outcomes before an
 agent inspects an exact contract and invokes it. This is a toolbox interface:
 agents own mathematical decomposition, exploration, and composition.

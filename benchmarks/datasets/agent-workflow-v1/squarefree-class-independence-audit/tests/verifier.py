@@ -31,7 +31,9 @@ def load_frozen() -> dict:
         test_input = TESTS / "input.json"
         if (
             any(
-                path.is_symlink() or not path.is_file() or path.stat().st_size > 1_048_576
+                path.is_symlink()
+                or not path.is_file()
+                or path.stat().st_size > 1_048_576
                 for path in (app_input, test_input)
             )
             or app_input.read_bytes() != test_input.read_bytes()
@@ -107,9 +109,7 @@ def evidence_valid(evidence: object, result: object) -> bool:
             for line in lines
             if line.startswith("RESULT_JSON:")
         )
-        body = "\n".join(
-            line for line in lines if not line.startswith("RESULT_JSON:")
-        )
+        body = "\n".join(line for line in lines if not line.startswith("RESULT_JSON:"))
         text = body.casefold()
         compact = "".join(text.split())
         obstruction = result["modular_obstruction"] if isinstance(result, dict) else {}
@@ -121,12 +121,18 @@ def evidence_valid(evidence: object, result: object) -> bool:
             f"quadratic_residues={obstruction.get('quadratic_residues')}",
             f"maximum_squares_ruled_out={obstruction.get('maximum_squares_ruled_out')}",
         )
-    except (OSError, StopIteration, UnicodeError, ValueError, RecursionError, TypeError):
+    except (
+        OSError,
+        StopIteration,
+        UnicodeError,
+        ValueError,
+        RecursionError,
+        TypeError,
+    ):
         return False
-    contradictory = (
-        re.search(r"\b(?:not|never)\b[^.]{0,80}\bsquarefree\s+kernel", text)
-        or re.search(r"\b(?:not|never)\b[^.]{0,80}\bat\s+least\s+four", text)
-    )
+    contradictory = re.search(
+        r"\b(?:not|never)\b[^.]{0,80}\bsquarefree\s+kernel", text
+    ) or re.search(r"\b(?:not|never)\b[^.]{0,80}\bat\s+least\s+four", text)
     return bool(
         isinstance(result, dict)
         and marker_result == result
@@ -136,7 +142,10 @@ def evidence_valid(evidence: object, result: object) -> bool:
         and "squarefree kernel" in text
         and "product" in text
         and "kernel" in text
-        and any(phrase in text for phrase in ("kernels agree", "kernels equal", "same kernel"))
+        and any(
+            phrase in text
+            for phrase in ("kernels agree", "kernels equal", "same kernel")
+        )
         and "sum" in text
         and "squared" in text
         and "class sizes" in text
@@ -159,9 +168,7 @@ def limitation_is_unchecked(value: object) -> bool:
         r"|proof[- ]assistant(?:[- ](?:checked|verified|verification|proof))?)"
     )
     negative_pattern = (
-        r"\b(?:not|no|without|does not|doesn't)\b[^.]{0,60}\b"
-        + verification
-        + r"\b"
+        r"\b(?:not|no|without|does not|doesn't)\b[^.]{0,60}\b" + verification + r"\b"
     )
     negative = re.search(negative_pattern, text)
     remainder = re.sub(negative_pattern, "", text)

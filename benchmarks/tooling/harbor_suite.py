@@ -509,6 +509,20 @@ def get_suite(dataset: str, *, path: Path = REGISTRY_PATH) -> Suite:
     raise HarborSuiteError(f"unknown dataset {dataset!r}")
 
 
+def select_task_refs(suite: Suite, task_names: tuple[str, ...]) -> tuple[TaskRef, ...]:
+    """Resolve an explicit, duplicate-free leaf selection for one dataset."""
+
+    if not task_names:
+        raise HarborSuiteError("at least one task must be selected")
+    if len(set(task_names)) != len(task_names):
+        raise HarborSuiteError("task selection contains duplicates")
+    refs_by_id = {ref.path.name: ref for ref in suite.tasks}
+    unknown = sorted(set(task_names) - refs_by_id.keys())
+    if unknown:
+        raise HarborSuiteError(f"unknown task(s) for {suite.id}: {', '.join(unknown)}")
+    return tuple(refs_by_id[name] for name in task_names)
+
+
 def iter_task_dirs(suite: Suite) -> tuple[Path, ...]:
     return tuple(ref.path for ref in suite.tasks)
 
@@ -797,7 +811,10 @@ def _canonical_support(suite: Suite) -> Path | None:
     return candidate if candidate.is_file() else None
 
 
-def check_verifier_support(suite: Suite) -> list[str]:
+def check_verifier_support(
+    suite: Suite,
+    refs: tuple[TaskRef, ...] | None = None,
+) -> list[str]:
     failures: list[str] = []
     canonical = _canonical_support(suite)
     if canonical is None:
@@ -805,7 +822,7 @@ def check_verifier_support(suite: Suite) -> list[str]:
             "benchmarks/tooling/verifier_support.py: canonical verifier support is missing"
         ]
     expected = canonical.read_bytes()
-    for ref in suite.tasks:
+    for ref in suite.tasks if refs is None else refs:
         target = ref.path / "tests" / "verifier_support.py"
         if not target.is_file() or target.read_bytes() != expected:
             failures.append(
@@ -859,6 +876,26 @@ def check_suite_topology(suite: Suite) -> list[str]:
     return failures
 
 
+def check_selected_tasks(
+    suite: Suite,
+    task_names: tuple[str, ...],
+) -> list[str]:
+    """Validate only the explicitly selected leaf task bundles."""
+
+    refs = select_task_refs(suite, task_names)
+    failures: list[str] = []
+    for ref in refs:
+        failures.extend(validate_task(suite, ref.path))
+        try:
+            task_digest(ref.path)
+        except (HarborSuiteError, OSError, ValueError) as exc:
+            failures.append(
+                f"{ref.path.relative_to(ROOT)}: Harbor task model rejected bundle: {exc}"
+            )
+    failures.extend(check_verifier_support(suite, refs))
+    return failures
+
+
 def check_suite(suite: Suite) -> list[str]:
     return check_suite_topology(suite)
 
@@ -880,6 +917,7 @@ __all__ = [
     "HarborSuiteError",
     "Suite",
     "TaskRef",
+    "check_selected_tasks",
     "check_suite",
     "check_suite_topology",
     "check_verifier_support",
@@ -889,6 +927,7 @@ __all__ = [
     "load_registry",
     "report_failures",
     "report_ok",
+    "select_task_refs",
     "suite_digests",
     "sync_verifier_support",
     "task_digest",

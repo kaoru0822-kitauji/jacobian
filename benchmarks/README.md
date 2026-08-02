@@ -48,19 +48,25 @@ benchmark layout are retained.
 
 ```sh
 make harbor-plan BASE=origin/main
-make harbor-check
+make harbor-check-task DATASET=agent-workflow-v1 TASKS="task-id"
 make benchmark-inventory OUTPUT=/tmp/benchmark-inventory.json
 make benchmark-snapshot DATASET=agent-workflow-v1
 make benchmark-snapshot-validate LOCK=benchmarks/snapshots/agent-workflow-v1/<digest>.lock.json
 make benchmark-publish LOCK=benchmarks/snapshots/agent-workflow-v1/<digest>.lock.json
-make harbor-oracle DATASET=agent-workflow-v1 TASKS="task-id"
+make harbor-oracle-task DATASET=agent-workflow-v1 TASKS="task-id"
+make harbor-check
+make harbor-oracle DATASET=agent-workflow-v1 FULL=1
 make harbor-oracle-all
-make agent-eval DATASET=agent-workflow-v1 TASKS=graph-counterexample EVAL_EXECUTE=1
-make agent-eval-validate RESULTS=... JOB=... RUNTIME_SNAPSHOT=... CONDITION=control OUTPUT=control-evidence.json
-make agent-eval-compare CONTROL=control-evidence.json TREATMENT=treatment-evidence.json OUTPUT=report
 make performance-eval
 make provider-eval PROVIDER=cgal
 ```
+
+`harbor-check-task` and `harbor-oracle-task` require an explicit dataset and
+task selection and are the normal gates for a leaf task. The full
+`harbor-check`/`harbor-oracle` paths remain for shared tooling, schemas,
+registry, suite policy, and control-plane changes. `harbor-oracle` requires
+`TASKS` unless `FULL=1` is explicitly supplied; `harbor-oracle-all` is the
+intentional full-portfolio sweep.
 
 Pull requests run contract checks and exact Oracles for changed executable
 tasks; large multi-task edits defer that matrix to the merge queue. Merge-queue
@@ -84,6 +90,11 @@ Correctness, evidence validity, scope, assurance calibration, false
 certification, tool traces, tokens, time, and cost remain separate. Reports
 from the public workflow suite are workflow evidence only, never causal
 capability evidence.
+
+The committed three-attempt control and treatment jobs are manual
+reproducibility fixtures. An operator may run `make agent-eval` with
+`EVAL_EXECUTE=1`, then validate and compare the resulting evidence, but model
+execution is not part of routine task authoring or the pull-request gate.
 
 Private held-out evaluation is dispatched through the protected
 `Held-out Benchmarks` workflow. Its S3 manifest freezes the treatment image,
