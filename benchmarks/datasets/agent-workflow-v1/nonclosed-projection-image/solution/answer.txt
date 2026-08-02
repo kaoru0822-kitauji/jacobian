@@ -1,0 +1,1 @@
+Let T on ell2 have diagonal weights 1/n. Its bounded graph is closed in ell2 direct-sum ell2, and projection to the second summand has image Range(T). Truncations of y_n=1/n lie in the range and converge by the reciprocal-square tail bound, while the forced preimage is the all-ones sequence and is not in ell2. This is a computed certificate.

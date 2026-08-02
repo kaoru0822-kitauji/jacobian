@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:890a233c3829a330a20b77aadf5699038afe860ed072252aa385c5c2979fd14e",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -625,6 +625,22 @@
       "candidate_ids": [],
       "disposition": "RUNTIME_FIX",
       "next_action": "Restore Lean availability and retain exact linear arithmetic as a composable operation; do not add proof-repair policy."
+    },
+    {
+      "task_id": "nonclosed-projection-image",
+      "mathematical_moves": [
+        "Construct a bounded diagonal operator on ell2 and use its graph as a closed subspace.",
+        "Identify the orthogonal projection image with the operator range.",
+        "Prove that range nonclosed using exact truncations, a square-summable limit, and a nonsummable forced preimage."
+      ],
+      "current_capabilities": [],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep the infinite-dimensional construction agent-owned; do not infer a general Hilbert-space topology capability from one counterexample family."
     },
     {
       "task_id": "noncompact-lefschetz-proof-audit",

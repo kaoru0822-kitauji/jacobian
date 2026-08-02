@@ -111,6 +111,10 @@ name = "jacobian/natural-subtraction-proof-repair"
 digest = "sha256:913e498b2f3abaad21133497df1043331bd39956d1124b8e6fb39158ffd36f25"
 
 [[tasks]]
+name = "jacobian/nonclosed-projection-image"
+digest = "sha256:a433a53fb75b451b02293dbfc8d10f0cb362af1380c15a2d9b33eaa15dd7413a"
+
+[[tasks]]
 name = "jacobian/noncompact-lefschetz-proof-audit"
 digest = "sha256:14f4382bc30c0af019d53a6a4c20c7915310d42b8fb876287a5ad681f022711e"
 
