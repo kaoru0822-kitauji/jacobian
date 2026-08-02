@@ -130,10 +130,15 @@ def _limitation_is_valid(limitations):
         return False
     return any(
         isinstance(item, str)
-        and "analytic continuation" in item.casefold()
-        and re.search(r"\b(?:not|no|doesn['']?t|cannot|without|only)\b", item, re.I)
+        and re.search(
+            r"(?:\b(?:not|no|doesn['']?t|cannot|without|only)\b.{0,80}analytic continuation|analytic continuation.{0,80}\b(?:not|no|doesn['']?t|cannot|without|unverified|unassessed)\b)",
+            item,
+            re.I,
+        )
         and not re.search(
-            r"\b(?:verifies|proves|is)\s+(?:the\s+)?analytic continuation", item, re.I
+            r"analytic continuation\s+\b(?:is|was|has been)\s+(?:verified|proved|established|certified)\b",
+            item,
+            re.I,
         )
         for item in limitations
     )
@@ -141,6 +146,8 @@ def _limitation_is_valid(limitations):
 
 def main():
     submission = load_submission()
+    if not isinstance(submission, dict):
+        submission = {}
     frozen = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
