@@ -240,12 +240,10 @@ def _evidence_is_valid(value: object, result: object) -> bool:
         return False
     return bool(
         all(
-            term in text
-            for term in ("unique", "reversed path", "bijection", "inverse")
+            term in text for term in ("unique", "reversed path", "bijection", "inverse")
         )
         and not any(
-            marker in text
-            for marker in ("not a bijection", "not unique", "no inverse")
+            marker in text for marker in ("not a bijection", "not unique", "no inverse")
         )
         and all(
             str(pair.get(key, "")).casefold() in text

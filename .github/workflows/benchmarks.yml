@@ -195,7 +195,7 @@ jobs:
         env:
           DATASET: ${{ matrix.dataset }}
           TASKS: ${{ join(matrix.tasks, ' ') }}
-        run: make harbor-oracle-run DATASET="$DATASET" TASKS="$TASKS"
+        run: make harbor-oracle-task DATASET="$DATASET" TASKS="$TASKS"
       - name: Upload Oracle evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

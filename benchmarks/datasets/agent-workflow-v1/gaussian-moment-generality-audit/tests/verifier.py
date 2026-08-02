@@ -133,7 +133,9 @@ def load_frozen() -> dict[str, Any]:
         test_input = TESTS / "input.json"
         if (
             any(
-                path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_SUBMISSION_BYTES
+                path.is_symlink()
+                or not path.is_file()
+                or path.stat().st_size > MAX_SUBMISSION_BYTES
                 for path in (workspace_input, test_input)
             )
             or workspace_input.read_bytes() != test_input.read_bytes()
@@ -148,7 +150,11 @@ def load_frozen() -> dict[str, Any]:
 def load_bounded_submission() -> dict[str, Any] | None:
     path = WORKSPACE / "submission.json"
     try:
-        if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_SUBMISSION_BYTES:
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size > MAX_SUBMISSION_BYTES
+        ):
             return None
     except OSError:
         return None
@@ -308,9 +314,13 @@ def evidence_valid(value: object, result: object) -> bool:
                 )
             )
             and any(term in lowered for term in ("cancel", "cancellation"))
-            and any(term in lowered for term in ("formal identity", "rational identity"))
+            and any(
+                term in lowered for term in ("formal identity", "rational identity")
+            )
             and not any(term in lowered for term in contradictions)
-            and not any(re.search(pattern, lowered) for pattern in contradictory_patterns)
+            and not any(
+                re.search(pattern, lowered) for pattern in contradictory_patterns
+            )
             and not (machine_claim and not machine_negation)
         )
     except (OSError, UnicodeError, ValueError):
@@ -322,7 +332,10 @@ def limitations_are_semantically_covered(limitations: object) -> bool:
         not isinstance(limitations, list)
         or not limitations
         or len(limitations) > MAX_LIMITATIONS
-        or any(not isinstance(item, str) or len(item) > MAX_LIMITATION_BYTES for item in limitations)
+        or any(
+            not isinstance(item, str) or len(item) > MAX_LIMITATION_BYTES
+            for item in limitations
+        )
     ):
         return False
     combined = " ".join(str(item) for item in limitations).lower()
@@ -338,10 +351,7 @@ def limitations_are_semantically_covered(limitations: object) -> bool:
             combined,
         )
     )
-    return (
-        has_verification_caveat
-        and has_scope_caveat
-    )
+    return has_verification_caveat and has_scope_caveat
 
 
 def main() -> None:

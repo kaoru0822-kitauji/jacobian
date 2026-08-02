@@ -28,8 +28,20 @@ native `public`, `no-network`, or `allowlist` task network policy. Proxy-backed
 operation belongs in the Harbor job composition and does not select an image.
 
 Run `make harbor-plan BASE=origin/main`, inspect the prospective digest and
-exact changed-task lane, and run `make harbor-check` followed by
-`make harbor-oracle DATASET=<dataset-id> TASKS="<task-id>"`.
+exact changed-task lane, then validate and Oracle only the task being authored:
+
+```sh
+make harbor-check-task DATASET=<dataset-id> TASKS="<task-id>"
+make harbor-oracle-task DATASET=<dataset-id> TASKS="<task-id>"
+```
+
+The focused gate requires an explicit dataset and one or more task IDs; it does
+not silently expand to the full corpus. Use `make harbor-check` for changes to
+shared Harbor tooling, schemas, the registry, suite policy, or other
+control-plane files. Control/treatment observation jobs are committed,
+three-attempt reproducibility fixtures, but running `make agent-eval ...
+EVAL_EXECUTE=1` is an explicit operator-run evidence exercise, not a task
+authoring or pull-request gate.
 
 Do not create a snapshot for every task addition. An operator creates a new
 content-addressed snapshot only when intentionally freezing an evaluation or

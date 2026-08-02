@@ -133,12 +133,8 @@ def cases_valid(result, frozen):
             return False
         available = {citation["id"] for citation in frozen_by_id[cid]["citations"]}
         selected_set = set(selected)
-        valid_selection = (
-            selected_set == rule["required"]
-            or (
-                cid == "lebesgue-nagell-progress"
-                and selected_set == {"KP2025"}
-            )
+        valid_selection = selected_set == rule["required"] or (
+            cid == "lebesgue-nagell-progress" and selected_set == {"KP2025"}
         )
         if (
             item.get("classification") != rule["classification"]
@@ -192,15 +188,24 @@ def evidence_valid(evidence, result):
         lowered = "\n".join(prose).lower()
         semantic_claims = (
             (
-                any(term in lowered for term in ("resolved", "solves", "all integer solutions"))
+                any(
+                    term in lowered
+                    for term in ("resolved", "solves", "all integer solutions")
+                )
                 and any(term in lowered for term in ("binomial", "bmss2019"))
             ),
             (
-                any(term in lowered for term in ("partial", "further results", "incomplete"))
+                any(
+                    term in lowered
+                    for term in ("partial", "further results", "incomplete")
+                )
                 and any(term in lowered for term in ("lebesgue", "kp2025"))
             ),
             (
-                any(term in lowered for term in ("historical", "open problem", "historically open"))
+                any(
+                    term in lowered
+                    for term in ("historical", "open problem", "historically open")
+                )
                 and any(term in lowered for term in ("vanishing", "z2008"))
             ),
             (

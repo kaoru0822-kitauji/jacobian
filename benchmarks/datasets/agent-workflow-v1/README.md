@@ -7,14 +7,22 @@ this directory and retains separate agent, Oracle, and verifier containers.
 `suite.toml` owns stable dataset policy. Each `members/<task>.toml` record owns
 membership, provenance, environment, and verifier-contract metadata. Immutable
 snapshot locks own frozen corpus identity; no mutable publication manifest is
-committed here. The Oracle contract gate is:
+committed here. The exact-task Oracle contract gate is:
 
 ```sh
-make harbor-oracle DATASET=agent-workflow-v1
+make harbor-oracle-task DATASET=agent-workflow-v1 \
+  TASKS="graph-counterexample"
 ```
 
-The standalone observation job uses the Jacobian MCP sidecar and is selected
-with:
+Use `make harbor-check` and an explicitly scoped `make harbor-oracle` only for
+shared Harbor tooling, schemas, registry, suite policy, or other control-plane
+changes. Pass `TASKS="..."` for a bounded Oracle; `FULL=1` is reserved for an
+intentional complete dataset sweep. Focused commands require explicit task IDs
+and never fall back to all tasks.
+
+The standalone observation job uses the Jacobian MCP sidecar and is an
+explicit operator-run evidence exercise, not a routine authoring or
+pull-request gate. It is selected with:
 
 ```sh
 make agent-eval DATASET=agent-workflow-v1 \

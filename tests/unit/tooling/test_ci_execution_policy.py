@@ -94,8 +94,20 @@ def test_oracle_workers_do_not_repeat_benchmark_contract_suite() -> None:
     oracle = workflow.split("  oracle:", 1)[1].split("  validation:", 1)[0]
 
     assert "needs: [plan, record-schema, prospective-digest]" in oracle
-    assert "make harbor-oracle-run" in oracle
+    assert "make harbor-oracle-task" in oracle
     assert "make harbor-oracle DATASET" not in oracle
+
+
+def test_local_oracle_targets_require_explicit_scope() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    oracle = makefile.split("harbor-oracle:", 1)[1].split("harbor-oracle-task:", 1)[0]
+    runner = makefile.split("harbor-oracle-run:", 1)[1].split("harbor-oracle-all:", 1)[
+        0
+    ]
+
+    assert '"$(TASKS)" -o "$(FULL)" = "1"' in oracle
+    assert '"$(TASKS)" -o "$(FULL)" = "1"' in runner
+    assert "DATASET=$$dataset FULL=1" in makefile
 
 
 def test_composition_lane_uses_timing_shards() -> None:

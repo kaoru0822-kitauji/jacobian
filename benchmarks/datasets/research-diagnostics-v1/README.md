@@ -14,7 +14,7 @@ evaluation is intentionally frozen. Run the Oracle
 contract gate with:
 
 ```sh
-make harbor-oracle DATASET=research-diagnostics-v1
+make harbor-oracle DATASET=research-diagnostics-v1 FULL=1
 ```
 
 Oracle success establishes solvability and verifier integrity. Results are

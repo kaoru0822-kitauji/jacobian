@@ -176,7 +176,9 @@ def _limitation_is_valid(limitations):
         for item in items
         for clause in re.split(r"(?:[.;\n]|,\s*(?:but|however)\b)", item, flags=re.I)
     )
-    return bool(items and not positive_claim and any(disclaimer.search(item) for item in items))
+    return bool(
+        items and not positive_claim and any(disclaimer.search(item) for item in items)
+    )
 
 
 def main():

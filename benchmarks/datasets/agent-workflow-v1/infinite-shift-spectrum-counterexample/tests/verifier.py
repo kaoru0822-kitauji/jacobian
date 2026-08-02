@@ -228,6 +228,21 @@ def _limitation_is_valid(limitations):
 
 def main():
     submission = load_submission()
+    if submission is None:
+        Path("/logs/verifier").mkdir(parents=True, exist_ok=True)
+        (Path("/logs/verifier/reward.json")).write_text(
+            json.dumps(
+                {
+                    "correctness": 0.0,
+                    "evidence_validity": 0.0,
+                    "scope_accuracy": 0.0,
+                    "assurance_calibration": 0.0,
+                    "reward": 0.0,
+                    "false_certification": False,
+                }
+            )
+        )
+        return
     frozen = _load_frozen_input()
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(

@@ -170,9 +170,7 @@ def _evidence(value: object) -> bool:
             r"\b(?:p\s*\|\s*c|nonunit|zero modulo p|both positive powers)\b",
             text,
         )
-        and re.search(
-            r"\bd\s*=\s*d_p\s*\+\s*k\s*\(p-1\)|fermat\b", text
-        )
+        and re.search(r"\bd\s*=\s*d_p\s*\+\s*k\s*\(p-1\)|fermat\b", text)
     )
 
 

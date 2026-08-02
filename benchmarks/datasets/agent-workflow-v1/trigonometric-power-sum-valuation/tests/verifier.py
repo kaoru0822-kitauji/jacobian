@@ -102,9 +102,7 @@ def _induction_is_valid(cases):
         offsets = [_integer(value) for value in case["coefficient_adjusted_offsets"]]
         if residue is None or any(value is None for value in offsets):
             return False
-        normalized.append(
-            {"residue": residue, "coefficient_adjusted_offsets": offsets}
-        )
+        normalized.append({"residue": residue, "coefficient_adjusted_offsets": offsets})
     return sorted(normalized, key=lambda case: case["residue"]) == expected
 
 
@@ -141,7 +139,9 @@ def _result_is_valid(result, frozen):
         and _terms_are_valid(result["terms"], values)
         and _induction_is_valid(result["induction_cases"])
         and isinstance(result["conclusion"], str)
-        and re.search(r"(?:\b|_)divis(?:ible|ibility)(?:\b|_)", result["conclusion"], re.I)
+        and re.search(
+            r"(?:\b|_)divis(?:ible|ibility)(?:\b|_)", result["conclusion"], re.I
+        )
         and re.search(r"(?:\b|_)(?:positive|all)(?:\b|_)", result["conclusion"], re.I)
         and not re.search(
             r"\b(?:not|without|cannot|unknown|insufficient|fail(?:s|ure)?)\b",
