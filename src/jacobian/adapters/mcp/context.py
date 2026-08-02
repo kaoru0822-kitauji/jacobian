@@ -137,12 +137,6 @@ def _classify_public_tool_error(
     from jacobian.experiments import ExperimentNotFoundError
     from jacobian.registry import CheckerNotFoundError
     from jacobian.store import ArtifactNotFoundError
-    from jacobian.workspaces import (
-        WorkspaceConflictError,
-        WorkspaceIdempotencyError,
-        WorkspaceNotFoundError,
-        WorkspaceReferenceError,
-    )
 
     if isinstance(tool_error, AgentRecoveryError):
         return (
@@ -180,7 +174,6 @@ def _classify_public_tool_error(
             ArtifactNotFoundError,
             CheckerNotFoundError,
             ExperimentNotFoundError,
-            WorkspaceNotFoundError,
         ),
     ):
         return (
@@ -191,28 +184,11 @@ def _classify_public_tool_error(
                 "call, then retry."
             ),
         )
-    if isinstance(tool_error, WorkspaceConflictError):
-        return (
-            "WORKSPACE_CONFLICT",
-            str(tool_error),
-            "Query the latest workspace revision, then retry from that exact head.",
-        )
-    if isinstance(tool_error, (WorkspaceIdempotencyError, WorkspaceReferenceError)):
-        return (
-            "INVALID_INPUT",
-            str(tool_error),
-            "Check the published workspace tool schema and returned handles.",
-        )
     if isinstance(tool_error, ValueError):
-        hint = (
-            "Check the published workspace tool schema, then retry."
-            if tool_name.startswith("workspace.")
-            else "Check the tool input schema or call capability.describe, then retry."
-        )
         return (
             "INVALID_INPUT",
             "The tool input is not valid for this operation.",
-            hint,
+            "Check the tool input schema or call capability.describe, then retry.",
         )
     return (
         "OPERATION_FAILED",

@@ -35,7 +35,6 @@ from jacobian.structures import StructureService
 from jacobian.transformations import TransformationService
 from jacobian.verification import VerificationService
 from jacobian.witnesses import WitnessSearchService
-from jacobian.workspaces import WorkspaceService
 
 
 @dataclass(slots=True)
@@ -52,7 +51,6 @@ class CoreServices:
     matrix_normal_forms: MatrixNormalFormArtifactService
     polynomial_expressions: PolynomialExpressionArtifactService
     memory: ResearchMemory
-    workspaces: WorkspaceService
     plugins: PluginRegistry
     checkers: CheckerRegistry
     capabilities: CapabilityService

@@ -14,14 +14,12 @@ from pathlib import Path
 import pytest
 
 from jacobian.adapters.mcp.context import _public_tool_error
-from jacobian.adapters.mcp.projections import WORKSPACE_TOOL_NAMES
 from jacobian.adapters.mcp.server import create_server
 from jacobian.adapters.mcp.tooling import _request_trace_digest, _run_blocking
 
 MCP_TOOL_NAMES = {
     "capability.describe",
     "capability.invoke",
-    *WORKSPACE_TOOL_NAMES,
 }
 
 
@@ -140,23 +138,14 @@ def test_mcp_protocol_and_authentication_errors_remain_distinct(tmp_path: Path) 
     asyncio.run(scenario())
 
 
-def test_direct_tool_calls_reject_unknown_and_malformed_arguments(
+def test_direct_tool_calls_reject_removed_and_malformed_arguments(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:
         server = create_server(tmp_path)
 
-        unknown = await server.call_tool(
-            "workspace.write",
-            {
-                "workspace_id": "workspace_fixture",
-                "expected_revision": 0,
-                "idempotency_key": "write_fixture",
-                "unexpected": True,
-            },
-        )
-        assert unknown.is_error is True
-        assert '"code": "INVALID_INPUT"' in unknown.content[0].text
+        removed = await server.call_tool("workspace.write", {})
+        assert removed.is_error is True
 
         malformed = await server.call_tool(
             "capability.describe",
@@ -169,7 +158,7 @@ def test_direct_tool_calls_reject_unknown_and_malformed_arguments(
     asyncio.run(scenario())
 
 
-def test_mcp_stdio_entrypoint_exposes_capability_and_workspace_tools(
+def test_mcp_stdio_entrypoint_exposes_only_capability_tools(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:

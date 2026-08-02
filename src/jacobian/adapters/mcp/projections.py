@@ -452,44 +452,6 @@ def _capability_descriptor_view(
     }
 
 
-WORKSPACE_TOOL_NAMES = frozenset(
-    {"workspace.open", "workspace.write", "workspace.query"}
-)
-WORKSPACE_OPEN_DESCRIPTION = (
-    "Direct tool; do not call capability.describe. Create a durable epistemic "
-    "workspace with one canonical problem, a main branch, and an immutable initial "
-    "revision. Workspace content is agent-authored and UNVERIFIED."
-)
-WORKSPACE_WRITE_DESCRIPTION = (
-    "Direct tool. Do not call capability.describe. Arguments are flat: send "
-    "base_revision (never revision_id) and top-level findings, attempts, marks, "
-    "scratch, or focus (never a batch wrapper). Every draft uses client_ref, never "
-    "ref. Append at an exact base revision. Finding fields are client_ref, kind, "
-    "title, body; optional links are dependency_refs and assumption_refs (never "
-    "depends_on_refs). Attempt fields are client_ref, target_ref, method, outcome, "
-    "summary. Margin marks append an explicit ACTIVE, CLOSED, RETRACTED, SUPERSEDED, "
-    "or ARCHIVED state; only SUPERSEDED carries superseded_by_ref. References may "
-    "use a client_ref from the same batch. "
-    "PROBLEM is reserved for workspace.open. A RETRACTED or SUPERSEDED card must "
-    "receive an ACTIVE mark before CLOSED or ARCHIVED. Set focus with "
-    "active_ref/pinned_refs, clear it with clear=true, or omit it; focus references "
-    "finding cards, never attempts, marks, or scratch. Never send "
-    "verification/assertion/stale fields: all workspace assertions remain "
-    "AGENT_RECORDED and UNVERIFIED. Canonical batch example: "
-    'findings=[{"client_ref":"C1","kind":"CLAIM","title":"...","body":"..."}], '
-    'attempts=[{"client_ref":"T1","target_ref":"C1","method":"...",'
-    '"outcome":"COMPLETED","summary":"..."}], '
-    'focus={"active_ref":"C1","pinned_refs":["C1"]}.'
-)
-WORKSPACE_QUERY_DESCRIPTION = (
-    "Direct tool; do not call capability.describe. Read a compact deterministic "
-    "RESUME, FRONTIER, ATTEMPTS, CONTEXT, or STALE view from agent-authored workspace "
-    "state. CONTEXT requires target_card_id and follows only explicit "
-    "dependency/assumption links. Derived staleness is a paper-like warning, not a "
-    "mathematical conclusion. Retrieval preserves UNVERIFIED status."
-)
-
-
 def _catalog_digest(
     catalog_version: str,
     capabilities: tuple[CapabilityDescriptor, ...],

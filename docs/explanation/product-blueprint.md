@@ -84,8 +84,6 @@ The boundaries are intentionally narrow:
   authorization, budgets, and provenance.
 - Capability adapters connect external SAT, SMT, CAS, optimization, retrieval,
   and proof systems to the primitive contract.
-- `WorkspaceService` owns durable agent-authored working state without
-  mathematical assurance.
 - Domain plugins own mathematical schemas, transformations, invariants,
   witness meanings, and required checker roles.
 - Independent checker packages implement replay; operators authorize them.
@@ -104,15 +102,14 @@ Codex CLI              ChatGPT / remote agent
     └──────────────┬───────────┘
                    ▼
                MCP projection
-         ┌─────────┴─────────┐
-         ▼                   ▼
- capability://catalog      workspace.open
- capability.describe      workspace.write
- capability.invoke        workspace.query
-         │                   │
-         ▼                   ▼
- CapabilityService       WorkspaceService
-       │                   └─ revisioned unverified notes
+                       │
+                       ▼
+          capability://catalog
+          capability.describe
+          capability.invoke
+                       │
+                       ▼
+               CapabilityService
        ├─ knowledge and memory
        ├─ math/solver adapters
        │  Lean SAT SMT CAS Alloy domain tools
@@ -247,32 +244,11 @@ operational status but do not enter research memory. An episode binds:
 original assurance; retrieval never upgrades them. The local store is useful
 without an external corpus provider.
 
-### Agent-authored workspace state
-
-The direct `workspace.open`, `workspace.write`, and `workspace.query` tools
-provide a durable paper-like scratchpad outside `CapabilityService`. A
-workspace starts with one canonical problem card, one `main` branch, and one
-immutable revision. Batch writes append scratch entries, typed findings,
-attempt reports, lifecycle marks, and focus changes against an exact base
-revision.
-
-Every entry and lifecycle mark remains `AGENT_RECORDED` and `UNVERIFIED`.
-`RETRACTED` and `SUPERSEDED` generate deterministic stale warnings only along
-explicit dependency and assumption links. `COMPLETED` does not close a goal,
-and `CLOSED` does not prove it. Query views retrieve bounded operational context
-without inferring missing premises or promoting assurance.
-
-Later corpus providers add cross-project ranking, temporal cutoffs, review,
-retraction, citation, and retention policy. They remain outside checker
-authority.
-
 ## Local and remote hosts
 
 The local Codex host uses STDIO. It exposes `capability://catalog`,
 `capability.describe`, and `capability.invoke` rather than projecting backend
-mathematical operations or workflows as additional top-level MCP tools. Three
-direct `workspace.*` tools expose operational working state because a
-successful persistence operation is not a mathematical capability result.
+mathematical operations or workflows as additional top-level MCP tools.
 
 Remote hosts use Streamable HTTP and subject-bound tenant state. Authentication,
 tenant isolation, persistence, and TLS are deployment responsibilities, not

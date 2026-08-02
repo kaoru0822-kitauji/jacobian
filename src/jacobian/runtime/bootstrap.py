@@ -19,7 +19,6 @@ from jacobian.sat_smt.sat import install_sat_artifacts
 from jacobian.sat_smt.smt import install_smt_artifacts
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.store import ArtifactStore
-from jacobian.workspaces import WorkspaceService
 
 
 def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreServices:
@@ -45,7 +44,6 @@ def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreService
                 artifacts,
             )
         memory = ResearchMemory(store, schemas)
-        workspaces = WorkspaceService(store, schemas)
         plugins = PluginRegistry(store, schemas)
         checkers = CheckerRegistry(store)
         checkers.bind_existing_when_omitted = (
@@ -67,7 +65,6 @@ def bootstrap_services(root: str | Path, options: RuntimeOptions) -> CoreService
             matrix_normal_forms=matrix_normal_forms,
             polynomial_expressions=polynomial_expressions,
             memory=memory,
-            workspaces=workspaces,
             plugins=plugins,
             checkers=checkers,
             capabilities=capabilities,

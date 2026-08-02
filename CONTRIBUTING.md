@@ -50,7 +50,7 @@ make test-component TESTS=tests/component/capabilities/test_mcp_invocation_proje
 make test-unit TESTS=tests/unit/contracts/test_result_envelope.py
 make test-process TESTS=tests/boundary/process/search/test_shrinking.py
 make test-mcp PYTEST_ARGS="-k authentication"
-make test-storage PYTEST_ARGS="-k workspace"
+make test-storage TESTS=tests/boundary/storage/transactions/test_state_database_migrations.py
 make test-lean TESTS=tests/boundary/providers/lean/test_lean_repl_runtime.py PYTEST_ARGS="-k induction"
 ```
 

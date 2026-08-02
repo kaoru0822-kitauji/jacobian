@@ -20,9 +20,6 @@ from jacobian.canonical import canonicalize_json
 EXPECTED_TOOLS = {
     "capability.describe",
     "capability.invoke",
-    "workspace.open",
-    "workspace.query",
-    "workspace.write",
 }
 DISCOVERY_RESPONSE_BYTE_LIMIT = 16_384
 
