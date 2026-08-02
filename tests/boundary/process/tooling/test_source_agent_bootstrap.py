@@ -1,16 +1,13 @@
-"""Contracts for source bootstrap identity and frozen benchmark baselines."""
+"""Contracts for source bootstrap identity and environment pins."""
 
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
-import tomllib
 from pathlib import Path
 from types import ModuleType
 
 import pytest
-from benchmarks.tooling.harbor_suite import get_suite
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -34,24 +31,6 @@ def test_version_identity_uses_uv_normalization(
 
     monkeypatch.setattr(doctor.subprocess, "run", fake_run)
     assert doctor._repository_version(ROOT) == "0.7.0a0"
-
-
-def test_performance_v1_is_one_explicit_historical_baseline() -> None:
-    dataset = ROOT / "benchmarks" / "datasets" / "performance-v1"
-    with (dataset / "baseline.toml").open("rb") as stream:
-        baseline = tomllib.load(stream)
-    assert baseline["classification"] == "historical-baseline"
-    revision = baseline["repository_revision"]
-    uv_version = baseline["uv_version"]
-    task_dirs = sorted(ref.path for ref in get_suite("performance-v1").tasks)
-    assert len(task_dirs) == 4
-    for task_dir in task_dirs:
-        environment = task_dir / "environment"
-        task_input = json.loads((environment / "input.json").read_text())
-        dockerfile = (environment / "Dockerfile").read_text()
-        assert task_input["repository_revision"] == revision
-        assert f"fetch --depth 1 origin {revision}" in dockerfile
-        assert f"ghcr.io/astral-sh/uv:{uv_version}-" in dockerfile
 
 
 def test_active_uv_surfaces_share_the_repository_pin() -> None:

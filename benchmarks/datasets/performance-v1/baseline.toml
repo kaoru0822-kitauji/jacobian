@@ -1,6 +1,0 @@
-schema_version = "1"
-classification = "historical-baseline"
-repository_revision = "6fd5fc5df6bc49f230484bc5c78cbd365941c78c"
-jacobian_version = "0.6.0-alpha.0"
-mcp_version = "2.0.0b2"
-uv_version = "0.8.4"

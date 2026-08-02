@@ -1,9 +1,9 @@
 # Jacobian Harbor datasets
 
-Every executable benchmark case is a self-contained Harbor task. The six
+Every executable benchmark case is a self-contained Harbor task. The five
 dataset identities below keep workflow observations, public reproductions,
-research diagnostics, operational measurements, provider feasibility, and
-examples from making incompatible claims look comparable.
+research diagnostics, provider feasibility, and examples from making
+incompatible claims look comparable.
 
 `benchmarks/datasets/<dataset>/` is the Harbor dataset root and contains the
 dataset's executable task bundles directly. `members/` retains Jacobian's
@@ -21,7 +21,6 @@ evaluation bundle.
 | `jacobian/agent-workflow-v1` | Fixed Jacobian-enabled mathematical workflows | Oracle and optional observation |
 | `jacobian/public-reproductions-v1` | Replay known public mathematical cases | Oracle |
 | `jacobian/research-diagnostics-v1` | Answer-visible research challenges | Oracle diagnostics |
-| `jacobian/performance-v1` | Historical pinned runtime baseline | Oracle |
 | `jacobian/provider-feasibility-v1` | Pinned optional-backend checks | Oracle |
 | `jacobian/examples-v1` | Tutorial and smoke workflows | Oracle |
 
@@ -37,9 +36,7 @@ dataset root and use Harbor's native task-name filtering.
 The repository `.uv-version` pins active development, CI, release, and product
 image builds. Harbor task images remain bound to the uv version and digest in
 their published task identity; changing that environment requires a new task
-digest and Oracle validation. In particular, `performance-v1` declares its
-historical source and toolchain in `baseline.toml` rather than pretending to
-measure current main.
+digest and Oracle validation.
 
 Tasks expose only `instruction.md` and `environment/` to an evaluated agent.
 Oracle solutions remain under `solution/`; verifier code and fixtures remain
@@ -65,7 +62,6 @@ make harbor-oracle-task DATASET=agent-workflow-v1 TASKS="task-id"
 make harbor-check
 make harbor-oracle DATASET=agent-workflow-v1 FULL=1
 make harbor-oracle-all
-make performance-eval
 make provider-eval PROVIDER=cgal
 ```
 

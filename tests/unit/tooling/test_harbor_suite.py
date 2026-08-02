@@ -194,7 +194,6 @@ def test_load_registry_parses_all_datasets() -> None:
     assert ids == {
         "agent-workflow-v1",
         "examples-v1",
-        "performance-v1",
         "provider-feasibility-v1",
         "public-reproductions-v1",
         "research-diagnostics-v1",
@@ -612,13 +611,6 @@ def test_check_verifier_support_uses_repository_canonical_copy(
 # ---------------------------------------------------------------------------
 # Integration with committed datasets
 # ---------------------------------------------------------------------------
-
-
-def test_committed_performance_suite_has_core_tasks() -> None:
-    suite = get_suite("jacobian/performance-v1")
-    assert suite.tasks
-    assert all(t.maximum_assurance == "COMPUTED" for t in suite.tasks)
-    assert all(t.required_provider == "core" for t in suite.tasks)
 
 
 def test_committed_provider_suite_has_provider_tasks() -> None:

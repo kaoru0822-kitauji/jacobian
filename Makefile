@@ -17,7 +17,7 @@ TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
 # provider lanes run risky work in killable children and set their own deadline.
-.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare performance-eval provider-eval clean docs-linkcheck deploy-check
+.PHONY: help uv-version-check setup setup-agent container-image hooks fix lint complexity-check lint-full security-audit typecheck test-architecture test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e test-affected test-all-ci test-compatibility test-stress test-ordering duplicate-code npm-test todo-check coverage build check precommit check-static harbor-plan harbor-sync harbor-validate harbor-check harbor-check-task benchmark-inventory benchmark-snapshot benchmark-snapshot-validate benchmark-publish harbor-oracle harbor-oracle-task harbor-oracle-run harbor-oracle-all harbor-adapter-check heldout-validate heldout-render heldout-smoke agent-eval agent-eval-validate agent-eval-compare provider-eval clean docs-linkcheck deploy-check
 
 help: ## Show available developer commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Jacobian developer commands:\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -257,7 +257,7 @@ harbor-oracle-run: ## Run a dataset Oracle after an already-successful contract 
 		$(if $(TASKS),--tasks $(TASKS),)
 
 harbor-oracle-all: harbor-check ## Run every registered dataset Oracle with tasks.
-	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 performance-v1 provider-feasibility-v1; do \
+	@set -e; for dataset in agent-workflow-v1 public-reproductions-v1 research-diagnostics-v1 provider-feasibility-v1; do \
 		$(MAKE) --no-print-directory harbor-oracle-run DATASET=$$dataset FULL=1 EVAL_ARGS="$(EVAL_ARGS)"; \
 	done
 
@@ -323,9 +323,6 @@ agent-eval-compare: ## Compare normalized observations (CONTROL=..., TREATMENT=.
 	@test -n "$(CONTROL)" -a -n "$(TREATMENT)" -a -n "$(OUTPUT)" || { echo "CONTROL, TREATMENT, and OUTPUT are required" >&2; exit 2; }
 	$(UV_RUN) python -m benchmarks.tooling.observation_results compare \
 		--control "$(CONTROL)" --treatment "$(TREATMENT)" --output "$(OUTPUT)"
-
-performance-eval: ## Run the report-only performance dataset through its Oracle job.
-	$(MAKE) harbor-oracle DATASET=performance-v1 FULL=1
 
 provider-eval: ## Run pinned provider feasibility jobs (PROVIDER=cddlib|cgal|gudhi|lean-repl|nauty|regina).
 	@test -n "$(PROVIDER)" || { echo "PROVIDER is required" >&2; exit 2; }

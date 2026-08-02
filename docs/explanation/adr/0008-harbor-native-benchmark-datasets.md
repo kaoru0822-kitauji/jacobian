@@ -36,12 +36,11 @@ canonical dataset paths, but they are not Harbor datasets, are not injected
 into agent containers, and must not be treated as performance evidence without
 a separately frozen held-out evaluation.
 
-Six datasets keep different claims separate:
+Five datasets keep different claims separate:
 
 - `jacobian/agent-workflow-v1`;
 - `jacobian/public-reproductions-v1`;
 - `jacobian/research-diagnostics-v1`;
-- `jacobian/performance-v1`;
 - `jacobian/provider-feasibility-v1`; and
 - `jacobian/examples-v1`.
 
@@ -84,6 +83,11 @@ Benchmark discovery, manifest generation, Harbor job configuration, verifier-sup
 synchronization, and integrity checks share one repository-owned suite
 boundary. Nested mathematical taxonomy no longer depends on Harbor's local
 directory recursion.
+
+The retired `performance-v1` historical baseline is not retained as an
+executable fixture. A future operational measurement must use a new versioned
+dataset whose source revision and toolchain are still runnable; it must not
+reuse a stale task bundle after a storage or runtime ownership refactor.
 
 Adding a case costs more than appending a JSON row: it requires an executable
 environment, an Oracle path, an independent verifier, explicit provenance,
