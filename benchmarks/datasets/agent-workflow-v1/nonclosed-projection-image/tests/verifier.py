@@ -24,6 +24,13 @@ LIMITATION = (
 # well past the prefix instead of only at the truncation point.
 MIN_VERIFICATION_TERMS = 100
 PREFIX_LENGTH = 12
+# Thread PRRT_kwDOThEfjc6VxiRv: cap the tail-bound exponent before exact
+# exponentiation. Fraction(m) ** exponent builds an unbounded integer; a
+# schema-valid bound_exponent of 10^10 would require over 1 GB for the
+# integer alone, exceeding the verifier memory limit before reward.json is
+# written. This conservative cap is far above any mathematically meaningful
+# decay rate for a square-summability tail bound.
+MAX_BOUND_EXPONENT = 100
 # Each proof obligation must carry a substantive argument (not a keyword) that
 # names the link it certifies. The result-bound RESULT_JSON marker ties the
 # prose to the exact submitted witness.
@@ -105,7 +112,9 @@ def _parse_tail_bound(
     if (
         coefficient is None
         or not isinstance(exponent, int)
+        or isinstance(exponent, bool)
         or exponent < 1
+        or exponent > MAX_BOUND_EXPONENT
         or type(terms) is not int
         or terms < MIN_VERIFICATION_TERMS
     ):
@@ -118,7 +127,12 @@ def _parse_growth(value: object) -> tuple[Fraction, int] | None:
         return None
     coefficient = _positive_fraction(value["bound_coefficient"])
     exponent = value["bound_exponent"]
-    if coefficient is None or type(exponent) is not int or exponent < 1:
+    if (
+        coefficient is None
+        or type(exponent) is not int
+        or exponent < 1
+        or exponent > MAX_BOUND_EXPONENT
+    ):
         return None
     return coefficient, exponent
 
@@ -150,7 +164,10 @@ def _prefixes_ok(
     for index, item in enumerate(prefixes, start=1):
         if not isinstance(item, dict) or set(item) != _PREFIX_FIELDS:
             return False
-        if item["n"] != index:
+        # Thread PRRT_kwDOThEfjc6VxiRy: reject JSON booleans for prefix indices.
+        # Python treats True == 1, so a bare equality check accepts boolean n
+        # values that violate the agent-visible integer schema.
+        if type(item["n"]) is not int or item["n"] != index:
             return False
         weight = _positive_fraction(item["weight"])
         preimage_coordinate = _fraction(item["preimage_coordinate"])
@@ -169,8 +186,7 @@ def _prefixes_ok(
                 limit_coordinates[index - 1] == 0
                 if index == 1
                 else limit_coordinates[index - 1]
-                == weight
-                * _fraction(prefixes[index - 2]["preimage_coordinate"])
+                == weight * _fraction(prefixes[index - 2]["preimage_coordinate"])
             )
         else:
             relation_ok = limit_coordinates[index - 1] == weight * preimage_coordinate
@@ -241,7 +257,9 @@ def _witness(value: object, source: dict[str, Any]) -> bool:
     )
     if not orthogonal_projection:
         return False
-    if not any(term in preimage for term in ("not in ell2", "not square", "not summable")):
+    if not any(
+        term in preimage for term in ("not in ell2", "not square", "not summable")
+    ):
         return False
     weighted_shift = "weighted shift" in operator
     if weighted_shift:
@@ -374,19 +392,22 @@ def main() -> None:
     correct = bool(contract and _witness(result, source))
     evidence = bool(correct and _evidence(data.get("evidence"), result))
     declared_scope = data.get("scope")
+    folded_scope = declared_scope.casefold() if isinstance(declared_scope, str) else ""
+    # Thread PRRT_kwDOThEfjc6VxiRu: match "closed" as a word-boundary unit so the
+    # substring "closed" inside "nonclosed" does not satisfy the closed-subspace
+    # requirement. A scope describing "a nonclosed Hilbert subspace" describes
+    # the wrong kind of M and must not receive scope credit.
     scope = bool(
         contract
         and isinstance(declared_scope, str)
         and (
             declared_scope == expected["required_scope"]
             or (
-                all(
-                    term in declared_scope.casefold()
-                    for term in ("closed", "hilbert", "subspace", "orthogonal", "projection")
-                )
-                and any(
-                    term in declared_scope.casefold()
-                    for term in ("nonclosed", "not closed", "non-closed")
+                re.search(r"\bclosed\b", folded_scope) is not None
+                and not re.search(r"\b(?:non[- ]closed|not\s+closed)\b", folded_scope)
+                and all(
+                    term in folded_scope
+                    for term in ("hilbert", "subspace", "orthogonal", "projection")
                 )
             )
         )
@@ -398,8 +419,7 @@ def main() -> None:
         contract
         and isinstance(data.get("limitations"), list)
         and any(
-            isinstance(item, str)
-            and _limitation_is_valid(item)
+            isinstance(item, str) and _limitation_is_valid(item)
             for item in data["limitations"]
         )
     )
