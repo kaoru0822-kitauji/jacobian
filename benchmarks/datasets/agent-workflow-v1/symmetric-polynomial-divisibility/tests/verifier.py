@@ -191,7 +191,7 @@ def main():
         and any(
             isinstance(item, str)
             and "proof assistant" in item.casefold()
-            and re.search(r"\b(?:not|doesn['']?t|without|cannot)\b", item, re.I)
+            and re.search(r"\b(?:not|no|doesn['']?t|without|cannot)\b", item, re.I)
             for item in submission.get("limitations", [])
         )
     )
