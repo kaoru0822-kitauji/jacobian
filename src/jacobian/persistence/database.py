@@ -25,6 +25,7 @@ class Migration:
     name: str
     definition: str
     apply: Callable[[sqlite3.Connection], None]
+    requires_foreign_keys_off: bool = False
 
     @property
     def checksum(self) -> str:
@@ -133,33 +134,74 @@ class StateDatabase:
                 if self._at_migration_head(connection, migrations):
                     return
                 connection.execute("PRAGMA journal_mode = WAL")
-                connection.execute("BEGIN IMMEDIATE")
+                ledger = connection.execute(
+                    """
+                    SELECT 1
+                    FROM sqlite_master
+                    WHERE type = 'table' AND name = 'jacobian_schema_migrations'
+                    """
+                ).fetchone()
+                applied_before_transaction = (
+                    self._applied_migrations(connection, migrations)
+                    if ledger is not None
+                    else ()
+                )
+                requires_foreign_keys_off = any(
+                    migration.requires_foreign_keys_off
+                    for migration in migrations[len(applied_before_transaction) :]
+                )
+                foreign_keys_were_enabled = bool(
+                    connection.execute("PRAGMA foreign_keys").fetchone()[0]
+                )
+                foreign_keys_changed = False
                 try:
-                    connection.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS jacobian_schema_migrations (
-                            revision INTEGER PRIMARY KEY,
-                            name TEXT NOT NULL UNIQUE,
-                            checksum TEXT NOT NULL,
-                            applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    if requires_foreign_keys_off and foreign_keys_were_enabled:
+                        # SQLite checks references to a table immediately when it
+                        # is dropped. This must happen before BEGIN; changing
+                        # foreign_keys inside the migration transaction is a
+                        # no-op.
+                        connection.execute("PRAGMA foreign_keys = OFF")
+                        foreign_keys_changed = not bool(
+                            connection.execute("PRAGMA foreign_keys").fetchone()[0]
                         )
-                        """,
-                    )
-                    applied = self._applied_migrations(connection, migrations)
-                    for migration in migrations[len(applied) :]:
-                        migration.apply(connection)
+                        if not foreign_keys_changed:
+                            raise StateDatabaseError(
+                                "could not disable foreign-key checks for migration"
+                            )
+                    connection.execute("BEGIN IMMEDIATE")
+                    try:
                         connection.execute(
                             """
-                            INSERT INTO jacobian_schema_migrations(
-                                revision, name, checksum
-                            ) VALUES (?, ?, ?)
+                            CREATE TABLE IF NOT EXISTS jacobian_schema_migrations (
+                                revision INTEGER PRIMARY KEY,
+                                name TEXT NOT NULL UNIQUE,
+                                checksum TEXT NOT NULL,
+                                applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                            )
                             """,
-                            (migration.revision, migration.name, migration.checksum),
                         )
-                    connection.commit()
-                except BaseException:
-                    connection.rollback()
-                    raise
+                        applied = self._applied_migrations(connection, migrations)
+                        for migration in migrations[len(applied) :]:
+                            migration.apply(connection)
+                            connection.execute(
+                                """
+                                INSERT INTO jacobian_schema_migrations(
+                                    revision, name, checksum
+                                ) VALUES (?, ?, ?)
+                                """,
+                                (
+                                    migration.revision,
+                                    migration.name,
+                                    migration.checksum,
+                                ),
+                            )
+                        connection.commit()
+                    except BaseException:
+                        connection.rollback()
+                        raise
+                finally:
+                    if foreign_keys_changed:
+                        connection.execute("PRAGMA foreign_keys = ON")
 
     @contextmanager
     def transient_connection(self) -> Iterator[sqlite3.Connection]:

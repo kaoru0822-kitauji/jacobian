@@ -475,6 +475,7 @@ STATE_MIGRATIONS = (
             "the persisted state format to revision 5."
         ),
         apply=_remove_workspace_schema,
+        requires_foreign_keys_off=True,
     ),
 )
 

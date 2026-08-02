@@ -87,24 +87,159 @@ def test_revision_five_removes_populated_legacy_workspace_tables(
         pass
 
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
+    connection.row_factory = sqlite3.Row
     try:
+        connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("DELETE FROM jacobian_schema_migrations WHERE revision = 5")
         connection.execute(
             "UPDATE jacobian_state_format SET format_revision = 4 WHERE id = 0"
         )
-        for table in (
-            "workspace_focus",
-            "workspace_marks",
-            "workspace_attempts",
-            "workspace_scratch",
-            "workspace_findings",
-            "workspace_branches",
-            "workspace_revisions",
-            "workspace_idempotency",
-            "workspaces",
-        ):
-            connection.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY)")
-            connection.execute(f"INSERT INTO {table}(id) VALUES (1)")
+        STATE_MIGRATIONS[2].apply(connection)
+        connection.commit()
+
+        connection.execute(
+            """
+            INSERT INTO artifacts(
+                artifact_uri,
+                manifest_digest,
+                object_digest,
+                payload_digest,
+                schema_uri,
+                semantics_uri,
+                canonicalizer_digest,
+                summary
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "artifact://legacy-workspace-revision",
+                "sha256:legacy-workspace-manifest",
+                "sha256:legacy-workspace-object",
+                "sha256:legacy-workspace-payload",
+                "schema://legacy-workspace",
+                "semantics://legacy-workspace",
+                "sha256:legacy-workspace-canonicalizer",
+                "legacy workspace revision",
+            ),
+        )
+        connection.commit()
+
+        # These tables contain a deliberately cyclic, but valid, legacy row
+        # set. The migration must remove it without relying on drop order.
+        connection.execute("PRAGMA defer_foreign_keys = ON")
+        connection.execute("BEGIN")
+        connection.execute(
+            """
+            INSERT INTO workspaces(workspace_id, name, root_branch_id, created_at)
+            VALUES ('workspace-1', 'Legacy workspace', 'branch-1', '2026-08-03')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_branches(
+                branch_id, workspace_id, alias, head_revision_id, created_at
+            ) VALUES ('branch-1', 'workspace-1', 'main', 'revision-1', '2026-08-03')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_revisions(
+                revision_id,
+                revision_artifact_uri,
+                workspace_id,
+                branch_id,
+                parent_revision_id,
+                request_digest,
+                created_at
+            ) VALUES (
+                'revision-1',
+                'artifact://legacy-workspace-revision',
+                'workspace-1',
+                'branch-1',
+                NULL,
+                'sha256:legacy-workspace-request',
+                '2026-08-03'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_idempotency(
+                idempotency_key, operation, request_digest, response_json
+            ) VALUES ('idempotency-1', 'create', 'sha256:request', '{}')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_scratch(
+                scratch_id,
+                workspace_id,
+                branch_id,
+                created_revision_id,
+                payload_json,
+                created_at
+            ) VALUES (
+                'scratch-1', 'workspace-1', 'branch-1', 'revision-1', '{}',
+                '2026-08-03'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_findings(
+                card_id,
+                workspace_id,
+                branch_id,
+                kind,
+                created_revision_id,
+                payload_json,
+                created_at
+            ) VALUES (
+                'finding-1', 'workspace-1', 'branch-1', 'note', 'revision-1',
+                '{}', '2026-08-03'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_attempts(
+                attempt_id,
+                workspace_id,
+                branch_id,
+                target_card_id,
+                outcome,
+                created_revision_id,
+                payload_json,
+                created_at
+            ) VALUES (
+                'attempt-1', 'workspace-1', 'branch-1', 'finding-1', 'open',
+                'revision-1', '{}', '2026-08-03'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_marks(
+                mark_id,
+                workspace_id,
+                branch_id,
+                target_card_id,
+                state,
+                created_revision_id,
+                payload_json,
+                created_at
+            ) VALUES (
+                'mark-1', 'workspace-1', 'branch-1', 'finding-1', 'open',
+                'revision-1', '{}', '2026-08-03'
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_focus(
+                branch_id, workspace_id, updated_revision_id, payload_json
+            ) VALUES ('branch-1', 'workspace-1', 'revision-1', '{}')
+            """
+        )
         connection.commit()
     finally:
         connection.close()
