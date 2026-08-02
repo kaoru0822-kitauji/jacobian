@@ -409,7 +409,9 @@ def test_research_status_audit_rejects_invalid_utf8_evidence(
     )
     evidence_path = app / "evidence" / "answer.txt"
     submission = json.loads((app / "submission.json").read_text())
-    evidence_path.write_bytes(b"\xff\xfe resolution partial-progress historical problem listing")
+    evidence_path.write_bytes(
+        b"\xff\xfe resolution partial-progress historical problem listing"
+    )
     submission["evidence"][0]["sha256"] = support._digest(evidence_path)
     support._write_json(app / "submission.json", submission)
     rejected = support._run_verifier(task, app, logs)
