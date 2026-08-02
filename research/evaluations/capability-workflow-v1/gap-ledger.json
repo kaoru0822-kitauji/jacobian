@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:bd86e871f32b3b64796c3fecab67db7a8b8347af656a06f7128bda0d53e1614a",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -247,6 +247,22 @@
       ],
       "disposition": "USE_EXISTING",
       "next_action": "Preserve polynomial identity replay, use ordered columns with matrix.nullspace.compute, and evaluate the still-open denominator-clearing artifact handoff."
+    },
+    {
+      "task_id": "exponential-moment-rationality",
+      "mathematical_moves": [
+        "Recover the next moment as a rational function of four preceding moments.",
+        "Separate the generic nonzero-determinant branch from the rank-one branch.",
+        "Replay both formulas by exact symbolic substitution into the two-atom model."
+      ],
+      "current_capabilities": [
+        {"capability_id": "polynomial.identity.verify", "availability": "AVAILABLE", "boundary": "Can replay each denominator-cleared identity but does not synthesize branch-complete rational formulas."}
+      ],
+      "gap_classes": ["EXISTING_WORKS", "MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "USE_EXISTING",
+      "next_action": "Retain as a branch-complete symbolic reconstruction regression without adding a moment-specific capability alias."
     },
     {
       "task_id": "finite-magma-countermodel",

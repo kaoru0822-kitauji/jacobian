@@ -47,6 +47,10 @@ name = "jacobian/euler-line-symbolic-certificate"
 digest = "sha256:8eb84393869b3e20c3b0f57e8c8e58184d8c4a8c3fa1341842951f1975ce8792"
 
 [[tasks]]
+name = "jacobian/exponential-moment-rationality"
+digest = "sha256:695c39f06bba22be94dfcfe12728a4274d088af82ab28599cdd3252f4f879fe1"
+
+[[tasks]]
 name = "jacobian/finite-magma-countermodel"
 digest = "sha256:49fb5a3a407dbafee9a5e215888c9acca52d062458ece01a4f53cb27bbdb9f55"
 

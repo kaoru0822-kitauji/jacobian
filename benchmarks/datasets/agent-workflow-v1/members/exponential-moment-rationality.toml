@@ -1,0 +1,3 @@
+task_id = "exponential-moment-rationality"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
