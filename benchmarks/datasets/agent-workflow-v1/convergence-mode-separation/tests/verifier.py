@@ -23,18 +23,7 @@ def _fraction(text):
     return value if str(value) == text else None
 
 
-def _valid_result(result, source):
-    if not isinstance(result, dict) or set(result) != {
-        "relationship",
-        "levels",
-        "probes",
-        "probability_argument",
-        "pointwise_argument",
-    }:
-        return False
-    start = source["construction"]["level_start"]
-    end = source["construction"]["level_end"]
-    levels = result["levels"]
+def _valid_levels(levels, start, end):
     if not isinstance(levels, list) or len(levels) != end - start + 1:
         return False
     for expected_k, row in zip(range(start, end + 1), levels, strict=True):
@@ -55,7 +44,10 @@ def _valid_result(result, source):
             and row["index_end"] == 2 * count - 1
         ):
             return False
-    probes = result["probes"]
+    return True
+
+
+def _valid_probes(probes, start, end):
     if not isinstance(probes, list) or not 3 <= len(probes) <= 8:
         return False
     points = []
@@ -72,8 +64,24 @@ def _valid_result(result, source):
         ]
         if probe["hit_indices"] != expected_hits:
             return False
+    return True
+
+
+def _valid_result(result, source):
+    if not isinstance(result, dict) or set(result) != {
+        "relationship",
+        "levels",
+        "probes",
+        "probability_argument",
+        "pointwise_argument",
+    }:
+        return False
+    start = source["construction"]["level_start"]
+    end = source["construction"]["level_end"]
     return bool(
-        result["relationship"] == "IN_PROBABILITY_NOT_IMPLY_ALMOST_SURE"
+        _valid_levels(result["levels"], start, end)
+        and _valid_probes(result["probes"], start, end)
+        and result["relationship"] == "IN_PROBABILITY_NOT_IMPLY_ALMOST_SURE"
         and result["probability_argument"] == "event_mass_tends_to_zero"
         and result["pointwise_argument"] == "one_hit_and_at_least_one_miss_per_level"
     )
