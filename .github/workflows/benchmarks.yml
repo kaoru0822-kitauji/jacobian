@@ -302,6 +302,7 @@ jobs:
           name: benchmark-timings-${{ github.sha }}
           path: .benchmark-timings.json
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 90
       - name: Save timing history for future main-branch plans
         if: github.ref == 'refs/heads/main'
