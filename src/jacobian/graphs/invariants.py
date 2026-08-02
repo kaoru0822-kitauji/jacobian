@@ -68,6 +68,8 @@ PROPERTY_NAMES = (
     "triangle_frequencies",
 )
 
+MAX_EXACT_INDEPENDENCE_ORDER = 24
+
 
 @dataclass(frozen=True, slots=True)
 class GraphInvariantResources:
@@ -197,7 +199,8 @@ class GraphPropertyAdapter:
                 status=CapabilityCompletenessStatus.COMPLETE,
                 basis=(
                     "every requested invariant received a terminal COMPUTED, "
-                    "NOT_APPLICABLE, or UNSUPPORTED result under registry version 1"
+                    "NOT_COMPUTED, NOT_APPLICABLE, or UNSUPPORTED result under "
+                    "registry version 1"
                 ),
                 assurance_level=CapabilityAssuranceLevel.COMPUTED,
             ),
@@ -338,6 +341,20 @@ def _compute_invariant_result(
             detail=(
                 "the invariant is not present in graph.compute.properties "
                 "registry version 1"
+            ),
+        )
+    if name == "independence_number" and graph.number_of_nodes() > (
+        MAX_EXACT_INDEPENDENCE_ORDER
+    ):
+        return GraphInvariantResult(
+            invariant=name,
+            status="NOT_COMPUTED",
+            exactness="NOT_APPLICABLE",
+            backend=_property_backend(name),
+            detail=(
+                "exact independence-number computation is limited to graphs of "
+                f"order {MAX_EXACT_INDEPENDENCE_ORDER}; received order "
+                f"{graph.number_of_nodes()}"
             ),
         )
     try:

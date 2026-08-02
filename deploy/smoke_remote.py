@@ -69,6 +69,17 @@ async def inspect(
     timeout_seconds: float,
 ) -> dict[str, Any]:
     token = os.environ.get("JACOBIAN_MCP_BEARER_TOKEN")
+    token_file = os.environ.get("JACOBIAN_MCP_AUTH_TOKENS_FILE")
+    if token is None and token_file:
+        from jacobian.adapters.mcp.remote import load_static_token_file
+
+        grants = load_static_token_file(token_file)
+        token = next(
+            (grant.token for grant in grants if "jacobian:use" in grant.scopes),
+            None,
+        )
+        if token is None:
+            raise RuntimeError("smoke token file has no jacobian:use grant")
     headers = {"Authorization": f"Bearer {token}"} if token else None
     failures: list[str] = []
     async with (
