@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:a205606eee0773b4bae176fb54220ac95ecfcb5e2e7d5506fc9205dbe87475f7",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -400,6 +400,19 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Keep as a producer-to-checker discovery and artifact-flow regression."
+    },
+    {
+      "task_id": "inseparable-minimal-polynomial-audit",
+      "mathematical_moves": [
+        "Diagnose the gap between a repeated-root annihilating polynomial and the minimal polynomial.",
+        "Use a rational-function valuation obstruction to establish irreducibility and inseparability."
+      ],
+      "current_capabilities": [],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep the valuation-to-irreducibility proof composition agent-owned; do not add a source-specific field-extension solver."
     },
     {
       "task_id": "inverse-distance-remainder-audit",
