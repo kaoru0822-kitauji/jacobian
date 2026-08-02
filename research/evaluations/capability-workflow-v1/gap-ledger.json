@@ -907,6 +907,16 @@
           "capability_id": "polynomial.identity.verify",
           "availability": "AVAILABLE",
           "boundary": "Can replay scalar polynomial identities but does not certify the cyclotomic-to-trigonometric derivation or the valuation induction."
+        },
+        {
+          "capability_id": "combinatorics.recurrence.linear.evaluate",
+          "availability": "AVAILABLE",
+          "boundary": "Replays a typed linear recurrence and its exact finite terms, but does not derive the trigonometric polynomial or authorize the divisibility conclusion."
+        },
+        {
+          "capability_id": "integer.compute.valuation",
+          "availability": "AVAILABLE",
+          "boundary": "Computes exact prime valuations of supplied integers, but does not prove the residue-class induction or connect it to the trigonometric derivation."
         }
       ],
       "gap_classes": [
