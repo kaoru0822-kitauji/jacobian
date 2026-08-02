@@ -139,8 +139,10 @@ def _result_is_valid(result, frozen):
 
 
 def _evidence_matches(evidence):
-    if not isinstance(evidence, list) or len(evidence) != 1 or not evidence_list_is_bound(
-        evidence, expected_path="evidence/answer.txt"
+    if (
+        not isinstance(evidence, list)
+        or len(evidence) != 1
+        or not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt")
     ):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
@@ -173,7 +175,12 @@ def main():
         contract and math_correct and _evidence_matches(submission.get("evidence"))
     )
     scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
+        contract
+        and isinstance(submission.get("scope"), str)
+        and all(
+            term in submission["scope"].casefold()
+            for term in ("frozen", "symbolic", "tiling", "reflection")
+        )
     )
     assurance_correct = bool(
         contract

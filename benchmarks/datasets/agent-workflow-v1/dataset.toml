@@ -160,7 +160,7 @@ digest = "sha256:da1d342960318e1d6076cee11ea07125bf3516993ccf20a55de96b61b50c44a
 
 [[tasks]]
 name = "jacobian/symmetric-polynomial-divisibility"
-digest = "sha256:abb633d9a3116c17ea50bff45c89dcce7ce8d49304aae6d3495d7a3498895cf6"
+digest = "sha256:fc186254c680268d1953a21500cf943e56b5f81b6ca23e644e624d23d7265d8f"
 
 [[tasks]]
 name = "jacobian/well-total-domination-counterexample"
