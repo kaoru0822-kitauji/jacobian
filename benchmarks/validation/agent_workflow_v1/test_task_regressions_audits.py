@@ -267,3 +267,118 @@ def test_indexed_pairwise_vacuity_rejects_overclaiming_limitations(
     rejected = support._run_verifier(task, app, logs)
     assert rejected["correctness"] == 1.0
     assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_boolean_witness_elements(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["subgroup"] = [False, 4, 8]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_boolean_coset_elements(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["cosets"][0][0] = False
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_boolean_artifact_elements(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["part_artifact"]["elements"] = [False, 4, 8]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_empty_limitations(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["limitations"] = []
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_broader_scope(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["scope"] = "the underlying conjecture"
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["scope_accuracy"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_assurance_above_ceiling(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = "CHECKED"
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["assurance_calibration"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_accepts_assurance_underclaim(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = "UNVERIFIED"
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["assurance_calibration"] == 0.0
+    assert accepted["reward"] == pytest.approx(0.9)
