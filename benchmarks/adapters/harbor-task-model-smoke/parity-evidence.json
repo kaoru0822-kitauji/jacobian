@@ -1,0 +1,5 @@
+{
+  "generator": "generate.py",
+  "status": "deterministic-reference",
+  "task_digest_source": "harbor==0.20.0 Task.checksum"
+}

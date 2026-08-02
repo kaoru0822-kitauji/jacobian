@@ -12,6 +12,8 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[1]
 ADAPTERS = ROOT / "benchmarks" / "adapters"
 SCHEMA = ROOT / "benchmarks" / "schemas" / "source-adapter-lock.schema.json"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _display(path: Path) -> str:

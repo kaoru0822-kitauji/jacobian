@@ -1,0 +1,31 @@
+{
+  "schema_version": "1",
+  "adapter_id": "harbor-task-model-smoke",
+  "source": {
+    "url": "https://github.com/laude-institute/harbor",
+    "revision": "v0.20.0",
+    "sha256": "sha256:6c5f94a56c53f0e14b9fc6a75f249fc4b0b04cf25a1d06c56f6e8d44f479f7f1",
+    "license": "Apache-2.0",
+    "redistribution": "metadata-only"
+  },
+  "selection": {
+    "included_rows": ["task-model-smoke/graph-counterexample"],
+    "excluded_rows": [],
+    "rule": "one deterministic task-model reference row"
+  },
+  "dependencies": {
+    "harbor": "==0.20.0",
+    "jsonschema": "==4.25.1",
+    "tomli-w": "==1.2.0"
+  },
+  "outputs": [
+    {
+      "task_id": "graph-counterexample",
+      "dataset": "agent-workflow-v1",
+      "source_row": "task-model-smoke/graph-counterexample",
+      "task_digest": "sha256:549a04a5648c0894415be4196447bbd82187764439a141640c0e88958a607bf3",
+      "oracle_evidence_digest": "sha256:3ac100fa0809e31cdb4d547029997958d912ab999a5a2a3274f789b362bde9c7",
+      "parity_evidence_digest": "sha256:dbaa1b26982252a619f63b34a40ed596b5a5f9440a464122da069b7de22d3f50"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "kind": "oracle-contract-fixture",
+  "task": "agent-workflow-v1/graph-counterexample",
+  "status": "not-executed",
+  "reason": "adapter fixture records task-model identity only"
+}

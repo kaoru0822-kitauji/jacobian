@@ -18,6 +18,13 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+from benchmarks.tooling.harbor_digest import (
+    HarborDigestError,
+)
+from benchmarks.tooling.harbor_digest import (
+    task_digest as _native_task_digest,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 BENCHMARKS = ROOT / "benchmarks"
 REGISTRY_PATH = BENCHMARKS / "registry.toml"
@@ -540,12 +547,9 @@ def task_full_name(suite: Suite, task_dir: Path) -> str:
 
 def _harbor_digest(task_dir: Path) -> str:
     try:
-        from harbor.models.task.task import Task
-    except (ImportError, ModuleNotFoundError) as exc:
-        raise HarborSuiteError(
-            "Harbor is required to compute task digests; use the pinned Harbor runner"
-        ) from exc
-    return str(Task(task_dir, disable_verification=True).checksum)
+        return _native_task_digest(task_dir)
+    except HarborDigestError as exc:
+        raise HarborSuiteError(str(exc)) from exc
 
 
 def task_digest(task_dir: Path) -> str:
