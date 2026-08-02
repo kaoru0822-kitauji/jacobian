@@ -135,10 +135,8 @@ def test_resource_derived_oracles_and_assurance_boundary(
             lambda result: result.update(expected_value="2025"),
         ),
         (
-            "research-status-evidence-audit",
-            lambda result: result["cases"][0].update(
-                classification="RESOLVED_BY_CITED_WORK"
-            ),
+            "lagrangian-projection-proof-audit",
+            lambda result: result["lagrangian_defect"][0].__setitem__(1, "0"),
         ),
     ],
 )
