@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from verifier_support import (
@@ -53,7 +54,8 @@ def _expected_orientation(orientation):
 def _valid_actions(actions, s_action, t_action, start, end):
     if not isinstance(actions, list) or len(actions) != end - start + 1:
         return False
-    for action, index in zip(actions, range(start, end + 1), strict=True):
+    seen = set()
+    for action in actions:
         if not isinstance(action, dict) or set(action) != {
             "basis_index",
             "s_output",
@@ -62,6 +64,10 @@ def _valid_actions(actions, s_action, t_action, start, end):
             "ts_output",
         }:
             return False
+        index = action["basis_index"]
+        if type(index) is not int or index in seen or not start <= index <= end:
+            return False
+        seen.add(index)
         expected = {
             "basis_index": index,
             "s_output": s_action(index),
@@ -69,6 +75,13 @@ def _valid_actions(actions, s_action, t_action, start, end):
             "st_output": _compose(s_action, t_action, index),
             "ts_output": _compose(t_action, s_action, index),
         }
+        for key, expected_value in expected.items():
+            actual_value = action[key]
+            if expected_value is None:
+                if actual_value is not None:
+                    return False
+            elif type(actual_value) is not int or actual_value != expected_value:
+                return False
         if action != expected:
             return False
     return True
@@ -113,18 +126,35 @@ def _evidence_matches(evidence, result):
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
-    return (
-        all(
-            term in text
-            for term in (
-                "finitely supported",
-                "identity",
-                "eigenvalue",
-                "finite-dimensional",
-            )
-        )
-        and result["zero_eigenvalue_product"].casefold() in text
+    zero = result["zero_eigenvalue_product"].casefold()
+    identity = result["identity_product"].casefold()
+    if not all(
+        term in text
+        for term in ("finitely supported", "eigenvalue", "finite-dimensional")
+    ):
+        return False
+    zero_role = re.search(
+        rf"\b{zero}\b[^.\n]*(?:zero eigenvalue|zero vector|kernel)", text
     )
+    identity_role = re.search(
+        rf"\b{identity}\b[^.\n]*(?:identity|one-to-one|injective)", text
+    )
+    return bool(zero_role and identity_role)
+
+
+def _limitation_is_valid(limitations):
+    if not isinstance(limitations, list):
+        return False
+    for item in limitations:
+        if not isinstance(item, str) or "lean" not in item.casefold():
+            continue
+        if re.search(
+            r"\blean\b[^.\n]*(?:compiled|compilation|checked|verified)", item, re.I
+        ):
+            continue
+        if re.search(r"\b(?:not|doesn['']?t|cannot|without|only)\b", item, re.I):
+            return True
+    return False
 
 
 def main():
@@ -151,17 +181,19 @@ def main():
         and submission.get("claimed_assurance") == expected["maximum_assurance"]
     )
     limitation_correct = bool(
-        contract
-        and any(
-            "lean" in item.casefold() and "not" in item.casefold()
-            for item in submission.get("limitations", [])
-        )
+        contract and _limitation_is_valid(submission.get("limitations"))
     )
     false_certification = false_verified_claim(
         submission, verification_record_bound=False
     )
     correct = bool(
-        contract and math_correct and limitation_correct and not false_certification
+        contract
+        and math_correct
+        and evidence_valid
+        and scope_correct
+        and assurance_correct
+        and limitation_correct
+        and not false_certification
     )
     reward = (
         0
