@@ -143,22 +143,41 @@ def _evidence_matches(evidence, result):
         for term in ("finitely supported", "eigenvalue", "finite-dimensional")
     ):
         return False
-    zero_role = re.search(
-        rf"(?:\b{zero}\b[^.\n]*(?:zero eigenvalue|zero vector|kernel)|"
-        rf"(?:zero eigenvalue|zero vector|kernel)[^.\n]*\b{zero}\b)",
-        text,
+    sentences = re.split(r"(?:\n+|(?<=[.!?])\s+)", text)
+
+    def positive_relation(patterns):
+        for sentence in sentences:
+            for pattern in patterns:
+                match = re.search(pattern, sentence, re.I)
+                if match and not re.search(
+                    r"\b(?:not|never|without|isn['']?t)\b", match.group(), re.I
+                ):
+                    return True
+        return False
+
+    # Keep the operator name inside the same short relation as the property.
+    # A sentence-level wildcard can accidentally transfer the claim from ST to
+    # TS (or vice versa) when both products occur in one sentence.
+    zero_role = positive_relation(
+        (
+            rf"\bzero\b[^.;:\n]{{0,80}}\b(?:eigenvalue|eigenvector|kernel)\b[^.;:\n]{{0,40}}\b{zero}\b",
+            rf"\b{zero}\b[^.;:\n]{{0,80}}\b(?:zero eigenvalue|zero vector|kernel|kills|annihilates)\b",
+        )
     )
-    identity_role = re.search(
-        rf"(?:\b{identity}\b[^.\n]*(?:identity|one-to-one|injective)|"
-        rf"(?:identity|one-to-one|injective)[^.\n]*\b{identity}\b)",
-        text,
+    identity_role = positive_relation(
+        (
+            rf"\bidentity\b[^.;:\n]{{0,80}}\b{identity}\b",
+            rf"\b{identity}\b[^.;:\n]{{0,80}}\b(?:identity|one-to-one|injective)\b",
+        )
     )
-    return bool(
-        zero_role
-        and identity_role
-        and not re.search(r"\b(?:not|never|without|isn['']?t)\b", zero_role.group(), re.I)
-        and not re.search(r"\b(?:not|never|without|isn['']?t)\b", identity_role.group(), re.I)
+    missing_assumption = positive_relation(
+        (
+            r"\b(?:missing|omitted|absent|requires?|assumption|hypothesis)\b"
+            r"[^.;:\n]{0,80}\bfinite[- ]dimensional\b",
+            r"\bfinite[- ]dimensional\b[^.;:\n]{0,80}\b(?:missing|omitted|absent|assumption|hypothesis)\b",
+        )
     )
+    return bool(zero_role and identity_role and missing_assumption)
 
 
 def _limitation_is_valid(limitations):
