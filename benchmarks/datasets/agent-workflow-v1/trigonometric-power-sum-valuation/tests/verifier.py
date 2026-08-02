@@ -142,10 +142,12 @@ def _evidence_matches(evidence):
     except (OSError, UnicodeError):
         return False
     return (
-        len(text) >= 120
+        len(text) >= 180
         and all(term in text for term in ("cubic", "recurrence", "7-adic", "induction"))
         and "valuation" in text
         and "divis" in text
+        and "minimal polynomial" in text
+        and "residue" in text
     )
 
 
@@ -178,7 +180,12 @@ def main():
         contract and math_correct and _evidence_matches(submission.get("evidence"))
     )
     scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
+        contract
+        and isinstance(submission.get("scope"), str)
+        and all(
+            term in submission["scope"].casefold()
+            for term in ("cubic", "recurrence", "7-adic")
+        )
     )
     assurance_correct = bool(
         contract

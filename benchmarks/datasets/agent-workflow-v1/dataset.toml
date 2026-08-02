@@ -160,7 +160,7 @@ digest = "sha256:da1d342960318e1d6076cee11ea07125bf3516993ccf20a55de96b61b50c44a
 
 [[tasks]]
 name = "jacobian/trigonometric-power-sum-valuation"
-digest = "sha256:349f20c27f891bb8c919deed8a07d27c65a6e2e9b9c4066103cfaf46f1ff903c"
+digest = "sha256:905da0ba2c18d319189f151b92fb1b63a27d3645cf142c34fc8a7fe2ef547911"
 
 [[tasks]]
 name = "jacobian/well-total-domination-counterexample"
