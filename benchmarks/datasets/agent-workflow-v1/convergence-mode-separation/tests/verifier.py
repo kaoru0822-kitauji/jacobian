@@ -104,13 +104,15 @@ def _limitation_is_scope_limiting(text):
     return bool(
         re.search(
             r"(?:open problem|lean theorem)[^.!?;]{0,100}"
-            r"\b(?:not|no|does not|cannot|can not|without|never|unsolved|unverified)\b"
+            r"\b(?:not|no|does not|cannot|can not|without|never|unsolved|"
+            r"unverified|neither|nor)\b"
             r"[^.!?;]{0,60}\b(?:solv(?:e|ed)|settle(?:d)?|verif(?:y|ied)|"
             r"elaborat(?:e|ed)|prove(?:s|d)?|machine)\b",
             normalized,
         )
         or re.search(
-            r"\b(?:not|no|does not|cannot|can not|without|never|unsolved|unverified)\b"
+            r"\b(?:not|no|does not|cannot|can not|without|never|unsolved|"
+            r"unverified|neither|nor)\b"
             r"[^.!?;]{0,60}\b(?:solv(?:e|ed)|settle(?:d)?|verif(?:y|ied)|"
             r"elaborat(?:e|ed)|prove(?:s|d)?|machine)\b[^.!?;]{0,100}"
             r"\b(?:open problem|lean theorem)\b",
@@ -135,7 +137,10 @@ def _load_bounded_submission():
             return None
     except OSError:
         return None
-    return load_submission(path)
+    try:
+        return load_submission(path)
+    except RecursionError:
+        return None
 
 
 def _fraction(text, *, canonical=True):
@@ -326,7 +331,10 @@ def main():
                 "dyadic" in scope.casefold()
                 and "typewriter" in scope.casefold()
                 and re.search(r"\[\s*0\s*,\s*1\s*\)", scope)
-                and not re.search(r"\b(?:not|no|without)\b", scope.casefold())
+                and not re.search(
+                    r"\b(?:not|no|without|does not|cannot|never)\b",
+                    scope.casefold(),
+                )
             )
         )
     )
@@ -334,6 +342,8 @@ def main():
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
     limitations = data.get("limitations", [])
+    if not isinstance(limitations, list):
+        limitations = []
     limitations_affirmative = any(
         _affirmative_solved_or_verified_claim(item)
         for item in limitations
