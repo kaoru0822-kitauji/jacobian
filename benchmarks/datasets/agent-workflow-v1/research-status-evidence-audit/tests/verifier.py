@@ -10,6 +10,7 @@ from verifier_support import (
 
 W = Path("/app")
 E = Path("/tests")
+MAX_EVIDENCE_BYTES = 1_048_576
 
 RULES = {
     "workshop-equation-status": {
@@ -30,9 +31,24 @@ RULES = {
     "lebesgue-nagell-progress": {
         "classification": "PARTIAL_PROGRESS_NO_FULL_RESOLUTION",
         "required": {"B2004", "KP2025"},
-        "unsupported": set(),
+        "unsupported": {"RESOLVED_RANGES_CHARACTERIZED_AS_SMALL_AND_SUFFICIENTLY_LARGE"},
     },
 }
+
+
+def load_frozen():
+    try:
+        workspace = W / "input.json"
+        frozen = E / "input.json"
+        if workspace.is_symlink() or frozen.is_symlink():
+            return {}
+        frozen_bytes = frozen.read_bytes()
+        if workspace.read_bytes() != frozen_bytes:
+            return {}
+        value = json.loads(frozen_bytes)
+    except (OSError, UnicodeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def citation_semantics_are_present(case):
@@ -57,6 +73,10 @@ def citation_semantics_are_present(case):
 
 
 def cases_valid(result, frozen):
+    if not isinstance(result, dict) or set(result) != {"cases"}:
+        return False
+    if not frozen or "cases" not in frozen:
+        return False
     submitted = result.get("cases")
     if not isinstance(submitted, list) or len(submitted) != len(RULES):
         return False
@@ -71,7 +91,7 @@ def cases_valid(result, frozen):
         }:
             return False
         cid = item.get("case_id")
-        if cid in seen or cid not in RULES:
+        if not isinstance(cid, str) or cid in seen or cid not in RULES:
             return False
         seen.add(cid)
         rule = RULES[cid]
@@ -89,7 +109,7 @@ def cases_valid(result, frozen):
         available = {citation["id"] for citation in frozen_by_id[cid]["citations"]}
         if (
             item.get("classification") != rule["classification"]
-            or not rule["required"].issubset(set(selected))
+            or set(selected) != rule["required"]
             or not set(selected).issubset(available)
             or set(unsupported) != rule["unsupported"]
             or not citation_semantics_are_present(frozen_by_id[cid])
@@ -98,25 +118,49 @@ def cases_valid(result, frozen):
     return seen == set(RULES)
 
 
-def evidence_valid(evidence):
+def evidence_valid(evidence, result):
     if not evidence_list_is_bound(evidence):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
         return False
     try:
-        text = target.read_text().lower()
-    except OSError:
+        if target.stat().st_size > MAX_EVIDENCE_BYTES:
+            return False
+        text = target.read_text()
+        markers = [
+            line.removeprefix("RESULT_JSON:").strip()
+            for line in text.splitlines()
+            if line.startswith("RESULT_JSON:")
+        ]
+        prose = [
+            line.strip()
+            for line in text.splitlines()
+            if line.strip() and not line.startswith("RESULT_JSON:")
+        ]
+        lowered = text.lower()
+        return bool(
+            len(markers) == 1
+            and json.loads(markers[0]) == result
+            and prose
+            and sum(map(len, prose)) >= 20
+            and all(
+                term in lowered
+                for term in (
+                    "resolution",
+                    "partial-progress",
+                    "historical",
+                    "problem listing",
+                )
+            )
+        )
+    except (OSError, UnicodeError, ValueError):
         return False
-    return all(
-        term in text
-        for term in ("resolution", "partial-progress", "historical", "problem listing")
-    )
 
 
 def main():
     submission = load_submission()
-    frozen = json.loads((W / "input.json").read_text())
+    frozen = load_frozen()
     expected = json.loads((E / "expected.json").read_text())
     mathematical_contract = strict_submission_contract(
         submission,
@@ -138,7 +182,9 @@ def main():
         and cases_valid(result, frozen)
     )
     evidence = bool(
-        mathematical_contract and evidence_valid(submission.get("evidence"))
+        mathematical_contract
+        and isinstance(result, dict)
+        and evidence_valid(submission.get("evidence"), result)
     )
     scope = bool(
         mathematical_contract and submission.get("scope") == expected["required_scope"]
