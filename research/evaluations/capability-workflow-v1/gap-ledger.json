@@ -125,8 +125,8 @@
       ],
       "contamination": "PUBLIC_ANSWER_VISIBLE",
       "candidate_ids": [],
-      "disposition": "NO_NEW_CAPABILITY",
-      "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
+      "disposition": "UNASSESSED",
+      "next_action": "Refresh the runtime snapshot and Oracle evidence against a tree containing this task before classifying its capability gap."
     },
     {
       "task_id": "continuant-reversal-certificate",
