@@ -179,7 +179,7 @@ def main():
         and isinstance(submission.get("scope"), str)
         and all(
             term in submission["scope"].casefold()
-            for term in ("frozen", "symbolic", "tiling", "reflection")
+            for term in ("ideal", "integer", "divis", "generator")
         )
     )
     assurance_correct = bool(
