@@ -12,6 +12,8 @@ Run the complete contract and regeneration checks with:
 make harbor-adapter-check ADAPTER=harbor-task-model-smoke
 ```
 
-The source metadata is a fixture for adapter plumbing, not a benchmark result.
-Oracle and parity evidence are the checked-in digests below, so the adapter can
-be validated without network access or a mutable source checkout.
+The source metadata is a fixture for adapter plumbing, not a new benchmark
+claim. `oracle-evidence.json` records the successful pinned Harbor Oracle run;
+`parity-evidence.json` records the field-by-field comparison between the
+generated manifest and the pinned Harbor task-model digest. Both files are
+content-bound by `source.lock.json` and checked without network access.
