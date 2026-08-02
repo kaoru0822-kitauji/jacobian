@@ -152,7 +152,7 @@ digest = "sha256:f8a8cd0791e229a8b64fbe3e3b805d2f6d113795d82c113b05f713b0e38c613
 
 [[tasks]]
 name = "jacobian/series-domain-junk-zero"
-digest = "sha256:5165163eae4bf31538faddbe9bf1e93dd867017bc09e04ceddb0fa4076815abf"
+digest = "sha256:501282c4416e8f0959e94524b11649bc9f6a6af07ef14ad37a46c1c980525bab"
 
 [[tasks]]
 name = "jacobian/subspace-direct-sum-counterexample"
