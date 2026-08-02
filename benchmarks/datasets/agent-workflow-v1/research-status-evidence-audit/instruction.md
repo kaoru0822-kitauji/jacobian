@@ -7,3 +7,4 @@ Write `/app/submission.json` following `/app/submission_schema.json` and a conci
 Use exactly these classifications: `RESOLVED_BY_CITED_WORK`, `PARTIAL_PROGRESS_NO_FULL_RESOLUTION`, `HISTORICALLY_OPEN_CURRENT_STATUS_NOT_ESTABLISHED`, or `PROBLEM_LISTED_STATUS_UNSUPPORTED`.
 
 Claim at most `COMPUTED`. The result audits frozen citation-to-claim support; it does not establish current theorem status.
+Set `scope` to: `the four frozen citation packets only; present mathematical truth and current literature status are not assessed`.
