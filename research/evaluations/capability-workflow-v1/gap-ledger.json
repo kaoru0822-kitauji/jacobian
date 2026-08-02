@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:a6a4c5949490605cf539241a0fc15a8932d1b239c3aab99b9358f70926a53550",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -849,6 +849,16 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Retain as a fail-closed assurance and producer-to-checker regression."
+    },
+    {
+      "task_id": "squarefree-class-three-square-audit",
+      "mathematical_moves": ["Reduce square-product adjacency to equality of squarefree-kernel classes.", "Translate the pair count to a sum of squared class sizes and apply a complete modulo-8 obstruction."],
+      "current_capabilities": [],
+      "gap_classes": ["MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep structural class reduction and transversal reconstruction agent-owned; do not add a constant-specific theorem solver."
     },
     {
       "task_id": "subspace-direct-sum-counterexample",

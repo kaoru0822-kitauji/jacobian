@@ -151,6 +151,10 @@ name = "jacobian/sat-witness"
 digest = "sha256:f8a8cd0791e229a8b64fbe3e3b805d2f6d113795d82c113b05f713b0e38c613d"
 
 [[tasks]]
+name = "jacobian/squarefree-class-three-square-audit"
+digest = "sha256:81d7e84ca5519353836bc38ee21b3911358fdd7d400a56c5426eec023a842ec2"
+
+[[tasks]]
 name = "jacobian/subspace-direct-sum-counterexample"
 digest = "sha256:dd54c483a3df187dea49c541a9a6b0e085ff6eb85e3f51fd2338249d50881462"
 

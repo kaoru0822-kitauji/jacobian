@@ -1,0 +1,6 @@
+Two integers have square product exactly when their squarefree kernels agree,
+so the count is the sum of the squared class sizes.  With at most three
+classes, 2023 would be a sum of three squares after padding by zeros.  Squares
+modulo 8 are 0, 1, 4 and their threefold sums omit 7, while 2023 is 7 modulo
+8.  Thus four classes exist and one element from each is the transversal.  The
+assurance remains COMPUTED.
