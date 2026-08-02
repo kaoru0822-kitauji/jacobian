@@ -42,6 +42,7 @@ RESOURCE_DERIVED_TASKS = (
     "polynomial-tail-counterexample",
     "putnam-2adic-induction-audit",
     "random-function-expectation-audit",
+    "squarefree-class-independence-audit",
     "subspace-direct-sum-counterexample",
     "well-total-domination-counterexample",
 )
