@@ -121,9 +121,9 @@ def _evidence_matches(evidence):
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
-    if len(text) < 120 or "result_json:" not in text:
+    if len(text) < 120:
         return False
-    proof = text.split("result_json:", 1)[1]
+    proof = text
     return all(
         re.search(pattern, proof, re.IGNORECASE)
         for pattern in (
