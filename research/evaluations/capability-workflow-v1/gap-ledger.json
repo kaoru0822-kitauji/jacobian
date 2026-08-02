@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:f3edce6f928f638fdbaf74ef5fc4a78e9cd1d5a130910063b803934e7a28b285",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -127,6 +127,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
+    },
+    {
+      "task_id": "convergence-mode-separation",
+      "mathematical_moves": [
+        "Construct a dyadic typewriter sequence with exact event masses.",
+        "Separate convergence in probability from almost-sure convergence through infinite hit and miss structure."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "rational.compute.product",
+          "availability": "AVAILABLE",
+          "boundary": "Supports exact dyadic mass and endpoint arithmetic but does not classify stochastic convergence modes."
+        }
+      ],
+      "gap_classes": [
+        "EXISTING_WORKS",
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Use the Assurance task to diagnose convergence-mode confusion without adding a task-shaped probability solver."
     },
     {
       "task_id": "dead-end-local-density-audit",
