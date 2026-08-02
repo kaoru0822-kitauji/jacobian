@@ -12,6 +12,7 @@ from verifier_support import (
 )
 
 E = Path("/tests")
+MAX_SUBMISSION_BYTES = 1_048_576
 
 # Lemma forms that, when used affirmatively about the open problem or Lean
 # theorem, claim it is solved or machine/formally verified. Base present-tense
@@ -60,18 +61,11 @@ _SCOPE_LIMITING_MARKERS = (
 )
 
 
-def _fraction(text):
-    if not isinstance(text, str):
-        return None
-    try:
-        value = Fraction(text)
-    except (ValueError, ZeroDivisionError):
-        return None
-    return value if str(value) == text else None
-
-
 def _words(text):
-    return re.findall(r"[a-z]+", text.casefold())
+    normalized = text.casefold().replace("isn't", "is not")
+    normalized = normalized.replace("doesn't", "does not")
+    normalized = normalized.replace("can't", "can not")
+    return re.findall(r"[a-z]+", normalized)
 
 
 def _affirmative_solved_or_verified_claim(text):
@@ -102,7 +96,27 @@ def _limitation_is_scope_limiting(text):
         return False
     if _affirmative_solved_or_verified_claim(text):
         return False
-    return any(marker in folded for marker in _SCOPE_LIMITING_MARKERS)
+    normalized = (
+        folded.replace("isn't", "is not")
+        .replace("doesn't", "does not")
+        .replace("can't", "can not")
+    )
+    return bool(
+        re.search(
+            r"(?:open problem|lean theorem)[^.!?;]{0,100}"
+            r"\b(?:not|no|does not|cannot|can not|without|never|unsolved|unverified)\b"
+            r"[^.!?;]{0,60}\b(?:solv(?:e|ed)|settle(?:d)?|verif(?:y|ied)|"
+            r"elaborat(?:e|ed)|prove(?:s|d)?|machine)\b",
+            normalized,
+        )
+        or re.search(
+            r"\b(?:not|no|does not|cannot|can not|without|never|unsolved|unverified)\b"
+            r"[^.!?;]{0,60}\b(?:solv(?:e|ed)|settle(?:d)?|verif(?:y|ied)|"
+            r"elaborat(?:e|ed)|prove(?:s|d)?|machine)\b[^.!?;]{0,100}"
+            r"\b(?:open problem|lean theorem)\b",
+            normalized,
+        )
+    )
 
 
 def _is_int(value):
@@ -110,10 +124,47 @@ def _is_int(value):
     return type(value) is int
 
 
+def _load_bounded_submission():
+    path = Path("/app/submission.json")
+    try:
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or path.stat().st_size > MAX_SUBMISSION_BYTES
+        ):
+            return None
+    except OSError:
+        return None
+    return load_submission(path)
+
+
+def _fraction(text, *, canonical=True):
+    if not isinstance(text, str) or len(text) > 128:
+        return None
+    if not re.fullmatch(r"[+-]?(?:\d+(?:/\d+)?|\d+\.\d+)", text):
+        return None
+    try:
+        value = Fraction(text)
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return None
+    return value if not canonical or str(value) == text else None
+
+
 def _valid_levels(levels, start, end):
     if not isinstance(levels, list) or len(levels) != end - start + 1:
         return False
-    for expected_k, row in zip(range(start, end + 1), levels, strict=True):
+    rows = {}
+    for row in levels:
+        if not isinstance(row, dict) or not _is_int(row.get("level")):
+            return False
+        level = row["level"]
+        if level in rows:
+            return False
+        rows[level] = row
+    for expected_k in range(start, end + 1):
+        row = rows.get(expected_k)
+        if row is None:
+            return False
         if not isinstance(row, dict) or set(row) != {
             "level",
             "interval_count",
@@ -128,7 +179,7 @@ def _valid_levels(levels, start, end):
             and row["level"] == expected_k
             and _is_int(row["interval_count"])
             and row["interval_count"] == count
-            and _fraction(row["event_mass"]) == Fraction(1, count)
+            and _fraction(row["event_mass"], canonical=False) == Fraction(1, count)
             and _is_int(row["index_start"])
             and row["index_start"] == count
             and _is_int(row["index_end"])
@@ -145,7 +196,7 @@ def _valid_probes(probes, start, end):
     for probe in probes:
         if not isinstance(probe, dict) or set(probe) != {"point", "hit_indices"}:
             return False
-        point = _fraction(probe["point"])
+        point = _fraction(probe["point"], canonical=True)
         # Accept the full frozen space [0,1): zero is a valid probe with the
         # unique hit index 2^k at every level.
         if point is None or not 0 <= point < 1 or point in points:
@@ -214,7 +265,7 @@ def _evidence_valid(evidence, result):
         return False
     try:
         bound_result = json.loads(markers[0])
-    except ValueError:
+    except (ValueError, RecursionError):
         return False
     if not isinstance(result, dict) or bound_result != result:
         return False
@@ -250,7 +301,7 @@ def _evidence_affirmative_claim(evidence):
 
 
 def main():
-    submission = load_submission()
+    submission = _load_bounded_submission()
     source = json.loads((E / "input.json").read_text())
     expected = json.loads((E / "expected.json").read_text())
     contract = strict_submission_contract(
@@ -265,7 +316,20 @@ def main():
     evidence_valid = bool(
         contract and math_correct and _evidence_valid(data.get("evidence"), result)
     )
-    scope_correct = bool(contract and data.get("scope") == expected["required_scope"])
+    scope = data.get("scope")
+    scope_correct = bool(
+        contract
+        and isinstance(scope, str)
+        and (
+            scope == expected["required_scope"]
+            or (
+                "dyadic" in scope.casefold()
+                and "typewriter" in scope.casefold()
+                and re.search(r"\[\s*0\s*,\s*1\s*\)", scope)
+                and not re.search(r"\b(?:not|no|without)\b", scope.casefold())
+            )
+        )
+    )
     assurance_correct = bool(
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]
     )
