@@ -24,6 +24,8 @@ _AFFIRMATIVE_LEMMAS = (
     "proved",
     "proven",
     "proves",
+    "certified",
+    "settled",
 )
 _NEGATION_TOKENS = (
     "not",
@@ -80,13 +82,15 @@ def _affirmative_solved_or_verified_claim(text):
     negation token in the preceding clause, so negated scope statements such as
     "does not solve" or "not machine verified" are accepted.
     """
-    words = _words(text)
-    for index, word in enumerate(words):
-        if word not in _AFFIRMATIVE_LEMMAS:
+    if re.search(r"\b(machine|formally?)\s+(verified|certified)\b", text.casefold()):
+        return True
+    for clause in re.split(r"[.!?;]+", text.casefold()):
+        if not any(subject in clause for subject in ("open problem", "lean theorem")):
             continue
-        window = words[max(0, index - 5) : index]
-        if not any(token in window for token in _NEGATION_TOKENS):
-            return True
+        words = _words(clause)
+        for index, word in enumerate(words):
+            if word in _AFFIRMATIVE_LEMMAS and not any(token in words[max(0, index - 4):index] for token in _NEGATION_TOKENS):
+                return True
     return False
 
 
@@ -182,7 +186,7 @@ def _valid_result(result, source):
 def _evidence_valid(evidence, result):
     if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
         return False
-    if not isinstance(evidence, list) or not evidence:
+    if not isinstance(evidence, list) or len(evidence) != 1:
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
@@ -221,6 +225,8 @@ def _evidence_valid(evidence, result):
             "infinitely often",
             "every point",
             "one interval per level",
+            "equals one infinitely often",
+            "zero infinitely often",
         )
     )
 
@@ -228,7 +234,7 @@ def _evidence_valid(evidence, result):
 def _evidence_affirmative_claim(evidence):
     if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
         return False
-    if not isinstance(evidence, list) or not evidence:
+    if not isinstance(evidence, list) or len(evidence) != 1:
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
