@@ -188,6 +188,62 @@ def test_research_status_audit_accepts_equivalent_case_order(tmp_path: Path) -> 
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_research_status_audit_rejects_wrong_scope_without_base_reward(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["scope"] = "wrong scope"
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["scope_accuracy"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.2)
+
+
+def test_research_status_audit_rejects_escaped_evidence_without_base_reward(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"] = [
+        {
+            "path": "../answer.txt",
+            "sha256": submission["evidence"][0]["sha256"],
+        }
+    ]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.2)
+
+
+def test_research_status_audit_rejects_wrong_assurance_without_base_reward(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "research-status-evidence-audit", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["claimed_assurance"] = "UNVERIFIED"
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["assurance_calibration"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.2)
+
+
 def test_inverse_distance_audit_accepts_alternative_rational_direction(
     tmp_path: Path,
 ) -> None:
