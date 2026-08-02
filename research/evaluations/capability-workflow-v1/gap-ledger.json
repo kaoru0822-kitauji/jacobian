@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:33d51f531f01e66e5d6421e2727a4debc4c4155f16cde2f6422782d5a9bc71bd",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -127,6 +127,28 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Keep recurrence construction, denominator auditing, and branch reconstruction as agent-owned composition rather than adding a problem-specific solver."
+    },
+    {
+      "task_id": "cubic-image-classification",
+      "mathematical_moves": [
+        "Factor a symmetric cubic form and enumerate its exact modulo-9 image.",
+        "Synthesize affine nonnegative families for every admissible residue class.",
+        "Combine modular necessity with parametric sufficiency into a complete image classification."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay each family identity but does not synthesize a complete parametric cover of the integer image."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep modular obstruction and parametric coverage as agent-owned composition; do not add a cubic-form-specific solver."
     },
     {
       "task_id": "dead-end-local-density-audit",

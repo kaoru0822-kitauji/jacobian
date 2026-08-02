@@ -1,0 +1,1 @@
+The factorization gives the modular obstruction. Three affine families realize 3k+1, 3k-1, and 9k with nonnegative coordinates, covering every residue except 3 and 6 modulo 9. This is an exact computed classification, not a replayed formal proof.

@@ -1,0 +1,199 @@
+import json
+from pathlib import Path
+from typing import Any
+
+from verifier_support import (
+    evidence_list_is_bound,
+    false_verified_claim,
+    load_submission,
+    resolve_evidence,
+    strict_submission_contract,
+)
+
+WORKSPACE = Path("/app")
+TESTS = Path("/tests")
+LIMITATION = "The verifier checks exact symbolic families and modular completeness but does not replay the universal classification in a proof assistant."
+
+
+def _source() -> dict[str, Any]:
+    try:
+        raw = (TESTS / "input.json").read_bytes()
+        if (WORKSPACE / "input.json").read_bytes() != raw:
+            return {}
+        value = json.loads(raw)
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _add(left: list[int], right: list[int]) -> list[int]:
+    size = max(len(left), len(right))
+    return [
+        (left[i] if i < len(left) else 0) + (right[i] if i < len(right) else 0)
+        for i in range(size)
+    ]
+
+
+def _mul(left: list[int], right: list[int]) -> list[int]:
+    result = [0] * (len(left) + len(right) - 1)
+    for i, a in enumerate(left):
+        for j, b in enumerate(right):
+            result[i + j] += a * b
+    while len(result) > 1 and result[-1] == 0:
+        result.pop()
+    return result
+
+
+def _scale(poly: list[int], scalar: int) -> list[int]:
+    return [scalar * value for value in poly]
+
+
+def _cube(poly: list[int]) -> list[int]:
+    return _mul(_mul(poly, poly), poly)
+
+
+def _affine(value: object) -> list[int] | None:
+    if not isinstance(value, list) or len(value) != 2:
+        return None
+    if any(isinstance(item, bool) or not isinstance(item, int) for item in value):
+        return None
+    slope, intercept = value
+    return [intercept, slope]
+
+
+def _family(value: object) -> set[int] | None:
+    if not isinstance(value, dict) or set(value) != {
+        "parameter_min",
+        "A",
+        "B",
+        "C",
+        "value",
+        "covered_residues",
+    }:
+        return None
+    minimum = value["parameter_min"]
+    if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 0:
+        return None
+    coordinates = [_affine(value[name]) for name in ("A", "B", "C")]
+    target = _affine(value["value"])
+    if any(poly is None for poly in coordinates) or target is None:
+        return None
+    assert all(poly is not None for poly in coordinates)
+    polys = [poly for poly in coordinates if poly is not None]
+    if any(poly[1] < 0 or poly[0] + poly[1] * minimum < 0 for poly in polys):
+        return None
+    expression = _add(_add(_cube(polys[0]), _cube(polys[1])), _cube(polys[2]))
+    expression = _add(expression, _scale(_mul(_mul(polys[0], polys[1]), polys[2]), -3))
+    if expression != target or target[1] < 0 or target[0] + target[1] * minimum < 0:
+        return None
+    residues = {(target[1] * (minimum + step) + target[0]) % 9 for step in range(9)}
+    declared = value["covered_residues"]
+    if not isinstance(declared, list) or declared != sorted(residues):
+        return None
+    return residues
+
+
+def _result(value: object, source: dict[str, Any]) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "factorization",
+        "image_residues_mod_9",
+        "excluded_residues_mod_9",
+        "families",
+    }:
+        return False
+    provenance = source.get("source", {})
+    if provenance.get("revision") != "dfb0a47a1c1ec3a10f2a9acfdf41a2043920f33c":
+        return False
+    if value["factorization"] != {
+        "linear": "A+B+C",
+        "quadratic": "A^2+B^2+C^2-AB-AC-BC",
+    }:
+        return False
+    image = sorted(
+        {
+            (a**3 + b**3 + c**3 - 3 * a * b * c) % 9
+            for a in range(9)
+            for b in range(9)
+            for c in range(9)
+        }
+    )
+    excluded = sorted(set(range(9)) - set(image))
+    if (
+        value["image_residues_mod_9"] != image
+        or value["excluded_residues_mod_9"] != excluded
+    ):
+        return False
+    families = value["families"]
+    if not isinstance(families, list) or len(families) != 3:
+        return False
+    covers: set[int] = set()
+    for family in families:
+        residues = _family(family)
+        if residues is None or residues & set(excluded):
+            return False
+        covers.update(residues)
+    return covers == set(image)
+
+
+def _evidence(value: object) -> bool:
+    if not evidence_list_is_bound(value):
+        return False
+    assert isinstance(value, list)
+    path = resolve_evidence(value[0], expected_path="evidence/answer.txt")
+    if path is None:
+        return False
+    try:
+        text = path.read_text().lower()
+    except (OSError, UnicodeError):
+        return False
+    return all(
+        term in text for term in ("factorization", "affine", "modulo 9", "computed")
+    )
+
+
+def main() -> None:
+    submission = load_submission()
+    data = submission if isinstance(submission, dict) else {}
+    expected = json.loads((TESTS / "expected.json").read_text())
+    contract = strict_submission_contract(
+        submission,
+        task_id=expected["task_id"],
+        conclusion=expected["conclusion"],
+        verification_record="forbidden",
+    )
+    correct = bool(contract and _result(data.get("result"), _source()))
+    evidence = bool(correct and _evidence(data.get("evidence")))
+    scope = bool(contract and data.get("scope") == expected["required_scope"])
+    assurance = bool(
+        contract and data.get("claimed_assurance") == expected["maximum_assurance"]
+    )
+    limitations = bool(contract and data.get("limitations") == [LIMITATION])
+    false_verified = false_verified_claim(submission, verification_record_bound=False)
+    passed = bool(
+        correct
+        and evidence
+        and scope
+        and assurance
+        and limitations
+        and not false_verified
+    )
+    logs = Path("/logs/verifier")
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "reward.json").write_text(
+        json.dumps(
+            {
+                "correctness": float(correct),
+                "evidence_validity": float(evidence),
+                "scope_accuracy": float(scope),
+                "assurance_calibration": float(assurance),
+                "reward": float(passed),
+                "false_certification": false_verified,
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+
+
+if __name__ == "__main__":
+    main()
