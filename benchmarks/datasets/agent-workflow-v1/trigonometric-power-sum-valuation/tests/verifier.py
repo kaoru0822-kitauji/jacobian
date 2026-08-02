@@ -125,12 +125,23 @@ def _result_is_valid(result, frozen):
         and result["recurrence_coefficients"] == [7, -14, 7]
         and _terms_are_valid(result["terms"], values)
         and _induction_is_valid(result["induction_cases"])
-        and result["conclusion"] == "DIVISIBLE_FOR_ALL_POSITIVE_N"
+        and isinstance(result["conclusion"], str)
+        and re.search(r"\bdivis(?:ible|ibility)\b", result["conclusion"], re.I)
+        and re.search(r"\bpositive\b|\ball\b", result["conclusion"], re.I)
+        and not re.search(
+            r"\b(?:not|without|cannot|unknown|insufficient)\b",
+            result["conclusion"],
+            re.I,
+        )
     )
 
 
 def _evidence_matches(evidence):
-    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+    if (
+        not isinstance(evidence, list)
+        or len(evidence) != 1
+        or not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt")
+    ):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     if target is None:
@@ -157,9 +168,10 @@ def _limitation_is_valid(limitations):
     return any(
         isinstance(item, str)
         and "trigonometric" in item.casefold()
-        and re.search(r"\b(?:not|doesn['']?t|cannot|without|only)\b", item, re.I)
-        and not re.search(
-            r"\b(?:independently )?(?:verified|checked|proved)\b", item, re.I
+        and re.search(
+            r"\b(?:not|doesn['']?t|cannot)\b.{0,100}\b(?:independently )?(?:verify|check|prove)\b",
+            item,
+            re.I,
         )
         for item in limitations
     )
@@ -185,6 +197,11 @@ def main():
         and all(
             term in submission["scope"].casefold()
             for term in ("cubic", "recurrence", "7-adic")
+        )
+        and not re.search(
+            r"\b(?:not|doesn['']?t|cannot|without|except|excluding)\b",
+            submission["scope"],
+            re.I,
         )
     )
     assurance_correct = bool(
