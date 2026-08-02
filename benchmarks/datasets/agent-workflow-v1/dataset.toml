@@ -76,7 +76,7 @@ digest = "sha256:b4bd0a8c4aaf2d13ace7ae29603abac2eb00fa41d437f0588fa72789f468601
 
 [[tasks]]
 name = "jacobian/inseparable-minimal-polynomial-audit"
-digest = "sha256:bebe045008468051706492fab0a4eaa9b1e6cf52edf3e1095da27e490b3c3d52"
+digest = "sha256:5ef611f85b2d5a49d36a10b1a5adbbe3b42e155602c72b358bb1b5527787d19f"
 
 [[tasks]]
 name = "jacobian/inverse-distance-remainder-audit"
