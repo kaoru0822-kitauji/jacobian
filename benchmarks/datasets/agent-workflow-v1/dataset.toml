@@ -147,6 +147,10 @@ name = "jacobian/rational-linear-solution"
 digest = "sha256:8c75dedca26f1e5d415dbb29ef0702e4eff0a0a38b101134579b8d228438098d"
 
 [[tasks]]
+name = "jacobian/rsa-exponent-domain-audit"
+digest = "sha256:f375785490c1bc5386c9f381f9c664ce2b8380367a91223f7888bea99cb436e4"
+
+[[tasks]]
 name = "jacobian/sat-witness"
 digest = "sha256:f8a8cd0791e229a8b64fbe3e3b805d2f6d113795d82c113b05f713b0e38c613d"
 
