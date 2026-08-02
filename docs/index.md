@@ -64,7 +64,9 @@ shared built-in operation contract. The
 [native Python API](reference/python-api.md) documents the supported
 native-value modules. Use the runtime `capability://catalog` and
 `capability.describe` for the installed capability inventory and exact
-operation schemas.
+operation schemas. The [persistent state format](reference/state-format.md)
+documents the supported migration floor and fresh-store transition for
+retired state revisions.
 
 Capability-specific references live with their owning domain or provider.
 They are intentionally not registered in this shared landing page: adding an

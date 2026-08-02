@@ -11,8 +11,10 @@ authoritative identity, provenance, assurance, provider, environment-profile,
 verifier-contract, and evaluation-ownership metadata. `suite.toml` contains
 stable dataset policy and defaults only.
 Reusable Harbor infrastructure belongs under `benchmarks/tooling/`, adapters
-under `benchmarks/adapters/`, and non-runnable evaluation plans and research
-handoffs under `research/evaluations/`.
+under `benchmarks/adapters/`, and task-owned discovery context under each
+task's `analysis/` directory. Immutable evaluation handoffs belong with the
+snapshot or task that owns them; there is no active suite-wide research
+evaluation bundle.
 
 | Dataset | Purpose | Default execution |
 | --- | --- | --- |
@@ -43,6 +45,12 @@ Tasks expose only `instruction.md` and `environment/` to an evaluated agent.
 Oracle solutions remain under `solution/`; verifier code and fixtures remain
 under `tests/`. No compatibility directories or aliases for the former
 benchmark layout are retained.
+
+The copied `tests/verifier_support.py` files are generated Harbor task
+artifacts. `benchmarks/tooling/verifier_support.py` is their canonical source;
+`make harbor-sync` updates the copies and snapshot generation fails if any
+copy drifts. They remain task-local until the digest-pinned shared verifier
+image migration in ADR 0011 is complete.
 
 ## Commands
 

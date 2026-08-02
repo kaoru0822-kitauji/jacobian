@@ -29,8 +29,9 @@ assurance, artifact-integrity, and fail-closed verification rules.
 The repository has three explicit ownership boundaries. `benchmarks/datasets/`
 contains executable Harbor cases and their dataset manifests.
 `benchmarks/tooling/` contains reusable Harbor infrastructure and does not own
-a second task list. `research/evaluations/` contains non-runnable evaluation
-plans, discovery handoffs, and reports. Research records may reference
+a second task list. Task- and snapshot-owned research records contain
+non-runnable evaluation plans, discovery handoffs, and reports. Research
+records may reference
 canonical dataset paths, but they are not Harbor datasets, are not injected
 into agent containers, and must not be treated as performance evidence without
 a separately frozen held-out evaluation.

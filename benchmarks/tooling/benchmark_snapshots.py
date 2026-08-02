@@ -332,6 +332,12 @@ def _lock_body(
     profiles_path: Path,
 ) -> dict[str, Any]:
     header = _suite_header(suite)
+    support_failures = harbor_suite.check_verifier_support(suite)
+    if support_failures:
+        raise HarborSuiteError(
+            "verifier support is not synchronized; run make harbor-sync: "
+            + "; ".join(support_failures)
+        )
     task_records = _task_records(suite, profiles=profiles, digest_fn=digest_fn)
     suite_section: dict[str, Any] = {
         "id": suite.id,

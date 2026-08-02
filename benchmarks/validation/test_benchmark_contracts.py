@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from benchmarks.tooling import benchmark_contracts, benchmark_inventory
@@ -37,3 +38,15 @@ def test_inventory_covers_every_registered_task(
     rendered = json.dumps(inventory)
     assert "verifier_digest" in rendered
     assert "submission_schema_digest" in rendered
+
+
+def test_task_gap_records_preserve_only_historical_provenance() -> None:
+    paths = sorted(
+        Path("benchmarks/datasets/agent-workflow-v1").glob("*/analysis/gap.json")
+    )
+    assert len(paths) == 60
+    for path in paths:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        assert record["provenance_status"] == "historical"
+        assert record["historical_provenance_id"].endswith(".capability-gap-analysis")
+        assert "ledger_id" not in record

@@ -122,6 +122,8 @@ oracle = "jobs/oracle.json"
 observation = "jobs/observation.json"
 """,
     )
+    support = "# canonical verifier support fixture\n"
+    _write(benchmarks / "tooling" / "verifier_support.py", support)
     _write(
         benchmarks / "environment-profiles.toml",
         """
@@ -162,6 +164,7 @@ authors = [{ name = "Jacobian contributors" }]
         '{"jobs_dir": "out", "n_attempts": 1}\n',
     )
     for task_id in _TASK_DIGITS:
+        _write(dataset / task_id / "tests" / "verifier_support.py", support)
         _write(
             dataset / task_id / "task.toml",
             f'task = {{ name = "jacobian/{task_id}" }}\n',
@@ -177,6 +180,16 @@ authors = [{ name = "Jacobian contributors" }]
         "registry": benchmarks / "registry.toml",
         "profiles": benchmarks / "environment-profiles.toml",
     }
+
+
+def test_build_lock_rejects_unsynchronized_verifier_support(
+    paths: dict[str, Path],
+) -> None:
+    target = paths["dataset"] / "alpha-task" / "tests" / "verifier_support.py"
+    target.write_text("# drifted verifier support\n", encoding="utf-8")
+
+    with pytest.raises(HarborSuiteError, match="verifier support is not synchronized"):
+        _build_from(paths)
 
 
 @pytest.fixture
@@ -390,6 +403,10 @@ def test_validate_lock_historical_remains_valid_after_adding_a_task(
         paths["dataset"] / new_id / "task.toml",
         f'task = {{ name = "jacobian/{new_id}" }}\n',
     )
+    _write(
+        paths["dataset"] / new_id / "tests" / "verifier_support.py",
+        "# canonical verifier support fixture\n",
+    )
     _write(paths["dataset"] / "members" / f"{new_id}.toml", _member_toml(new_id))
     # Historical validation must not re-read the tree.
     assert validate_lock(path) == lock
@@ -479,6 +496,10 @@ def test_validate_lock_reproduce_detects_added_task(
     _write(
         paths["dataset"] / new_id / "task.toml",
         f'task = {{ name = "jacobian/{new_id}" }}\n',
+    )
+    _write(
+        paths["dataset"] / new_id / "tests" / "verifier_support.py",
+        "# canonical verifier support fixture\n",
     )
     _write(paths["dataset"] / "members" / f"{new_id}.toml", _member_toml(new_id))
     with pytest.raises(HarborSuiteError, match="no longer reproduces"):

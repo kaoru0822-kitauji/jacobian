@@ -1,6 +1,7 @@
 {
   "schema_version": "1",
-  "ledger_id": "jacobian.agent-workflow-v1.capability-gap-ledger",
+  "provenance_status": "historical",
+  "historical_provenance_id": "jacobian.agent-workflow-v1.capability-gap-analysis",
   "task_id": "indexed-pairwise-vacuity",
   "analysis": {
     "mathematical_moves": [
