@@ -15,10 +15,8 @@ from benchmarks.tooling.heldout_bundle import (
     validate_manifest,
     verify_bundle,
 )
-from benchmarks.tooling.observation_results import (
-    collect_heldout_evidence,
-    compare_evidence,
-)
+from benchmarks.tooling.observation_comparison import compare_evidence
+from benchmarks.tooling.observation_results import collect_heldout_evidence
 
 ROOT = Path(__file__).parents[2]
 
