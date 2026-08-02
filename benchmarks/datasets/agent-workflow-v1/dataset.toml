@@ -75,6 +75,10 @@ name = "jacobian/hermite-normal-form"
 digest = "sha256:b4bd0a8c4aaf2d13ace7ae29603abac2eb00fa41d437f0588fa72789f4686013"
 
 [[tasks]]
+name = "jacobian/indexed-pairwise-vacuity"
+digest = "sha256:75cf8ff3a99d09e7996b54728741358903f8e99de95b7e948d6da479ef0f885a"
+
+[[tasks]]
 name = "jacobian/inverse-distance-remainder-audit"
 digest = "sha256:da39b223acfdc15423a11baf90c99851877c2bc97670870ee3b4d5742aa4b54a"
 

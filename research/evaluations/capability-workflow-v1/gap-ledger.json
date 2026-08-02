@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:fc2414fdd2ea57f2642fbe58e7efaf28cf9a652b0780718fcf435e200cd45002",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -400,6 +400,28 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Keep as a producer-to-checker discovery and artifact-flow regression."
+    },
+    {
+      "task_id": "indexed-pairwise-vacuity",
+      "mathematical_moves": [
+        "Construct an exact cyclic-group coset covering with a repeated subgroup part.",
+        "Compare pairwise predicates over deduplicated values and distinct source indices."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "finite.coverage.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can check bounded exactly-once coverage but does not interpret the higher-order index-versus-range semantic mismatch."
+        }
+      ],
+      "gap_classes": [
+        "EXISTING_WORKS",
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "USE_EXISTING",
+      "next_action": "Use exact finite coverage for the construction while keeping semantic alignment agent-owned."
     },
     {
       "task_id": "inverse-distance-remainder-audit",
