@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:8fcf2e83cf5e90df15e660a7d61f3b9458b1ac78681b6ad51d2da6731b0e7750",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -849,6 +849,28 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Retain as a fail-closed assurance and producer-to-checker regression."
+    },
+    {
+      "task_id": "subset-incidence-determinant",
+      "mathematical_moves": [
+        "Express nonempty intersection through inclusion-exclusion on common subsets.",
+        "Factor the matrix through a unit-triangular subset-zeta transform.",
+        "Reduce the determinant sign to the parity of nonempty even-cardinality subsets."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "matrix.determinant.compute",
+          "availability": "AVAILABLE",
+          "boundary": "Computes a finite determinant but does not discover the incidence-algebra factorization or general parity law."
+        }
+      ],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep incidence-basis discovery as agent-owned composition; do not add a problem-specific subset determinant operation."
     },
     {
       "task_id": "subspace-direct-sum-counterexample",

@@ -1,0 +1,3 @@
+task_id = "subset-incidence-determinant"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
