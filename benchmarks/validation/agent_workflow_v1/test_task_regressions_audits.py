@@ -527,3 +527,44 @@ def test_putnam_2adic_evidence_requires_result_binding(
     rejected = support._run_verifier(task, app, logs)
     assert rejected["correctness"] == 1.0
     assert rejected["evidence_validity"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_accepts_canonical_case(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_indexed_pairwise_vacuity_rejects_boolean_witness_element(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["subgroup"] = [False, 4, 8]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_accepts_unordered_elements(tmp_path: Path) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["subgroup"] = [8, 0, 4]
+    result["cosets"][0] = [8, 4, 0]
+    result["part_artifact"]["elements"] = [8, 0, 4]
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
