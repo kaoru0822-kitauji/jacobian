@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:7166e4c0bd1c8e10846da5ad74ad4ba62d7ebd08c6d5d92663a7e9dc8ac92281",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -849,6 +849,21 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Retain as a fail-closed assurance and producer-to-checker regression."
+    },
+    {
+      "task_id": "series-domain-junk-zero",
+      "mathematical_moves": [
+        "Construct exact dyadic-block lower bounds for a positive Dirichlet series at a reciprocal rational exponent.",
+        "Separate a nonsummability fallback value from an analytically continued function value and calibrate assurance accordingly."
+      ],
+      "current_capabilities": [],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep domain-of-definition reasoning and fallback-value classification as agent-owned composition; do not add a problem-specific series solver."
     },
     {
       "task_id": "subspace-direct-sum-counterexample",

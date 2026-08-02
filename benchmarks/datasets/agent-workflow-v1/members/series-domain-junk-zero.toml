@@ -1,0 +1,3 @@
+task_id = "series-domain-junk-zero"
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
