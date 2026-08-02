@@ -75,6 +75,10 @@ name = "jacobian/hermite-normal-form"
 digest = "sha256:b4bd0a8c4aaf2d13ace7ae29603abac2eb00fa41d437f0588fa72789f4686013"
 
 [[tasks]]
+name = "jacobian/infinite-shift-spectrum-counterexample"
+digest = "sha256:a3c2a58e81a1a81dc59bbcf2f8f586b88c11aa7c349fa172b330b7f3b031d5bc"
+
+[[tasks]]
 name = "jacobian/inverse-distance-remainder-audit"
 digest = "sha256:da39b223acfdc15423a11baf90c99851877c2bc97670870ee3b4d5742aa4b54a"
 

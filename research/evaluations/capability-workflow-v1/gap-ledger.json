@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:1fa8fcddcace78326a2b3bb8f27b5a5ad587e3869d2a306c4732c1321746aa1b",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -400,6 +400,21 @@
       "candidate_ids": [],
       "disposition": "USE_EXISTING",
       "next_action": "Keep as a producer-to-checker discovery and artifact-flow regression."
+    },
+    {
+      "task_id": "infinite-shift-spectrum-counterexample",
+      "mathematical_moves": [
+        "Construct unilateral left and right shifts on finitely supported rational sequences.",
+        "Replay both operator compositions and isolate the zero-eigenspace asymmetry caused by missing finite-dimensional scope."
+      ],
+      "current_capabilities": [],
+      "gap_classes": [
+        "MODEL_REASONING"
+      ],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Keep infinite-dimensional scope diagnosis and operator construction as agent-owned reasoning; do not add a theorem-specific spectrum solver."
     },
     {
       "task_id": "inverse-distance-remainder-audit",

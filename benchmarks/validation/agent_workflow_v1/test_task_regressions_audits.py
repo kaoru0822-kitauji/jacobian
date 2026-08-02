@@ -199,6 +199,52 @@ def test_inverse_distance_audit_accepts_alternative_rational_direction(
     assert accepted["reward"] == pytest.approx(1.0)
 
 
+def test_infinite_shift_spectrum_accepts_reversed_operator_orientation(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "infinite-shift-spectrum-counterexample", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["orientation"] = "S_LEFT_T_RIGHT"
+    result["zero_eigenvalue_product"] = "TS"
+    result["identity_product"] = "ST"
+    for action in result["actions"]:
+        index = action["basis_index"]
+        action.update(
+            {
+                "s_output": None if index == 0 else index - 1,
+                "t_output": index + 1,
+                "st_output": index,
+                "ts_output": None if index == 0 else index,
+            }
+        )
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+
+
+def test_infinite_shift_spectrum_rejects_corrupted_composition(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "infinite-shift-spectrum-counterexample", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["actions"][5]["st_output"] = 4
+    support._bind_result_evidence(app, submission)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
 @pytest.mark.parametrize(
     ("path", "replacement"),
     [
