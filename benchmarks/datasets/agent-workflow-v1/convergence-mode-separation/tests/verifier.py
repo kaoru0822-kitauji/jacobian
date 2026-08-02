@@ -288,7 +288,10 @@ def main():
         false_verified_claim(submission, verification_record_bound=False)
         or limitations_affirmative
         or _evidence_affirmative_claim(data.get("evidence"))
-        or data.get("claimed_assurance") not in {"UNVERIFIED", "COMPUTED"}
+        or (
+            isinstance(data.get("claimed_assurance"), str)
+            and data.get("claimed_assurance") not in {"UNVERIFIED", "COMPUTED"}
+        )
     )
     correct = bool(
         contract
