@@ -118,7 +118,7 @@
               "const": "each_tiling_ends_in_a_square_or_domino"
             },
             "recurrence": {
-              "const": "F_k=F_(k-1)+a_k*F_(k-2)"
+              "const": "F_(k+1)=F_k+a_k*F_(k-1)"
             },
             "reflection": {
               "const": "i_maps_to_n_minus_i_and_is_an_involution"
