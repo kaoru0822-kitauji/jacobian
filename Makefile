@@ -194,6 +194,7 @@ harbor-check: ## Run Harbor topology, digest, provenance, and host-side validati
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 	$(UV_RUN) python tools/check_benchmark_contracts.py
 	$(HARBOR_PYTHON) tools/check_benchmark_adapters.py
+	$(HARBOR_PYTHON) -m unittest benchmarks.validation.test_benchmark_adapters_runtime
 	$(UV_RUN) pytest -n 0 benchmarks/validation
 
 benchmark-inventory: ## Render the content-bound benchmark inventory (OUTPUT=path optional).
