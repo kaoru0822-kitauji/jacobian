@@ -16,7 +16,7 @@ MAX_EVIDENCE_BYTES = 1_048_576
 EXPECTED_PROOF = {
     "base_cases": [{"length": 0, "value": "1"}, {"length": 1, "value": "1"}],
     "partition": "each_tiling_ends_in_a_square_or_domino",
-    "recurrence": "F_k=F_(k-1)+a_k*F_(k-2)",
+    "recurrence": "F_(k+1)=F_k+a_k*F_(k-1)",
     "reflection": "i_maps_to_n_minus_i_and_is_an_involution",
 }
 
@@ -118,6 +118,12 @@ def _result_is_valid(result, frozen):
         and forward_set == set(supports)
         and reverse_set == set(supports)
         and _pairs_are_valid(result["reflection_pairs"], supports, n)
+        and isinstance(result["recurrence_contract"], dict)
+        and isinstance(result["recurrence_contract"].get("initial_values"), list)
+        and all(
+            type(value) is int
+            for value in result["recurrence_contract"]["initial_values"]
+        )
         and result["recurrence_contract"]
         == {
             "initial_values": [1, 1],
@@ -143,16 +149,17 @@ def _evidence_matches(evidence):
     try:
         if target.stat().st_size > MAX_EVIDENCE_BYTES:
             return False
-        text = target.read_text().casefold()
+        raw_text = target.read_text()
+        text = raw_text.casefold()
     except (OSError, UnicodeError):
         return False
     if len(text) < 120:
         return False
     marker = next(
         (
-            line[len("result_json:") :].strip()
-            for line in text.splitlines()
-            if line.startswith("result_json:")
+            line[len("RESULT_JSON:") :].strip()
+            for line in raw_text.splitlines()
+            if line.startswith("RESULT_JSON:")
         ),
         None,
     )
@@ -162,12 +169,26 @@ def _evidence_matches(evidence):
         bound_proof = json.loads(marker)
     except (TypeError, ValueError):
         return False
-    return bound_proof == EXPECTED_PROOF and all(
-        re.search(pattern, text, re.IGNORECASE)
-        for pattern in (
-            r"tiling.{0,160}(?:recurrence|monomial)",
-            r"recurrence.{0,160}(?:tiling|reflection)",
-            r"reflection.{0,160}(?:support|monomial)",
+    return (
+        bound_proof == EXPECTED_PROOF
+        and all(
+            re.search(pattern, text, re.IGNORECASE)
+            for pattern in (
+                r"tiling.{0,160}(?:recurrence|monomial)",
+                r"recurrence.{0,160}(?:tiling|reflection)",
+                r"reflection.{0,160}(?:support|monomial)",
+            )
+        )
+        and all(
+            phrase in text
+            for phrase in (
+                "tiling",
+                "square",
+                "domino",
+                "a_i",
+                "n-i",
+                "coefficient",
+            )
         )
     )
 
@@ -197,12 +218,27 @@ def main():
     evidence_valid = bool(
         contract and math_correct and _evidence_matches(submission.get("evidence"))
     )
+    scope = submission.get("scope") if isinstance(submission, dict) else None
+    scope_text = scope.casefold() if isinstance(scope, str) else ""
     scope_correct = bool(
         contract
-        and isinstance(submission.get("scope"), str)
-        and all(
-            term in submission["scope"].casefold()
-            for term in ("frozen", "symbolic", "tiling", "reflection")
+        and (
+            (
+                "frozen" in scope_text
+                and "symbolic" in scope_text
+                and "tiling" in scope_text
+                and "reflection" in scope_text
+            )
+            or (
+                ("n=10" in scope_text or "length 10" in scope_text)
+                and ("support" in scope_text or "monomial" in scope_text)
+                and ("reflection" in scope_text or "involution" in scope_text)
+                and ("commuting" in scope_text or "arbitrary" in scope_text)
+            )
+        )
+        and not re.search(
+            r"\b(?:not|without|exclude|excluding|omit)\b[^.]{0,60}\b(?:reflection|arbitrary|general)\b",
+            scope_text,
         )
     )
     assurance_correct = bool(

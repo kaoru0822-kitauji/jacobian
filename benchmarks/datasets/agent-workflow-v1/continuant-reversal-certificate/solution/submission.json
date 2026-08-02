@@ -1856,7 +1856,7 @@
         }
       ],
       "partition": "each_tiling_ends_in_a_square_or_domino",
-      "recurrence": "F_k=F_(k-1)+a_k*F_(k-2)",
+      "recurrence": "F_(k+1)=F_k+a_k*F_(k-1)",
       "reflection": "i_maps_to_n_minus_i_and_is_an_involution"
     },
     "conclusion": "FINAL_POLYNOMIALS_EQUAL"
@@ -1867,7 +1867,7 @@
   "evidence": [
     {
       "path": "evidence/answer.txt",
-      "sha256": "sha256:27683d7d7d7ee0ec4b0f83ab8ba1eb7baad4fc4029644411a3a32d563269ad30"
+      "sha256": "sha256:4044bcffc253157f7800b74842c71c2e5c94608d921847783a6110d27b5bf998"
     }
   ],
   "limitations": [
