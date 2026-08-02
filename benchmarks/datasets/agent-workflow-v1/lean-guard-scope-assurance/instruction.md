@@ -10,6 +10,7 @@ state scope from textual binder order, ordinary numeric types from a custom
 type where `0` and `1` are definitionally equal, proof terms from theorem
 statements, and division-by-zero risk from precision-loss truncation.
 
-Bind `/app/evidence/answer.txt`.  The offline verifier derives every expected
-finding from the frozen semantic facts.  Do not claim `VERIFIED` or claim that
-Lean compilation was replayed.
+Bind `/app/evidence/answer.txt`, include a `RESULT_JSON:` line containing the
+submitted result as JSON, and bind that file with its SHA-256 digest.  The
+offline verifier derives every expected finding from the frozen semantic facts.
+Do not claim `VERIFIED` or claim that Lean compilation was replayed.
