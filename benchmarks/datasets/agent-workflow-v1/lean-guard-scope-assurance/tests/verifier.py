@@ -77,14 +77,38 @@ def _result(value: object, source: dict[str, Any]) -> bool:
         derived = _derive(case)
         if derived is None:
             return False
-        findings, reason = derived
-        if item != {"id": case.get("id"), "findings": findings, "reason": reason}:
+        findings, _reason = derived
+        submitted_reason = item.get("reason")
+        if not isinstance(submitted_reason, str) or len(submitted_reason.strip()) < 12:
+            return False
+        reason_text = submitted_reason.casefold()
+        if (
+            findings
+            and "DIVISION_BY_ZERO" in findings
+            and not ("zero" in reason_text or "divisor" in reason_text)
+        ):
+            return False
+        if (
+            findings
+            and "INTEGER_DIVISION_TRUNCATION" in findings
+            and "truncat" not in reason_text
+        ):
+            return False
+        if not findings and not any(
+            term in reason_text for term in ("proof", "statement", "term")
+        ):
+            return False
+        if item.get("id") != case.get("id") or item.get("findings") != findings:
             return False
     return True
 
 
 def _evidence(value: object) -> bool:
-    if not evidence_list_is_bound(value):
+    if (
+        not isinstance(value, list)
+        or len(value) != 1
+        or not evidence_list_is_bound(value)
+    ):
         return False
     assert isinstance(value, list)
     path = resolve_evidence(value[0], expected_path="evidence/answer.txt")

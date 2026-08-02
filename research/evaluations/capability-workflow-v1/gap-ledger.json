@@ -455,8 +455,8 @@
       "current_capabilities": [
         {
           "capability_id": "lean.statement.elaborate",
-          "availability": "AVAILABLE",
-          "boundary": "Elaborates a proposition but does not audit semantic-guard soundness or linter finding calibration."
+          "availability": "UNAVAILABLE",
+          "boundary": "The frozen snapshot records that the pinned Lean 4.31.0 runtime is unavailable; no live elaboration is performed for this audit."
         }
       ],
       "gap_classes": [
