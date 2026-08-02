@@ -13,7 +13,44 @@ from verifier_support import (
 
 WORKSPACE = Path("/app")
 TESTS = Path("/tests")
-LIMITATION = "The verifier checks exact sequence identities and analytic bounds but does not formalize Hilbert-space topology in a proof assistant."
+LIMITATION = (
+    "The verifier checks exact sequence identities and analytic bounds but does "
+    "not formalize Hilbert-space topology in a proof assistant."
+)
+# Minimum number of submitted limit coordinates so the tail bound is exercised
+# well past the prefix instead of only at the truncation point.
+MIN_VERIFICATION_TERMS = 100
+PREFIX_LENGTH = 12
+# Each proof obligation must carry a substantive argument (not a keyword) that
+# names the link it certifies. The result-bound RESULT_JSON marker ties the
+# prose to the exact submitted witness.
+PROOF_OBLIGATIONS = (
+    ("boundedness", ("bound",)),
+    ("closedness", ("closed",)),
+    ("range_identification", ("range", "image")),
+    ("convergence", ("converg", "tail")),
+    ("absent_preimage", ("preimage", "ell2", "summable")),
+)
+MIN_PROOF_ARGUMENT_CHARS = 40
+_RESULT_FIELDS = {
+    "space",
+    "operator",
+    "subspace",
+    "projection",
+    "operator_bound",
+    "prefixes",
+    "limit_coordinates",
+    "tail_bound",
+    "limit_preimage",
+}
+_PREFIX_FIELDS = {
+    "n",
+    "weight",
+    "preimage_coordinate",
+    "limit_norm_sq_partial",
+    "preimage_norm_sq_partial",
+}
+_TAIL_BOUND_FIELDS = {"bound_coefficient", "bound_exponent", "verification_terms"}
 
 
 def _source() -> dict[str, Any]:
@@ -37,62 +74,171 @@ def _fraction(value: object) -> Fraction | None:
     return result if str(result) == value else None
 
 
-def _result(value: object, source: dict[str, Any]) -> bool:
-    required = {
-        "space",
-        "operator",
-        "subspace",
-        "projection",
-        "prefixes",
-        "tail_bound",
-        "limit_preimage",
-    }
-    if not isinstance(value, dict) or set(value) != required:
-        return False
-    provenance = source.get("source", {})
-    if provenance.get("revision") != "d4e9f8ca877552f4491a9c2d52e0d230c0fca620":
-        return False
-    if any(
-        value[key] != expected
-        for key, expected in {
-            "space": "ell2_direct_sum_ell2",
-            "operator": "T(x)_n=x_n/n",
-            "subspace": "closed_graph_of_bounded_T",
-            "projection": "P(u,v)=(0,v)",
-            "tail_bound": "sum_{n>m}1/n^2<=1/m",
-            "limit_preimage": "x_n=1_not_in_ell2",
-        }.items()
+def _positive_fraction(value: object) -> Fraction | None:
+    parsed = _fraction(value)
+    return parsed if parsed is not None and parsed > 0 else None
+
+
+def _parse_tail_bound(
+    value: object,
+) -> tuple[Fraction, int, int] | None:
+    if not isinstance(value, dict) or set(value) != _TAIL_BOUND_FIELDS:
+        return None
+    coefficient = _positive_fraction(value["bound_coefficient"])
+    exponent = value["bound_exponent"]
+    terms = value["verification_terms"]
+    if (
+        coefficient is None
+        or not isinstance(exponent, int)
+        or exponent < 1
+        or not isinstance(terms, int)
+        or terms < MIN_VERIFICATION_TERMS
     ):
+        return None
+    return coefficient, exponent, terms
+
+
+def _parse_limit_coordinates(value: object, terms: int) -> list[Fraction] | None:
+    if not isinstance(value, list) or len(value) != terms:
+        return None
+    parsed: list[Fraction] = []
+    for entry in value:
+        coordinate = _fraction(entry)
+        if coordinate is None:
+            return None
+        parsed.append(coordinate)
+    return parsed
+
+
+def _prefixes_ok(
+    prefixes: object,
+    limit_coordinates: list[Fraction],
+    bound: Fraction,
+    length: int,
+) -> bool:
+    if not isinstance(prefixes, list) or len(prefixes) != length:
         return False
-    prefixes = value["prefixes"]
-    length = source.get("prefix_length")
-    if not isinstance(prefixes, list) or len(prefixes) != length or length != 12:
-        return False
-    partial = Fraction(0)
-    for n, item in enumerate(prefixes, start=1):
-        if not isinstance(item, dict) or set(item) != {
-            "n",
-            "weight",
-            "limit_norm_sq_partial",
-            "preimage_norm_sq",
-        }:
+    limit_partial = Fraction(0)
+    preimage_partial = Fraction(0)
+    for index, item in enumerate(prefixes, start=1):
+        if not isinstance(item, dict) or set(item) != _PREFIX_FIELDS:
             return False
-        partial += Fraction(1, n * n)
+        if item["n"] != index:
+            return False
+        weight = _positive_fraction(item["weight"])
+        preimage_coordinate = _fraction(item["preimage_coordinate"])
         if (
-            item["n"] != n
-            or _fraction(item["weight"]) != Fraction(1, n)
-            or _fraction(item["limit_norm_sq_partial"]) != partial
-            or item["preimage_norm_sq"] != n
+            weight is None
+            or preimage_coordinate is None
+            or preimage_coordinate == 0
+            or weight > bound
         ):
             return False
-    # Integral comparison: sum_{n>m} n^-2 <= integral_m^infinity x^-2 dx = 1/m.
+        # Range identity: the limit coordinate is the weight applied to the
+        # forced preimage coordinate (y = T x on the diagonal operator).
+        if limit_coordinates[index - 1] != weight * preimage_coordinate:
+            return False
+        limit_partial += limit_coordinates[index - 1] ** 2
+        preimage_partial += preimage_coordinate**2
+        if (
+            _fraction(item["limit_norm_sq_partial"]) != limit_partial
+            or _fraction(item["preimage_norm_sq_partial"]) != preimage_partial
+        ):
+            return False
+    return True
+
+
+def _tail_bound_ok(
+    limit_coordinates: list[Fraction],
+    coefficient: Fraction,
+    exponent: int,
+    terms: int,
+    length: int,
+) -> bool:
+    # sum_{n=m+1}^{terms} y_n^2 <= C / m^d for each prefix index m. exponent >= 1
+    # forces the bound to zero, so sum y_n^2 converges and the declared limit is
+    # square-summable.
+    suffix_sums = [Fraction(0)] * (terms + 2)
+    running = Fraction(0)
+    for n in range(terms, 0, -1):
+        running += limit_coordinates[n - 1] ** 2
+        suffix_sums[n] = running
     return all(
-        sum(Fraction(1, n * n) for n in range(m + 1, 10_000)) < Fraction(1, m)
-        for m in range(1, 13)
+        suffix_sums[m + 1] <= coefficient / Fraction(m) ** exponent
+        for m in range(1, length + 1)
     )
 
 
-def _evidence(value: object) -> bool:
+def _witness(value: object, source: dict[str, Any]) -> bool:
+    """Validate a diagonal-operator graph counterexample generically.
+
+    Accepts any bounded positive diagonal weights with a square-summable limit
+    ``y`` whose forced preimage ``x`` (related by ``y_n = w_n x_n``) is not
+    square-summable, plus a tail bound proving convergence of ``sum y_n^2``.
+    The hidden Oracle's exact construction is not required.
+    """
+    length = source.get("prefix_length")
+    if not isinstance(length, int) or length != PREFIX_LENGTH:
+        return False
+    if not isinstance(value, dict) or set(value) != _RESULT_FIELDS:
+        return False
+    for key in ("space", "operator", "subspace", "projection", "limit_preimage"):
+        if not isinstance(value[key], str) or not value[key].strip():
+            return False
+    bound = _positive_fraction(value["operator_bound"])
+    if bound is None:
+        return False
+    tail = _parse_tail_bound(value["tail_bound"])
+    if tail is None:
+        return False
+    coefficient, exponent, terms = tail
+    limit_coordinates = _parse_limit_coordinates(value["limit_coordinates"], terms)
+    if limit_coordinates is None:
+        return False
+    return _prefixes_ok(
+        value["prefixes"], limit_coordinates, bound, length
+    ) and _tail_bound_ok(limit_coordinates, coefficient, exponent, terms, length)
+
+
+def _extract_proof(text: str) -> dict[str, Any] | None:
+    proof_marker = next(
+        (
+            line.removeprefix("PROOF_JSON:").strip()
+            for line in text.splitlines()
+            if line.startswith("PROOF_JSON:")
+        ),
+        None,
+    )
+    if proof_marker is None:
+        return None
+    try:
+        proof = json.loads(proof_marker)
+    except ValueError:
+        return None
+    if not isinstance(proof, dict) or set(proof) != {
+        name for name, _ in PROOF_OBLIGATIONS
+    }:
+        return None
+    return proof
+
+
+def _proof_ok(proof: dict[str, Any]) -> bool:
+    for name, terms in PROOF_OBLIGATIONS:
+        argument = proof.get(name)
+        if not isinstance(argument, str) or len(argument) < MIN_PROOF_ARGUMENT_CHARS:
+            return False
+        if not any(term in argument.lower() for term in terms):
+            return False
+    return True
+
+
+def _evidence(value: object, result: object) -> bool:
+    """Require result-bound proof evidence with a substantive argument per link.
+
+    The evidence file must repeat the exact submitted result via a
+    ``RESULT_JSON:`` marker and carry a ``PROOF_JSON:`` block whose obligation
+    fields each contain a non-trivial argument naming the link they certify.
+    """
     if not evidence_list_is_bound(value):
         return False
     assert isinstance(value, list)
@@ -100,12 +246,16 @@ def _evidence(value: object) -> bool:
     if path is None:
         return False
     try:
-        text = path.read_text().lower()
+        text = path.read_text()
     except (OSError, UnicodeError):
         return False
-    return all(
-        term in text for term in ("ell2", "graph", "projection", "all-ones", "computed")
+    result_marker = "RESULT_JSON: " + json.dumps(
+        result, sort_keys=True, separators=(",", ":")
     )
+    if result_marker not in text:
+        return False
+    proof = _extract_proof(text)
+    return proof is not None and _proof_ok(proof)
 
 
 def main() -> None:
@@ -118,8 +268,10 @@ def main() -> None:
         conclusion=expected["conclusion"],
         verification_record="forbidden",
     )
-    correct = bool(contract and _result(data.get("result"), _source()))
-    evidence = bool(correct and _evidence(data.get("evidence")))
+    source = _source()
+    result = data.get("result")
+    correct = bool(contract and _witness(result, source))
+    evidence = bool(correct and _evidence(data.get("evidence"), result))
     scope = bool(contract and data.get("scope") == expected["required_scope"])
     assurance = bool(
         contract and data.get("claimed_assurance") == expected["maximum_assurance"]

@@ -3,12 +3,13 @@
 Give an explicit Hilbert space `H`, closed linear subspace `M`, and orthogonal
 projection `P` such that `P(M)` is not closed.
 
-Use an `ell2` diagonal-operator graph construction and certify every link:
-boundedness (hence closedness of the graph), the projection image, a sequence
-inside that image converging to a declared limit, a tail bound proving
-convergence, and a proof that the limit has no `ell2` preimage.  For every
-prefix through `prefix_length`, submit the exact rational diagonal weight,
-partial squared norm of the limit, and squared norm of its forced preimage.
+Certify every link of the counterexample: the mechanism establishing that `M`
+is closed, identification of the projection image `P(M)`, a sequence inside
+that image converging to a declared limit, a tail bound proving convergence,
+and a proof that the limit has no `ell2` preimage.  For every prefix through
+`prefix_length`, submit the exact rational weight, limit coordinate, forced
+preimage coordinate, and partial squared norms of the limit and its forced
+preimage.
 
 A finite-dimensional matrix, a bare theorem citation, or a single approximate
 sequence is insufficient.  Fractions must be canonical.  Bind
