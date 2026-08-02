@@ -43,13 +43,20 @@ def _valid_cover(result, bounds):
 
 
 def _valid_predicates(result):
-    parts = result.get("part_ids")
+    artifact = result.get("part_artifact")
+    references = result.get("covering_part_references")
     cosets = result.get("cosets")
     pair = result.get("duplicate_indices")
     if (
-        not isinstance(parts, list)
+        not isinstance(artifact, dict)
+        or set(artifact) != {"id", "kind", "elements"}
+        or artifact.get("id") != 0
+        or artifact.get("kind") != "SUBGROUP"
+        or artifact.get("elements") != result.get("subgroup")
+        or not isinstance(references, list)
         or not isinstance(cosets, list)
-        or len(parts) != len(cosets)
+        or len(references) != len(cosets)
+        or any(type(reference) is not int or reference != 0 for reference in references)
     ):
         return False
     if (
@@ -59,10 +66,10 @@ def _valid_predicates(result):
     ):
         return False
     left, right = pair
-    if not 0 <= left < right < len(parts):
+    if not 0 <= left < right < len(references):
         return False
-    unique_parts = list(dict.fromkeys(parts))
-    sizes = {part: len(cosets[parts.index(part)]) for part in unique_parts}
+    unique_parts = list(dict.fromkeys(references))
+    sizes = {part: len(cosets[references.index(part)]) for part in unique_parts}
     range_pairwise = all(
         sizes[a] != sizes[b]
         for i, a in enumerate(unique_parts)
@@ -76,7 +83,7 @@ def _valid_predicates(result):
     return bool(
         result.get("range_pairwise_truth") is range_pairwise is True
         and result.get("indexed_pairwise_truth") is indexed_pairwise is False
-        and parts[left] == parts[right]
+        and references[left] == references[right] == artifact["id"]
         and len(cosets[left]) == len(cosets[right])
     )
 
@@ -88,7 +95,8 @@ def _valid_result(result, source):
         "subgroup",
         "representatives",
         "cosets",
-        "part_ids",
+        "part_artifact",
+        "covering_part_references",
         "range_pairwise_truth",
         "indexed_pairwise_truth",
         "duplicate_indices",
