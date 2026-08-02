@@ -24,7 +24,7 @@ digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d840601741
 
 [[tasks]]
 name = "jacobian/convergence-mode-separation"
-digest = "sha256:a52116fd9b086085855e009962443a43d1e516a45628b68418d6f51afa683ba2"
+digest = "sha256:c2448e93cae92438e921beaab8b5d5f42500349aaf28a5638a2c8874ca6cd7fc"
 
 [[tasks]]
 name = "jacobian/dead-end-local-density-audit"

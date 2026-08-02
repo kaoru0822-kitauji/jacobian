@@ -219,17 +219,12 @@ def _evidence_valid(evidence, result):
     if not isinstance(result, dict) or bound_result != result:
         return False
     folded = text.casefold()
-    return all(
-        term in folded
-        for term in (
-            "probability",
-            "almost surely",
-            "infinitely often",
-            "every point",
-            "one interval per level",
-            "equals one infinitely often",
-            "zero infinitely often",
-        )
+    return (
+        all(term in folded for term in ("probability", "almost surely", "infinitely often"))
+        and "every point" in folded
+        and ("one interval per level" in folded or "one member" in folded)
+        and ("zero infinitely often" in folded or "zeros infinitely often" in folded)
+        and ("equals one infinitely often" in folded or "ones infinitely often" in folded)
     )
 
 
@@ -242,6 +237,8 @@ def _evidence_affirmative_claim(evidence):
     if target is None:
         return False
     try:
+        if target.stat().st_size > 1_048_576:
+            return False
         return _affirmative_solved_or_verified_claim(target.read_text())
     except (OSError, UnicodeError):
         return False
@@ -286,6 +283,7 @@ def main():
         false_verified_claim(submission, verification_record_bound=False)
         or limitations_affirmative
         or _evidence_affirmative_claim(data.get("evidence"))
+        or data.get("claimed_assurance") not in {"UNVERIFIED", "COMPUTED"}
     )
     correct = bool(
         contract
