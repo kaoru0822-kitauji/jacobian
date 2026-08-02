@@ -76,7 +76,7 @@ digest = "sha256:b4bd0a8c4aaf2d13ace7ae29603abac2eb00fa41d437f0588fa72789f468601
 
 [[tasks]]
 name = "jacobian/indexed-pairwise-vacuity"
-digest = "sha256:faf50ddebd24e177ce3025417d1e63f4cad0a4ff4005416e65494a35ee2daa57"
+digest = "sha256:bb76c6c59af65ae64ed229e3a89773991defe3518c630ed162bfe7d62dead629"
 
 [[tasks]]
 name = "jacobian/inverse-distance-remainder-audit"

@@ -382,3 +382,190 @@ def test_indexed_pairwise_vacuity_accepts_assurance_underclaim(
     assert accepted["correctness"] == 1.0
     assert accepted["assurance_calibration"] == 0.0
     assert accepted["reward"] == pytest.approx(0.9)
+
+
+def test_indexed_pairwise_vacuity_accepts_schema_valid_integral_floats(
+    tmp_path: Path,
+) -> None:
+    """JSON Schema's integer type accepts zero-fraction floats (VvCg2)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["modulus"] = float(result["modulus"])
+    result["subgroup_step"] = float(result["subgroup_step"])
+    result["subgroup"] = [float(value) for value in result["subgroup"]]
+    result["representatives"] = [float(value) for value in result["representatives"]]
+    result["cosets"] = [
+        [float(value) for value in coset] for coset in result["cosets"]
+    ]
+    result["part_artifact"]["elements"] = [
+        float(value) for value in result["part_artifact"]["elements"]
+    ]
+    result["covering_part_references"] = [
+        float(value) for value in result["covering_part_references"]
+    ]
+    result["duplicate_indices"] = [
+        float(value) for value in result["duplicate_indices"]
+    ]
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_indexed_pairwise_vacuity_rejects_non_integral_floats(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["modulus"] = 12.5
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_accepts_unordered_subgroup_and_coset_elements(
+    tmp_path: Path,
+) -> None:
+    """The schema requires only unique elements, so element order is free (VvKD8)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    result = submission["result"]
+    result["subgroup"] = [8, 0, 4]
+    result["cosets"][0] = [8, 4, 0]
+    result["part_artifact"]["elements"] = [8, 0, 4]
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_indexed_pairwise_vacuity_accepts_either_duplicate_index_order(
+    tmp_path: Path,
+) -> None:
+    """The schema requires two distinct indices, not ascending order (VvKD9)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["duplicate_indices"] = [1, 0]
+    support._write_json(submission_path, submission)
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+
+
+def test_indexed_pairwise_vacuity_rejects_duplicate_index_pair_out_of_range(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["result"]["duplicate_indices"] = [0, 4]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 0.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_affirmative_open_conjecture_claim(
+    tmp_path: Path,
+) -> None:
+    """A limitation that affirms settling the conjecture must fail (VvCgy)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["limitations"] = [
+        "The verifier settles the open conjecture with this finite audit."
+    ]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_limitation_mentioning_only_keywords(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["limitations"] = [
+        "This relates to the open conjecture."
+    ]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_rejects_contradicting_evidence(
+    tmp_path: Path,
+) -> None:
+    """Evidence negating the submitted conclusion must be invalid (VvCgz)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    evidence_path = app / "evidence" / "answer.txt"
+    evidence_path.write_text(
+        "This is not an exact cover; Set.range is not vacuously true.\n",
+        encoding="utf-8",
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence_path)
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_indexed_pairwise_vacuity_rejects_duplicated_evidence_descriptors(
+    tmp_path: Path,
+) -> None:
+    """The schema caps evidence at one descriptor (VvCg4)."""
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"] = [submission["evidence"][0], submission["evidence"][0]]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["evidence_validity"] == 0.0
+    assert rejected["reward"] == pytest.approx(0.9)
+
+
+def test_agent_workflow_v1_readme_keeps_1_1_0_and_adds_1_2_0_entry() -> None:
+    readme = (support.TASKS / "README.md").read_text(encoding="utf-8")
+
+    assert "Version 1.1.0 adds the independently reviewed finite-magma and" in readme
+    assert "Version 1.2.0 adds the indexed-pairwise-vacuity audit" in readme

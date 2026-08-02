@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from verifier_support import (
@@ -19,15 +20,32 @@ _ASSURANCE_ORDER = {
 }
 
 
+def _is_integer(value):
+    """Accept any schema-valid integral JSON number while rejecting booleans.
+
+    JSON Schema's ``integer`` type accepts numbers with a zero fractional part
+    (e.g. ``12.0``), so the verifier must validate mathematical integrality
+    rather than requiring Python's ``int`` representation. Booleans are still
+    rejected because ``False == 0`` would otherwise spoof a zero element.
+    """
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    if isinstance(value, float):
+        return value.is_integer()
+    return False
+
+
 def _is_int_list(value):
-    return isinstance(value, list) and all(type(item) is int for item in value)
+    return isinstance(value, list) and all(_is_integer(item) for item in value)
 
 
 def _is_int_matrix(value):
     return bool(
         isinstance(value, list)
         and all(isinstance(row, list) for row in value)
-        and all(type(item) is int for row in value for item in row)
+        and all(_is_integer(item) for row in value for item in row)
     )
 
 
@@ -35,11 +53,13 @@ def _valid_cover(result, bounds):
     n = result.get("modulus")
     step = result.get("subgroup_step")
     if (
-        type(n) is not int
-        or type(step) is not int
+        not _is_integer(n)
+        or not _is_integer(step)
         or not bounds["minimum_modulus"] <= n <= bounds["maximum_modulus"]
     ):
         return False
+    n = int(n)
+    step = int(step)
     if (
         step < bounds["minimum_cosets"]
         or n % step
@@ -61,10 +81,14 @@ def _valid_cover(result, bounds):
         and _is_int_matrix(submitted_cosets)
     ):
         return False
+    # The published schema requires only unique integer elements, so the
+    # subgroup and each coset are compared as unordered collections. The coset
+    # list order is still fixed because covering-part references and the
+    # duplicate index pair address cosets by position.
     return bool(
-        submitted_subgroup == subgroup
+        sorted(submitted_subgroup) == sorted(subgroup)
         and submitted_representatives == representatives
-        and submitted_cosets == cosets
+        and [sorted(coset) for coset in submitted_cosets] == cosets
         and len({value for coset in cosets for value in coset}) == n
         and sum(len(coset) for coset in cosets) == n
     )
@@ -78,25 +102,32 @@ def _valid_predicates(result):
     if (
         not isinstance(artifact, dict)
         or set(artifact) != {"id", "kind", "elements"}
-        or type(artifact.get("id")) is not int
+        or not _is_integer(artifact.get("id"))
         or artifact.get("id") != 0
         or artifact.get("kind") != "SUBGROUP"
         or not _is_int_list(artifact.get("elements"))
-        or artifact.get("elements") != result.get("subgroup")
+        or sorted(artifact.get("elements")) != sorted(result.get("subgroup"))
         or not isinstance(references, list)
         or not isinstance(cosets, list)
         or len(references) != len(cosets)
-        or any(type(reference) is not int or reference != 0 for reference in references)
+        or any(not _is_integer(reference) or reference != 0 for reference in references)
     ):
         return False
     if (
         not isinstance(pair, list)
         or len(pair) != 2
-        or not all(type(index) is int for index in pair)
+        or not all(_is_integer(index) for index in pair)
     ):
         return False
-    left, right = pair
-    if not 0 <= left < right < len(references):
+    left, right = int(pair[0]), int(pair[1])
+    # The submission schema only requires two distinct in-range integers, so the
+    # exposing pair is accepted in either order; the remaining checks are
+    # symmetric in left/right.
+    if not (
+        0 <= left < len(references)
+        and 0 <= right < len(references)
+        and left != right
+    ):
         return False
     unique_parts = list(dict.fromkeys(references))
     sizes = {part: len(cosets[references.index(part)]) for part in unique_parts}
@@ -139,7 +170,48 @@ def _valid_result(result, source):
     )
 
 
+_CONJECTURE_KINDS = ("open conjecture", "underlying conjecture")
+_DISCLAIMERS = (
+    "does not settle",
+    "does not resolve",
+    "does not prove",
+    "does not establish",
+    "not settle",
+    "not resolve",
+    "not prove",
+    "not establish",
+)
+# An affirmative settlement claim ("settles the open conjecture", etc.) that is
+# not preceded by a negation. The fixed-width negative lookbehinds exclude
+# "not settle ..." and "n't settle ..." while still matching bare overclaims.
+_AFFIRMATIVE_SETTLEMENT = re.compile(
+    r"(?<!not )(?<!n't )"
+    r"(?:settle|settles|resolve|resolves|prove|proves|establish|establishes)"
+    r" the (?:open|underlying) conjecture"
+)
+
+
+def _limitation_disclaims_conjecture(text):
+    """Require a limitation to disclaim settling the open conjecture.
+
+    The task forbids presenting the finite audit as settling the underlying
+    conjecture, so a valid limitation must reference the open/underlying
+    conjecture, explicitly disclaim settling it, and must not affirm that it is
+    settled. Mere keyword presence is not enough.
+    """
+    lowered = text.casefold()
+    if not any(kind in lowered for kind in _CONJECTURE_KINDS):
+        return False
+    if _AFFIRMATIVE_SETTLEMENT.search(lowered):
+        return False
+    return any(disclaimer in lowered for disclaimer in _DISCLAIMERS)
+
+
 def _evidence_valid(evidence):
+    # The published submission schema caps the evidence array at one descriptor,
+    # so require exactly one before awarding evidence validity.
+    if not isinstance(evidence, list) or len(evidence) != 1:
+        return False
     if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
@@ -149,7 +221,23 @@ def _evidence_valid(evidence):
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
-    return all(term in text for term in ("exact cover", "set.range", "vacuously"))
+    if not all(term in text for term in ("exact cover", "set.range", "vacuously")):
+        return False
+    # Reject evidence that contradicts the submitted conclusion. The audit
+    # asserts an exact cover with a vacuously-true Set.range predicate, so any
+    # negation of those claims invalidates the evidence regardless of keyword
+    # presence.
+    contradictions = (
+        "not an exact cover",
+        "not a exact cover",
+        "no exact cover",
+        "is not an exact cover",
+        "set.range is not vacuously",
+        "not vacuously true",
+        "not vacuously",
+        "vacuously false",
+    )
+    return not any(contradiction in text for contradiction in contradictions)
 
 
 def main():
@@ -176,7 +264,7 @@ def main():
         and isinstance(submission.get("limitations"), list)
         and submission.get("limitations")
         and any(
-            "open conjecture" in item.casefold()
+            _limitation_disclaims_conjecture(item)
             for item in submission.get("limitations", [])
             if isinstance(item, str)
         )
