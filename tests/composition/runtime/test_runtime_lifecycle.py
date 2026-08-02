@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from jacobian.contracts.discovery import ExperimentHandle
 from jacobian.contracts.search import ExperimentState
@@ -205,6 +206,32 @@ def test_enumeration_close_timeout_keeps_store_open_for_retry(
     )
     release_worker.set()
     runtime.close()
+
+
+def test_negative_search_close_timeout_does_not_enter_closing_state(
+    tmp_path: Path,
+) -> None:
+    runtime = create_runtime(tmp_path)
+    try:
+        with pytest.raises(ValueError, match="non-negative"):
+            runtime.services.search.close(timeout_seconds=-1)
+        with pytest.raises(ValidationError):
+            runtime.services.search.start({})
+    finally:
+        runtime.close()
+
+
+def test_negative_enumeration_close_timeout_does_not_enter_closing_state(
+    tmp_path: Path,
+) -> None:
+    runtime = create_runtime(tmp_path)
+    try:
+        with pytest.raises(ValueError, match="non-negative"):
+            runtime.services.experiments.close(timeout_seconds=-1)
+        with pytest.raises(ValidationError):
+            runtime.services.experiments.start_enumeration({})
+    finally:
+        runtime.close()
 
 
 def test_close_waits_for_a_reserved_search_start_through_worker_launch(

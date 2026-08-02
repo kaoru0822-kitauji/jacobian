@@ -229,6 +229,59 @@ def test_apply_tactic_returns_rejection_without_successor(
     assert result.output["diagnostics"][0]["severity"] == "ERROR"
 
 
+@pytest.mark.parametrize(
+    ("tactic_response", "expected_message"),
+    (
+        (
+            {
+                "proofState": 2,
+                "proofStatus": "Goals",
+                "goals": [],
+                "error": "tactic protocol error",
+            },
+            "tactic protocol error",
+        ),
+        (
+            {"proofState": 2, "proofStatus": "failed", "goals": []},
+            "Lean tactic returned proof status 'failed'",
+        ),
+    ),
+)
+def test_rejected_transition_persists_all_protocol_diagnostics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tactic_response: dict[str, object],
+    expected_message: str,
+) -> None:
+    adapter = _adapter(tmp_path)
+    _stub_lean_runtime(
+        monkeypatch,
+        adapter,
+        lambda: (
+            {"env": 0, "sorries": [{"proofState": 0}]},
+            {"proofState": 1, "proofStatus": "Goals", "goals": ["⊢ True"]},
+            tactic_response,
+        ),
+    )
+
+    result = adapter.invoke(
+        CapabilityRequest(
+            capability_id="lean.proof_state.apply_tactic",
+            input={
+                "environment": "CORE",
+                "statement": "True",
+                "tactic": "skip",
+            },
+        )
+    )
+
+    assert result.output["accepted"] is False
+    assert expected_message in result.output["messages"]
+    assert expected_message in {
+        diagnostic["message"] for diagnostic in result.output["diagnostics"]
+    }
+
+
 def test_apply_tactic_rejects_environment_stale_state_before_replay(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

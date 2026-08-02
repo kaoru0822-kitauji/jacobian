@@ -160,6 +160,8 @@ class SearchService:
     def close(self, *, timeout_seconds: float = 30) -> None:
         """Quiesce runtime-owned workers before their shared store is closed."""
 
+        if timeout_seconds < 0:
+            raise ValueError("timeout_seconds must be non-negative")
         with self._thread_lock:
             if self._closed:
                 return

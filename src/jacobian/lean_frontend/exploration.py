@@ -33,7 +33,10 @@ from jacobian.contracts.lean_exploration import (
     LeanTacticDiagnostic,
     LeanTypedGoal,
 )
-from jacobian.lean_frontend.repl import LeanExplorationReplRuntime
+from jacobian.lean_frontend.repl import (
+    LeanExplorationReplRuntime,
+    _response_errors,
+)
 from jacobian.references import LeanCheckerInstallation
 from jacobian.schema_registry import SchemaRegistry
 from jacobian.storage.repository import ArtifactRepository
@@ -183,8 +186,11 @@ def _tactic_diagnostics(
 ) -> tuple[LeanTacticDiagnostic, ...]:
     diagnostics: list[LeanTacticDiagnostic] = []
     for response in responses:
-        message = response.get("message")
-        if isinstance(message, str):
+        seen: set[str] = set()
+        for message in _response_errors(response):
+            if message in seen:
+                continue
+            seen.add(message)
             diagnostics.append(LeanTacticDiagnostic(severity="ERROR", message=message))
         structured = response.get("messages")
         if not isinstance(structured, list):
@@ -195,6 +201,9 @@ def _tactic_diagnostics(
             data = item.get("data")
             if not isinstance(data, str):
                 continue
+            if data in seen:
+                continue
+            seen.add(data)
             raw_severity = item.get("severity")
             severity = (
                 "ERROR"

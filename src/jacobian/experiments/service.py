@@ -149,6 +149,8 @@ class ExperimentService:
     def close(self, *, timeout_seconds: float = 30) -> None:
         """Quiesce enumeration starts and workers before storage teardown."""
 
+        if timeout_seconds < 0:
+            raise ValueError("timeout_seconds must be non-negative")
         with self._thread_lock:
             if self._closed:
                 return

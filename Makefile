@@ -193,7 +193,11 @@ harbor-validate: ## Run all repository-owned Harbor checks under the pinned Harb
 	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --check
 	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 	$(HARBOR_PYTHON) tools/check_benchmark_contracts.py
-	$(HARBOR_PYTHON) tools/check_benchmark_adapters.py
+	@set -eu; for adapter_dir in benchmarks/adapters/*; do \
+		test -d "$$adapter_dir" || continue; \
+		$(MAKE) --no-print-directory harbor-adapter-check \
+			ADAPTER="$${adapter_dir##*/}"; \
+	done
 	$(UV_RUN) pytest -n 0 benchmarks/validation
 
 harbor-check: harbor-validate ## Run Harbor topology, digest, provenance, and host-side validation checks.
