@@ -37,6 +37,7 @@ RESOURCE_DERIVED_TASKS = (
     "metric-tsp-proof-repair",
     "noncompact-lefschetz-proof-audit",
     "parameterized-sharp-bound-audit",
+    "polynomial-divisibility-uniqueness",
     "polynomial-tail-counterexample",
     "putnam-2adic-induction-audit",
     "random-function-expectation-audit",

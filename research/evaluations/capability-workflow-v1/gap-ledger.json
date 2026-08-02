@@ -4,8 +4,8 @@
   "captured_at": "2026-08-01",
   "source_suite": {
     "path": "benchmarks/datasets/agent-workflow-v1/dataset.toml",
-    "task_count": 38,
-    "manifest_sha256": "sha256:d3bc205f36fdd1c3a05ee0740e3dc13dc029cb70bc54f7d2392f73fedec27d07",
+    "task_count": 39,
+    "manifest_sha256": "sha256:8a67dd54e5cfecde69279ce01826b67f3872da58b040fd12a7e3aa9024259918",
     "contamination": "PUBLIC_ANSWER_VISIBLE"
   },
   "runtime_snapshot": {
@@ -677,6 +677,26 @@
       "candidate_ids": [],
       "disposition": "NO_NEW_CAPABILITY",
       "next_action": "Use as a proof-audit diagnostic; do not add an inequality-specific sharp-bound solver without repeated independent workflows."
+    },
+    {
+      "task_id": "polynomial-divisibility-uniqueness",
+      "mathematical_moves": [
+        "Reduce a degree-13 polynomial modulo a quadratic family over the parameter ring.",
+        "Use the monic gcd of both remainder coefficients to certify the unique parameter.",
+        "Replay the exact quotient product at the surviving integer parameter."
+      ],
+      "current_capabilities": [
+        {
+          "capability_id": "polynomial.identity.verify",
+          "availability": "AVAILABLE",
+          "boundary": "Can replay the final product identity but does not establish parameter-family completeness."
+        }
+      ],
+      "gap_classes": ["EXISTING_WORKS", "MODEL_REASONING"],
+      "contamination": "PUBLIC_ANSWER_VISIBLE",
+      "candidate_ids": [],
+      "disposition": "NO_NEW_CAPABILITY",
+      "next_action": "Retain symbolic parameter reduction as agent-owned reasoning; one task does not justify a dedicated divisibility-family wrapper."
     },
     {
       "task_id": "polynomial-map-collision",

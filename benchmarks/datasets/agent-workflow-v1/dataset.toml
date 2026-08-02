@@ -123,6 +123,10 @@ name = "jacobian/parameterized-sharp-bound-audit"
 digest = "sha256:057a1079c58d718bd55a5056449f908d80a4dae47ae6fc3f9e9213615b06afb8"
 
 [[tasks]]
+name = "jacobian/polynomial-divisibility-uniqueness"
+digest = "sha256:902e752df6492c9597474db8566b027a3c7e9ebc2ee846ede4a67cd01cf4445c"
+
+[[tasks]]
 name = "jacobian/polynomial-map-collision"
 digest = "sha256:0c7c5a81fd92c4e5a8790f67d3bf4aca8e3f131905a91b58d7ec93e49b17f538"
 
