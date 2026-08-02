@@ -24,7 +24,7 @@ digest = "sha256:7973a71a04ee7ae9af0f4e95c31398fe75e6570b9296451301fc1d840601741
 
 [[tasks]]
 name = "jacobian/continuant-reversal-certificate"
-digest = "sha256:3b8d2f03db12381b48559fddc8f16d31e0f739f57947fd33d9dd834f74c4db4b"
+digest = "sha256:2b0182c98fb48fc1ac8af46c39e393f318d18a98ba3f79993af005ce52c5786d"
 
 [[tasks]]
 name = "jacobian/dead-end-local-density-audit"
