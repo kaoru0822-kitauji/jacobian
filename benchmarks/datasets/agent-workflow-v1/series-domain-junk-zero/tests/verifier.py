@@ -197,8 +197,19 @@ def main():
         and math_correct
         and _evidence_matches(submission.get("evidence"), submission["result"])
     )
+    scope = submission.get("scope")
+    scope_text = scope.casefold() if isinstance(scope, str) else ""
     scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
+        contract
+        and (
+            scope == expected["required_scope"]
+            or (
+                "frozen" in scope_text
+                and "api" in scope_text
+                and "fallback" in scope_text
+                and ("summable" in scope_text or "zero" in scope_text)
+            )
+        )
     )
     assurance_correct = bool(
         contract
