@@ -1,0 +1,2 @@
+At dyadic level k each event has probability 2^-k, so the indicators converge to zero in probability. Every point of [0,1) lies in exactly one interval per level, hence the typewriter sequence equals one infinitely often and zero infinitely often at that point. It therefore fails to converge pointwise anywhere and cannot converge almost surely. This is a convergence-mode audit, not a solution of Erdős problem 522.
+
