@@ -1,0 +1,18 @@
+schema_version = "1"
+task_id = "graph-atlas-enumeration"
+task_name = "jacobian/graph-atlas-enumeration"
+evaluation_kind = "workflow"
+domain = "mathematical-sciences"
+field = "graph-theory"
+provenance_class = "hand-designed-bounded-enumeration"
+provenance_ref = "Exhaustive enumeration of the complete order-seven labelled graph space, quotiented by vertex relabelling."
+assurance_ceiling = "COMPUTED"
+required_provider = "core"
+environment_profile = "core-python"
+verifier_contract_version = "1"
+evaluation_owner = "jacobian/agent-workflow-v1"
+
+[tool_opportunity]
+value = "HIGH"
+relevant_capability_ids = ["graph.search.atlas"]
+rationale = "The task requires a complete non-isomorphic class enumeration rather than one short witness; bounded atlas search directly supplies the finite scope and match count."

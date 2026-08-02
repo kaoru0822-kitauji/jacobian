@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "conclusion", "result", "claimed_assurance", "scope", "completeness", "evidence", "limitations"],
+  "properties": {
+    "task_id": {"const": "jacobian/graph-atlas-enumeration"},
+    "conclusion": {"const": "COMPLETE"},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class_count", "representatives"],
+      "properties": {
+        "class_count": {"type": "integer", "minimum": 0},
+        "representatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["vertices", "edges"],
+            "properties": {
+              "vertices": {"type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": {"type": ["string", "integer"]}},
+              "edges": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": ["string", "integer"]}}
+              }
+            }
+          }
+        }
+      }
+    },
+    "claimed_assurance": {"const": "COMPUTED"},
+    "scope": {"const": "jacobian/graph-atlas-enumeration all isomorphism classes on the complete seven-vertex scope"},
+    "completeness": {"const": "COMPLETE"},
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"const": "evidence/enumeration-certificate.json"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "limitations": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"const": "ORDER_SEVEN_SCOPE_ONLY"}}
+  }
+}

@@ -39,6 +39,7 @@ from benchmarks.tooling.harbor_suite import (
     get_suite,
     task_digest,
 )
+from jacobian.eval.telemetry import parse_agent_transcript
 
 
 def _read_json(path: Path) -> Any:
@@ -1247,6 +1248,392 @@ def build_observation_evidence(
     return evidence, failures
 
 
+def _routing_config_state(
+    config: dict[str, Any],
+) -> tuple[list[Any], bool, list[str]]:
+    agents = config.get("agents")
+    if not isinstance(agents, list) or len(agents) != 1:
+        return [], False, ["resolved config must contain exactly one agent"]
+    agent = agents[0]
+    if not isinstance(agent, dict) or agent.get("name") != "codex":
+        return [], False, ["resolved config must select the Codex agent"]
+    servers = agent.get("mcp_servers", [])
+    if not isinstance(servers, list):
+        return [], False, ["resolved agent mcp_servers must be an array"]
+    environment = _object(config.get("environment"))
+    compose = environment.get("extra_docker_compose", [])
+    if not isinstance(compose, list):
+        return [], False, ["resolved extra_docker_compose must be an array"]
+    has_sidecar = any(
+        Path(str(value)).name == "jacobian-observation.compose.yaml"
+        for value in compose
+    )
+    return servers, has_sidecar, []
+
+
+def resolved_config_failures(config: dict[str, Any], *, condition: str) -> list[str]:
+    """Validate the fully resolved Harbor condition before model execution."""
+
+    if condition not in {"control", "treatment"}:
+        return [f"unknown observation condition: {condition}"]
+    servers, has_sidecar, failures = _routing_config_state(config)
+    if failures:
+        return failures
+    expected_server = {
+        "name": "jacobian",
+        "transport": "streamable-http",
+        "url": "http://jacobian:8000/mcp",
+    }
+    if condition == "treatment":
+        if servers != [expected_server]:
+            failures.append("treatment does not contain the exact Jacobian MCP server")
+        if not has_sidecar:
+            failures.append("treatment does not contain the Jacobian sidecar compose")
+    else:
+        if servers:
+            failures.append("control unexpectedly contains MCP servers")
+        if has_sidecar:
+            failures.append("control unexpectedly contains the Jacobian sidecar")
+    return failures
+
+
+def _opportunity(task_ref: Any) -> dict[str, Any]:
+    value = task_ref.tool_opportunity
+    if value is None:
+        return {
+            "value": "UNASSESSED",
+            "relevant_capability_ids": [],
+            "rationale": None,
+        }
+    return {
+        "value": value.value,
+        "relevant_capability_ids": list(value.relevant_capability_ids),
+        "rationale": value.rationale,
+    }
+
+
+def _empty_routing_telemetry() -> dict[str, Any]:
+    return {
+        "transcript": None,
+        "turn_usage_present": False,
+        "mcp_calls": [],
+        "successful_mcp_calls": [],
+        "tool_error_count": 0,
+        "capability_attempt_ids": [],
+        "capability_ids": [],
+        "capability_descriptions": [],
+    }
+
+
+def _routing_telemetry(
+    trial_path: Path | None,
+    *,
+    jobs_dir: Path,
+) -> tuple[dict[str, Any], list[str]]:
+    telemetry = _empty_routing_telemetry()
+    if trial_path is None:
+        return telemetry, ["raw agent transcript is unavailable for inline result"]
+    transcript = trial_path.parent / "agent" / "codex.txt"
+    try:
+        if transcript.is_symlink() or not transcript.is_file():
+            return telemetry, ["raw agent transcript is missing or symlinked"]
+        if transcript.stat().st_size > 67_108_864:
+            return telemetry, ["raw agent transcript exceeds 64 MiB"]
+        relative = transcript.resolve().relative_to(jobs_dir.resolve()).as_posix()
+        parsed = parse_agent_transcript(transcript)
+    except (OSError, UnicodeError, ValueError) as exc:
+        return telemetry, [f"raw agent transcript is invalid: {exc}"]
+    descriptions = parsed.get("capability_descriptions", [])
+    if not isinstance(descriptions, list) or not all(
+        isinstance(item, dict)
+        and set(item)
+        == {"kind", "query", "domain", "mode", "capability_id", "match_ids"}
+        and isinstance(item.get("match_ids"), list)
+        and all(isinstance(value, str) for value in item["match_ids"])
+        for item in descriptions
+    ):
+        return telemetry, ["capability description telemetry is malformed"]
+
+    def strings(key: str) -> list[str]:
+        value = parsed.get(key, [])
+        return (
+            [item for item in value if isinstance(item, str)]
+            if isinstance(value, list)
+            else []
+        )
+
+    raw_errors = parsed.get("tool_error_count", 0)
+    telemetry.update(
+        transcript={"path": relative, "digest": _sha256(transcript)},
+        turn_usage_present=isinstance(parsed.get("usage"), dict),
+        mcp_calls=strings("mcp_calls"),
+        successful_mcp_calls=strings("successful_tool_calls"),
+        tool_error_count=(
+            raw_errors
+            if isinstance(raw_errors, int) and not isinstance(raw_errors, bool)
+            else 0
+        ),
+        capability_attempt_ids=strings("capability_attempt_ids"),
+        capability_ids=strings("capability_ids"),
+        capability_descriptions=descriptions,
+    )
+    return telemetry, []
+
+
+def _description_ids(descriptions: object) -> set[str]:
+    observed: set[str] = set()
+    if not isinstance(descriptions, list):
+        return observed
+    for description in descriptions:
+        if not isinstance(description, dict):
+            continue
+        capability_id = description.get("capability_id")
+        if isinstance(capability_id, str):
+            observed.add(capability_id)
+        matches = description.get("match_ids")
+        if isinstance(matches, list):
+            observed.update(item for item in matches if isinstance(item, str))
+    return observed
+
+
+def _matches_opportunity(observed: set[str], relevant: set[str]) -> bool:
+    return bool(observed & relevant or (observed and not relevant))
+
+
+def _discovery_status(telemetry: dict[str, Any], relevant: set[str]) -> str:
+    descriptions = telemetry["capability_descriptions"]
+    if _matches_opportunity(_description_ids(descriptions), relevant):
+        return "DESCRIBED_NOT_INVOKED"
+    if "capability.describe" not in telemetry["mcp_calls"]:
+        return "AVAILABLE_NO_CALL"
+    if telemetry["tool_error_count"] and not descriptions:
+        return "DISCOVERY_FAILED"
+    return "DISCOVERY_MISS"
+
+
+def _routing_status(
+    *,
+    condition: str,
+    config_failures: list[str],
+    telemetry: dict[str, Any],
+    opportunity: dict[str, Any],
+) -> str:
+    if condition == "control":
+        return "NOT_CONFIGURED"
+    if config_failures:
+        return "HARNESS_UNAVAILABLE"
+    if telemetry["transcript"] is None or not telemetry["turn_usage_present"]:
+        return "EVIDENCE_INCOMPLETE"
+
+    relevant = set(opportunity["relevant_capability_ids"])
+    completed = set(telemetry["capability_ids"])
+    attempted = set(telemetry["capability_attempt_ids"])
+    if _matches_opportunity(completed, relevant):
+        return "USED"
+    if completed:
+        return "USED_OTHER_CAPABILITY"
+    if _matches_opportunity(attempted, relevant):
+        return "INVOKE_FAILED"
+    if "capability.invoke" in telemetry["mcp_calls"]:
+        return "INVOKE_FAILED"
+    return _discovery_status(telemetry, relevant)
+
+
+def _routing_rewards(raw: dict[str, Any]) -> dict[str, Any]:
+    rewards = _object(_object(raw.get("verifier_result")).get("rewards"))
+    return {
+        name: rewards.get(name)
+        for name in (
+            "correctness",
+            "evidence_validity",
+            "scope_accuracy",
+            "assurance_calibration",
+            "reward",
+            "false_certification",
+        )
+    }
+
+
+def _routing_summary(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    statuses = Counter(str(trial["routing_status"]) for trial in trials)
+    by_opportunity: list[dict[str, Any]] = []
+    for value in ("NONE", "OPTIONAL", "HIGH", "UNASSESSED"):
+        selected = [trial for trial in trials if trial["opportunity"]["value"] == value]
+        relevant_used = sum(trial["routing_status"] == "USED" for trial in selected)
+        measured = value in {"OPTIONAL", "HIGH"}
+        by_opportunity.append(
+            {
+                "value": value,
+                "trials": len(selected),
+                "relevant_used": relevant_used,
+                "adoption_rate": (
+                    relevant_used / len(selected) if selected and measured else None
+                ),
+            }
+        )
+    return {
+        "trial_count": len(trials),
+        "routing_status_counts": [
+            {"status": status, "count": count}
+            for status, count in sorted(statuses.items())
+        ],
+        "by_tool_opportunity": by_opportunity,
+    }
+
+
+def build_routing_observation(
+    *,
+    dataset: str,
+    condition: str,
+    resolved_config_path: Path,
+    jobs_dir: Path,
+    result_path: Path | None = None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Build value-aware routing evidence without changing mathematical rewards."""
+
+    config = _read_json(resolved_config_path)
+    if not isinstance(config, dict):
+        raise HarborSuiteError("resolved Harbor config must be an object")
+    config_failures = resolved_config_failures(config, condition=condition)
+    result_path = (result_path or _find_result(jobs_dir)).resolve()
+    payload = _read_json(result_path)
+    if not isinstance(payload, dict):
+        raise HarborSuiteError("Harbor result must be an object")
+
+    suite = get_suite(dataset)
+    refs = {ref.path.name: ref for ref in suite.tasks}
+    known = {
+        name: "sha256:" + task_digest(ref.path).removeprefix("sha256:")
+        for name, ref in refs.items()
+    }
+    expected_tasks, selection_mode, _eval_args_value, selection_failures = (
+        _normalize_selection(
+            config,
+            known=known,
+            task_dirs={name: ref.path for name, ref in refs.items()},
+            dataset_path=suite.path,
+        )
+    )
+    raw_attempts = config.get("n_attempts")
+    attempts = (
+        raw_attempts
+        if isinstance(raw_attempts, int) and not isinstance(raw_attempts, bool)
+        else 0
+    )
+    raw_trials = _trial_results(result_path, payload)
+    raw_trials.sort(
+        key=lambda pair: (
+            _task_id(pair[1].get("task_name")),
+            str(pair[1].get("trial_name", "")),
+        )
+    )
+
+    counters: Counter[str] = Counter()
+    trials: list[dict[str, Any]] = []
+    validation_trials: list[dict[str, Any]] = []
+    telemetry_failures: list[str] = []
+    for trial_path, raw in raw_trials:
+        task = _task_id(raw.get("task_name"))
+        repetition = counters[task]
+        counters[task] += 1
+        telemetry, trace_failures = _routing_telemetry(trial_path, jobs_dir=jobs_dir)
+        telemetry_failures.extend(
+            f"{task} repetition {repetition}: {failure}" for failure in trace_failures
+        )
+        opportunity = (
+            _opportunity(refs[task])
+            if task in refs
+            else {
+                "value": "UNASSESSED",
+                "relevant_capability_ids": [],
+                "rationale": None,
+            }
+        )
+        task_checksum = "sha256:" + str(raw.get("task_checksum", "")).removeprefix(
+            "sha256:"
+        )
+        trials.append(
+            {
+                "task": task,
+                "task_digest": task_checksum,
+                "repetition": repetition,
+                "opportunity": opportunity,
+                "routing_status": _routing_status(
+                    condition=condition,
+                    config_failures=config_failures,
+                    telemetry=telemetry,
+                    opportunity=opportunity,
+                ),
+                "rewards": _routing_rewards(raw),
+                "telemetry": telemetry,
+                "raw_result_digest": (
+                    _sha256(trial_path) if trial_path is not None else _json_digest(raw)
+                ),
+            }
+        )
+        validation_trials.append(
+            {
+                "task": task,
+                "task_digest": task_checksum,
+                "repetition": repetition,
+                "status": _trial_status(raw, raw.get("exception_info")),
+            }
+        )
+
+    failures = [*config_failures, *selection_failures]
+    failures.extend(
+        _observation_failures(
+            counters=counters,
+            expected_tasks=set(expected_tasks),
+            attempts=attempts,
+            expected_digests={
+                task: known[task] for task in expected_tasks if task in known
+            },
+            trials=validation_trials,
+            payload=payload,
+        )
+    )
+    if condition == "treatment":
+        failures.extend(telemetry_failures)
+        failures.extend(
+            f"{trial['task']} repetition {trial['repetition']}: routing evidence is incomplete"
+            for trial in trials
+            if trial["routing_status"] == "EVIDENCE_INCOMPLETE"
+        )
+    servers, has_sidecar, _state_failures = _routing_config_state(config)
+    jacobian_server = {
+        "name": "jacobian",
+        "transport": "streamable-http",
+        "url": "http://jacobian:8000/mcp",
+    }
+    report = {
+        "schema_version": "2",
+        "evidence_class": "workflow-routing-observation",
+        "causal_claim_authorized": False,
+        "status": "VALID" if not failures else "INCOMPLETE",
+        "source_sha": _git_sha(),
+        "dataset": suite.dataset_name,
+        "condition": condition,
+        "resolved_config": {
+            "path": _display_path(resolved_config_path),
+            "digest": _sha256(resolved_config_path),
+            "selection_mode": (
+                selection_mode
+                if selection_mode in {"dataset-task-names", "explicit-tasks"}
+                else "invalid"
+            ),
+            "selection": expected_tasks,
+            "n_attempts": attempts,
+            "jacobian_mcp_configured": servers == [jacobian_server],
+            "jacobian_sidecar_configured": has_sidecar,
+        },
+        "summary": _routing_summary(trials),
+        "trials": trials,
+        "validation_failures": failures,
+    }
+    return report, failures
+
+
 def _number(value: Any) -> float | None:
     if isinstance(value, bool):
         return float(value)
@@ -1675,6 +2062,20 @@ def render_markdown(report: dict[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+    config_parser = subparsers.add_parser("validate-config")
+    config_parser.add_argument("--config", type=Path, required=True)
+    config_parser.add_argument(
+        "--condition", choices=("control", "treatment"), required=True
+    )
+    routing_parser = subparsers.add_parser("route")
+    routing_parser.add_argument("--dataset", required=True)
+    routing_parser.add_argument(
+        "--condition", choices=("control", "treatment"), required=True
+    )
+    routing_parser.add_argument("--config", type=Path, required=True)
+    routing_parser.add_argument("--jobs-dir", type=Path, required=True)
+    routing_parser.add_argument("--result", type=Path)
+    routing_parser.add_argument("--output", type=Path, required=True)
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("--dataset", required=True)
     validate_parser.add_argument("--condition", required=True)
@@ -1695,6 +2096,32 @@ def main() -> int:
     compare_parser.add_argument("--treatment", type=Path, required=True)
     compare_parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if args.command == "validate-config":
+        config = _read_json(args.config)
+        if not isinstance(config, dict):
+            raise HarborSuiteError("resolved Harbor config must be an object")
+        failures = resolved_config_failures(config, condition=args.condition)
+        if failures:
+            for failure in failures:
+                print(failure)
+            return 1
+        print(args.config)
+        return 0
+    if args.command == "route":
+        report, failures = build_routing_observation(
+            dataset=args.dataset,
+            condition=args.condition,
+            resolved_config_path=args.config,
+            jobs_dir=args.jobs_dir,
+            result_path=args.result,
+        )
+        _validate_contract(report, "routing-observation.schema.json")
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(args.output)
+        return 1 if failures else 0
     if args.command == "validate":
         runtime = _read_json(args.runtime_snapshot) if args.runtime_snapshot else None
         heldout = _read_json(args.heldout_manifest) if args.heldout_manifest else None
@@ -1751,7 +2178,9 @@ if __name__ == "__main__":
 
 __all__ = [
     "build_observation_evidence",
+    "build_routing_observation",
     "collect_heldout_evidence",
     "compare_evidence",
     "render_markdown",
+    "resolved_config_failures",
 ]

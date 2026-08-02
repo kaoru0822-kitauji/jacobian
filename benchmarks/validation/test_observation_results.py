@@ -16,8 +16,10 @@ from benchmarks.tooling.observation_results import (
     _trial_artifacts,
     _validate_explicit_task_path,
     build_observation_evidence,
+    build_routing_observation,
     compare_evidence,
     render_markdown,
+    resolved_config_failures,
 )
 
 _DIGEST = "sha256:" + "a" * 64
@@ -1398,3 +1400,292 @@ def test_incomplete_execution_fails_closed(
     assert evidence["status"] == "INCOMPLETE"
     assert evidence["trials"][0]["status"] == "ERROR"
     assert any("incomplete" in f for f in failures)
+
+
+# ---------------------------------------------------------------------------
+# Tool-routing diagnostics
+# ---------------------------------------------------------------------------
+
+
+def _resolved_treatment(tmp_path: Path) -> Path:
+    config_path = tmp_path / "resolved-config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "jobs_dir": str(tmp_path / "jobs"),
+                "n_attempts": 1,
+                "environment": {
+                    "type": "docker",
+                    "extra_docker_compose": [
+                        "benchmarks/config/agent-eval-proxy.compose.yaml",
+                        "benchmarks/datasets/agent-workflow-v1/jacobian-observation.compose.yaml",
+                    ],
+                },
+                "agents": [
+                    {
+                        "name": "codex",
+                        "model_name": "model",
+                        "mcp_servers": [
+                            {
+                                "name": "jacobian",
+                                "transport": "streamable-http",
+                                "url": "http://jacobian:8000/mcp",
+                            }
+                        ],
+                    }
+                ],
+                "datasets": [
+                    {
+                        "path": "benchmarks/datasets/agent-workflow-v1",
+                        "task_names": ["graph-counterexample"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def _routing_result(tmp_path: Path, events: list[dict]) -> tuple[Path, Path]:
+    run = tmp_path / "jobs" / "run"
+    trial = run / "trial-0"
+    (trial / "agent").mkdir(parents=True)
+    (trial / "agent" / "codex.txt").write_text(
+        "\n".join(json.dumps(event) for event in events) + "\n",
+        encoding="utf-8",
+    )
+    trial_result = {
+        "task_name": "jacobian/graph-counterexample",
+        "task_checksum": _DIGEST,
+        "trial_name": "attempt-0",
+        "agent_info": {"model_info": {"name": "model"}},
+        "agent_result": {},
+        "verifier_result": {
+            "rewards": {
+                "correctness": 1.0,
+                "evidence_validity": 1.0,
+                "scope_accuracy": 1.0,
+                "assurance_calibration": 1.0,
+                "reward": 1.0,
+                "false_certification": False,
+            }
+        },
+        "exception_info": None,
+    }
+    (trial / "result.json").write_text(json.dumps(trial_result), encoding="utf-8")
+    result = {
+        "id": "run",
+        "started_at": "2026-01-01T00:00:00Z",
+        "finished_at": "2026-01-01T00:01:00Z",
+        "n_total_trials": 1,
+        "stats": {
+            "n_completed_trials": 1,
+            "n_errored_trials": 0,
+            "n_running_trials": 0,
+            "n_pending_trials": 0,
+            "n_cancelled_trials": 0,
+        },
+    }
+    result_path = run / "result.json"
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    return tmp_path / "jobs", result_path
+
+
+def test_resolved_config_separates_control_and_treatment(tmp_path: Path) -> None:
+    treatment = json.loads(_resolved_treatment(tmp_path).read_text(encoding="utf-8"))
+    assert resolved_config_failures(treatment, condition="treatment") == []
+
+    control = deepcopy(treatment)
+    control["agents"][0].pop("mcp_servers")
+    control["environment"]["extra_docker_compose"] = [
+        "benchmarks/config/agent-eval-proxy.compose.yaml"
+    ]
+    assert resolved_config_failures(control, condition="control") == []
+    assert resolved_config_failures(treatment, condition="control")
+
+
+def test_optional_correct_no_call_is_valid_routing_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(observation_results, "task_digest", lambda _path: "a" * 64)
+    monkeypatch.setattr(observation_results, "_git_sha", lambda: "b" * 40)
+    config = _resolved_treatment(tmp_path)
+    jobs_dir, result = _routing_result(
+        tmp_path,
+        [{"type": "turn.completed", "usage": {"input_tokens": 10}}],
+    )
+
+    report, failures = build_routing_observation(
+        dataset="agent-workflow-v1",
+        condition="treatment",
+        resolved_config_path=config,
+        jobs_dir=jobs_dir,
+        result_path=result,
+    )
+
+    observation_results._validate_contract(report, "routing-observation.schema.json")
+    assert failures == []
+    assert report["status"] == "VALID"
+    assert report["trials"][0]["routing_status"] == "AVAILABLE_NO_CALL"
+    assert report["trials"][0]["opportunity"]["value"] == "OPTIONAL"
+    optional = report["summary"]["by_tool_opportunity"][1]
+    assert optional == {
+        "value": "OPTIONAL",
+        "trials": 1,
+        "relevant_used": 0,
+        "adoption_rate": 0.0,
+    }
+
+
+def test_routing_observation_distinguishes_discovery_miss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(observation_results, "task_digest", lambda _path: "a" * 64)
+    monkeypatch.setattr(observation_results, "_git_sha", lambda: "b" * 40)
+    config = _resolved_treatment(tmp_path)
+    describe = {
+        "type": "item.completed",
+        "item": {
+            "type": "mcp_tool_call",
+            "tool": "capability.describe",
+            "arguments": {"query": "finite graph"},
+            "status": "completed",
+            "result": {
+                "isError": False,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "kind": "discovery",
+                                "matches": [
+                                    {"capability_id": "graph.compute.properties"}
+                                ],
+                            }
+                        ),
+                    }
+                ],
+            },
+        },
+    }
+    jobs_dir, result = _routing_result(
+        tmp_path,
+        [describe, {"type": "turn.completed", "usage": {"input_tokens": 10}}],
+    )
+
+    report, failures = build_routing_observation(
+        dataset="agent-workflow-v1",
+        condition="treatment",
+        resolved_config_path=config,
+        jobs_dir=jobs_dir,
+        result_path=result,
+    )
+
+    assert failures == []
+    assert report["trials"][0]["routing_status"] == "DISCOVERY_MISS"
+
+
+@pytest.mark.parametrize(
+    ("telemetry", "expected"),
+    [
+        ({}, "EVIDENCE_INCOMPLETE"),
+        (
+            {
+                "transcript": {"path": "run/agent/codex.txt", "digest": _DIGEST},
+                "turn_usage_present": True,
+                "mcp_calls": ["capability.describe"],
+                "successful_mcp_calls": ["capability.describe"],
+                "tool_error_count": 0,
+                "capability_attempt_ids": [],
+                "capability_ids": [],
+                "capability_descriptions": [
+                    {
+                        "kind": "exact",
+                        "query": None,
+                        "domain": None,
+                        "mode": None,
+                        "capability_id": "graph.search.atlas",
+                        "match_ids": [],
+                    }
+                ],
+            },
+            "DESCRIBED_NOT_INVOKED",
+        ),
+        (
+            {
+                "transcript": {"path": "run/agent/codex.txt", "digest": _DIGEST},
+                "turn_usage_present": True,
+                "mcp_calls": ["capability.invoke"],
+                "successful_mcp_calls": [],
+                "tool_error_count": 1,
+                "capability_attempt_ids": ["graph.search.atlas"],
+                "capability_ids": [],
+                "capability_descriptions": [],
+            },
+            "INVOKE_FAILED",
+        ),
+        (
+            {
+                "transcript": {"path": "run/agent/codex.txt", "digest": _DIGEST},
+                "turn_usage_present": True,
+                "mcp_calls": ["capability.invoke"],
+                "successful_mcp_calls": ["capability.invoke"],
+                "tool_error_count": 0,
+                "capability_attempt_ids": ["graph.search.atlas"],
+                "capability_ids": ["graph.search.atlas"],
+                "capability_descriptions": [],
+            },
+            "USED",
+        ),
+    ],
+)
+def test_routing_status_classification(
+    telemetry: dict,
+    expected: str,
+) -> None:
+    complete = observation_results._empty_routing_telemetry()
+    complete.update(telemetry)
+    opportunity = {
+        "value": "HIGH",
+        "relevant_capability_ids": ["graph.search.atlas"],
+        "rationale": "bounded complete enumeration",
+    }
+
+    assert (
+        observation_results._routing_status(
+            condition="treatment",
+            config_failures=[],
+            telemetry=complete,
+            opportunity=opportunity,
+        )
+        == expected
+    )
+
+
+def test_routing_schema_rejects_untyped_telemetry_extension(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(observation_results, "task_digest", lambda _path: "a" * 64)
+    monkeypatch.setattr(observation_results, "_git_sha", lambda: "b" * 40)
+    config = _resolved_treatment(tmp_path)
+    jobs_dir, result = _routing_result(
+        tmp_path,
+        [{"type": "turn.completed", "usage": {"input_tokens": 10}}],
+    )
+    report, _failures = build_routing_observation(
+        dataset="agent-workflow-v1",
+        condition="treatment",
+        resolved_config_path=config,
+        jobs_dir=jobs_dir,
+        result_path=result,
+    )
+    report["trials"][0]["telemetry"]["raw"] = {"anything": True}
+
+    with pytest.raises(observation_results.HarborSuiteError):
+        observation_results._validate_contract(
+            report, "routing-observation.schema.json"
+        )

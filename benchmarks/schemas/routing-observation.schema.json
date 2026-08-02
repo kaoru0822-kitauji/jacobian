@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jacobian.invalid/benchmarks/schemas/routing-observation.schema.json",
+  "title": "Jacobian Harbor tool-routing observation v2",
+  "description": "Strict diagnostic evidence for whether Jacobian was configured, discoverable, invoked, and successfully used. Tool opportunity is evaluator metadata and never affects mathematical reward.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence_class", "causal_claim_authorized", "status", "source_sha", "dataset", "condition", "resolved_config", "summary", "trials", "validation_failures"],
+  "properties": {
+    "schema_version": {"const": "2"},
+    "evidence_class": {"const": "workflow-routing-observation"},
+    "causal_claim_authorized": {"const": false},
+    "status": {"enum": ["VALID", "INCOMPLETE"]},
+    "source_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "dataset": {"type": "string", "minLength": 1},
+    "condition": {"enum": ["control", "treatment"]},
+    "resolved_config": {"$ref": "#/$defs/resolved_config"},
+    "summary": {"$ref": "#/$defs/summary"},
+    "trials": {"type": "array", "items": {"$ref": "#/$defs/trial"}},
+    "validation_failures": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "resolved_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "digest", "selection_mode", "selection", "n_attempts", "jacobian_mcp_configured", "jacobian_sidecar_configured"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"},
+        "selection_mode": {"enum": ["dataset-task-names", "explicit-tasks", "invalid"]},
+        "selection": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "n_attempts": {"type": "integer", "minimum": 0},
+        "jacobian_mcp_configured": {"type": "boolean"},
+        "jacobian_sidecar_configured": {"type": "boolean"}
+      }
+    },
+    "opportunity_value": {"enum": ["NONE", "OPTIONAL", "HIGH", "UNASSESSED"]},
+    "opportunity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "relevant_capability_ids", "rationale"],
+      "properties": {
+        "value": {"$ref": "#/$defs/opportunity_value"},
+        "relevant_capability_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "rationale": {"type": ["string", "null"]}
+      }
+    },
+    "routing_status": {
+      "enum": ["NOT_CONFIGURED", "HARNESS_UNAVAILABLE", "EVIDENCE_INCOMPLETE", "AVAILABLE_NO_CALL", "DISCOVERY_FAILED", "DISCOVERY_MISS", "DESCRIBED_NOT_INVOKED", "INVOKE_FAILED", "USED_OTHER_CAPABILITY", "USED"]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trial_count", "routing_status_counts", "by_tool_opportunity"],
+      "properties": {
+        "trial_count": {"type": "integer", "minimum": 0},
+        "routing_status_counts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "count"],
+            "properties": {
+              "status": {"$ref": "#/$defs/routing_status"},
+              "count": {"type": "integer", "minimum": 1}
+            }
+          }
+        },
+        "by_tool_opportunity": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "trials", "relevant_used", "adoption_rate"],
+            "properties": {
+              "value": {"$ref": "#/$defs/opportunity_value"},
+              "trials": {"type": "integer", "minimum": 0},
+              "relevant_used": {"type": "integer", "minimum": 0},
+              "adoption_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+            }
+          }
+        }
+      }
+    },
+    "reward": {"type": ["number", "boolean", "null"]},
+    "rewards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correctness", "evidence_validity", "scope_accuracy", "assurance_calibration", "reward", "false_certification"],
+      "properties": {
+        "correctness": {"$ref": "#/$defs/reward"},
+        "evidence_validity": {"$ref": "#/$defs/reward"},
+        "scope_accuracy": {"$ref": "#/$defs/reward"},
+        "assurance_calibration": {"$ref": "#/$defs/reward"},
+        "reward": {"$ref": "#/$defs/reward"},
+        "false_certification": {"$ref": "#/$defs/reward"}
+      }
+    },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "query", "domain", "mode", "capability_id", "match_ids"],
+      "properties": {
+        "kind": {"type": ["string", "null"]},
+        "query": {"type": ["string", "null"]},
+        "domain": {"type": ["string", "null"]},
+        "mode": {"type": ["string", "null"]},
+        "capability_id": {"type": ["string", "null"]},
+        "match_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transcript", "turn_usage_present", "mcp_calls", "successful_mcp_calls", "tool_error_count", "capability_attempt_ids", "capability_ids", "capability_descriptions"],
+      "properties": {
+        "transcript": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/artifact_identity"}]},
+        "turn_usage_present": {"type": "boolean"},
+        "mcp_calls": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "successful_mcp_calls": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "tool_error_count": {"type": "integer", "minimum": 0},
+        "capability_attempt_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "capability_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "capability_descriptions": {"type": "array", "items": {"$ref": "#/$defs/description"}}
+      }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "task_digest", "repetition", "opportunity", "routing_status", "rewards", "telemetry", "raw_result_digest"],
+      "properties": {
+        "task": {"type": "string", "minLength": 1},
+        "task_digest": {"$ref": "#/$defs/digest"},
+        "repetition": {"type": "integer", "minimum": 0},
+        "opportunity": {"$ref": "#/$defs/opportunity"},
+        "routing_status": {"$ref": "#/$defs/routing_status"},
+        "rewards": {"$ref": "#/$defs/rewards"},
+        "telemetry": {"$ref": "#/$defs/telemetry"},
+        "raw_result_digest": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}
