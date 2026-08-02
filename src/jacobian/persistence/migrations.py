@@ -415,6 +415,33 @@ def _install_state_format_schema(connection: sqlite3.Connection) -> None:
         connection.execute(statement)
 
 
+_REMOVED_WORKSPACE_TABLES = (
+    "workspace_focus",
+    "workspace_marks",
+    "workspace_attempts",
+    "workspace_scratch",
+    "workspace_findings",
+    "workspace_branches",
+    "workspace_revisions",
+    "workspace_idempotency",
+    "workspaces",
+)
+
+
+def _remove_workspace_schema(connection: sqlite3.Connection) -> None:
+    """Remove the retired workspace product surface from every store."""
+
+    for table in _REMOVED_WORKSPACE_TABLES:
+        connection.execute(f"DROP TABLE IF EXISTS {table}")
+    connection.execute(
+        """
+        UPDATE jacobian_state_format
+        SET format_revision = 5
+        WHERE id = 0
+        """
+    )
+
+
 STATE_MIGRATIONS = (
     Migration(
         revision=1,
@@ -440,8 +467,17 @@ STATE_MIGRATIONS = (
         definition=_STATE_FORMAT_SCHEMA,
         apply=_install_state_format_schema,
     ),
+    Migration(
+        revision=5,
+        name="remove-workspace-surface-v1",
+        definition=(
+            "Drop the retired workspace tables in dependency order and advance "
+            "the persisted state format to revision 5."
+        ),
+        apply=_remove_workspace_schema,
+    ),
 )
 
 SUPPORTED_STATE_FLOOR = 3
-CURRENT_STATE_FORMAT_REVISION = 4
+CURRENT_STATE_FORMAT_REVISION = 5
 RESEARCH_INDEX_UPGRADE_ID = "research-episode-index-v2"
