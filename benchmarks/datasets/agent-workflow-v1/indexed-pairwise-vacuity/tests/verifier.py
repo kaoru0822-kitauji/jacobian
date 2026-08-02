@@ -131,6 +131,7 @@ def _valid_predicates(result):
         not isinstance(pair, list)
         or len(pair) != 2
         or not all(_is_integer(index) for index in pair)
+        or not all(_fits_small_integer(index, len(references) - 1) for index in pair)
     ):
         return False
     left, right = int(pair[0]), int(pair[1])
@@ -250,6 +251,8 @@ def _evidence_valid(evidence):
     if target is None:
         return False
     try:
+        if target.stat().st_size > 1_048_576:
+            return False
         text = target.read_text().casefold()
     except (OSError, UnicodeError):
         return False
