@@ -1,4 +1,5 @@
 import json
+import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -142,6 +143,13 @@ def _formula_valid(
     return evaluated_numerator == _mul(evaluated_denominator, target)
 
 
+def _is_nonzero_scalar_multiple(poly, template):
+    if not poly or not template or set(poly) != set(template):
+        return False
+    scale = poly[next(iter(template))] / template[next(iter(template))]
+    return scale != 0 and all(value == scale * template[key] for key, value in poly.items())
+
+
 def _result_is_valid(result, frozen):
     required = {
         "variables",
@@ -157,6 +165,8 @@ def _result_is_valid(result, frozen):
     ):
         return False
     maximum_degree = frozen.get("maximum_formula_degree")
+    if type(maximum_degree) is not int or maximum_degree < 0:
+        return False
     generic = _generic_moments()
     singular = _singular_moments()
     generic_formula = result["generic_formula"]
@@ -165,7 +175,20 @@ def _result_is_valid(result, frozen):
     generic_denominator = _parse_polynomial(
         generic_formula["denominator"], maximum_degree
     )
-    if generic_denominator is None or _evaluate(generic_denominator, singular[:4]):
+    delta = {
+        (1, 0, 1, 0): Fraction(1),
+        (0, 2, 0, 0): Fraction(-1),
+    }
+    if generic_denominator is None or not _is_nonzero_scalar_multiple(
+        generic_denominator, delta
+    ):
+        return False
+    singular_denominator = _parse_polynomial(
+        result["singular_formula"]["denominator"], maximum_degree
+    )
+    if singular_denominator is None or not _is_nonzero_scalar_multiple(
+        singular_denominator, {(3, 0, 0, 0): Fraction(1)}
+    ):
         return False
     if not _formula_valid(
         result["singular_formula"], singular[:4], singular[4], maximum_degree
@@ -179,14 +202,22 @@ def _result_is_valid(result, frozen):
 
 
 def _evidence_matches(evidence):
-    if not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt"):
+    if (
+        not isinstance(evidence, list)
+        or len(evidence) != 1
+        or not evidence_list_is_bound(evidence, expected_path="evidence/answer.txt")
+    ):
         return False
     target = resolve_evidence(evidence[0], expected_path="evidence/answer.txt")
     try:
         text = target.read_text().casefold() if target else ""
     except (OSError, UnicodeError):
         return False
-    return all(word in text for word in ("delta", "nonzero", "rational"))
+    return bool(
+        len(text) >= 180
+        and all(word in text for word in ("delta", "nonzero", "generic", "singular", "x=y"))
+        and re.search(r"\brational\b", text)
+    )
 
 
 def main():
@@ -203,7 +234,12 @@ def main():
         contract and math_correct and _evidence_matches(submission.get("evidence"))
     )
     scope_correct = bool(
-        contract and submission.get("scope") == expected["required_scope"]
+        contract
+        and isinstance(submission.get("scope"), str)
+        and all(
+            term in submission["scope"].casefold()
+            for term in ("two", "atom", "exponential", "generic", "rank")
+        )
     )
     assurance_correct = bool(
         contract
