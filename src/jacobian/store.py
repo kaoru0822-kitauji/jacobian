@@ -206,7 +206,6 @@ class ArtifactStore:
         try:
             self._reject_unsupported_state_revision()
             self.database.migrate(STATE_MIGRATIONS)
-            self._run_state_data_upgrades()
         except UnsupportedStateVersionError:
             with suppress(StateDatabaseError):
                 self.database.close(checkpoint=False)
@@ -329,13 +328,6 @@ class ArtifactStore:
             raise StoreCorruptionError(
                 "state-format metadata does not match the migration head"
             )
-
-    def _run_state_data_upgrades(self) -> None:
-        """Run durable data-format upgrades after the artifact store is ready."""
-
-        from jacobian.persistence.state_upgrade import upgrade_state_data
-
-        upgrade_state_data(self)
 
     def close(self) -> None:
         """Checkpoint SQLite and end this store's owned lifetime."""

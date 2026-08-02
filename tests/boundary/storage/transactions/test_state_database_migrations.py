@@ -18,8 +18,9 @@ from jacobian.persistence.database import (
 from jacobian.persistence.migrations import (
     CURRENT_STATE_FORMAT_REVISION,
     STATE_MIGRATIONS,
+    SUPPORTED_STATE_FLOOR,
 )
-from jacobian.store import ArtifactStore, StoreError
+from jacobian.store import ArtifactStore, StoreError, UnsupportedStateVersionError
 
 
 def _ledger(root: Path) -> tuple[sqlite3.Row, ...]:
@@ -67,6 +68,12 @@ def test_fresh_store_records_immutable_ordered_migrations(tmp_path: Path) -> Non
         assert connection.execute(
             "SELECT format_revision FROM jacobian_state_format WHERE id = 0"
         ).fetchone() == (CURRENT_STATE_FORMAT_REVISION,)
+        assert (
+            connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'jacobian_data_upgrades'"
+            ).fetchone()
+            is None
+        )
     finally:
         connection.close()
 
@@ -90,7 +97,7 @@ def test_revision_five_removes_populated_legacy_workspace_tables(
     connection.row_factory = sqlite3.Row
     try:
         connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("DELETE FROM jacobian_schema_migrations WHERE revision = 5")
+        connection.execute("DELETE FROM jacobian_schema_migrations WHERE revision > 4")
         connection.execute(
             "UPDATE jacobian_state_format SET format_revision = 4 WHERE id = 0"
         )
@@ -244,8 +251,11 @@ def test_revision_five_removes_populated_legacy_workspace_tables(
     finally:
         connection.close()
 
-    with ArtifactStore(tmp_path):
-        pass
+    database = StateDatabase(tmp_path / "metadata.sqlite3", synchronous="FULL")
+    try:
+        database.migrate(STATE_MIGRATIONS)
+    finally:
+        database.close(checkpoint=False)
 
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
     try:
@@ -258,10 +268,19 @@ def test_revision_five_removes_populated_legacy_workspace_tables(
         assert not any(name.startswith("workspace") for name in tables)
         assert connection.execute(
             "SELECT format_revision FROM jacobian_state_format WHERE id = 0"
-        ).fetchone() == (5,)
+        ).fetchone() == (CURRENT_STATE_FORMAT_REVISION,)
         assert connection.execute(
             "SELECT revision FROM jacobian_schema_migrations WHERE revision = 5"
         ).fetchone() == (5,)
+        assert connection.execute(
+            "SELECT revision FROM jacobian_schema_migrations WHERE revision = 6"
+        ).fetchone() == (6,)
+        assert (
+            connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'jacobian_data_upgrades'"
+            ).fetchone()
+            is None
+        )
     finally:
         connection.close()
 
@@ -280,6 +299,25 @@ def test_legacy_schema_without_ledger_is_adopted(tmp_path: Path) -> None:
         pass
 
     assert len(_ledger(tmp_path)) == len(STATE_MIGRATIONS)
+
+
+def test_revision_five_state_requires_export_to_current_floor(tmp_path: Path) -> None:
+    with ArtifactStore(tmp_path):
+        pass
+    connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
+    try:
+        connection.execute("DELETE FROM jacobian_schema_migrations WHERE revision > 5")
+        connection.execute(
+            "UPDATE jacobian_state_format SET format_revision = 5 WHERE id = 0"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    with pytest.raises(UnsupportedStateVersionError) as exc_info:
+        ArtifactStore(tmp_path)
+    assert exc_info.value.detected_revision == 5
+    assert exc_info.value.minimum_revision == SUPPORTED_STATE_FLOOR
 
 
 def test_current_head_bootstrap_performs_no_sqlite_writes(
@@ -365,10 +403,10 @@ def test_newer_revision_fails_closed(tmp_path: Path) -> None:
     with pytest.raises(StoreError, match="UNSUPPORTED_STATE_VERSION") as exc_info:
         ArtifactStore(tmp_path)
     assert exc_info.value.detected_revision == 99
-    assert exc_info.value.minimum_revision == 3
+    assert exc_info.value.minimum_revision == SUPPORTED_STATE_FLOOR
 
 
-def test_missing_tail_revision_is_reapplied(tmp_path: Path) -> None:
+def test_missing_retirement_revision_requires_fresh_store(tmp_path: Path) -> None:
     with ArtifactStore(tmp_path):
         pass
     connection = sqlite3.connect(tmp_path / "metadata.sqlite3")
@@ -381,12 +419,10 @@ def test_missing_tail_revision_is_reapplied(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    with ArtifactStore(tmp_path):
-        pass
-
-    assert tuple(row["revision"] for row in _ledger(tmp_path)) == tuple(
-        range(1, len(STATE_MIGRATIONS) + 1)
-    )
+    with pytest.raises(UnsupportedStateVersionError) as exc_info:
+        ArtifactStore(tmp_path)
+    assert exc_info.value.detected_revision == 5
+    assert exc_info.value.minimum_revision == SUPPORTED_STATE_FLOOR
 
 
 def test_missing_non_tail_revision_fails_closed(tmp_path: Path) -> None:

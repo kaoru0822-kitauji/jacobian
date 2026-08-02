@@ -442,6 +442,19 @@ def _remove_workspace_schema(connection: sqlite3.Connection) -> None:
     )
 
 
+def _retire_data_upgrade_ledger(connection: sqlite3.Connection) -> None:
+    """Retire the completed research-index upgrade bookkeeping."""
+
+    connection.execute("DROP TABLE IF EXISTS jacobian_data_upgrades")
+    connection.execute(
+        """
+        UPDATE jacobian_state_format
+        SET format_revision = 6
+        WHERE id = 0
+        """
+    )
+
+
 STATE_MIGRATIONS = (
     Migration(
         revision=1,
@@ -477,8 +490,17 @@ STATE_MIGRATIONS = (
         apply=_remove_workspace_schema,
         requires_foreign_keys_off=True,
     ),
+    Migration(
+        revision=6,
+        name="retire-state-data-upgrade-ledger-v1",
+        definition=(
+            "Drop the completed research-index data-upgrade ledger and advance "
+            "the persisted state format to revision 6."
+        ),
+        apply=_retire_data_upgrade_ledger,
+    ),
 )
 
-SUPPORTED_STATE_FLOOR = 3
-CURRENT_STATE_FORMAT_REVISION = 5
+SUPPORTED_STATE_FLOOR = 6
+CURRENT_STATE_FORMAT_REVISION = 6
 RESEARCH_INDEX_UPGRADE_ID = "research-episode-index-v2"
