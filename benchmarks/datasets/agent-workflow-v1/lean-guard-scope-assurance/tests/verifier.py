@@ -79,7 +79,11 @@ def _result(value: object, source: dict[str, Any]) -> bool:
     if provenance.get("revision") != "3e7e99d027fece04d9cd96288cdd040c366458e5":
         return False
     for item, case in zip(submitted, cases, strict=True):
-        if not isinstance(item, dict) or not isinstance(case, dict):
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"id", "findings", "reason"}
+            or not isinstance(case, dict)
+        ):
             return False
         derived = _derive(case)
         if derived is None:
@@ -92,13 +96,23 @@ def _result(value: object, source: dict[str, Any]) -> bool:
         if (
             findings
             and "DIVISION_BY_ZERO" in findings
-            and not ("zero" in reason_text or "divisor" in reason_text)
+            and (
+                not ("zero" in reason_text or "divisor" in reason_text)
+                or any(
+                    marker in reason_text
+                    for marker in ("no division", "not a division", "safe divisor")
+                )
+            )
         ):
             return False
         if (
             findings
             and "INTEGER_DIVISION_TRUNCATION" in findings
-            and "truncat" not in reason_text
+            and (
+                "truncat" not in reason_text
+                or "no truncation" in reason_text
+                or "does not truncate" in reason_text
+            )
         ):
             return False
         if not findings and not any(
