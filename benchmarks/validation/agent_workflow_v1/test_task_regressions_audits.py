@@ -236,3 +236,34 @@ def test_inverse_distance_audit_rejects_corrupted_certificates(
     rejected = support._run_verifier(task, app, logs)
     assert rejected["correctness"] == 0.0
     assert rejected["reward"] == 0.0
+
+
+def test_indexed_pairwise_vacuity_accepts_canonical_limitation(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+
+    accepted = support._run_verifier(task, app, logs)
+    assert accepted["correctness"] == 1.0
+    assert accepted["reward"] == pytest.approx(1.0)
+    assert accepted["false_certification"] is False
+
+
+def test_indexed_pairwise_vacuity_rejects_overclaiming_limitations(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support._prepare_case(
+        tmp_path, "indexed-pairwise-vacuity", "computed"
+    )
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["limitations"] = [
+        "The verifier fully settles the indexed pairwise vacuity question."
+    ]
+    support._write_json(submission_path, submission)
+
+    rejected = support._run_verifier(task, app, logs)
+    assert rejected["correctness"] == 1.0
+    assert rejected["reward"] == 0.0
