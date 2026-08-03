@@ -185,9 +185,9 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	} | sort -u); \
 	$(HARBOR_PYTHON) .github/scripts/plan-benchmarks $(if $(BASE),--base "$(BASE)",) -- $$changed_paths
 
-harbor-sync: ## Update vendored verifier support and deterministic task digests.
+harbor-sync: ## Update vendored verifier support and validate leaf-only datasets.
 	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --write
-	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --write
+	$(HARBOR_PYTHON) tools/check_harbor_dataset.py --check
 
 harbor-validate: ## Run all repository-owned Harbor checks under the pinned Harbor runtime.
 	$(HARBOR_PYTHON) tools/sync_harbor_verifier_support.py --check
@@ -198,6 +198,7 @@ harbor-validate: ## Run all repository-owned Harbor checks under the pinned Harb
 		$(MAKE) --no-print-directory harbor-adapter-check \
 			ADAPTER="$${adapter_dir##*/}"; \
 	done
+	$(HARBOR_PYTHON) -m unittest benchmarks.validation.test_benchmark_adapters_runtime
 	$(UV_RUN) pytest -n 0 benchmarks/validation
 
 harbor-check: harbor-validate ## Run Harbor topology, digest, provenance, and host-side validation checks.
@@ -292,13 +293,20 @@ endif
 ifeq ($(JACOBIAN_ENABLED),0)
 EVAL_CONFIG ?= benchmarks/config/agent-workflow-v1-control.json
 override MCP_CONFIG :=
+EVAL_CONDITION := control
+EVAL_RESULTS ?= benchmarks/results/$(or $(DATASET),agent-workflow-v1)-control
 else
 EVAL_CONFIG ?= benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)/jobs/jacobian-observation.json
 MCP_CONFIG ?= benchmarks/config/jacobian.mcp.json
+EVAL_CONDITION := treatment
+EVAL_RESULTS ?= benchmarks/results/$(or $(DATASET),agent-workflow-v1)
 endif
+EVAL_RESOLVED_CONFIG ?= $(EVAL_RESULTS)/resolved-config.json
+EVAL_ROUTING_REPORT ?= $(EVAL_RESULTS)/routing-observation.json
 
 agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, DATASET=agent-workflow-v1, EVAL_EXECUTE=1).
-	@if [ "$(EVAL_EXECUTE)" != "1" ]; then \
+	@set -e; \
+	if [ "$(EVAL_EXECUTE)" != "1" ]; then \
 		echo "Model execution is opt-in. Review the job, then run: make agent-eval DATASET=agent-workflow-v1 EVAL_EXECUTE=1"; \
 		exit 0; \
 	fi; \
@@ -306,13 +314,28 @@ agent-eval: ## Run a Harbor evaluation (JACOBIAN_ENABLED=0|1, DATASET=agent-work
 		echo "JACOBIAN_MODEL must be exported" >&2; \
 		exit 2; \
 	fi; \
+	mkdir -p "$(EVAL_RESULTS)"; \
+	$(HARBOR_RUNNER) run --print-config \
+		-c "$(EVAL_CONFIG)" \
+		-a codex \
+		-m "$${JACOBIAN_MODEL}" \
+		$(if $(MCP_CONFIG),--mcp-config "$(MCP_CONFIG)",) \
+		$(if $(TASKS),-p "benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)" $(foreach task,$(TASKS),--include-task-name "$(task)"),) \
+		$(EVAL_ARGS) > "$(EVAL_RESOLVED_CONFIG)"; \
+	$(UV_RUN) python -m benchmarks.tooling.observation_results validate-config \
+		--config "$(EVAL_RESOLVED_CONFIG)" --condition "$(EVAL_CONDITION)"; \
 	$(HARBOR_RUNNER) run \
 		-c "$(EVAL_CONFIG)" \
 		-a codex \
 		-m "$${JACOBIAN_MODEL}" \
 		$(if $(MCP_CONFIG),--mcp-config "$(MCP_CONFIG)",) \
 		$(if $(TASKS),-p "benchmarks/datasets/$(or $(DATASET),agent-workflow-v1)" $(foreach task,$(TASKS),--include-task-name "$(task)"),) \
-		$(EVAL_ARGS)
+		$(EVAL_ARGS); \
+	$(UV_RUN) python -m benchmarks.tooling.observation_results route \
+		--dataset "$(or $(DATASET),agent-workflow-v1)" \
+		--condition "$(EVAL_CONDITION)" \
+		--config "$(EVAL_RESOLVED_CONFIG)" \
+		--output "$(EVAL_ROUTING_REPORT)"
 
 agent-eval-validate: ## Normalize one observation (RESULTS=..., JOB=..., CONDITION=..., OUTPUT=...).
 	@test -n "$(RESULTS)" -a -n "$(JOB)" -a -n "$(CONDITION)" -a -n "$(OUTPUT)" || { echo "RESULTS, JOB, CONDITION, and OUTPUT are required" >&2; exit 2; }
