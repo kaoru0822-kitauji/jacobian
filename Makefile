@@ -138,7 +138,8 @@ ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 
 test-changed: ## Run changed-path tests, defaulting BASE to origin/main.
 	@if [ -n "$(PATHS)" ]; then \
-		$(UV_RUN) python .github/scripts/plan-local-tests --paths $(PATHS) --execute; \
+		trap 'rm -f "$(PATHS_FILE)"' EXIT; \
+		$(UV_RUN) python .github/scripts/plan-local-tests --paths-file "$(PATHS_FILE)" --execute; \
 	else \
 		$(UV_RUN) python .github/scripts/plan-local-tests --base "$(or $(BASE),origin/main)" --execute; \
 	fi
