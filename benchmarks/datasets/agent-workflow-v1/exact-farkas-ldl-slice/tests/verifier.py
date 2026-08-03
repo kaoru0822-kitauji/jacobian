@@ -23,9 +23,7 @@ def _load_frozen():
         workspace_path = W / "input.json"
         if not is_regular_bounded_file(
             frozen_path, max_bytes=MAX_INPUT_BYTES
-        ) or not is_regular_bounded_file(
-            workspace_path, max_bytes=MAX_INPUT_BYTES
-        ):
+        ) or not is_regular_bounded_file(workspace_path, max_bytes=MAX_INPUT_BYTES):
             return {}
         raw = frozen_path.read_bytes()
         if workspace_path.read_bytes() != raw:
@@ -173,9 +171,7 @@ def main():
     submission_path = W / "submission.json"
     submission = (
         load_submission()
-        if is_regular_bounded_file(
-            submission_path, max_bytes=MAX_SUBMISSION_BYTES
-        )
+        if is_regular_bounded_file(submission_path, max_bytes=MAX_SUBMISSION_BYTES)
         else None
     )
     frozen = _load_frozen()
@@ -194,9 +190,7 @@ def main():
         and isinstance(submission.get("claimed_assurance"), str)
         and submission.get("claimed_assurance") in {"UNVERIFIED", "COMPUTED"}
     )
-    math_correct = bool(
-        structure_ok and _result_ok(submission.get("result"), frozen)
-    )
+    math_correct = bool(structure_ok and _result_ok(submission.get("result"), frozen))
     evidence = None
     if (
         structure_ok
@@ -204,9 +198,7 @@ def main():
         and len(submission["evidence"]) == 1
     ):
         evidence_path = W / "evidence" / "farkas-slice-certificate.json"
-        if is_regular_bounded_file(
-            evidence_path, max_bytes=MAX_EVIDENCE_BYTES
-        ):
+        if is_regular_bounded_file(evidence_path, max_bytes=MAX_EVIDENCE_BYTES):
             evidence = read_evidence_json(
                 submission["evidence"][0],
                 expected_path="evidence/farkas-slice-certificate.json",
