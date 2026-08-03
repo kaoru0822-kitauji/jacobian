@@ -16,7 +16,12 @@ the Harbor skill owns dataset layout and repository commands.
 1. Establish the contract boundary. Read the agent-visible schema and
    instructions, hidden expected material, task metadata, evidence format, and
    assurance ceiling. List what is intentionally fixed, what alternate witness
-   forms are valid, and what the verifier must not reveal.
+   forms are valid, and what the verifier must not reveal. Make the public
+   protocol explicit: the agent should receive the required output shape and
+   types, allowed enum values, assurance ceiling, evidence paths and digest
+   rules, scope, completeness, and artifact names. Do not expose the expected
+   solution, hidden verifier logic, private authorization records, or Oracle
+   fixtures merely to explain the format.
 
 2. Trace every acceptance path:
 
@@ -33,11 +38,12 @@ the Harbor skill owns dataset layout and repository commands.
    reading, reject symlink and workspace escapes, bind evidence to exact paths
    and digests, and reject `VERIFIED` without independent authorization.
 
-4. Keep diagnostic dimensions independent. Compute mathematical correctness,
-   evidence validity, scope accuracy, and assurance calibration separately.
-   Aggregate them only at the final reward boundary; invalid protocol or false
-   certification must force aggregate reward to zero without hiding which other
-   dimensions passed.
+4. Keep diagnostic dimensions independent. Compute protocol compliance,
+   mathematical correctness, evidence validity, scope accuracy, and assurance
+   calibration separately. Aggregate them only at the final reward boundary;
+   invalid protocol or false certification may force aggregate reward to zero,
+   but must not hide which other dimensions passed or make a correct
+   mathematical result look like a mathematical failure.
 
 5. Make prose requirements structural. Do not award credit because a response
    contains words such as “duplicate”, “line”, or “region”. Prefer typed result
@@ -45,8 +51,11 @@ the Harbor skill owns dataset layout and repository commands.
    semantic checks. Any unavoidable text predicate must be documented in the
    visible contract and tested with equivalent phrasing.
 
-6. Build adversarial fixtures before trusting the Oracle. Cover the canonical
-   witness, alternate valid witnesses, wrong mathematics, booleans and floats,
+6. Build adversarial fixtures before trusting the Oracle. Cover the public
+   contract itself, including a correct witness with the permitted assurance
+   level and a correct witness with an unsupported assurance claim. Also cover
+   the canonical witness, alternate valid witnesses, wrong mathematics,
+   booleans and floats,
    unreduced rationals, missing and extra fields, empty and unhashable nested
    values, out-of-range values, oversized and malformed files, symlink and
    traversal evidence, wrong digests, duplicate evidence descriptors, missing

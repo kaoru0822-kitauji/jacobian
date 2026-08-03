@@ -65,6 +65,15 @@ separate clean-room verifier. Instructions must
 be agent-agnostic: describe the mathematical outcome and evidence, never
 capability IDs, tool sequences, preferred decompositions, or Jacobian details.
 
+Treat the agent-visible schema and instructions as the task's public protocol.
+They must state the required output shape and types, allowed enum values,
+assurance ceiling, evidence paths and digest rules, scope, completeness, and
+artifact names. Do not rely on maintainer-only metadata or a README the agent
+does not receive for constraints that affect a valid submission. Keep expected
+solutions, hidden verifier logic, private authorization records, and Oracle
+fixtures out of that protocol; the verifier must independently enforce every
+public rule.
+
 For a new task, copy the member shape from `benchmarks/templates/member.toml`,
 create exactly one `members/<task-id>.toml` record alongside the direct task
 bundle, and resolve its `environment_profile` through
@@ -76,10 +85,13 @@ paths, floating image tags, or symlinks to share hidden material.
 
 Verifiers must reject malformed submissions, symlink or workspace escapes,
 wrong evidence paths or digests, incomplete scope, mismatched claims, and false
-`VERIFIED` assertions. Score correctness, evidence validity, scope accuracy,
-assurance calibration, and aggregate reward; force reward to zero for wrong
-answers and false certification. Accept alternate mathematically valid
-witnesses where the task permits them.
+`VERIFIED` assertions. Score protocol compliance, correctness, evidence
+validity, scope accuracy, assurance calibration, and aggregate reward; force
+reward to zero for wrong answers and false certification. Accept alternate
+mathematically valid
+witnesses where the task permits them. Report protocol or assurance failures
+alongside mathematical correctness so an aggregate zero is not misread as a
+wrong mathematical answer.
 
 Keep Jacobian out of task bundles. Attach it only through the Harbor job's agent
 configuration and MCP sidecar. Keep credentials, raw caches, host paths,
@@ -116,7 +128,7 @@ contract change:
    reward.
 4. Exercise deliberate failures: empty or malformed output, wrong answers,
    forged or escaped evidence, incomplete scope, mismatched claims, timeouts,
-   and false assurance.
+   false assurance, and correct witnesses with unsupported assurance claims.
 5. Confirm alternate valid witnesses pass and scan task bundles for leakage,
    secrets, host paths, raw caches, and floating dependencies.
 
