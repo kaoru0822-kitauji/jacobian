@@ -1,0 +1,117 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from benchmarks.validation.agent_workflow_v1 import support
+
+TASK = "bounded-variation-uniform-limit"
+
+
+def _case(tmp_path: Path):
+    return support._prepare_case(tmp_path, TASK, "computed")
+
+
+def test_reference_passes(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    assert support._run_verifier(task, app, logs)["reward"] == 1.0
+
+
+def test_alternative_scale_and_indices_pass(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    submission["result"]["scale_q"] = 5
+    submission["result"]["uniform_certificate"]["sup_norm_denominator_coefficient"] = 5
+    submission["result"]["checkpoints"] = []
+    for n in (3, 7, 13, 21):
+        k = 5 * n
+        submission["result"]["checkpoints"].append(
+            {
+                "n": n,
+                "frequency": k,
+                "amplitude": f"1/{k}",
+                "interior_segments": 2 * k - 1,
+                "endpoint_contribution": f"2/{k}",
+                "interior_contribution": f"{4 * k - 2}/{k}",
+                "total_variation": "4",
+            }
+        )
+    support._bind_result_evidence(app, submission)
+    support._write_json(path, submission)
+    assert support._run_verifier(task, app, logs)["reward"] == 1.0
+
+
+def _mutate(tmp_path: Path, mutation) -> float:
+    task, app, logs = _case(tmp_path)
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    mutation(submission)
+    support._bind_result_evidence(app, submission)
+    support._write_json(path, submission)
+    return support._run_verifier(task, app, logs)["reward"]
+
+
+def test_wrong_segment_count_is_rejected(tmp_path: Path) -> None:
+    assert (
+        _mutate(
+            tmp_path,
+            lambda s: s["result"]["checkpoints"][0].__setitem__("interior_segments", 6),
+        )
+        == 0.0
+    )
+
+
+def test_wrong_variation_is_rejected(tmp_path: Path) -> None:
+    assert (
+        _mutate(
+            tmp_path,
+            lambda s: s["result"]["variation_formula"].__setitem__(
+                "total_variation", "0"
+            ),
+        )
+        == 0.0
+    )
+
+
+def test_duplicate_indices_are_rejected(tmp_path: Path) -> None:
+    def duplicate(submission):
+        submission["result"]["checkpoints"][1] = dict(
+            submission["result"]["checkpoints"][0]
+        )
+
+    assert _mutate(tmp_path, duplicate) == 0.0
+
+
+def test_false_verified_is_rejected(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    submission["claimed_assurance"] = "VERIFIED"
+    support._write_json(path, submission)
+    result = support._run_verifier(task, app, logs)
+    assert result["reward"] == 0.0
+    assert result["false_certification"] is True
+
+
+def test_visible_input_tampering_is_rejected(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    data = json.loads((app / "input.json").read_text())
+    data["source"]["row"] = 601
+    support._write_json(app / "input.json", data)
+    assert support._run_verifier(task, app, logs)["reward"] == 0.0
+
+
+def test_keyword_only_evidence_is_rejected(tmp_path: Path) -> None:
+    task, app, logs = _case(tmp_path)
+    path = app / "submission.json"
+    submission = json.loads(path.read_text())
+    evidence = app / "evidence" / "answer.txt"
+    evidence.write_text(
+        "uniform variation endpoint interior does not\nRESULT_JSON:"
+        + json.dumps(submission["result"], separators=(",", ":"))
+        + "\n"
+    )
+    submission["evidence"][0]["sha256"] = support._digest(evidence)
+    support._write_json(path, submission)
+    assert support._run_verifier(task, app, logs)["reward"] == 0.0

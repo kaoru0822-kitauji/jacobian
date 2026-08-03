@@ -1,0 +1,1 @@
+{"task_id":"jacobian/bounded-variation-uniform-limit","conclusion":"UNIFORM_CONVERGENCE_DOES_NOT_FORCE_VARIATION_CONVERGENCE","maximum_assurance":"COMPUTED","required_scope":"the full sequence on [0,2*pi] and all submitted exact checkpoints"}
