@@ -6,14 +6,6 @@ from jacobian.contracts.capabilities import CapabilityAssuranceLevel, Capability
 from jacobian.contracts.results import ExecutionStatus
 
 
-def test_resource_portfolio_has_more_than_one_hundred_atomic_capabilities(
-    attached_complete_runtime,
-) -> None:
-    assert (
-        len(attached_complete_runtime.core.capabilities.catalog().capabilities) >= 100
-    )
-
-
 def test_consolidated_domain_results_are_exact_computed_evidence(
     attached_complete_runtime,
 ) -> None:

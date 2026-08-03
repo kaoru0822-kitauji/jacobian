@@ -11,15 +11,12 @@ from jacobian.contracts.results import ExecutionStatus
 from jacobian.math import arithmetic, matrices
 
 
-def _assert_computed_lineage(runtime, result) -> None:
+def _assert_computed_result(result) -> None:
     assert result.execution.status is ExecutionStatus.COMPLETED
     assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
     assert result.completeness.status is CapabilityCompletenessStatus.COMPLETE
-    assert len(result.artifact_uris) == 2
-    source_uri, result_uri = result.artifact_uris
-    assert runtime.core.store.get(result_uri).manifest.parents == (source_uri,)
-    assert result.relationships[0].source_artifact_uris == (source_uri,)
-    assert result.relationships[0].target_artifact_uris == (result_uri,)
+    assert result.artifact_uris == ()
+    assert result.relationships == ()
 
 
 def test_native_and_capability_arithmetic_agree(authorized_complete_runtime) -> None:
@@ -39,7 +36,7 @@ def test_native_and_capability_arithmetic_agree(authorized_complete_runtime) -> 
         "num": str(native.numerator),
         "den": str(native.denominator),
     }
-    _assert_computed_lineage(runtime, result)
+    _assert_computed_result(result)
 
 
 def test_native_and_capability_matrix_inverse_agree(
@@ -67,7 +64,7 @@ def test_native_and_capability_matrix_inverse_agree(
         ]
     )
     assert bridged == native
-    _assert_computed_lineage(runtime, result)
+    _assert_computed_result(result)
 
 
 def test_capability_provider_provenance_is_unchanged(

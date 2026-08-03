@@ -31,7 +31,7 @@ def _install_hypothesis_plugin(
     runtime: JacobianRuntime,
     *,
     transformer_entrypoint: str = (
-        "tests.component.plugins._fixture_plugins:transform_fixture_hypothesis"
+        "tests.support.plugin_entrypoints:transform_fixture_hypothesis"
     ),
 ) -> tuple[str, str, str, str]:
     claim_schema_uri = runtime.core.schemas.register(
@@ -57,12 +57,10 @@ def _install_hypothesis_plugin(
     )
     entrypoints = {
         "HypothesisTransformer": transformer_entrypoint,
-        "Proposer": "tests.component.plugins._fixture_plugins:propose_fixture_values",
-        "Refiner": "tests.component.plugins._fixture_plugins:refine_fixture_search",
-        "Evaluator": "tests.component.plugins._fixture_plugins:evaluate_candidate",
-        "WitnessOracle": (
-            "tests.component.plugins._fixture_plugins:find_fixture_witness"
-        ),
+        "Proposer": "tests.support.plugin_entrypoints:propose_fixture_values",
+        "Refiner": "tests.support.plugin_entrypoints:refine_fixture_search",
+        "Evaluator": "tests.support.plugin_entrypoints:evaluate_candidate",
+        "WitnessOracle": ("tests.support.plugin_entrypoints:find_fixture_witness"),
     }
     capabilities: dict[str, dict[str, str]] = {}
     for name, entrypoint in entrypoints.items():
@@ -518,7 +516,7 @@ def test_hypothesis_plugin_cannot_promote_parameter_region(
     claim_uri, plugin_id, checker_id, candidate_schema_uri = _install_hypothesis_plugin(
         runtime,
         transformer_entrypoint=(
-            "tests.component.plugins._fixture_plugins:"
+            "tests.support.plugin_entrypoints:"
             "transform_with_unsupported_region_promotion"
         ),
     )
@@ -557,7 +555,7 @@ def test_hypothesis_plugin_cannot_cite_unbound_region_samples(
     claim_uri, plugin_id, _, _ = _install_hypothesis_plugin(
         runtime,
         transformer_entrypoint=(
-            "tests.component.plugins._fixture_plugins:transform_with_unbound_region_sample"
+            "tests.support.plugin_entrypoints:transform_with_unbound_region_sample"
         ),
     )
 

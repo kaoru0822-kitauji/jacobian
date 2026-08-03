@@ -39,10 +39,10 @@ def _interval(lo: str, hi: str) -> dict[str, Any]:
 
 @pytest.fixture()
 def installation(tmp_path: Path):
-    return install_capability_bundle(
-        tmp_path,
-        install_polynomial_interval_capabilities,
-    )
+    with install_capability_bundle(
+        tmp_path, install_polynomial_interval_capabilities
+    ) as bundle:
+        yield bundle
 
 
 def test_enclose_capability_computes_a_valid_bernstein_enclosure(

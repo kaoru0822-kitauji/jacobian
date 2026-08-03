@@ -175,6 +175,7 @@ def test_computed_domain_operation_remains_available_without_checker_authority(
             assert unavailable["execution"]["status"] == "ERROR"
             assert unavailable["output"]["error"]["code"] == "UNKNOWN_CAPABILITY"
             assert unavailable["assurance"]["level"] == "HEURISTIC"
+            assert "conclusion" not in unavailable["output"]
 
     asyncio.run(scenario())
 

@@ -61,13 +61,25 @@ def test_every_tracked_source_file_has_explicit_suite_ownership() -> None:
 
 def test_every_tracked_support_file_has_explicit_suite_ownership() -> None:
     manifest = json.loads(OWNERSHIP.read_text(encoding="utf-8"))
-    support_paths = subprocess.run(
+    tracked_paths = subprocess.run(
         ["git", "ls-files", "tests/support", "tests/conftest.py"],
         check=True,
         capture_output=True,
         text=True,
         timeout=30,
     ).stdout.splitlines()
+    repo_root = OWNERSHIP.parent.parent
+    worktree_paths = [
+        path.relative_to(repo_root).as_posix()
+        for path in (repo_root / "tests" / "support").glob("*.py")
+    ] + ["tests/conftest.py"]
+    support_paths = sorted(
+        {
+            path
+            for path in (*tracked_paths, *worktree_paths)
+            if (repo_root / path).is_file()
+        }
+    )
 
     unowned = [
         path

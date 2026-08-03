@@ -33,20 +33,6 @@ class DomainTestServices:
 
 
 @contextmanager
-def open_core_services(
-    root: str | Path,
-    options: RuntimeOptions | None = None,
-) -> Iterator[CoreServices]:
-    """Open capability-independent services without installing a portfolio."""
-
-    core = bootstrap_services(root, options or RuntimeOptions())
-    try:
-        yield core
-    finally:
-        core.close()
-
-
-@contextmanager
 def open_domain_services(
     root: str | Path,
     *bundles: DomainBundle,

@@ -462,9 +462,10 @@
       "name": "generic-test-support",
       "patterns": [
         "tests/support/__init__.py",
-        "tests/support/commands.py",
-        "tests/support/domains.py",
-        "tests/support/runtime_fixtures.py",
+        "tests/support/runtime_templates.py",
+        "tests/support/runtime_instances.py",
+        "tests/support/plugin_entrypoints.py",
+        "tests/support/plugin_noisy_module.py",
         "tests/support/services.py",
         "tests/support/state.py",
         "tests/support/artifacts.py",
@@ -506,7 +507,7 @@
     {
       "name": "provider-spike-isolation-support",
       "patterns": [
-        "tests/support/provider_spike_isolation.py"
+        "tests/composition/runtime/provider_spike_isolation.py"
       ],
       "suites": [
         "composition",

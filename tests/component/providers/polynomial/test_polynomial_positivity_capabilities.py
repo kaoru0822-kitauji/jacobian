@@ -264,10 +264,10 @@ def test_checker_rejects_noncanonical_rational() -> None:
 
 @pytest.fixture()
 def installation(tmp_path: Path):
-    return install_capability_bundle(
-        tmp_path,
-        install_polynomial_positivity_capabilities,
-    )
+    with install_capability_bundle(
+        tmp_path, install_polynomial_positivity_capabilities
+    ) as bundle:
+        yield bundle
 
 
 def test_decide_capability_finds_positive_linear(installation) -> None:

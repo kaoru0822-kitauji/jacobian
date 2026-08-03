@@ -67,6 +67,7 @@ def test_graph_search_witness_and_independent_replay(
     )
     assert evaluation.items[0].result.conclusion.value == "FALSE"
     assert evaluation.items[0].result.assurance.verification.value == "UNVERIFIED"
+    assert evaluation.items[0].result.verification_record_uri is None
 
     found = authorized_complete_runtime.services.witnesses.find(
         claim_uri=claim.artifact_uri,
@@ -85,6 +86,8 @@ def test_graph_search_witness_and_independent_replay(
 
     assert verified.conclusion.value == "FALSE"
     assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
+    assert found.witness_uri in verified.evidence_uris
 
     replay = subprocess.run(
         [
@@ -165,6 +168,8 @@ def test_matrix_kernel_witness_and_independent_replay(
     assert verified.conclusion.value == "FALSE"
     assert verified.assurance.arithmetic.value == "EXACT_RATIONAL"
     assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
+    assert found.witness_uri in verified.evidence_uris
 
 
 def test_erdos_straus_range_witness_and_independent_replay(
@@ -214,6 +219,8 @@ def test_erdos_straus_range_witness_and_independent_replay(
     assert verified.assurance.arithmetic.value == "EXACT_INTEGER"
     assert verified.assurance.coverage.value == "EXHAUSTIVE"
     assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
+    assert found.witness_uri in verified.evidence_uris
 
 
 def test_matrix_maxdet_certificate_replays_full_scope(
@@ -273,6 +280,8 @@ def test_matrix_maxdet_certificate_replays_full_scope(
     )
     assert verified_witness.conclusion.value == "TRUE"
     assert verified_witness.assurance.coverage.value == "EXHAUSTIVE"
+    assert verified_witness.verification_record_uri is not None
+    assert found.witness_uri in verified_witness.evidence_uris
 
     payload = {
         "maximum": {"num": "4", "den": "1"},
@@ -307,6 +316,8 @@ def test_matrix_maxdet_certificate_replays_full_scope(
     assert verified.conclusion.value == "TRUE"
     assert verified.assurance.coverage.value == "EXHAUSTIVE"
     assert verified.assurance.verification.value == "VERIFIED"
+    assert verified.verification_record_uri is not None
+    assert stored.artifact_uri in verified.evidence_uris
 
 
 def test_graph_counterexample_shrinks_to_the_odd_cycle(

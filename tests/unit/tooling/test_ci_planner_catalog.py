@@ -4,7 +4,6 @@ import contextlib
 import importlib.util
 import io
 import json
-import subprocess
 import sys
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -82,24 +81,24 @@ def test_paths_environment_supports_local_planning_without_a_git_base(
     assert "make test-process" in output
 
 
-def test_planners_accept_a_file_backed_path_payload(tmp_path: Path) -> None:
+def test_planners_accept_a_file_backed_path_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     paths_file = tmp_path / "paths.txt"
     paths_file.write_text("tools/check_doc_commands.py\n", encoding="utf-8")
 
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / ".github/scripts/classify-ci-paths"),
-            "--paths-file",
-            str(paths_file),
-        ],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
+    classifier = _load_script("classify-ci-paths")
+    output = io.StringIO()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["classify-ci-paths", "--paths-file", str(paths_file)],
     )
+    with contextlib.redirect_stdout(output):
+        classifier.main()
 
-    plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
+    plan = dict(line.split("=", 1) for line in output.getvalue().splitlines())
     assert plan["run-docs"] == "true"
     assert plan["run-component"] == "false"
 

@@ -21,15 +21,17 @@ class _Distribution:
         return f"1.0-{self.requested_name}"
 
 
-@pytest.fixture(autouse=True)
-def _isolated_metadata_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.fixture
+def isolated_metadata_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(provider_metadata, "_version_cache", {})
     monkeypatch.setattr(provider_metadata, "_summary_cache", {})
 
 
 def test_distribution_summary_computes_identical_identity_once(
+    isolated_metadata_cache: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    del isolated_metadata_cache
     requested: list[str] = []
 
     def lookup(name: str) -> _Distribution:
@@ -46,8 +48,10 @@ def test_distribution_summary_computes_identical_identity_once(
 
 
 def test_distribution_summary_keeps_distinct_inputs_distinct(
+    isolated_metadata_cache: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    del isolated_metadata_cache
     requested: list[str] = []
 
     def lookup(name: str) -> _Distribution:
@@ -64,8 +68,10 @@ def test_distribution_summary_keeps_distinct_inputs_distinct(
 
 
 def test_missing_distribution_is_not_cached(
+    isolated_metadata_cache: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    del isolated_metadata_cache
     calls = 0
 
     def lookup(name: str) -> _Distribution:

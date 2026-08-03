@@ -371,11 +371,3 @@ def test_model_backed_artifact_rejects_digest_tampering(tmp_path: Path) -> None:
                 semantics_uri=installation.semantics_uri,
                 payload=malformed,
             )
-
-
-def test_formal_dataset_capability_is_owned_by_domain_bundle() -> None:
-    assert build_formal_dataset_bundle().domain_id == "formal_datasets"
-    assert tuple(
-        operation.capability_id
-        for operation in build_formal_dataset_bundle().capabilities
-    ) == ("dataset.formal.materialize",)

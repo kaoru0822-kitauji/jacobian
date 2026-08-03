@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import importlib
 from pathlib import Path
 
@@ -87,8 +88,10 @@ def test_digest_rejects_package_symlinks(
     link = package / "plugin.py"
     try:
         link.symlink_to(outside)
-    except OSError:
-        pytest.skip("this platform cannot create test symlinks")
+    except OSError as exc:
+        if exc.errno not in {errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP}:
+            raise
+        pytest.skip(f"this platform cannot create test symlinks: {exc}")
     monkeypatch.syspath_prepend(str(tmp_path))
     importlib.invalidate_caches()
 

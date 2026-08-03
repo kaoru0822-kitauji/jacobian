@@ -277,7 +277,10 @@ def _tier(path: PurePosixPath) -> str | None:
 
 
 def _runtime_allowed(path: PurePosixPath, tier_override: str | None = None) -> bool:
-    if path == PurePosixPath("tests/support/runtime_fixtures.py"):
+    if path in {
+        PurePosixPath("tests/support/runtime_templates.py"),
+        PurePosixPath("tests/support/runtime_instances.py"),
+    }:
         return True
     tier = tier_override or _tier(path)
     if tier in {"composition", "e2e"}:

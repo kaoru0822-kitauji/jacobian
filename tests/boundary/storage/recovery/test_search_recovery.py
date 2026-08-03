@@ -175,7 +175,7 @@ def test_interrupted_search_recovers_from_checkpoint_without_chat_state(
     claim_uri, plugin_id = _install_search_plugin(
         runtime,
         proposer_entrypoint=(
-            "tests.component.plugins._fixture_plugins:propose_fixture_values_slowly"
+            "tests.support.plugin_entrypoints:propose_fixture_values_slowly"
         ),
     )
     handle = runtime.services.search.start(
@@ -234,7 +234,7 @@ def test_interrupted_cancellation_remains_cancelled_after_recovery(
     claim_uri, plugin_id = _install_search_plugin(
         runtime,
         proposer_entrypoint=(
-            "tests.component.plugins._fixture_plugins:propose_fixture_values_slowly"
+            "tests.support.plugin_entrypoints:propose_fixture_values_slowly"
         ),
     )
     handle = runtime.services.search.start(

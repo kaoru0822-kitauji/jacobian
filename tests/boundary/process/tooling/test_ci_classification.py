@@ -171,7 +171,7 @@ def _expected_plan(classification: str, *enabled: str) -> dict[str, str]:
             _expected_plan("selective", "run-static"),
         ),
         (
-            ("tests/support/provider_spike_isolation.py",),
+            ("tests/composition/runtime/provider_spike_isolation.py",),
             _expected_plan(
                 "python",
                 "run-python",
