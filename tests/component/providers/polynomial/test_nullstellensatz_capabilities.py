@@ -1,0 +1,282 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import pytest
+from tests.support.nullstellensatz import load_chart_certificates
+from tests.support.services import DomainTestServices, open_domain_services
+
+from jacobian.contracts.capabilities import (
+    CapabilityAssuranceLevel,
+    CapabilityMode,
+    CapabilityRequest,
+    CapabilityResult,
+)
+from jacobian.contracts.nullstellensatz import NullstellensatzCertificateBundle
+from jacobian.contracts.results import (
+    Arithmetic,
+    Assurance,
+    Conclusion,
+    Coverage,
+    Execution,
+    ExecutionStatus,
+    InputStatus,
+    InputValidation,
+    Method,
+    ResultEnvelope,
+    Verification,
+)
+from jacobian.domains.polynomial_nullstellensatz import (
+    build_nullstellensatz_core_bundle,
+)
+from jacobian.domains.polynomial_nullstellensatz.core import (
+    MATERIALIZE_CAPABILITY_ID,
+    VERIFY_CAPABILITY_ID,
+)
+from jacobian.runtime import CheckerAuthorityMode
+
+
+def _invoke(
+    services: DomainTestServices,
+    capability_id: str,
+    payload: dict[str, Any],
+    mode: CapabilityMode,
+) -> CapabilityResult:
+    return services.core.capabilities.invoke(
+        CapabilityRequest(
+            capability_id=capability_id,
+            mode=mode,
+            input=payload,
+        )
+    )
+
+
+def _persist_certificate(
+    services: DomainTestServices,
+    materialized: CapabilityResult,
+    *,
+    mutate: Callable[[dict[str, Any]], None] | None = None,
+) -> str:
+    system_uri = materialized.output["system_uri"]
+    system_artifact = services.core.store.get(system_uri)
+    verify_descriptor = services.core.capabilities._adapters[
+        VERIFY_CAPABILITY_ID
+    ].descriptor
+    bundle = NullstellensatzCertificateBundle(
+        system_uri=system_uri,
+        system_digest=system_artifact.manifest.object_digest,
+        producer_version="4.4.1p5",
+        producer_digest="sha256:" + "4" * 64,
+        charts=load_chart_certificates(),
+    )
+    payload = bundle.model_dump(mode="json")
+    if mutate is not None:
+        mutate(payload)
+    stored = services.core.artifacts.put(
+        schema_uri=verify_descriptor.accepted_artifact_types[1],
+        semantics_uri=system_artifact.manifest.semantics_uri,
+        payload=payload,
+        parents=(system_uri,),
+        summary="test Nullstellensatz certificate bundle",
+        producer_write=True,
+    )
+    return str(stored.artifact_uri)
+
+
+def test_authorized_checker_verifies_complete_bundle(tmp_path: Path) -> None:
+    with open_domain_services(
+        tmp_path,
+        build_nullstellensatz_core_bundle(),
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+    ) as services:
+        materialized = _invoke(
+            services,
+            MATERIALIZE_CAPABILITY_ID,
+            {},
+            CapabilityMode.EXPLORE,
+        )
+        certificate_uri = _persist_certificate(services, materialized)
+
+        result = _invoke(
+            services,
+            VERIFY_CAPABILITY_ID,
+            {
+                "system_uri": materialized.output["system_uri"],
+                "certificate_bundle_uri": certificate_uri,
+            },
+            CapabilityMode.VERIFY,
+        )
+
+        assert result.output["claim"] == "SYSTEM_INFEASIBLE"
+        assert result.output["conclusion"] == "TRUE"
+        assert result.output["assurance"] == "VERIFIED"
+        assert result.assurance.level is CapabilityAssuranceLevel.VERIFIED
+        assert result.output["verification_record_uri"] in result.artifact_uris
+        assert result.relationships[0].status.value == "VERIFIED"
+
+
+def test_unavailable_checker_never_false_certifies(tmp_path: Path) -> None:
+    with open_domain_services(
+        tmp_path,
+        build_nullstellensatz_core_bundle(),
+        checker_authority=CheckerAuthorityMode.NONE,
+    ) as services:
+        materialized = _invoke(
+            services,
+            MATERIALIZE_CAPABILITY_ID,
+            {},
+            CapabilityMode.EXPLORE,
+        )
+        certificate_uri = _persist_certificate(services, materialized)
+
+        result = _invoke(
+            services,
+            VERIFY_CAPABILITY_ID,
+            {
+                "system_uri": materialized.output["system_uri"],
+                "certificate_bundle_uri": certificate_uri,
+            },
+            CapabilityMode.VERIFY,
+        )
+
+        assert result.output["conclusion"] == "UNKNOWN"
+        assert result.output["verification_record_uri"] is None
+        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+        assert not result.relationships
+
+
+def test_mutated_certificate_cannot_return_verified(tmp_path: Path) -> None:
+    with open_domain_services(
+        tmp_path,
+        build_nullstellensatz_core_bundle(),
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+    ) as services:
+        materialized = _invoke(
+            services,
+            MATERIALIZE_CAPABILITY_ID,
+            {},
+            CapabilityMode.EXPLORE,
+        )
+
+        def remove_term(payload: dict[str, Any]) -> None:
+            multipliers = payload["charts"][0]["multipliers"]
+            next(
+                item["multiplier"]["terms"]
+                for item in multipliers
+                if len(item["multiplier"]["terms"]) >= 2
+            ).pop()
+
+        certificate_uri = _persist_certificate(
+            services,
+            materialized,
+            mutate=remove_term,
+        )
+        result = _invoke(
+            services,
+            VERIFY_CAPABILITY_ID,
+            {
+                "system_uri": materialized.output["system_uri"],
+                "certificate_bundle_uri": certificate_uri,
+            },
+            CapabilityMode.VERIFY,
+        )
+
+        assert result.output["conclusion"] == "UNKNOWN"
+        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED
+        assert result.output["verification_record_uri"] is None
+
+
+def test_stale_artifact_binding_is_rejected_before_checker(tmp_path: Path) -> None:
+    with open_domain_services(
+        tmp_path,
+        build_nullstellensatz_core_bundle(),
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+    ) as services:
+        materialized = _invoke(
+            services,
+            MATERIALIZE_CAPABILITY_ID,
+            {},
+            CapabilityMode.EXPLORE,
+        )
+        certificate_uri = _persist_certificate(services, materialized)
+        wrong_schema = services.core.capabilities._adapters[
+            VERIFY_CAPABILITY_ID
+        ].descriptor.accepted_artifact_types[0]
+        reordered_payload = dict(
+            services.core.store.get(materialized.output["system_uri"]).payload
+        )
+        reordered_payload["charts"] = list(reversed(reordered_payload["charts"]))
+        wrong_system = services.core.artifacts.put(
+            schema_uri=wrong_schema,
+            semantics_uri=services.core.store.get(
+                materialized.output["system_uri"]
+            ).manifest.semantics_uri,
+            payload=reordered_payload,
+            summary="reordered system with no certificate parent binding",
+            producer_write=True,
+        )
+
+        result = _invoke(
+            services,
+            VERIFY_CAPABILITY_ID,
+            {
+                "system_uri": wrong_system.artifact_uri,
+                "certificate_bundle_uri": certificate_uri,
+            },
+            CapabilityMode.VERIFY,
+        )
+
+        assert result.execution.status.value == "ERROR"
+        assert result.diagnostics[0].code == (
+            "INVALID_NULLSTELLENSATZ_VERIFICATION_REQUEST"
+        )
+
+
+def test_checker_timeout_never_verifies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with open_domain_services(
+        tmp_path,
+        build_nullstellensatz_core_bundle(),
+        checker_authority=CheckerAuthorityMode.INSTALL_BUNDLED,
+    ) as services:
+        materialized = _invoke(
+            services,
+            MATERIALIZE_CAPABILITY_ID,
+            {},
+            CapabilityMode.EXPLORE,
+        )
+        certificate_uri = _persist_certificate(services, materialized)
+        monkeypatch.setattr(
+            services.application.verification,
+            "verify_certificate",
+            lambda **_kwargs: ResultEnvelope(
+                execution=Execution(status=ExecutionStatus.TIMEOUT),
+                input=InputValidation(status=InputStatus.ACCEPTED),
+                conclusion=Conclusion.UNKNOWN,
+                assurance=Assurance(
+                    arithmetic=Arithmetic.EXACT_RATIONAL,
+                    method=Method.CHECKED_CERTIFICATE,
+                    coverage=Coverage.EXHAUSTIVE,
+                    verification=Verification.UNVERIFIED,
+                ),
+            ),
+        )
+
+        result = _invoke(
+            services,
+            VERIFY_CAPABILITY_ID,
+            {
+                "system_uri": materialized.output["system_uri"],
+                "certificate_bundle_uri": certificate_uri,
+            },
+            CapabilityMode.VERIFY,
+        )
+
+        assert result.execution.status is ExecutionStatus.TIMEOUT
+        assert result.output["conclusion"] == "UNKNOWN"
+        assert result.output["verification_record_uri"] is None
+        assert result.assurance.level is CapabilityAssuranceLevel.COMPUTED

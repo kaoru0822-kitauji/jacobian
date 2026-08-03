@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ def test_structured_oracle_receives_full_reward(
 ) -> None:
     result = support.run_verifier(*support.prepare_case(tmp_path, task_name))
 
-    assert result == {
+    expected = {
         "correctness": 1.0,
         "evidence_validity": 1.0,
         "scope_accuracy": 1.0,
@@ -25,6 +26,9 @@ def test_structured_oracle_receives_full_reward(
         "reward": 1.0,
         "false_certification": False,
     }
+    if task_name == "jcb-postdoc-019":
+        expected["protocol_compliance"] = 1.0
+    assert result == expected
 
 
 @pytest.mark.parametrize("task_name", TASKS)
@@ -126,6 +130,63 @@ def test_structured_verifiers_fail_closed_on_protocol_attacks(
     assert rejected["reward"] == 0.0
     if attack == "false-verified":
         assert rejected["false_certification"] is True
+
+
+def test_structured_verifier_scores_math_separately_from_protocol_compliance(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-019")
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["unexpected"] = True
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["correctness"] == 1.0
+    assert result["evidence_validity"] == 1.0
+    assert result["scope_accuracy"] == 1.0
+    assert result["assurance_calibration"] == 1.0
+    assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_nullstellensatz_verifier_rejects_nonregular_workspace_input(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-019")
+    input_path = app / "input.json"
+    input_path.unlink()
+    os.mkfifo(input_path)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["protocol_compliance"] == 0.0
+    assert result["reward"] == 0.0
+
+
+def test_nullstellensatz_verifier_accepts_reordered_polynomial_terms(
+    tmp_path: Path,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-019")
+    certificate_path = app / "evidence" / "nullstellensatz-certificate.json"
+    certificate = json.loads(certificate_path.read_text())
+    for chart in certificate["charts"]:
+        for named in chart["generators"]:
+            named["polynomial"]["terms"] = list(reversed(named["polynomial"]["terms"]))
+        for multiplier in chart["multipliers"]:
+            multiplier["multiplier"]["terms"] = list(
+                reversed(multiplier["multiplier"]["terms"])
+            )
+    support.write_json(certificate_path, certificate)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(certificate_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["reward"] == 1.0
 
 
 def test_syzygy_verifier_rejects_mutated_workspace_input(tmp_path: Path) -> None:
@@ -263,4 +324,53 @@ def test_syzygy_verifier_rejects_corrupted_certificates(
 
     result = support.run_verifier(task, app, logs)
     assert result["correctness"] == 0.0
+    assert result["reward"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "wrong-generator",
+        "reordered-variables",
+        "altered-domain",
+        "truncated-multiplier",
+        "missing-term",
+        "incorrect-constant",
+        "missing-chart",
+    ),
+)
+def test_nullstellensatz_verifier_rejects_corrupted_certificates(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-019")
+    certificate_path = app / "evidence" / "nullstellensatz-certificate.json"
+    certificate = json.loads(certificate_path.read_text())
+    first = certificate["charts"][0]
+    if mutation == "wrong-generator":
+        first["generators"][0]["polynomial"]["terms"][0]["coefficient"]["num"] = "7"
+    elif mutation == "reordered-variables":
+        first["variable_order"][0:2] = reversed(first["variable_order"][0:2])
+    elif mutation == "altered-domain":
+        certificate["coefficient_domain"] = "RR"
+    elif mutation == "truncated-multiplier":
+        first["multipliers"].pop()
+    elif mutation == "missing-term":
+        next(
+            item["multiplier"]["terms"]
+            for item in first["multipliers"]
+            if item["multiplier"]["terms"]
+        ).pop()
+    elif mutation == "incorrect-constant":
+        first["identity_rhs"] = {"num": "2", "den": "1"}
+    else:
+        certificate["charts"].pop()
+    support.write_json(certificate_path, certificate)
+    submission_path = app / "submission.json"
+    submission = json.loads(submission_path.read_text())
+    submission["evidence"][0]["sha256"] = support.digest(certificate_path)
+    support.write_json(submission_path, submission)
+
+    result = support.run_verifier(task, app, logs)
+
     assert result["reward"] == 0.0

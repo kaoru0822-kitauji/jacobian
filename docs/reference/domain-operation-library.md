@@ -201,6 +201,27 @@ Two bounded portfolio examples show the intended boundary:
   kernel witness; full sparse entries are opt-in.
   `polynomial.jacobian_syzygy.minimum_degree.verify` reconstructs the maps with
   a standard-library rational checker independent of the SymPy producer.
+- `polynomial.jacobian_degree_slice.system.materialize` writes the frozen
+  normalized bivariate degree-`(2,3)` system as a producer-only typed artifact.
+  Exact degree is the disjunction that the quadratic and cubic top coefficient
+  vectors are nonzero; the materializer represents it by the complete twelve
+  charts `t*a_i*b_j-1`, not by requiring every leading coefficient to be
+  nonzero. `polynomial.nullstellensatz.infeasibility_certificate.compute` is
+  installed only with pinned Singular 4.4.1p5 and persists a bounded bundle of
+  identities `sum(h_i*f_i)=1` under the exact system semantics. The bundle is a
+  child of the system artifact and records its URI and object digest.
+  `polynomial.nullstellensatz.infeasibility_certificate.verify` independently
+  reconstructs the frozen generators and replays sparse rational products in
+  a standard-library-only checker. The producer and checker share neither
+  Gröbner reduction nor certificate-generation code. Missing Singular removes
+  only the producer; missing checker authority leaves materialization usable
+  and makes verification return a non-conclusion.
+
+The degree-slice system and certificate bundle use producer-only schemas rather
+than a new global persistence enum. This gives typed artifact handoff and
+durable lineage now, while leaving the broader persistence-policy design in
+issue #386 unresolved. Consumers must pass the returned artifact URIs; inline
+summaries are not substitutes for the stored system or certificate.
 
 `geometry.projective_line_arrangement.flats.materialize` is a complete finite
 materializer rather than a theorem prover. It normalizes labelled rational

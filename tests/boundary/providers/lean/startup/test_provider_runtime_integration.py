@@ -79,14 +79,20 @@ def test_catalog_exposes_exact_runtime_identity_for_every_adapter(
         descriptors["universal_algebra.search.countermodel"].provider_runtime.provider
         == "jacobian.z3"
     )
+    built_in_bundles = build_builtin_domain_bundles()
     built_in_ids = {
-        operation.capability_id
-        for bundle in build_builtin_domain_bundles()
-        for operation in bundle.capabilities
+        capability_id
+        for bundle in built_in_bundles
+        if bundle.provider_runtime.availability
+        is CapabilityProviderAvailability.AVAILABLE
+        for capability_id in bundle.capability_ids
     }
     assert built_in_ids <= descriptors.keys()
     assert set(runtime.portfolio.domain_bundles) == {
-        bundle.domain_id for bundle in build_builtin_domain_bundles()
+        bundle.domain_id
+        for bundle in built_in_bundles
+        if bundle.provider_runtime.availability
+        is CapabilityProviderAvailability.AVAILABLE
     }
     assert {
         "matrix.integer.row_hermite_normal_form",

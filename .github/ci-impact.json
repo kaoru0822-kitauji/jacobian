@@ -397,6 +397,7 @@
         "tests/support/artifacts.py",
         "tests/support/capabilities.py",
         "tests/support/capability_installations.py",
+        "tests/support/nullstellensatz.py",
         "tests/support/polynomials.py",
         "tests/conftest.py"
       ],
