@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import json
-from pathlib import Path
-import pytest
-from benchmarks.validation.agent_workflow_v1 import support
 import runpy
 import sys
+from pathlib import Path
+
+import pytest
+from benchmarks.validation.agent_workflow_v1 import support
 
 TASK = "sharp-cauchy-inequality"
 

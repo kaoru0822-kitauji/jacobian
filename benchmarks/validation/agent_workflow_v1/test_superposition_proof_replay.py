@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import json
 from pathlib import Path
+
 from benchmarks.validation.agent_workflow_v1 import support
 
 TASK = "superposition-proof-replay"
