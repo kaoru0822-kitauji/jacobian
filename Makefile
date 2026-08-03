@@ -17,6 +17,11 @@ RUFF_PATHS := src tests benchmarks
 TOPOLOGY_RUNNER := $(UV_RUN) python tools/test_topology.py
 PUBLIC_COMMANDS := help setup check check-changed ci-plan test-plan test-changed test-unit test-component test-domain test-composition test-storage test-process test-mcp test-provider test-lean test-e2e docs-command-check docs-linkcheck harbor-plan harbor-check-task harbor-oracle-task npm-test test-all-ci check-static deploy-check
 
+ifneq ($(strip $(PATHS)),)
+PATHS_FILE := $(shell mktemp)
+$(file >$(PATHS_FILE),$(PATHS))
+endif
+
 # A timeout is a lane-level containment policy.  It intentionally does not live
 # in pyproject.toml: direct pytest invocations must not silently inherit a
 # signal-based deadline that cannot interrupt a native solver.  Process and
@@ -86,7 +91,8 @@ test-architecture: ## Enforce semantic test-layer and provider-import boundaries
 
 test-plan: ## Print local validation selected for BASE..HEAD or explicit PATHS.
 	@if [ -n "$(PATHS)" ]; then \
-		$(UV_RUN) python .github/scripts/plan-local-tests --paths $(PATHS); \
+		trap 'rm -f "$(PATHS_FILE)"' EXIT; \
+		$(UV_RUN) python .github/scripts/plan-local-tests --paths-file "$(PATHS_FILE)"; \
 	else \
 		test -n "$(BASE)" || { echo "BASE is required unless PATHS is set (for example: make test-plan BASE=origin/main)" >&2; exit 2; }; \
 		$(UV_RUN) python .github/scripts/plan-local-tests --base "$(BASE)"; \
@@ -95,11 +101,11 @@ test-plan: ## Print local validation selected for BASE..HEAD or explicit PATHS.
 ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 	@set -eu; \
 	tmp_dir=$$(mktemp -d); \
-	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	trap 'rm -rf "$$tmp_dir"; if [ -n "$(PATHS_FILE)" ]; then rm -f "$(PATHS_FILE)"; fi' EXIT; \
 	base_sha=$$(git rev-parse "$(or $(BASE),origin/main)"); \
 	head_sha=$$(git rev-parse HEAD); \
 	if [ -n "$(PATHS)" ]; then \
-		printf '%s\n' $(PATHS) | sort -u > "$$tmp_dir/changed-paths.txt"; \
+		$(UV_RUN) python .github/scripts/normalize-ci-paths --file "$(PATHS_FILE)" > "$$tmp_dir/changed-paths.txt"; \
 	else \
 		{ \
 			git diff --name-only "$(or $(BASE),origin/main)" HEAD; \
@@ -108,8 +114,12 @@ ci-plan: ## Print the hosted CI lane plan for BASE..HEAD and working changes.
 			git ls-files --others --exclude-standard; \
 		} | sort -u > "$$tmp_dir/changed-paths.txt"; \
 	fi; \
-	changed_paths=$$(tr '\n' ' ' < "$$tmp_dir/changed-paths.txt"); \
-	$(UV_RUN) python .github/scripts/classify-ci-paths -- $$changed_paths > "$$tmp_dir/plan.txt"; \
+	if [ -n "$(PATHS)" ]; then \
+		$(UV_RUN) python .github/scripts/classify-ci-paths --paths-file "$(PATHS_FILE)" > "$$tmp_dir/plan.txt"; \
+	else \
+		changed_paths=$$(tr '\n' ' ' < "$$tmp_dir/changed-paths.txt"); \
+		$(UV_RUN) python .github/scripts/classify-ci-paths -- $$changed_paths > "$$tmp_dir/plan.txt"; \
+	fi; \
 	$(UV_RUN) python .github/scripts/validate-ci-plan < "$$tmp_dir/plan.txt"; \
 	$(UV_RUN) python .github/scripts/emit-plan-receipt \
 		--kind product-ci --event pull_request \
@@ -232,7 +242,7 @@ check-static: lint-full typecheck test-architecture todo-check build ## Run CI-o
 harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	@set -eu; \
 	tmp_dir=$$(mktemp -d); \
-	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	trap 'rm -rf "$$tmp_dir"; if [ -n "$(PATHS_FILE)" ]; then rm -f "$(PATHS_FILE)"; fi' EXIT; \
 	base_sha=""; \
 	base_arg=""; \
 	if [ -n "$(BASE)" ]; then \
@@ -241,7 +251,7 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 	fi; \
 	head_sha=$$(git rev-parse HEAD); \
 	if [ -n "$(PATHS)" ]; then \
-		printf '%s\n' $(PATHS) | sort -u > "$$tmp_dir/changed-paths.txt"; \
+		$(UV_RUN) python .github/scripts/normalize-ci-paths --file "$(PATHS_FILE)" > "$$tmp_dir/changed-paths.txt"; \
 	else \
 		{ \
 			if [ -n "$(BASE)" ]; then git diff --name-only "$(BASE)" HEAD; fi; \
@@ -249,9 +259,14 @@ harbor-plan: ## Print the independent Harbor benchmark plan (BASE=... optional).
 			git ls-files --others --exclude-standard; \
 		} | sort -u > "$$tmp_dir/changed-paths.txt"; \
 	fi; \
-	changed_paths=$$(tr '\n' ' ' < "$$tmp_dir/changed-paths.txt"); \
-	$(HARBOR_PYTHON) .github/scripts/plan-benchmarks \
-		$$base_arg --head "$$head_sha" -- $$changed_paths > "$$tmp_dir/plan.txt"; \
+	if [ -n "$(PATHS)" ]; then \
+		$(HARBOR_PYTHON) .github/scripts/plan-benchmarks \
+			$$base_arg --head "$$head_sha" --paths-file "$(PATHS_FILE)" > "$$tmp_dir/plan.txt"; \
+	else \
+		changed_paths=$$(tr '\n' ' ' < "$$tmp_dir/changed-paths.txt"); \
+		$(HARBOR_PYTHON) .github/scripts/plan-benchmarks \
+			$$base_arg --head "$$head_sha" -- $$changed_paths > "$$tmp_dir/plan.txt"; \
+	fi; \
 	$(UV_RUN) python .github/scripts/validate-benchmark-plan < "$$tmp_dir/plan.txt"; \
 	$(UV_RUN) python .github/scripts/emit-plan-receipt \
 		--kind benchmark --event pull_request \

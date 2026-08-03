@@ -661,6 +661,7 @@ def main() -> int:
     parser.add_argument("--base")
     parser.add_argument("--head")
     parser.add_argument("--paths", nargs="+", action="append", dest="path_groups")
+    parser.add_argument("--paths-file", type=Path)
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
     paths = list(args.paths)
@@ -668,6 +669,11 @@ def main() -> int:
         paths = paths[1:]
     if args.path_groups:
         paths = [path for group in args.path_groups for path in group] + paths
+    elif args.paths_file is not None:
+        try:
+            paths = path_values(args.paths_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     elif not paths and "PATHS" in os.environ:
         try:
             paths = path_values(os.environ["PATHS"])

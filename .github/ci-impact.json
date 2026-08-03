@@ -301,6 +301,7 @@
         ".github/scripts/_ci_paths.py",
         ".github/scripts/classify-ci-paths",
         ".github/scripts/emit-plan-receipt",
+        ".github/scripts/normalize-ci-paths",
         ".github/scripts/plan-local-tests",
         ".github/scripts/validate-ci-plan"
       ],

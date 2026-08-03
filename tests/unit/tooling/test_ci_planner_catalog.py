@@ -4,6 +4,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 import sys
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -79,6 +80,28 @@ def test_paths_environment_supports_local_planning_without_a_git_base(
     assert "base: (explicit paths)" in output
     assert "make deploy-check" in output
     assert "make test-process" in output
+
+
+def test_planners_accept_a_file_backed_path_payload(tmp_path: Path) -> None:
+    paths_file = tmp_path / "paths.txt"
+    paths_file.write_text("tools/check_doc_commands.py\n", encoding="utf-8")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / ".github/scripts/classify-ci-paths"),
+            "--paths-file",
+            str(paths_file),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    plan = dict(line.split("=", 1) for line in completed.stdout.splitlines())
+    assert plan["run-docs"] == "true"
+    assert plan["run-component"] == "false"
 
 
 def test_benchmark_path_input_is_forwarded_without_running_git(

@@ -399,6 +399,7 @@ def main() -> None:
         help="Execute the exact selectors or fail-closed lane commands.",
     )
     parser.add_argument("--paths", nargs="+", action="append", dest="path_groups")
+    parser.add_argument("--paths-file", type=Path)
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
 
@@ -408,6 +409,11 @@ def main() -> None:
         paths = paths[1:]
     if args.path_groups:
         explicit_paths = [path for group in args.path_groups for path in group] + paths
+    elif args.paths_file is not None:
+        try:
+            explicit_paths = path_values(args.paths_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     elif paths:
         explicit_paths = paths
     elif "PATHS" in os.environ:
