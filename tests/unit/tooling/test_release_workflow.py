@@ -1,7 +1,10 @@
+import json
 from pathlib import Path
 from tomllib import loads
 
 ROOT = Path(__file__).resolve().parents[3]
+RELEASE_PLEASE_CONFIG = ROOT / "release-please-config.json"
+SERVER_METADATA = ROOT / "server.json"
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 
 
@@ -39,6 +42,24 @@ def test_mcp_publisher_is_verified_before_oidc_or_publication() -> None:
     publication = publisher.index("./mcp-publisher publish")
 
     assert source_check < checksum < extraction < oidc < publication
+
+
+def test_release_please_updates_all_mcp_server_versions() -> None:
+    configuration = json.loads(RELEASE_PLEASE_CONFIG.read_text(encoding="utf-8"))
+    extra_files = configuration["packages"]["."]["extra-files"]
+    server_updates = [
+        entry
+        for entry in extra_files
+        if isinstance(entry, dict) and entry["path"] == "server.json"
+    ]
+
+    assert {entry["jsonpath"] for entry in server_updates} == {
+        "$.version",
+        "$.packages[0].version",
+    }
+
+    metadata = json.loads(SERVER_METADATA.read_text(encoding="utf-8"))
+    assert metadata["version"] == metadata["packages"][0]["version"]
 
 
 def test_local_diagnostics_are_excluded_from_source_distributions() -> None:

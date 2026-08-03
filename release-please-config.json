@@ -6,7 +6,16 @@
       "package-name": "jacobian",
       "extra-files": [
         "npm/package.json",
-        "server.json"
+        {
+          "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.packages[0].version"
+        }
       ]
     }
   }
