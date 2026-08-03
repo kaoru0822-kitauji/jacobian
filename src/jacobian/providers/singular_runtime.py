@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -21,6 +22,9 @@ from jacobian.provider_runtime import (
 )
 
 SINGULAR_VERSION = "4.4.1p5"
+_VERSION_PATTERN = re.compile(
+    r"(?<![0-9A-Za-z])(?P<version>[0-9]+\.[0-9]+\.[0-9]+p[0-9]+(?:[-+][0-9A-Za-z.]+)?)(?![0-9A-Za-z])"
+)
 
 
 def singular_provider_runtime(
@@ -47,12 +51,14 @@ def singular_provider_runtime(
             stderr_limit=16_384,
         )
         version_text = (completed.stdout + completed.stderr).decode("utf-8")
+        version_match = _VERSION_PATTERN.search(version_text)
         if (
             completed.timed_out
             or completed.stdout_exceeded
             or completed.stderr_exceeded
             or completed.returncode != 0
-            or SINGULAR_VERSION not in version_text
+            or version_match is None
+            or version_match.group("version") != SINGULAR_VERSION
         ):
             raise ProviderRuntimeError("Singular version probe did not match the pin")
         digest = _sha256_file(resolved)

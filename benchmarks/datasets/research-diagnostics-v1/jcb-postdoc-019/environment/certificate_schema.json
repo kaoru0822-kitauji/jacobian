@@ -29,7 +29,12 @@
       "additionalProperties": false,
       "required": ["terms"],
       "properties": {
-        "terms": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/term"}}
+        "terms": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {"$ref": "#/$defs/term"},
+          "description": "Terms may be supplied in any order; the verifier canonicalizes them by exponent tuple before replay."
+        }
       }
     },
     "named_polynomial": {

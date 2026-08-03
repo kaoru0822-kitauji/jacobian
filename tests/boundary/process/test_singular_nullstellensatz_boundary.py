@@ -152,3 +152,41 @@ def test_missing_singular_only_marks_provider_unavailable() -> None:
 
     assert runtime.availability is CapabilityProviderAvailability.UNAVAILABLE
     assert "4.4.1p5" in (runtime.diagnostic or "")
+
+
+@pytest.mark.parametrize(
+    ("version_text", "available"),
+    (
+        ("Singular 4.4.1p5\n", True),
+        ("Singular 4.4.1p50\n", False),
+        ("Singular 4.4.1p5-custom\n", False),
+    ),
+)
+def test_singular_version_probe_matches_the_pinned_version_exactly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    version_text: str,
+    available: bool,
+) -> None:
+    executable = tmp_path / "Singular"
+    executable.write_bytes(b"test executable")
+    monkeypatch.setattr("jacobian.providers.singular_runtime.shutil.which", lambda _name: str(executable))
+    monkeypatch.setattr(
+        "jacobian.providers.singular_runtime.run_bounded_process",
+        lambda *_args, **_kwargs: BoundedProcessResult(
+            returncode=0,
+            stdout=version_text.encode(),
+            stderr=b"",
+            stdout_exceeded=False,
+            stderr_exceeded=False,
+            timed_out=False,
+        ),
+    )
+
+    runtime = singular_provider_runtime()
+
+    assert runtime.availability is (
+        CapabilityProviderAvailability.AVAILABLE
+        if available
+        else CapabilityProviderAvailability.UNAVAILABLE
+    )

@@ -10,7 +10,7 @@ algebraic-geometry / computational-commutative-algebra
 
 - case_version: research-diagnostics-v1
 - contamination_class: public-answer-visible-diagnostic
-- fixture_digest: sha256:99fdb8056b95863414f40c670e37e6a3cf5d487e8b8ff930837b9a22f5e88021
+- fixture_digest: sha256:51eda9c52f09969ca055153699d5aadb60a824aebc89ec1e2f7737243c0644bf
 - derivation: the exact degree disjunction is split into 12 Rabinowitsch charts, each certified by a bounded rational Nullstellensatz identity.
 
 ## Portfolio status
