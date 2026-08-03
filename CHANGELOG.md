@@ -1,5 +1,88 @@
 # Changelog
 
+## [0.8.0](https://github.com/morluto/jacobian/compare/jacobian-v0.7.0...jacobian-v0.8.0) (2026-08-03)
+
+
+### Features
+
+* **benchmarks:** add task-scoped Harbor gates ([a68b43e](https://github.com/morluto/jacobian/commit/a68b43e2aaf08252120ffe051ee41f3235bcdd09))
+* **storage:** remove retired workspace schema ([8f6dc25](https://github.com/morluto/jacobian/commit/8f6dc257a75085aa7e4295fc8bfb1adcd5fc846e))
+
+
+### Bug Fixes
+
+* address lifecycle, Lean, and Harbor review findings ([e254903](https://github.com/morluto/jacobian/commit/e254903000da70ae1125fcc4e422fb60e1cb0b15))
+* **benchmark:** accept positive denominator factors and bound evidence ([11c7ac0](https://github.com/morluto/jacobian/commit/11c7ac0c236093d83fbd1aa0ff48234ebad977c3))
+* **benchmark:** accept semantic frozen API scope wording ([981b4a4](https://github.com/morluto/jacobian/commit/981b4a47cf655f57a03e99eea9c9dc8f04af1d7f))
+* **benchmark:** align continuant schema and refresh verifier checksum ([ae58f2e](https://github.com/morluto/jacobian/commit/ae58f2e9783c0a5f3f868746c8e9fe51040531a0))
+* **benchmark:** allow independently checkable irreducibility certificates ([c550df1](https://github.com/morluto/jacobian/commit/c550df1014ed1fab89622bd92c53036ab59519d8))
+* **benchmark:** bind convergence scope to Lebesgue semantics ([84aab8a](https://github.com/morluto/jacobian/commit/84aab8a5b7f1213008a8014bc5ec7c005a9925bd))
+* **benchmark:** bind indexed evidence and bound duplicate inputs ([3c5ad74](https://github.com/morluto/jacobian/commit/3c5ad748a3a7a13387fa15484af2e52eb4b4b55a))
+* **benchmark:** bind infinite-spectrum evidence to all basis actions ([70fe213](https://github.com/morluto/jacobian/commit/70fe21336da5619cdb354fc89af9f40cbee99585))
+* **benchmark:** build research-status evidence semantics from prose only ([949bee5](https://github.com/morluto/jacobian/commit/949bee59c4ea65ab6e3aad57dacfef4d8a317e35))
+* **benchmark:** disclose result marker and catch nested JSON ([13c1201](https://github.com/morluto/jacobian/commit/13c12014a88a7af304f40664f81d84e3feb778b4))
+* **benchmark:** fail closed on malformed symmetric submissions ([cb637e2](https://github.com/morluto/jacobian/commit/cb637e23b59fb691a6712f463fa5d2491c93f4ec))
+* **benchmark:** gate research-status-evidence-audit base reward on evidence, scope, and assurance ([ed44019](https://github.com/morluto/jacobian/commit/ed440193c55d1d397598ac90cf393b11249805e4))
+* **benchmark:** harden convergence scope and parsing ([b5bf476](https://github.com/morluto/jacobian/commit/b5bf476a0d9253f2bcdeaada78c954c24e7570cd))
+* **benchmark:** harden projection scope and tail parsing ([008a356](https://github.com/morluto/jacobian/commit/008a3561dc5c2e79b3226106c7e91fb75d060d60))
+* **benchmark:** harden research-status-evidence-audit verifier ([b9937df](https://github.com/morluto/jacobian/commit/b9937df148c6cc5e99ea59f2919bbf5a892be2d6))
+* **benchmark:** make trigonometric derivation strategy agent-owned ([6c6b87c](https://github.com/morluto/jacobian/commit/6c6b87cdf1a638ee07c00dfd10fe664f92aa7a87))
+* **benchmark:** refresh research-status verifier checksum ([8127e61](https://github.com/morluto/jacobian/commit/8127e61249e54fd621199fda9a5ddb435590216c))
+* **benchmark:** regenerate Harbor verifier checksum and dataset manifest for research-status-evidence-audit ([71072a5](https://github.com/morluto/jacobian/commit/71072a502868b24e91c514f1580e4f0cee173fc4))
+* **benchmark:** reject boolean continuant proof lengths ([7a6e21b](https://github.com/morluto/jacobian/commit/7a6e21b5c416b8a0b06b10e04959d1359ec38696))
+* **benchmark:** reject negated symmetric scope claims ([dc06808](https://github.com/morluto/jacobian/commit/dc06808243f684e23a3638216b4f52d7047ed826))
+* **benchmarks:** align Harbor job schema and digest ([104d94b](https://github.com/morluto/jacobian/commit/104d94b08825c4c8d973efaa9df94fb99fcd8b63))
+* **benchmarks:** allow bounded agent networking without web search ([b7108ef](https://github.com/morluto/jacobian/commit/b7108efda5581ab9f9b2b7ddee5a20ee564ca459))
+* **benchmarks:** bind adapter evidence to checked results ([5afdb15](https://github.com/morluto/jacobian/commit/5afdb154ab2a2b720871251662a64da27a5a5992))
+* **benchmarks:** bind and bound research evidence ([79d0e95](https://github.com/morluto/jacobian/commit/79d0e9585ac5db0b7c5a69fcddf164ec018c382e))
+* **benchmarks:** bind snapshot provenance and retire stale research names ([e3ef4e9](https://github.com/morluto/jacobian/commit/e3ef4e9e265a57c0548a3106f407e2e35f5fea40))
+* **benchmarks:** complete research-status verifier review fixes ([035cb21](https://github.com/morluto/jacobian/commit/035cb218e917edd0c90530a459bc97094a577812))
+* **benchmarks:** fail closed on malformed assurance claims ([faeacb3](https://github.com/morluto/jacobian/commit/faeacb3fd3e9ac78b4eb7acf32935d5571bb45df))
+* **benchmarks:** fix import sorting in merged leaf tests and update complexity baseline ([b62d286](https://github.com/morluto/jacobian/commit/b62d2860554d370675f917dcc222ea168b1fea68))
+* **benchmarks:** fix import sorting in test_exact_farkas_ldl_slice leaf file ([13a1c38](https://github.com/morluto/jacobian/commit/13a1c38368531da2f4e1d2a7d8d8c0449b147a65))
+* **benchmarks:** harden convergence evidence claims ([b0c9c27](https://github.com/morluto/jacobian/commit/b0c9c27cdd081cb3c6985e159832304ecceaa5cd))
+* **benchmarks:** keep Jacobian observations offline ([45c4ff9](https://github.com/morluto/jacobian/commit/45c4ff9ccccb5090b97895d1b515a0ad09611d85))
+* **benchmarks:** match lowercased evidence term in inseparable-polynomial verifier ([9c0e83c](https://github.com/morluto/jacobian/commit/9c0e83c646bc82036a25697aed9fcb89bf962f16))
+* **benchmarks:** refresh Harbor adapter digest ([fe22e54](https://github.com/morluto/jacobian/commit/fe22e544522466d9ca0961a041990507c6203e32))
+* **benchmarks:** refresh stale symmetric divisibility verifier checksum ([84710ff](https://github.com/morluto/jacobian/commit/84710ff86913989016c4e2a5a4ff98ddef40983d))
+* **benchmarks:** require integral divisibility multipliers ([fca3890](https://github.com/morluto/jacobian/commit/fca3890e3c48dc272bf52f03f118fe7a0700a9df))
+* **benchmarks:** ruff format fixup ([5b9fec2](https://github.com/morluto/jacobian/commit/5b9fec2f2508f438282f928f67dc252b93d65d6a))
+* **benchmarks:** sync vendored verifier support to canonical source ([00044b2](https://github.com/morluto/jacobian/commit/00044b2ccc8cac5c697c1bc1340a2f275e3d8d21))
+* **benchmarks:** update Farkas verifier checksum after ruff format ([9151005](https://github.com/morluto/jacobian/commit/915100504ef1078c76600ffac97585a950e73242))
+* **benchmarks:** update gap count, fix lint, update complexity baseline ([fd0dd0e](https://github.com/morluto/jacobian/commit/fd0dd0e54c1c942552dea495ab196a7d6a9543cf))
+* **ci:** accept valid irreducibility strategy ([091631d](https://github.com/morluto/jacobian/commit/091631d5505890317182f852d3130b80355d756f))
+* **ci:** close planner review gaps ([ea187ab](https://github.com/morluto/jacobian/commit/ea187ab1fc626761ad8101f4320026e38fa3496f))
+* **ci:** keep timing artifact failures out of test gates ([5205fd9](https://github.com/morluto/jacobian/commit/5205fd9a37cb5da981bddd3dae7a0d67924882b5))
+* **ci:** pass PATHS through temporary files ([35dee17](https://github.com/morluto/jacobian/commit/35dee17ff84babade21002f7545571ef55149b5e))
+* **ci:** route test-changed through PATHS file ([c935497](https://github.com/morluto/jacobian/commit/c935497562ab19cd82af24139d91d89f637b74ef))
+* **ci:** sync symmetric verifier support ([ac4d66d](https://github.com/morluto/jacobian/commit/ac4d66d8772071fc8a2776ae3508e7aea1dd338a))
+* **ci:** sync vendored Harbor verifier support ([058ff8b](https://github.com/morluto/jacobian/commit/058ff8b9aaf78ced46ffb7d60221fa7f05816af6))
+* **ci:** sync vendored Harbor verifier support ([357b90c](https://github.com/morluto/jacobian/commit/357b90cd600010221e13bff7ec09b08ee8316b64))
+* fail-closed JSON type checks for indexed pairwise vacuity verifier ([29d96c4](https://github.com/morluto/jacobian/commit/29d96c49054e7ddf56d4de47b23e69d325511985))
+* **harbor:** make Codex evaluations proxy-aware ([f8bd184](https://github.com/morluto/jacobian/commit/f8bd1847ad9c28483f2a54eeffc7263bb52c6eaa))
+* **release:** sync MCP package metadata versions ([9b9d9d5](https://github.com/morluto/jacobian/commit/9b9d9d5e9f95e96e75545c38a4e94e8dd7de890f))
+* **security:** update cryptography lock entry ([e0b9b75](https://github.com/morluto/jacobian/commit/e0b9b7509bd601a783ca7dc1e4436018284abbce))
+* **storage:** handle foreign keys during workspace removal ([6d0cd7a](https://github.com/morluto/jacobian/commit/6d0cd7ad95a35de1ca1b80cdce3ae9cfe645ea5d))
+
+
+### Dependencies
+
+* **deps-dev:** bump ruff from 0.16.0 to 0.16.1 ([#379](https://github.com/morluto/jacobian/issues/379)) ([30e59f9](https://github.com/morluto/jacobian/commit/30e59f9e6262ea85ad7ad24180be9ab1ff1578a1))
+* **deps-dev:** bump types-networkx ([#381](https://github.com/morluto/jacobian/issues/381)) ([e5e31c5](https://github.com/morluto/jacobian/commit/e5e31c5189e0f7d306bba2e9fbe101e56f33a793))
+* **deps:** bump astral-sh/setup-uv from 8.3.2 to 9.0.0 ([#383](https://github.com/morluto/jacobian/issues/383)) ([c61c7f2](https://github.com/morluto/jacobian/commit/c61c7f23211985e6789b1f4588cc76f8c8def272))
+* **deps:** bump https://github.com/astral-sh/ruff-pre-commit ([#378](https://github.com/morluto/jacobian/issues/378)) ([213b00b](https://github.com/morluto/jacobian/commit/213b00b3c1bd463c156f44e03ea4673901c8edf0))
+
+
+### Documentation
+
+* add Simplified Chinese README ([#400](https://github.com/morluto/jacobian/issues/400)) ([94d02bc](https://github.com/morluto/jacobian/commit/94d02bc116f25e63ee5e2c5fbb56b9218fc44d13))
+* **benchmarks:** publish research-status scope ([203302e](https://github.com/morluto/jacobian/commit/203302ec6d1f59217d1acf32893ef6445e24199f))
+* simplify capability result guidance ([7b6e7cb](https://github.com/morluto/jacobian/commit/7b6e7cbdf50daddcb76dbbb9fb4d6c5d5b819dc7))
+* **skills:** add verifier evaluation guidance ([7508f5a](https://github.com/morluto/jacobian/commit/7508f5ae6be5657e9243eec1460f49b81e134a9a))
+* **skills:** clarify agent-facing eval contracts ([be9c9cc](https://github.com/morluto/jacobian/commit/be9c9cc50adb68b461ca305a762dcb344b9bb4ae))
+* streamline focused validation guidance ([afff87b](https://github.com/morluto/jacobian/commit/afff87b52b5bbd180a801ce6d3e99124021e19d5))
+* **workflow:** remove mandatory capability development path ([3aea2dc](https://github.com/morluto/jacobian/commit/3aea2dc8cbba5e940d8b78ba768077d8ff76b185))
+
 ## [0.7.0](https://github.com/morluto/jacobian/compare/jacobian-v0.6.0...jacobian-v0.7.0) (2026-08-01)
 
 

@@ -53,10 +53,7 @@ def test_release_please_updates_all_mcp_server_versions() -> None:
         if isinstance(entry, dict) and entry["path"] == "server.json"
     ]
 
-    assert {entry["jsonpath"] for entry in server_updates} == {
-        "$.version",
-        "$.packages[0].version",
-    }
+    assert {entry["jsonpath"] for entry in server_updates} == {"$..version"}
 
     metadata = json.loads(SERVER_METADATA.read_text(encoding="utf-8"))
     assert metadata["version"] == metadata["packages"][0]["version"]
