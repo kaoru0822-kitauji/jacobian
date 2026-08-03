@@ -16,6 +16,21 @@ RANK_PRIME = 1_000_003
 COEFFICIENT_LIMIT = 1_000_000_000
 
 
+def _load_frozen_input():
+    try:
+        workspace = WORKSPACE / "input.json"
+        frozen = TESTS / "input.json"
+        if workspace.is_symlink() or frozen.is_symlink():
+            return {}
+        frozen_bytes = frozen.read_bytes()
+        if workspace.read_bytes() != frozen_bytes:
+            return {}
+        value = json.loads(frozen_bytes)
+    except (OSError, ValueError, UnicodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def _integer(value):
     return type(value) is int
 
@@ -320,7 +335,7 @@ def main():
     submission = load_submission()
     data = submission if isinstance(submission, dict) else {}
     expected = json.loads((TESTS / "expected.json").read_text())
-    input_data = json.loads((WORKSPACE / "input.json").read_text())
+    input_data = _load_frozen_input()
     contract = bool(
         strict_submission_contract(
             submission,

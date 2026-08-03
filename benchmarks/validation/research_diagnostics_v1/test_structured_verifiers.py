@@ -81,43 +81,66 @@ def test_structured_verifiers_fail_closed_on_protocol_attacks(
     submission = json.loads(submission_path.read_text())
     evidence_path = app / "evidence" / support.TASK_EVIDENCE[task_name]
 
-    if attack == "malformed-output":
-        submission_path.write_text("{", encoding="utf-8")
-    elif attack == "missing-output":
-        submission_path.unlink()
-    elif attack == "unknown-field":
-        submission["unexpected"] = True
+    def rewrite_submission(update):
+        update(submission)
         support.write_json(submission_path, submission)
-    elif attack == "wrong-result":
-        submission["result"] = {}
-        support.write_json(submission_path, submission)
-    elif attack == "wrong-scope":
-        submission["scope"] = "incomplete"
-        support.write_json(submission_path, submission)
-    elif attack == "wrong-digest":
-        submission["evidence"][0]["sha256"] = "sha256:" + "0" * 64
-        support.write_json(submission_path, submission)
-    elif attack == "escaped-evidence":
-        submission["evidence"][0]["path"] = "../certificate.json"
-        support.write_json(submission_path, submission)
-    elif attack == "missing-evidence":
-        evidence_path.unlink()
-    elif attack == "malformed-evidence":
+
+    def malformed_evidence():
         evidence_path.write_text("{", encoding="utf-8")
         submission["evidence"][0]["sha256"] = support.digest(evidence_path)
         support.write_json(submission_path, submission)
-    elif attack == "symlink-evidence":
+
+    def symlink_evidence():
         target = evidence_path.with_name("target.json")
         evidence_path.rename(target)
         evidence_path.symlink_to(target.name)
-    else:
-        submission["claimed_assurance"] = "VERIFIED"
-        support.write_json(submission_path, submission)
+
+    attack_handlers = {
+        "malformed-output": lambda: submission_path.write_text("{", encoding="utf-8"),
+        "missing-output": submission_path.unlink,
+        "unknown-field": lambda: rewrite_submission(
+            lambda value: value.update(unexpected=True)
+        ),
+        "wrong-result": lambda: rewrite_submission(
+            lambda value: value.update(result={})
+        ),
+        "wrong-scope": lambda: rewrite_submission(
+            lambda value: value.update(scope="incomplete")
+        ),
+        "wrong-digest": lambda: rewrite_submission(
+            lambda value: value["evidence"][0].update(sha256="sha256:" + "0" * 64)
+        ),
+        "escaped-evidence": lambda: rewrite_submission(
+            lambda value: value["evidence"][0].update(path="../certificate.json")
+        ),
+        "missing-evidence": evidence_path.unlink,
+        "malformed-evidence": malformed_evidence,
+        "symlink-evidence": symlink_evidence,
+        "false-verified": lambda: rewrite_submission(
+            lambda value: value.update(claimed_assurance="VERIFIED")
+        ),
+    }
+    attack_handlers[attack]()
 
     rejected = support.run_verifier(task, app, logs)
     assert rejected["reward"] == 0.0
     if attack == "false-verified":
         assert rejected["false_certification"] is True
+
+
+def test_syzygy_verifier_rejects_mutated_workspace_input(tmp_path: Path) -> None:
+    task, app, logs = support.prepare_case(tmp_path, "jcb-postdoc-014")
+    input_path = app / "input.json"
+    input_data = json.loads(input_path.read_text())
+    input_data["instance"]["linear_factors"]["f"][0] = [
+        2 * coefficient
+        for coefficient in input_data["instance"]["linear_factors"]["f"][0]
+    ]
+    support.write_json(input_path, input_data)
+
+    result = support.run_verifier(task, app, logs)
+
+    assert result["reward"] == 0.0
 
 
 def test_graph_verifier_accepts_a_relabelled_counterexample(tmp_path: Path) -> None:
